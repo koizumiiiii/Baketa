@@ -2,96 +2,96 @@
 
 *最終更新: 2025年4月18日*
 
-このドキュメントでは、GTTプロジェクトの改善されたアーキテクチャに基づく名前空間構造および移行方針について詳述します。
+このドキュメントでは、Baketaプロジェクトの改善されたアーキテクチャに基づく名前空間構造および移行方針について詳述します。
 
-> **重要**: GTTプロジェクトはWindows専用アプリケーションとして開発を継続し、Linux/macOSへのクロスプラットフォーム対応は行いません。
+> **重要**: BaketaプロジェクトはWindows専用アプリケーションとして開発を継続し、Linux/macOSへのクロスプラットフォーム対応は行いません。
 
 ## 1. 改善されたアーキテクチャの概要
 
-GTTプロジェクトを以下の4つの主要レイヤーに分割します：
+Baketaプロジェクトを以下の4つの主要レイヤーに分割します：
 
 ```
-GTT/
-├── GTT.Core/               # プラットフォーム非依存のコア機能
-├── GTT.Infrastructure/     # インフラストラクチャ層
-├── GTT.Application/        # アプリケーションサービス
-└── GTT.UI/                 # UI層
+Baketa/
+├── Baketa.Core/               # プラットフォーム非依存のコア機能
+├── Baketa.Infrastructure/     # インフラストラクチャ層
+├── Baketa.Application/        # アプリケーションサービス
+└── Baketa.UI/                 # UI層
 ```
 
 ## 2. 詳細な名前空間構造
 
-### 2.1 GTT.Core (コア層)
+### 2.1 Baketa.Core (コア層)
 
 プラットフォーム非依存の基本機能と抽象化を提供します：
 
 ```
-GTT.Core/
-├── GTT.Core.Abstractions/  # 基本抽象化（旧Interfaces）
+Baketa.Core/
+├── Baketa.Core.Abstractions/  # 基本抽象化（旧Interfaces）
 │   ├── Imaging/            # 画像処理抽象化
 │   ├── Capture/            # キャプチャ抽象化
 │   ├── Translation/        # 翻訳抽象化
 │   └── Common/             # 共通抽象化
-├── GTT.Core.Models/        # データモデル
-├── GTT.Core.Services/      # コアサービス実装
+├── Baketa.Core.Models/        # データモデル
+├── Baketa.Core.Services/      # コアサービス実装
 │   ├── Imaging/            # 画像処理サービス
 │   ├── Capture/            # キャプチャサービス
 │   └── Translation/        # 翻訳サービス
-├── GTT.Core.Events/        # イベント定義と集約機構
-└── GTT.Core.Common/        # 共通ユーティリティ
+├── Baketa.Core.Events/        # イベント定義と集約機構
+└── Baketa.Core.Common/        # 共通ユーティリティ
 ```
 
-### 2.2 GTT.Infrastructure (インフラストラクチャ層)
+### 2.2 Baketa.Infrastructure (インフラストラクチャ層)
 
 Windows固有の実装と外部サービス連携を担当します：
 
 ```
-GTT.Infrastructure/
-├── GTT.Infrastructure.Abstractions/  # インフラ抽象化
-├── GTT.Infrastructure.Platform/      # プラットフォーム関連機能
+Baketa.Infrastructure/
+├── Baketa.Infrastructure.Abstractions/  # インフラ抽象化
+├── Baketa.Infrastructure.Platform/      # プラットフォーム関連機能
 │   └── Windows/                      # Windows固有実装
 │       ├── Imaging/                  # Windows画像処理
 │       ├── Capture/                  # Windowsキャプチャ
 │       └── Adapters/                 # Windows用アダプター
-├── GTT.Infrastructure.OCR/           # OCR機能
+├── Baketa.Infrastructure.OCR/           # OCR機能
 │   ├── PaddleOCR/                    # PaddleOCR実装
 │   ├── Services/                     # OCRサービス
 │   └── Optimization/                 # OpenCVベースのOCR最適化
-├── GTT.Infrastructure.Translation/   # 翻訳機能
+├── Baketa.Infrastructure.Translation/   # 翻訳機能
 │   ├── Engines/                      # 翻訳エンジン
 │   ├── ONNX/                         # ONNXモデル実装
 │   └── Cloud/                        # クラウドサービス連携
-└── GTT.Infrastructure.Persistence/   # 永続化機能
+└── Baketa.Infrastructure.Persistence/   # 永続化機能
 ```
 
-### 2.3 GTT.Application (アプリケーション層)
+### 2.3 Baketa.Application (アプリケーション層)
 
 ビジネスロジックと機能統合を担当します：
 
 ```
-GTT.Application/
-├── GTT.Application.Abstractions/     # アプリケーション抽象化
-├── GTT.Application.Services/         # アプリケーションサービス
+Baketa.Application/
+├── Baketa.Application.Abstractions/     # アプリケーション抽象化
+├── Baketa.Application.Services/         # アプリケーションサービス
 │   ├── OCR/                          # OCRアプリケーションサービス
 │   ├── Translation/                  # 翻訳アプリケーションサービス
 │   ├── Capture/                      # キャプチャアプリケーションサービス
 │   └── Integration/                  # 統合サービス
-├── GTT.Application.DI/               # 依存性注入設定
-├── GTT.Application.Handlers/         # イベントハンドラー
-└── GTT.Application.Configuration/    # アプリケーション設定
+├── Baketa.Application.DI/               # 依存性注入設定
+├── Baketa.Application.Handlers/         # イベントハンドラー
+└── Baketa.Application.Configuration/    # アプリケーション設定
 ```
 
-### 2.4 GTT.UI (UI層)
+### 2.4 Baketa.UI (UI層)
 
 ユーザーインターフェースとプレゼンテーションロジックを担当します：
 
 ```
-GTT.UI/
-├── GTT.UI.Abstractions/    # UI抽象化
-├── GTT.UI.Core/            # UI共通機能
+Baketa.UI/
+├── Baketa.UI.Abstractions/    # UI抽象化
+├── Baketa.UI.Core/            # UI共通機能
 │   ├── Services/           # UI共通サービス
 │   ├── Controls/           # 共通コントロール
 │   └── ViewModels/         # 共通ビューモデル
-└── GTT.UI.Avalonia/        # Avalonia UI実装
+└── Baketa.UI.Avalonia/        # Avalonia UI実装
     ├── Views/              # XAML Views
     ├── ViewModels/         # ViewModels
     ├── Controls/           # カスタムコントロール
@@ -122,11 +122,11 @@ GTT.UI/
 
 | レイヤー | 命名パターン | 例 |
 |---------|--------------|-----|
-| コア層 | `GTT.Core.[機能分野]` | `GTT.Core.Imaging`, `GTT.Core.Capture` |
-| インフラ層 | `GTT.Infrastructure.[機能/プラットフォーム]` | `GTT.Infrastructure.Platform.Windows` |
-| アプリケーション層 | `GTT.Application.[機能]` | `GTT.Application.Services.OCR` |
-| UI層 | `GTT.UI.[フレームワーク].[機能]` | `GTT.UI.Avalonia.ViewModels` |
-| 抽象化 | `[レイヤー].Abstractions.[機能]` | `GTT.Core.Abstractions.Imaging` |
+| コア層 | `Baketa.Core.[機能分野]` | `Baketa.Core.Imaging`, `Baketa.Core.Capture` |
+| インフラ層 | `Baketa.Infrastructure.[機能/プラットフォーム]` | `Baketa.Infrastructure.Platform.Windows` |
+| アプリケーション層 | `Baketa.Application.[機能]` | `Baketa.Application.Services.OCR` |
+| UI層 | `Baketa.UI.[フレームワーク].[機能]` | `Baketa.UI.Avalonia.ViewModels` |
+| 抽象化 | `[レイヤー].Abstractions.[機能]` | `Baketa.Core.Abstractions.Imaging` |
 
 ## 4. 名前空間移行指針
 

@@ -1,10 +1,10 @@
-# GTTプロジェクト 依存性注入ガイドライン
+# Baketaプロジェクト 依存性注入ガイドライン
 
 *最終更新: 2025年4月15日*
 
 ## 1. 概要
 
-このドキュメントでは、GTTプロジェクトにおける依存性注入（DI）の使用に関するガイドラインを提供します。統一された方法でサービスを登録し、疎結合で保守性の高いコードを実現するための指針となります。
+このドキュメントでは、Baketaプロジェクトにおける依存性注入（DI）の使用に関するガイドラインを提供します。統一された方法でサービスを登録し、疎結合で保守性の高いコードを実現するための指針となります。
 
 ## 2. 基本原則
 
@@ -115,7 +115,7 @@ public class TranslationService : ITranslationService
 // 推奨パターン
 public static class OcrServiceRegistration
 {
-    public static IServiceCollection AddGTTOcrServices(this IServiceCollection services)
+    public static IServiceCollection AddBaketaOcrServices(this IServiceCollection services)
     {
         // 関連するサービス登録
         return services;
@@ -171,7 +171,7 @@ public static IServiceCollection AddMockOcrServices(this IServiceCollection serv
 ```csharp
 // 部分的なサービス置き換え
 var services = new ServiceCollection();
-services.AddGTTCoreServices(); // 実サービス
+services.AddBaketaCoreServices(); // 実サービス
 services.AddMockOcrServices(); // モックサービス
 ```
 
@@ -189,7 +189,7 @@ public static IServiceCollection AddTranslationServices(this IServiceCollection 
 }
 
 // 使用側
-services.AddGTTCoreServices()
+services.AddBaketaCoreServices()
         .AddTranslationServices();
 ```
 
@@ -198,8 +198,8 @@ services.AddGTTCoreServices()
 ```csharp
 // 避けるべき書き方
 // 問題: 散在した登録、プロジェクト間の一貫性のない依存関係
-services.AddSingleton<GTT.Core.Services.SettingsService>();
-services.AddTransient<GTT.UI.Avalonia.Services.SettingsService>();
+services.AddSingleton<Baketa.Core.Services.SettingsService>();
+services.AddTransient<Baketa.UI.Avalonia.Services.SettingsService>();
 
 // 問題: インターフェースを使用していない
 services.AddSingleton(new LoggingService());
@@ -215,11 +215,11 @@ services.AddSingleton<TranslationService>(sp =>
 // 開発環境とプロダクション環境の区別
 if (isDevelopment)
 {
-    services.AddGTTCoreDevelopmentServices();
+    services.AddBaketaCoreDevelopmentServices();
 }
 else
 {
-    services.AddGTTCoreServices();
+    services.AddBaketaCoreServices();
 }
 ```
 
@@ -256,4 +256,4 @@ public class TranslationService
 }
 ```
 
-このガイドラインに従うことで、GTTプロジェクトの依存性管理が向上し、一貫性のあるアーキテクチャが実現できます。
+このガイドラインに従うことで、Baketaプロジェクトの依存性管理が向上し、一貫性のあるアーキテクチャが実現できます。
