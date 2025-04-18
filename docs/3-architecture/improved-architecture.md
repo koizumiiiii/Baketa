@@ -11,7 +11,7 @@
 現在のBaketaプロジェクトには以下の問題が存在します：
 
 1. **インターフェース定義の重複**：
-   - 同名のインターフェース（例：`IScreenCaptureService`、`IGTTImage`）が複数の名前空間に存在
+   - 同名のインターフェース（例：`IScreenCaptureService`、`IBaketaImage`）が複数の名前空間に存在
    - 不明確な責任分担によるコードの重複
 
 2. **アーキテクチャの課題**：
@@ -760,33 +760,9 @@ namespace Baketa.Application.DI
 }
 ```
 
-## 9. 移行戦略
+## 9. 名前空間の衝突が起きにくいようにする提案
 
-現行システムから新アーキテクチャへの移行は段階的に行います：
-
-1. **フェーズ1**: 新しいインターフェース定義の作成
-   - 新しい名前空間構造とインターフェース階層の作成
-   - 既存インターフェースを`[Obsolete]`に設定
-
-2. **フェーズ2**: アダプターの実装
-   - 新旧インターフェース間のブリッジとなるアダプターの実装
-   - 既存コードからのスムーズな移行を可能に
-
-3. **フェーズ3**: コアモジュールの移行
-   - 基本機能を新しいアーキテクチャに移行
-   - イベント集約機構の導入
-
-4. **フェーズ4**: Windows依存コードの整理
-   - Windows固有コードの整理と明確な分離
-   - Windows関連インターフェースの定義
-
-5. **フェーズ5**: アプリケーション層とUI層の構築
-   - 新しいアプリケーションサービスの構築
-   - UI層とのインテグレーション
-
-## 10. 名前空間の衝突が起きにくいようにする提案
-
-### 10.1 階層的な名前空間構造の徹底
+### 9.1 階層的な名前空間構造の徹底
 
 ```csharp
 Baketa.Core.Abstractions.Imaging
@@ -796,7 +772,7 @@ Baketa.Infrastructure.Platform.Windows
 
 のように、機能ごとに明確に区分けされた階層構造を作り、一貫性を保ちます。
 
-### 10.2 インターフェースと実装の命名規則の厳格化
+### 9.2 インターフェースと実装の命名規則の厳格化
 
 - インターフェース: `IImageProcessor`
 - 実装クラス: `WindowsImageProcessor`
@@ -804,7 +780,7 @@ Baketa.Infrastructure.Platform.Windows
 
 明確な接頭辞/接尾辞のパターンを使用することで、同名の衝突を防ぎます。
 
-### 10.3 モジュール単位のアセンブリ分割
+### 9.3 モジュール単位のアセンブリ分割
 
 各機能を独立したアセンブリ（DLL）に分割します：
 - `Baketa.Core.Abstractions.dll`
@@ -813,14 +789,14 @@ Baketa.Infrastructure.Platform.Windows
 
 これにより、参照関係が明確になり、循環参照も防止できます。
 
-### 10.4 アダプターレイヤーの集中管理
+### 9.4 アダプターレイヤーの集中管理
 
 異なる実装間の変換を行うアダプターは、専用の名前空間に集約します：
 ```csharp
 Baketa.Infrastructure.Adapters
 ```
 
-### 10.5 グローバル名前空間の明示的な使用
+### 9.5 グローバル名前空間の明示的な使用
 
 ```csharp
 using CoreImage = global::Baketa.Core.Abstractions.Imaging.IImage;
@@ -829,20 +805,11 @@ using WindowsImage = global::Baketa.Infrastructure.Platform.Windows.Imaging.IWin
 
 衝突が予想される型には、エイリアスを使用して明示的に区別します。
 
-### 10.6 非推奨インターフェースへの段階的移行
-
-既存の衝突するインターフェースには[Obsolete]属性を付け、新しいインターフェースへの移行パスを提供します：
-
-```csharp
-[Obsolete("代わりに IImage を使用してください。")]
-public interface IGTTImage { }
-```
-
-### 10.7 アセンブリ強い名前の使用
+### 9.6 アセンブリ強い名前の使用
 
 プロジェクトに強い名前（署名）を付けることで、アセンブリレベルでの衝突を防ぎます。
 
-### 10.8 依存性注入コンテナのモジュール分割
+### 9.7 依存性注入コンテナのモジュール分割
 
 ```csharp
 public static IServiceCollection AddBaketaCoreServices(this IServiceCollection services)
@@ -851,7 +818,7 @@ public static IServiceCollection AddBaketaInfrastructureServices(this IServiceCo
 
 サービス登録も機能ごとに分離することで、依存関係の管理が容易になります。
 
-### 10.9 バージョン管理の導入
+### 9.8 バージョン管理の導入
 
 ```csharp
 namespace Baketa.Core.Abstractions.V1.Imaging
@@ -860,7 +827,7 @@ namespace Baketa.Core.Abstractions.V2.Imaging
 
 主要なAPIの変更がある場合、バージョンを名前空間に含めることで旧バージョンとの互換性を保持できます。
 
-### 10.10 ドメイン駆動設計の境界コンテキスト導入
+### 9.9 ドメイン駆動設計の境界コンテキスト導入
 
 機能を論理的な「境界コンテキスト」で区切り、各コンテキスト内での命名は独立させます：
 
@@ -869,7 +836,7 @@ Baketa.OCR.Domain
 Baketa.Translation.Domain
 ```
 
-## 11. まとめ
+## 10. まとめ
 
 本ドキュメントで提案した改善されたアーキテクチャは、以下の利点をもたらします：
 

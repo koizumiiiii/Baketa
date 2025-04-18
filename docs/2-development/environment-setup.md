@@ -22,7 +22,7 @@
 
 ```powershell
 # リポジトリをクローン
-git clone https://github.com/yourusername/Baketa.git E:\dev\Baketa
+git clone https://github.com/koizumiiiii/Baketa.git E:\dev\Baketa
 cd E:\dev\Baketa
 
 # サブモジュールがある場合は初期化
@@ -114,12 +114,20 @@ Baketa/
 ├── Baketa.Core/               # コア機能と抽象化
 │   ├── Common/                # 共通ユーティリティ
 │   ├── Interfaces/            # インターフェース
+│   │   ├── Image/             # 画像抽象化インターフェース
+│   │   └── Platform/          # プラットフォーム抽象化インターフェース
 │   └── Models/                # モデルクラス
 │
 ├── Baketa.Infrastructure/     # インフラストラクチャ層
 │   ├── OCR/                   # OCR機能実装
 │   ├── Translation/           # 翻訳機能実装
-│   └── Platform/              # プラットフォーム依存機能
+│   └── Services/              # サービス実装
+│
+├── Baketa.Infrastructure.Platform/  # プラットフォーム依存機能
+│   ├── Abstractions/          # プラットフォーム抽象化インターフェース
+│   ├── Windows/               # Windows実装
+│   │   └── NativeMethods/     # P/Invoke定義
+│   └── Adapters/              # アダプターレイヤー
 │
 ├── Baketa.Application/        # アプリケーション層 
 │   ├── Services/              # アプリケーションサービス
