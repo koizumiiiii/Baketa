@@ -1,6 +1,6 @@
 # Baketaプロジェクト 依存性注入ガイドライン
 
-*最終更新: 2025年4月15日*
+*最終更新: 2025年4月20日*
 
 ## 1. 概要
 
@@ -253,6 +253,70 @@ public class TranslationService
     {
         return _engineFactory(type);
     }
+}
+```
+
+## 10. 新名前空間構造での依存性注入
+
+名前空間移行（Issue #1～#6）完了後の新しいインターフェース構造では、以下の点に注意して依存性注入を行います。
+
+### 10.1 新インターフェースの注入
+
+```csharp
+// 新しい名前空間でのサービス登録
+public static IServiceCollection AddImageServices(this IServiceCollection services)
+{
+    // 新しい名前空間を使用した登録
+    services.AddSingleton<Baketa.Core.Abstractions.Factories.IImageFactory, CoreImageFactory>();
+    services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, WindowsImageFactory>();
+    services.AddSingleton<Baketa.Core.Abstractions.Imaging.IImageProcessor, OpenCvImageProcessor>();
+    
+    return services;
+}
+```
+
+### 10.2 型エイリアスの活用
+
+同名のインターフェースが複数の名前空間に存在する可能性がある場合は、型エイリアスを使用して明確にします：
+
+```csharp
+// 型エイリアスを使用したサービス登録
+using IImageFactoryInterface = Baketa.Core.Abstractions.Factories.IImageFactory;
+using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
+
+public static IServiceCollection AddImageServices(this IServiceCollection services)
+{
+    services.AddSingleton<IImageFactoryInterface, CoreImageFactory>();
+    services.AddSingleton<IWindowsImageFactoryInterface, WindowsImageFactory>();
+    
+    return services;
+}
+```
+
+### 10.3 モジュール化された依存性注入
+
+新しいアーキテクチャでは、機能ごとにモジュール化された依存性注入を推奨します：
+
+```csharp
+// コア機能の依存性注入
+public static IServiceCollection AddBaketaCoreServices(this IServiceCollection services)
+{
+    // コアサービスの登録
+    return services;
+}
+
+// Windowsプラットフォームサービスの依存性注入
+public static IServiceCollection AddWindowsPlatformServices(this IServiceCollection services)
+{
+    // Windows固有サービスの登録
+    return services;
+}
+
+// OCRサービスの依存性注入
+public static IServiceCollection AddBaketaOcrServices(this IServiceCollection services)
+{
+    // OCRサービスの登録
+    return services;
 }
 ```
 

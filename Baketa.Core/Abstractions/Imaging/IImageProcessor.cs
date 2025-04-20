@@ -49,48 +49,31 @@ namespace Baketa.Core.Abstractions.Imaging
     /// <summary>
     /// テキスト領域を表す構造体
     /// </summary>
-    public readonly struct TextRegion
+    public readonly struct TextRegion(int x, int y, int width, int height, float confidence)
     {
         /// <summary>
         /// X座標
         /// </summary>
-        public int X { get; }
+        public int X { get; } = x;
         
         /// <summary>
         /// Y座標
         /// </summary>
-        public int Y { get; }
+        public int Y { get; } = y;
         
         /// <summary>
         /// 幅
         /// </summary>
-        public int Width { get; }
+        public int Width { get; } = width;
         
         /// <summary>
         /// 高さ
         /// </summary>
-        public int Height { get; }
+        public int Height { get; } = height;
         
         /// <summary>
         /// テキスト領域である確率（0.0〜1.0）
         /// </summary>
-        public float Confidence { get; }
-        
-        /// <summary>
-        /// テキスト領域を初期化します。
-        /// </summary>
-        /// <param name="x">X座標</param>
-        /// <param name="y">Y座標</param>
-        /// <param name="width">幅</param>
-        /// <param name="height">高さ</param>
-        /// <param name="confidence">確率（0.0〜1.0）</param>
-        public TextRegion(int x, int y, int width, int height, float confidence)
-        {
-            X = x;
-            Y = y;
-            Width = width;
-            Height = height;
-            Confidence = confidence;
-        }
+        public float Confidence { get; } = confidence;
     }
 }
