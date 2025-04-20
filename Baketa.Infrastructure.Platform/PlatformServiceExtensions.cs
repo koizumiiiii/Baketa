@@ -1,7 +1,6 @@
 using System.Runtime.Versioning;
-using Baketa.Core.Interfaces.Image;
-using Baketa.Core.Interfaces.Platform;
-using Baketa.Infrastructure.Platform.Abstractions;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Platform;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.Platform
