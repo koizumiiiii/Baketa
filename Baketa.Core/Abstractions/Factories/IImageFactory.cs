@@ -1,13 +1,12 @@
-using System;
 using System.IO;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Imaging
+namespace Baketa.Core.Abstractions.Factories
 {
     /// <summary>
     /// 画像オブジェクトの生成を担当するファクトリーインターフェース
     /// </summary>
-    [Obsolete("このインターフェースは非推奨です。代わりに Baketa.Core.Abstractions.Factories.IImageFactory を使用してください。")]
     public interface IImageFactory
     {
         /// <summary>
