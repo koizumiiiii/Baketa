@@ -113,7 +113,7 @@ Baketaプロジェクトは以下の構造になっています：
 Baketa/
 ├── Baketa.Core/               # コア機能と抽象化
 │   ├── Common/                # 共通ユーティリティ
-│   ├── Interfaces/            # インターフェース
+│   ├── Abstractions/          # インターフェース
 │   │   ├── Image/             # 画像抽象化インターフェース
 │   │   └── Platform/          # プラットフォーム抽象化インターフェース
 │   └── Models/                # モデルクラス
