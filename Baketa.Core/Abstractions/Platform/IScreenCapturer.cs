@@ -1,14 +1,13 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
-using Baketa.Core.Interfaces.Image;
+using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Interfaces.Platform
+namespace Baketa.Core.Abstractions.Platform
 {
     /// <summary>
     /// 画面キャプチャインターフェース
     /// </summary>
-    [Obsolete("このインターフェースは非推奨です。代わりに Baketa.Core.Abstractions.Platform.IScreenCapturer を使用してください。")]
     public interface IScreenCapturer
     {
         /// <summary>
@@ -37,5 +36,32 @@ namespace Baketa.Core.Interfaces.Platform
         /// <param name="windowHandle">ウィンドウハンドル</param>
         /// <returns>キャプチャした画像</returns>
         Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle);
+        
+        /// <summary>
+        /// キャプチャのオプションを設定
+        /// </summary>
+        /// <param name="options">キャプチャオプション</param>
+        void SetCaptureOptions(CaptureOptions options);
+    }
+    
+    /// <summary>
+    /// キャプチャオプション
+    /// </summary>
+    public class CaptureOptions
+    {
+        /// <summary>
+        /// キャプチャの品質（1-100）
+        /// </summary>
+        public int Quality { get; set; } = 100;
+        
+        /// <summary>
+        /// カーソルを含むかどうか
+        /// </summary>
+        public bool IncludeCursor { get; set; } = false;
+        
+        /// <summary>
+        /// キャプチャの間隔（ミリ秒）
+        /// </summary>
+        public int CaptureInterval { get; set; } = 100;
     }
 }
