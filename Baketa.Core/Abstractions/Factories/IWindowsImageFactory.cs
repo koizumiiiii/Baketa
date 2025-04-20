@@ -1,13 +1,13 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Core.Abstractions.Platform.Windows
+namespace Baketa.Core.Abstractions.Factories
 {
     /// <summary>
     /// Windows画像ファクトリインターフェース
     /// </summary>
-    [Obsolete("このインターフェースは非推奨です。代わりに Baketa.Core.Abstractions.Factories.IWindowsImageFactory を使用してください。")]
     public interface IWindowsImageFactory
     {
         /// <summary>
