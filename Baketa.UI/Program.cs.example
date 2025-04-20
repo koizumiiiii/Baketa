@@ -1,0 +1,130 @@
+using Baketa.Application.DI.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
+
+namespace Baketa.UI
+{
+    public static class Program
+    {
+        // アプリケーションのエントリーポイント
+        [STAThread]
+        public static void Main(string[] args)
+        {
+            var services = new ServiceCollection();
+            
+            // 環境に基づいて適切なサービスを登録
+            ConfigureServices(services, GetEnvironment(args));
+            
+            // サービスプロバイダーの構築
+            var serviceProvider = services.BuildServiceProvider();
+            
+            // アプリケーションの実行
+            using (var app = serviceProvider.GetRequiredService<App>())
+            {
+                app.Run();
+            }
+        }
+        
+        // 環境に基づいてサービスを設定
+        private static void ConfigureServices(IServiceCollection services, string environment)
+        {
+            // ロギングの設定
+            ConfigureLogging(services, environment);
+            
+            // アプリケーションのメインクラスを登録
+            services.AddSingleton<App>();
+            
+            // 環境に基づいてモジュールを登録
+            switch (environment.ToLower())
+            {
+                case "development":
+                    // 開発環境設定
+                    services.AddBaketaModules(scanForModules: true);
+                    services.AddDevelopmentServices();
+                    break;
+                    
+                case "test":
+                    // テスト環境設定
+                    services.AddBaketaApplicationModules();
+                    services.AddTestServices();
+                    break;
+                    
+                case "production":
+                default:
+                    // 本番環境設定
+                    services.AddBaketaModules(scanForModules: false);
+                    services.AddProductionServices();
+                    break;
+            }
+        }
+        
+        // ロギングの設定
+        private static void ConfigureLogging(IServiceCollection services, string environment)
+        {
+            services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                
+                if (environment.ToLower() == "development")
+                {
+                    builder.SetMinimumLevel(LogLevel.Debug);
+                }
+                else
+                {
+                    builder.SetMinimumLevel(LogLevel.Information);
+                }
+                
+                // ファイルロガーの追加（必要に応じて）
+                // builder.AddFile("logs/baketa-{Date}.log");
+            });
+        }
+        
+        // コマンドライン引数から環境を取得
+        private static string GetEnvironment(string[] args)
+        {
+            // コマンドライン引数から環境を検索
+            foreach (var arg in args)
+            {
+                if (arg.StartsWith("--environment=", StringComparison.OrdinalIgnoreCase))
+                {
+                    return arg.Substring("--environment=".Length);
+                }
+            }
+            
+            // 環境変数から環境を取得
+            var env = Environment.GetEnvironmentVariable("BAKETA_ENVIRONMENT");
+            if (!string.IsNullOrEmpty(env))
+            {
+                return env;
+            }
+            
+            // デフォルト環境
+            return "production";
+        }
+        
+        // 開発環境特有のサービスを追加
+        private static IServiceCollection AddDevelopmentServices(this IServiceCollection services)
+        {
+            // 開発環境特有のサービスを登録
+            // 例: services.AddSingleton<IDeveloperTools, DeveloperToolsImplementation>();
+            return services;
+        }
+        
+        // テスト環境特有のサービスを追加
+        private static IServiceCollection AddTestServices(this IServiceCollection services)
+        {
+            // テスト環境特有のサービスを登録
+            // 例: services.AddSingleton<ITestingHelper, TestingHelperImplementation>();
+            return services;
+        }
+        
+        // 本番環境特有のサービスを追加
+        private static IServiceCollection AddProductionServices(this IServiceCollection services)
+        {
+            // 本番環境特有のサービスを登録
+            // 例: services.AddSingleton<ITelemetry, TelemetryImplementation>();
+            return services;
+        }
+    }
+}
