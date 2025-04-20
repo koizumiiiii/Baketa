@@ -6,6 +6,8 @@ namespace Baketa.Core.Interfaces.Image
     /// <summary>
     /// 画像抽象化の基本インターフェース
     /// </summary>
+    // 注: 後の段階で非推奨化予定
+    // [Obsolete("このインターフェースは非推奨です。代わりに Baketa.Core.Abstractions.Imaging.IImage を使用してください。")]
     public interface IImage : IDisposable
     {
         /// <summary>
