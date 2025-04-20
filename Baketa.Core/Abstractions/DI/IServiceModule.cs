@@ -1,34 +1,27 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Baketa.Core.Abstractions.DI
 {
     /// <summary>
-    /// サービス登録モジュールインターフェース
+    /// サービス登録モジュールのインターフェース。
+    /// モジュール化された依存性注入パターンを実現するための基盤となります。
     /// </summary>
     public interface IServiceModule
     {
         /// <summary>
-        /// サービスの登録
+        /// このモジュールが提供するサービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        void RegisterServices(object services);
-        
+        void RegisterServices(IServiceCollection services);
+
         /// <summary>
-        /// モジュール名
+        /// このモジュールが依存する他のモジュールの型を取得します。
+        /// デフォルトでは依存モジュールはありません。
         /// </summary>
-        string Name { get; }
-        
-        /// <summary>
-        /// モジュールの説明
-        /// </summary>
-        string Description { get; }
-        
-        /// <summary>
-        /// モジュールの優先順位（低い値ほど先に登録される）
-        /// </summary>
-        int Priority { get; }
-        
-        /// <summary>
-        /// 依存するモジュール名の配列
-        /// </summary>
-        string[] Dependencies { get; }
+        /// <returns>依存モジュールの型のコレクション</returns>
+        IEnumerable<Type> GetDependentModules() => [];
     }
 }
