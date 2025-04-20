@@ -1,6 +1,8 @@
-using Baketa.Core.Interfaces.Image;
+using IImageFactoryInterface = Baketa.Core.Abstractions.Factories.IImageFactory;
+using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Adapters;
-using Baketa.Infrastructure.Platform.Abstractions;
 using Baketa.Infrastructure.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,8 +21,8 @@ namespace Baketa.Infrastructure.Platform.DependencyInjection
         public static IServiceCollection AddPlatformServices(this IServiceCollection services)
         {
             // Windows画像関連
-            services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
-            services.AddSingleton<IImageFactory, WindowsImageAdapterFactory>();
+            services.AddSingleton<IWindowsImageFactoryInterface, WindowsImageFactory>();
+            services.AddSingleton<IImageFactoryInterface, WindowsImageAdapterFactory>();
 
             // その他のプラットフォームサービスを登録
             // services.AddSingleton<IWindowManager, WindowsManager>();

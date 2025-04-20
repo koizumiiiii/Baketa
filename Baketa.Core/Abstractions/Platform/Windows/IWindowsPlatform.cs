@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Factories;
 
 namespace Baketa.Core.Abstractions.Platform.Windows
 {
@@ -11,7 +12,7 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// <summary>
         /// Windows画像ファクトリを取得
         /// </summary>
-        IWindowsImageFactory ImageFactory { get; }
+        Factories.IWindowsImageFactory ImageFactory { get; }
         
         /// <summary>
         /// Windowsキャプチャサービスを取得
