@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Threading.Tasks;
-using Baketa.Core.Interfaces.Image;
-using Baketa.Infrastructure.Platform.Abstractions;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
 
 namespace Baketa.Infrastructure.Platform.Adapters
