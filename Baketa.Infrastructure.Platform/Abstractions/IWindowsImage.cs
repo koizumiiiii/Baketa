@@ -6,6 +6,7 @@ namespace Baketa.Infrastructure.Platform.Abstractions
     /// <summary>
     /// Windows固有画像インターフェース
     /// </summary>
+    [Obsolete("このインターフェースは非推奨です。代わりに Baketa.Core.Abstractions.Platform.Windows.IWindowsImage を使用してください。")]
     public interface IWindowsImage : IDisposable
     {
         /// <summary>
