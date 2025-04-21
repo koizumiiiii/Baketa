@@ -1,8 +1,11 @@
 using Baketa.Application.DI.Modules;
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
+using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.Platform.DI.Modules;
-//using Baketa.UI.DI.Modules; // UIモジュールは現在実装中
+// UIモジュールは別アセンブリから参照するため直接参照しない
+// using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 
@@ -18,23 +21,26 @@ namespace Baketa.Application.DI.Extensions
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         /// <param name="scanForModules">オプショナルなモジュールを自動スキャンするかどうか</param>
+        /// <param name="environment">アプリケーション実行環境</param>
         /// <returns>サービスコレクション</returns>
         public static IServiceCollection AddBaketaModules(
             this IServiceCollection services,
-            bool scanForModules = false)
+            bool scanForModules = false,
+            BaketaEnvironment environment = BaketaEnvironment.Production)
         {
             // 標準モジュールのインスタンスを作成
             var standardModules = new IServiceModule[]
             {
                 new CoreModule(),              // コアレイヤー
-                // new InfrastructureModule(),    // インフラストラクチャレイヤー (現時点では実装済みのモジュールのみ含める)
+                new InfrastructureModule(),    // インフラストラクチャレイヤー
                 new PlatformModule(),          // プラットフォーム依存レイヤー
                 new ApplicationModule(),       // アプリケーションレイヤー
-                // new UIModule()                 // UIレイヤー (現時点では実装済みのモジュールのみ含める)
+                // UIModuleは別途登録する
+                // new UIModule()                 // UIレイヤー
             };
             
             // ServiceCollectionExtensions.AddBaketaServicesを使用して登録
-            return services.AddBaketaServices(scanForModules, standardModules);
+            return services.AddBaketaServices(scanForModules, environment, standardModules);
         }
         
         /// <summary>
@@ -42,23 +48,30 @@ namespace Baketa.Application.DI.Extensions
         /// テスト用やヘッドレス実行に便利です。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
         /// <returns>サービスコレクション</returns>
-        public static IServiceCollection AddBaketaCoreModules(this IServiceCollection services)
+        public static IServiceCollection AddBaketaCoreModules(
+            this IServiceCollection services,
+            BaketaEnvironment environment = BaketaEnvironment.Production)
         {
-            return services.AddBaketaServices(false, new CoreModule());
+            return services.AddBaketaServices(false, environment, new CoreModule());
         }
         
         /// <summary>
         /// Baketa.Infrastructureとそれまでのモジュールのみを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
         /// <returns>サービスコレクション</returns>
-        public static IServiceCollection AddBaketaInfrastructureModules(this IServiceCollection services)
+        public static IServiceCollection AddBaketaInfrastructureModules(
+            this IServiceCollection services,
+            BaketaEnvironment environment = BaketaEnvironment.Production)
         {
             return services.AddBaketaServices(
                 false, 
-                new CoreModule());
-                // Infrastructureモジュールは現在実装中
+                environment,
+                new CoreModule(),
+                new InfrastructureModule());
         }
         
         /// <summary>
@@ -66,15 +79,43 @@ namespace Baketa.Application.DI.Extensions
         /// UI要素を含まないバージョンに便利です。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
         /// <returns>サービスコレクション</returns>
-        public static IServiceCollection AddBaketaApplicationModules(this IServiceCollection services)
+        public static IServiceCollection AddBaketaApplicationModules(
+            this IServiceCollection services,
+            BaketaEnvironment environment = BaketaEnvironment.Production)
         {
             return services.AddBaketaServices(
                 false, 
+                environment,
                 new CoreModule(),
-                // new InfrastructureModule(), 現在実装中
+                new InfrastructureModule(),
                 new PlatformModule(),
                 new ApplicationModule());
+        }
+        
+        /// <summary>
+        /// 開発環境用の標準モジュールを登録します。
+        /// デバッグ機能や詳細なログ出力が有効になります。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="scanForModules">オプショナルなモジュールを自動スキャンするかどうか</param>
+        /// <returns>サービスコレクション</returns>
+        public static IServiceCollection AddBaketaDevelopmentModules(
+            this IServiceCollection services,
+            bool scanForModules = false)
+        {
+            return services.AddBaketaModules(scanForModules, BaketaEnvironment.Development);
+        }
+        
+        /// <summary>
+        /// テスト環境用の標準モジュールを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <returns>サービスコレクション</returns>
+        public static IServiceCollection AddBaketaTestModules(this IServiceCollection services)
+        {
+            return services.AddBaketaModules(false, BaketaEnvironment.Test);
         }
     }
 }

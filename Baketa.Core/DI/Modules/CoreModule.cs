@@ -27,42 +27,55 @@ namespace Baketa.Core.DI.Modules
             
             // その他のコアサービス
             RegisterCoreServices(services);
+            
+            // Note: 現時点ではAddLogging()拡張メソッドが存在しないか、
+            // Microsoft.Extensions.Loggingパッケージが必要なためコメントアウト
+            // services.AddLogging();
         }
 
         /// <summary>
         /// コアの抽象化（インターフェース）を登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterAbstractions(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterAbstractions(IServiceCollection _)
         {
             // ファクトリーやインターフェースの登録
+            // 実際の実装はプロジェクトの状況に応じて追加
             // 例: services.AddSingleton<IImageFactory, DefaultImageFactory>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // ヘルパーと共通実装
+            // 例: services.AddTransient<IJsonSerializer, SystemTextJsonSerializer>();
         }
         
         /// <summary>
         /// イベント集約システムを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterEventAggregator(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterEventAggregator(IServiceCollection _)
         {
             // イベント集約システムの登録
             // 例: services.AddSingleton<IEventAggregator, EventAggregator>();
+            // 例: services.AddSingleton<IEventDispatcher, EventDispatcher>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 基本的なイベント処理用サービス
+            // 例: services.AddTransient<IEventExceptionHandler, LoggingEventExceptionHandler>();
         }
         
         /// <summary>
         /// その他のコアサービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterCoreServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterCoreServices(IServiceCollection _)
         {
             // ロギングサービスやその他の基本サービス
-            // 例: services.AddSingleton<ISettingsManager, SettingsManager>();
+            // 例: services.AddSingleton<ISettingsManager, JsonSettingsManager>();
+            // 例: services.AddSingleton<IPathProvider, AppDataPathProvider>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 基本的なライフサイクル管理
+            // 例: services.AddSingleton<IApplicationLifecycle, ApplicationLifecycle>();
+            
+            // 各種プロファイル管理
+            // 例: services.AddSingleton<IProfileManager, ProfileManager>();
         }
     }
 }
