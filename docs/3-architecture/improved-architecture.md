@@ -575,7 +575,7 @@ namespace Baketa.Application.Services.Capture
 イベント集約機構により、モジュール間の疎結合なコミュニケーションを実現します：
 
 ```csharp
-namespace Baketa.Core.Abstractions.Events
+namespace Baketa.Core.Events
 {
     /// <summary>
     /// 基本イベントインターフェース
@@ -591,6 +591,16 @@ namespace Baketa.Core.Abstractions.Events
         /// イベント発生時刻
         /// </summary>
         DateTime Timestamp { get; }
+        
+        /// <summary>
+        /// イベント名
+        /// </summary>
+        string Name { get; }
+        
+        /// <summary>
+        /// イベントカテゴリ
+        /// </summary>
+        string Category { get; }
     }
 
     /// <summary>
@@ -603,6 +613,7 @@ namespace Baketa.Core.Abstractions.Events
         /// イベント処理
         /// </summary>
         /// <param name="event">イベント</param>
+        /// <returns>処理の完了を表すTask</returns>
         Task HandleAsync(TEvent @event);
     }
 
@@ -616,6 +627,7 @@ namespace Baketa.Core.Abstractions.Events
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
         /// <param name="event">イベント</param>
+        /// <returns>イベント発行の完了を表すTask</returns>
         Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent;
         
         /// <summary>
@@ -631,6 +643,33 @@ namespace Baketa.Core.Abstractions.Events
         /// <typeparam name="TEvent">イベント型</typeparam>
         /// <param name="handler">ハンドラ</param>
         void Unsubscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+    }
+    
+    /// <summary>
+    /// イベント基本実装
+    /// </summary>
+    public abstract class EventBase : IEvent
+    {
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        protected EventBase()
+        {
+            Id = Guid.NewGuid();
+            Timestamp = DateTime.UtcNow;
+        }
+        
+        /// <inheritdoc />
+        public Guid Id { get; }
+        
+        /// <inheritdoc />
+        public DateTime Timestamp { get; }
+        
+        /// <inheritdoc />
+        public abstract string Name { get; }
+        
+        /// <inheritdoc />
+        public abstract string Category { get; }
     }
 }
 ```
