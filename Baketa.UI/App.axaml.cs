@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events;
 using Baketa.Core.Events.EventTypes;
 // using Baketa.UI.Services; // 必要なサービスは後で追加
 using Baketa.UI.ViewModels;
