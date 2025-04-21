@@ -2,6 +2,7 @@ using Baketa.Application.DI.Modules;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
+using Baketa.UI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -21,6 +22,9 @@ namespace Baketa.UI.DI.Modules
         /// <param name="services">サービスコレクション</param>
         public override void RegisterServices(IServiceCollection services)
         {
+            // プロダクション環境をデフォルトとして使用
+            // 環境設定は必要に応じてサービスプロバイダーから取得
+            
             // ViewModelの登録
             RegisterViewModels(services);
             
@@ -35,39 +39,66 @@ namespace Baketa.UI.DI.Modules
         /// ViewModelを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        private void RegisterViewModels(IServiceCollection services)
+        private static void RegisterViewModels(IServiceCollection services)
         {
             // メインViewModelとオーバーレイViewModel
-            // 例: services.AddSingleton<MainViewModel>();
+            services.AddSingleton<MainViewModel>();
+            services.AddSingleton<MainWindowViewModel>(); // デザイナー用
             // 例: services.AddSingleton<OverlayViewModel>();
+            // 例: services.AddSingleton<SystemTrayViewModel>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 翻訳仕様を同期するサービス
+            // 例: services.AddSingleton<IViewModelSynchronizationService, ViewModelSynchronizationService>();
+            
+            // 状態管理
+            // 例: services.AddSingleton<IApplicationStateService, ApplicationStateService>();
+            
+            // メッセージバス
+            // 例: services.AddSingleton<IMessageBusService, MessageBusService>();
         }
         
         /// <summary>
         /// UI関連サービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterUIServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterUIServices(IServiceCollection _)
         {
             // ダイアログサービスやナビゲーションサービス
             // 例: services.AddSingleton<IDialogService, AvaloniaDialogService>();
             // 例: services.AddSingleton<INotificationService, AvaloniaNotificationService>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // ページ遷移とナビゲーション
+            // 例: services.AddSingleton<INavigationService, AvaloniaNavigationService>();
+            // 例: services.AddSingleton<IPageService, AvaloniaPageService>();
+            
+            // ウィンドウ管理
+            // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
+            
+            // UIヘルパー
+            // 例: services.AddSingleton<IClipboardService, AvaloniaClipboardService>();
         }
         
         /// <summary>
         /// 設定系UIを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterSettingsUI(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterSettingsUI(IServiceCollection _)
         {
             // 設定ViewModelと関連サービス
             // 例: services.AddTransient<SettingsViewModel>();
+            // 例: services.AddTransient<GeneralSettingsViewModel>();
+            // 例: services.AddTransient<OcrSettingsViewModel>();
+            // 例: services.AddTransient<TranslationSettingsViewModel>();
+            // 例: services.AddTransient<UISettingsViewModel>();
+            // 例: services.AddTransient<HotkeySettingsViewModel>();
             // 例: services.AddTransient<ProfileEditorViewModel>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 設定関連サービス
+            // 例: services.AddSingleton<ISettingsUIService, SettingsUIService>();
+            // 例: services.AddSingleton<IProfileEditorService, ProfileEditorService>();
+            
+            // リアルタイムプレビュー
+            // 例: services.AddSingleton<IPreviewService, PreviewService>();
         }
         
         /// <summary>

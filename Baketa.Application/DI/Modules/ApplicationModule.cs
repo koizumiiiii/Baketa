@@ -6,6 +6,7 @@ using Baketa.Infrastructure.Platform.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Baketa.Application.DI.Modules
 {
@@ -22,6 +23,12 @@ namespace Baketa.Application.DI.Modules
         /// <param name="services">サービスコレクション</param>
         public override void RegisterServices(IServiceCollection services)
         {
+            // 環境設定は、BuildServiceProviderが存在しないか必要なパッケージがないため
+            // コメントアウトし、デフォルト値を使用
+            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
+            //    ?? Core.DI.BaketaEnvironment.Production;
+            var environment = Core.DI.BaketaEnvironment.Production;
+            
             // OCRアプリケーションサービス
             RegisterOcrApplicationServices(services);
             
@@ -29,7 +36,7 @@ namespace Baketa.Application.DI.Modules
             RegisterTranslationApplicationServices(services);
             
             // その他のアプリケーションサービス
-            RegisterOtherApplicationServices(services);
+            RegisterOtherApplicationServices(services, environment);
             
             // イベントハンドラー
             RegisterEventHandlers(services);
@@ -38,49 +45,96 @@ namespace Baketa.Application.DI.Modules
         /// <summary>
         /// OCRアプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterOcrApplicationServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterOcrApplicationServices(IServiceCollection _)
         {
             // OCR関連のアプリケーションサービス
             // 例: services.AddSingleton<IOcrService, OcrService>();
+            // 例: services.AddSingleton<IOcrProfileService, OcrProfileService>();
+            // 例: services.AddSingleton<IOcrConfigurationService, OcrConfigurationService>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // OCR結果処理サービス
+            // 例: services.AddSingleton<IOcrResultProcessor, OcrResultProcessor>();
+            // 例: services.AddSingleton<IOcrTextFormatter, OcrTextFormatter>();
         }
         
         /// <summary>
         /// 翻訳アプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterTranslationApplicationServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterTranslationApplicationServices(IServiceCollection _)
         {
             // 翻訳関連のアプリケーションサービス
             // 例: services.AddSingleton<ITranslationService, TranslationService>();
+            // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
+            // 例: services.AddSingleton<ILanguageService, LanguageService>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 翻訳カスタマイズ
+            // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
+            // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
         }
         
         /// <summary>
         /// その他のアプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterOtherApplicationServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
+        private static void RegisterOtherApplicationServices(IServiceCollection _, Core.DI.BaketaEnvironment environment)
         {
             // キャプチャサービスなど他のアプリケーションサービス
             // 例: services.AddSingleton<ICaptureService, CaptureService>();
+            // 例: services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
+            // 例: services.AddSingleton<IWindowCaptureService, WindowCaptureService>();
             
-            // 現時点では実際の実装はプレースホルダー
+            // 統合サービス
+            // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
+            
+            // プロファイル管理
+            // 例: services.AddSingleton<IGameProfileService, GameProfileService>();
+            
+            // テキスト処理
+            // 例: services.AddSingleton<ITextAnalysisService, TextAnalysisService>();
+            
+            // デバッグサービス（開発環境のみ）
+            if (environment == Core.DI.BaketaEnvironment.Development)
+            {
+                // 例: services.AddSingleton<IDevelopmentService, DevelopmentService>();
+                // 例: services.AddSingleton<IDebugConsoleService, DebugConsoleService>();
+            }
         }
         
         /// <summary>
         /// イベントハンドラーを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private void RegisterEventHandlers(IServiceCollection services)
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterEventHandlers(IServiceCollection _)
         {
             // 各種イベントハンドラーの登録
-            // 例: services.AddSingleton<ICaptureCompletedEventHandler, CaptureCompletedEventHandler>();
+            // 例: services.AddSingleton<CaptureCompletedEventHandler>();
+            // 例: services.AddSingleton<IEventHandler<CaptureCompletedEvent>>(sp => 
+            //     sp.GetRequiredService<CaptureCompletedEventHandler>());
             
-            // 現時点では実際の実装はプレースホルダー
+            // 自動登録が必要な場合は必要に応じて実装
+            // RegisterEventHandlersAutomatically(services);
+        }
+        
+        /// <summary>
+        /// イベントハンドラーを反射を使用して自動的に登録します。
+        /// </summary>
+        /// <param name="_">サービスコレクション</param>
+        private static void RegisterEventHandlersAutomatically(IServiceCollection _)
+        {
+            // 現在は実装が必要なインターフェースが存在しないため、
+            // 必要に応じて実装を追加してください。
+            // 
+            // 例: アセンブリからイベントハンドラーを探して登録するコード
+            // var handlerTypes = typeof(ApplicationModule).Assembly
+            //     .GetTypes()
+            //     .Where(t => t.Namespace?.StartsWith("Baketa.Application.Handlers") == true
+            //             && !t.IsInterface
+            //             && !t.IsAbstract
+            //             && t.GetInterfaces().Any(i => i.IsGenericType 
+            //                 && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)));
         }
         
         /// <summary>
