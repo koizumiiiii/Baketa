@@ -11,22 +11,11 @@ namespace Baketa.Infrastructure.Platform.Adapters
     /// ICaptureAdapterインターフェースの基本スタブ実装
     /// 注：実際の機能実装は後の段階で行います
     /// </summary>
-    public class CaptureAdapterStub : ICaptureAdapter
+    public class CaptureAdapterStub(IWindowsImageAdapter imageAdapter, IWindowsCapturer windowsCapturer) : ICaptureAdapter
     {
-        private readonly IWindowsImageAdapter _imageAdapter;
-        private readonly IWindowsCapturer _windowsCapturer;
+        private readonly IWindowsImageAdapter _imageAdapter = imageAdapter ?? throw new ArgumentNullException(nameof(imageAdapter));
+        private readonly IWindowsCapturer _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
         private CaptureOptions _captureOptions = new();
-
-        /// <summary>
-        /// CaptureAdapterのコンストラクタ
-        /// </summary>
-        /// <param name="imageAdapter">画像アダプター</param>
-        /// <param name="windowsCapturer">Windows用キャプチャーサービス</param>
-        public CaptureAdapterStub(IWindowsImageAdapter imageAdapter, IWindowsCapturer windowsCapturer)
-        {
-            _imageAdapter = imageAdapter ?? throw new ArgumentNullException(nameof(imageAdapter));
-            _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
-        }
 
         /// <summary>
         /// Windows固有のキャプチャサービスを使用して画面全体をキャプチャし、プラットフォーム非依存のIImageを返します

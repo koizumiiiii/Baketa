@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
+using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 
 namespace Baketa.Infrastructure.Platform.Adapters
 {
@@ -12,8 +13,13 @@ namespace Baketa.Infrastructure.Platform.Adapters
     /// IWindowsImageAdapterインターフェースの基本スタブ実装
     /// 注：実際の機能実装は後の段階で行います
     /// </summary>
-    public class WindowsImageAdapterStub(IWindowsImageFactory? imageFactory = null) : IWindowsImageAdapter
-    {
+    public class WindowsImageAdapterStub(IWindowsImageFactoryInterface? imageFactory = null) : IWindowsImageAdapter
+    {        
+        // ファクトリーインスタンスを保存（将来の拡張用）
+#pragma warning disable CA1823 // 未使用のプライベートフィールドは使用予定があるため抑制
+        private readonly IWindowsImageFactoryInterface? _imageFactory = imageFactory;
+#pragma warning restore CA1823
+        
         /// <summary>
         /// Windowsネイティブイメージ(IWindowsImage)をコアイメージ(IAdvancedImage)に変換します
         /// </summary>
@@ -112,7 +118,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>変換後のAdvancedImage</returns>
         /// <exception cref="ArgumentNullException">imageDataがnullの場合</exception>
         /// <exception cref="ArgumentException">無効な画像データの場合</exception>
-        public async Task<IAdvancedImage> CreateAdvancedImageFromBytesAsync(byte[] imageData)
+        public Task<IAdvancedImage> CreateAdvancedImageFromBytesAsync(byte[] imageData)
         {
             ArgumentNullException.ThrowIfNull(imageData, nameof(imageData));
             
@@ -125,7 +131,8 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 var persistentBitmap = (Bitmap)bitmap.Clone();
                 var windowsImage = new Windows.WindowsImage(persistentBitmap);
                 
-                return ToAdvancedImage(windowsImage);
+                var result = ToAdvancedImage(windowsImage);
+                return Task.FromResult(result);
             }
             catch (ArgumentException ex)
             {
@@ -143,14 +150,14 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <exception cref="ArgumentException">無効な画像データの場合</exception>
         /// <exception cref="IOException">ファイル読み込み時にエラーが発生した場合</exception>
         public async Task<IAdvancedImage> CreateAdvancedImageFromFileAsync(string filePath)
-        {
+        {            
             ArgumentNullException.ThrowIfNull(filePath, nameof(filePath));
             
             if (!File.Exists(filePath))
             {
                 throw new FileNotFoundException("指定されたファイルが見つかりません", filePath);
             }
-            
+
             try
             {
                 // ファイルをバイト配列として読み込み

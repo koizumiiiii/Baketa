@@ -18,9 +18,10 @@ namespace Baketa.Infrastructure.Platform.DI
         {
             ArgumentNullException.ThrowIfNull(services, nameof(services));
             
-            // Windows画像ファクトリを登録
-            // 注: 実際の実装では、プロジェクトのサービス構成に合わせて適切なファクトリを登録
-            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowsImageFactory, Baketa.Infrastructure.Platform.Windows.WindowsImageFactory>();
+            // Windowsサービス実装の登録
+            services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, Baketa.Infrastructure.Platform.Windows.WindowsImageFactory>();
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowsCapturer, Baketa.Infrastructure.Platform.Windows.WindowsCapturerStub>();
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager, Baketa.Infrastructure.Platform.Windows.WindowsManagerStub>();
 
             // アダプターインターフェースとスタブ実装を登録
             services.AddSingleton<IWindowsImageAdapter, WindowsImageAdapterStub>();
