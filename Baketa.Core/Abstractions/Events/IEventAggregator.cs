@@ -12,50 +12,50 @@ namespace Baketa.Core.Abstractions.Events
         /// イベントの発行
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="event">イベント</param>
-        Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent;
+        /// <param name="eventData">イベントデータ</param>
+        Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録
+        /// イベントプロセッサの登録
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録解除
+        /// イベントプロセッサの登録解除
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Unsubscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
         
         /// <summary>
-        /// すべてのハンドラの登録解除
+        /// すべてのイベントプロセッサの登録解除
         /// </summary>
         void UnsubscribeAll();
         
         /// <summary>
-        /// 特定のイベント型に対するすべてのハンドラの登録解除
+        /// 特定のイベント型に対するすべてのイベントプロセッサの登録解除
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
         void UnsubscribeAllForEvent<TEvent>() where TEvent : IEvent;
         
         /// <summary>
-        /// オブジェクトに関連するすべてのハンドラの登録解除
+        /// オブジェクトに関連するすべてのイベントプロセッサの登録解除
         /// </summary>
         /// <param name="subscriber">購読者オブジェクト</param>
         void UnsubscribeAllForSubscriber(object subscriber);
         
         /// <summary>
-        /// イベントハンドラーの実行時に発生するエラーイベント
+        /// イベント処理の実行時に発生するエラーイベント
         /// </summary>
-        event EventHandler<EventHandlerErrorEventArgs> EventHandlerError;
+        event EventHandler<EventProcessorErrorEventArgs> EventProcessorError;
     }
     
     /// <summary>
-    /// イベントハンドラーエラーイベント引数
+    /// イベントプロセッサのエラーイベント引数
     /// </summary>
-    public class EventHandlerErrorEventArgs : EventArgs
+    public class EventProcessorErrorEventArgs : EventArgs
     {
         /// <summary>
         /// 発生した例外
@@ -65,24 +65,24 @@ namespace Baketa.Core.Abstractions.Events
         /// <summary>
         /// 処理しようとしていたイベント
         /// </summary>
-        public IEvent Event { get; }
+        public IEvent EventData { get; }
         
         /// <summary>
-        /// 例外を発生させたハンドラー
+        /// 例外を発生させたイベントプロセッサ
         /// </summary>
-        public object Handler { get; }
+        public object Processor { get; }
         
         /// <summary>
         /// コンストラクター
         /// </summary>
         /// <param name="exception">発生した例外</param>
-        /// <param name="event">処理しようとしていたイベント</param>
-        /// <param name="handler">例外を発生させたハンドラー</param>
-        public EventHandlerErrorEventArgs(Exception exception, IEvent @event, object handler)
+        /// <param name="eventData">処理しようとしていたイベント</param>
+        /// <param name="processor">例外を発生させたイベントプロセッサ</param>
+        public EventProcessorErrorEventArgs(Exception exception, IEvent eventData, object processor)
         {
             Exception = exception;
-            Event = @event;
-            Handler = handler;
+            EventData = eventData;
+            Processor = processor;
         }
     }
 }

@@ -30,6 +30,10 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [パフォーマンス最適化ガイドライン](2-development/coding-standards/performance.md)
 - [プラットフォーム間相互運用](2-development/coding-standards/platform-interop.md)
 
+#### 言語機能
+- [C# 12サポートガイド](2-development/language-features/csharp-12-support.md)
+- [C# 12実装ノート](2-development/language-features/csharp-12-implementation-notes.md)
+
 ### 3. アーキテクチャ
 
 #### プラットフォーム抽象化

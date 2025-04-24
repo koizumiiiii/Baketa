@@ -17,13 +17,15 @@ namespace Baketa.Application.DI.Modules
         /// インフラストラクチャサービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters",
+            Justification = "サンプルコードに静的リソースを使用")]
         public override void RegisterServices(IServiceCollection services)
         {
             // ここで実際のサービス登録を行います
             // 例：services.AddSingleton<ISettingsService, SettingsService>();
             
             // サンプル用なのでログメッセージのみ出力
-            Console.WriteLine($"{nameof(SampleInfrastructureModule)} のサービスを登録しました。");
+            Console.WriteLine(Resources.ModuleResources.SampleInfrastructureModuleRegistered);
         }
         
         /// <summary>

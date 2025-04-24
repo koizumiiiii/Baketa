@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <!-- C# 12を明示的に有効化 -->
+    <LangVersion>12.0</LangVersion>
+    
+    <!-- C# 12 Preview機能のサポート -->
+    <Features>InterceptorsPreview</Features>
+    
+    <!-- 警告を統一的に制御 -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    
+    <!-- コード分析ルールの有効化 -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisMode>All</AnalysisMode>
+  </PropertyGroup>
+  
+  <!-- Interceptors機能に必要な参照設定 -->
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
+  </ItemGroup>
+</Project>

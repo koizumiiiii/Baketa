@@ -2,6 +2,7 @@ using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
+using Baketa.Infrastructure.Platform.Resources;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -19,6 +20,8 @@ namespace Baketa.Infrastructure.Platform.DI.Modules
         /// プラットフォーム固有サービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters",
+            Justification = "プラットフォーム警告に静的リソースを使用")]
         public override void RegisterServices(IServiceCollection services)
         {
             // Windowsプラットフォーム固有の実装を登録
@@ -39,7 +42,7 @@ namespace Baketa.Infrastructure.Platform.DI.Modules
             else
             {
                 // 現在はWindows専用
-                Console.WriteLine("警告: Baketaは現在Windowsプラットフォームのみをサポートしています。");
+                Console.WriteLine(Resources.ModuleResources.PlatformWarning);
             }
         }
 

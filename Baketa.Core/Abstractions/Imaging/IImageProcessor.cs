@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 namespace Baketa.Core.Abstractions.Imaging
@@ -49,31 +50,91 @@ namespace Baketa.Core.Abstractions.Imaging
     /// <summary>
     /// テキスト領域を表す構造体
     /// </summary>
-    public readonly struct TextRegion(int x, int y, int width, int height, float confidence)
+    public readonly struct TextRegion : IEquatable<TextRegion>
     {
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <param name="width">幅</param>
+        /// <param name="height">高さ</param>
+        /// <param name="confidence">テキスト領域である確率</param>
+        public TextRegion(int x, int y, int width, int height, float confidence)
+        {
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+            Confidence = confidence;
+        }
+        
         /// <summary>
         /// X座標
         /// </summary>
-        public int X { get; } = x;
+        public int X { get; }
         
         /// <summary>
         /// Y座標
         /// </summary>
-        public int Y { get; } = y;
+        public int Y { get; }
         
         /// <summary>
         /// 幅
         /// </summary>
-        public int Width { get; } = width;
+        public int Width { get; }
         
         /// <summary>
         /// 高さ
         /// </summary>
-        public int Height { get; } = height;
+        public int Height { get; }
         
         /// <summary>
         /// テキスト領域である確率（0.0〜1.0）
         /// </summary>
-        public float Confidence { get; } = confidence;
+        public float Confidence { get; }
+        
+        /// <summary>
+        /// 指定されたTextRegionインスタンスと現在のインスタンスが等しいかどうかを判定します
+        /// </summary>
+        /// <param name="other">比較対象のTextRegion</param>
+        /// <returns>等しい場合はtrue</returns>
+        public bool Equals(TextRegion other)
+        {
+            return X == other.X && 
+                   Y == other.Y && 
+                   Width == other.Width && 
+                   Height == other.Height &&
+                   Confidence == other.Confidence;
+        }
+        
+        /// <summary>
+        /// オブジェクトが現在のインスタンスと等しいかどうかを判定します
+        /// </summary>
+        /// <param name="obj">比較対象のオブジェクト</param>
+        /// <returns>等しい場合はtrue</returns>
+        public override bool Equals(object? obj)
+        {
+            return obj is TextRegion other && Equals(other);
+        }
+        
+        /// <summary>
+        /// ハッシュコードを取得します
+        /// </summary>
+        /// <returns>ハッシュコード</returns>
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(X, Y, Width, Height, Confidence);
+        }
+        
+        /// <summary>
+        /// 等価性比較演算子
+        /// </summary>
+        public static bool operator ==(TextRegion left, TextRegion right) => left.Equals(right);
+        
+        /// <summary>
+        /// 非等価性比較演算子
+        /// </summary>
+        public static bool operator !=(TextRegion left, TextRegion right) => !left.Equals(right);
     }
 }

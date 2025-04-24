@@ -194,66 +194,211 @@ tests/
 ```csharp
 namespace Baketa.Core.Abstractions.Imaging
 {
+    // IImageBase、IImage、IAdvancedImageの定義は省略...
+
     /// <summary>
-    /// 基本的な画像プロパティを提供する基底インターフェース
+    /// 色チャンネルを表す列挙型
     /// </summary>
-    public interface IImageBase : IDisposable
+    public enum ColorChannel
     {
         /// <summary>
-        /// 画像の幅（ピクセル単位）
+        /// 赤チャンネル
         /// </summary>
-        int Width { get; }
-
-        /// <summary>
-        /// 画像の高さ（ピクセル単位）
-        /// </summary>
-        int Height { get; }
+        Red,
         
         /// <summary>
-        /// 画像をバイト配列に変換します。
+        /// 緑チャンネル
         /// </summary>
-        /// <returns>画像データを表すバイト配列</returns>
-        Task<byte[]> ToByteArrayAsync();
+        Green,
+        
+        /// <summary>
+        /// 青チャンネル
+        /// </summary>
+        Blue,
+        
+        /// <summary>
+        /// アルファチャンネル（透明度）
+        /// </summary>
+        Alpha,
+        
+        /// <summary>
+        /// 輝度（明るさ）
+        /// </summary>
+        Luminance
     }
 
     /// <summary>
-    /// 標準的な画像操作機能を提供するインターフェース
+    /// 画像フィルターを表すインターフェース
     /// </summary>
-    public interface IImage : IImageBase
+    public interface IImageFilter
     {
         /// <summary>
-        /// 画像のクローンを作成します。
+        /// フィルター名
         /// </summary>
-        /// <returns>元の画像と同じ内容を持つ新しい画像インスタンス</returns>
-        IImage Clone();
+        string Name { get; }
         
         /// <summary>
-        /// 画像のサイズを変更します。
+        /// フィルターの説明
         /// </summary>
-        /// <param name="width">新しい幅</param>
-        /// <param name="height">新しい高さ</param>
-        /// <returns>リサイズされた新しい画像インスタンス</returns>
-        Task<IImage> ResizeAsync(int width, int height);
+        string Description { get; }
+        
+        /// <summary>
+        /// フィルターパラメータ
+        /// </summary>
+        IReadOnlyDictionary<string, object> Parameters { get; }
+        
+        /// <summary>
+        /// フィルターを画像データに適用します
+        /// </summary>
+        /// <param name="sourceData">元の画像データ</param>
+        /// <param name="width">画像の幅</param>
+        /// <param name="height">画像の高さ</param>
+        /// <param name="stride">ストライド（行ごとのバイト数）</param>
+        /// <returns>フィルター適用後の画像データ</returns>
+        byte[] Apply(byte[] sourceData, int width, int height, int stride);
     }
-
+    
     /// <summary>
     /// 高度な画像処理機能を提供するインターフェース
     /// </summary>
     public interface IAdvancedImage : IImage
     {
         /// <summary>
-        /// 画像にフィルターを適用します。
+        /// 指定座標のピクセル値を取得します
         /// </summary>
-        /// <param name="filter">適用するフィルター</param>
-        /// <returns>フィルターが適用された新しい画像インスタンス</returns>
-        Task<IImage> ApplyFilterAsync(IImageFilter filter);
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <returns>ピクセル値</returns>
+        Color GetPixel(int x, int y);
         
         /// <summary>
-        /// 2つの画像の類似度を計算します。
+        /// 指定座標にピクセル値を設定します
+        /// </summary>
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <param name="color">設定する色</param>
+        void SetPixel(int x, int y, Color color);
+        
+        /// <summary>
+        /// 画像にフィルターを適用します
+        /// </summary>
+        /// <param name="filter">適用するフィルター</param>
+        /// <returns>フィルター適用後の新しい画像</returns>
+        Task<IAdvancedImage> ApplyFilterAsync(IImageFilter filter);
+        
+        /// <summary>
+        /// 複数のフィルターを順番に適用します
+        /// </summary>
+        /// <param name="filters">適用するフィルターのコレクション</param>
+        /// <returns>フィルター適用後の新しい画像</returns>
+        Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters);
+        
+        /// <summary>
+        /// 画像のヒストグラムを生成します
+        /// </summary>
+        /// <param name="channel">対象チャンネル</param>
+        /// <returns>ヒストグラムデータ</returns>
+        Task<int[]> ComputeHistogramAsync(ColorChannel channel = ColorChannel.Luminance);
+        
+        /// <summary>
+        /// 画像をグレースケールに変換します
+        /// </summary>
+        /// <returns>グレースケール変換された新しい画像</returns>
+        Task<IAdvancedImage> ToGrayscaleAsync();
+        
+        /// <summary>
+        /// 画像を二値化します
+        /// </summary>
+        /// <param name="threshold">閾値（0～255）</param>
+        /// <returns>二値化された新しい画像</returns>
+        Task<IAdvancedImage> ToBinaryAsync(byte threshold);
+        
+        /// <summary>
+        /// 画像の特定領域を抽出します
+        /// </summary>
+        /// <param name="rectangle">抽出する領域</param>
+        /// <returns>抽出された新しい画像</returns>
+        Task<IAdvancedImage> ExtractRegionAsync(Rectangle rectangle);
+        
+        /// <summary>
+        /// OCR前処理の最適化を行います
+        /// </summary>
+        /// <returns>OCR向けに最適化された新しい画像</returns>
+        Task<IAdvancedImage> OptimizeForOcrAsync();
+        
+        /// <summary>
+        /// OCR前処理の最適化を指定されたオプションで行います
+        /// </summary>
+        /// <param name="options">最適化オプション</param>
+        /// <returns>OCR向けに最適化された新しい画像</returns>
+        Task<IAdvancedImage> OptimizeForOcrAsync(OcrImageOptions options);
+        
+        /// <summary>
+        /// 2つの画像の類似度を計算します
         /// </summary>
         /// <param name="other">比較対象の画像</param>
         /// <returns>0.0〜1.0の類似度（1.0が完全一致）</returns>
         Task<float> CalculateSimilarityAsync(IImage other);
+        
+        /// <summary>
+        /// 画像の特定領域におけるテキスト存在可能性を評価します
+        /// </summary>
+        /// <param name="rectangle">評価する領域</param>
+        /// <returns>テキスト存在可能性（0.0〜1.0）</returns>
+        Task<float> EvaluateTextProbabilityAsync(Rectangle rectangle);
+        
+        /// <summary>
+        /// 画像の回転を行います
+        /// </summary>
+        /// <param name="degrees">回転角度（度数法）</param>
+        /// <returns>回転された新しい画像</returns>
+        Task<IAdvancedImage> RotateAsync(float degrees);
+    }
+
+    /// <summary>
+    /// OCR画像最適化オプション
+    /// </summary>
+    public class OcrImageOptions
+    {
+        /// <summary>
+        /// 二値化閾値 (0〜255、0で無効)
+        /// </summary>
+        public int BinarizationThreshold { get; set; } = 0;
+        
+        /// <summary>
+        /// 適応的二値化を使用するかどうか
+        /// </summary>
+        public bool UseAdaptiveThreshold { get; set; } = true;
+        
+        /// <summary>
+        /// 適応的二値化のブロックサイズ
+        /// </summary>
+        public int AdaptiveBlockSize { get; set; } = 11;
+        
+        /// <summary>
+        /// ノイズ除去レベル (0.0〜1.0)
+        /// </summary>
+        public float NoiseReduction { get; set; } = 0.3f;
+        
+        /// <summary>
+        /// コントラスト強調 (0.0〜2.0、1.0で変更なし)
+        /// </summary>
+        public float ContrastEnhancement { get; set; } = 1.2f;
+        
+        /// <summary>
+        /// シャープネス強調 (0.0〜1.0)
+        /// </summary>
+        public float SharpnessEnhancement { get; set; } = 0.3f;
+        
+        /// <summary>
+        /// 境界を膨張させる画素数
+        /// </summary>
+        public int DilationPixels { get; set; } = 0;
+        
+        /// <summary>
+        /// テキスト方向の検出と修正
+        /// </summary>
+        public bool DetectAndCorrectOrientation { get; set; } = false;
     }
 }
 ```
@@ -604,10 +749,10 @@ namespace Baketa.Core.Events
     }
 
     /// <summary>
-    /// イベントハンドラインターフェース
+    /// イベント処理インターフェース
     /// </summary>
     /// <typeparam name="TEvent">イベント型</typeparam>
-    public interface IEventHandler<in TEvent> where TEvent : IEvent
+    public interface IEventProcessor<in TEvent> where TEvent : IEvent
     {
         /// <summary>
         /// イベント処理
@@ -631,18 +776,18 @@ namespace Baketa.Core.Events
         Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録
+        /// イベントプロセッサの登録
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録解除
+        /// イベントプロセッサの登録解除
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Unsubscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
     
     /// <summary>

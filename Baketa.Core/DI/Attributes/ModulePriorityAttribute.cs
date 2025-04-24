@@ -7,7 +7,7 @@ namespace Baketa.Core.DI.Attributes
     /// 優先順位が高いモジュールが先に登録されます。
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-    public class ModulePriorityAttribute(ModulePriority priority) : Attribute
+    public sealed class ModulePriorityAttribute(ModulePriority priority) : Attribute
     {
         /// <summary>
         /// モジュールの優先順位
@@ -20,6 +20,11 @@ namespace Baketa.Core.DI.Attributes
     /// </summary>
     public enum ModulePriority
     {
+        /// <summary>
+        /// 優先度が設定されていない場合
+        /// </summary>
+        None = 0,
+        
         /// <summary>
         /// システムコアコンポーネント（最優先）
         /// </summary>
