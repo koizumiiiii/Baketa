@@ -576,3 +576,8 @@ private double CalculateColorDifference(Vec3b color1, Vec3b color2)
    - Windows APIとの連携強化
 
 このOpenCVベースのアプローチにより、Baketaプロジェクトの OCR機能は大幅に強化され、ユーザーはより高精度で効率的な翻訳体験を得ることができます。
+
+## 11. 関連ドキュメント
+
+- [OCR前処理システム設計ドキュメント](./preprocessing/index.md)
+- [OCR実装ガイド](./ocr-implementation.md)

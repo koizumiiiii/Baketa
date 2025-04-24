@@ -51,6 +51,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [OCRアプローチ](3-architecture/ocr-system/ocr-opencv-approach.md)
 - [OCR設定UI設計](3-architecture/ocr-system/ocr-settings-ui.md)
 - [OCR実装ガイド](3-architecture/ocr-system/ocr-implementation.md)
+- [OCR前処理システム](3-architecture/ocr-system/preprocessing/index.md)
 
 ## ライセンス
 
