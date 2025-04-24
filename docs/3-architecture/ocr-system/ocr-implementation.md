@@ -687,3 +687,8 @@ namespace Baketa.Application.DI.Modules
 - [PaddleOCRSharp NuGet](https://www.nuget.org/packages/PaddleOCRSharp/)
 - [OpenCV Documentation](https://docs.opencv.org/)
 - [OCR精度向上テクニック集](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality)
+
+## 9. 関連ドキュメント
+
+- [OCR前処理システム設計ドキュメント](./preprocessing/index.md)
+- [OCR OpenCV最適化アプローチ](./ocr-opencv-approach.md)
