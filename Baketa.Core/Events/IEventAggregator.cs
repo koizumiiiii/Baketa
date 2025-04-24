@@ -11,22 +11,22 @@ namespace Baketa.Core.Events
         /// イベントの発行
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="event">イベント</param>
+        /// <param name="eventData">イベント</param>
         /// <returns>イベント発行の完了を表すTask</returns>
-        Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent;
+        Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録
+        /// イベントプロセッサの登録
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
         
         /// <summary>
-        /// イベントハンドラの登録解除
+        /// イベントプロセッサの登録解除
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
-        void Unsubscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+        /// <param name="processor">イベントプロセッサ</param>
+        void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
 }

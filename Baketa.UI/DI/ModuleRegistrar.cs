@@ -8,7 +8,7 @@ namespace Baketa.UI.DI
     /// <summary>
     /// UIモジュール登録クラス
     /// </summary>
-    public static class ModuleRegistrar
+    internal static class ModuleRegistrar
     {
         /// <summary>
         /// UIモジュールを登録します

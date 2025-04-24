@@ -7,10 +7,15 @@ namespace Baketa.UI.ViewModels
     /// <summary>
     /// メインビューモデル
     /// </summary>
-    public class MainViewModel : ViewModelBase
+    internal class MainViewModel : ViewModelBase
     {
         private readonly ILogger<MainViewModel> _logger;
         private readonly IEventAggregator _eventAggregator;
+        
+        // LoggerMessageデリゲートの定義
+        private static readonly Action<ILogger, Exception?> _logInitialized =
+            LoggerMessage.Define(LogLevel.Information, new EventId(1, nameof(MainViewModel)),
+                "MainViewModelが初期化されました");
 
         /// <summary>
         /// 表示用のグリーティングメッセージ
@@ -29,7 +34,7 @@ namespace Baketa.UI.ViewModels
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
             
-            _logger.LogInformation("MainViewModelが初期化されました");
+            _logInitialized(_logger, null);
         }
     }
 }

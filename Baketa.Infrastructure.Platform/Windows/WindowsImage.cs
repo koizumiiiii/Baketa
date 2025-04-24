@@ -10,10 +10,19 @@ namespace Baketa.Infrastructure.Platform.Windows
     /// <summary>
     /// Windows画像の実装
     /// </summary>
-    public class WindowsImage(Bitmap bitmap) : IWindowsImage
+    public sealed class WindowsImage : IWindowsImage
     {
-        private readonly Bitmap _bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
+        private readonly Bitmap _bitmap;
         private bool _disposed;
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="bitmap">Bitmapインスタンス</param>
+        public WindowsImage(Bitmap bitmap)
+        {
+            _bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
+        }
 
         /// <summary>
         /// 画像の幅を取得
@@ -50,12 +59,28 @@ namespace Baketa.Infrastructure.Platform.Windows
         /// </summary>
         public void Dispose()
         {
-            if (!_disposed)
-            {
-                _bitmap?.Dispose();
-                _disposed = true;
-            }
+            Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// リソースを解放
+        /// </summary>
+        /// <param name="disposing">trueの場合、マネージドとアンマネージドリソースを解放、falseの場合はアンマネージドリソースのみ</param>
+        private void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // マネージドリソースの解放
+                _bitmap?.Dispose();
+            }
+
+            // アンマネージドリソースを解放するコードがあればここに記述
+
+            _disposed = true;
         }
 
         /// <summary>
@@ -79,7 +104,7 @@ namespace Baketa.Infrastructure.Platform.Windows
             // フォーマットが指定されていない場合はPNGを使用
             format ??= ImageFormat.Png;
             
-            await Task.Run(() => _bitmap.Save(path, format));
+            await Task.Run(() => _bitmap.Save(path, format)).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -96,7 +121,7 @@ namespace Baketa.Infrastructure.Platform.Windows
             {
                 var resizedBitmap = new Bitmap(_bitmap, width, height);
                 return new WindowsImage(resizedBitmap);
-            });
+            }).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -127,7 +152,7 @@ namespace Baketa.Infrastructure.Platform.Windows
                     GraphicsUnit.Pixel);
                 
                 return new WindowsImage(croppedBitmap);
-            });
+            }).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -147,7 +172,7 @@ namespace Baketa.Infrastructure.Platform.Windows
                 using var stream = new MemoryStream();
                 _bitmap.Save(stream, format);
                 return stream.ToArray();
-            });
+            }).ConfigureAwait(false);
         }
     }
 }

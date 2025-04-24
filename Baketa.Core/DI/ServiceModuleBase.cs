@@ -37,6 +37,10 @@ namespace Baketa.Core.DI
             HashSet<Type> registeredModules,
             Stack<Type> moduleStack)
         {
+            ArgumentNullException.ThrowIfNull(services, nameof(services));
+            ArgumentNullException.ThrowIfNull(registeredModules, nameof(registeredModules));
+            ArgumentNullException.ThrowIfNull(moduleStack, nameof(moduleStack));
+            
             var moduleType = GetType();
             
             // 循環依存の検出

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Threading.Tasks;
 
 namespace Baketa.Core.Abstractions.Imaging
@@ -8,61 +11,125 @@ namespace Baketa.Core.Abstractions.Imaging
     public interface IAdvancedImage : IImage
     {
         /// <summary>
-        /// 画像にフィルターを適用します。
+        /// 指定座標のピクセル値を取得します
         /// </summary>
-        /// <param name="filterType">適用するフィルタータイプ</param>
-        /// <returns>フィルターが適用された新しい画像インスタンス</returns>
-        Task<IImage> ApplyFilterAsync(ImageFilterType filterType);
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <returns>ピクセル値</returns>
+        Color GetPixel(int x, int y);
         
         /// <summary>
-        /// 2つの画像の類似度を計算します。
+        /// 指定座標にピクセル値を設定します
+        /// </summary>
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <param name="color">設定する色</param>
+        void SetPixel(int x, int y, Color color);
+        
+        /// <summary>
+        /// 画像にフィルターを適用します
+        /// </summary>
+        /// <param name="filter">適用するフィルター</param>
+        /// <returns>フィルター適用後の新しい画像</returns>
+        Task<IAdvancedImage> ApplyFilterAsync(IImageFilter filter);
+        
+        /// <summary>
+        /// 複数のフィルターを順番に適用します
+        /// </summary>
+        /// <param name="filters">適用するフィルターのコレクション</param>
+        /// <returns>フィルター適用後の新しい画像</returns>
+        Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters);
+        
+        /// <summary>
+        /// 画像のヒストグラムを生成します
+        /// </summary>
+        /// <param name="channel">対象チャンネル</param>
+        /// <returns>ヒストグラムデータ</returns>
+        Task<int[]> ComputeHistogramAsync(ColorChannel channel = ColorChannel.Luminance);
+        
+        /// <summary>
+        /// 画像をグレースケールに変換します
+        /// </summary>
+        /// <returns>グレースケール変換された新しい画像</returns>
+        Task<IAdvancedImage> ToGrayscaleAsync();
+        
+        /// <summary>
+        /// 画像を二値化します
+        /// </summary>
+        /// <param name="threshold">閾値（0～255）</param>
+        /// <returns>二値化された新しい画像</returns>
+        Task<IAdvancedImage> ToBinaryAsync(byte threshold);
+        
+        /// <summary>
+        /// 画像の特定領域を抽出します
+        /// </summary>
+        /// <param name="rectangle">抽出する領域</param>
+        /// <returns>抽出された新しい画像</returns>
+        Task<IAdvancedImage> ExtractRegionAsync(Rectangle rectangle);
+        
+        /// <summary>
+        /// OCR前処理の最適化を行います
+        /// </summary>
+        /// <returns>OCR向けに最適化された新しい画像</returns>
+        Task<IAdvancedImage> OptimizeForOcrAsync();
+        
+        /// <summary>
+        /// OCR前処理の最適化を指定されたオプションで行います
+        /// </summary>
+        /// <param name="options">最適化オプション</param>
+        /// <returns>OCR向けに最適化された新しい画像</returns>
+        Task<IAdvancedImage> OptimizeForOcrAsync(OcrImageOptions options);
+        
+        /// <summary>
+        /// 2つの画像の類似度を計算します
         /// </summary>
         /// <param name="other">比較対象の画像</param>
         /// <returns>0.0〜1.0の類似度（1.0が完全一致）</returns>
         Task<float> CalculateSimilarityAsync(IImage other);
         
         /// <summary>
-        /// 画像の特定領域を切り出します。
+        /// 画像の特定領域におけるテキスト存在可能性を評価します
         /// </summary>
-        /// <param name="x">切り出し開始X座標</param>
-        /// <param name="y">切り出し開始Y座標</param>
-        /// <param name="width">切り出し幅</param>
-        /// <param name="height">切り出し高さ</param>
-        /// <returns>切り出された新しい画像インスタンス</returns>
-        Task<IImage> CropAsync(int x, int y, int width, int height);
+        /// <param name="rectangle">評価する領域</param>
+        /// <returns>テキスト存在可能性（0.0〜1.0）</returns>
+        Task<float> EvaluateTextProbabilityAsync(Rectangle rectangle);
         
         /// <summary>
-        /// 画像の回転を行います。
+        /// 画像の回転を行います
         /// </summary>
         /// <param name="degrees">回転角度（度数法）</param>
-        /// <returns>回転された新しい画像インスタンス</returns>
-        Task<IImage> RotateAsync(float degrees);
+        /// <returns>回転された新しい画像</returns>
+        Task<IAdvancedImage> RotateAsync(float degrees);
     }
     
     /// <summary>
-    /// 画像フィルタータイプ
+    /// 色チャンネルを表す列挙型
     /// </summary>
-    public enum ImageFilterType
+    public enum ColorChannel
     {
-        /// <summary>グレースケール</summary>
-        Grayscale,
+        /// <summary>
+        /// 赤チャンネル
+        /// </summary>
+        Red,
         
-        /// <summary>ぼかし</summary>
-        Blur,
+        /// <summary>
+        /// 緑チャンネル
+        /// </summary>
+        Green,
         
-        /// <summary>シャープ化</summary>
-        Sharpen,
+        /// <summary>
+        /// 青チャンネル
+        /// </summary>
+        Blue,
         
-        /// <summary>エッジ検出</summary>
-        EdgeDetection,
+        /// <summary>
+        /// アルファチャンネル（透明度）
+        /// </summary>
+        Alpha,
         
-        /// <summary>コントラスト強調</summary>
-        ContrastEnhancement,
-        
-        /// <summary>二値化</summary>
-        Binarize,
-        
-        /// <summary>ガンマ補正</summary>
-        GammaCorrection
+        /// <summary>
+        /// 輝度（明るさ）
+        /// </summary>
+        Luminance
     }
 }

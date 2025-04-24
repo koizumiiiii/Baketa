@@ -2,7 +2,7 @@
 
 namespace Baketa.UI.ViewModels
 {
-    public class ViewModelBase : ReactiveObject
+    internal abstract class ViewModelBase : ReactiveObject
     {
     }
 }

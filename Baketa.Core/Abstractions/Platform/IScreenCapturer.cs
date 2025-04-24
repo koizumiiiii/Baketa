@@ -57,11 +57,11 @@ namespace Baketa.Core.Abstractions.Platform
         /// <summary>
         /// カーソルを含むかどうか
         /// </summary>
-        public bool IncludeCursor { get; set; } = false;
+        public bool IncludeCursor { get; set; }
         
         /// <summary>
         /// キャプチャの間隔（ミリ秒）
         /// </summary>
-        public int CaptureInterval { get; set; } = 100;
+        public int CaptureInterval { get; set; }
     }
 }
