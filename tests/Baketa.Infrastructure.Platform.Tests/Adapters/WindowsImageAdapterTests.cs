@@ -11,7 +11,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
     /// <summary>
     /// WindowsImageAdapterのテストクラス
     /// </summary>
-    internal class WindowsImageAdapterTests
+    public class WindowsImageAdapterTests
     {
         /// <summary>
         /// ToAdvancedImageメソッドがnull引数でArgumentNullExceptionをスローすることを確認
@@ -49,7 +49,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromAdvancedImageAsync(null!)).ConfigureAwait(false);
+            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromAdvancedImageAsync(null!));
         }
         
         /// <summary>
@@ -62,7 +62,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromImageAsync(null!)).ConfigureAwait(false);
+            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromImageAsync(null!));
         }
         
         /// <summary>
@@ -88,7 +88,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromBytesAsync(null!)).ConfigureAwait(false);
+            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromBytesAsync(null!));
         }
         
         /// <summary>
@@ -101,7 +101,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromFileAsync(null!)).ConfigureAwait(false);
+            await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromFileAsync(null!));
         }
     }
 }

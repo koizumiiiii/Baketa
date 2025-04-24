@@ -11,18 +11,9 @@ namespace Baketa.Infrastructure.Platform.Adapters
     /// IWindowManagerAdapterインターフェースの基本スタブ実装
     /// 注：実際の機能実装は後の段階で行います
     /// </summary>
-    public class WindowManagerAdapterStub : IWindowManagerAdapter
+    public class WindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Windows.IWindowManager windowManager) : IWindowManagerAdapter
     {
-        private readonly Baketa.Core.Abstractions.Platform.Windows.IWindowManager _windowManager;
-
-        /// <summary>
-        /// WindowManagerAdapterのコンストラクタ
-        /// </summary>
-        /// <param name="windowManager">Windows用ウィンドウマネージャー</param>
-        public WindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Windows.IWindowManager windowManager)
-        {
-            _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        }
+        private readonly Baketa.Core.Abstractions.Platform.Windows.IWindowManager _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
 
         /// <summary>
         /// Windows固有のウィンドウマネージャーを使用してアクティブなウィンドウハンドルを取得します
@@ -93,7 +84,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         {
             // スタブ実装では空のリストを返す
             // 実際の実装ではWindows API を用いて実行中のアプリケーションウィンドウを列挙する
-            return Array.Empty<WindowInfo>();
+            return [];
         }
 
         /// <summary>
@@ -123,9 +114,8 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>プラットフォーム非依存のウィンドウマネージャー</returns>
         public Baketa.Core.Abstractions.Platform.IWindowManager AdaptWindowManager(Baketa.Core.Abstractions.Platform.Windows.IWindowManager windowsManager)
         {
-            // スタブ実装では単に引数をそのまま返す
-            // 実際の実装では適切なアダプターを返す
-            return windowsManager;
+            // スタブ実装では適切なアダプターを返す
+            return new WindowManagerAdapter(windowsManager);
         }
 
         /// <summary>
