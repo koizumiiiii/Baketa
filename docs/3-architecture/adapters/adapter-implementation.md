@@ -907,8 +907,201 @@ public class AdapterIntegrationTests
 }
 ```
 
-## 9. まとめ
+## 9. アダプターファクトリーパターン
+
+### 9.1 ファクトリーインターフェース設計
+
+アダプターの生成と管理を効率化するため、ファクトリーパターンを導入しています。中核となるインターフェースは以下の通りです：
+
+```csharp
+/// <summary>
+/// アダプターファクトリーの基本インターフェース
+/// </summary>
+/// <remarks>
+/// アダプターインスタンスの作成を一元管理し、環境に応じた適切な実装を提供します
+/// </remarks>
+public interface IAdapterFactory
+{
+    /// <summary>
+    /// 画像アダプターを作成します
+    /// </summary>
+    /// <returns>画像アダプターインスタンス</returns>
+    IWindowsImageAdapter CreateImageAdapter();
+
+    /// <summary>
+    /// キャプチャアダプターを作成します
+    /// </summary>
+    /// <returns>キャプチャアダプターインスタンス</returns>
+    ICaptureAdapter CreateCaptureAdapter();
+
+    /// <summary>
+    /// ウィンドウマネージャーアダプターを作成します
+    /// </summary>
+    /// <returns>ウィンドウマネージャーアダプターインスタンス</returns>
+    IWindowManagerAdapter CreateWindowManagerAdapter();
+}
+```
+
+### 9.2 環境別ファクトリー実装
+
+異なる環境向けに特化したファクトリー実装を提供しています：
+
+#### 9.2.1 標準Windows環境用ファクトリー
+
+```csharp
+/// <summary>
+/// Windows環境用のアダプターファクトリー実装
+/// </summary>
+public class WindowsAdapterFactory(IServiceProvider serviceProvider) : IAdapterFactory
+{
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    
+    /// <inheritdoc/>
+    public IWindowsImageAdapter CreateImageAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowsImageAdapter>();
+        
+    /// <inheritdoc/>
+    public ICaptureAdapter CreateCaptureAdapter() => 
+        _serviceProvider.GetRequiredService<ICaptureAdapter>();
+        
+    /// <inheritdoc/>
+    public IWindowManagerAdapter CreateWindowManagerAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowManagerAdapter>();
+}
+```
+
+#### 9.2.2 テスト環境用ファクトリー
+
+```csharp
+/// <summary>
+/// テスト環境用のモックアダプターファクトリー実装
+/// </summary>
+public class MockAdapterFactory(IServiceProvider serviceProvider) : IAdapterFactory
+{
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    
+    /// <inheritdoc/>
+    public IWindowsImageAdapter CreateImageAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowsImageAdapter>();
+        
+    /// <inheritdoc/>
+    public ICaptureAdapter CreateCaptureAdapter() => 
+        _serviceProvider.GetRequiredService<ICaptureAdapter>();
+        
+    /// <inheritdoc/>
+    public IWindowManagerAdapter CreateWindowManagerAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowManagerAdapter>();
+}
+```
+
+#### 9.2.3 開発環境用ファクトリー
+
+```csharp
+/// <summary>
+/// 開発環境用のスタブアダプターファクトリー実装
+/// </summary>
+public class StubAdapterFactory(IServiceProvider serviceProvider) : IAdapterFactory
+{
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    
+    /// <inheritdoc/>
+    public IWindowsImageAdapter CreateImageAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowsImageAdapter>();
+        
+    /// <inheritdoc/>
+    public ICaptureAdapter CreateCaptureAdapter() => 
+        _serviceProvider.GetRequiredService<ICaptureAdapter>();
+        
+    /// <inheritdoc/>
+    public IWindowManagerAdapter CreateWindowManagerAdapter() => 
+        _serviceProvider.GetRequiredService<IWindowManagerAdapter>();
+}
+```
+
+### 9.3 依存性注入の設定
+
+アダプターファクトリーとアダプターインスタンスの登録方法：
+
+```csharp
+/// <summary>
+/// アダプターファクトリーサービス登録のための拡張メソッド群
+/// </summary>
+public static class AdapterFactoryServiceExtensions
+{
+    /// <summary>
+    /// 標準環境（Windows実装）用のアダプターファクトリーサービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    /// <returns>サービスコレクション（チェーン呼び出し用）</returns>
+    public static IServiceCollection AddAdapterFactoryServices(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services, nameof(services));
+        
+        // 基本アダプターとファクトリーを登録
+        services.AddSingleton<IAdapterFactory, WindowsAdapterFactory>();
+        
+        // 各アダプターをTransientで登録
+        services.AddTransient<IWindowsImageAdapter, DefaultWindowsImageAdapter>();
+        services.AddTransient<ICaptureAdapter, CaptureAdapterStub>();  // 実際の実装に置き換え予定
+        services.AddTransient<IWindowManagerAdapter, WindowManagerAdapterStub>();  // 実際の実装に置き換え予定
+        
+        return services;
+    }
+    
+    /// <summary>
+    /// テスト環境用のモックアダプターファクトリーサービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    /// <returns>サービスコレクション（チェーン呼び出し用）</returns>
+    public static IServiceCollection AddMockAdapterFactoryServices(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services, nameof(services));
+        
+        // モックアダプターとファクトリーを登録
+        services.AddSingleton<IAdapterFactory, MockAdapterFactory>();
+        
+        // 各モックアダプターをSingletonで登録
+        services.AddSingleton<IWindowsImageAdapter, WindowsImageAdapterStub>();
+        services.AddSingleton<ICaptureAdapter, CaptureAdapterStub>();
+        services.AddSingleton<IWindowManagerAdapter, WindowManagerAdapterStub>();
+        
+        return services;
+    }
+}
+```
+
+### 9.4 アダプターファクトリー使用例
+
+```csharp
+public class OcrService : IOcrService
+{
+    private readonly IAdapterFactory _adapterFactory;
+    
+    public OcrService(IAdapterFactory adapterFactory)
+    {
+        _adapterFactory = adapterFactory ?? throw new ArgumentNullException(nameof(adapterFactory));
+    }
+    
+    public async Task<OcrResult> PerformOcrAsync(IntPtr windowHandle)
+    {
+        // ファクトリーからアダプターを取得
+        var captureAdapter = _adapterFactory.CreateCaptureAdapter();
+        
+        // アダプターを使用してキャプチャを実行
+        var image = await captureAdapter.CaptureWindowAsync(windowHandle);
+        
+        // OCR処理を実行
+        // ...
+        
+        return new OcrResult();
+    }
+}
+```
+
+## 10. まとめ
 
 アダプターレイヤーは、プラットフォーム依存コードと抽象化レイヤー間の明確な境界を提供する重要な役割を担います。適切に設計・実装されたアダプターにより、レイヤー間の疎結合化、テスト容易性、拡張性の向上が実現され、アプリケーション全体の品質向上に貢献します。
 
 各アダプターは単一責任原則に従い、変換ロジックを集中管理することで、コードの保守性と可読性が高まります。また、適切なエラー処理と非同期処理の実装により、堅牢で効率的なアプリケーションの構築が可能になります。
+
+さらに、アダプターファクトリーパターンの導入により、環境別の適切なアダプターを簡単に取得できるようになり、テスト容易性と拡張性がさらに向上しました。
