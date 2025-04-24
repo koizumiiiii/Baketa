@@ -20,6 +20,10 @@ namespace Baketa.Core.Tests
         // 1. コレクション式の様々な使用方法テスト
         public static void CollectionExpressions()
         {
+            // 設定オプションクラスのテスト（CA1812警告回避のため明示的にインスタンス化）
+            var options = new ConfigOptions("TestConfig");
+            Console.WriteLine($"設定：{options.Name}, 有効：{options.Enabled}, タイムアウト：{options.Timeout}");
+
             // 空のコレクション式 - 型指定が必要
             int[] _ = [];
             List<string> __ = [];
@@ -66,7 +70,7 @@ namespace Baketa.Core.Tests
         }
         
         // 2. プライマリコンストラクタのオプション引数
-    internal class ConfigOptions(string name, bool enabled = true, int timeout = 30)
+        internal sealed class ConfigOptions(string name, bool enabled = true, int timeout = 30)
         {
             public string Name { get; } = name;
             public bool Enabled { get; } = enabled;

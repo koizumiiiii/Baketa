@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform;
+using Baketa.Infrastructure.Platform.DI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.Platform
@@ -27,6 +28,20 @@ namespace Baketa.Infrastructure.Platform
             services.AddSingleton<IImageFactory, WindowsImageAdapterFactory>();
             */
             
+            return services;
+        }
+
+        /// <summary>
+        /// Windows特有のプラットフォームサービスの登録
+        /// </summary>
+        [SupportedOSPlatform("windows")]
+        public static IServiceCollection AddWindowsPlatformServices(this IServiceCollection services)
+        {
+            // Windowsサービス実装の登録
+            services.AddSingleton<Core.Abstractions.Factories.IWindowsImageFactory, Windows.WindowsImageFactory>();
+            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.WindowsCapturerStub>();
+            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManagerStub>();
+
             return services;
         }
     }

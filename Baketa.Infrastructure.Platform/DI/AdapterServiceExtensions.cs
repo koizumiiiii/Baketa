@@ -1,5 +1,6 @@
 using System;
 using Baketa.Infrastructure.Platform.Adapters;
+using Baketa.Infrastructure.Platform.Adapters.Factory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.Platform.DI
@@ -51,6 +52,60 @@ namespace Baketa.Infrastructure.Platform.DI
             services.AddSingleton<IWindowsImageAdapter, WindowsImageAdapterStub>();
             services.AddSingleton<ICaptureAdapter, CaptureAdapterStub>();
             services.AddSingleton<IWindowManagerAdapter, WindowManagerAdapterStub>();
+            
+            return services;
+        }
+
+        /// <summary>
+        /// すべてのアダプターサービスを依存性注入コンテナに登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <returns>サービスコレクション（チェーン呼び出し用）</returns>
+        public static IServiceCollection AddAllAdapterServices(this IServiceCollection services)
+        {
+            ArgumentNullException.ThrowIfNull(services, nameof(services));
+            
+            // Windowsサービス実装の登録
+            services.AddWindowsPlatformServices();
+            
+            // アダプターサービスの登録
+            services.AddAdapterServices();
+            
+            // アダプターファクトリーの登録
+            services.AddAdapterFactoryServices();
+            
+            return services;
+        }
+        
+        /// <summary>
+        /// 開発環境向けのアダプターサービスを依存性注入コンテナに登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <returns>サービスコレクション（チェーン呼び出し用）</returns>
+        public static IServiceCollection AddDevelopmentAdapterServices(this IServiceCollection services)
+        {
+            ArgumentNullException.ThrowIfNull(services, nameof(services));
+            
+            // Windowsサービス実装の登録
+            services.AddWindowsPlatformServices();
+            
+            // スタブアダプターサービスの登録
+            services.AddStubAdapterFactoryServices();
+            
+            return services;
+        }
+        
+        /// <summary>
+        /// テスト環境向けのアダプターサービスを依存性注入コンテナに登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <returns>サービスコレクション（チェーン呼び出し用）</returns>
+        public static IServiceCollection AddTestAdapterServices(this IServiceCollection services)
+        {
+            ArgumentNullException.ThrowIfNull(services, nameof(services));
+            
+            // モックアダプターサービスの登録
+            services.AddMockAdapterFactoryServices();
             
             return services;
         }
