@@ -14,7 +14,7 @@ namespace Baketa.UI.DI.Modules
     /// ViewModelやUI関連サービスの実装が含まれます。
     /// </summary>
     [ModulePriority(ModulePriority.UI)]
-    public class UIModule : ServiceModuleBase
+    internal sealed class UIModule : ServiceModuleBase
     {
         /// <summary>
         /// UIサービスを登録します。

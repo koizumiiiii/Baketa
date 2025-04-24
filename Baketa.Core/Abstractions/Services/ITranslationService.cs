@@ -82,7 +82,7 @@ namespace Baketa.Core.Abstractions.Services
         /// <summary>
         /// 他の候補言語と信頼度
         /// </summary>
-        public Dictionary<string, float>? AlternativeLanguages { get; set; }
+        public IReadOnlyDictionary<string, float>? AlternativeLanguages { get; set; }
     }
     
     /// <summary>

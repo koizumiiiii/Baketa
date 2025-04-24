@@ -173,6 +173,30 @@ namespace Baketa.Application.DI.Extensions
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         /// <param name="registeredModules">登録されたモジュールの型</param>
+        // LoggerMessageデリゲートの定義
+        private static readonly Action<ILogger, string, Exception?> _logRegisteredModules =
+            LoggerMessage.Define<string>(
+                LogLevel.Debug,
+                new EventId(1, nameof(LogRegisteredModules)),
+                "登録されたモジュール: {RegisteredModules}");
+
+        private static readonly Action<ILogger, int, Exception?> _logServiceCount =
+            LoggerMessage.Define<int>(
+                LogLevel.Trace,
+                new EventId(2, "ServiceCount"),
+                "登録されたサービス: {ServiceCount}個");
+
+        private static readonly Action<ILogger, string, Exception?> _logServiceDetail =
+            LoggerMessage.Define<string>(
+                LogLevel.Trace,
+                new EventId(3, "ServiceDetail"),
+                "  {Service}");
+
+        /// <summary>
+        /// 登録されたモジュールをログに出力します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="registeredModules">登録されたモジュールの型</param>
         private static void LogRegisteredModules(
             IServiceCollection services, 
             HashSet<Type> registeredModules)
@@ -183,8 +207,10 @@ namespace Baketa.Application.DI.Extensions
                 
                 if (logger != null)
                 {
-                    logger.LogDebug("登録されたモジュール: {RegisteredModules}", 
-                        string.Join(", ", registeredModules.Select(t => t.Name)));
+                    // LoggerMessageデリゲートを使用
+                    _logRegisteredModules(logger, 
+                        string.Join(", ", registeredModules.Select(t => t.Name)),
+                        null);
                     
                     // 詳細なサービス登録情報（デバッグ用）
                     if (logger.IsEnabled(LogLevel.Trace))
@@ -194,18 +220,19 @@ namespace Baketa.Application.DI.Extensions
                             .Select(s => $"{s.ServiceType.Name} => {s.ImplementationType?.Name ?? "Factory"} ({s.Lifetime})")
                             .ToList();
                             
-                        logger.LogTrace("登録されたサービス: {ServiceCount}個", services.Count);
+                        _logServiceCount(logger, services.Count, null);
                         
                         // 必要な場合はクエリを再実行
                         foreach (var service in services.Select(s => 
                             $"{s.ServiceType.Name} => {s.ImplementationType?.Name ?? "Factory"} ({s.Lifetime})"))
                         {
-                            logger.LogTrace("  {Service}", service);
+                            _logServiceDetail(logger, service, null);
                         }
                     }
                 }
-            } catch (Exception ex) {
+            } catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException) {
                 // ロギングに失敗しても処理を継続
+                // 重大なシステム例外の場合は再スロー
                 Console.WriteLine($"モジュール登録のログ出力に失敗: {ex.Message}");
             }
         }

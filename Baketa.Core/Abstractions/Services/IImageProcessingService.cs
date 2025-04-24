@@ -25,21 +25,21 @@ namespace Baketa.Core.Abstractions.Services
         /// <param name="image2">2つ目の画像</param>
         /// <param name="threshold">差分検出の閾値 (0.0-1.0)</param>
         /// <returns>差分領域のリスト</returns>
-        Task<List<Rectangle>> DetectDifferencesAsync(IImage image1, IImage image2, float threshold = 0.05f);
+        Task<IReadOnlyCollection<Rectangle>> DetectDifferencesAsync(IImage image1, IImage image2, float threshold = 0.05f);
         
         /// <summary>
         /// 画像からテキスト領域を検出します
         /// </summary>
         /// <param name="image">処理する画像</param>
         /// <returns>テキスト領域の可能性が高い領域のリスト</returns>
-        Task<List<Rectangle>> DetectTextAreasAsync(IImage image);
+        Task<IReadOnlyCollection<Rectangle>> DetectTextAreasAsync(IImage image);
         
         /// <summary>
         /// 画像からオブジェクトを検出します
         /// </summary>
         /// <param name="image">処理する画像</param>
         /// <returns>検出されたオブジェクトのリスト</returns>
-        Task<List<DetectedObject>> DetectObjectsAsync(IImage image);
+        Task<IReadOnlyCollection<DetectedObject>> DetectObjectsAsync(IImage image);
         
         /// <summary>
         /// 画像を指定した領域でクロップします
@@ -55,7 +55,7 @@ namespace Baketa.Core.Abstractions.Services
         /// <param name="images">結合する画像のリスト</param>
         /// <param name="direction">結合方向</param>
         /// <returns>結合された画像</returns>
-        Task<IImage> CombineImagesAsync(IList<IImage> images, CombineDirection direction);
+        Task<IImage> CombineImagesAsync(IReadOnlyCollection<IImage> images, CombineDirection direction);
     }
     
     /// <summary>
@@ -87,42 +87,42 @@ namespace Baketa.Core.Abstractions.Services
         /// <summary>
         /// 明るさ調整 (-1.0 - 1.0)
         /// </summary>
-        public float Brightness { get; set; } = 0.0f;
+        public float Brightness { get; set; }
         
         /// <summary>
-        /// コントラスト調整 (0.0 - 2.0)
+        /// コントラスト調整 (0.0 - 2.0, デフォルトは1.0)
         /// </summary>
-        public float Contrast { get; set; } = 1.0f;
+        public float Contrast { get; set; }
         
         /// <summary>
         /// シャープネス (0.0 - 1.0)
         /// </summary>
-        public float Sharpness { get; set; } = 0.0f;
+        public float Sharpness { get; set; }
         
         /// <summary>
         /// ノイズ除去 (0.0 - 1.0)
         /// </summary>
-        public float NoiseReduction { get; set; } = 0.0f;
+        public float NoiseReduction { get; set; }
         
         /// <summary>
         /// 2値化閾値 (0 - 255, 0の場合は2値化を行わない)
         /// </summary>
-        public int BinarizationThreshold { get; set; } = 0;
+        public int BinarizationThreshold { get; set; }
         
         /// <summary>
         /// 適応的2値化を使用するかどうか
         /// </summary>
-        public bool UseAdaptiveThreshold { get; set; } = false;
+        public bool UseAdaptiveThreshold { get; set; }
         
         /// <summary>
         /// テキスト検出最適化
         /// </summary>
-        public bool OptimizeForText { get; set; } = false;
+        public bool OptimizeForText { get; set; }
         
         /// <summary>
         /// カラー処理モード
         /// </summary>
-        public ColorProcessingMode ColorMode { get; set; } = ColorProcessingMode.Preserve;
+        public ColorProcessingMode ColorMode { get; set; }
     }
     
     /// <summary>

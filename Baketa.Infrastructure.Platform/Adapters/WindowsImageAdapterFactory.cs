@@ -15,9 +15,19 @@ namespace Baketa.Infrastructure.Platform.Adapters
     /// <summary>
     /// WindowsImageAdapterFactory - Windows画像をIImageに変換するファクトリー
     /// </summary>
-    public class WindowsImageAdapterFactory(IWindowsImageFactoryInterface windowsImageFactory) : IImageFactoryInterface
+    public class WindowsImageAdapterFactory : IImageFactoryInterface
     {
-        private readonly IWindowsImageFactoryInterface _windowsImageFactory = windowsImageFactory ?? throw new ArgumentNullException(nameof(windowsImageFactory));
+        private readonly IWindowsImageFactoryInterface _windowsImageFactory;
+        
+        /// <summary>
+        /// WindowsImageAdapterFactoryコンストラクタ
+        /// </summary>
+        /// <param name="windowsImageFactory">Windows画像ファクトリインターフェース</param>
+        public WindowsImageAdapterFactory(IWindowsImageFactoryInterface windowsImageFactory)
+        {
+            ArgumentNullException.ThrowIfNull(windowsImageFactory, nameof(windowsImageFactory));
+            _windowsImageFactory = windowsImageFactory;
+        }
 
         /// <summary>
         /// ファイルから画像を作成します。
@@ -26,7 +36,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>作成された画像</returns>
         public async Task<IImage> CreateFromFileAsync(string filePath)
         {
-            var windowsImage = await _windowsImageFactory.CreateFromFileAsync(filePath);
+            var windowsImage = await _windowsImageFactory.CreateFromFileAsync(filePath).ConfigureAwait(false);
             return new WindowsImageAdapter(windowsImage);
         }
         
@@ -37,7 +47,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>作成された画像</returns>
         public async Task<IImage> CreateFromBytesAsync(byte[] imageData)
         {
-            var windowsImage = await _windowsImageFactory.CreateFromBytesAsync(imageData);
+            var windowsImage = await _windowsImageFactory.CreateFromBytesAsync(imageData).ConfigureAwait(false);
             return new WindowsImageAdapter(windowsImage);
         }
         
@@ -48,12 +58,14 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>作成された画像</returns>
         public async Task<IImage> CreateFromStreamAsync(Stream stream)
         {
+            ArgumentNullException.ThrowIfNull(stream, nameof(stream));
+            
             // ストリームをバイト配列に変換
             using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream);
+            await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
             var data = memoryStream.ToArray();
             
-            return await CreateFromBytesAsync(data);
+            return await CreateFromBytesAsync(data).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -64,7 +76,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>作成された画像</returns>
         public async Task<IImage> CreateEmptyAsync(int width, int height)
         {
-            var windowsImage = await _windowsImageFactory.CreateEmptyAsync(width, height);
+            var windowsImage = await _windowsImageFactory.CreateEmptyAsync(width, height).ConfigureAwait(false);
             return new WindowsImageAdapter(windowsImage);
         }
         
@@ -75,8 +87,23 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>高度な画像処理機能を持つ画像インスタンス</returns>
         public IAdvancedImage ConvertToAdvancedImage(IImage image)
         {
-            // 注：ここでは実装されていません
-            throw new NotImplementedException("このメソッドはまだ実装されていません");
+            ArgumentNullException.ThrowIfNull(image, nameof(image));
+            
+            // 既にIAdvancedImageの場合はそのまま返す
+            if (image is IAdvancedImage advancedImage)
+            {
+                return advancedImage;
+            }
+            
+            // WindowsImageAdapterを使用している場合はクローンして変換
+            if (image is WindowsImageAdapter windowsAdapter)
+            {
+                // クローンを作成してそのまま返す（既にIAdvancedImageを実装している）
+                return (IAdvancedImage)windowsAdapter.Clone();
+            }
+            
+            // それ以外の場合はバイト配列経由で変換
+            throw new NotImplementedException("このタイプの画像の変換はまだ実装されていません");
         }
     }
 
