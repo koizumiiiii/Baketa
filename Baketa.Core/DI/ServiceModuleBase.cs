@@ -46,19 +46,23 @@ namespace Baketa.Core.DI
             // 循環依存の検出
             if (moduleStack.Contains(moduleType))
             {
+                // スタックのコピーを作成し、循環経路を正しい順序で取得
+                var tempStack = new Stack<Type>(new Stack<Type>(moduleStack));
                 var cycle = new List<Type>();
-                var found = false;
                 
-                foreach (var item in moduleStack)
+                // スタックをポップして循環経路を構築
+                while (tempStack.Count > 0)
                 {
+                    var item = tempStack.Pop();
+                    cycle.Add(item);
                     if (item == moduleType)
-                        found = true;
-                        
-                    if (found)
-                        cycle.Add(item);
+                        break;
                 }
                 
-                cycle.Add(moduleType); // 完全な循環を表示するために追加
+                // リストを反転して依存関係の順序を正しくする
+                cycle.Reverse();
+                // 完全な循環を表示するために追加
+                cycle.Add(moduleType);
                 
                 var cycleInfo = string.Join(" -> ", cycle.Select(t => t.Name));
                 throw new CircularDependencyException(
