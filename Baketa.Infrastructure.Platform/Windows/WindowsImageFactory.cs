@@ -42,23 +42,23 @@ namespace Baketa.Infrastructure.Platform.Windows
                 {
                     throw new InvalidOperationException($"画像ファイルの読み込みに失敗しました: {filePath}", ex);
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         /// <summary>
         /// バイト配列からの画像作成
         /// </summary>
-        public async Task<IWindowsImageInterface> CreateFromBytesAsync(byte[] imageData)
+        public async Task<IWindowsImageInterface> CreateFromBytesAsync(byte[] data)
         {
-            ArgumentNullException.ThrowIfNull(imageData);
-            if (imageData.Length == 0)
-                throw new ArgumentException("画像データが空です", nameof(imageData));
+            ArgumentNullException.ThrowIfNull(data);
+            if (data.Length == 0)
+                throw new ArgumentException("画像データが空です", nameof(data));
 
             return await Task.Run(() =>
             {
                 try
                 {
-                    using var stream = new MemoryStream(imageData);
+                    using var stream = new MemoryStream(data);
                     var bitmap = new Bitmap(stream);
                     return new WindowsImage(bitmap);
                 }
@@ -66,7 +66,7 @@ namespace Baketa.Infrastructure.Platform.Windows
                 {
                     throw new InvalidOperationException("バイトデータからの画像作成に失敗しました", ex);
                 }
-            });
+            }).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -94,7 +94,7 @@ namespace Baketa.Infrastructure.Platform.Windows
                 }
                 
                 return new WindowsImage(bitmap);
-            });
+            }).ConfigureAwait(false);
         }
     }
 }

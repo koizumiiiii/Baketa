@@ -54,7 +54,7 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
         /// 実行中のアプリケーションのウィンドウリストを取得（プラットフォーム共通のオブジェクトで表現）
         /// </summary>
         /// <returns>ウィンドウ情報のリスト</returns>
-        List<WindowInfo> GetRunningApplicationWindows();
+        IReadOnlyCollection<WindowInfo> GetRunningApplicationWindows();
     }
     
     /// <summary>

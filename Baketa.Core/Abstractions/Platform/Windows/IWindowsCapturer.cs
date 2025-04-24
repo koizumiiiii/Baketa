@@ -67,7 +67,7 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// <summary>
         /// カーソルを含むかどうか
         /// </summary>
-        public bool IncludeCursor { get; set; } = false;
+        public bool IncludeCursor { get; set; }
         
         /// <summary>
         /// 透過ウィンドウの透過部分を維持するかどうか

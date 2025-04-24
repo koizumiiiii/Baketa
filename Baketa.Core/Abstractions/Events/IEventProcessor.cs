@@ -3,16 +3,16 @@ using System.Threading.Tasks;
 namespace Baketa.Core.Abstractions.Events
 {
     /// <summary>
-    /// イベントハンドラインターフェース
+    /// イベント処理インターフェース
     /// </summary>
     /// <typeparam name="TEvent">イベント型</typeparam>
-    public interface IEventHandler<in TEvent> where TEvent : IEvent
+    public interface IEventProcessor<in TEvent> where TEvent : IEvent
     {
         /// <summary>
         /// イベント処理
         /// </summary>
-        /// <param name="event">イベント</param>
-        Task HandleAsync(TEvent @event);
+        /// <param name="eventData">イベントデータ</param>
+        Task HandleAsync(TEvent eventData);
         
         /// <summary>
         /// このハンドラーの優先度

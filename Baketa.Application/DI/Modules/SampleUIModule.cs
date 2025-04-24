@@ -18,13 +18,15 @@ namespace Baketa.Application.DI.Modules
         /// UIサービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters",
+            Justification = "サンプルコードに静的リソースを使用")]
         public override void RegisterServices(IServiceCollection services)
         {
             // ここで実際のサービス登録を行います
             // 例：services.AddTransient<MainViewModel>();
             
             // サンプル用なのでログメッセージのみ出力
-            Console.WriteLine($"{nameof(SampleUIModule)} のサービスを登録しました。");
+            Console.WriteLine(Resources.ModuleResources.SampleUIModuleRegistered);
         }
         
         /// <summary>

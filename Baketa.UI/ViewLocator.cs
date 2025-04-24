@@ -2,10 +2,13 @@ using System;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Baketa.UI.ViewModels;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Baketa.UI
 {
-    public class ViewLocator : IDataTemplate
+    [SuppressMessage("Microsoft.Performance", "CA1812:AvoidUninstantiatedInternalClasses",
+        Justification = "Instantiated by Avalonia XAML processor")]
+    internal sealed class ViewLocator : IDataTemplate
     {
 
         public Control? Build(object? param)

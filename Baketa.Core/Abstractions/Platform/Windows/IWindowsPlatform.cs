@@ -79,7 +79,7 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// <summary>
         /// ディスプレイデバイス情報
         /// </summary>
-        public required DisplayDeviceInfo[] DisplayDevices { get; set; }
+        public required IReadOnlyList<DisplayDeviceInfo> DisplayDevices { get; set; }
     }
     
     /// <summary>

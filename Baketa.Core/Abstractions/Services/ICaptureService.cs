@@ -72,7 +72,7 @@ namespace Baketa.Core.Abstractions.Services
         /// <summary>
         /// カーソルを含むかどうか
         /// </summary>
-        public bool IncludeCursor { get; set; } = false;
+        public bool IncludeCursor { get; set; }
         
         /// <summary>
         /// キャプチャの間隔（ミリ秒）
