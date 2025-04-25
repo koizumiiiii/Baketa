@@ -1,30 +1,45 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
+// Deprecatedな方は使用せず、新しい名前空間のみインポート
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
 namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
 {
     /// <summary>
+    /// テスト用 WindowsImageFactory モック
+    /// </summary>
+    internal class WindowsImageFactoryMock : Baketa.Core.Abstractions.Factories.IWindowsImageFactory
+    {
+        public Task<IWindowsImage> CreateFromFileAsync(string filePath) => throw new NotImplementedException();
+        public Task<IWindowsImage> CreateFromBytesAsync(byte[] data) => throw new NotImplementedException();
+        public IWindowsImage CreateFromBitmap(Bitmap bitmap) => new Mock<IWindowsImage>().Object;
+        public Task<IWindowsImage> CreateEmptyAsync(int width, int height, Color? backgroundColor = null) => throw new NotImplementedException();
+    }
+    
+    /// <summary>
     /// GdiScreenCapturerのテストクラス
     /// </summary>
     [Collection("Windows系テスト")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Type is not internal", Justification = "テストクラスはxUnit要件により公開される必要がある")]
     public class GdiScreenCapturerTests
     {
-        private readonly Mock<IWindowsImageFactory> _mockImageFactory;
+        // 完全修飾名を使用して曖昧さを解消
+        private readonly Mock<Baketa.Core.Abstractions.Factories.IWindowsImageFactory> _mockImageFactory;
         private readonly Mock<ILogger<GdiScreenCapturer>> _mockLogger;
         private readonly Mock<IWindowsImage> _mockWindowsImage;
         
         public GdiScreenCapturerTests()
         {
-            _mockImageFactory = new Mock<IWindowsImageFactory>();
+            _mockImageFactory = new Mock<Baketa.Core.Abstractions.Factories.IWindowsImageFactory>();
             _mockLogger = new Mock<ILogger<GdiScreenCapturer>>();
             _mockWindowsImage = new Mock<IWindowsImage>();
             
@@ -41,17 +56,22 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
         /// 依存性注入の登録テスト
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "テストメソッドは可読性を優先")]
         public void DI_登録できること()
         {
             // Arrange
             var services = new ServiceCollection();
             
-            // Act
-            services.AddGdiScreenCapturer();
-            var provider = services.BuildServiceProvider();
+            // DIコンテナの設定
+            services.AddLogging();
+            services.AddTransient<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, WindowsImageFactoryMock>();
+            
+            // テスト対象の拡張メソッドを呼び出し
+            Baketa.Infrastructure.Platform.Windows.Capture.GdiScreenCapturerExtensions.AddGdiScreenCapturer(services);
+            var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
             
             // Assert
-            var capturer = provider.GetService<IGdiScreenCapturer>();
+            var capturer = serviceProvider.GetService<IGdiScreenCapturer>();
             Assert.NotNull(capturer);
         }
         
@@ -59,6 +79,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
         /// コンストラクタでNULLを許容しないこと
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "テストメソッドは可読性を優先")]
         public void コンストラクタ_NULLを許容しないこと()
         {
             // Arrange & Act & Assert
@@ -74,10 +95,12 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
         [InlineData(100, 0)]
         [InlineData(-1, 100)]
         [InlineData(100, -1)]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "テストメソッドは可読性を優先")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task CaptureRegionAsync_無効なサイズの場合例外がスローされること(int width, int height)
         {
             // Arrange
-            var capturer = new GdiScreenCapturer(_mockImageFactory.Object, _mockLogger.Object);
+            using var capturer = new GdiScreenCapturer(_mockImageFactory.Object, _mockLogger.Object);
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -88,10 +111,12 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
         /// ウィンドウキャプチャの無効なハンドルテスト
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "テストメソッドは可読性を優先")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task CaptureWindowAsync_無効なハンドルの場合例外がスローされること()
         {
             // Arrange
-            var capturer = new GdiScreenCapturer(_mockImageFactory.Object, _mockLogger.Object);
+            using var capturer = new GdiScreenCapturer(_mockImageFactory.Object, _mockLogger.Object);
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() => 

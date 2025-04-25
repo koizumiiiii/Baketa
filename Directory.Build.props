@@ -1,5 +1,8 @@
 <Project>
   <PropertyGroup>
+    <!-- デフォルトのプラットフォーム設定 -->
+    <Platforms>x64;AnyCPU</Platforms>
+    
     <!-- C# 12を明示的に有効化 -->
     <LangVersion>12.0</LangVersion>
     
