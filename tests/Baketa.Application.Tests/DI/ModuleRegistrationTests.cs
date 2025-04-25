@@ -10,20 +10,22 @@ namespace Baketa.Application.Tests.DI
     /// <summary>
     /// モジュール登録の単体テスト
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Assembly-internal types should not be exposed in application code", Justification = "xUnitテストクラスは必ずpublicである必要がある")]
     public class ModuleRegistrationTests
     {
         /// <summary>
         /// AddBaketaModulesでコア依存関係が正常に登録されることをテスト
         /// </summary>
         [Fact]
-        public void AddBaketaModules_RegistersAllModules()
+        public void AddBaketaModulesRegistersAllModules()
         {
             // Arrange
             var services = new ServiceCollection();
             
             // Act
             services.AddBaketaModules();
-            var provider = services.BuildServiceProvider();
+            // 何も検証しないのでBuildServiceProviderは不要
+            //var provider = services.BuildServiceProvider();
             
             // ここでは実装が存在しないため、特定のサービスの存在をアサートできません
             // したがって、RegisterServicesが例外を投げずに実行されたことをテスト
@@ -37,7 +39,7 @@ namespace Baketa.Application.Tests.DI
         /// AddBaketaCoreModulesがコアモジュールのみを登録することをテスト
         /// </summary>
         [Fact]
-        public void AddBaketaCoreModules_RegistersOnlyCoreModule()
+        public void AddBaketaCoreModulesRegistersOnlyCoreModule()
         {
             // Arrange
             var services = new ServiceCollection();
@@ -53,7 +55,7 @@ namespace Baketa.Application.Tests.DI
         /// AddBaketaInfrastructureModulesが適切なモジュールを登録することをテスト
         /// </summary>
         [Fact]
-        public void AddBaketaInfrastructureModules_RegistersCoreAndInfrastructureModules()
+        public void AddBaketaInfrastructureModulesRegistersCoreAndInfrastructureModules()
         {
             // Arrange
             var services = new ServiceCollection();
@@ -69,7 +71,7 @@ namespace Baketa.Application.Tests.DI
         /// AddBaketaApplicationModulesが適切なモジュールを登録することをテスト
         /// </summary>
         [Fact]
-        public void AddBaketaApplicationModules_RegistersAllExceptUIModules()
+        public void AddBaketaApplicationModulesRegistersAllExceptUIModules()
         {
             // Arrange
             var services = new ServiceCollection();
@@ -85,13 +87,14 @@ namespace Baketa.Application.Tests.DI
         /// モジュールの優先順位が適切に考慮されることをテスト
         /// </summary>
         [Fact]
-        public void ModuleRegistration_ConsidersModulePriorities()
+        public void ModuleRegistrationConsidersModulePriorities()
         {
             // Arrange
             var services = new ServiceCollection();
             
-            // Act - 登録追跡のためにリスナーを追加
-            var registrationOrder = new System.Collections.Generic.List<string>();
+            // Act
+            // 実際のテストでは、以下のようなリスナーを追加することになる
+            // var registrationOrder = new System.Collections.Generic.List<string>();
             
             // モックモジュールの作成とリスナーの追加は実際のテストで実装
             
