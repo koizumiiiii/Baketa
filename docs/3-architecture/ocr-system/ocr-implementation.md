@@ -692,3 +692,5 @@ namespace Baketa.Application.DI.Modules
 
 - [OCR前処理システム設計ドキュメント](./preprocessing/index.md)
 - [OCR OpenCV最適化アプローチ](./ocr-opencv-approach.md)
+- [キャプチャシステム実装ガイド](../capture-system/capture-implementation.md)
+- [プラットフォーム抽象化レイヤー](../platform/platform-abstraction.md)

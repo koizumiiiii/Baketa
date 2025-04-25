@@ -817,7 +817,89 @@ public class OptimizedWindowsCapturer : IScreenCapturer
 }
 ```
 
-## 14. まとめ
+## 14. キャプチャ実装
+
+### 14.1 GDIベースのキャプチャメソッド
+
+Windows GDI (Graphics Device Interface)を使用した画面キャプチャ機能の実装について説明します。GDIベースのキャプチャは安定性と互換性に優れており、多くのゲームとの互換性があります。
+
+```csharp
+public interface IGdiScreenCapturer : IDisposable
+{
+    /// <summary>
+    /// プライマリスクリーン全体をキャプチャします
+    /// </summary>
+    /// <returns>キャプチャした画像</returns>
+    Task<IWindowsImage> CaptureScreenAsync();
+    
+    /// <summary>
+    /// 指定したウィンドウをキャプチャします
+    /// </summary>
+    /// <param name="hWnd">ウィンドウハンドル</param>
+    /// <returns>キャプチャした画像</returns>
+    Task<IWindowsImage> CaptureWindowAsync(IntPtr hWnd);
+    
+    /// <summary>
+    /// 指定した領域をキャプチャします
+    /// </summary>
+    /// <param name="region">キャプチャする領域</param>
+    /// <returns>キャプチャした画像</returns>
+    Task<IWindowsImage> CaptureRegionAsync(Rectangle region);
+}
+```
+
+#### 14.1.1 主な特徴
+
+- **BitBlt関数**：スクリーン領域のキャプチャに使用
+- **PrintWindow関数**：ウィンドウ全体のキャプチャに使用
+- **DIBセクションの再利用**：キャプチャのパフォーマンス最適化
+- **DPI対応**：高DPI環境でのキャプチャ精度を確保
+- **メモリ管理**：SafeHandleを使用した適切なリソース解放
+
+#### 14.1.2 リソース管理
+
+GDIリソースは適切に管理する必要があります。以下のように`SafeHandle`を継承したクラスを使用して、リソースのリークを防止します：
+
+```csharp
+internal sealed class DeviceContextHandle : SafeHandle
+{
+    public DeviceContextHandle(IntPtr hDC) : base(IntPtr.Zero, true)
+    {
+        SetHandle(hDC);
+    }
+    
+    public override bool IsInvalid => handle == IntPtr.Zero;
+    
+    protected override bool ReleaseHandle()
+    {
+        if (handle != IntPtr.Zero)
+        {
+            int result = User32Methods.ReleaseDC(IntPtr.Zero, handle);
+            return result != 0;
+        }
+        return true;
+    }
+}
+```
+
+#### 14.1.3 パフォーマンス最適化
+
+GDIキャプチャでは、以下のパフォーマンス最適化テクニックを適用しています：
+
+- **メモリDCの再利用**：同一サイズのキャプチャで再利用
+- **非同期処理**：UIスレッドをブロックしない設計
+- **エラー処理**：適切な例外とフォールバックメカニズム
+- **ロギング**：LoggerMessageパターンによる効率的なロギング
+
+#### 14.1.4 セキュリティ対策
+
+DLLハイジャック脆弱性を防ぐために、以下の対策を実施しています：
+
+- 明示的なシステムディレクトリパスの指定
+- `SetLastError = true`と`ExactSpelling = true`の設定
+- 適切なエラーハンドリングとアクセス制御
+
+## 15. まとめ
 
 プラットフォーム抽象化レイヤーは、Baketaアプリケーションのコア機能とWindows固有コードの間の明確な境界を提供します。適切な抽象化レベルと依存関係の方向性を維持することで、アプリケーションの保守性、テスト容易性、および将来的な拡張可能性が向上します。
 
