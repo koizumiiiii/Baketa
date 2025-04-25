@@ -11,6 +11,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
     /// <summary>
     /// WindowsImageAdapterのテストクラス
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Type is not internal", Justification = "テストクラスはxUnit要件により公開される必要がある")]
     public class WindowsImageAdapterTests
     {
         /// <summary>
@@ -20,7 +21,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         public void ToAdvancedImageWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => adapter.ToAdvancedImage(null!));
@@ -33,7 +34,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         public void ToImageWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => adapter.ToImage(null!));
@@ -43,10 +44,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         /// FromAdvancedImageAsyncメソッドがnull引数でArgumentNullExceptionをスローすることを確認
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task FromAdvancedImageAsyncWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromAdvancedImageAsync(null!));
@@ -56,10 +58,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         /// FromImageAsyncメソッドがnull引数でArgumentNullExceptionをスローすることを確認
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task FromImageAsyncWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.FromImageAsync(null!));
@@ -72,7 +75,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         public void CreateAdvancedImageFromBitmapWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => adapter.CreateAdvancedImageFromBitmap(null!));
@@ -82,10 +85,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         /// CreateAdvancedImageFromBytesAsyncメソッドがnull引数でArgumentNullExceptionをスローすることを確認
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task CreateAdvancedImageFromBytesAsyncWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromBytesAsync(null!));
@@ -95,10 +99,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         /// CreateAdvancedImageFromFileAsyncメソッドがnull引数でArgumentNullExceptionをスローすることを確認
         /// </summary>
         [Fact]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2007:Consider calling ConfigureAwait on the awaited task", Justification = "テストメソッドではConfigureAwaitを使用しない")]
         public async Task CreateAdvancedImageFromFileAsyncWithNullArgumentThrowsArgumentNullException()
         {
             // Arrange
-            var adapter = new WindowsImageAdapterStub();
+            using var adapter = new WindowsImageAdapterStub();
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromFileAsync(null!));
