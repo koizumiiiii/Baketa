@@ -14,7 +14,7 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 反転フィルター実装
         /// </summary>
-        private class InvertFilter : IImageFilter
+        private sealed class InvertFilter : IImageFilter
         {
             public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
             {
@@ -31,7 +31,7 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 恒等フィルター（何も変更しない）
         /// </summary>
-        private class IdentityFilter : IImageFilter
+        private sealed class IdentityFilter : IImageFilter
         {
             public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
             {
@@ -46,7 +46,7 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 指定値を返すフィルター
         /// </summary>
-        private class ConstantFilter(byte value) : IImageFilter
+        private sealed class ConstantFilter(byte value) : IImageFilter
         {
         private readonly byte _value = value;
 

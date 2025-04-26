@@ -4,12 +4,15 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Windows;
+// 名前空間の衝突を解決するためのエイリアス
 using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
+using CoreImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
 using SysRectangle = System.Drawing.Rectangle;
 
 namespace Baketa.Infrastructure.Platform.Adapters
@@ -17,6 +20,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
     /// <summary>
     /// WindowsイメージをIAdvancedImageインターフェースに変換するアダプター
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public class WindowsImageAdapter : DisposableBase, IAdvancedImage
     {
         private readonly IWindowsImage _windowsImage;
@@ -28,9 +32,9 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <exception cref="ArgumentNullException">windowsImageがnullの場合</exception>
         public WindowsImageAdapter(IWindowsImage windowsImage)
         {
-        ArgumentNullException.ThrowIfNull(windowsImage, nameof(windowsImage));
+            ArgumentNullException.ThrowIfNull(windowsImage, nameof(windowsImage));
             _windowsImage = windowsImage;
-    }
+        }
         
         /// <summary>
         /// 画像の幅
@@ -41,6 +45,11 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// 画像の高さ
         /// </summary>
         public int Height => _windowsImage.Height;
+        
+        /// <summary>
+        /// 画像のフォーマット
+        /// </summary>
+        public CoreImageFormat Format => DetermineImageFormat();
         
         /// <summary>
         /// 画像のクローンを作成します
@@ -167,7 +176,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 
                 // フィルター適用
                 // フィルター適用（IReadOnlyList<byte>の結果を受け取る）
-var resultDataList = await Task.Run(() => filter.Apply(sourceData, bitmap.Width, bitmap.Height, bitmapData.Stride))
+                var resultDataList = await Task.Run(() => filter.Apply(sourceData, bitmap.Width, bitmap.Height, bitmapData.Stride))
                     .ConfigureAwait(false);
                 
                 // IReadOnlyList<byte>をbyte[]に変換
@@ -461,10 +470,10 @@ var resultDataList = await Task.Run(() => filter.Apply(sourceData, bitmap.Width,
             }
             
             // 他の画像のバイトデータを取得
-var otherBytes = await other.ToByteArrayAsync().ConfigureAwait(false);
+            var otherBytes = await other.ToByteArrayAsync().ConfigureAwait(false);
 
-return await Task.Run(() => {
-    using var otherImage = new Bitmap(new MemoryStream(otherBytes));
+            return await Task.Run(() => {
+                using var otherImage = new Bitmap(new MemoryStream(otherBytes));
                 int samePixels = 0;
                 int totalPixels = Width * Height;
                 
@@ -594,6 +603,33 @@ return await Task.Run(() => {
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
                 return new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// ネイティブ画像のフォーマットを判断します
+        /// </summary>
+        /// <returns>Baketaのイメージフォーマット</returns>
+        private CoreImageFormat DetermineImageFormat()
+        {
+            // ネイティブ画像の型を确認して判断
+            var nativeImage = _windowsImage.GetNativeImage();
+            
+            if (nativeImage is System.Drawing.Bitmap bitmap)
+            {
+                // PixelFormatから判断
+                return bitmap.PixelFormat switch
+                {
+                    System.Drawing.Imaging.PixelFormat.Format24bppRgb => CoreImageFormat.Rgb24,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb => CoreImageFormat.Rgba32,
+                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb => CoreImageFormat.Rgba32,
+                    System.Drawing.Imaging.PixelFormat.Format32bppRgb => CoreImageFormat.Rgba32,
+                    System.Drawing.Imaging.PixelFormat.Format8bppIndexed => CoreImageFormat.Grayscale8,
+                    _ => CoreImageFormat.Unknown
+                };
+            }
+            
+            // デフォルトはUnknown
+            return CoreImageFormat.Unknown;
         }
         
         /// <summary>

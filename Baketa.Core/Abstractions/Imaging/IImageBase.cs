@@ -19,6 +19,11 @@ namespace Baketa.Core.Abstractions.Imaging
         int Height { get; }
         
         /// <summary>
+        /// 画像のフォーマット
+        /// </summary>
+        ImageFormat Format { get; }
+        
+        /// <summary>
         /// 画像をバイト配列に変換します。
         /// </summary>
         /// <returns>画像データを表すバイト配列</returns>
