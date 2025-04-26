@@ -4,10 +4,8 @@ using OpenCvSharp;
 
 namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
 {
-    /// <summary>
-    /// OpenCV関連の拡張メソッドを提供するクラス
-    /// </summary>
-    internal static class OpenCvExtensions
+    // 内部クラスをテスト用に public に変更
+public static class OpenCvExtensions
     {
         /// <summary>
         /// ThresholdTypeをOpenCVのThresholdTypesに変換します
