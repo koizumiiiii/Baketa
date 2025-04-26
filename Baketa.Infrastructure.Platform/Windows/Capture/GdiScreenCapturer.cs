@@ -276,6 +276,14 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture
         }
         
         /// <summary>
+        /// ファイナライザー
+        /// </summary>
+        ~GdiScreenCapturer()
+        {
+            Dispose(false);
+        }
+        
+        /// <summary>
         /// リソースを解放します
         /// </summary>
         public void Dispose()
