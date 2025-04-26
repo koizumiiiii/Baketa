@@ -1,6 +1,7 @@
 using System;
 using Baketa.Core.Abstractions.OCR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Platform.Windows.OpenCv
@@ -18,20 +19,20 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// <returns>サービスコレクション</returns>
         public static IServiceCollection AddOpenCvServices(
             this IServiceCollection services, 
-            Action<OpenCvOptions> configureOptions = null)
+            Action<OpenCvOptions>? configureOptions = null)
         {
-            // オプション設定
+            ArgumentNullException.ThrowIfNull(services);
             if (configureOptions != null)
             {
                 services.Configure(configureOptions);
             }
             else
             {
-                services.Configure<OpenCvOptions>(_ => {});
+                services.Configure<OpenCvOptions>(_ => { /* デフォルト設定を適用 */ });
             }
             
             // OpenCVラッパーサービスの登録
-            services.AddSingleton<IOpenCvWrapper, WindowsOpenCvWrapper>();
+            services.TryAddSingleton<IOpenCvWrapper, WindowsOpenCvWrapper>();
             
             return services;
         }
@@ -45,7 +46,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// <summary>
         /// 画像処理のデフォルトスレッド数 (0の場合はシステムが自動設定)
         /// </summary>
-        public int DefaultThreadCount { get; set; } = 0;
+        public int DefaultThreadCount { get; set; }
         
         /// <summary>
         /// MSER検出のデフォルトパラメータ

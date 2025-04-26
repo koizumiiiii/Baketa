@@ -86,6 +86,6 @@ namespace Baketa.Core.Abstractions.OCR
         /// <param name="method">テキスト検出方法</param>
         /// <param name="parameters">テキスト検出パラメータ（nullの場合はデフォルト値が使用される）</param>
         /// <returns>検出された矩形のリスト</returns>
-        Task<IReadOnlyList<Rectangle>> DetectTextRegionsAsync(IAdvancedImage source, TextDetectionMethod method, TextDetectionParams parameters = null);
+        Task<IReadOnlyList<Rectangle>> DetectTextRegionsAsync(IAdvancedImage source, TextDetectionMethod method, TextDetectionParams? parameters = null);
     }
 }

@@ -18,12 +18,12 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
         {
             return type switch
             {
-                ThresholdType.Binary => ThresholdTypes.Binary,
-                ThresholdType.BinaryInv => ThresholdTypes.BinaryInv,
-                ThresholdType.Truncate => ThresholdTypes.Trunc,
-                ThresholdType.ToZero => ThresholdTypes.Tozero,
-                ThresholdType.ToZeroInv => ThresholdTypes.TozeroInv,
-                ThresholdType.Otsu => ThresholdTypes.Binary | ThresholdTypes.Otsu,
+                ThresholdType.Binary => OpenCvSharp.ThresholdTypes.Binary,
+                ThresholdType.BinaryInv => OpenCvSharp.ThresholdTypes.BinaryInv,
+                ThresholdType.Truncate => OpenCvSharp.ThresholdTypes.Trunc,
+                ThresholdType.ToZero => OpenCvSharp.ThresholdTypes.Tozero,
+                ThresholdType.ToZeroInv => OpenCvSharp.ThresholdTypes.TozeroInv,
+                ThresholdType.Otsu => OpenCvSharp.ThresholdTypes.Binary | OpenCvSharp.ThresholdTypes.Otsu,
                 ThresholdType.Adaptive => throw new ArgumentException("適応的閾値処理にはApplyAdaptiveThresholdAsyncメソッドを使用してください", nameof(type)),
                 _ => throw new ArgumentException($"未サポートの閾値処理タイプ: {type}", nameof(type))
             };
@@ -38,9 +38,9 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
         {
             return type switch
             {
-                ThresholdType.Binary => ThresholdTypes.Binary,
-                ThresholdType.BinaryInv => ThresholdTypes.BinaryInv,
-                _ => ThresholdTypes.Binary // デフォルトはBinary
+                ThresholdType.Binary => OpenCvSharp.ThresholdTypes.Binary,
+                ThresholdType.BinaryInv => OpenCvSharp.ThresholdTypes.BinaryInv,
+                _ => OpenCvSharp.ThresholdTypes.Binary // デフォルトはBinary
             };
         }
 
@@ -53,8 +53,8 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
         {
             return type switch
             {
-                AdaptiveThresholdType.Mean => AdaptiveThresholdTypes.MeanC,
-                AdaptiveThresholdType.Gaussian => AdaptiveThresholdTypes.GaussianC,
+                AdaptiveThresholdType.Mean => OpenCvSharp.AdaptiveThresholdTypes.MeanC,
+                AdaptiveThresholdType.Gaussian => OpenCvSharp.AdaptiveThresholdTypes.GaussianC,
                 _ => throw new ArgumentException($"未サポートの適応的閾値処理タイプ: {type}", nameof(type))
             };
         }
@@ -68,13 +68,13 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
         {
             return type switch
             {
-                MorphType.Erode => MorphTypes.Erode,
-                MorphType.Dilate => MorphTypes.Dilate,
-                MorphType.Open => MorphTypes.Open,
-                MorphType.Close => MorphTypes.Close,
-                MorphType.Gradient => MorphTypes.Gradient,
-                MorphType.TopHat => MorphTypes.TopHat,
-                MorphType.BlackHat => MorphTypes.BlackHat,
+                MorphType.Erode => OpenCvSharp.MorphTypes.Erode,
+                MorphType.Dilate => OpenCvSharp.MorphTypes.Dilate,
+                MorphType.Open => OpenCvSharp.MorphTypes.Open,
+                MorphType.Close => OpenCvSharp.MorphTypes.Close,
+                MorphType.Gradient => OpenCvSharp.MorphTypes.Gradient,
+                MorphType.TopHat => OpenCvSharp.MorphTypes.TopHat,
+                MorphType.BlackHat => OpenCvSharp.MorphTypes.BlackHat,
                 _ => throw new ArgumentException($"未サポートのモルフォロジー演算タイプ: {type}", nameof(type))
             };
         }
