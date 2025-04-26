@@ -26,6 +26,7 @@ namespace Baketa.Core.Tests.Imaging
 
         public int Width => _width;
         public int Height => _height;
+        public ImageFormat Format => ImageFormat.Rgba32; // テスト用のデフォルトフォーマット
         
         public IImage Clone()
         {

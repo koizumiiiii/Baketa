@@ -14,7 +14,7 @@ using System.Runtime.CompilerServices;
 
 namespace Baketa.UI
 {
-    internal partial class App : Avalonia.Application
+    internal sealed partial class App : Avalonia.Application
     {
         private ILogger<App>? _logger;
         private IEventAggregator? _eventAggregator;
