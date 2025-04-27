@@ -1,0 +1,153 @@
+using System;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Reactive.Disposables;
+using System.Threading.Tasks;
+using Baketa.UI.Framework;
+using Baketa.UI.Framework.Events;
+using Microsoft.Extensions.Logging;
+using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
+using ReactiveUI.Validation.Extensions;
+
+namespace Baketa.UI.ViewModels.Examples
+{
+    /// <summary>
+    /// ReactiveUIパターンの使用例を示すサンプルビューモデル
+    /// </summary>
+    public class ReactiveViewModelExample : ViewModelBase
+    {
+        // Fodyによる自動プロパティ変更通知を使用したプロパティ
+        [Reactive] public string Name { get; set; } = string.Empty;
+        [Reactive] public string Description { get; set; } = string.Empty;
+        [Reactive] public bool IsActive { get; set; }
+        
+        // ObservableAsPropertyHelperを使用した派生プロパティ
+        private readonly ObservableAsPropertyHelper<bool> _canSave;
+        public bool CanSave => _canSave.Value;
+        
+        // コマンド
+        public ReactiveCommand<Unit, Unit> SaveCommand { get; }
+        public ReactiveCommand<Unit, Unit> ResetCommand { get; }
+        
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="eventAggregator">イベント集約器</param>
+        /// <param name="logger">ロガー</param>
+        public ReactiveViewModelExample(IEventAggregator eventAggregator, ILogger logger = null) 
+            : base(eventAggregator, logger)
+        {
+            // バリデーションルールの追加
+            var nameRule = this.ValidationRule(
+                vm => vm.Name,
+                name => !string.IsNullOrWhiteSpace(name),
+                "名前は必須項目です");
+            _disposables.Add(nameRule);
+            
+            var descRule = this.ValidationRule(
+                vm => vm.Description,
+                description => description?.Length <= 100,
+                "説明は100文字以内で入力してください");
+            _disposables.Add(descRule);
+                
+            // 派生プロパティの設定（Name, Descriptionの両方が有効な場合のみ保存可能）
+            _canSave = this.WhenAnyValue(
+                x => x.Name,
+                x => x.Description,
+                (name, desc) => 
+                    !string.IsNullOrWhiteSpace(name) &&
+                    !(desc?.Length > 100))
+                .ToProperty(this, x => x.CanSave);
+            _disposables.Add(_canSave);
+                
+            // コマンドの作成
+            SaveCommand = ReactiveCommandFactory.Create(
+                    ExecuteSaveAsync,
+                    this.WhenAnyValue(x => x.CanSave))
+                .WithLogging("Save", logger as ILogger<ReactiveViewModelExample>);
+            _disposables.Add(SaveCommand);
+                
+            ResetCommand = ReactiveCommandFactory.Create(
+                    ExecuteResetAsync)
+                .WithLogging("Reset", logger as ILogger<ReactiveViewModelExample>);
+            _disposables.Add(ResetCommand);
+        }
+        
+        /// <summary>
+        /// 保存コマンドの実行処理
+        /// </summary>
+        private async Task ExecuteSaveAsync()
+        {
+            try
+            {
+                IsLoading = true;
+                ErrorMessage = null;
+                
+                _logger?.LogInformation("データを保存します: {Name}", Name);
+                
+                // 保存処理の模擬
+                await Task.Delay(1000);
+                
+                // イベントの発行
+                await PublishEventAsync(new DataSavedEvent(Name));
+                
+                _logger?.LogInformation("データが正常に保存されました");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "保存処理でエラーが発生しました");
+                ErrorMessage = "保存に失敗しました: " + ex.Message;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+        
+        /// <summary>
+        /// リセットコマンドの実行処理
+        /// </summary>
+        private async Task ExecuteResetAsync()
+        {
+            _logger?.LogInformation("データをリセットします");
+            
+            // リアクティブプログラミングのメリットを示すため、変更通知を遅延
+            using (DelayChangeNotifications())
+            {
+                Name = string.Empty;
+                Description = string.Empty;
+                IsActive = false;
+                ErrorMessage = null;
+            }
+            
+            // 非同期処理の例示
+            await Task.CompletedTask;
+        }
+        
+        /// <summary>
+        /// アクティベーション時の処理
+        /// </summary>
+        protected override void HandleActivation()
+        {
+            base.HandleActivation();
+            
+            // イベント購読の例
+            SubscribeToEvent<DataRequestEvent>(async _ => 
+            {
+                _logger?.LogInformation("データリクエストイベントを受信しました");
+                await ExecuteSaveAsync();
+            });
+        }
+    }
+    
+    /// <summary>
+    /// データ保存イベント
+    /// </summary>
+    public record DataSavedEvent(string Name) : IEvent;
+    
+    /// <summary>
+    /// データリクエストイベント
+    /// </summary>
+    public record DataRequestEvent : IEvent;
+}
