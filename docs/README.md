@@ -50,6 +50,9 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 #### UI システム
 - [Avalonia UI実装計画](3-architecture/ui-system/avalonia-migration.md)
 - [Avalonia UIガイドライン](3-architecture/ui-system/avalonia-guidelines.md)
+- [ReactiveUI実装ガイド](3-architecture/ui-system/reactiveui-guide.md)
+- [ReactiveUIバージョン互換性ガイド](3-architecture/ui-system/reactiveui-version-compatibility.md)
+- [Issue56実装ノート](3-architecture/ui-system/issue56-implementation-notes.md)
 
 #### OCR システム
 - [OCRアプローチ](3-architecture/ocr-system/ocr-opencv-approach.md)

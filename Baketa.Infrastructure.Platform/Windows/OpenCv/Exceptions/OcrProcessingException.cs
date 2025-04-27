@@ -10,7 +10,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions
         /// <summary>
         /// 新しいOcrProcessingExceptionインスタンスを初期化します
         /// </summary>
-        public OcrProcessingException() : base() { }
+        public OcrProcessingException() : base("") { }
 
         /// <summary>
         /// 指定されたエラーメッセージを使用して、新しいOcrProcessingExceptionインスタンスを初期化します
