@@ -60,9 +60,12 @@ namespace Baketa.UI.DI.Modules
         /// <summary>
         /// UI関連サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterUIServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterUIServices(IServiceCollection services)
         {
+            // 現在は実装されていないため空のメソッドとして残す
+            // 将来的に実装される予定の内容：
+            
             // ダイアログサービスやナビゲーションサービス
             // 例: services.AddSingleton<IDialogService, AvaloniaDialogService>();
             // 例: services.AddSingleton<INotificationService, AvaloniaNotificationService>();
@@ -76,14 +79,19 @@ namespace Baketa.UI.DI.Modules
             
             // UIヘルパー
             // 例: services.AddSingleton<IClipboardService, AvaloniaClipboardService>();
+            
+            _ = services; // 未使用警告の抑制
         }
         
         /// <summary>
         /// 設定系UIを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterSettingsUI(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterSettingsUI(IServiceCollection services)
         {
+            // 現在は実装されていないため空のメソッドとして残す
+            // 将来的に実装される予定の内容：
+            
             // 設定ViewModelと関連サービス
             // 例: services.AddTransient<SettingsViewModel>();
             // 例: services.AddTransient<GeneralSettingsViewModel>();
@@ -99,6 +107,8 @@ namespace Baketa.UI.DI.Modules
             
             // リアルタイムプレビュー
             // 例: services.AddSingleton<IPreviewService, PreviewService>();
+            
+            _ = services; // 未使用警告の抑制
         }
         
         /// <summary>
