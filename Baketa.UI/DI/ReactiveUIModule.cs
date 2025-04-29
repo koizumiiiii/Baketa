@@ -70,24 +70,12 @@ namespace Baketa.UI.DI
     /// <summary>
     /// ホストビルダーコンテキスト（アプリケーション起動時の初期化用）
     /// </summary>
-    /// <summary>
-    /// ホストビルダーコンテキスト（アプリケーション起動時の初期化用）
-    /// </summary>
     /// <param name="serviceProvider">サービスプロバイダー</param>
-    internal class HostBuilderContext
+    internal class HostBuilderContext(System.IServiceProvider serviceProvider)
     {
         /// <summary>
         /// サービスプロバイダー
         /// </summary>
-        public System.IServiceProvider ServiceProvider { get; }
-
-        /// <summary>
-        /// 新しいホストビルダーコンテキストを初期化します
-        /// </summary>
-        /// <param name="serviceProvider">サービスプロバイダー</param>
-        public HostBuilderContext(System.IServiceProvider serviceProvider)
-        {
-            ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        }
+        public System.IServiceProvider ServiceProvider { get; } = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 }
