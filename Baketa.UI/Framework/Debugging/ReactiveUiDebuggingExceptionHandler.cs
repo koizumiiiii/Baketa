@@ -1,65 +1,48 @@
 using System;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using ReactiveUI;
 
 namespace Baketa.UI.Framework.Debugging
 {
     /// <summary>
-    /// ReactiveUI用デバッグ例外ハンドラ
+    /// ReactiveUIのデバッグ用例外ハンドラー
     /// </summary>
-    internal sealed class ReactiveUiDebuggingExceptionHandler(ILogger? logger = null) : IObserver<Exception>
+    internal sealed class ReactiveUiDebuggingExceptionHandler(ILogger<ReactiveUiDebuggingExceptionHandler>? logger = null) : IObserver<Exception>
     {
-        private readonly ILogger? _logger = logger;
-
-        // LoggerMessage デリゲートを定義
-        private static readonly Action<ILogger, string, Exception> _logReactiveUiException =
-            LoggerMessage.Define<string>(
-                LogLevel.Error,
-                new EventId(1, "ReactiveUiException"),
-                "[ReactiveUI例外] {ExceptionMessage}");
-
-        /// <inheritdoc/>
+        private readonly ILogger<ReactiveUiDebuggingExceptionHandler>? _logger = logger;
+        
+        /// <summary>
+        /// シーケンスの完了通知
+        /// </summary>
         public void OnCompleted()
         {
-            // 何もしない
+            _logger?.LogInformation("ReactiveUI例外シーケンスが完了しました");
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// エラー通知
+        /// </summary>
+        /// <param name="error">エラー</param>
         public void OnError(Exception error)
         {
-            ArgumentNullException.ThrowIfNull(error);
-            HandleException(error);
+            _logger?.LogError(error, "ReactiveUI例外ハンドラーでエラーが発生しました");
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// 例外通知
+        /// </summary>
+        /// <param name="value">例外</param>
         public void OnNext(Exception value)
         {
-            ArgumentNullException.ThrowIfNull(value);
-            HandleException(value);
-        }
-
-        private void HandleException(Exception ex)
-        {
-            var message = $"[ReactiveUI例外] {ex.GetType().Name}: {ex.Message}";
-            Debug.WriteLine(message);
-            Debug.WriteLine(ex.StackTrace);
+            // このハンドラーはReactiveUIフレームワーク内で発生した例外をログに記録する
+            _logger?.LogError(value, "ReactiveUIで未処理の例外が発生しました: {ExceptionType}", value.GetType().Name);
             
-            if (_logger != null)
+            #if DEBUG
+            // デバッグビルドではスタックトレースをより詳細にログ出力
+            if (value.StackTrace != null)
             {
-                _logReactiveUiException(_logger, $"{ex.GetType().Name}: {ex.Message}", ex);
+                _logger?.LogDebug("スタックトレース: {StackTrace}", value.StackTrace);
             }
+            #endif
         }
-    }
-
-    /// <summary>
-    /// コマンド実行メッセージ（デバッグ用）
-    /// </summary>
-    internal sealed class ExecuteCommandMessage(string commandName)
-    {
-        /// <summary>
-        /// コマンド名
-        /// </summary>
-        public string CommandName { get; } = commandName;
     }
 }

@@ -6,11 +6,11 @@ using ReactiveUI;
 namespace Baketa.UI.Views
 {
     /// <summary>
-    /// メインウィンドウ
+    /// 翻訳設定画面のビュー
     /// </summary>
-    internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
+    internal partial class TranslationView : ReactiveUserControl<TranslationViewModel>
     {
-        public MainWindow()
+        public TranslationView()
         {
             InitializeComponent();
             

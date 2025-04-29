@@ -1,0 +1,231 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.OverlayView"
+             x:DataType="vm:OverlayViewModel">
+    
+    <Design.DataContext>
+        <vm:OverlayViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="オーバーレイ設定" 
+                       Classes="TitleTextBlockStyle"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="翻訳結果を表示するオーバーレイの見た目や位置を設定します。" 
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,10">
+                <!-- 表示設定 -->
+                <Border Grid.Row="0" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,0,10,10">
+                    <StackPanel>
+                        <TextBlock Text="表示設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <CheckBox Content="オーバーレイを表示する" 
+                                  IsChecked="{Binding IsOverlayVisible}"
+                                  Margin="0,5,0,10"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 配色設定 -->
+                <Border Grid.Row="0" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="配色設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="テキスト色:" 
+                                       VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" 
+                                     Text="{Binding TextColor}" 
+                                     Margin="10,0,0,5"
+                                     Watermark="#FFFFFF"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="背景色:" 
+                                       VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" 
+                                     Text="{Binding BackgroundColor}" 
+                                     Margin="10,0,0,5"
+                                     Watermark="#000000"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="背景透明度:" 
+                                       VerticalAlignment="Center"/>
+                            <Slider Grid.Row="2" Grid.Column="1" 
+                                   Value="{Binding BackgroundOpacity}" 
+                                   Minimum="0" 
+                                   Maximum="1"
+                                   TickFrequency="0.1"
+                                   Margin="10,5,0,5"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- フォント設定 -->
+                <Border Grid.Row="1" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,10,10,10">
+                    <StackPanel>
+                        <TextBlock Text="フォント設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="フォント:" 
+                                       VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" 
+                                      ItemsSource="{Binding AvailableFonts}"
+                                      SelectedItem="{Binding FontFamily}"
+                                      Width="200"
+                                      HorizontalAlignment="Left"
+                                      Margin="10,0,0,5"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="サイズ:" 
+                                       VerticalAlignment="Center"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                          Value="{Binding FontSize}"
+                                          Minimum="8"
+                                          Maximum="36"
+                                          Increment="1"
+                                          Width="100"
+                                          HorizontalAlignment="Left"
+                                          Margin="10,0,0,5"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="太字:" 
+                                       VerticalAlignment="Center"/>
+                            <CheckBox Grid.Row="2" Grid.Column="1" 
+                                      IsChecked="{Binding IsBold}"
+                                      Margin="10,0,0,5"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 位置設定 -->
+                <Border Grid.Row="1" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,10,0,10">
+                    <StackPanel>
+                        <TextBlock Text="位置設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" 
+                                       Text="位置:" 
+                                       VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" 
+                                      ItemsSource="{Binding AvailablePositions}"
+                                      SelectedItem="{Binding Position}"
+                                      Width="100"
+                                      HorizontalAlignment="Left"
+                                      Margin="10,0,0,5"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" 
+                                       Text="X位置調整:" 
+                                       VerticalAlignment="Center"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" 
+                                          Value="{Binding OffsetX}"
+                                          Minimum="-500"
+                                          Maximum="500"
+                                          Increment="10"
+                                          Width="100"
+                                          HorizontalAlignment="Left"
+                                          Margin="10,0,0,5"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" 
+                                       Text="Y位置調整:" 
+                                       VerticalAlignment="Center"/>
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" 
+                                          Value="{Binding OffsetY}"
+                                          Minimum="-500"
+                                          Maximum="500"
+                                          Increment="10"
+                                          Width="100"
+                                          HorizontalAlignment="Left"
+                                          Margin="10,0,0,5"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- インタラクション設定 -->
+                <Border Grid.Row="2" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,10,10,10">
+                    <StackPanel>
+                        <TextBlock Text="インタラクション設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <CheckBox Content="ドラッグ移動を許可" 
+                                  IsChecked="{Binding AllowDrag}"
+                                  Margin="0,5,0,5"/>
+                        <CheckBox Content="サイズ変更を許可" 
+                                  IsChecked="{Binding AllowResize}"
+                                  Margin="0,5,0,5"/>
+                        <CheckBox Content="閉じるボタンを表示" 
+                                  IsChecked="{Binding ShowCloseButton}"
+                                  Margin="0,5,0,5"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- プレビュー -->
+                <Border Grid.Row="2" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,10,0,10">
+                    <StackPanel>
+                        <TextBlock Text="プレビュー" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Button Content="プレビューを表示" 
+                                Command="{Binding PreviewOverlayCommand}" 
+                                Classes="primary" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,5,0,10"/>
+                        <Border Background="#000000" 
+                                Opacity="0.7"
+                                Width="300"
+                                Height="80"
+                                HorizontalAlignment="Center"
+                                CornerRadius="4">
+                            <TextBlock Text="これは翻訳テキストのプレビューです" 
+                                       Foreground="White"
+                                       FontFamily="Yu Gothic UI"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+                
+                <!-- ボタン -->
+                <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,20,0,0">
+                    <Button Content="設定をリセット" 
+                            Command="{Binding ResetSettingsCommand}" 
+                            Classes="secondary" 
+                            Margin="0,0,10,0"/>
+                    <Button Content="設定を保存" 
+                            Command="{Binding SaveSettingsCommand}" 
+                            Classes="primary"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
