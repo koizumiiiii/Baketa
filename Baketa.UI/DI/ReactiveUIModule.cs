@@ -1,81 +1,52 @@
 using System;
 using Baketa.UI.Framework.Debugging;
-using Baketa.UI.Framework.Navigation;
-using Baketa.UI.ViewModels.Examples;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using Splat;
+using Splat.Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.UI.DI
 {
     /// <summary>
-    /// ReactiveUI関連サービスを登録するDIモジュール
+    /// ReactiveUIサービスを登録するモジュール
     /// </summary>
     internal static class ReactiveUIModule
     {
         /// <summary>
-        /// ReactiveUI関連サービスを登録します
+        /// ReactiveUIサービスを登録します
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        /// <param name="enableDebugMode">デバッグモードを有効化するかどうか</param>
+        /// <param name="enableDebugMode">デバッグモードを有効にするかどうか</param>
         /// <returns>サービスコレクション</returns>
         public static IServiceCollection AddReactiveUIServices(
             this IServiceCollection services,
             bool enableDebugMode = false)
         {
-            // ReactiveUIの基本設定をサービスに登録
-            // AddReactiveUIメソッドが定義されていない場合は直接サービスを登録
-            services.AddSingleton<IViewLocator, DefaultViewLocator>();
-            // RoutingStateのインスタンスを先に作成
-            services.AddSingleton<RoutingState>();
+            // SplatアダプターでReactiveUIのサービスをDIコンテナに接続
+            services.UseMicrosoftDependencyResolver();
             
-            // IScreenを実装するクラスを登録
-            services.AddSingleton<IScreen>(sp => {
-                var routingState = sp.GetRequiredService<RoutingState>();
-                // IScreenインターフェースを実装するクラスを返す
-                return new ScreenAdapter(routingState);
-            });
+            var resolver = Splat.Locator.CurrentMutable;
+            resolver.InitializeSplat();
+            resolver.InitializeReactiveUI();
             
-            // IScreenのアダプタークラスを追加
-            services.AddTransient<ScreenAdapter>();
-            
+            // カスタム例外ハンドラー設定
             if (enableDebugMode)
             {
-                // デバッグ機能を有効化
-                // カスタム例外ハンドラを使用
-                RxApp.DefaultExceptionHandler = new ReactiveUiDebuggingExceptionHandler();
+                // デバッグモードでは詳細な例外情報をログに出力
+                services.AddSingleton<ReactiveUiDebuggingExceptionHandler>();
+                services.AddSingleton<IObserver<Exception>>(provider => 
+                    provider.GetRequiredService<ReactiveUiDebuggingExceptionHandler>());
             }
-            
-            // サンプルビューモデルを登録
-            services.AddTransient<ReactiveViewModelExample>();
-            
-            // 必要に応じて、ホストでサービスプロバイダーが作成された後にデバッグモードを有効化
-            if (enableDebugMode)
+            else
             {
-                services.AddSingleton<Action<System.IServiceProvider>>(sp =>
-                {
-                    // RxApp初期化後にデバッグモードを有効化
-                    var logger = sp.GetRequiredService<ILogger<object>>();
-                    var debugLogger = sp.GetRequiredService<ILogger<object>>();
-                    ReactiveUiDebugging.EnableReactiveUiDebugMode(debugLogger);
-                });
-                
-                services.AddSingleton<HostBuilderContext>();
+                // 本番モードではシンプルなログ出力
+                services.AddSingleton<IObserver<Exception>>(provider => 
+                    new ReactiveUiDebuggingExceptionHandler(
+                        provider.GetService<ILogger<ReactiveUiDebuggingExceptionHandler>>()));
             }
-
+            
             return services;
         }
-    }
-
-    /// <summary>
-    /// ホストビルダーコンテキスト（アプリケーション起動時の初期化用）
-    /// </summary>
-    /// <param name="serviceProvider">サービスプロバイダー</param>
-    internal class HostBuilderContext(System.IServiceProvider serviceProvider)
-    {
-        /// <summary>
-        /// サービスプロバイダー
-        /// </summary>
-        public System.IServiceProvider ServiceProvider { get; } = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 }

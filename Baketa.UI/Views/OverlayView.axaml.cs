@@ -6,11 +6,11 @@ using ReactiveUI;
 namespace Baketa.UI.Views
 {
     /// <summary>
-    /// メインウィンドウ
+    /// オーバーレイ設定画面のビュー
     /// </summary>
-    internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
+    internal partial class OverlayView : ReactiveUserControl<OverlayViewModel>
     {
-        public MainWindow()
+        public OverlayView()
         {
             InitializeComponent();
             

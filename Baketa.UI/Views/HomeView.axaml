@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.HomeView"
+             x:DataType="vm:HomeViewModel">
+    
+    <Design.DataContext>
+        <vm:HomeViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="{Binding WelcomeMessage}" 
+                       Classes="TitleTextBlockStyle"
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding AppDescription}" 
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding StatusMessage}" 
+                       Foreground="{DynamicResource InfoBrush}"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="*,*" Margin="0,10">
+            <!-- クイックスタート -->
+            <Border Grid.Row="0" Grid.Column="0" 
+                    Classes="card" 
+                    Margin="0,0,10,10">
+                <StackPanel>
+                    <TextBlock Text="クイックスタート" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,10"/>
+                    <Button Content="キャプチャを開始" 
+                            Command="{Binding StartCaptureCommand}" 
+                            Classes="primary" 
+                            HorizontalAlignment="Stretch" 
+                            Margin="0,5,0,5"/>
+                    <Button Content="翻訳設定" 
+                            Command="{Binding OpenSettingsCommand}" 
+                            Classes="secondary" 
+                            HorizontalAlignment="Stretch" 
+                            Margin="0,5,0,5"/>
+                    <Button Content="ヘルプ" 
+                            Command="{Binding OpenHelpCommand}" 
+                            Classes="secondary" 
+                            HorizontalAlignment="Stretch" 
+                            Margin="0,5,0,5"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- 最近の翻訳 -->
+            <Border Grid.Row="0" Grid.Column="1" 
+                    Classes="card" 
+                    Margin="10,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="最近の翻訳" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,10"/>
+                    <TextBlock Text="翻訳履歴はまだありません" 
+                               Foreground="{DynamicResource TextSecondaryBrush}" 
+                               IsVisible="{Binding !HasHistory}"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"
+                               Margin="0,20"/>
+                    <!-- 履歴データがある場合は表示 -->
+                </StackPanel>
+            </Border>
+            
+            <!-- 使用状況 -->
+            <Border Grid.Row="1" Grid.Column="0" 
+                    Classes="card" 
+                    Margin="0,10,10,0">
+                <StackPanel>
+                    <TextBlock Text="使用状況" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,10"/>
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="キャプチャ状態:"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="停止中" Margin="10,0,0,0"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="翻訳エンジン:"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Google" Margin="10,0,0,0"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="翻訳先言語:"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="英語" Margin="10,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- ヒント -->
+            <Border Grid.Row="1" Grid.Column="1" 
+                    Classes="card" 
+                    Margin="10,10,0,0">
+                <StackPanel>
+                    <TextBlock Text="ヒント" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,10"/>
+                    <TextBlock Text="• 左側のタブから各機能を開くことができます" TextWrapping="Wrap" Margin="0,2"/>
+                    <TextBlock Text="• キャプチャ開始前に、ゲーム画面の翻訳したい領域を選択してください" TextWrapping="Wrap" Margin="0,2"/>
+                    <TextBlock Text="• オーバーレイ設定で表示位置やフォントをカスタマイズできます" TextWrapping="Wrap" Margin="0,2"/>
+                    <TextBlock Text="• 翻訳履歴から過去の翻訳内容を確認できます" TextWrapping="Wrap" Margin="0,2"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

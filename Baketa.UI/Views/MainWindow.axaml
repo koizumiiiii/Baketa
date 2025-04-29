@@ -3,18 +3,103 @@
         xmlns:vm="using:Baketa.UI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:local="using:Baketa.UI.Views"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
         x:Class="Baketa.UI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Baketa.UI">
+        Title="Baketa - ゲーム翻訳オーバーレイ"
+        MinWidth="600" MinHeight="400">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- ヘッダー -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Background="{DynamicResource HeaderBackground}">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,5">
+                <Image Source="/Assets/avalonia-logo.ico" Width="24" Height="24" Margin="0,0,10,0"/>
+                <TextBlock Text="Baketa" 
+                           VerticalAlignment="Center" 
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextOnPrimaryBrush}"/>
+            </StackPanel>
+            
+            <Menu Grid.Column="1" Margin="20,0" Foreground="{DynamicResource TextOnPrimaryBrush}">
+                <MenuItem Header="ファイル">
+                    <MenuItem Header="設定" Command="{Binding OpenSettingsCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="終了" Command="{Binding ExitCommand}"/>
+                </MenuItem>
+                <MenuItem Header="キャプチャ">
+                    <MenuItem Header="キャプチャ開始" Command="{Binding StartCaptureCommand}"/>
+                    <MenuItem Header="キャプチャ停止" Command="{Binding StopCaptureCommand}"/>
+                    <MenuItem Header="領域選択" Command="{Binding SelectRegionCommand}"/>
+                </MenuItem>
+                <MenuItem Header="ツール">
+                    <MenuItem Header="ログビューア" Command="{Binding OpenLogViewerCommand}"/>
+                    <MenuItem Header="翻訳履歴" Command="{Binding OpenTranslationHistoryCommand}"/>
+                </MenuItem>
+                <MenuItem Header="ヘルプ">
+                    <MenuItem Header="使い方" Command="{Binding OpenHelpCommand}"/>
+                    <MenuItem Header="バージョン情報" Command="{Binding OpenAboutCommand}"/>
+                </MenuItem>
+            </Menu>
+            
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,5">
+                <Button Command="{Binding MinimizeToTrayCommand}" 
+                        ToolTip.Tip="トレイに最小化"
+                        Classes="headerIcon">
+                    <PathIcon Data="{StaticResource MinimizeIcon}"/>
+                </Button>
+            </StackPanel>
+        </Grid>
 
+        <!-- メインコンテンツエリア -->
+        <TabControl Grid.Row="1" 
+                    TabStripPlacement="Left" 
+                    SelectedIndex="{Binding SelectedTabIndex}">
+            <TabItem Header="ホーム" ToolTip.Tip="ホーム画面">
+                <local:HomeView DataContext="{Binding HomeViewModel}"/>
+            </TabItem>
+            <TabItem Header="キャプチャ" ToolTip.Tip="キャプチャ設定">
+                <local:CaptureView DataContext="{Binding CaptureViewModel}"/>
+            </TabItem>
+            <TabItem Header="翻訳" ToolTip.Tip="翻訳設定">
+                <local:TranslationView DataContext="{Binding TranslationViewModel}"/>
+            </TabItem>
+            <TabItem Header="オーバーレイ" ToolTip.Tip="オーバーレイ設定">
+                <local:OverlayView DataContext="{Binding OverlayViewModel}"/>
+            </TabItem>
+            <TabItem Header="履歴" ToolTip.Tip="翻訳履歴">
+                <local:HistoryView DataContext="{Binding HistoryViewModel}"/>
+            </TabItem>
+        </TabControl>
+        
+        <!-- ステータスバー -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Background="{DynamicResource StatusBarBackground}">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,2">
+                <TextBlock Text="{Binding StatusMessage}" 
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextOnPrimaryBrush}"/>
+            </StackPanel>
+            
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,2">
+                <TextBlock Text="{Binding TranslationEngine}" 
+                           Margin="0,0,10,0" 
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextOnPrimaryBrush}"/>
+                <TextBlock Text="{Binding CaptureStatus}" 
+                           Margin="0,0,10,0" 
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextOnPrimaryBrush}"/>
+                <ProgressBar Value="{Binding Progress}" 
+                             Width="100" 
+                             Height="16" 
+                             Margin="0,0,10,0"
+                             IsVisible="{Binding IsProcessing}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
 </Window>

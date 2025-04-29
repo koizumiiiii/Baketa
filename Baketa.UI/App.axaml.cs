@@ -1,16 +1,13 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Baketa.Core.Events;
-using Baketa.Core.Events.EventTypes;
-// using Baketa.UI.Services; // 必要なサービスは後で追加
+using Baketa.UI.Framework.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
-using System.Runtime.CompilerServices;
 
 namespace Baketa.UI
 {
@@ -62,17 +59,17 @@ namespace Baketa.UI
                     
                     _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                     
-                    // MainViewModelを取得
-                    var mainViewModel = serviceProvider.GetRequiredService<MainViewModel>();
+                    // MainWindowViewModelを取得
+                    var mainWindowViewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
                     
                     // MainWindowを設定
                     desktop.MainWindow = new MainWindow
                     {
-                        DataContext = mainViewModel,
+                        DataContext = mainWindowViewModel,
                     };
                     
                     // アプリケーション起動完了イベントをパブリッシュ
-                    _eventAggregator.PublishAsync(new ApplicationStartupEvent());
+                    _eventAggregator.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
                     
                     if (_logger != null)
                     {
@@ -131,5 +128,14 @@ namespace Baketa.UI
                 }
             }
         }
+    }
+    
+    // イベント定義
+    internal class ApplicationStartupEvent : IEvent
+    {
+    }
+    
+    internal class ApplicationShutdownEvent : IEvent
+    {
     }
 }

@@ -26,9 +26,8 @@ namespace Baketa.UI.DI
             var enableDebugMode = environment == BaketaEnvironment.Development;
             services.AddReactiveUIServices(enableDebugMode);
             
-            // 必要なビューモデルやサービスの登録
-            UIModule.RegisterViewModels(services);
-            UIModule.RegisterServices(services, environment);
+            // UIサービスとビューモデルを登録
+            services.RegisterUIServices();
             
             return services;
         }

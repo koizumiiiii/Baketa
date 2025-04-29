@@ -6,11 +6,11 @@ using ReactiveUI;
 namespace Baketa.UI.Views
 {
     /// <summary>
-    /// メインウィンドウ
+    /// ホーム画面のビュー
     /// </summary>
-    internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
+    internal partial class HomeView : ReactiveUserControl<HomeViewModel>
     {
-        public MainWindow()
+        public HomeView()
         {
             InitializeComponent();
             

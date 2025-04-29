@@ -1,0 +1,149 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.TranslationView"
+             x:DataType="vm:TranslationViewModel">
+    
+    <Design.DataContext>
+        <vm:TranslationViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="翻訳設定" 
+                       Classes="TitleTextBlockStyle"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="テキスト翻訳に関する設定を行います。翻訳エンジンや言語を選択できます。" 
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,10">
+                <!-- 言語設定 -->
+                <Border Grid.Row="0" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,0,10,10">
+                    <StackPanel>
+                        <TextBlock Text="言語設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="翻訳先言語:" 
+                                   Margin="0,0,0,5"/>
+                        <ComboBox ItemsSource="{Binding AvailableLanguages}" 
+                                  SelectedItem="{Binding TargetLanguage}"
+                                  Width="200"
+                                  HorizontalAlignment="Left"
+                                  Margin="0,0,0,10"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 翻訳エンジン -->
+                <Border Grid.Row="0" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="翻訳エンジン" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="使用する翻訳エンジン:" 
+                                   Margin="0,0,0,5"/>
+                        <ComboBox ItemsSource="{Binding AvailableEngines}" 
+                                  SelectedItem="{Binding TranslationEngine}"
+                                  Width="200"
+                                  HorizontalAlignment="Left"
+                                  Margin="0,0,0,10"/>
+                        <TextBlock Text="APIキー (必要な場合):" 
+                                   Margin="0,10,0,5"/>
+                        <TextBox Text="{Binding ApiKey}" 
+                                 Width="300"
+                                 HorizontalAlignment="Left"
+                                 PasswordChar="*"
+                                 Watermark="APIキーを入力"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 翻訳設定 -->
+                <Border Grid.Row="1" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,10,10,10">
+                    <StackPanel>
+                        <TextBlock Text="翻訳設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <CheckBox Content="自動翻訳を有効にする" 
+                                  IsChecked="{Binding AutoTranslate}"
+                                  Margin="0,5,0,5"/>
+                        <CheckBox Content="翻訳キャッシュを使用する" 
+                                  IsChecked="{Binding UseCache}"
+                                  Margin="0,5,0,5"/>
+                        <TextBlock Text="キャッシュ有効期間 (時間):" 
+                                   Margin="0,10,0,5"/>
+                        <NumericUpDown Value="{Binding CacheExpiration}" 
+                                       Minimum="1" 
+                                       Maximum="720" 
+                                       Increment="1"
+                                       Width="200"
+                                       HorizontalAlignment="Left"/>
+                        <Button Content="キャッシュをクリア" 
+                                Command="{Binding ClearCacheCommand}" 
+                                Classes="secondary" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- テスト翻訳 -->
+                <Border Grid.Row="1" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,10,0,10">
+                    <StackPanel>
+                        <TextBlock Text="テスト翻訳" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="翻訳テスト用のテキスト:" 
+                                   Margin="0,0,0,5"/>
+                        <TextBox Text="{Binding TestText}" 
+                                 Watermark="翻訳するテキストを入力"
+                                 Height="80"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"/>
+                        <Button Content="テスト翻訳" 
+                                Command="{Binding TestTranslationCommand}" 
+                                Classes="primary" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,10,0,10"/>
+                        <TextBlock Text="翻訳結果:" 
+                                   Margin="0,0,0,5"/>
+                        <Border Background="{DynamicResource BackgroundDarkBrush}" 
+                                BorderBrush="{DynamicResource BackgroundDarkBrush}" 
+                                BorderThickness="1" 
+                                CornerRadius="4" 
+                                Padding="10">
+                            <TextBlock Text="{Binding TranslatedText}" 
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                        <ProgressBar IsVisible="{Binding IsLoading}" 
+                                     IsIndeterminate="True"
+                                     Margin="0,10,0,0"
+                                     Height="4"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 保存ボタン -->
+                <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                        Margin="0,10,0,0"
+                        Padding="0">
+                    <Button Content="設定を保存" 
+                            Command="{Binding SaveSettingsCommand}"
+                            Classes="primary"
+                            HorizontalAlignment="Right"/>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -6,11 +6,11 @@ using ReactiveUI;
 namespace Baketa.UI.Views
 {
     /// <summary>
-    /// メインウィンドウ
+    /// キャプチャ設定画面のビュー
     /// </summary>
-    internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
+    internal partial class CaptureView : ReactiveUserControl<CaptureViewModel>
     {
-        public MainWindow()
+        public CaptureView()
         {
             InitializeComponent();
             
