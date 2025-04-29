@@ -31,9 +31,12 @@ namespace Baketa.UI.Framework
             if (EqualityComparer<TProperty>.Default.Equals(backingField, newValue))
                 return false;
                 
-            This.RaisePropertyChanging(propertyName);
+            // nullの場合は空文字列を使用
+            var safeName = propertyName ?? string.Empty;
+            
+            This.RaisePropertyChanging(safeName);
             backingField = newValue;
-            This.RaisePropertyChanged(propertyName);
+            This.RaisePropertyChanged(safeName);
             return true;
         }
         
@@ -42,12 +45,12 @@ namespace Baketa.UI.Framework
         /// </summary>
         /// <param name="This">ReactiveObjectインスタンス</param>
         /// <param name="propertyNames">プロパティ名の配列</param>
-        public static void RaisePropertyChanged(this ReactiveObject This, params string[]? propertyNames)
+        public static void RaisePropertyChanged(this ReactiveObject This, params string[] propertyNames)
         {
             ArgumentNullException.ThrowIfNull(This);
             
-            // propertyNamesがnullの場合は何もしない
-            if (propertyNames is null)
+            // propertyNamesがnullの場合は何もしない (コンパイラの警告を防ぐため、パラメータのnull許容を削除)
+            if (propertyNames is null || propertyNames.Length == 0)
             {
                 return;
             }
