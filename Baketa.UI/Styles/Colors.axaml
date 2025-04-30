@@ -1,5 +1,36 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- テーマ切替対応 -->
+    <ResourceDictionary.ThemeDictionaries>
+        <!-- ライトテーマ -->
+        <ResourceDictionary x:Key="Light">
+            <!-- 背景色 -->
+            <Color x:Key="BackgroundColor">#F5F5F5</Color>
+            <Color x:Key="BackgroundLightColor">#FFFFFF</Color>
+            <Color x:Key="BackgroundDarkColor">#E0E0E0</Color>
+            
+            <!-- テキスト色 -->
+            <Color x:Key="TextPrimaryColor">#212121</Color>
+            <Color x:Key="TextSecondaryColor">#757575</Color>
+            <Color x:Key="TextDisabledColor">#BDBDBD</Color>
+        </ResourceDictionary>
+        
+        <!-- ダークテーマ -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- 背景色 -->
+            <Color x:Key="BackgroundColor">#303030</Color>
+            <Color x:Key="BackgroundLightColor">#424242</Color>
+            <Color x:Key="BackgroundDarkColor">#212121</Color>
+            
+            <!-- テキスト色 -->
+            <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
+            <Color x:Key="TextSecondaryColor">#B0B0B0</Color>
+            <Color x:Key="TextDisabledColor">#707070</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+    
+    <!-- テーマに依存しない共通カラー -->
     <!-- メインカラー -->
     <Color x:Key="PrimaryColor">#3F51B5</Color>
     <Color x:Key="PrimaryLightColor">#7986CB</Color>
@@ -10,15 +41,7 @@
     <Color x:Key="AccentLightColor">#FF8A65</Color>
     <Color x:Key="AccentDarkColor">#E64A19</Color>
     
-    <!-- 背景色 -->
-    <Color x:Key="BackgroundColor">#F5F5F5</Color>
-    <Color x:Key="BackgroundLightColor">#FFFFFF</Color>
-    <Color x:Key="BackgroundDarkColor">#E0E0E0</Color>
-    
-    <!-- テキスト色 -->
-    <Color x:Key="TextPrimaryColor">#212121</Color>
-    <Color x:Key="TextSecondaryColor">#757575</Color>
-    <Color x:Key="TextDisabledColor">#BDBDBD</Color>
+    <!-- テキスト色（白背景） -->
     <Color x:Key="TextOnPrimaryColor">#FFFFFF</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
     
@@ -29,26 +52,30 @@
     <Color x:Key="ErrorColor">#F44336</Color>
     
     <!-- ブラシ変換 -->
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
-    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLightColor}"/>
-    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}"/>
-    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
-    <SolidColorBrush x:Key="AccentLightBrush" Color="{StaticResource AccentLightColor}"/>
-    <SolidColorBrush x:Key="AccentDarkBrush" Color="{StaticResource AccentDarkColor}"/>
-    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
-    <SolidColorBrush x:Key="BackgroundLightBrush" Color="{StaticResource BackgroundLightColor}"/>
-    <SolidColorBrush x:Key="BackgroundDarkBrush" Color="{StaticResource BackgroundDarkColor}"/>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
-    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}"/>
-    <SolidColorBrush x:Key="TextOnPrimaryBrush" Color="{StaticResource TextOnPrimaryColor}"/>
-    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccentColor}"/>
-    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
-    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
-    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
-    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}"/>
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{DynamicResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{DynamicResource PrimaryLightColor}"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{DynamicResource PrimaryDarkColor}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentLightBrush" Color="{DynamicResource AccentLightColor}"/>
+    <SolidColorBrush x:Key="AccentDarkBrush" Color="{DynamicResource AccentDarkColor}"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="BackgroundLightBrush" Color="{DynamicResource BackgroundLightColor}"/>
+    <SolidColorBrush x:Key="BackgroundDarkBrush" Color="{DynamicResource BackgroundDarkColor}"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabledColor}"/>
+    <SolidColorBrush x:Key="TextOnPrimaryBrush" Color="{DynamicResource TextOnPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource TextOnAccentColor}"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
     
     <!-- 特殊ブラシ -->
-    <SolidColorBrush x:Key="HeaderBackground" Color="{StaticResource PrimaryDarkColor}"/>
-    <SolidColorBrush x:Key="StatusBarBackground" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="HeaderBackground" Color="{DynamicResource PrimaryDarkColor}"/>
+    <SolidColorBrush x:Key="StatusBarBackground" Color="{DynamicResource PrimaryColor}"/>
+    
+    <!-- キャプチャステータス表示用ブラシ -->
+    <SolidColorBrush x:Key="CaptureActiveStatusBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="CaptureInactiveStatusBrush" Color="{DynamicResource TextSecondaryColor}"/>
 </ResourceDictionary>

@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -164,9 +165,13 @@ namespace Baketa.UI.ViewModels
             // 履歴に追加
             var newItem = new TranslationHistoryItem
             {
+                Id = Guid.NewGuid().ToString(),
                 SourceText = eventData.SourceText,
                 TranslatedText = eventData.TranslatedText,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
+                SourceLanguage = "日本語",
+                TargetLanguage = "英語",
+                Engine = "Google"
             };
             
             HistoryItems.Insert(0, newItem);
@@ -179,43 +184,36 @@ namespace Baketa.UI.ViewModels
         {
             HistoryItems.Add(new TranslationHistoryItem
             {
+                Id = Guid.NewGuid().ToString(),
                 SourceText = "こんにちは、世界",
                 TranslatedText = "Hello, world",
-                Timestamp = DateTime.Now.AddMinutes(-5)
+                Timestamp = DateTime.Now.AddMinutes(-5),
+                SourceLanguage = "日本語",
+                TargetLanguage = "英語",
+                Engine = "Google"
             });
             
             HistoryItems.Add(new TranslationHistoryItem
             {
+                Id = Guid.NewGuid().ToString(),
                 SourceText = "ゲームの世界を冒険しよう",
                 TranslatedText = "Let's explore the game world",
-                Timestamp = DateTime.Now.AddMinutes(-10)
+                Timestamp = DateTime.Now.AddMinutes(-10),
+                SourceLanguage = "日本語",
+                TargetLanguage = "英語",
+                Engine = "Google"
             });
             
             HistoryItems.Add(new TranslationHistoryItem
             {
+                Id = Guid.NewGuid().ToString(),
                 SourceText = "攻撃ボタンを押して敵を倒せ",
                 TranslatedText = "Press the attack button to defeat enemies",
-                Timestamp = DateTime.Now.AddMinutes(-15)
+                Timestamp = DateTime.Now.AddMinutes(-15),
+                SourceLanguage = "日本語",
+                TargetLanguage = "英語",
+                Engine = "Google"
             });
         }
-    }
-    
-    /// <summary>
-    /// 翻訳履歴アイテム
-    /// </summary>
-    internal class TranslationHistoryItem()
-    {
-        public string SourceText { get; set; } = string.Empty;
-        public string TranslatedText { get; set; } = string.Empty;
-        public DateTime Timestamp { get; set; }
-        public string SourceLanguage { get; set; } = "日本語";
-        public string TargetLanguage { get; set; } = "英語";
-        public string Engine { get; set; } = "Google";
-    }
-    
-    internal class TranslationCompletedEvent(string sourceText, string translatedText) : IEvent
-    {
-        public string SourceText { get; } = sourceText;
-        public string TranslatedText { get; } = translatedText;
     }
 }

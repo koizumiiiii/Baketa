@@ -143,6 +143,9 @@ namespace Baketa.UI.ViewModels
             OpenHelpCommand = ReactiveCommandFactory.Create(ExecuteOpenHelpAsync);
             OpenAboutCommand = ReactiveCommandFactory.Create(ExecuteOpenAboutAsync);
             MinimizeToTrayCommand = ReactiveCommandFactory.Create(ExecuteMinimizeToTrayAsync);
+            
+            // ナビゲーションイベントの購読
+            SubscribeToNavigationEvents();
         }
         
         /// <summary>
@@ -157,6 +160,31 @@ namespace Baketa.UI.ViewModels
             SubscribeToEvent<TranslationErrorEvent>(OnTranslationError);
         }
         
+        /// <summary>
+        /// ナビゲーションイベントを購読します
+        /// </summary>
+        private void SubscribeToNavigationEvents()
+        {
+            // 各タブへの移動リクエストを購読
+            SubscribeToEvent<OpenCaptureSettingsRequestedEvent>(async _ => 
+            {
+                SelectedTabIndex = 1; // キャプチャ設定タブ
+                await Task.CompletedTask.ConfigureAwait(false);
+            });
+            
+            SubscribeToEvent<OpenTranslationSettingsRequestedEvent>(async _ => 
+            {
+                SelectedTabIndex = 2; // 翻訳設定タブ
+                await Task.CompletedTask.ConfigureAwait(false);
+            });
+            
+            SubscribeToEvent<OpenHistoryViewRequestedEvent>(async _ => 
+            {
+                SelectedTabIndex = 4; // 履歴タブ
+                await Task.CompletedTask.ConfigureAwait(false);
+            });
+        }
+        
         // 設定画面を開くコマンド実行
         private async Task ExecuteOpenSettingsAsync()
         {
@@ -165,7 +193,7 @@ namespace Baketa.UI.ViewModels
             // 設定タブに切り替え
             SelectedTabIndex = 1; // CaptureViewModelタブ
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // アプリケーション終了コマンド実行
@@ -202,7 +230,7 @@ namespace Baketa.UI.ViewModels
             CaptureStatus = "停止中";
             StatusMessage = "キャプチャを停止しました";
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 領域選択コマンド実行
@@ -217,7 +245,7 @@ namespace Baketa.UI.ViewModels
             // Note: ReactiveCommandの.Executeは非同期メソッドではなく、直接awaitできない
             CaptureViewModel.SelectRegionCommand.Execute().Subscribe();
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // ログビューワーを開くコマンド実行
@@ -228,7 +256,7 @@ namespace Baketa.UI.ViewModels
             // ログビューワーを開くロジック
             // (まだ実装されていません)
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 翻訳履歴を開くコマンド実行
@@ -239,7 +267,7 @@ namespace Baketa.UI.ViewModels
             // 履歴タブに切り替え
             SelectedTabIndex = 4; // HistoryViewModelタブ
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // ヘルプを開くコマンド実行
@@ -250,7 +278,7 @@ namespace Baketa.UI.ViewModels
             // ヘルプ画面を開くロジック
             // (まだ実装されていません)
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // バージョン情報を開くコマンド実行
@@ -261,7 +289,7 @@ namespace Baketa.UI.ViewModels
             // バージョン情報ダイアログを表示するロジック
             // (まだ実装されていません)
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // トレイに最小化するコマンド実行
@@ -272,7 +300,7 @@ namespace Baketa.UI.ViewModels
             // トレイに最小化するロジック
             await PublishEventAsync(new MinimizeToTrayRequestedEvent()).ConfigureAwait(false);
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 翻訳完了イベントハンドラ
@@ -283,7 +311,7 @@ namespace Baketa.UI.ViewModels
             IsProcessing = false;
             Progress = 0;
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // キャプチャ状態変更イベントハンドラ
@@ -294,7 +322,7 @@ namespace Baketa.UI.ViewModels
             CaptureStatus = eventData.IsActive ? "キャプチャ中" : "停止中";
             StatusMessage = eventData.IsActive ? "キャプチャを開始しました" : "キャプチャを停止しました";
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 翻訳設定変更イベントハンドラ
@@ -304,7 +332,7 @@ namespace Baketa.UI.ViewModels
             TranslationEngine = eventData.Engine;
             StatusMessage = $"翻訳設定を更新しました: {eventData.Engine}, {eventData.TargetLanguage}";
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 翻訳エラーイベントハンドラ
@@ -316,27 +344,7 @@ namespace Baketa.UI.ViewModels
             IsProcessing = false;
             Progress = 0;
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
-    }
-    
-    // イベント定義
-    internal class ApplicationExitRequestedEvent : IEvent
-    {
-    }
-    
-    internal class MinimizeToTrayRequestedEvent : IEvent
-    {
-    }
-    
-    internal class TranslationSettingsChangedEvent(string engine, string targetLanguage) : IEvent
-    {
-        public string Engine { get; } = engine;
-        public string TargetLanguage { get; } = targetLanguage;
-    }
-    
-    internal class TranslationErrorEvent(string errorMessage) : IEvent
-    {
-        public string ErrorMessage { get; } = errorMessage;
     }
 }

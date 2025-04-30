@@ -1,0 +1,31 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- 基本TextBoxスタイル -->
+    <Style Selector="TextBox">
+        <Setter Property="FontFamily" Value="{DynamicResource FallbackFontFamily}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeNormal}"/>
+    </Style>
+    
+    <!-- 基本TextBlockスタイル -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource FallbackFontFamily}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeNormal}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    
+    <!-- 基本ボタンスタイル調整 -->
+    <Style Selector="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource FallbackFontFamily}"/>
+    </Style>
+    
+    <!-- 基本メニューアイテムスタイル調整 -->
+    <Style Selector="MenuItem">
+        <Setter Property="FontFamily" Value="{DynamicResource FallbackFontFamily}"/>
+    </Style>
+    
+    <!-- 基本タブアイテムスタイル調整 -->
+    <Style Selector="TabItem">
+        <Setter Property="FontFamily" Value="{DynamicResource FallbackFontFamily}"/>
+    </Style>
+</Styles>

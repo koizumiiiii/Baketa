@@ -9,7 +9,8 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Baketa - ゲーム翻訳オーバーレイ"
-        MinWidth="600" MinHeight="400">
+        MinWidth="600" MinHeight="400"
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -23,27 +24,64 @@
                 <TextBlock Text="Baketa" 
                            VerticalAlignment="Center" 
                            FontWeight="Bold"
+                           FontFamily="{DynamicResource PrimaryFontFamily}"
                            Foreground="{DynamicResource TextOnPrimaryBrush}"/>
             </StackPanel>
             
             <Menu Grid.Column="1" Margin="20,0" Foreground="{DynamicResource TextOnPrimaryBrush}">
                 <MenuItem Header="ファイル">
-                    <MenuItem Header="設定" Command="{Binding OpenSettingsCommand}"/>
+                    <MenuItem Header="設定" Command="{Binding OpenSettingsCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource SettingsIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <Separator/>
-                    <MenuItem Header="終了" Command="{Binding ExitCommand}"/>
+                    <MenuItem Header="終了" Command="{Binding ExitCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource ExitIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="キャプチャ">
-                    <MenuItem Header="キャプチャ開始" Command="{Binding StartCaptureCommand}"/>
-                    <MenuItem Header="キャプチャ停止" Command="{Binding StopCaptureCommand}"/>
-                    <MenuItem Header="領域選択" Command="{Binding SelectRegionCommand}"/>
+                    <MenuItem Header="キャプチャ開始" Command="{Binding StartCaptureCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource CaptureIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="キャプチャ停止" Command="{Binding StopCaptureCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource CaptureIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="領域選択" Command="{Binding SelectRegionCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource OverlayIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="ツール">
-                    <MenuItem Header="ログビューア" Command="{Binding OpenLogViewerCommand}"/>
-                    <MenuItem Header="翻訳履歴" Command="{Binding OpenTranslationHistoryCommand}"/>
+                    <MenuItem Header="ログビューア" Command="{Binding OpenLogViewerCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource HistoryIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="翻訳履歴" Command="{Binding OpenTranslationHistoryCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource HistoryIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="ヘルプ">
-                    <MenuItem Header="使い方" Command="{Binding OpenHelpCommand}"/>
-                    <MenuItem Header="バージョン情報" Command="{Binding OpenAboutCommand}"/>
+                    <MenuItem Header="使い方" Command="{Binding OpenHelpCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource HelpIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="バージョン情報" Command="{Binding OpenAboutCommand}">
+                        <MenuItem.Icon>
+                            <PathIcon Data="{StaticResource InfoIcon}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
             </Menu>
             
@@ -60,19 +98,58 @@
         <TabControl Grid.Row="1" 
                     TabStripPlacement="Left" 
                     SelectedIndex="{Binding SelectedTabIndex}">
-            <TabItem Header="ホーム" ToolTip.Tip="ホーム画面">
+            <!-- ホームタブ -->
+            <TabItem ToolTip.Tip="ホーム画面">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource HomeIcon}" Width="16" Height="16"/>
+                        <TextBlock Text="ホーム" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <local:HomeView DataContext="{Binding HomeViewModel}"/>
             </TabItem>
-            <TabItem Header="キャプチャ" ToolTip.Tip="キャプチャ設定">
+            
+            <!-- キャプチャタブ -->
+            <TabItem ToolTip.Tip="キャプチャ設定">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource CaptureIcon}" Width="16" Height="16"/>
+                        <TextBlock Text="キャプチャ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <local:CaptureView DataContext="{Binding CaptureViewModel}"/>
             </TabItem>
-            <TabItem Header="翻訳" ToolTip.Tip="翻訳設定">
+            
+            <!-- 翻訳タブ -->
+            <TabItem ToolTip.Tip="翻訳設定">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource TranslateIcon}" Width="16" Height="16"/>
+                        <TextBlock Text="翻訳" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <local:TranslationView DataContext="{Binding TranslationViewModel}"/>
             </TabItem>
-            <TabItem Header="オーバーレイ" ToolTip.Tip="オーバーレイ設定">
+            
+            <!-- オーバーレイタブ -->
+            <TabItem ToolTip.Tip="オーバーレイ設定">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource OverlayIcon}" Width="16" Height="16"/>
+                        <TextBlock Text="オーバーレイ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <local:OverlayView DataContext="{Binding OverlayViewModel}"/>
             </TabItem>
-            <TabItem Header="履歴" ToolTip.Tip="翻訳履歴">
+            
+            <!-- 履歴タブ -->
+            <TabItem ToolTip.Tip="翻訳履歴">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource HistoryIcon}" Width="16" Height="16"/>
+                        <TextBlock Text="履歴" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <local:HistoryView DataContext="{Binding HistoryViewModel}"/>
             </TabItem>
         </TabControl>
@@ -82,6 +159,7 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,2">
                 <TextBlock Text="{Binding StatusMessage}" 
                            VerticalAlignment="Center"
+                           Classes="StatusBarTextBlockStyle"
                            Foreground="{DynamicResource TextOnPrimaryBrush}"/>
             </StackPanel>
             
@@ -89,10 +167,12 @@
                 <TextBlock Text="{Binding TranslationEngine}" 
                            Margin="0,0,10,0" 
                            VerticalAlignment="Center"
+                           Classes="StatusBarTextBlockStyle"
                            Foreground="{DynamicResource TextOnPrimaryBrush}"/>
                 <TextBlock Text="{Binding CaptureStatus}" 
                            Margin="0,0,10,0" 
                            VerticalAlignment="Center"
+                           Classes="StatusBarTextBlockStyle"
                            Foreground="{DynamicResource TextOnPrimaryBrush}"/>
                 <ProgressBar Value="{Binding Progress}" 
                              Width="100" 

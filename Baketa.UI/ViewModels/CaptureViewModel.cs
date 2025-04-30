@@ -3,6 +3,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -122,7 +123,7 @@ namespace Baketa.UI.ViewModels
             // 領域選択ロジック（実際にはダイアログなどを表示）
             SelectedRegion = "X: 100, Y: 100, 幅: 500, 高さ: 300";
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 設定保存コマンド実行
@@ -132,19 +133,14 @@ namespace Baketa.UI.ViewModels
             
             // 設定保存ロジック
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // キャプチャステータス変更イベントハンドラ
         private async Task OnCaptureStatusChanged(CaptureStatusChangedEvent eventData)
         {
             IsCapturing = eventData.IsActive;
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
-    }
-    
-    // イベント定義
-    internal class StopCaptureRequestedEvent : IEvent
-    {
     }
 }
