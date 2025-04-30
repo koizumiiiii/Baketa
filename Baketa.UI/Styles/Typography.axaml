@@ -9,43 +9,117 @@
     <sys:Double x:Key="FontSizeExtraLarge">22</sys:Double>
     <sys:Double x:Key="FontSizeHeader">24</sys:Double>
     
+    <!-- フォントファミリー定義 -->
+    <!-- アプリにフォントファイルがインストールされた後に有効化 -->
+    <!--
+    <FontFamily x:Key="PrimaryFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="SecondaryFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSans-Regular.ttf#Noto Sans</FontFamily>
+    
+    <FontFamily x:Key="FallbackFontFamily">
+        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.otf#Noto Sans SC,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansTC-Regular.otf#Noto Sans TC,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansKR-Regular.otf#Noto Sans KR,
+        Segoe UI,
+        Yu Gothic UI,
+        Meiryo UI,
+        MS UI Gothic,
+        sans-serif
+    </FontFamily>
+    -->
+    
+    <!-- 一時的なフォントファミリー（フォントファイルがインストールされるまで使用） -->
+    <FontFamily x:Key="PrimaryFontFamily">Yu Gothic UI, Meiryo UI, Segoe UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="SecondaryFontFamily">Yu Gothic UI, Meiryo UI, Segoe UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="FallbackFontFamily">Yu Gothic UI, Meiryo UI, Segoe UI, MS UI Gothic, sans-serif</FontFamily>
+    
     <!-- テキストスタイル -->
     <Style x:Key="TitleTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeHeader}"/>
         <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontFamily" Value="{StaticResource PrimaryFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     </Style>
     
     <Style x:Key="SubtitleTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeLarge}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontFamily" Value="{StaticResource PrimaryFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     </Style>
     
     <Style x:Key="BodyTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     </Style>
     
     <Style x:Key="CaptionTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
     </Style>
     
     <Style x:Key="ErrorTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
         <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
     </Style>
     
     <Style x:Key="HeaderTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}"/>
         <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontFamily" Value="{StaticResource PrimaryFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnPrimaryBrush}"/>
     </Style>
     
     <Style x:Key="StatusBarTextBlockStyle" Selector="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnPrimaryBrush}"/>
+    </Style>
+    
+    <!-- 翻訳オーバーレイ表示用スタイル -->
+    <Style x:Key="OverlayTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
+        <Setter Property="Background" Value="#CC000000"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    
+    <!-- 言語別フォント設定のための拡張スタイル -->
+    <!-- 現在はコメントアウト。フォントファイルがインストールされた後に有効化 -->
+    <!--
+    <Style x:Key="JapaneseTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontFamily" Value="avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP"/>
+    </Style>
+    
+    <Style x:Key="ChineseSimplifiedTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontFamily" Value="avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.otf#Noto Sans SC"/>
+    </Style>
+    
+    <Style x:Key="ChineseTraditionalTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontFamily" Value="avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansTC-Regular.otf#Noto Sans TC"/>
+    </Style>
+    
+    <Style x:Key="KoreanTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontFamily" Value="avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansKR-Regular.otf#Noto Sans KR"/>
+    </Style>
+    -->
+    
+    <!-- 基本スタイルはx:Keyが必要なため、名前付きスタイルとして定義 -->
+    <Style x:Key="BaseTextBoxStyle" Selector="TextBox">
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}"/>
+    </Style>
+    
+    <Style x:Key="BaseTextBlockStyle" Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 </ResourceDictionary>

@@ -131,11 +131,29 @@ namespace Baketa.UI
     }
     
     // イベント定義
-    internal class ApplicationStartupEvent : IEvent
-    {
-    }
+internal class ApplicationStartupEvent : IEvent
+{
+    /// <summary>
+    /// イベントの一意な識別子
+    /// </summary>
+    public Guid EventId { get; } = Guid.NewGuid();
     
-    internal class ApplicationShutdownEvent : IEvent
-    {
-    }
+    /// <summary>
+    /// イベントが発生した時刻
+    /// </summary>
+    public DateTime Timestamp { get; } = DateTime.Now;
+}
+
+internal class ApplicationShutdownEvent : IEvent
+{
+    /// <summary>
+    /// イベントの一意な識別子
+    /// </summary>
+    public Guid EventId { get; } = Guid.NewGuid();
+    
+    /// <summary>
+    /// イベントが発生した時刻
+    /// </summary>
+    public DateTime Timestamp { get; } = DateTime.Now;
+}
 }

@@ -223,10 +223,10 @@ namespace Baketa.UI.ViewModels
     
     // イベント定義
     internal class OverlaySettingsChangedEvent(
-        string position, 
-        int fontSize, 
-        string fontColor, 
-        string backgroundColor, 
+        string position,
+        int fontSize,
+        string fontColor,
+        string backgroundColor,
         double backgroundOpacity) : IEvent
     {
         public string Position { get; } = position;
@@ -234,5 +234,15 @@ namespace Baketa.UI.ViewModels
         public string FontColor { get; } = fontColor;
         public string BackgroundColor { get; } = backgroundColor;
         public double BackgroundOpacity { get; } = backgroundOpacity;
+        
+        /// <summary>
+        /// イベントの一意な識別子
+        /// </summary>
+        public Guid EventId { get; } = Guid.NewGuid();
+        
+        /// <summary>
+        /// イベントが発生した時刻
+        /// </summary>
+        public DateTime Timestamp { get; } = DateTime.Now;
     }
 }

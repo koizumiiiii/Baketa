@@ -11,6 +11,7 @@
   
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Baketa.UI/Styles/BasicStyles.axaml" />
         <StyleInclude Source="avares://Baketa.UI/Styles/Buttons.axaml" />
         <StyleInclude Source="avares://Baketa.UI/Styles/Controls.axaml" />
     </Application.Styles>

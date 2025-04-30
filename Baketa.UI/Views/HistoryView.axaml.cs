@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.ReactiveUI;
 using Baketa.UI.ViewModels;
+using Baketa.UI.Models;
 using ReactiveUI;
 using System;
 

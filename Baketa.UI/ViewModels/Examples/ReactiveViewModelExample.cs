@@ -250,10 +250,42 @@ namespace Baketa.UI.ViewModels.Examples
     /// <summary>
     /// データ保存イベント
     /// </summary>
-    internal record DataSavedEvent(string Name) : IEvent;
+    internal record DataSavedEvent : IEvent
+    {
+        /// <summary>
+        /// 保存されたデータ名
+        /// </summary>
+        public string Name { get; }
+        
+        /// <summary>
+        /// イベントの一意な識別子
+        /// </summary>
+        public Guid EventId { get; } = Guid.NewGuid();
+        
+        /// <summary>
+        /// イベントが発生した時刻
+        /// </summary>
+        public DateTime Timestamp { get; } = DateTime.Now;
+        
+        public DataSavedEvent(string name)
+        {
+            Name = name;
+        }
+    }
     
     /// <summary>
     /// データリクエストイベント
     /// </summary>
-    internal record DataRequestEvent : IEvent;
+    internal record DataRequestEvent : IEvent
+    {
+        /// <summary>
+        /// イベントの一意な識別子
+        /// </summary>
+        public Guid EventId { get; } = Guid.NewGuid();
+        
+        /// <summary>
+        /// イベントが発生した時刻
+        /// </summary>
+        public DateTime Timestamp { get; } = DateTime.Now;
+    };
 }
