@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             x:Class="Baketa.UI.Views.AccessibilitySettingsView"
+             x:DataType="vm:AccessibilitySettingsViewModel">
+  
+  <ScrollViewer>
+    <StackPanel Spacing="16" Margin="20">
+      <TextBlock Text="アクセシビリティ設定" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"
+                 AutomationProperties.Name="アクセシビリティ設定見出し" />
+      
+      <!-- アニメーション制御 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16" 
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+        <StackPanel Spacing="16">
+          <TextBlock Text="アニメーションとトランジション" FontWeight="SemiBold" 
+                     AutomationProperties.Name="アニメーション設定セクション" />
+          
+          <CheckBox Content="アニメーションを無効にする" IsChecked="{Binding DisableAnimations}" 
+                    AutomationProperties.Name="アニメーション無効化チェックボックス"
+                    AutomationProperties.HelpText="すべてのアニメーションとトランジションを無効にします"
+                    TabIndex="0" />
+          
+          <TextBlock Text="視覚的な効果を無効にすると、UI要素のトランジションやアニメーションがなくなり、より安定した表示になります。"
+                     TextWrapping="Wrap" Opacity="0.7" Margin="24,0,0,0"
+                     AutomationProperties.Name="アニメーション設定の説明" />
+        </StackPanel>
+      </Border>
+      
+      <!-- 表示設定 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16"
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+        <StackPanel Spacing="16">
+          <TextBlock Text="表示設定" FontWeight="SemiBold"
+                     AutomationProperties.Name="表示設定セクション" />
+          
+          <CheckBox Content="ハイコントラストモードを使用" IsChecked="{Binding HighContrastMode}"
+                    AutomationProperties.Name="ハイコントラストモードチェックボックス"
+                    AutomationProperties.HelpText="テキストと背景のコントラストを高くします"
+                    TabIndex="1" />
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="フォントサイズ倍率:" 
+                       AutomationProperties.Name="フォントサイズ倍率ラベル" />
+            
+            <Grid ColumnDefinitions="*,Auto">
+              <Slider Value="{Binding FontScaleFactor}" Minimum="0.8" Maximum="1.5" 
+                     SmallChange="0.05" LargeChange="0.1" TickFrequency="0.1" 
+                     TickPlacement="BottomRight" IsSnapToTickEnabled="True"
+                     AutomationProperties.Name="フォントサイズ倍率スライダー"
+                     AutomationProperties.HelpText="フォントサイズの倍率を調整します"
+                     TabIndex="2" />
+              
+              <TextBlock Grid.Column="1" Text="{Binding FontScaleFactor, StringFormat='{}{0:P0}'}" 
+                         VerticalAlignment="Center" Margin="8,0,0,0"
+                         AutomationProperties.Name="フォントサイズ倍率表示" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+      
+      <!-- キーボード操作設定 -->
+      <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16"
+              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+        <StackPanel Spacing="16">
+          <TextBlock Text="キーボード操作設定" FontWeight="SemiBold"
+                     AutomationProperties.Name="キーボード操作設定セクション" />
+          
+          <CheckBox Content="キーボードフォーカスを常に表示" IsChecked="{Binding AlwaysShowKeyboardFocus}"
+                    AutomationProperties.Name="キーボードフォーカス表示チェックボックス"
+                    AutomationProperties.HelpText="キーボードフォーカスを常に視覚的に表示します"
+                    TabIndex="3" />
+          
+          <StackPanel Spacing="8">
+            <TextBlock Text="キーボードナビゲーション速度:" 
+                       AutomationProperties.Name="キーボードナビゲーション速度ラベル" />
+            
+            <Grid ColumnDefinitions="*,Auto">
+              <Slider Value="{Binding KeyboardNavigationSpeed}" Minimum="0.5" Maximum="2.0" 
+                     SmallChange="0.1" LargeChange="0.5" TickFrequency="0.25" 
+                     TickPlacement="BottomRight" IsSnapToTickEnabled="True"
+                     AutomationProperties.Name="キーボードナビゲーション速度スライダー"
+                     AutomationProperties.HelpText="キーボードナビゲーションの速度を調整します"
+                     TabIndex="4" />
+              
+              <TextBlock Grid.Column="1" Text="{Binding KeyboardNavigationSpeed, StringFormat='{}{0:F2}x'}" 
+                         VerticalAlignment="Center" Margin="8,0,0,0"
+                         AutomationProperties.Name="キーボードナビゲーション速度表示" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+      
+      <!-- 保存ボタン -->
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0" Spacing="8">
+        <Button Content="デフォルトに戻す" Command="{Binding ResetToDefaultCommand}"
+                Classes="secondary" 
+                AutomationProperties.Name="デフォルト設定に戻すボタン"
+                AutomationProperties.HelpText="すべての設定をデフォルト値に戻します"
+                TabIndex="5" />
+        
+        <Button Content="保存" Command="{Binding SaveSettingsCommand}" 
+                Classes="primary"
+                AutomationProperties.Name="設定保存ボタン"
+                AutomationProperties.HelpText="変更した設定を保存します"
+                TabIndex="6" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

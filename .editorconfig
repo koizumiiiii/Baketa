@@ -1,36 +1,31 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
 root = true
 
-[*]
+# .NET code style settings
+[*.{cs,vb}]
+# IDE0028: コレクション初期化の簡素化（既に対応済みだが警告が出ている場合）
+dotnet_style_collection_initializer = true:suggestion
+
+# CA1515: 内部クラスの警告拒否
+dotnet_diagnostic.CA1515.severity = none
+
+# CA1848: LoggerMessageデリゲートの使用に関する警告抑制
+dotnet_diagnostic.CA1848.severity = none
+
+# IDE0290: プライマリコンストラクターの使用に関する警告抑制
+dotnet_diagnostic.IDE0290.severity = suggestion
+
+# IDE0031: Nullチェックの簡素化に関する警告抑制
+dotnet_diagnostic.IDE0031.severity = suggestion
+
+# プロジェクト固有の設定
+[*.cs]
+# 基本設定（プロジェクトのコーディング規約に合わせて調整）
 indent_style = space
 indent_size = 4
 end_of_line = crlf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
-
-# C# ファイル
-[*.cs]
-
-# IDE0003: this修飾子の削除
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_style_qualification_for_property = false:suggestion
-dotnet_style_qualification_for_method = false:suggestion
-dotnet_style_qualification_for_event = false:suggestion
-
-# CA1812: 明らかにインスタンス化されないクラス (DIで使用されるクラスは抑制)
-dotnet_diagnostic.CA1812.severity = none
-
-# CA1852: シール可能な型 (サブクラスが存在しないクラス)
-# 現時点では警告をキープし、一括修正後に抑制
-
-# UI関連コードでのConfigureAwait
-dotnet_diagnostic.CA2007.severity = suggestion
-
-# ログメッセージのデリゲート (CA1848)
-dotnet_diagnostic.CA1848.severity = suggestion
-
-# テストプロジェクト
-[*Tests.cs]
-# テストコードでは一部の警告を抑制
-dotnet_diagnostic.CA1852.severity = none
-dotnet_diagnostic.CA1812.severity = none

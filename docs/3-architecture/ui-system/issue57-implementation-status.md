@@ -85,17 +85,24 @@ Colors.axamlにテーマ対応機能を追加し、ライト/ダークテーマ�
 
 ### 3.4 フォント設定の改善
 
-Typography.axamlにフォント定義を追加し、将来的にLINE Seed JPとNoto Sansフォントを使用できるように準備：
+Typography.axamlにフォント定義を追加し、フォントファイルを実際に導入しました：
+
+```
+/Baketa.UI/Assets/Fonts/
+  ├── LINESeedJP/    # 日本語用 (OTF形式)
+  ├── LINESeedEN/    # 英語用 (OTF形式)
+  ├── NotoSans/      # その他言語用 (TTF形式)
+      ├── NotoSansSC-Regular.ttf
+      └── ...
+```
+
+フォント定義を更新し、日本語用と英語用に個別のLINE Seedフォントを設定：
 
 ```xml
-<!-- フォントファミリー定義 - コメントアウト状態でフォントファイル導入後に有効化 -->
-<!--
-<FontFamily x:Key="PrimaryFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
-<FontFamily x:Key="SecondaryFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSans-Regular.ttf#Noto Sans</FontFamily>
--->
-
-<!-- 一時的なフォントファミリー -->
-<FontFamily x:Key="PrimaryFontFamily">Yu Gothic UI, Meiryo UI, Segoe UI, MS UI Gothic, sans-serif</FontFamily>
+<!-- フォントファミリー定義 -->
+<FontFamily x:Key="JapaneseFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+<FontFamily x:Key="EnglishFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN</FontFamily>
+<FontFamily x:Key="SecondaryFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC</FontFamily>
 ```
 
 ### 3.5 グローバルスタイルの導入
@@ -142,23 +149,25 @@ DynamicResourceを使用した参照により、テーマ切り替えにスム�
 
 ## 5. 今後の課題
 
-1. **フォントファイルの導入**
-   - LINE Seed JPフォントの追加
-   - Noto Sansフォントの追加
-   - フォントファミリー定義の有効化
+1. ✅ **フォントファイルの導入**
+   - ✅ LINE Seed JPの追加（OTFファイル）
+   - ✅ LINE Seed ENの追加（OTFファイル）
+   - ✅ Noto Sansフォントの一部追加（TTFファイル）
+   - ◻ その他言語用Noto Sansフォントの追加
+   - ◻ Typography.axamlの更新と適用
 
 2. **アプリケーションロゴの作成**
-   - Baketa専用のロゴデザイン作成
-   - アイコンファイル（.ico/.png）の準備
+   - ◻ Baketa専用のロゴデザイン作成
+   - ◻ アイコンファイル（.ico/.png）の準備
 
 3. **各タブビューの連携テスト**
-   - 各タブ間のナビゲーション動作確認
-   - ステータス表示の連携確認
-   - イベント発行・購読の動作確認
+   - ◻ 各タブ間のナビゲーション動作確認
+   - ◻ ステータス表示の連携確認
+   - ◻ イベント発行・購読の動作確認
 
 4. **テーマ切り替え機能のUIサポート**
-   - テーマ切り替えUI要素の追加
-   - テーマ選択の永続化対応
+   - ◻ テーマ切り替えUI要素の追加
+   - ◻ テーマ選択の永続化対応
 
 ## 6. 注意点とTips
 
@@ -176,4 +185,4 @@ DynamicResourceを使用した参照により、テーマ切り替えにスム�
 
 ## 7. 結論
 
-Issue #57の実装を進め、メインウィンドウUIデザインの基本部分を実装しました。タブナビゲーション、ホーム画面の改善、テーマ対応の強化など、ユーザビリティとビジュアルの改善を行いました。今後はフォントファイルの導入やアプリケーションロゴの作成を進め、UIのブラッシュアップを継続します。
+Issue #57の実装を進め、メインウィンドウUIデザインの基本部分を実装しました。タブナビゲーション、ホーム画面の改善、テーマ対応の強化など、ユーザビリティとビジュアルの改善を行いました。また、フォントファイルの導入も完了し、日本語用・英語用に別々のLINE Seedフォントを導入しました。今後はアプリケーションロゴの作成とUIのさらなるブラッシュアップを継続します。

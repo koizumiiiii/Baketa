@@ -1,0 +1,70 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- フォントファミリーの定義 -->
+    <!-- 日本語フォント LINE Seed JP - 各ウェイト -->
+    <FontFamily x:Key="JapaneseFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Thin">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Th.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Regular">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Bold">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Bd.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.ExtraBold">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_ExBd.otf#LINE Seed JP</FontFamily>
+    
+    <!-- 英語フォント LINE Seed EN - 各ウェイト -->
+    <FontFamily x:Key="EnglishFontFamily">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Thin">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Th.otf#LINE Seed EN</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Regular">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Bold">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Bd.otf#LINE Seed EN</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.ExtraBold">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_ExBd.otf#LINE Seed EN</FontFamily>
+    
+    <!-- その他言語フォント -->
+    <FontFamily x:Key="ChineseFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC</FontFamily>
+
+    <!-- フォールバックフォント定義 -->
+    <FontFamily x:Key="FallbackFontFamily">
+        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
+        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
+        Segoe UI,
+        Yu Gothic UI,
+        Meiryo UI,
+        MS UI Gothic,
+        sans-serif
+    </FontFamily>
+    
+    <!-- 言語別最適化フォントファミリー -->
+    <FontFamily x:Key="OptimizedFontFamily.Japanese">
+        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
+        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
+        Segoe UI,
+        Yu Gothic UI,
+        Meiryo UI,
+        MS UI Gothic,
+        sans-serif
+    </FontFamily>
+    
+    <FontFamily x:Key="OptimizedFontFamily.English">
+        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN,
+        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
+        Segoe UI,
+        sans-serif
+    </FontFamily>
+    
+    <FontFamily x:Key="OptimizedFontFamily.ChineseSimplified">
+        avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
+        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
+        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedEN_OTF_Rg.otf#LINE Seed EN,
+        Microsoft YaHei UI,
+        SimHei,
+        sans-serif
+    </FontFamily>
+
+    <!-- フォントサイズ定義 -->
+    <x:Double x:Key="FontSizeSmall">12</x:Double>
+    <x:Double x:Key="FontSizeNormal">14</x:Double>
+    <x:Double x:Key="FontSizeMedium">16</x:Double>
+    <x:Double x:Key="FontSizeLarge">18</x:Double>
+    <x:Double x:Key="FontSizeHeader">20</x:Double>
+    <x:Double x:Key="FontSizeTitle">24</x:Double>
+</ResourceDictionary>

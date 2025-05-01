@@ -28,6 +28,44 @@
             <Color x:Key="TextSecondaryColor">#B0B0B0</Color>
             <Color x:Key="TextDisabledColor">#707070</Color>
         </ResourceDictionary>
+        
+        <!-- ハイコントラストテーマ -->
+        <ResourceDictionary x:Key="HighContrast">
+            <!-- 背景色 -->
+            <Color x:Key="BackgroundColor">#000000</Color>
+            <Color x:Key="BackgroundLightColor">#101010</Color>
+            <Color x:Key="BackgroundDarkColor">#000000</Color>
+            
+            <!-- テキスト色 -->
+            <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
+            <Color x:Key="TextSecondaryColor">#FFFFFF</Color>
+            <Color x:Key="TextDisabledColor">#CCCCCC</Color>
+            
+            <!-- メインカラー -->
+            <Color x:Key="PrimaryColor">#FFFF00</Color>
+            <Color x:Key="PrimaryLightColor">#FFFF44</Color>
+            <Color x:Key="PrimaryDarkColor">#CCCC00</Color>
+            
+            <!-- アクセントカラー -->
+            <Color x:Key="AccentColor">#00FFFF</Color>
+            <Color x:Key="AccentLightColor">#55FFFF</Color>
+            <Color x:Key="AccentDarkColor">#00CCCC</Color>
+            
+            <!-- テキスト色（白背景） -->
+            <Color x:Key="TextOnPrimaryColor">#000000</Color>
+            <Color x:Key="TextOnAccentColor">#000000</Color>
+            
+            <!-- ステータス色 -->
+            <Color x:Key="SuccessColor">#00FF00</Color>
+            <Color x:Key="InfoColor">#00FFFF</Color>
+            <Color x:Key="WarningColor">#FFFF00</Color>
+            <Color x:Key="ErrorColor">#FF0000</Color>
+            
+            <!-- 特殊ブラシ -->
+            <Color x:Key="HeaderBackgroundColor">#000000</Color>
+            <Color x:Key="StatusBarBackgroundColor">#000000</Color>
+            <Color x:Key="BorderColor">#FFFFFF</Color>
+        </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     
     <!-- テーマに依存しない共通カラー -->
@@ -51,6 +89,16 @@
     <Color x:Key="WarningColor">#FFC107</Color>
     <Color x:Key="ErrorColor">#F44336</Color>
     
+    <!-- コントロール要素色 -->
+    <Color x:Key="BorderColor">#BDBDBD</Color>
+    <Color x:Key="CardBackgroundColor">#FFFFFF</Color>
+    <Color x:Key="NotificationBackgroundColor">#323232</Color>
+    <Color x:Key="NotificationForegroundColor">#FFFFFF</Color>
+    
+    <!-- 特殊色 -->
+    <Color x:Key="HeaderBackgroundColor">#303F9F</Color>
+    <Color x:Key="StatusBarBackgroundColor">#3F51B5</Color>
+    
     <!-- ブラシ変換 -->
     <SolidColorBrush x:Key="PrimaryBrush" Color="{DynamicResource PrimaryColor}"/>
     <SolidColorBrush x:Key="PrimaryLightBrush" Color="{DynamicResource PrimaryLightColor}"/>
@@ -70,10 +118,14 @@
     <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+    <SolidColorBrush x:Key="CardBackground" Color="{DynamicResource CardBackgroundColor}"/>
+    <SolidColorBrush x:Key="NotificationBackground" Color="{DynamicResource NotificationBackgroundColor}"/>
+    <SolidColorBrush x:Key="NotificationForeground" Color="{DynamicResource NotificationForegroundColor}"/>
     
     <!-- 特殊ブラシ -->
-    <SolidColorBrush x:Key="HeaderBackground" Color="{DynamicResource PrimaryDarkColor}"/>
-    <SolidColorBrush x:Key="StatusBarBackground" Color="{DynamicResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="HeaderBackground" Color="{DynamicResource HeaderBackgroundColor}"/>
+    <SolidColorBrush x:Key="StatusBarBackground" Color="{DynamicResource StatusBarBackgroundColor}"/>
     
     <!-- キャプチャステータス表示用ブラシ -->
     <SolidColorBrush x:Key="CaptureActiveStatusBrush" Color="{DynamicResource SuccessColor}"/>
