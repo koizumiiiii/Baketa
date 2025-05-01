@@ -108,7 +108,7 @@ namespace Baketa.UI.ViewModels.Examples
             _disposables.Add(_canSave);
                 
             // コマンドの作成
-            SaveCommand = Baketa.UI.Framework.ReactiveCommandFactory.Create(
+            SaveCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
                     ExecuteSaveAsync,
                     this.WhenAnyValue(x => x.CanSave));
             
@@ -128,7 +128,7 @@ namespace Baketa.UI.ViewModels.Examples
             
             _disposables.Add(SaveCommand);
                 
-            ResetCommand = Baketa.UI.Framework.ReactiveCommandFactory.Create(
+            ResetCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
                     ExecuteResetAsync);
                     
             // コマンドにログ機能を追加
@@ -180,7 +180,7 @@ namespace Baketa.UI.ViewModels.Examples
                 await Task.Delay(1000).ConfigureAwait(false);
                 
                 // イベントの発行
-                await PublishEventAsync(new DataSavedEvent(Name)).ConfigureAwait(false);
+                await PublishEventAsync(new DataSavedEvent(this.Name)).ConfigureAwait(false);
                 
                 if (_logger != null)
                     _logDataSaveComplete(_logger, null);
@@ -250,10 +250,30 @@ namespace Baketa.UI.ViewModels.Examples
     /// <summary>
     /// データ保存イベント
     /// </summary>
-    internal record DataSavedEvent(string Name) : IEvent;
+    /// <param name="name">データ名</param>
+    internal class DataSavedEvent(string name) : UIEventBase
+    {
+        /// <summary>
+        /// 保存されたデータ名
+        /// </summary>
+        public string DataName { get; } = name;
+        
+        /// <inheritdoc/>
+        public override string Name => "DataSaved";
+        
+        /// <inheritdoc/>
+        public override string Category => "Data";
+    }
     
     /// <summary>
     /// データリクエストイベント
     /// </summary>
-    internal record DataRequestEvent : IEvent;
+    internal class DataRequestEvent : UIEventBase
+    {
+        /// <inheritdoc/>
+        public override string Name => "DataRequest";
+        
+        /// <inheritdoc/>
+        public override string Category => "Data";
+    }
 }

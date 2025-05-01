@@ -1,0 +1,82 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- テキストスタイルの定義 -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- 見出しスタイル -->
+    <Style Selector="TextBlock.h1">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <!-- 英語見出しスタイル -->
+    <Style Selector="TextBlock.h1-en">
+        <Setter Property="FontFamily" Value="{StaticResource EnglishFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <!-- 本文スタイル - 日本語 -->
+    <Style Selector="TextBlock.body-ja">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
+        <Setter Property="LineHeight" Value="20" />
+    </Style>
+
+    <!-- 本文スタイル - 英語 -->
+    <Style Selector="TextBlock.body-en">
+        <Setter Property="FontFamily" Value="{StaticResource EnglishFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
+        <Setter Property="LineHeight" Value="20" />
+    </Style>
+
+    <!-- 翻訳オーバーレイ表示用スタイル -->
+    <Style Selector="TextBlock.overlay">
+        <Setter Property="FontFamily" Value="{StaticResource FallbackFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="#CC000000" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    
+    <!-- 言語別オーバーレイスタイル -->
+    <Style Selector="TextBlock.overlay-ja">
+        <Setter Property="FontFamily" Value="{StaticResource OptimizedFontFamily.Japanese}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="#CC000000" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    
+    <Style Selector="TextBlock.overlay-en">
+        <Setter Property="FontFamily" Value="{StaticResource OptimizedFontFamily.English}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="#CC000000" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    
+    <Style Selector="TextBlock.overlay-zh">
+        <Setter Property="FontFamily" Value="{StaticResource OptimizedFontFamily.ChineseSimplified}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="#CC000000" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+</Styles>

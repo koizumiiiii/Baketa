@@ -1,0 +1,241 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.HomeView"
+             x:DataType="vm:HomeViewModel">
+    
+    <Design.DataContext>
+        <vm:HomeViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="{Binding WelcomeMessage}" 
+                       Classes="TitleTextBlockStyle"
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding AppDescription}" 
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding StatusMessage}" 
+                       Foreground="{DynamicResource InfoBrush}"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="*,*" Margin="0,10">
+            <!-- クイックスタート -->
+            <Border Grid.Row="0" Grid.Column="0" 
+                    Classes="card" 
+                    Margin="0,0,10,10">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Text="クイックスタート" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,15"/>
+                    <StackPanel Grid.Row="1" Spacing="8">
+                        <Button Command="{Binding StartCaptureCommand}" 
+                                Classes="primary" 
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="{StaticResource CaptureIcon}" Width="16" Height="16"/>
+                                <TextBlock Text="キャプチャを開始"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenCaptureSettingsCommand}" 
+                                Classes="secondary" 
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="{StaticResource SettingsIcon}" Width="16" Height="16"/>
+                                <TextBlock Text="キャプチャ設定"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenTranslationSettingsCommand}" 
+                                Classes="secondary" 
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="{StaticResource TranslateIcon}" Width="16" Height="16"/>
+                                <TextBlock Text="翻訳設定"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenHelpCommand}" 
+                                Classes="secondary" 
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="{StaticResource HelpIcon}" Width="16" Height="16"/>
+                                <TextBlock Text="ヘルプ"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- 最近の翻訳 -->
+            <Border Grid.Row="0" Grid.Column="1" 
+                    Classes="card" 
+                    Margin="10,0,0,10">
+                <Grid RowDefinitions="Auto,*">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="最近の翻訳" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,15"/>
+                        <Button Grid.Column="1" 
+                                Content="すべて表示" 
+                                Command="{Binding ViewAllHistoryCommand}" 
+                                Classes="secondary"
+                                FontSize="12"
+                                Padding="8,4"
+                                IsVisible="{Binding HasHistory}"/>
+                    </Grid>
+                    
+                    <Grid Grid.Row="1">
+                        <!-- 履歴がない場合 -->
+                        <TextBlock Text="翻訳履歴はまだありません" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" 
+                                   IsVisible="{Binding !HasHistory}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,20"/>
+                        
+                        <!-- 履歴がある場合 -->
+                        <ListBox ItemsSource="{Binding RecentHistoryItems}"
+                                 IsVisible="{Binding HasHistory}"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource BackgroundDarkBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="0,5,0,5"
+                                            Margin="0,0,0,5">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding SourceText}" 
+                                                       TextTrimming="CharacterEllipsis"
+                                                       FontWeight="Medium"/>
+                                            <TextBlock Text="{Binding TranslatedText}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}" 
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
+            
+            <!-- 使用状況 -->
+            <Border Grid.Row="1" Grid.Column="0" 
+                    Classes="card" 
+                    Margin="0,10,10,0">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Text="使用状況" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,15"/>
+                    
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,5">
+                        <TextBlock Grid.Row="0" Grid.Column="0" 
+                                   Text="キャプチャ状態:" 
+                                   Margin="0,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="0" Grid.Column="1" 
+                                    Orientation="Horizontal" 
+                                    Margin="10,0,0,10">
+                            <Ellipse Width="10" 
+                                     Height="10" 
+                                     Fill="{Binding CaptureStatusColor}" 
+                                     Margin="0,0,5,0" 
+                                     VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding CaptureStatus}" 
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" 
+                                   Text="翻訳エンジン:" 
+                                   Margin="0,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" 
+                                   Text="{Binding TranslationEngine}" 
+                                   Margin="10,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" 
+                                   Text="翻訳先言語:" 
+                                   Margin="0,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" 
+                                   Text="{Binding TargetLanguage}" 
+                                   Margin="10,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" 
+                                   Text="メモリ使用量:" 
+                                   Margin="0,0,0,10"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="3" Grid.Column="1" 
+                                    Orientation="Horizontal" 
+                                    Margin="10,0,0,10">
+                            <TextBlock Text="{Binding MemoryUsage}" 
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text=" MB" 
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <TextBlock Grid.Row="4" Grid.Column="0" 
+                                   Text="実行時間:" 
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" 
+                                   Text="{Binding RunningTime}" 
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Grid>
+            </Border>
+            
+            <!-- ヒント -->
+            <Border Grid.Row="1" Grid.Column="1" 
+                    Classes="card" 
+                    Margin="10,10,0,0">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Text="ヒント" 
+                               Classes="SubtitleTextBlockStyle" 
+                               Margin="0,0,0,15"/>
+                    
+                    <StackPanel Grid.Row="1" Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                            <PathIcon Data="{StaticResource InfoIcon}" Width="14" Height="14" Foreground="{DynamicResource InfoBrush}"/>
+                            <TextBlock Text="左側のタブから各機能を開くことができます" 
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                            <PathIcon Data="{StaticResource InfoIcon}" Width="14" Height="14" Foreground="{DynamicResource InfoBrush}"/>
+                            <TextBlock Text="キャプチャ開始前に、ゲーム画面の翻訳したい領域を選択してください" 
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                            <PathIcon Data="{StaticResource InfoIcon}" Width="14" Height="14" Foreground="{DynamicResource InfoBrush}"/>
+                            <TextBlock Text="オーバーレイ設定で表示位置やフォントをカスタマイズできます" 
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                            <PathIcon Data="{StaticResource InfoIcon}" Width="14" Height="14" Foreground="{DynamicResource InfoBrush}"/>
+                            <TextBlock Text="翻訳履歴から過去の翻訳内容を確認できます" 
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                            <PathIcon Data="{StaticResource InfoIcon}" Width="14" Height="14" Foreground="{DynamicResource InfoBrush}"/>
+                            <TextBlock Text="現在のバージョン: 0.9.1 Beta" 
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

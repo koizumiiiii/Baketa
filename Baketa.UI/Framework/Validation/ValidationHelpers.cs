@@ -12,7 +12,7 @@ namespace Baketa.UI.Framework.Validation
     /// シンプルなバリデーションヘルパー
     /// 特定のインターフェース名に依存しない実装
     /// </summary>
-    internal static class SimpleValidationHelpers
+    internal static class DetailedValidationHelpers
     {
         /// <summary>
         /// バリデーションオブジェクトから指定されたプロパティのエラーメッセージを取得します
@@ -22,7 +22,7 @@ namespace Baketa.UI.Framework.Validation
         /// <param name="validationObject">バリデーションオブジェクト</param>
         /// <param name="propertyExpression">プロパティセレクタ</param>
         /// <returns>エラーメッセージのコレクション</returns>
-        public static IEnumerable<string> GetErrorMessages<TViewModel, TProperty>(
+        public static IEnumerable<string> GetDetailedErrorMessages<TViewModel, TProperty>(
             this ReactiveValidationObject validationObject,
             Expression<Func<TViewModel, TProperty>> propertyExpression)
             where TViewModel : class
@@ -42,53 +42,53 @@ namespace Baketa.UI.Framework.Validation
                 
                 // リフレクションで必要なメソッドを探す
                 var method = contextType.GetMethod("GetPropertyValidationStatuses", 
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 
                 if (method != null)
                 {
-                    // メソッドを呼び出して検証状態を取得
-                    var result = method.Invoke(context, new object[] { propertyName });
-                    
-                    // 戻り値から必要な情報を抽出
-                    var errorList = new List<string>(10); // 適切な初期容量を設定
-                    if (result is IEnumerable<object> validationStates)
-                    {
-                        foreach (var state in validationStates)
-                        {
-                            // Text プロパティを取得
-                            var textProperty = state.GetType().GetProperty("Text");
-                            if (textProperty != null)
-                            {
-                                var text = textProperty.GetValue(state) as string;
-                                if (!string.IsNullOrEmpty(text))
-                                {
-                                    errorList.Add(text);
-                                }
-                            }
-                        }
-                    }
-                    
-                    return errorList;
+                // メソッドを呼び出して検証状態を取得
+                var result = method.Invoke(context, new object[] { propertyName });
+                
+                // 戻り値から必要な情報を抽出
+                List<string> errorList = new List<string>();
+                if (result is IEnumerable<object> validationStates)
+                {
+                foreach (var state in validationStates)
+                {
+                // Text プロパティを取得
+                var textProperty = state.GetType().GetProperty("Text");
+                if (textProperty != null)
+                {
+                var text = textProperty.GetValue(state) as string;
+                if (!string.IsNullOrEmpty(text))
+                {
+                errorList.Add(text);
+                }
+                }
+                }
+                }
+                
+                return errorList;
                 }
                 
                 // 代替手段：すべてのエラーを取得してプロパティでフィルター
-                var errors = new List<string>(5); // 適切な初期容量を設定
+                // 初期値を設定するための変数
+                List<string> errors = new List<string>();
                 
                 // IsValidプロパティを使って無効な場合のみエラーを収集
                 var isValidProp = contextType.GetProperty("IsValid");
                 if (isValidProp != null)
                 {
                     var isValidValue = isValidProp.GetValue(context);
-                    if (isValidValue != null && !(bool)isValidValue)
+                    if (isValidValue != null && isValidValue is bool valid && !valid)
                     {
                         // ValidationTextプロパティを取得
                         var textMethod = contextType.GetMethod("GetErrors");
                         if (textMethod != null)
                         {
-                            var allErrors = textMethod.Invoke(context, null) as IEnumerable<string>;
-                            if (allErrors != null)
+                            if (textMethod.Invoke(context, null) is IEnumerable<string> allErrors)
                             {
-                                errors.AddRange(allErrors);
+                                errors = new List<string>(allErrors);
                             }
                         }
                     }

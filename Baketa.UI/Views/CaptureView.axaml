@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.CaptureView"
+             x:DataType="vm:CaptureViewModel">
+    
+    <Design.DataContext>
+        <vm:CaptureViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="キャプチャ設定" 
+                       Classes="TitleTextBlockStyle"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="ゲーム画面からのテキストキャプチャを設定します。" 
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,10">
+                <!-- キャプチャ領域 -->
+                <Border Grid.Row="0" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,0,10,10">
+                    <StackPanel>
+                        <TextBlock Text="キャプチャ領域" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="{Binding SelectedRegion}" 
+                                   Margin="0,0,0,10"/>
+                        <Button Content="領域を選択" 
+                                Command="{Binding SelectRegionCommand}" 
+                                Classes="primary" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,5,0,5"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- キャプチャ操作 -->
+                <Border Grid.Row="0" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="キャプチャ操作" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Button Content="キャプチャ開始" 
+                                Command="{Binding StartCaptureCommand}" 
+                                Classes="primary" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,5,0,5"
+                                IsVisible="{Binding !IsCapturing}"/>
+                        <Button Content="キャプチャ停止" 
+                                Command="{Binding StopCaptureCommand}" 
+                                Classes="accent" 
+                                HorizontalAlignment="Left" 
+                                Margin="0,5,0,5"
+                                IsVisible="{Binding IsCapturing}"/>
+                        <TextBlock Text="現在の状態: " 
+                                   Margin="0,10,0,0"/>
+                        <TextBlock Text="キャプチャ中" 
+                                   Foreground="{DynamicResource SuccessBrush}"
+                                   FontWeight="Bold"
+                                   IsVisible="{Binding IsCapturing}"/>
+                        <TextBlock Text="停止中" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   IsVisible="{Binding !IsCapturing}"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- OCR言語設定 -->
+                <Border Grid.Row="1" Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,10,10,10">
+                    <StackPanel>
+                        <TextBlock Text="OCR言語設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="ゲーム内テキストの言語:" 
+                                   Margin="0,0,0,5"/>
+                        <ComboBox SelectedItem="{Binding SourceLanguage}" 
+                                  Width="200"
+                                  HorizontalAlignment="Left">
+                            <ComboBoxItem>日本語</ComboBoxItem>
+                            <ComboBoxItem>英語</ComboBoxItem>
+                            <ComboBoxItem>中国語</ComboBoxItem>
+                            <ComboBoxItem>韓国語</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+                
+                <!-- OCR設定 -->
+                <Border Grid.Row="1" Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,10,0,10">
+                    <StackPanel>
+                        <TextBlock Text="OCR設定" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <CheckBox Content="画像前処理を有効にする" 
+                                  IsChecked="{Binding EnablePreprocessing}"
+                                  Margin="0,5,0,5"/>
+                        <TextBlock Text="キャプチャ間隔 (ミリ秒):" 
+                                   Margin="0,10,0,5"/>
+                        <NumericUpDown Value="{Binding CaptureInterval}" 
+                                       Minimum="100" 
+                                       Maximum="5000" 
+                                       Increment="100"
+                                       Width="200"
+                                       HorizontalAlignment="Left"/>
+                        <CheckBox Content="インテリジェントキャプチャを使用 (画面変更時のみキャプチャ)" 
+                                  IsChecked="{Binding UseIntelligentCapture}"
+                                  Margin="0,10,0,5"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- プレビュー -->
+                <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                        Classes="card" 
+                        Margin="0,10,0,10">
+                    <StackPanel>
+                        <TextBlock Text="キャプチャプレビュー" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        <Border Background="#222222" 
+                                Width="400" 
+                                Height="225" 
+                                HorizontalAlignment="Center"
+                                CornerRadius="4">
+                            <TextBlock Text="キャプチャを開始するとプレビューが表示されます" 
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 保存ボタン -->
+                <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                        Margin="0,10,0,0"
+                        Padding="0">
+                    <Button Content="設定を保存" 
+                            Command="{Binding SaveSettingsCommand}"
+                            Classes="primary"
+                            HorizontalAlignment="Right"/>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

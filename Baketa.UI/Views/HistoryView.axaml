@@ -1,0 +1,162 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.HistoryView"
+             x:DataType="vm:HistoryViewModel">
+    
+    <Design.DataContext>
+        <vm:HistoryViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="翻訳履歴" 
+                       Classes="TitleTextBlockStyle"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="過去の翻訳結果を表示します。検索や並べ替えが可能です。" 
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,10">
+            <!-- 検索と並び替え -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,10">
+                <TextBox Grid.Column="0" 
+                         Text="{Binding SearchText}" 
+                         Watermark="検索キーワードを入力"
+                         Margin="0,0,10,0"/>
+                <Button Grid.Column="1" 
+                        Content="検索" 
+                        Command="{Binding SearchCommand}"
+                        Classes="primary"
+                        Margin="0,0,10,0"/>
+                <ComboBox Grid.Column="2" 
+                          ItemsSource="{Binding AvailableSortOrders}"
+                          SelectedItem="{Binding SortOrder}"
+                          Width="150"/>
+            </Grid>
+            
+            <!-- 履歴リストと詳細 -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                <!-- 履歴リスト -->
+                <Border Grid.Column="0" 
+                        Classes="card" 
+                        Margin="0,0,10,0"
+                        Padding="10">
+                    <Grid RowDefinitions="*,Auto">
+                        <ListBox Grid.Row="0" 
+                                 x:Name="HistoryListBox"
+                                 ItemsSource="{Binding HistoryItems}" 
+                                 SelectedItem="{Binding SelectedItem}"
+                                 Margin="0,0,0,10">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding SourceText}" 
+                                                       FontWeight="Bold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding TranslatedText}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}" 
+                                                           FontSize="10"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBlock Text="{Binding Engine}" 
+                                                           FontSize="10"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" 
+                                                x:Name="RemoveButton"
+                                                Content="削除"
+                                                CommandParameter="{Binding}"
+                                                Classes="secondary"
+                                                FontSize="10"
+                                                Padding="6,2"
+                                                VerticalAlignment="Top"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        
+                        <!-- ボタン -->
+                        <StackPanel Grid.Row="1" 
+                                    Orientation="Horizontal" 
+                                    HorizontalAlignment="Right"
+                                    Spacing="10">
+                            <Button Content="履歴をクリア" 
+                                    Command="{Binding ClearHistoryCommand}" 
+                                    Classes="secondary"/>
+                            <Button Content="エクスポート" 
+                                    Command="{Binding ExportHistoryCommand}" 
+                                    Classes="primary"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                
+                <!-- 履歴詳細 -->
+                <Border Grid.Column="1" 
+                        Classes="card" 
+                        Margin="10,0,0,0"
+                        Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="詳細情報" 
+                                   Classes="SubtitleTextBlockStyle" 
+                                   Margin="0,0,0,10"/>
+                        
+                        <TextBlock Text="選択されている項目がありません" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" 
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Margin="0,20"
+                                   IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNull}}"/>
+                        
+                        <StackPanel IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <TextBlock Text="原文:" FontWeight="Bold" Margin="0,5,0,2"/>
+                            <Border Background="{DynamicResource BackgroundDarkBrush}" 
+                                    BorderBrush="{DynamicResource BackgroundDarkBrush}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="4" 
+                                    Padding="10"
+                                    Margin="0,0,0,10">
+                                <TextBlock Text="{Binding DetailSourceText}" 
+                                           TextWrapping="Wrap"/>
+                            </Border>
+                            
+                            <TextBlock Text="翻訳文:" FontWeight="Bold" Margin="0,5,0,2"/>
+                            <Border Background="{DynamicResource BackgroundDarkBrush}" 
+                                    BorderBrush="{DynamicResource BackgroundDarkBrush}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="4" 
+                                    Padding="10"
+                                    Margin="0,0,0,10">
+                                <TextBlock Text="{Binding DetailTranslatedText}" 
+                                           TextWrapping="Wrap"/>
+                            </Border>
+                            
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,10,0,0">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="翻訳日時:"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding DetailTimestamp, StringFormat='{}{0:yyyy年MM月dd日 HH:mm:ss}'}" Margin="10,0,0,0"/>
+                                
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="元言語:"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DetailSourceLanguage}" Margin="10,0,0,0"/>
+                                
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="翻訳先言語:"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DetailTargetLanguage}" Margin="10,0,0,0"/>
+                                
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="翻訳エンジン:"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DetailEngine}" Margin="10,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
