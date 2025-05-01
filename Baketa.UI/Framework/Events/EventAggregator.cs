@@ -53,7 +53,7 @@ namespace Baketa.UI.Framework.Events
                 "イベント {EventType} の購読を解除します");
         
         /// <inheritdoc/>
-        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : Baketa.Core.Events.IEvent
         {
             var eventType = typeof(TEvent);
             if (_logger != null)
@@ -102,7 +102,7 @@ namespace Baketa.UI.Framework.Events
         }
         
         /// <inheritdoc/>
-        public IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : IEvent
+        public IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : Baketa.Core.Events.IEvent
         {
             var eventType = typeof(TEvent);
             if (_logger != null)

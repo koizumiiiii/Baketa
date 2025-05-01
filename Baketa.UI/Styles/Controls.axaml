@@ -1,0 +1,213 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- メニューアイテムスタイル -->
+    <Style Selector="MenuItem">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="MenuItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="MenuItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="Menu > MenuItem">
+        <Setter Property="Padding" Value="12,6" />
+    </Style>
+    
+    <!-- タブコントロールスタイル -->
+    <Style Selector="TabControl">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+    </Style>
+    
+    <Style Selector="TabItem">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeNormal}" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="TabItem:selected">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="TabItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="TabItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <!-- 左側タブスタイル -->
+    <Style Selector="TabControl[TabStripPlacement=Left]">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    
+    <Style Selector="TabControl[TabStripPlacement=Left] > TabItem">
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="MinHeight" Value="48" />
+        <Setter Property="Margin" Value="0,2" />
+        <Setter Property="CornerRadius" Value="8,0,0,8" />
+    </Style>
+    
+    <!-- プログレスバースタイル -->
+    <Style Selector="ProgressBar">
+        <Setter Property="Height" Value="8" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundDarkBrush}" />
+    </Style>
+    
+    <!-- コンボボックススタイル -->
+    <Style Selector="ComboBox">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    
+    <Style Selector="ComboBox:pointerover /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    
+    <Style Selector="ComboBox:focus /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    
+    <!-- テキストボックススタイル -->
+    <Style Selector="TextBox">
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="SelectionForegroundBrush" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="TextBox:focus /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    
+    <!-- チェックボックススタイル -->
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="CheckBox:checked /template/ Border">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="CheckBox:pointerover /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}" />
+    </Style>
+    
+    <!-- ラジオボタンスタイル -->
+    <Style Selector="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="RadioButton:checked /template/ Ellipse#CheckGlyph">
+        <Setter Property="Fill" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="RadioButton:pointerover /template/ Ellipse">
+        <Setter Property="Stroke" Value="{DynamicResource PrimaryLightBrush}" />
+    </Style>
+    
+    <!-- ツールチップスタイル -->
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    
+    <!-- リストボックススタイル -->
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    
+    <Style Selector="ListBoxItem">
+        <Setter Property="Padding" Value="8,4" />
+    </Style>
+    
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <!-- スクロールバースタイル -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    
+    <Style Selector="ScrollBar:horizontal">
+        <Setter Property="Height" Value="8" />
+    </Style>
+    
+    <Style Selector="ScrollBar:vertical">
+        <Setter Property="Width" Value="8" />
+    </Style>
+    
+    <Style Selector="ScrollBar /template/ Thumb">
+        <Setter Property="Background" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    
+    <Style Selector="ScrollBar /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+    </Style>
+    
+    <Style Selector="ScrollBar /template/ Thumb:pressed">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    
+    <!-- カードパネルスタイル -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="Margin" Value="8" />
+        <Setter Property="BoxShadow" Value="0 2 4 #20000000" />
+    </Style>
+
+    <!-- ナビゲーションヘッダースタイル -->
+    <Style Selector="Border.navigationHeader">
+        <Setter Property="Background" Value="{DynamicResource HeaderBackground}" />
+        <Setter Property="Padding" Value="16,8" />
+    </Style>
+    
+    <!-- ステータスバースタイル -->
+    <Style Selector="Border.statusBar">
+        <Setter Property="Background" Value="{DynamicResource StatusBarBackground}" />
+        <Setter Property="Padding" Value="16,4" />
+    </Style>
+</Styles>

@@ -19,12 +19,16 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- プロジェクト参照の順序を適切に設定 -->
   <ItemGroup>
     <ProjectReference Include="..\..\Baketa.Core\Baketa.Core.csproj" />
     <ProjectReference Include="..\..\Baketa.Infrastructure\Baketa.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\..\Baketa.Application\Baketa.Application.csproj" />
-    <ProjectReference Include="..\..\Baketa.UI\Baketa.UI.csproj" />
+    <ProjectReference Include="..\..\Baketa.UI\Baketa.UI.csproj">
+      <Private>True</Private>
+      <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

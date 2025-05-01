@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Baketa.UI.App"
              xmlns:local="using:Baketa.UI"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             xmlns:conv="clr-namespace:Baketa.UI.Converters;assembly=Baketa.UI"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
@@ -11,5 +13,28 @@
   
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Baketa.UI/Styles/BasicStyles.axaml" />
+        <StyleInclude Source="avares://Baketa.UI/Styles/Buttons.axaml" />
+        <StyleInclude Source="avares://Baketa.UI/Styles/Controls.axaml" />
+        <StyleInclude Source="avares://Baketa.UI/Styles/Typography.axaml" />
+        <!-- アニメーション定義を追加 -->
+        <StyleInclude Source="avares://Baketa.UI/Styles/Animations.axaml" />
     </Application.Styles>
+    
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Baketa.UI/Styles/Colors.axaml" />
+                <ResourceInclude Source="avares://Baketa.UI/Styles/Icons.axaml" />
+                <ResourceInclude Source="avares://Baketa.UI/Styles/TypographyTypes.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- コンバーター -->
+            <local:EnumToIntConverter x:Key="EnumToIntConverter" />
+            <local:EnumComparisonConverter x:Key="EnumComparisonConverter" />
+            
+            <!-- アクセシビリティ設定 -->
+            <x:Boolean x:Key="AnimationsEnabled">True</x:Boolean>
+        </ResourceDictionary>
+    </Application.Resources>
 </Application>

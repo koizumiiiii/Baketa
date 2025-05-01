@@ -122,9 +122,9 @@ namespace Baketa.UI.Framework
         /// イベントを発行します
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="event">イベントインスタンス</param>
+        /// <param name="eventData">イベントインスタンス</param>
         /// <returns>発行タスク</returns>
-        protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+        protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : Baketa.Core.Events.IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             return _eventAggregator.PublishAsync(eventData);
@@ -136,7 +136,7 @@ namespace Baketa.UI.Framework
         /// <typeparam name="TEvent">イベント型</typeparam>
         /// <param name="handler">ハンドラ</param>
         /// <returns>購読解除可能なDisposable</returns>
-        protected IDisposable SubscribeToEvent<TEvent>(Func<TEvent, Task> handler) where TEvent : IEvent
+        protected IDisposable SubscribeToEvent<TEvent>(Func<TEvent, Task> handler) where TEvent : Baketa.Core.Events.IEvent
         {
             ArgumentNullException.ThrowIfNull(handler);
             
