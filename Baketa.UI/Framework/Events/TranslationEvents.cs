@@ -5,127 +5,84 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// 翻訳設定変更イベント
     /// </summary>
-    internal sealed class TranslationSettingsChangedEvent : IEvent
+    /// <param name="engine">翻訳エンジン</param>
+    /// <param name="targetLanguage">翻訳先言語</param>
+    internal sealed class TranslationSettingsChangedEvent(string engine, string targetLanguage) : UIEventBase
     {
-        public string Engine { get; }
-        public string TargetLanguage { get; }
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <summary>
+        /// 使用された翻訳エンジン
+        /// </summary>
+        public string Engine { get; } = engine;
 
-        public TranslationSettingsChangedEvent(string engine, string targetLanguage)
-        {
-            Engine = engine;
-            TargetLanguage = targetLanguage;
-        }
+        /// <summary>
+        /// 翻訳先言語
+        /// </summary>
+        public string TargetLanguage { get; } = targetLanguage;
+
+        /// <inheritdoc/>
+        public override string Name => "TranslationSettingsChanged";
+
+        /// <inheritdoc/>
+        public override string Category => "Translation";
     }
 
     /// <summary>
     /// キャプチャステータス変更イベント
     /// </summary>
-    internal sealed class CaptureStatusChangedEvent : IEvent
+    /// <param name="isActive">キャプチャがアクティブかどうか</param>
+    internal sealed class CaptureStatusChangedEvent(bool isActive) : UIEventBase
     {
-        public bool IsActive { get; }
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <summary>
+        /// キャプチャがアクティブかどうか
+        /// </summary>
+        public bool IsActive { get; } = isActive;
 
-        public CaptureStatusChangedEvent(bool isActive)
-        {
-            IsActive = isActive;
-        }
+        /// <inheritdoc/>
+        public override string Name => "CaptureStatusChanged";
+
+        /// <inheritdoc/>
+        public override string Category => "Capture";
     }
 
     /// <summary>
     /// 翻訳完了イベント
     /// </summary>
-    internal sealed class TranslationCompletedEvent : IEvent
+    /// <param name="sourceText">原文</param>
+    /// <param name="translatedText">翻訳結果</param>
+    internal sealed class TranslationCompletedEvent(string sourceText, string translatedText) : UIEventBase
     {
-        public string SourceText { get; }
-        public string TranslatedText { get; }
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <summary>
+        /// 原文
+        /// </summary>
+        public string SourceText { get; } = sourceText;
 
-        public TranslationCompletedEvent(string sourceText, string translatedText)
-        {
-            SourceText = sourceText;
-            TranslatedText = translatedText;
-        }
-    }
+        /// <summary>
+        /// 翻訳結果
+        /// </summary>
+        public string TranslatedText { get; } = translatedText;
 
-    /// <summary>
-    /// キャプチャ開始要求イベント
-    /// </summary>
-    internal sealed class StartCaptureRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
-    }
+        /// <inheritdoc/>
+        public override string Name => "TranslationCompleted";
 
-    /// <summary>
-    /// キャプチャ停止要求イベント
-    /// </summary>
-    internal sealed class StopCaptureRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
-    }
-
-    /// <summary>
-    /// アプリケーション終了要求イベント
-    /// </summary>
-    internal sealed class ApplicationExitRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
-    }
-
-    /// <summary>
-    /// トレイ最小化要求イベント
-    /// </summary>
-    internal sealed class MinimizeToTrayRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <inheritdoc/>
+        public override string Category => "Translation";
     }
 
     /// <summary>
     /// 翻訳エラーイベント
     /// </summary>
-    internal sealed class TranslationErrorEvent : IEvent
+    /// <param name="errorMessage">エラーメッセージ</param>
+    internal sealed class TranslationErrorEvent(string errorMessage) : UIEventBase
     {
-        public string ErrorMessage { get; }
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <summary>
+        /// エラーメッセージ
+        /// </summary>
+        public string ErrorMessage { get; } = errorMessage;
 
-        public TranslationErrorEvent(string errorMessage)
-        {
-            ErrorMessage = errorMessage;
-        }
-    }
+        /// <inheritdoc/>
+        public override string Name => "TranslationError";
 
-    /// <summary>
-    /// キャプチャ設定画面を開く要求イベント
-    /// </summary>
-    internal sealed class OpenCaptureSettingsRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
-    }
-
-    /// <summary>
-    /// 翻訳設定画面を開く要求イベント
-    /// </summary>
-    internal sealed class OpenTranslationSettingsRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
-    }
-
-    /// <summary>
-    /// 履歴画面を開く要求イベント
-    /// </summary>
-    internal sealed class OpenHistoryViewRequestedEvent : IEvent
-    {
-        public Guid EventId { get; } = Guid.NewGuid();
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <inheritdoc/>
+        public override string Category => "Translation";
     }
 }

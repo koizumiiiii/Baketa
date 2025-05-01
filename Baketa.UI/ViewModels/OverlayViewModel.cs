@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
-using Baketa.UI.Framework.Events;
+using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+
+// 名前空間エイリアスを使用して衝突を解決
+using UIEvents = Baketa.UI.Framework.Events;
 
 namespace Baketa.UI.ViewModels
 {
@@ -171,14 +174,14 @@ namespace Baketa.UI.ViewModels
         /// </summary>
         /// <param name="eventAggregator">イベント集約器</param>
         /// <param name="logger">ロガー</param>
-        public OverlayViewModel(IEventAggregator eventAggregator, ILogger? logger = null)
+        public OverlayViewModel(UIEvents.IEventAggregator eventAggregator, ILogger? logger = null)
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            SaveSettingsCommand = ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
-            PreviewOverlayCommand = ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
-            ResetToDefaultsCommand = ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
-            ResetSettingsCommand = ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
+            SaveSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
+            PreviewOverlayCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
+            ResetToDefaultsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
+            ResetSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
         }
         
         // 設定保存コマンド実行
@@ -222,27 +225,50 @@ namespace Baketa.UI.ViewModels
     }
     
     // イベント定義
+    /// <summary>
+    /// オーバーレイ設定変更イベント
+    /// </summary>
+    /// <param name="position">位置</param>
+    /// <param name="fontSize">フォントサイズ</param>
+    /// <param name="fontColor">フォント色</param>
+    /// <param name="backgroundColor">背景色</param>
+    /// <param name="backgroundOpacity">背景透過度</param>
     internal class OverlaySettingsChangedEvent(
         string position,
         int fontSize,
         string fontColor,
         string backgroundColor,
-        double backgroundOpacity) : IEvent
+        double backgroundOpacity) : Baketa.UI.Framework.Events.UIEventBase
     {
+        /// <summary>
+        /// 位置
+        /// </summary>
         public string Position { get; } = position;
+
+        /// <summary>
+        /// フォントサイズ
+        /// </summary>
         public int FontSize { get; } = fontSize;
+
+        /// <summary>
+        /// フォント色
+        /// </summary>
         public string FontColor { get; } = fontColor;
+
+        /// <summary>
+        /// 背景色
+        /// </summary>
         public string BackgroundColor { get; } = backgroundColor;
+
+        /// <summary>
+        /// 背景透過度
+        /// </summary>
         public double BackgroundOpacity { get; } = backgroundOpacity;
         
-        /// <summary>
-        /// イベントの一意な識別子
-        /// </summary>
-        public Guid EventId { get; } = Guid.NewGuid();
+        /// <inheritdoc/>
+        public override string Name => "OverlaySettingsChanged";
         
-        /// <summary>
-        /// イベントが発生した時刻
-        /// </summary>
-        public DateTime Timestamp { get; } = DateTime.Now;
+        /// <inheritdoc/>
+        public override string Category => "UI.Overlay";
     }
 }

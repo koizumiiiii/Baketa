@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -119,12 +120,12 @@ namespace Baketa.UI.ViewModels
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            StartCaptureCommand = ReactiveCommandFactory.Create(ExecuteStartCaptureAsync);
-            OpenSettingsCommand = ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync);
-            OpenCaptureSettingsCommand = ReactiveCommandFactory.Create(ExecuteOpenCaptureSettingsAsync);
-            OpenTranslationSettingsCommand = ReactiveCommandFactory.Create(ExecuteOpenTranslationSettingsAsync);
-            OpenHelpCommand = ReactiveCommandFactory.Create(ExecuteOpenHelpAsync);
-            ViewAllHistoryCommand = ReactiveCommandFactory.Create(ExecuteViewAllHistoryAsync);
+            StartCaptureCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteStartCaptureAsync);
+            OpenSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync);
+            OpenCaptureSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenCaptureSettingsAsync);
+            OpenTranslationSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenTranslationSettingsAsync);
+            OpenHelpCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenHelpAsync);
+            ViewAllHistoryCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteViewAllHistoryAsync);
             
             // デモデータの初期化
             InitializeDemo();

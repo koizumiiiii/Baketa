@@ -1,0 +1,281 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+    
+    <Design.DataContext>
+        <vm:SettingsViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,20">
+            <TextBlock Text="設定" 
+                       Classes="TitleTextBlockStyle"
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="Baketaアプリケーションの動作をカスタマイズします。" 
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10"/>
+        </StackPanel>
+        
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" ColumnDefinitions="220,*">
+            <!-- カテゴリナビゲーション -->
+            <Border Grid.Column="0" 
+                    Classes="card" 
+                    Margin="0,0,15,0">
+                <ListBox x:Name="CategoryListBox"
+                         SelectedIndex="{Binding SelectedCategory, Converter={StaticResource EnumToIntConverter}}"
+                         Background="Transparent"
+                         Padding="5">
+                    <!-- 一般設定 -->
+                    <ListBoxItem x:Name="GeneralSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource SettingsIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="一般設定" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    
+                    <!-- 外観設定 -->
+                    <ListBoxItem x:Name="AppearanceSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource ThemeIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="外観設定" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    
+                    <!-- 言語設定 -->
+                    <ListBoxItem x:Name="LanguageSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource LanguageIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="言語設定" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    
+                    <!-- ホットキー設定 -->
+                    <ListBoxItem x:Name="HotkeysSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource KeyboardIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="ホットキー設定" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    
+                    <!-- 詳細設定 -->
+                    <ListBoxItem x:Name="AdvancedSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource AdvancedIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="詳細設定" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </Border>
+            
+            <!-- 設定パネル -->
+            <Border Grid.Column="1" Classes="card">
+                <ScrollViewer>
+                    <!-- 各カテゴリのパネル -->
+                    <Panel>
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.General}}"
+                                    Spacing="20" Margin="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="一般設定" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <CheckBox Content="Windows起動時に自動的に起動する" 
+                                          IsChecked="{Binding StartWithWindows}"/>
+                                <CheckBox Content="最小化時にシステムトレイに格納する" 
+                                          IsChecked="{Binding MinimizeToTray}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- 外観設定 -->
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.Appearance}}"
+                                    Spacing="20" Margin="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="テーマ設定" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <RadioButton Content="ライトテーマ" 
+                                                 IsChecked="{Binding !IsDarkTheme}" 
+                                                 GroupName="Theme"/>
+                                    <RadioButton Content="ダークテーマ" 
+                                                 IsChecked="{Binding IsDarkTheme}" 
+                                                 GroupName="Theme"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="UIスケール" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <ComboBox ItemsSource="{Binding UIScaleOptions}" 
+                                          SelectedItem="{Binding UIScale}" 
+                                          HorizontalAlignment="Left" 
+                                          Width="100"/>
+                                <TextBlock Text="※UIのサイズを調整します。変更後は再起動が必要です。" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           FontSize="12" 
+                                           Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- 言語設定 -->
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.Language}}"
+                                    Spacing="20" Margin="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="UI言語" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <ComboBox ItemsSource="{Binding UILanguageOptions}" 
+                                          SelectedItem="{Binding UILanguage}" 
+                                          HorizontalAlignment="Left" 
+                                          Width="200"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="OCR言語" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <ComboBox ItemsSource="{Binding OCRLanguageOptions}" 
+                                          SelectedItem="{Binding OCRLanguage}" 
+                                          HorizontalAlignment="Left" 
+                                          Width="200"/>
+                                <TextBlock Text="※テキスト検出に使用する言語を選択します" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           FontSize="12" 
+                                           Margin="0,5,0,0"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="翻訳先言語" 
+                                           Classes="SubtitleTextBlockStyle"  
+                                           Margin="0,0,0,10"/>
+                                <ComboBox ItemsSource="{Binding TranslationLanguageOptions}" 
+                                          SelectedItem="{Binding TranslationLanguage}" 
+                                          HorizontalAlignment="Left" 
+                                          Width="200"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- ホットキー設定 -->
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.Hotkeys}}"
+                                    Spacing="20" Margin="10">
+                            <TextBlock Text="ホットキー設定" 
+                                       Classes="SubtitleTextBlockStyle"  
+                                       Margin="0,0,0,10"/>
+                                       
+                            <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5">
+                                <TextBlock Grid.Row="0" Grid.Column="0" 
+                                           Text="キャプチャ開始/停止:" 
+                                           VerticalAlignment="Center" 
+                                           Margin="0,0,20,10"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" 
+                                         Text="{Binding CaptureHotkey}" 
+                                         Watermark="例: Ctrl+Alt+C"
+                                         Margin="0,0,0,10" 
+                                         Width="200" 
+                                         HorizontalAlignment="Left"/>
+                                         
+                                <TextBlock Grid.Row="1" Grid.Column="0" 
+                                           Text="手動翻訳:" 
+                                           VerticalAlignment="Center" 
+                                           Margin="0,0,20,10"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" 
+                                         Text="{Binding TranslateHotkey}" 
+                                         Watermark="例: Ctrl+Alt+T"
+                                         Margin="0,0,0,10" 
+                                         Width="200" 
+                                         HorizontalAlignment="Left"/>
+                                         
+                                <TextBlock Grid.Row="2" Grid.Column="0" 
+                                           Text="リセット:" 
+                                           VerticalAlignment="Center" 
+                                           Margin="0,0,20,10"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" 
+                                         Text="{Binding ResetHotkey}" 
+                                         Watermark="例: Ctrl+Alt+R"
+                                         Width="200" 
+                                         HorizontalAlignment="Left"/>
+                            </Grid>
+                            
+                            <TextBlock Text="※変更を反映するには、設定を保存後にアプリケーションを再起動してください" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}" 
+                                       FontSize="12" 
+                                       Margin="0,10,0,0"/>
+                        </StackPanel>
+                        
+                        <!-- 詳細設定 -->
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.Advanced}}"
+                                    Spacing="20" Margin="10">
+                            <TextBlock Text="詳細設定" 
+                                       Classes="SubtitleTextBlockStyle"  
+                                       Margin="0,0,0,10"/>
+                                       
+                            <CheckBox Content="デバッグログを有効にする" 
+                                      IsChecked="{Binding EnableDebugLogs}"/>
+                                      
+                            <StackPanel Spacing="5" Margin="0,10,0,0">
+                                <Button Content="設定をデフォルトにリセット" 
+                                        Command="{Binding ResetToDefaultsCommand}" 
+                                        Classes="danger" 
+                                        HorizontalAlignment="Left"/>
+                                <TextBlock Text="※すべての設定をデフォルト値に戻します" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                           FontSize="12" 
+                                           Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        
+        <!-- フッター（ボタン） -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" Margin="0,20,0,0">
+            <ProgressBar Grid.Column="0" 
+                         IsIndeterminate="True" 
+                         IsVisible="{Binding IsLoading}" 
+                         Width="100" 
+                         Height="4" 
+                         Margin="0,0,10,0" 
+                         VerticalAlignment="Center"/>
+                         
+            <TextBlock Grid.Column="1" 
+                       Text="{Binding ErrorMessage}" 
+                       Foreground="Red" 
+                       VerticalAlignment="Center" 
+                       IsVisible="{Binding !!ErrorMessage}"/>
+                       
+            <StackPanel Grid.Column="2" 
+                        Orientation="Horizontal" 
+                        HorizontalAlignment="Right" 
+                        Spacing="10">
+                <Button Content="キャンセル" 
+                        Command="{Binding CancelCommand}" 
+                        Classes="secondary" 
+                        IsEnabled="{Binding HasChanges}"/>
+                <Button Content="保存" 
+                        Command="{Binding SaveCommand}" 
+                        Classes="primary" 
+                        IsEnabled="{Binding HasChanges}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

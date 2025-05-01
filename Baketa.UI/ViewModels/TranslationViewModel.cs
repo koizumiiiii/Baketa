@@ -3,6 +3,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -96,9 +97,9 @@ namespace Baketa.UI.ViewModels
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            SaveSettingsCommand = ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
-            TestTranslationCommand = ReactiveCommandFactory.Create(ExecuteTestTranslationAsync);
-            ClearCacheCommand = ReactiveCommandFactory.Create(ExecuteClearCacheAsync);
+            SaveSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
+            TestTranslationCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteTestTranslationAsync);
+            ClearCacheCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteClearCacheAsync);
         }
         
         // 設定保存コマンド実行

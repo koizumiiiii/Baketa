@@ -5,16 +5,13 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// イベント集約機構で使用される全てのイベントの基底インターフェース
     /// </summary>
-    internal interface IEvent
+    internal interface IEvent : Baketa.Core.Events.IEvent
     {
-        /// <summary>
-        /// イベントの一意な識別子を取得します
-        /// </summary>
-        Guid EventId { get; }
-        
-        /// <summary>
-        /// イベントが発生した時刻を取得します
-        /// </summary>
-        DateTime Timestamp { get; }
+        // Core.Events.IEventを継承し、互換性を確保
+        // Core.Events.IEventのプロパティ：
+        // Guid Id { get; }
+        // DateTime Timestamp { get; }
+        // string Name { get; }
+        // string Category { get; }
     }
 }

@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -73,13 +74,13 @@ namespace Baketa.UI.ViewModels
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            ClearHistoryCommand = ReactiveCommandFactory.Create(ExecuteClearHistoryAsync);
-            ExportHistoryCommand = ReactiveCommandFactory.Create(ExecuteExportHistoryAsync);
-            CopySourceCommand = ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteCopySourceAsync);
-            CopyTranslationCommand = ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteCopyTranslationAsync);
+            ClearHistoryCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteClearHistoryAsync);
+            ExportHistoryCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteExportHistoryAsync);
+            CopySourceCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteCopySourceAsync);
+            CopyTranslationCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteCopyTranslationAsync);
             
-            SearchCommand = ReactiveCommandFactory.Create(ExecuteSearchAsync);
-            RemoveItemCommand = ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteRemoveItemAsync);
+            SearchCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSearchAsync);
+            RemoveItemCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create<TranslationHistoryItem>(ExecuteRemoveItemAsync);
             
             // デモ用のサンプルデータ
             LoadSampleData();
