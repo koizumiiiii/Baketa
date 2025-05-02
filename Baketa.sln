@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Baketa.Infrastructure.Platf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Baketa.Application.Tests", "tests\Baketa.Application.Tests\Baketa.Application.Tests.csproj", "{A090FD79-0CBB-B183-0EC2-CE8C3762298B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Baketa.Infrastructure.Tests", "tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj", "{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -91,6 +93,14 @@ Global
 		{A090FD79-0CBB-B183-0EC2-CE8C3762298B}.Release|Any CPU.Build.0 = Release|x64
 		{A090FD79-0CBB-B183-0EC2-CE8C3762298B}.Release|x64.ActiveCfg = Release|x64
 		{A090FD79-0CBB-B183-0EC2-CE8C3762298B}.Release|x64.Build.0 = Release|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Debug|Any CPU.Build.0 = Debug|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Debug|x64.ActiveCfg = Debug|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Debug|x64.Build.0 = Debug|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Release|Any CPU.ActiveCfg = Release|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Release|Any CPU.Build.0 = Release|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Release|x64.ActiveCfg = Release|x64
+		{3CFAA9CA-B536-36C2-FBF9-F88FA9F7CEDE}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
