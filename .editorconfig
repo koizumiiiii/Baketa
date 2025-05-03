@@ -5,8 +5,9 @@ root = true
 
 # .NET code style settings
 [*.{cs,vb}]
-# IDE0028: コレクション初期化の簡素化（既に対応済みだが警告が出ている場合）
-dotnet_style_collection_initializer = true:suggestion
+# IDE0028: コレクション初期化の簡素化
+dotnet_style_collection_initializer = true:silent
+dotnet_diagnostic.IDE0028.severity = silent
 
 # CA1515: 内部クラスの警告拒否
 dotnet_diagnostic.CA1515.severity = none
@@ -15,10 +16,20 @@ dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1848.severity = none
 
 # IDE0290: プライマリコンストラクターの使用に関する警告抑制
-dotnet_diagnostic.IDE0290.severity = suggestion
+dotnet_diagnostic.IDE0290.severity = silent
 
 # IDE0031: Nullチェックの簡素化に関する警告抑制
 dotnet_diagnostic.IDE0031.severity = suggestion
+
+# IDE0090: new式の簡素化
+dotnet_style_object_initializer = true:silent
+dotnet_diagnostic.IDE0090.severity = silent
+
+# IDE0305: コレクション初期化の簡素化
+dotnet_diagnostic.IDE0305.severity = silent
+
+# CA1305: IFormatProviderの指定
+dotnet_diagnostic.CA1305.severity = warning
 
 # プロジェクト固有の設定
 [*.cs]

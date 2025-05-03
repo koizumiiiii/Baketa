@@ -717,7 +717,9 @@ namespace Baketa.Application.Services.Capture
 
 ## 7. イベント集約機構の設計
 
-イベント集約機構により、モジュール間の疎結合なコミュニケーションを実現します：
+イベント集約機構により、モジュール間の疎結合なコミュニケーションを実現します。この機構は既に実装済みであり、主要なインターフェースと実装クラスは以下の通りです：
+
+### 7.1 主要インターフェース
 
 ```csharp
 namespace Baketa.Core.Events
@@ -757,9 +759,9 @@ namespace Baketa.Core.Events
         /// <summary>
         /// イベント処理
         /// </summary>
-        /// <param name="event">イベント</param>
+        /// <param name="eventData">イベント</param>
         /// <returns>処理の完了を表すTask</returns>
-        Task HandleAsync(TEvent @event);
+        Task HandleAsync(TEvent eventData);
     }
 
     /// <summary>
@@ -771,9 +773,9 @@ namespace Baketa.Core.Events
         /// イベントの発行
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="event">イベント</param>
+        /// <param name="eventData">イベント</param>
         /// <returns>イベント発行の完了を表すTask</returns>
-        Task PublishAsync<TEvent>(TEvent @event) where TEvent : IEvent;
+        Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent;
         
         /// <summary>
         /// イベントプロセッサの登録
@@ -789,35 +791,190 @@ namespace Baketa.Core.Events
         /// <param name="processor">イベントプロセッサ</param>
         void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
-    
+}
+```
+
+### 7.2 実装クラス
+
+イベント集約機構は`EventAggregator`クラスに実装されており、以下の機能を提供しています：
+
+```csharp
+namespace Baketa.Core.Events.Implementation
+{
     /// <summary>
-    /// イベント基本実装
+    /// イベント集約機構の実装
     /// </summary>
-    public abstract class EventBase : IEvent
+    public class EventAggregator : IEventAggregator
     {
+        private readonly ILogger<EventAggregator>? _logger;
+        private readonly Dictionary<Type, List<object>> _processors = new Dictionary<Type, List<object>>();
+        private readonly object _syncRoot = new object();
+
         /// <summary>
-        /// コンストラクタ
+        /// イベント集約機構を初期化します
         /// </summary>
-        protected EventBase()
+        /// <param name="logger">ロガー（オプション）</param>
+        public EventAggregator(ILogger<EventAggregator>? logger = null)
         {
-            Id = Guid.NewGuid();
-            Timestamp = DateTime.UtcNow;
+            _logger = logger;
         }
         
         /// <inheritdoc />
-        public Guid Id { get; }
+        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+        {
+            // イベント発行ロジック
+        }
+        
+        /// <summary>
+        /// キャンセレーション対応のイベント発行
+        /// </summary>
+        public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
+            where TEvent : IEvent
+        {
+            // キャンセレーション対応のイベント発行ロジック
+        }
         
         /// <inheritdoc />
-        public DateTime Timestamp { get; }
+        public void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        {
+            // プロセッサ登録ロジック
+        }
         
         /// <inheritdoc />
-        public abstract string Name { get; }
-        
-        /// <inheritdoc />
-        public abstract string Category { get; }
+        public void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        {
+            // プロセッサ登録解除ロジック
+        }
     }
 }
 ```
+
+### 7.3 パフォーマンス測定機能
+
+イベント処理のパフォーマンスを詳細に測定するための`EventProcessorMetrics`クラスも実装されています：
+
+```csharp
+namespace Baketa.Core.Events.Implementation
+{
+    /// <summary>
+    /// イベントプロセッサのパフォーマンスメトリクス
+    /// </summary>
+    public class EventProcessorMetrics
+    {
+        // パフォーマンス測定機能の実装
+        // - 処理時間の測定
+        // - 成功率の計算
+        // - 95パーセンタイルなどの統計情報
+        // - レポート生成機能
+    }
+    
+    /// <summary>
+    /// プロセッサのメトリクス情報
+    /// </summary>
+    public class ProcessorMetric
+    {
+        // メトリック情報を格納するプロパティ
+    }
+}
+```
+
+### 7.4 依存性注入の統合
+
+DIコンテナでの登録は以下のように実装されています：
+
+```csharp
+namespace Baketa.Core.Events.Implementation
+{
+    /// <summary>
+    /// イベント集約機構のサービス登録拡張メソッド
+    /// </summary>
+    public static class EventAggregatorServiceExtensions
+    {
+        /// <summary>
+        /// イベント集約機構をサービスコレクションに登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <returns>設定済みのサービスコレクション</returns>
+        public static IServiceCollection AddEventAggregator(this IServiceCollection services)
+        {
+            // イベント集約機構をシングルトンとして登録
+            services.AddSingleton<IEventAggregator, EventAggregator>();
+            
+            return services;
+        }
+    }
+}
+```
+
+### 7.5 イベント使用例
+
+イベント集約機構の使用例：
+
+```csharp
+// イベント定義
+public class CaptureCompletedEvent : EventBase
+{
+    public CaptureCompletedEvent(IImage capturedImage)
+    {
+        CapturedImage = capturedImage;
+    }
+    
+    public IImage CapturedImage { get; }
+    
+    public override string Name => "CaptureCompleted";
+    
+    public override string Category => "Capture";
+}
+
+// イベントプロセッサ
+public class CaptureProcessor : IEventProcessor<CaptureCompletedEvent>
+{
+    private readonly IOcrService _ocrService;
+    
+    public CaptureProcessor(IOcrService ocrService)
+    {
+        _ocrService = ocrService;
+    }
+    
+    public async Task HandleAsync(CaptureCompletedEvent eventData)
+    {
+        // キャプチャ画像に対してOCR処理を実行
+        await _ocrService.ProcessImageAsync(eventData.CapturedImage);
+    }
+}
+
+// 登録と発行
+public class SampleService
+{
+    private readonly IEventAggregator _eventAggregator;
+    private readonly ICaptureService _captureService;
+    private readonly CaptureProcessor _captureProcessor;
+    
+    public SampleService(
+        IEventAggregator eventAggregator,
+        ICaptureService captureService,
+        CaptureProcessor captureProcessor)
+    {
+        _eventAggregator = eventAggregator;
+        _captureService = captureService;
+        _captureProcessor = captureProcessor;
+        
+        // プロセッサを登録
+        _eventAggregator.Subscribe(_captureProcessor);
+    }
+    
+    public async Task ExecuteAsync()
+    {
+        // 画面をキャプチャ
+        var image = await _captureService.CaptureScreenAsync();
+        
+        // イベントを発行
+        await _eventAggregator.PublishAsync(new CaptureCompletedEvent(image));
+    }
+}
+```
+
+このイベント集約機構は、モジュール間の疎結合なコミュニケーションを実現し、系統だったイベント処理を可能にします。
 
 ## 8. 依存性注入の最適化
 

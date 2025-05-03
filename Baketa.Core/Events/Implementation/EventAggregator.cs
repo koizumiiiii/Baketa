@@ -1,0 +1,385 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+
+namespace Baketa.Core.Events.Implementation
+{
+    /// <summary>
+    /// イベント集約機構の実装
+    /// </summary>
+    // プライマリコンストラクターの使用を拒否（IDE0290）
+    public class EventAggregator : IEventAggregator
+    {
+        private readonly ILogger<EventAggregator>? _logger;
+        // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）
+        private readonly Dictionary<Type, List<object>> _processors = new Dictionary<Type, List<object>>();
+        private readonly object _syncRoot = new object();
+
+        /// <summary>
+        /// イベント集約機構を初期化します
+        /// </summary>
+        /// <param name="logger">ロガー（オプション）</param>
+        public EventAggregator(ILogger<EventAggregator>? logger = null)
+        {
+            _logger = logger;
+        }
+        
+        /// <inheritdoc />
+        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+        {
+            ArgumentNullException.ThrowIfNull(eventData);
+            
+            _logger?.LogDebug("イベント発行: {EventType} (ID: {EventId})", typeof(TEvent).Name, eventData.Id);
+            
+            var eventType = typeof(TEvent);
+            List<object>? eventProcessors = null;
+            
+            lock (_syncRoot)
+            {
+                if (_processors.TryGetValue(eventType, out var handlers))
+                {
+                    eventProcessors = handlers.ToList(); // スレッドセーフにするため複製
+                }
+            }
+            
+            if (eventProcessors == null || eventProcessors.Count == 0)
+            {
+                _logger?.LogDebug("イベント {EventType} のプロセッサが登録されていません", eventType.Name);
+                return;
+            }
+            
+            // List<Task> そのままの実装を使用（IDE0305を拒否）
+            // List<Task> そのままの実装を使用（IDE0305を拒否）
+            var tasks = new List<Task>();
+            
+            foreach (var processor in eventProcessors.OfType<IEventProcessor<TEvent>>())
+            {
+                try
+                {
+                    var processorType = processor.GetType().Name;
+                    _logger?.LogTrace("プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
+                        processorType, eventType.Name);
+                    
+                    tasks.Add(ExecuteProcessorAsync(processor, eventData, processorType));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger?.LogError(ex, "プロセッサ {ProcessorType} で操作エラーが発生しました", 
+                        processor.GetType().Name);
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger?.LogError(ex, "プロセッサ {ProcessorType} で引数エラーが発生しました", 
+                        processor.GetType().Name);
+                }
+                // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
+                // このcatchブロックは意図的に一般的な例外を捕捉します
+                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name))
+                {
+                    // ロギングはShouldCatchExceptionメソッド内で行われます
+                }
+            }
+            
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                eventType.Name, eventProcessors.Count);
+        }
+        
+        /// <summary>
+        /// キャンセレーション対応のイベント発行
+        /// </summary>
+        /// <typeparam name="TEvent">イベント型</typeparam>
+        /// <param name="eventData">イベント</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>イベント発行の完了を表すTask</returns>
+        public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
+            where TEvent : IEvent
+        {
+            ArgumentNullException.ThrowIfNull(eventData);
+            
+            _logger?.LogDebug("イベント発行(キャンセル可能): {EventType} (ID: {EventId})", 
+                typeof(TEvent).Name, eventData.Id);
+            
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            var eventType = typeof(TEvent);
+            List<object>? eventProcessors = null;
+            
+            lock (_syncRoot)
+            {
+                if (_processors.TryGetValue(eventType, out var handlers))
+                {
+                    eventProcessors = handlers.ToList(); // スレッドセーフにするため複製
+                }
+            }
+            
+            if (eventProcessors == null || eventProcessors.Count == 0)
+            {
+                _logger?.LogDebug("イベント {EventType} のプロセッサが登録されていません", eventType.Name);
+                return;
+            }
+            
+            var tasks = new List<Task>();
+            
+            foreach (var processor in eventProcessors.OfType<IEventProcessor<TEvent>>())
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger?.LogInformation("イベント {EventType} の処理がキャンセルされました", eventType.Name);
+                    break;
+                }
+                
+                try
+                {
+                    var processorType = processor.GetType().Name;
+                    _logger?.LogTrace("プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
+                        processorType, eventType.Name);
+                    
+                    tasks.Add(ExecuteProcessorAsync(processor, eventData, processorType, cancellationToken));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger?.LogError(ex, "プロセッサ {ProcessorType} で操作エラーが発生しました", 
+                        processor.GetType().Name);
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger?.LogError(ex, "プロセッサ {ProcessorType} で引数エラーが発生しました", 
+                        processor.GetType().Name);
+                }
+                // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
+                // このcatchブロックは意図的に一般的な例外を捕捉します
+                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name) && 
+                                          ex is not OperationCanceledException)
+                {
+                    // ロギングはShouldCatchExceptionメソッド内で行われます
+                }
+            }
+            
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                    eventType.Name, eventProcessors.Count);
+            }
+        }
+        
+        /// <inheritdoc />
+        public void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        {
+            ArgumentNullException.ThrowIfNull(processor);
+            
+            var eventType = typeof(TEvent);
+            
+            lock (_syncRoot)
+            {
+                if (!_processors.TryGetValue(eventType, out var handlers))
+                {
+                    // List<object> そのままの実装を使用（IDE0028を拒否）
+                    handlers = new List<object>();
+                    _processors[eventType] = handlers;
+                }
+                
+                if (!handlers.Contains(processor))
+                {
+                    handlers.Add(processor);
+                    _logger?.LogDebug("プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
+                        processor.GetType().Name, eventType.Name);
+                }
+                else
+                {
+                    _logger?.LogDebug("プロセッサ {ProcessorType} は既にイベント {EventType} に登録されています", 
+                        processor.GetType().Name, eventType.Name);
+                }
+            }
+        }
+        
+        /// <inheritdoc />
+        public void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        {
+            ArgumentNullException.ThrowIfNull(processor);
+            
+            var eventType = typeof(TEvent);
+            
+            lock (_syncRoot)
+            {
+                if (_processors.TryGetValue(eventType, out var handlers))
+                {
+                    if (handlers.Remove(processor))
+                    {
+                        _logger?.LogDebug("プロセッサ {ProcessorType} のイベント {EventType} 登録を解除しました", 
+                            processor.GetType().Name, eventType.Name);
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("プロセッサ {ProcessorType} はイベント {EventType} に登録されていませんでした", 
+                            processor.GetType().Name, eventType.Name);
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 登録されたプロセッサを実行し、エラーハンドリングを行う
+        /// </summary>
+        /// <typeparam name="TEvent">イベント型</typeparam>
+        /// <param name="processor">イベントプロセッサ</param>
+        /// <param name="eventData">イベント</param>
+        /// <param name="processorType">プロセッサタイプ名（ログ用）</param>
+        /// <returns>処理の完了を表すTask</returns>
+        private async Task ExecuteProcessorAsync<TEvent>(
+            IEventProcessor<TEvent> processor, 
+            TEvent eventData, 
+            string processorType) 
+            where TEvent : IEvent
+        {
+            try
+            {
+                // パフォーマンス測定のための開始時間記録
+                var startTime = DateTime.UtcNow;
+                
+                // プロセッサの実行
+                await processor.HandleAsync(eventData).ConfigureAwait(false);
+                
+                // 処理時間の計算と記録
+                var processingTime = DateTime.UtcNow - startTime;
+                _logger?.LogTrace("プロセッサ {ProcessorType} がイベント {EventType} を処理しました (処理時間: {ProcessingTime}ms)",
+                    processorType, typeof(TEvent).Name, processingTime.TotalMilliseconds);
+                
+                // 処理時間が長い場合は警告を出力
+                if (processingTime.TotalMilliseconds > 100)
+                {
+                    _logger?.LogWarning("プロセッサ {ProcessorType} のイベント処理に {ProcessingTime}ms かかりました",
+                        processorType, processingTime.TotalMilliseconds);
+                }
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger?.LogInformation(ex, "プロセッサ {ProcessorType} のタスクがキャンセルされました", processorType);
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger?.LogInformation(ex, "プロセッサ {ProcessorType} の処理がキャンセルされました", processorType);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に操作エラーが発生しました",
+                    processorType, typeof(TEvent).Name);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に引数エラーが発生しました",
+                    processorType, typeof(TEvent).Name);
+            }
+            // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
+            // このcatchブロックは意図的に一般的な例外を捕捉します
+            catch (Exception ex) when (ShouldCatchException(ex, processorType))
+            {
+                // ロギングはShouldCatchExceptionメソッド内で行われます
+            }
+        }
+        
+        /// <summary>
+        /// キャンセル可能なプロセッサ実行
+        /// </summary>
+        /// <typeparam name="TEvent">イベント型</typeparam>
+        /// <param name="processor">イベントプロセッサ</param>
+        /// <param name="eventData">イベント</param>
+        /// <param name="processorType">プロセッサタイプ名（ログ用）</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>処理の完了を表すTask</returns>
+        private async Task ExecuteProcessorAsync<TEvent>(
+            IEventProcessor<TEvent> processor, 
+            TEvent eventData, 
+            string processorType,
+            CancellationToken cancellationToken) 
+            where TEvent : IEvent
+        {
+            try
+            {
+                // キャンセルされている場合は早期リターン
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger?.LogDebug("プロセッサ {ProcessorType} の処理はキャンセルされました", processorType);
+                    return;
+                }
+                
+                // パフォーマンス測定のための開始時間記録
+                var startTime = DateTime.UtcNow;
+                
+                // 実際にはプロセッサに渡すトークンを作成するべきだが、
+                // IEventProcessor<TEvent>インターフェースには対応するオーバーロードがないため、
+                // 内部的にキャンセル状態をチェックする
+                
+                // プロセッサの実行
+                await processor.HandleAsync(eventData).ConfigureAwait(false);
+                
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                
+                // 処理時間の計算と記録
+                var processingTime = DateTime.UtcNow - startTime;
+                _logger?.LogTrace("プロセッサ {ProcessorType} がイベント {EventType} を処理しました (処理時間: {ProcessingTime}ms)",
+                    processorType, typeof(TEvent).Name, processingTime.TotalMilliseconds);
+                
+                // 処理時間が長い場合は警告を出力
+                if (processingTime.TotalMilliseconds > 100)
+                {
+                    _logger?.LogWarning("プロセッサ {ProcessorType} のイベント処理に {ProcessingTime}ms かかりました",
+                        processorType, processingTime.TotalMilliseconds);
+                }
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger?.LogInformation(ex, "プロセッサ {ProcessorType} のタスクがキャンセルされました", processorType);
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger?.LogInformation(ex, "プロセッサ {ProcessorType} の処理がキャンセルされました", processorType);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に操作エラーが発生しました",
+                    processorType, typeof(TEvent).Name);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に引数エラーが発生しました",
+                    processorType, typeof(TEvent).Name);
+            }
+            // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
+            // このcatchブロックは意図的に一般的な例外を捕捉します
+            catch (Exception ex) when (ShouldCatchException(ex, processorType))
+            {
+                // ロギングはShouldCatchExceptionメソッド内で行われます
+            }
+        }
+        /// <summary>
+        /// 例外を捕捉すべきかを判断し、ログ出力も行います
+        /// </summary>
+        /// <param name="exception">発生した例外</param>
+        /// <param name="processorType">プロセッサタイプ名</param>
+        /// <returns>例外を捕捉すべき場合はtrue</returns>
+        private bool ShouldCatchException(Exception exception, string processorType)
+        {
+            // 既知の例外型をチェック
+            if (exception is OutOfMemoryException or StackOverflowException or ThreadAbortException)
+            {
+                // これらの致命的な例外は再スローする（捕捉しない）
+                return false;
+            }
+            
+            // それ以外の例外はログに記録して処理を継続
+            _logger?.LogError(exception, "プロセッサ {ProcessorType} で予期しない例外が発生しました: {ExceptionType}", 
+                processorType, exception.GetType().Name);
+            
+            return true;
+        }
+    }
+}
