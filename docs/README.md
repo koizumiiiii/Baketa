@@ -47,6 +47,10 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [イメージ抽象化レイヤー](3-architecture/core/image-abstraction.md)
 - [イメージ実装ガイド](3-architecture/core/image-implementation.md)
 
+#### イベント集約機構
+- [イベントシステム概要](3-architecture/event-system/event-system-overview.md)
+- [イベント実装ガイド](3-architecture/event-system/event-implementation-guide.md)
+
 #### UI システム
 - [Avalonia UI実装計画](3-architecture/ui-system/avalonia-migration.md)
 - [Avalonia UIガイドライン](3-architecture/ui-system/avalonia-guidelines.md)
