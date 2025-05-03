@@ -116,7 +116,9 @@ Baketa/
 │   ├── Abstractions/          # インターフェース
 │   │   ├── Image/             # 画像抽象化インターフェース
 │   │   └── Platform/          # プラットフォーム抽象化インターフェース
-│   └── Models/                # モデルクラス
+│   ├── Models/                # モデルクラス
+│   └── Events/                 # イベント集約機構
+│       └── Implementation/      # イベント集約実装
 │
 ├── Baketa.Infrastructure/     # インフラストラクチャ層
 │   ├── OCR/                   # OCR機能実装
@@ -133,6 +135,7 @@ Baketa/
 │   ├── Services/              # アプリケーションサービス
 │   ├── DI/                    # 依存性注入管理
 │   └── Events/                # イベント処理
+│       └── Processors/          # イベントプロセッサ実装
 │
 ├── Baketa.UI/                 # UI層
 │   ├── Avalonia/              # Avalonia UI実装

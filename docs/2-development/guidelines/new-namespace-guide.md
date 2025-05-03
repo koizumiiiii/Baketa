@@ -229,6 +229,93 @@ namespace Baketa.Application.Services.OCR
 }
 ```
 
+### 5.3 イベント集約機構の例
+
+```csharp
+// イベント定義
+namespace Baketa.Core.Events
+{
+    public class CaptureCompletedEvent : IEvent
+    {
+        public CaptureCompletedEvent(IImage capturedImage)
+        {
+            CapturedImage = capturedImage;
+            Id = Guid.NewGuid();
+            Timestamp = DateTime.UtcNow;
+        }
+        
+        public IImage CapturedImage { get; }
+        public Guid Id { get; }
+        public DateTime Timestamp { get; }
+        public string Name => "CaptureCompleted";
+        public string Category => "Capture";
+    }
+}
+
+// イベントプロセッサ
+namespace Baketa.Application.Events.Processors
+{
+    public class CaptureCompletedProcessor : IEventProcessor<CaptureCompletedEvent>
+    {
+        private readonly IOcrService _ocrService;
+        private readonly ILogger<CaptureCompletedProcessor> _logger;
+        
+        public CaptureCompletedProcessor(
+            IOcrService ocrService,
+            ILogger<CaptureCompletedProcessor> logger)
+        {
+            _ocrService = ocrService;
+            _logger = logger;
+        }
+        
+        public async Task HandleAsync(CaptureCompletedEvent eventData)
+        {
+            _logger.LogInformation("キャプチャ完了イベントを処理します");
+            
+            try
+            {
+                await _ocrService.ProcessImageAsync(eventData.CapturedImage);
+                _logger.LogInformation("キャプチャ画像のOCR処理が完了しました");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "キャプチャ画像のOCR処理中にエラーが発生しました");
+                throw; // 上位レイヤーでのエラーハンドリングを容易にするために再スロー
+            }
+        }
+    }
+}
+
+// イベント集約機構の使用例
+namespace Baketa.Application.Services.Capture
+{
+    public class CaptureService : ICaptureService
+    {
+        private readonly IEventAggregator _eventAggregator;
+        private readonly IWindowsCaptureService _windowsCaptureService;
+        
+        public CaptureService(
+            IEventAggregator eventAggregator,
+            IWindowsCaptureService windowsCaptureService)
+        {
+            _eventAggregator = eventAggregator;
+            _windowsCaptureService = windowsCaptureService;
+        }
+        
+        public async Task<IImage> CaptureScreenAsync()
+        {
+            // スクリーンキャプチャを実行
+            var image = await _windowsCaptureService.CaptureScreenAsync();
+            
+            // イベントを発行
+            await _eventAggregator.PublishAsync(new CaptureCompletedEvent(image));
+            
+            return image;
+        }
+    }
+}
+```
+
 ## 6. 旧インターフェースからの移行
 
 Issue #1～#6の対応により、旧名前空間のインターフェースは既にすべて新しい名前空間に移行され、プロジェクトから削除されています。もしあなたが開発中のブランチにまだ旧インターフェースへの参照が含まれている場合は、以下の対応が必要です：

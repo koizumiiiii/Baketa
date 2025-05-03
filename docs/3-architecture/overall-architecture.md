@@ -191,6 +191,17 @@ Baketaプロジェクトは主に4つの層から構成されています：
 5. 翻訳が完了すると`TranslationCompletedEvent`を発行
 6. UI層がイベントを購読し、結果を表示
 
+イベント集約機構は以下のコンポーネントで構成されています：
+
+- **IEvent**: すべてのイベントの基底インターフェース
+- **IEventProcessor<TEvent>**: イベント処理を行うプロセッサーのインターフェース
+- **IEventAggregator**: イベント発行と購読を管理するインターフェース
+- **EventAggregator**: イベント集約機構の実装クラス
+
+イベント集約機構はキャンセレーショントークン対応や並列処理などの拡張機能もサポートしています。
+
+詳細な使用方法は[event-system-overview.md](event-system/event-system-overview.md)と[event-implementation-guide.md](event-system/event-implementation-guide.md)を参照してください。
+
 ## 5. 横断的関心事（クロスカッティングコンサーン）
 
 ### 5.1 ロギング

@@ -23,6 +23,8 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 #### 開発ガイドライン
 - [依存性注入ガイドライン](2-development/guidelines/dependency-injection.md)
 - [名前空間構成ガイド](2-development/guidelines/namespace-migration.md)
+- [新名前空間ガイド](2-development/guidelines/new-namespace-guide.md)
+- [イベント集約機構の使用ガイド](2-development/guidelines/event-aggregator-usage.md)
 
 #### コーディング規約
 - [C#コーディング基本規約](2-development/coding-standards/csharp-standards.md)
@@ -46,6 +48,10 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 #### コア抽象化
 - [イメージ抽象化レイヤー](3-architecture/core/image-abstraction.md)
 - [イメージ実装ガイド](3-architecture/core/image-implementation.md)
+
+#### イベント集約機構
+- [イベントシステム概要](3-architecture/event-system/event-system-overview.md)
+- [イベント実装ガイド](3-architecture/event-system/event-implementation-guide.md)
 
 #### UI システム
 - [Avalonia UI実装計画](3-architecture/ui-system/avalonia-migration.md)

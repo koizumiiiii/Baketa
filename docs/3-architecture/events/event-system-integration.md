@@ -1,5 +1,7 @@
 # イベントシステム統合ガイド
 
+*最終更新: 2025年5月3日*
+
 ## 1. 概要
 
 Baketaプロジェクトでは、当初別々に実装されていた2つのイベントシステム（Core層とUI層）を統合する設計変更を行いました。このドキュメントでは、イベントシステムの統合アプローチとその実装方法について説明します。
@@ -195,3 +197,93 @@ await _eventAggregator.PublishAsync(new UIEvents.UISampleEvent("value")).Configu
   ```csharp
   where TEvent : Baketa.Core.Events.IEvent
   ```
+
+## 10. Core層イベント集約機構の実装と統合
+
+2025年5月に実装されたイベント集約機構（Issue #27）により、イベント处理が大幅に改善されました。この実装では以下のインターフェースが導入されました：
+
+```csharp
+public interface IEventProcessor<in TEvent> where TEvent : IEvent
+{
+    Task HandleAsync(TEvent eventData);
+}
+```
+
+当初の実装例では `IEventHandler<TEvent>` という名前でしたが、アクティブな処理を強調するため `IEventProcessor<TEvent>` に変更されています。
+
+### 10.1 Core層イベント集約機構の使用
+
+Core層のイベント集約機構は、以下のように使用します：
+
+```csharp
+// イベントプロセッサの実装
+public class CaptureCompletedProcessor : IEventProcessor<CaptureCompletedEvent>
+{
+    private readonly IOcrService _ocrService;
+    
+    public CaptureCompletedProcessor(IOcrService ocrService)
+    {
+        _ocrService = ocrService;
+    }
+    
+    public async Task HandleAsync(CaptureCompletedEvent eventData)
+    {
+        // キャプチャ完了イベントの処理
+        await _ocrService.ProcessImageAsync(eventData.CapturedImage);
+    }
+}
+
+// イベント集約機構への登録
+public class SomeService
+{
+    private readonly IEventAggregator _eventAggregator;
+    private readonly CaptureCompletedProcessor _processor;
+    
+    public SomeService(IEventAggregator eventAggregator, CaptureCompletedProcessor processor)
+    {
+        _eventAggregator = eventAggregator;
+        _processor = processor;
+        
+        // プロセッサを登録
+        _eventAggregator.Subscribe(_processor);
+    }
+    
+    public void Dispose()
+    {
+        // プロセッサの登録解除
+        _eventAggregator.Unsubscribe(_processor);
+    }
+}
+```
+
+### 10.2 UI層イベントとの統合
+
+UI層のイベントでもCore層のイベント集約機構を使用する場合は、以下のようにアダプターパターンを実装します：
+
+```csharp
+// UIイベントのCoreイベントプロセッサーアダプター
+public class UiEventProcessorAdapter<TUiEvent> : IEventProcessor<TUiEvent>
+    where TUiEvent : UIEvents.UIEventBase, UIEvents.IEvent
+{
+    private readonly UIEvents.IEventHandler<TUiEvent> _uiHandler;
+    
+    public UiEventProcessorAdapter(UIEvents.IEventHandler<TUiEvent> uiHandler)
+    {
+        _uiHandler = uiHandler;
+    }
+    
+    public async Task HandleAsync(TUiEvent eventData)
+    {
+        // UIイベントハンドラーにUIイベントを渡す
+        await _uiHandler.HandleAsync(eventData);
+    }
+}
+```
+
+### 10.3 注意点
+
+- Core層イベント集約機構の使用を推奨します
+- イベントプロセッサはシングルトンやスコープ付きライフタイムが適切な場合が多い
+- キャンセレーション対応と並列処理を利用した効率的な設計を検討
+
+詳細な使用方法は、[イベントシステム概要](../../3-architecture/event-system/event-system-overview.md)と[イベント実装ガイド](../../3-architecture/event-system/event-implementation-guide.md)を参照してください。
