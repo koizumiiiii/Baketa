@@ -1,6 +1,6 @@
 # 名前空間移行ガイドライン
 
-*最終更新: 2025年4月20日*
+*最終更新: 2025年5月3日*
 
 このドキュメントでは、Baketaプロジェクトの改善されたアーキテクチャに基づく名前空間構造および移行方針について詳述します。
 
@@ -37,6 +37,9 @@ Baketa.Core/
 │   ├── Capture/            # キャプチャサービス
 │   └── Translation/        # 翻訳サービス
 ├── Baketa.Core.Events/        # イベント定義と集約機構
+│   ├── Abstractions/       # イベント抽象化
+│   ├── Implementation/     # イベント実装
+│   └── EventTypes/         # イベント型定義
 └── Baketa.Core.Common/        # 共通ユーティリティ
 ```
 
@@ -128,9 +131,83 @@ Baketa.UI/
 | UI層 | `Baketa.UI.[フレームワーク].[機能]` | `Baketa.UI.Avalonia.ViewModels` |
 | 抽象化 | `[レイヤー].Abstractions.[機能]` | `Baketa.Core.Abstractions.Imaging` |
 
-## 4. 名前空間移行指針
+## 4. イベント集約機構のインターフェース定義
 
-### 4.1 移行ステップ
+イベント集約機構では、以下のインターフェースを使用します：
+
+```csharp
+/// <summary>
+/// 基本イベントインターフェース
+/// </summary>
+public interface IEvent
+{
+    /// <summary>
+    /// イベントID
+    /// </summary>
+    Guid Id { get; }
+    
+    /// <summary>
+    /// イベント発生時刻
+    /// </summary>
+    DateTime Timestamp { get; }
+    
+    /// <summary>
+    /// イベント名
+    /// </summary>
+    string Name { get; }
+    
+    /// <summary>
+    /// イベントカテゴリ
+    /// </summary>
+    string Category { get; }
+}
+
+/// <summary>
+/// イベント処理インターフェース
+/// </summary>
+/// <typeparam name="TEvent">イベント型</typeparam>
+public interface IEventProcessor<in TEvent> where TEvent : IEvent
+{
+    /// <summary>
+    /// イベント処理
+    /// </summary>
+    /// <param name="eventData">イベントデータ</param>
+    /// <returns>処理の完了を表すTask</returns>
+    Task HandleAsync(TEvent eventData);
+}
+
+/// <summary>
+/// イベント集約インターフェース
+/// </summary>
+public interface IEventAggregator
+{
+    /// <summary>
+    /// イベントの発行
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="eventData">イベント</param>
+    /// <returns>イベント発行の完了を表すTask</returns>
+    Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent;
+    
+    /// <summary>
+    /// イベントプロセッサの登録
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="processor">イベントプロセッサ</param>
+    void Subscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
+    
+    /// <summary>
+    /// イベントプロセッサの登録解除
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="processor">イベントプロセッサ</param>
+    void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
+}
+```
+
+## 5. 名前空間移行指針
+
+### 5.1 移行ステップ
 
 1. **フェーズ1**: 新しいインターフェース定義の作成
    - 新しい名前空間構造とインターフェース階層の作成
@@ -152,14 +229,14 @@ Baketa.UI/
    - 新しいアプリケーションサービスの構築
    - UI層とのインテグレーション
 
-### 4.2 移行時のベストプラクティス
+### 5.2 移行時のベストプラクティス
 
 - 移行前にすべての依存関係を確認する
 - 一度に関連するクラス群をまとめて移行する
 - 移行後は単体テストを実施し機能が保たれていることを確認する
 - 名前空間エイリアスを使用して移行期間中の互換性を維持する
 
-## 5. 移行の検証
+## 6. 移行の検証
 
 移行完了後、以下の検証を行います：
 
@@ -168,13 +245,14 @@ Baketa.UI/
 3. 主要な機能が正常に動作すること
 4. パフォーマンス低下がないこと
 
-**移行状況 (2025年4月20日時点)**:
+**移行状況 (2025年5月3日時点)**:
 - すべての古いインターフェースが非推奨化され、プロジェクト全体から削除されました
 - すべてのコードが新しい名前空間構造を使用しています
 - すべての依存性注入設定が更新されました
+- イベント集約機構の実装が完了しました（Issue #24～#27）
 - インターフェース移行は完了しました（Issue #1～#6）
 
-## 6. 移行スケジュール
+## 7. 移行スケジュール
 
 | フェーズ | 対象モジュール | 完了予定 | 実際の完了日 |
 |--------|--------------|--------|--------|
@@ -183,7 +261,8 @@ Baketa.UI/
 | 3      | コアモジュール移行 | 2025年6月上旬 | 2025年4月15日 |
 | 4      | Windows依存コード整理 | 2025年6月下旬 | 2025年4月17日 |
 | 5      | アプリケーション層とUI層 | 2025年7月中旬 | 2025年4月20日 |
+| 6      | イベント集約機構実装 | 2025年7月下旬 | 2025年5月3日 |
 
-移行は予定よりも早く完了し、すべてのインターフェースが新しい名前空間構造に移行され、古いインターフェースはプロジェクトから削除されました。
+移行は予定よりも早く完了し、すべてのインターフェースが新しい名前空間構造に移行され、古いインターフェースはプロジェクトから削除されました。イベント集約機構の実装も完了し、アプリケーション全体でのイベントベースの通信が可能になりました。
 
 移行に関する詳細な質問や課題は開発チームに相談してください。
