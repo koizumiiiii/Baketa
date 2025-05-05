@@ -31,6 +31,33 @@ dotnet_diagnostic.IDE0305.severity = silent
 # CA1305: IFormatProviderの指定
 dotnet_diagnostic.CA1305.severity = warning
 
+# Null安全性関連の設定
+dotnet_style_null_propagation = true:warning
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_auto_properties = true:warning
+dotnet_diagnostic.IDE0270.severity = warning
+
+# usingステートメント関連の設定
+csharp_using_directive_placement = outside_namespace:warning
+csharp_prefer_simple_using_statement = true:warning
+dotnet_diagnostic.IDE0063.severity = warning
+
+# リソース管理関連の設定
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA1816.severity = warning
+
+# 未使用変数/パラメータ関連
+dotnet_diagnostic.IDE0060.severity = suggestion
+dotnet_code_quality_unused_parameters = all:suggestion
+dotnet_diagnostic.CS0219.severity = warning
+dotnet_diagnostic.xUnit1026.severity = warning
+
+# readonlyフィールド関連
+dotnet_style_readonly_field = true:warning
+dotnet_diagnostic.IDE0044.severity = warning
+
 # プロジェクト固有の設定
 [*.cs]
 # 基本設定（プロジェクトのコーディング規約に合わせて調整）
