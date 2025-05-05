@@ -10,6 +10,9 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    
+    <!-- テストメソッド名にアンダースコアを許可するように警告を抑制 -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
