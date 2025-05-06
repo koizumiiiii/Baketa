@@ -165,7 +165,7 @@ public async Task<TranslationResult> TranslateAsync(
 
 ## 5. コード分析ルールの遵守
 
-プロジェクトでは.NET Analzyer（CA）とIDE分析による警告を最小限に抑えるよう努めています。
+プロジェクトでは.NET Analzyer（CA）とIDE分析による警告を最小限に抑えるよう努めています。具体的な設定は `.editorconfig` ファイルで管理されています。詳細は [.editorconfigガイドライン](editorconfig-guide.md) を参照してください。
 
 ### 5.1 警告レベルの優先度
 
