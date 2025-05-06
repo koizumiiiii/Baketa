@@ -42,7 +42,8 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [プラットフォーム抽象化レイヤー](3-architecture/platform/platform-abstraction.md)
 
 #### アダプターレイヤー
-- [アダプター実装ガイド](3-architecture/adapters/adapter-implementation.md)
+- [アダプター実装ベストプラクティス](3-architecture/adapters/adapter-implementation-best-practices.md)
+- [アダプター実装サマリー](3-architecture/adapters/adapter-implementation-summary.md)
 - [アダプターファクトリーパターン](3-architecture/adapters/adapter-implementation.md#9-アダプターファクトリーパターン)
 
 #### コア抽象化
