@@ -20,29 +20,101 @@ namespace Baketa.Infrastructure.Platform.Windows
         /// </summary>
         /// <param name="bitmap">Bitmapインスタンス</param>
         public WindowsImage(Bitmap bitmap)
+{
+    ArgumentNullException.ThrowIfNull(bitmap, nameof(bitmap));
+    
+    try
+    {
+        // 幅と高さにアクセスして有効性を確認（これがArgumentExceptionを発生させる可能性がある）
+        int width = bitmap.Width;
+        int height = bitmap.Height;
+        
+        if (width <= 0 || height <= 0)
         {
-            _bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
+            throw new ArgumentException("無効なBitmapです。幅と高さは正の値である必要があります。", nameof(bitmap));
         }
+        
+        // 問題がなければインスタンス変数を設定
+        _bitmap = bitmap;
+        _disposed = false;
+    }
+    catch (Exception ex) when (ex is not ArgumentNullException)
+    {
+        // 例外発生時、渡されたbitmapを破棄
+        bitmap.Dispose();
+        throw new ArgumentException("無効なBitmapが渡されました", nameof(bitmap), ex);
+    }
+}
 
         /// <summary>
-        /// 画像の幅を取得
-        /// </summary>
-        public int Width => _bitmap.Width;
-
-        /// <summary>
-        /// 画像の高さを取得
-        /// </summary>
-        public int Height => _bitmap.Height;
-
-        /// <summary>
-        /// ネイティブImageオブジェクトを取得
-        /// </summary>
-        /// <returns>System.Drawing.Image インスタンス</returns>
-        public Image GetNativeImage()
+/// 画像の幅を取得
+/// </summary>
+public int Width
+{
+    get
+    {
+        ThrowIfDisposed();
+        try
         {
-            ThrowIfDisposed();
-            return _bitmap;
+            // _bitmapが有効であることを確認
+            if (_bitmap is Bitmap bitmap)
+            {
+                return bitmap.Width;
+            }
+            throw new InvalidOperationException("内部ビットマップが無効です");
         }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("画像の幅の取得に失敗しました", ex);
+        }
+    }
+}
+
+        /// <summary>
+/// 画像の高さを取得
+/// </summary>
+public int Height
+{
+    get
+    {
+        ThrowIfDisposed();
+        try
+        {
+            // _bitmapが有効であることを確認
+            if (_bitmap is Bitmap bitmap)
+            {
+                return bitmap.Height;
+            }
+            throw new InvalidOperationException("内部ビットマップが無効です");
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("画像の高さの取得に失敗しました", ex);
+        }
+    }
+}
+
+        /// <summary>
+/// ネイティブImageオブジェクトを取得
+/// </summary>
+/// <returns>System.Drawing.Image インスタンス</returns>
+public Image GetNativeImage()
+{
+        ThrowIfDisposed();
+        try
+    {
+        // _bitmapが有効であることを確認
+        if (_bitmap is Bitmap bitmap)
+        {
+            return bitmap;
+        }
+        throw new InvalidOperationException("内部ビットマップが無効です");
+    }
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException("ネイティブイメージの取得に失敗しました", ex);
+    }
+}
 
         /// <summary>
         /// Bitmapとして取得
@@ -69,7 +141,7 @@ namespace Baketa.Infrastructure.Platform.Windows
         /// <param name="disposing">trueの場合、マネージドとアンマネージドリソースを解放、falseの場合はアンマネージドリソースのみ</param>
         private void Dispose(bool disposing)
         {
-            if (_disposed)
+            if (_disposed is true)
                 return;
 
             if (disposing)
@@ -87,25 +159,49 @@ namespace Baketa.Infrastructure.Platform.Windows
         /// オブジェクトが破棄済みの場合に例外をスロー
         /// </summary>
         private void ThrowIfDisposed()
-        {
-            ObjectDisposedException.ThrowIf(_disposed, nameof(WindowsImage));
-        }
+{
+    // IDE0083警告に対応するためパターンマッチングを使用
+    if (_disposed is true)
+    {
+        throw new ObjectDisposedException(nameof(WindowsImage), "このWindowsImageインスタンスは既に破棄されています");
+    }
+    
+    // ビットマップがnullの場合も例外をスロー
+    if (_bitmap is null)
+    {
+        _disposed = true; // 回復不能なので破棄済みとマーク
+        throw new ObjectDisposedException(nameof(WindowsImage), "内部ビットマップリソースが無効です");
+    }
+}
         
         /// <summary>
-        /// 指定したパスに画像を保存
-        /// </summary>
-        /// <param name="path">保存先パス</param>
-        /// <param name="format">画像フォーマット（省略時はPNG）</param>
-        /// <returns>非同期タスク</returns>
-        public async Task SaveAsync(string path, ImageFormat? format = null)
-        {
-            ThrowIfDisposed();
-            
-            // フォーマットが指定されていない場合はPNGを使用
-            format ??= ImageFormat.Png;
-            
-            await Task.Run(() => _bitmap.Save(path, format)).ConfigureAwait(false);
-        }
+/// 指定したパスに画像を保存
+/// </summary>
+/// <param name="path">保存先パス</param>
+/// <param name="format">画像フォーマット（省略時はPNG）</param>
+/// <returns>非同期タスク</returns>
+public async Task SaveAsync(string path, ImageFormat? format = null)
+{
+ThrowIfDisposed();
+
+// フォーマットが指定されていない場合はPNGを使用
+format ??= ImageFormat.Png;
+
+try
+{
+await Task.Run(() => 
+{
+// 保存前に再度チェック
+ObjectDisposedException.ThrowIf(_disposed is true || _bitmap is null, nameof(WindowsImage));
+
+_bitmap.Save(path, format);
+}).ConfigureAwait(false);
+}
+catch (Exception ex) when (ex is not ObjectDisposedException)
+{
+throw new InvalidOperationException($"画像の保存に失敗しました: {path}", ex);
+}
+}
         
         /// <summary>
         /// 画像のサイズを変更
@@ -156,23 +252,41 @@ namespace Baketa.Infrastructure.Platform.Windows
         }
         
         /// <summary>
-        /// 画像をバイト配列に変換
-        /// </summary>
-        /// <param name="format">画像フォーマット（省略時はPNG）</param>
-        /// <returns>画像データのバイト配列</returns>
-        public async Task<byte[]> ToByteArrayAsync(ImageFormat? format = null)
+/// 画像をバイト配列に変換
+/// </summary>
+/// <param name="format">画像フォーマット（省略時はPNG）</param>
+/// <returns>画像データのバイト配列</returns>
+public async Task<byte[]> ToByteArrayAsync(ImageFormat? format = null)
+{
+    ThrowIfDisposed();
+    
+    // フォーマットが指定されていない場合はPNGを使用
+    format ??= ImageFormat.Png;
+    
+    try
+    {
+        return await Task.Run(() => 
         {
-            ThrowIfDisposed();
+            // 実行前に再度チェック
+            // IDE0083警告に対応するためパターンマッチングを使用
+            ObjectDisposedException.ThrowIf(_disposed is true || _bitmap is null, nameof(WindowsImage));
             
-            // フォーマットが指定されていない場合はPNGを使用
-            format ??= ImageFormat.Png;
-            
-            return await Task.Run(() => 
+            using var stream = new MemoryStream();
+            try
             {
-                using var stream = new MemoryStream();
                 _bitmap.Save(stream, format);
                 return stream.ToArray();
-            }).ConfigureAwait(false);
-        }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("画像のバイト配列変換中にエラーが発生しました", ex);
+            }
+        }).ConfigureAwait(false);
+    }
+    catch (Exception ex) when (ex is not ObjectDisposedException)
+    {
+        throw new InvalidOperationException("画像のバイト配列変換に失敗しました", ex);
+    }
+}
     }
 }

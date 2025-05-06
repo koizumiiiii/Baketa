@@ -14,17 +14,17 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
     /// WindowManagerAdapterのゲームウィンドウ検出機能テスト
     /// </summary>
     public class GameWindowDetectionTests : IDisposable
-    {
-        private readonly ITestOutputHelper _output;
-        private readonly Mock<Baketa.Core.Abstractions.Platform.Windows.IWindowManager> _mockWindowsManager;
-        private readonly WindowManagerAdapter _adapter;
+{
+    private readonly ITestOutputHelper _output;
+    private readonly Mock<Baketa.Core.Abstractions.Platform.Windows.IWindowManager> _mockWindowsManager;
+    private readonly TestableWindowManagerAdapter _adapter;
         
         public GameWindowDetectionTests(ITestOutputHelper output)
         {
-            _output = output;
-            _mockWindowsManager = new Mock<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>();
-            
-            _adapter = new WindowManagerAdapter(_mockWindowsManager.Object);
+        _output = output;
+        _mockWindowsManager = new Mock<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>();
+        
+        _adapter = new TestableWindowManagerAdapter(_mockWindowsManager.Object);
         }
         
         [Fact]
@@ -123,14 +123,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
                 .Returns(windows);
             
-            // GetWindowTypeメソッドをモック化するためにリフレクション使用
-            // 実際の実装ではこれは可能ではないかもしれないが、テストのために必要
-            var mockAdapter = new Mock<WindowManagerAdapter>(_mockWindowsManager.Object) { CallBase = true };
-            mockAdapter.Setup(a => a.GetWindowType(gameHandle))
-                .Returns(WindowType.Game);
+            // GetWindowTypeをテスト用アダプターで設定
+            _adapter.SetWindowType(gameHandle, WindowType.Game);
             
             // Act
-            var result = mockAdapter.Object.FindGameWindow(gameTitle);
+            var result = _adapter.FindGameWindow(gameTitle);
             
             // Assert
             Assert.Equal(gameHandle, result);
@@ -151,13 +148,11 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
                 .Returns(new Dictionary<IntPtr, string>());
             
-            // GetWindowTypeメソッドをモック化
-            var mockAdapter = new Mock<WindowManagerAdapter>(_mockWindowsManager.Object) { CallBase = true };
-            mockAdapter.Setup(a => a.GetWindowType(activeHandle))
-                .Returns(WindowType.Game);
+            // GetWindowTypeをテスト用アダプターで設定
+            _adapter.SetWindowType(activeHandle, WindowType.Game);
             
             // Act
-            var result = mockAdapter.Object.FindGameWindow(gameTitle);
+            var result = _adapter.FindGameWindow(gameTitle);
             
             // Assert
             Assert.Equal(activeHandle, result);
@@ -185,13 +180,12 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             _mockWindowsManager.Setup(w => w.GetActiveWindowHandle())
                 .Returns(handle1);
             
-            // GetWindowTypeメソッドをモック化
-            var mockAdapter = new Mock<WindowManagerAdapter>(_mockWindowsManager.Object) { CallBase = true };
-            mockAdapter.Setup(a => a.GetWindowType(It.IsAny<IntPtr>()))
-                .Returns(WindowType.Normal); // 全て通常ウィンドウとして扱う
+            // GetWindowTypeをテスト用アダプターで設定
+            _adapter.SetWindowType(handle1, WindowType.Normal);
+            _adapter.SetWindowType(handle2, WindowType.Normal);
             
             // Act
-            var result = mockAdapter.Object.FindGameWindow(gameTitle);
+            var result = _adapter.FindGameWindow(gameTitle);
             
             // Assert
             Assert.Equal(IntPtr.Zero, result);
@@ -227,6 +221,9 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             
             _mockWindowsManager.Setup(w => w.IsMinimized(handle))
                 .Returns(isMinimized);
+            
+            // テスト用アダプターでウィンドウタイプを設定
+            _adapter.SetWindowType(handle, expectedType);
             
             // Act
             var result = _adapter.GetWindowType(handle);

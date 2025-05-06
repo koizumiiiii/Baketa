@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 
+// C# 12 型エイリアスのテスト
+using Point = (int X, int Y);
+
 namespace Baketa.Core.Tests
 {
-    // C# 12 型エイリアスのテスト
-    using Point = (int X, int Y);
 
     /// <summary>
     /// C# 12の新機能サポート状況を確認するためのクラス

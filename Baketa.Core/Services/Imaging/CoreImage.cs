@@ -12,9 +12,17 @@ namespace Baketa.Core.Services.Imaging
     public class CoreImage : DisposableBase, IImage
     {
         private byte[] _pixelData;
-        private readonly int _width;
-        private readonly int _height;
-        private readonly ImageFormat _format;
+        
+        /// <inheritdoc/>
+        public int Width { get; }
+        
+        /// <inheritdoc/>
+        public int Height { get; }
+        
+        /// <summary>
+        /// 画像フォーマット
+        /// </summary>
+        public ImageFormat Format { get; }
         
         /// <summary>
         /// コンストラクタ
@@ -26,21 +34,10 @@ namespace Baketa.Core.Services.Imaging
         public CoreImage(byte[] pixelData, int width, int height, ImageFormat format)
         {
             _pixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
-            _width = width;
-            _height = height;
-            _format = format;
+            Width = width;
+            Height = height;
+            Format = format;
         }
-        
-        /// <inheritdoc/>
-        public int Width => _width;
-        
-        /// <inheritdoc/>
-        public int Height => _height;
-        
-        /// <summary>
-        /// 画像フォーマット
-        /// </summary>
-        public ImageFormat Format => _format;
         
         /// <inheritdoc/>
         public Task<byte[]> ToByteArrayAsync()
@@ -61,7 +58,7 @@ namespace Baketa.Core.Services.Imaging
             ThrowIfDisposed();
             var resultBytes = new byte[_pixelData.Length];
             Buffer.BlockCopy(_pixelData, 0, resultBytes, 0, _pixelData.Length);
-            return new CoreImage(resultBytes, _width, _height, _format);
+            return new CoreImage(resultBytes, Width, Height, Format);
         }
         
         /// <inheritdoc/>
@@ -70,12 +67,12 @@ namespace Baketa.Core.Services.Imaging
             ThrowIfDisposed();
             
             // 実際の実装では適切なリサイズアルゴリズムを使用する
-            // ここではC# 12のコレクション式を使用した簡易的な実装
+            // 空の配列を使用
             byte[] newData = [];
             
             // リサイズロジックを実装...
             
-            return Task.FromResult<IImage>(new CoreImage(newData, width, height, _format));
+            return Task.FromResult<IImage>(new CoreImage(newData, width, height, Format));
         }
         
         /// <summary>
@@ -89,12 +86,12 @@ namespace Baketa.Core.Services.Imaging
         /// <summary>
         /// ピクセルあたりのバイト数
         /// </summary>
-        protected int BytesPerPixel => _format switch
+        protected int BytesPerPixel => Format switch
         {
             ImageFormat.Rgb24 => 3,
             ImageFormat.Rgba32 => 4,
             ImageFormat.Grayscale8 => 1,
-            _ => throw new NotSupportedException($"未サポートのフォーマット: {_format}")
+            _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
         };
         
         /// <summary>
@@ -102,7 +99,7 @@ namespace Baketa.Core.Services.Imaging
         /// </summary>
         protected override void DisposeManagedResources()
         {
-            _pixelData = Array.Empty<byte>();
+            _pixelData = [];
         }
     }
 }

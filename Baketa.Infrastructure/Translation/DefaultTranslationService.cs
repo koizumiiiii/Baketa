@@ -16,7 +16,6 @@ namespace Baketa.Infrastructure.Translation
     {
         private readonly ILogger<DefaultTranslationService> _logger;
         private readonly List<ITranslationEngine> _availableEngines;
-        private ITranslationEngine _activeEngine;
 
         /// <summary>
         /// コンストラクタ
@@ -36,7 +35,7 @@ namespace Baketa.Infrastructure.Translation
             }
 
             // 最初のエンジンをデフォルトのアクティブエンジンとして設定
-            _activeEngine = _availableEngines[0];
+            ActiveEngine = _availableEngines[0];
         }
 
         /// <summary>
@@ -48,7 +47,7 @@ namespace Baketa.Infrastructure.Translation
         /// <summary>
         /// 現在アクティブな翻訳エンジンを取得します
         /// </summary>
-        public ITranslationEngine ActiveEngine => _activeEngine;
+        public ITranslationEngine ActiveEngine { get; private set; }
 
         /// <summary>
         /// 指定された名前のエンジンをアクティブにします
@@ -83,7 +82,7 @@ namespace Baketa.Infrastructure.Translation
                 }
             }
 
-            _activeEngine = engine;
+            ActiveEngine = engine;
             _logger.LogInformation("アクティブな翻訳エンジンを '{EngineName}' に変更しました。", engineName);
             return true;
         }
@@ -112,7 +111,7 @@ namespace Baketa.Infrastructure.Translation
                 Context = context
             };
 
-            return await _activeEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+            return await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -144,7 +143,7 @@ namespace Baketa.Infrastructure.Translation
                 Context = context
             }).ToList();
 
-            return await _activeEngine.TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
+            return await ActiveEngine.TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
         }
     }
 }
