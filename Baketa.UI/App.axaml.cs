@@ -200,14 +200,7 @@ namespace Baketa.UI
             Resources["AlwaysShowKeyboardFocus"] = alwaysShowFocus;
             
             // キーボードフォーカス表示のスタイル設定（BasicStyles.axaml内で参照される）
-            if (alwaysShowFocus)
-            {
-                Resources["KeyboardFocusOpacity"] = 1.0;
-            }
-            else
-            {
-                Resources["KeyboardFocusOpacity"] = 0.0;
-            }
+            Resources["KeyboardFocusOpacity"] = alwaysShowFocus ? 1.0 : 0.0;
         }
         
         /// <summary>

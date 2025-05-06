@@ -165,25 +165,31 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
             // 画像フォーマットを検出（ヘッダー解析）
             var imageFormat = DetectImageFormat(imageData);
             
-            // 画像サイズに基づく最適化
-            if (IsLargeImage(stream))
+            // 画像作成前にストリームの有効性をチェック
+            if (stream.Length == 0 || stream.Length < 8)
             {
-                // 大きな画像の場合は、メモリ使用量を抑えるために最適化された読み込み処理を使用
-                using var bitmap = OptimizedBitmapLoad(stream, imageFormat);
-                using var windowsImage = new WindowsImage((Bitmap)bitmap.Clone());
-                var result = ToAdvancedImage(windowsImage);
-                return result;
+            throw new ArgumentException("無効な画像データです", nameof(imageData));
             }
-            else
-            {
-                // 通常サイズの画像は標準的な処理
+
+            try {
+            // 通常サイズの画像は標準的な処理
                 using var bitmap = new Bitmap(stream);
-                // 所有権移転のためのクローン作成
-            using var persistentBitmap = (Bitmap)bitmap.Clone();
-                using var windowsImage = new WindowsImage(persistentBitmap);
-                var result = ToAdvancedImage(windowsImage);
-                return result;
+                // Bitmapの有効性を確認
+                if (bitmap.Width <= 0 || bitmap.Height <= 0)
+            {
+                throw new ArgumentException("無効なBitmapが生成されました");
             }
+            
+            // 所有権移転のためのクローン作成
+            using var persistentBitmap = (Bitmap)bitmap.Clone();
+            var windowsImage = new WindowsImage(persistentBitmap);
+                var result = ToAdvancedImage(windowsImage);
+            return result;
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ArgumentException("画像データからBitmapの作成に失敗しました", ex);
+        }
         }
         catch (ArgumentException ex)
         {
@@ -375,23 +381,34 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
         if (disposing)
         {
             // CA2213対応：ThreadLocal<MemoryStream>の明示的なDisposeを行う
-            if (_recycledMemoryStream != null)
+            try
             {
-                if (_recycledMemoryStream.IsValueCreated && _recycledMemoryStream.Value != null)
+                if (_recycledMemoryStream?.IsValueCreated == true && _recycledMemoryStream.Value != null)
                 {
                     _recycledMemoryStream.Value.Dispose();
                 }
-                _recycledMemoryStream.Dispose();
+                _recycledMemoryStream?.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 既に破棄済みの場合は何もしない
             }
             
             // CA2213対応：作成した全てのWindowsImageAdapterを破棄
-            if (_createdAdapters != null)
+            try
             {
-                foreach (var adapter in _createdAdapters)
+                if (_createdAdapters != null)
                 {
-                    adapter?.Dispose();
+                    foreach (var adapter in _createdAdapters.ToArray())
+                    {
+                        adapter?.Dispose();
+                    }
+                    _createdAdapters.Clear();
                 }
-                _createdAdapters.Clear();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 既に破棄済みの場合は何もしない
             }
         }
         

@@ -16,22 +16,28 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のモック画像クラス
         /// </summary>
-        private class MockAdvancedImage(int width, int height) : IAdvancedImage
+        private class MockAdvancedImage : IAdvancedImage
         {
-        private readonly byte[] _imageData = new byte[width * height * 3]; // RGB形式
-        private readonly int _width = width;
-        private readonly int _height = height;
+        private readonly byte[] _imageData;
         private readonly Dictionary<(int x, int y), Color> _pixels = [];
         private bool _isDisposed = false;
 
-        public int Width => _width;
-        public int Height => _height;
+        public int Width { get; }
+        public int Height { get; }
         public ImageFormat Format => ImageFormat.Rgba32; // テスト用のデフォルトフォーマット
+        
+        // コンストラクタ
+        public MockAdvancedImage(int width, int height)
+        {
+            Width = width;
+            Height = height;
+            _imageData = new byte[width * height * 3]; // RGB形式
+        }
         
         public IImage Clone()
         {
             // クローン作成のモック実装
-            var clone = new MockAdvancedImage(_width, _height);
+            var clone = new MockAdvancedImage(Width, Height);
             foreach (var pixelEntry in _pixels)
             {
                 clone.SetPixel(pixelEntry.Key.x, pixelEntry.Key.y, pixelEntry.Value);
@@ -48,7 +54,7 @@ namespace Baketa.Core.Tests.Imaging
         public Task<byte[]> ToByteArrayAsync()
         {
             // バイト配列変換のモック実装
-            return Task.FromResult(new byte[_width * _height * 3]);
+            return Task.FromResult(new byte[Width * Height * 3]);
         }
 
         public void Dispose()
@@ -63,19 +69,19 @@ namespace Baketa.Core.Tests.Imaging
         public Task<IAdvancedImage> ApplyFilterAsync(IImageFilter filter)
         {
             // フィルター適用のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters)
         {
             // 複数フィルター適用のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<float> CalculateSimilarityAsync(IImage other)
         {
             // 類似度計算のモック動作（同一サイズなら高い類似度、それ以外は低い類似度）
-            return Task.FromResult(other.Width == _width && other.Height == _height ? 0.9f : 0.1f);
+            return Task.FromResult(other.Width == Width && other.Height == Height ? 0.9f : 0.1f);
         }
 
         public Task<int[]> ComputeHistogramAsync(ColorChannel _1 = ColorChannel.Luminance)
@@ -98,7 +104,7 @@ namespace Baketa.Core.Tests.Imaging
 
         public Color GetPixel(int x, int y)
         {
-            if (x < 0 || x >= _width || y < 0 || y >= _height)
+            if (x < 0 || x >= Width || y < 0 || y >= Height)
             {
                 throw new ArgumentOutOfRangeException(nameof(x), "座標が範囲外です");
             }
@@ -110,24 +116,24 @@ namespace Baketa.Core.Tests.Imaging
         public Task<IAdvancedImage> OptimizeForOcrAsync()
         {
             // OCR最適化のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<IAdvancedImage> OptimizeForOcrAsync(OcrImageOptions options)
         {
             // OCRオプション指定最適化のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<IAdvancedImage> RotateAsync(float degrees)
         {
             // 画像回転のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public void SetPixel(int x, int y, Color color)
         {
-            if (x < 0 || x >= _width || y < 0 || y >= _height)
+            if (x < 0 || x >= Width || y < 0 || y >= Height)
             {
                 throw new ArgumentOutOfRangeException(nameof(x), "座標が範囲外です");
             }
@@ -138,13 +144,13 @@ namespace Baketa.Core.Tests.Imaging
         public Task<IAdvancedImage> ToBinaryAsync(byte threshold)
         {
             // 二値化のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<IAdvancedImage> ToGrayscaleAsync()
         {
             // グレースケール変換のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(_width, _height));
+            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
         public Task<IReadOnlyList<byte>> GetRawDataAsync()

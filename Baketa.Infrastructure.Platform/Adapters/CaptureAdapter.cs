@@ -297,15 +297,36 @@ namespace Baketa.Infrastructure.Platform.Adapters
         {
             ArgumentNullException.ThrowIfNull(coreOptions, nameof(coreOptions));
             
+            // _windowsCapturerがnullでないことを確認
+            if (_windowsCapturer == null)
+            {
+                // Windowsキャプチャーが設定されていない場合はデフォルト値を返す
+                return new WindowsCaptureOptions
+                {
+                    Quality = coreOptions.Quality,
+                    IncludeCursor = coreOptions.IncludeCursor
+                };
+            }
+            
             // 現在のWindowsオプションを取得（既存の設定を維持するため）
             var currentWindowsOptions = _windowsCapturer.GetCaptureOptions();
             
             // コアのオプションで上書き
-            currentWindowsOptions.Quality = coreOptions.Quality;
-            currentWindowsOptions.IncludeCursor = coreOptions.IncludeCursor;
-            
-            // Windows固有のオプションは変更しない
-            return currentWindowsOptions;
+            if (currentWindowsOptions != null)
+            {
+                currentWindowsOptions.Quality = coreOptions.Quality;
+                currentWindowsOptions.IncludeCursor = coreOptions.IncludeCursor;
+                return currentWindowsOptions;
+            }
+            else
+            {
+                // オプションがnullの場合は新規作成
+                return new WindowsCaptureOptions
+                {
+                    Quality = coreOptions.Quality,
+                    IncludeCursor = coreOptions.IncludeCursor
+                };
+            }
         }
         
         /// <summary>

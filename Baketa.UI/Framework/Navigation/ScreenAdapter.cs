@@ -9,15 +9,22 @@ namespace Baketa.UI.Framework.Navigation
     /// RoutingStateをIScreenとして使用するためのアダプター
     /// ReactiveUI 20.1.63用に最適化
     /// </summary>
-    internal class ScreenAdapter(RoutingState routingState) : ReactiveObject, IScreen
+    internal class ScreenAdapter : ReactiveObject, IScreen
     {
-        private readonly RoutingState _routingState = routingState ?? throw new ArgumentNullException(nameof(routingState));
-
         /// <summary>
         /// 画面遷移に使用するルーター
         /// IScreenの要件に準拠
         /// </summary>
-        public RoutingState Router => _routingState;
+        public RoutingState Router { get; }
+        
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="routingState">ルーティングステート</param>
+        public ScreenAdapter(RoutingState routingState)
+        {
+            Router = routingState ?? throw new ArgumentNullException(nameof(routingState));
+        }
         
         // IScreenインターフェースにはRouter以外のプロパティは存在しない
         // ReactiveUI 20.xでは、IScreenインターフェースにはRouter一つのみがあり、

@@ -463,6 +463,18 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>ウィンドウの種類</returns>
         public WindowType GetWindowType(IntPtr handle)
         {
+            // 実際の判定は保護メソッドに委託
+            return GetWindowTypeInternal(handle);
+        }
+        
+        /// <summary>
+        /// ウィンドウの種類を判定する内部メソッド
+        /// オーバーライド可能なためテスト時にモック可能
+        /// </summary>
+        /// <param name="handle">ウィンドウハンドル</param>
+        /// <returns>ウィンドウの種類</returns>
+        internal protected virtual WindowType GetWindowTypeInternal(IntPtr handle)
+        {
             if (handle == IntPtr.Zero)
             {
                 return WindowType.Unknown;

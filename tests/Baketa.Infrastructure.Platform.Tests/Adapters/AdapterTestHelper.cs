@@ -89,15 +89,19 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
         /// <returns>モック化されたIWindowsImageオブジェクト</returns>
         public static IWindowsImage CreateMockWindowsImage(int width, int height)
         {
+            // CA2000警告に対処: 他の場所のusingステートメントでリソースが破棄される可能性があるため、
+            // この警告を抜き出す必要があります。
+#pragma warning disable CA2000 // 破棄可能なオブジェクトを使用する
             if (width <= 0 || height <= 0)
             {
                 throw new ArgumentException("幅と高さは正の値である必要があります", nameof(width));
             }
-            
-            // モックオブジェクトを使用する場合は実際のインターフェース実装を返す
-            using var bitmap = CreateTestImage(width, height);
-            // BitmapがクローンされてWindowsImageに渡されるため、ここでのusingは済み
+
+            // Bitmapを作成し、WindowsImageに所有権を移転
+            // WindowsImageはコンストラクタで受け取ったBitmapを内部で保持し、自身がDisposeされるときにバイト配列も破棄する
+            var bitmap = CreateTestImage(width, height);
             return new Baketa.Infrastructure.Platform.Windows.WindowsImage(bitmap);
+#pragma warning restore CA2000 // 破棄可能なオブジェクトを使用する
         }
         
         /// <summary>
@@ -137,21 +141,28 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             
             if (!File.Exists(smallImagePath))
             {
-                using var bitmap = CreateTestImage(320, 240);
-                bitmap.Save(smallImagePath, ImageFormat.Png);
+                SaveTestImage(320, 240, smallImagePath);
             }
             
             if (!File.Exists(mediumImagePath))
             {
-                using var bitmap = CreateTestImage(1024, 768);
-                bitmap.Save(mediumImagePath, ImageFormat.Png);
+                SaveTestImage(1024, 768, mediumImagePath);
             }
             
             if (!File.Exists(largeImagePath))
             {
-                using var bitmap = CreateTestImage(1920, 1080);
-                bitmap.Save(largeImagePath, ImageFormat.Png);
+                SaveTestImage(1920, 1080, largeImagePath);
             }
+        }
+        
+        /// <summary>
+        /// テスト画像を生成して指定パスに保存します
+        /// </summary>
+        private static void SaveTestImage(int width, int height, string filePath)
+        {
+            // CA2000警告を解決するため、usingステートメントでリソースを確実に破棄
+            using var bitmap = CreateTestImage(width, height);
+            bitmap.Save(filePath, ImageFormat.Png);
         }
     }
 }
