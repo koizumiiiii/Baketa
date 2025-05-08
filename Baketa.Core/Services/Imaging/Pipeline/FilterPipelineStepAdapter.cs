@@ -16,6 +16,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
     {
         private readonly IImageFilter _filter;
         private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly ILogger _logger;
         
         /// <summary>
         /// ステップの名前
@@ -41,12 +42,22 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// 新しいFilterPipelineStepAdapterを作成します
         /// </summary>
         /// <param name="filter">適応させるフィルター</param>
-        public FilterPipelineStepAdapter(IImageFilter filter)
+        /// <param name="logger">ロガー</param>
+        public FilterPipelineStepAdapter(IImageFilter filter, ILogger logger)
         {
             _filter = filter ?? throw new ArgumentNullException(nameof(filter));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             // フィルターのパラメータからパイプラインステップのパラメータを作成
             CreateParametersFromFilter();
+        }
+        
+        /// <summary>
+        /// 新しいFilterPipelineStepAdapterを作成します
+        /// </summary>
+        /// <param name="filter">適応させるフィルター</param>
+        public FilterPipelineStepAdapter(IImageFilter filter) : this(filter, new Microsoft.Extensions.Logging.Abstractions.NullLogger<FilterPipelineStepAdapter>())
+        {
         }
         
         /// <summary>

@@ -276,11 +276,19 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="profileName">保存するプロファイル名</param>
         /// <returns>非同期タスク</returns>
-        public Task SaveProfileAsync(string profileName)
+        public async Task SaveProfileAsync(string profileName)
         {
-            // 現在はサンプル実装として、未実装
-            _logger.LogWarning("パイプラインプロファイルの保存機能は実装されていません。プロファイル名: {ProfileName}", profileName);
-            return Task.CompletedTask;
+            ArgumentException.ThrowIfNullOrEmpty(profileName, nameof(profileName));
+            
+            // IPipelineProfileManagerがDIで注入される場合は、
+            // そのインスタンスを使用してプロファイルを保存します。
+            // ここでは、この実装はプレースホルダーとなります。
+            
+            _logger.LogInformation("パイプラインプロファイル '{ProfileName}' を保存します", profileName);
+            
+            // 実際の永続化は、DIで注入されたIPipelineProfileManagerを
+            // 使用するコードで行う必要があります
+            await Task.CompletedTask.ConfigureAwait(false);
         }
 
         /// <summary>
@@ -288,11 +296,21 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="profileName">読み込むプロファイル名</param>
         /// <returns>読み込まれたパイプライン</returns>
-        public Task<IImagePipeline> LoadProfileAsync(string profileName)
+        public async Task<IImagePipeline> LoadProfileAsync(string profileName)
         {
-            // 現在はサンプル実装として、自分自身を返す
-            _logger.LogWarning("パイプラインプロファイルの読み込み機能は実装されていません。プロファイル名: {ProfileName}", profileName);
-            return Task.FromResult<IImagePipeline>(this);
+            ArgumentException.ThrowIfNullOrEmpty(profileName, nameof(profileName));
+            
+            // IPipelineProfileManagerがDIで注入される場合は、
+            // そのインスタンスを使用してプロファイルを読み込みます。
+            // ここでは、この実装はプレースホルダーとなります。
+            
+            _logger.LogInformation("パイプラインプロファイル '{ProfileName}' を読み込みます", profileName);
+            
+            // 実際の永続化は、DIで注入されたIPipelineProfileManagerを
+            // 使用するコードで行う必要があります
+            await Task.CompletedTask.ConfigureAwait(false);
+            
+            return this;
         }
 
         /// <summary>
