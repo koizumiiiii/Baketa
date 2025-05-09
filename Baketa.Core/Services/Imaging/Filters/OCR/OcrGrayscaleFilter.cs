@@ -1,6 +1,8 @@
 using System.Threading.Tasks;
+using System;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -18,7 +20,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <param name="logger">ロガー</param>
         public OcrGrayscaleFilter(ILogger<OcrGrayscaleFilter> logger)
         {
-            _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>
@@ -43,6 +45,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCRグレースケールフィルターを適用中...");
 
             try
@@ -69,7 +72,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                     // カスタム重み付きグレースケール変換を実行
                     // 通常、IAdvancedImageにはWeightedGrayscaleのような
                     // メソッドが実装されているはずですが、現在はプレースホルダーとします
-                    grayImage = await inputImage.ToGrayscaleAsync(redWeight, greenWeight, blueWeight);
+                    grayImage = await inputImage.ToGrayscaleAsync(redWeight, greenWeight, blueWeight).ConfigureAwait(false);
                     _logger.LogDebug("入力画像をカスタム重み付きグレースケールに変換しました (R:{RedWeight}, G:{GreenWeight}, B:{BlueWeight})",
                         redWeight, greenWeight, blueWeight);
                 }
@@ -80,13 +83,13 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                     // コントラスト強調 - テキスト検出向けの特殊な処理
                     // 通常このステップは別のフィルター（コントラスト強調フィルター）で行うべきですが、
                     // ここでは特定のOCRユースケースに特化した処理を組み込んでいます
-                    grayImage = await grayImage.EnhanceContrastAsync(0.5, 1.5); // 例: 特定のパラメータでコントラスト強調
+                    grayImage = await grayImage.EnhanceContrastAsync(0.5, 1.5).ConfigureAwait(false); // 例: 特定のパラメータでコントラスト強調
                     _logger.LogDebug("OCR用にコントラスト強調を適用しました");
                 }
 
                 return grayImage;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "OCRグレースケールフィルターの適用中にエラーが発生しました");
                 throw;
@@ -96,6 +99,8 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
+            
             return new ImageInfo
             {
                 Width = inputImage.Width,
