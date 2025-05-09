@@ -1,95 +1,45 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.Imaging.Filters;
 
 namespace Baketa.Core.Services.Imaging.Filters
 {
     /// <summary>
     /// 二値化フィルター
     /// </summary>
-    public sealed class BinarizationFilter : ImageFilterBase
+    public sealed class BinarizationFilter(byte threshold) : IImageFilter
     {
+        private readonly byte _threshold = threshold;
+        
         /// <summary>
         /// フィルター名
         /// </summary>
-        public override string Name => "二値化フィルター";
+        public static string FilterName => "二値化フィルター";
+        
+        // インターフェース実装のため、static化できない
+        /// <summary>
+        /// フィルター名
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "インターフェース実装のため静的化できない")]
+        public string Name => FilterName;
         
         /// <summary>
-        /// フィルターの説明
+        /// 指定された閾値に対する説明テキストを生成します
         /// </summary>
-        public override string Description => $"画像を指定された閾値({GetParameterValue<byte>("Threshold")})で二値化します";
+        /// <param name="thresholdValue">閾値</param>
+        /// <returns>説明テキスト</returns>
+        public static string GenerateDescription(byte thresholdValue) => $"画像を指定された閾値({thresholdValue})で二値化します";
         
-        /// <summary>
-        /// フィルターのカテゴリ
-        /// </summary>
-        public override FilterCategory Category => FilterCategory.Threshold;
-
-        /// <summary>
-        /// デフォルトのコンストラクター
-        /// </summary>
-        public BinarizationFilter()
-        {
-            InitializeDefaultParameters();
-        }
+        /// <inheritdoc/>
+        public string Description => GenerateDescription(_threshold);
         
-        /// <summary>
-        /// 閾値を指定して初期化するコンストラクター
-        /// </summary>
-        /// <param name="threshold">二値化の閾値（0～255）</param>
-        public BinarizationFilter(byte threshold)
-        {
-            InitializeDefaultParameters();
-            SetParameter("Threshold", threshold);
-        }
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<string, object> Parameters => new Dictionary<string, object> { ["threshold"] = _threshold };
         
-        /// <summary>
-        /// デフォルトパラメータを初期化します
-        /// </summary>
-        protected override void InitializeDefaultParameters()
-        {
-            RegisterParameter("Threshold", (byte)128);
-            RegisterParameter("InvertResult", false);
-        }
-        
-        /// <summary>
-        /// 画像にフィルターを適用します
-        /// </summary>
-        /// <param name="inputImage">入力画像</param>
-        /// <returns>フィルター適用後の新しい画像</returns>
-        public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
-        {
-            byte threshold = GetParameterValue<byte>("Threshold");
-            return await inputImage.ToBinaryAsync(threshold).ConfigureAwait(false);
-        }
-        
-        /// <summary>
-        /// フィルター適用後の画像情報を取得します
-        /// </summary>
-        /// <param name="inputImage">入力画像</param>
-        /// <returns>出力画像の情報</returns>
-        public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
-        {
-            return new ImageInfo
-            {
-                Width = inputImage.Width,
-                Height = inputImage.Height,
-                Format = ImageFormat.Grayscale8,
-                Channels = 1
-            };
-        }
-        
-        /// <summary>
-        /// レガシーインターフェースとの互換性のための実装
-        /// </summary>
-        /// <param name="imageData">処理する画像データ</param>
-        /// <param name="_">画像の幅</param>
-        /// <param name="__">画像の高さ</param>
-        /// <param name="___">ストライド（1行あたりのバイト数）</param>
-        /// <returns>処理後の画像データ</returns>
-        public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _, int __, int ___)
+        /// <inheritdoc/>
+        public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int width, int height, int stride)
         {
             ArgumentNullException.ThrowIfNull(imageData, nameof(imageData));
             
@@ -99,14 +49,10 @@ namespace Baketa.Core.Services.Imaging.Filters
             // 結果配列の作成
             byte[] resultData = new byte[sourceData.Length];
             
-            byte threshold = GetParameterValue<byte>("Threshold");
-            bool invertResult = GetParameterValue<bool>("InvertResult");
-            
             for (int i = 0; i < sourceData.Length; i++)
             {
                 // グレースケールを想定
-                bool isAboveThreshold = sourceData[i] >= threshold;
-                resultData[i] = (byte)(invertResult ? (isAboveThreshold ? 0 : 255) : (isAboveThreshold ? 255 : 0));
+                resultData[i] = sourceData[i] >= _threshold ? (byte)255 : (byte)0;
             }
             
             return resultData;

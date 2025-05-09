@@ -1,218 +1,192 @@
-# コード分析警告の対処ガイド
+# 静的コード分析(CA)警告修正ガイド
 
-このドキュメントでは、Baketaプロジェクトで頻出するコード分析警告の対処方法をまとめています。これらのガイドラインに従うことで、より一貫性のあるコードベースを維持し、静的コード分析の警告を最小限に抑えることができます。
+## 概要
 
-## CA1062: 引数のNull検証
+このドキュメントでは、Baketaプロジェクトで頻繁に発生する静的コード分析の警告とその修正方法について説明します。
 
-### 警告メッセージ
+## 1. 予約キーワードとの衝突 (CA1716)
 
-```
-外部から参照できるメソッドが、引数が null であるかどうかを確認せずに参照引数の 1 つを逆参照しています。外部から参照できるメソッドに渡されるすべての参照引数は、null でないかどうかを確認する必要があります。
-```
+### 問題
+インターフェースやメソッドの名前が、プログラミング言語の予約キーワードと衝突すると、他言語でのオーバーライドや実装が困難になります。
 
-### 対処方法
+### 修正方法
+メソッド名の前に動詞や接頭辞を追加します。
 
-1. **ArgumentNullExceptionを使用したNull検証**
-
+**修正前:**
 ```csharp
-public void ProcessData(MyClass data)
+void Error(string message, params object[] args);
+```
+
+**修正後:**
+```csharp
+void LogError(string message, params object[] args);
+```
+
+### 対象となる一般的な予約キーワード
+- `Error` -> `LogError`
+- `event` -> `eventData`
+- `object` -> `objectValue`
+- `string` -> `textValue`
+
+## 2. 破棄可能オブジェクトの処理 (CA2000)
+
+### 問題
+`IDisposable`を実装するオブジェクトが明示的に破棄されない場合、リソースリークが発生する可能性があります。
+
+### 修正方法
+`using`ステートメントまたは`using`宣言を使用します。所有権が移転される場合は明確にコメントで示します。
+
+**修正前:**
+```csharp
+var bitmap = new Bitmap(width, height);
+var image = new WindowsImage(bitmap);
+return new WindowsImageAdapter(image);
+```
+
+**修正後:**
+```csharp
+using var tempBitmap = new Bitmap(width, height);
+// 所有権が移転されるので、Disposeされないクローンを作成
+var persistentBitmap = (Bitmap)tempBitmap.Clone();
+var image = new WindowsImage(persistentBitmap);
+return new WindowsImageAdapter(image);
+```
+
+## 3. 静的メンバーとインスタンスメンバー (CA1822)
+
+### 問題
+インスタンスデータにアクセスしないメソッドやプロパティは、`static`として宣言することでパフォーマンスが向上します。
+
+### 修正方法
+インスタンスフィールドを使用しないメソッドを`static`に変更します。
+
+**修正前:**
+```csharp
+public string GetDescription() => $"説明: {_staticValue}";
+```
+
+**修正後:**
+```csharp
+public static string GetDescription() => "説明: 静的値";
+```
+
+## 4. クラス設計と修飾子 (CA1812, CA1852)
+
+### 問題
+- **CA1812**: インスタンス化されない内部クラスがある場合、コード量が増加します
+- **CA1852**: 継承されない型は`sealed`としてマークすべきです
+
+### 修正方法
+- インスタンス化されないクラスは静的クラスに変更するか、属性で抑制します
+- 継承が意図されていない場合は`sealed`修飾子を追加します
+
+**修正例:**
+```csharp
+// インスタンス化は行われるが、コードからは確認できない場合
+[SuppressMessage("Microsoft.Performance", "CA1812:AvoidUninstantiatedInternalClasses", 
+    Justification = "Instantiated by Avalonia XAML processor")]
+internal sealed class ViewLocator : IDataTemplate
 {
-    // パラメータを使用する前にNull検証
-    ArgumentNullException.ThrowIfNull(data, nameof(data));
-    
-    // 以下、dataを使用する処理
-    var result = data.Process();
+    // 実装
 }
 ```
 
-2. **ネストした参照の場合は完全修飾名を使用**
+## 5. ロギング最適化 (CA1848)
 
+### 問題
+標準的なILoggerメソッド呼び出しは、ログレベルが無効な場合でも文字列連結が発生し、パフォーマンスが低下します。
+
+### 修正方法
+LoggerMessageデリゲートを使用して、ログメッセージのテンプレートをコンパイル時に最適化します。
+
+**修正前:**
 ```csharp
-public void ProcessConfiguration(Context context)
+_logger.LogInformation($"処理を開始しました: {processName}");
+```
+
+**修正後:**
+```csharp
+private static readonly Action<ILogger, string, Exception?> _logProcessStarted = 
+    LoggerMessage.Define<string>(
+        LogLevel.Information,
+        new EventId(1, nameof(ProcessStarted)),
+        "処理を開始しました: {ProcessName}");
+
+public void ProcessStarted(string processName)
 {
-    ArgumentNullException.ThrowIfNull(context);
-    
-    // ネストしたプロパティのNull検証
-    ArgumentNullException.ThrowIfNull(context.Configuration, 
-        nameof(context) + "." + nameof(context.Configuration));
-    
-    // 以下、context.Configurationを使用する処理
+    _logProcessStarted(_logger, processName, null);
 }
 ```
 
-3. **コンストラクタで初期化されるメンバーの場合も明示的にチェック**
+## 6. 例外処理 (CA1031)
 
+### 問題
+一般的な例外（`System.Exception`）をキャッチすると、重要な例外も抑制される可能性があります。
+
+### 修正方法
+具体的な例外タイプをキャッチするか、適切に再スローします。
+
+**修正前:**
 ```csharp
-public async Task<Result> ExecuteAsync(Input input)
+try
 {
-    ArgumentNullException.ThrowIfNull(input);
-    
-    // _serviceがコンストラクタで初期化されていても、CA1062を満たすため再確認
-    ArgumentNullException.ThrowIfNull(_service, nameof(_service));
-    
-    return await _service.ProcessAsync(input);
+    // 処理
+}
+catch (Exception ex)
+{
+    _logger.LogError(ex, "エラーが発生しました");
 }
 ```
 
-## CA2208: ArgumentExceptionの適切な使用
-
-### 警告メッセージ
-
-```
-ArgumentException またはそれから派生した例外の種類の既定の (パラメーターのない) コンストラクターに対して呼び出しが行われます。または、正しくない文字列引数が、ArgumentException またはそれから派生した例外の種類のパラメーター化されたコンストラクターに渡されます。
-```
-
-### 対処方法
-
-1. **ArgumentExceptionの適切なコンストラクタ使用**
-
+**修正後:**
 ```csharp
-// パラメータ名は必ずnameofで取得し、メッセージは3番目の引数に
-throw new ArgumentException("値が不正です", nameof(parameterName));
-
-// ArgumentOutOfRangeExceptionの場合
-throw new ArgumentOutOfRangeException(
-    nameof(parameterName),  // パラメータ名
-    actualValue,            // 実際の値
-    "値が範囲外です");      // メッセージ
-```
-
-2. **メンバー変数ではなくパラメータ名を使用**
-
-```csharp
-// 誤り: メンバー変数をparamNameとして使用
-throw new ArgumentException($"値が不正: {_value}", nameof(_value));
-
-// 正しい: 実際のパラメータ名を使用
-throw new ArgumentException($"値が不正: {value}", nameof(value));
-```
-
-3. **内部状態エラーにはInvalidOperationExceptionを使用**
-
-```csharp
-// 内部状態が不正な場合はArgumentExceptionではなくInvalidOperationExceptionを使用
-switch (_state)
+try
 {
-    case State.Ready: return Process();
-    case State.Busy: return Wait();
-    default: throw new InvalidOperationException($"不明な状態: {_state}");
+    // 処理
+}
+catch (IOException ex)
+{
+    _logger.LogError(ex, "ファイルアクセス中にエラーが発生しました");
+}
+catch (InvalidOperationException ex)
+{
+    _logger.LogError(ex, "無効な操作が行われました");
+}
+catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
+{
+    _logger.LogError(ex, "予期しないエラーが発生しました");
+    // 必要に応じて再スロー
+    throw;
 }
 ```
 
-## IDE0270: Nullチェックの簡素化
+## 警告の抑制について
 
-### 警告メッセージ
-
-```
-Null チェックを簡素化できます
-```
-
-### 対処方法
-
-1. **null合体演算子（??）の使用**
+警告の抑制は最後の手段として考えるべきです。抑制が必要な場合は、明確な理由とともに属性を使用します：
 
 ```csharp
-// 変更前
-if (config == null)
-{
-    config = new Configuration();
-}
-
-// 変更後
-config ??= new Configuration();
+[SuppressMessage("Category", "RuleId:説明", 
+    Justification = "抑制の理由を詳細に記述")]
+public void Method() { }
 ```
 
-2. **null条件演算子（?.）と合体演算子の組み合わせ**
+## 配列とコレクションプロパティ (CA1819, CA2227)
 
+### 問題
+- 配列プロパティは参照透過性がなく、変更が可能
+- 書き込み可能なコレクションプロパティは内部状態を不用意に変更される可能性がある
+
+### 修正方法
+- 配列の代わりに`IReadOnlyList<T>`や`IEnumerable<T>`を使用
+- コレクションプロパティは読み取り専用にする
+
+**修正例:**
 ```csharp
-// 変更前
-var name = user != null ? user.Name : "Unknown";
+// 修正前
+public byte[] Data { get; set; }
+public List<string> Items { get; set; }
 
-// 変更後
-var name = user?.Name ?? "Unknown";
+// 修正後
+public IReadOnlyList<byte> Data => _data;
+public IReadOnlyCollection<string> Items => _items;
 ```
-
-3. **nullチェックと例外のパターン**
-
-```csharp
-// 変更前
-if (value == null)
-{
-    throw new ArgumentNullException(nameof(value));
-}
-
-// 変更後
-value ?? throw new ArgumentNullException(nameof(value));
-
-// または .NET 6以降ではさらに簡潔に
-ArgumentNullException.ThrowIfNull(value);
-```
-
-4. **FirstOrDefaultとnullチェックの簡素化**
-
-```csharp
-// 変更前
-var item = items.FirstOrDefault(i => i.Id == id);
-if (item == null)
-{
-    throw new KeyNotFoundException($"ID {id} not found");
-}
-
-// 変更後
-var item = items.FirstOrDefault(i => i.Id == id) 
-    ?? throw new KeyNotFoundException($"ID {id} not found");
-```
-
-## IDE0301: コレクション初期化の簡素化
-
-### 警告メッセージ
-
-```
-コレクションの初期化を簡素化できます
-```
-
-### 対処方法
-
-1. **C# 12の簡素化されたコレクション初期化構文の使用**
-
-```csharp
-// 変更前
-public IReadOnlyCollection<Parameter> Parameters => Array.Empty<Parameter>();
-
-// 変更後
-public IReadOnlyCollection<Parameter> Parameters => [];
-```
-
-2. **コレクション型の初期化**
-
-```csharp
-// 変更前
-var list = new List<string>();
-var dict = new Dictionary<string, int>();
-
-// 変更後
-var list = [];
-var dict = new Dictionary<string, int>();
-// または特定の型が明確な場合
-var dict = [];
-```
-
-## 実装事例とベストプラクティス
-
-Issue 42（画像前処理パイプラインの設計と実装）での対応例に基づくベストプラクティス：
-
-1. **パラメータのnullチェックは一箇所に集約せず、使用直前にも行う**
-   - コンストラクタでnullチェック済みのフィールドでも、パブリックメソッド内で再度チェックする
-   - これにより、将来的な変更でも問題が発生しにくくなる
-
-2. **例外の型は目的に合わせて選択する**
-   - 引数に関する問題: ArgumentException, ArgumentNullException
-   - 内部状態の問題: InvalidOperationException
-   - 範囲外の値: ArgumentOutOfRangeException
-   - キーが見つからない: KeyNotFoundException
-
-3. **コード簡潔性とパフォーマンスのバランスを考慮する**
-   - 簡潔な構文は可読性を高めるが、意図を明確にすることが最優先
-   - パフォーマンス上重要なコードパスでは、簡潔さより効率を優先する場合もある
-
-これらのガイドラインを遵守することで、コード品質を高めながら、静的コード分析の警告を解消できます。不明点がある場合は、チームリーダーに相談するか、より詳細な.NET Frameworkのコーディングガイドラインを参照してください。
