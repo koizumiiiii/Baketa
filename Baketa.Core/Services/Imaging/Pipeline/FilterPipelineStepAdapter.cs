@@ -7,6 +7,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
+#pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
+
 namespace Baketa.Core.Services.Imaging.Pipeline
 {
     /// <summary>
@@ -114,22 +116,15 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                     case StepErrorHandlingStrategy.UseFallback:
                         // イベントハンドラーのフォールバック処理を使用
                         var fallbackResult = await context.EventListener.OnStepErrorAsync(this, ex, context).ConfigureAwait(false);
-                        if (fallbackResult is not null)
-                        {
-                            return fallbackResult;
-                        }
-                        context.Logger.LogWarning("フィルター '{FilterName}' のフォールバック処理が提供されなかったため、入力をそのまま返します", Name);
-                        return input;
+                        return fallbackResult ?? input;
                         
                     case StepErrorHandlingStrategy.LogAndContinue:
                         context.Logger.LogWarning("フィルター '{FilterName}' でエラーが発生しましたが、処理を継続します", Name);
                         return input;
                         
                     default:
-                        throw new ArgumentOutOfRangeException(
-                            nameof(ErrorHandlingStrategy),  // パラメータ名
-                            ErrorHandlingStrategy,        // 実際の値
-                            $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}");  // メッセージ
+                        var errorMsg = $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}";
+                        throw new ArgumentOutOfRangeException(nameof(ErrorHandlingStrategy), ErrorHandlingStrategy, errorMsg);
                 }
             }
         }
@@ -141,10 +136,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <param name="value">設定する値</param>
         public void SetParameter(string parameterName, object value)
         {
-            ArgumentException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException($"パラメータ名が空またはnullです。", nameof(parameterName));
+            }
             
             // パラメータ定義をチェック
-            var paramDef = _parameterDefinitions.FirstOrDefault(p => p.Name == parameterName) 
+            var paramDef = _parameterDefinitions.FirstOrDefault(p => p.Name == parameterName)
                 ?? throw new ArgumentException($"パラメータ '{parameterName}' はこのステップでは定義されていません。", nameof(parameterName));
             
             // パラメータ値を検証
@@ -164,7 +162,10 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <returns>パラメータ値</returns>
         public object GetParameter(string parameterName)
         {
-            ArgumentException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException($"パラメータ名が空またはnullです。", nameof(parameterName));
+            }
             
             // フィルターからパラメータを取得
             try
@@ -183,12 +184,17 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <typeparam name="T">取得する型</typeparam>
         /// <param name="parameterName">パラメータ名</param>
         /// <returns>パラメータ値</returns>
+#pragma warning disable IDE0270 // nullチェックの簡素化
         public T GetParameter<T>(string parameterName)
         {
             var value = GetParameter(parameterName);
             
-            return value is T typedValue ? typedValue : throw new InvalidCastException($"パラメータ '{parameterName}' の値を型 {typeof(T).Name} に変換できません。");
+            if (value is T typedValue)
+                return typedValue;
+            
+            throw new InvalidCastException($"パラメータ '{parameterName}' の値を型 {typeof(T).Name} に変換できません。");
         }
+#pragma warning restore IDE0270
 
         /// <summary>
         /// 出力画像情報を取得します
@@ -208,11 +214,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         private void CreateParametersFromFilter()
         {
-            var filterParams = _filter.GetParameters();
+            // nullチェックを追加
+            var filterParams = _filter.GetParameters() ?? new Dictionary<string, object>();
             
             foreach (var param in filterParams)
             {
                 // フィルターパラメータの型を推定
+                // param.Valueがnullの場合はobject型を使用
                 var paramType = param.Value?.GetType() ?? typeof(object);
                 
                 // パラメータを登録
@@ -220,8 +228,10 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                     param.Key,
                     $"{param.Key} パラメータ", // 適切な説明がない場合のフォールバック
                     paramType,
-                    param.Value));
+                    param.Value)); // nullも許容
             }
         }
     }
 }
+
+#pragma warning restore CA2208

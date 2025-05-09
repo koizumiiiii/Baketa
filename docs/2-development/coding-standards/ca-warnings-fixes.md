@@ -197,22 +197,170 @@ var dict = new Dictionary<string, int>();
 var dict = [];
 ```
 
-## 実装事例とベストプラクティス
+## CA2017: ログメッセージテンプレートのパラメータ不一致
 
-Issue 42（画像前処理パイプラインの設計と実装）での対応例に基づくベストプラクティス：
+### 警告メッセージ
 
-1. **パラメータのnullチェックは一箇所に集約せず、使用直前にも行う**
-   - コンストラクタでnullチェック済みのフィールドでも、パブリックメソッド内で再度チェックする
-   - これにより、将来的な変更でも問題が発生しにくくなる
+```
+ログ メッセージ テンプレートで指定されたパラメーターの数が、名前付きプレースホルダーの数と一致しません。
+```
 
-2. **例外の型は目的に合わせて選択する**
-   - 引数に関する問題: ArgumentException, ArgumentNullException
-   - 内部状態の問題: InvalidOperationException
-   - 範囲外の値: ArgumentOutOfRangeException
-   - キーが見つからない: KeyNotFoundException
+### 対処方法
 
-3. **コード簡潔性とパフォーマンスのバランスを考慮する**
-   - 簡潔な構文は可読性を高めるが、意図を明確にすることが最優先
-   - パフォーマンス上重要なコードパスでは、簡潔さより効率を優先する場合もある
+1. **名前付きプレースホルダーの使用**
 
-これらのガイドラインを遵守することで、コード品質を高めながら、静的コード分析の警告を解消できます。不明点がある場合は、チームリーダーに相談するか、より詳細な.NET Frameworkのコーディングガイドラインを参照してください。
+```csharp
+// 誤った使用法
+_logger.LogInformation("プロファイルディレクトリを作成しました: {Directory}", profilesDirectory);
+
+// 正しい使用法
+_logger.LogInformation("プロファイルディレクトリを作成しました: {DirectoryPath}", profilesDirectory);
+```
+
+2. **数字のみのプレースホルダーの代わりに名前付きプレースホルダーを使用**
+
+```csharp
+// 誤った使用法
+_logger.LogInformation("オブジェクト {0} を作成しました", objectName);
+
+// 正しい使用法
+_logger.LogInformation("オブジェクト {ObjectName} を作成しました", objectName);
+```
+
+3. **パラメータ数の一致**
+
+```csharp
+// 誤った使用法: プレースホルダーが二つ、パラメータが一つ
+_logger.LogInformation("エラーが発生しました: {ErrorCode} {ErrorMessage}", errorCode);
+
+// 正しい使用法
+_logger.LogInformation("エラーが発生しました: {ErrorCode} {ErrorMessage}", errorCode, errorMessage);
+```
+
+## CA1849: 非同期メソッド内での同期メソッド使用
+
+### 警告メッセージ
+
+```
+Task-returning メソッド内にメソッドが存在する場合は、メソッドの非同期バージョンを使用します。
+```
+
+### 対処方法
+
+1. **同期メソッドの代わりに非同期バージョンを使用**
+
+```csharp
+// 誤った使用法
+public async Task<Result> ProcessAsync(string filePath)
+{
+    var text = File.ReadAllText(filePath);  // 同期版
+    return await ProcessTextAsync(text);
+}
+
+// 正しい使用法
+public async Task<Result> ProcessAsync(string filePath)
+{
+    var text = await File.ReadAllTextAsync(filePath);  // 非同期版
+    return await ProcessTextAsync(text);
+}
+```
+
+2. **テストコードでの警告抑制**
+
+```csharp
+// テストコードでは単純に警告を抑制する場合もある
+namespace MyProject.Tests
+{
+#pragma warning disable CA1849 // 非同期メソッド内での同期メソッドの使用（テストコードのため抑制）
+    public class MyTests
+    {
+        [Fact]
+        public async Task TestMethod_ReturnsCorrectResult()
+        {
+            // テストコード内では同期メソッドを使用しても問題ない
+            var mockData = File.ReadAllText("testdata.json");
+            var result = await _service.ProcessAsync(mockData);
+            Assert.NotNull(result);
+        }
+    }
+#pragma warning restore CA1849
+}
+```
+
+3. **同期メソッド使用が必要な場合の抑制**
+
+```csharp
+public async Task<Result> ProcessAsync(string filePath)
+{
+    // 非同期バージョンが存在しない場合や、実装上の理由から同期メソッドが必要な場合
+#pragma warning disable CA1849 // 一時的な使用であるか、非同期バージョンが存在しない
+    var specialText = CustomLibrary.ProcessText(data);
+#pragma warning restore CA1849
+
+    return await FinalizeAsync(specialText);
+}
+```
+
+## 警告抑制のベストプラクティス
+
+警告を抑制する際には、次のベストプラクティスに従いましょう：
+
+1. **抑制の理由を常に明記する**
+
+```csharp
+// 良い例
+#pragma warning disable CA1062 // privateメソッドであり内部的に制御されているので抑制
+// 悪い例
+#pragma warning disable CA1062
+```
+
+2. **抑制の範囲を最小限にする**
+
+```csharp
+// 良い例: 特定のメソッドのみに抑制を適用
+public void CustomMethod()
+{
+#pragma warning disable CA1031 // ここでは全ての例外をロギングする必要がある
+    try { /* 処理 */ } catch (Exception ex) { _logger.LogError(ex, "Error"); }
+#pragma warning restore CA1031
+}
+
+// 悪い例: クラス全体で抑制（必要でない場合）
+#pragma warning disable CA1031 // 全体的な抑制は避ける
+public class MyService
+{
+    // このクラスの全てのメソッドで警告が抑制される
+}
+#pragma warning restore CA1031
+```
+
+3. **編集構成ファイルの活用**
+
+```csharp
+// .editorconfigを使用し、プロジェクト全体での実行コードとテストコードで異なるルールを適用
+
+// E:\dev\Baketa\.editorconfigの例
+[*.{cs}]
+# テストプロジェクトでは非同期メソッドの警告を下げる
+[*Tests.cs]
+dotnet_diagnostic.CA1849.severity = none
+```
+
+## Issue 42とIssue 30の対応から得た教訓
+
+「画像前処理パイプライン」および「画像処理フィルターの抽象化」実装で発生した警告への対応から得た教訓：
+
+1. **複雑なコードではなくシンプルな構文を活用する**
+   - 三項演算子とthrowの組み合わせは、if文とthrowに替える
+   - null合体演算子(`??`)はシンプルな場合に限定して使用する
+
+2. **記述が複雑になる場合は、分割して読みやすくする**
+   - `FirstOrDefault(...) ?? throw new ...`より、変数代入とif文の組み合わせが読みやすい場合もある
+
+3. **テストコードと実装コードは異なる基準で評価する**
+   - テストコードでは同期メソッドを使用してほしい場合も多い
+   - テスト用の`.editorconfig`やプラグマ指示子で警告を抑制する
+
+4. **ロガー使用時の一貫性**
+   - 渡すパラメータと名前付きプレースホルダーは一致させる
+   - パラメータ名は一貫性を持たせる（例：`{Directory}`ではなく`{DirectoryPath}`）

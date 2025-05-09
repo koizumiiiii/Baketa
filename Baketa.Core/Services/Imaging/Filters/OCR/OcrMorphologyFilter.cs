@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -45,6 +46,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCRモルフォロジー処理フィルターを適用中...");
 
             try
@@ -66,49 +68,49 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 {
                     case "Dilate":
                         // 膨張 - テキストを太くする
-                        resultImage = await inputImage.DilateAsync(kernelShape, kernelSize, iterations);
+                        resultImage = await inputImage.DilateAsync(kernelShape, kernelSize, iterations).ConfigureAwait(false);
                         _logger.LogDebug("膨張操作を適用しました (形状:{Shape}, サイズ:{Size}, 繰り返し:{Iterations})",
                             kernelShape, kernelSize, iterations);
                         break;
 
                     case "Erode":
                         // 収縮 - テキストを細くする
-                        resultImage = await inputImage.ErodeAsync(kernelShape, kernelSize, iterations);
+                        resultImage = await inputImage.ErodeAsync(kernelShape, kernelSize, iterations).ConfigureAwait(false);
                         _logger.LogDebug("収縮操作を適用しました (形状:{Shape}, サイズ:{Size}, 繰り返し:{Iterations})",
                             kernelShape, kernelSize, iterations);
                         break;
 
                     case "Open":
                         // オープニング（収縮→膨張） - ノイズ除去に効果的
-                        resultImage = await inputImage.MorphOpenAsync(kernelShape, kernelSize, iterations);
+                        resultImage = await inputImage.MorphOpenAsync(kernelShape, kernelSize, iterations).ConfigureAwait(false);
                         _logger.LogDebug("オープニング操作を適用しました (形状:{Shape}, サイズ:{Size}, 繰り返し:{Iterations})",
                             kernelShape, kernelSize, iterations);
                         break;
 
                     case "Close":
                         // クロージング（膨張→収縮） - 文字の穴を埋める
-                        resultImage = await inputImage.MorphCloseAsync(kernelShape, kernelSize, iterations);
+                        resultImage = await inputImage.MorphCloseAsync(kernelShape, kernelSize, iterations).ConfigureAwait(false);
                         _logger.LogDebug("クロージング操作を適用しました (形状:{Shape}, サイズ:{Size}, 繰り返し:{Iterations})",
                             kernelShape, kernelSize, iterations);
                         break;
 
                     case "TopHat":
                         // トップハット変換 - 明るい部分を強調
-                        resultImage = await inputImage.MorphTopHatAsync(kernelShape, kernelSize);
+                        resultImage = await inputImage.MorphTopHatAsync(kernelShape, kernelSize).ConfigureAwait(false);
                         _logger.LogDebug("トップハット変換を適用しました (形状:{Shape}, サイズ:{Size})",
                             kernelShape, kernelSize);
                         break;
 
                     case "BlackHat":
                         // ブラックハット変換 - 暗い部分を強調
-                        resultImage = await inputImage.MorphBlackHatAsync(kernelShape, kernelSize);
+                        resultImage = await inputImage.MorphBlackHatAsync(kernelShape, kernelSize).ConfigureAwait(false);
                         _logger.LogDebug("ブラックハット変換を適用しました (形状:{Shape}, サイズ:{Size})",
                             kernelShape, kernelSize);
                         break;
 
                     case "Gradient":
                         // モルフォロジー勾配 - エッジを強調
-                        resultImage = await inputImage.MorphGradientAsync(kernelShape, kernelSize);
+                        resultImage = await inputImage.MorphGradientAsync(kernelShape, kernelSize).ConfigureAwait(false);
                         _logger.LogDebug("モルフォロジー勾配を適用しました (形状:{Shape}, サイズ:{Size})",
                             kernelShape, kernelSize);
                         break;
@@ -194,6 +196,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             // モルフォロジー処理はフォーマットを変更しないが、
             // 理想的にはグレースケールまたは二値化された画像に適用すべき
             return new ImageInfo
@@ -208,7 +211,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// フォーマットからチャネル数を取得
         /// </summary>
-        private int GetChannelCount(ImageFormat format)
+        private static int GetChannelCount(ImageFormat format)
         {
             return format switch
             {

@@ -46,8 +46,8 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// 指定された名前のステップを取得します
         /// </summary>
         /// <param name="name">取得するステップの名前</param>
-        /// <returns>パイプラインステップ</returns>
-        IImagePipelineStep GetStepByName(string name);
+        /// <returns>パイプラインステップ、見つからない場合はnull</returns>
+        IImagePipelineStep? GetStepByName(string name);
         
         /// <summary>
         /// パイプライン内のステップの数を取得します

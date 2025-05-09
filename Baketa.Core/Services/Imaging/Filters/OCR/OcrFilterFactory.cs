@@ -55,12 +55,12 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         {
             return new Dictionary<string, OcrFilterType>
             {
-                { "グレースケール変換", OcrFilterType.Grayscale },
-                { "コントラスト強調", OcrFilterType.ContrastEnhancement },
-                { "ノイズ除去", OcrFilterType.NoiseReduction },
-                { "二値化", OcrFilterType.Threshold },
-                { "モルフォロジー処理", OcrFilterType.Morphology },
-                { "エッジ検出", OcrFilterType.EdgeDetection }
+                ["グレースケール変換"] = OcrFilterType.Grayscale,
+                ["コントラスト強調"] = OcrFilterType.ContrastEnhancement,
+                ["ノイズ除去"] = OcrFilterType.NoiseReduction,
+                ["二値化"] = OcrFilterType.Threshold,
+                ["モルフォロジー処理"] = OcrFilterType.Morphology,
+                ["エッジ検出"] = OcrFilterType.EdgeDetection
             };
         }
 
@@ -75,14 +75,13 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
             // 3. コントラスト強調
             // 4. 二値化
             // 5. モルフォロジー処理（必要に応じて）
-            return new Baketa.Core.Abstractions.Imaging.IImageFilter[]
-            {
+            return [
                 CreateFilter(OcrFilterType.Grayscale),
                 CreateFilter(OcrFilterType.NoiseReduction),
                 CreateFilter(OcrFilterType.ContrastEnhancement),
                 CreateFilter(OcrFilterType.Threshold),
                 CreateFilter(OcrFilterType.Morphology)
-            };
+            ];
         }
 
         /// <inheritdoc/>
@@ -94,12 +93,11 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
             // 1. グレースケール変換
             // 2. コントラスト強調
             // 3. 二値化
-            return new Baketa.Core.Abstractions.Imaging.IImageFilter[]
-            {
+            return [
                 CreateFilter(OcrFilterType.Grayscale),
                 CreateFilter(OcrFilterType.ContrastEnhancement),
                 CreateFilter(OcrFilterType.Threshold)
-            };
+            ];
         }
 
         /// <inheritdoc/>
@@ -112,13 +110,12 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
             // 2. ノイズ除去
             // 3. エッジ検出
             // 4. 二値化
-            return new Baketa.Core.Abstractions.Imaging.IImageFilter[]
-            {
+            return [
                 CreateFilter(OcrFilterType.Grayscale),
                 CreateFilter(OcrFilterType.NoiseReduction),
                 CreateFilter(OcrFilterType.EdgeDetection),
                 CreateFilter(OcrFilterType.Threshold)
-            };
+            ];
         }
     }
 
@@ -127,6 +124,23 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
     /// </summary>
     public class OcrFilterCreationException : Exception
     {
+        /// <summary>
+        /// 新しいOcrFilterCreationExceptionを作成します
+        /// </summary>
+        public OcrFilterCreationException()
+            : base()
+        {
+        }
+
+        /// <summary>
+        /// 新しいOcrFilterCreationExceptionを作成します
+        /// </summary>
+        /// <param name="message">エラーメッセージ</param>
+        public OcrFilterCreationException(string message)
+            : base(message)
+        {
+        }
+
         /// <summary>
         /// 新しいOcrFilterCreationExceptionを作成します
         /// </summary>

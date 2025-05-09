@@ -12,6 +12,7 @@ using Xunit;
 
 namespace Baketa.Core.Tests.Imaging.Pipeline
 {
+#pragma warning disable CA1849 // 非同期メソッド内での同期メソッドの使用（テストコードのため抑制）
     public class FilterPipelineStepAdapterTests
     {
         private readonly Mock<ILogger<FilterPipelineStepAdapter>> _loggerMock;
@@ -100,10 +101,12 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             _filterMock.Setup(f => f.ApplyAsync(_imageMock.Object))
                 .ReturnsAsync(transformedImage);
                 
-            var context = new PipelineContext
-            {
-                IntermediateResultMode = IntermediateResultMode.All
-            };
+            var context = new PipelineContext(
+                _loggerMock.Object,
+                IntermediateResultMode.All,
+                StepErrorHandlingStrategy.StopExecution,
+                null,
+                CancellationToken.None);
 
             // Act
             var result = await adapter.ExecuteAsync(
@@ -124,10 +127,12 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             _filterMock.Setup(f => f.ApplyAsync(_imageMock.Object))
                 .ThrowsAsync(new InvalidOperationException("フィルターエラー"));
                 
-            var context = new PipelineContext
-            {
-                IntermediateResultMode = IntermediateResultMode.All
-            };
+            var context = new PipelineContext(
+                _loggerMock.Object,
+                IntermediateResultMode.All,
+                StepErrorHandlingStrategy.StopExecution,
+                null,
+                CancellationToken.None);
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -144,10 +149,12 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             var adapter = new FilterPipelineStepAdapter(
                 _filterMock.Object, _loggerMock.Object);
             
-            var context = new PipelineContext
-            {
-                IntermediateResultMode = IntermediateResultMode.All
-            };
+            var context = new PipelineContext(
+                _loggerMock.Object,
+                IntermediateResultMode.All,
+                StepErrorHandlingStrategy.StopExecution,
+                null,
+                CancellationToken.None);
             
             // キャンセル済みのトークンを作成
             var cts = new CancellationTokenSource();
@@ -155,7 +162,7 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
 
             // Act & Assert
             await Assert.ThrowsAsync<OperationCanceledException>(
-                async () => await adapter.ExecuteAsync(
+                () => adapter.ExecuteAsync(
                     _imageMock.Object, context, cts.Token));
         }
 
@@ -185,4 +192,5 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             _filterMock.Verify(f => f.GetOutputImageInfo(_imageMock.Object), Times.Once);
         }
     }
+#pragma warning restore CA1849
 }

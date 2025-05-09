@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -47,6 +48,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCR二値化フィルターを適用中...");
 
             try
@@ -71,7 +73,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 // 自動しきい値調整が有効な場合、Otsu法を使用して最適なしきい値を計算
                 if (autoThreshold && method == "Global")
                 {
-                    thresholdValue = await inputImage.CalculateOptimalThresholdAsync();
+                    thresholdValue = await inputImage.CalculateOptimalThresholdAsync().ConfigureAwait(false);
                     _logger.LogDebug("自動しきい値計算: {Threshold}", thresholdValue);
                 }
 
@@ -81,14 +83,14 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 {
                     case "Global":
                         // グローバル二値化
-                        binaryImage = await inputImage.ThresholdAsync(thresholdValue, maxValue, invert);
+                        binaryImage = await inputImage.ThresholdAsync(thresholdValue, maxValue, invert).ConfigureAwait(false);
                         _logger.LogDebug("グローバル二値化を適用しました (閾値:{Threshold}, 最大値:{MaxValue}, 反転:{Invert})",
                             thresholdValue, maxValue, invert);
                         break;
 
                     case "Otsu":
                         // Otsu法による最適な二値化
-                        binaryImage = await inputImage.OtsuThresholdAsync(maxValue, invert);
+                        binaryImage = await inputImage.OtsuThresholdAsync(maxValue, invert).ConfigureAwait(false);
                         _logger.LogDebug("Otsu法による二値化を適用しました (最大値:{MaxValue}, 反転:{Invert})",
                             maxValue, invert);
                         break;
@@ -100,7 +102,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                             adaptiveMethod: "Gaussian",
                             blockSize: blockSize,
                             c: c,
-                            invert: invert);
+                            invert: invert).ConfigureAwait(false);
                         _logger.LogDebug("ガウシアン適応的二値化を適用しました (ブロックサイズ:{BlockSize}, C:{C}, 反転:{Invert})",
                             blockSize, c, invert);
                         break;
@@ -112,7 +114,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                             adaptiveMethod: "Mean",
                             blockSize: blockSize,
                             c: c,
-                            invert: invert);
+                            invert: invert).ConfigureAwait(false);
                         _logger.LogDebug("平均適応的二値化を適用しました (ブロックサイズ:{BlockSize}, C:{C}, 反転:{Invert})",
                             blockSize, c, invert);
                         break;
@@ -135,6 +137,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             // 二値化後もフォーマットは変わらない（グレースケールのまま）
             return new ImageInfo
             {
