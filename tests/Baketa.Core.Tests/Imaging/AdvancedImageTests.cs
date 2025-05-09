@@ -153,16 +153,25 @@ namespace Baketa.Core.Tests.Imaging
             return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
 
-        public Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options)
+        public Task<IReadOnlyList<byte>> GetRawDataAsync()
         {
-            // 弾化処理のモック動作
-            return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
+            return Task.FromResult<IReadOnlyList<byte>>(_imageData);
         }
-        
-        public Task<List<Rectangle>> DetectTextRegionsAsync()
+
+        public Task<byte[]> SaveAsync(ImageFormat _1)
         {
-            // テキスト領域検出のモック動作
-            return Task.FromResult(new List<Rectangle> { new Rectangle(10, 10, 20, 20) });
+            // 画像保存のモック動作
+            return Task.FromResult(new byte[100]);
+        }
+
+        public IReadOnlyList<byte> GetRawData()
+        {
+            return _imageData;
+        }
+
+        public byte[] Save(ImageFormat _1)
+        {
+            return new byte[100];
         }
     }
 
@@ -171,83 +180,10 @@ namespace Baketa.Core.Tests.Imaging
     /// </summary>
     private class MockImageFilter : IImageFilter
     {
-        public string Name => "モックフィルター";
-        public string Description => "テスト用のモックフィルター実装";
-        public FilterCategory Category => FilterCategory.Effect;
-
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
-
-        public MockImageFilter()
-        {
-            InitializeDefaultParameters();
-        }
-
-        public Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
-        {
-            ArgumentNullException.ThrowIfNull(inputImage);
-            // 単純にクローンを返すモック実装
-            return Task.FromResult((IAdvancedImage)inputImage.Clone());
-        }
-
-        public void ResetParameters()
-        {
-            _parameters.Clear();
-            InitializeDefaultParameters();
-        }
-
-        public IDictionary<string, object> GetParameters()
-        {
-            return new Dictionary<string, object>(_parameters);
-        }
-
-        public void SetParameter(string name, object value)
-        {
-            if (!_parameters.ContainsKey(name))
-                throw new ArgumentException($"パラメータ '{name}' はこのフィルターでは定義されていません。");
-
-            _parameters[name] = value;
-        }
-
-        public bool SupportsFormat(ImageFormat format)
-        {
-            // モック実装ではすべてのフォーマットをサポート
-            return true;
-        }
-
-        public ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
-        {
-            // モック実装では入力画像と同じ情報を返す
-            return new ImageInfo
-            {
-                Width = inputImage.Width,
-                Height = inputImage.Height,
-                Format = inputImage.Format,
-                Channels = GetChannelCount(inputImage.Format)
-            };
-        }
-
-        // レガシーのインターフェースサポート用
         public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
         {
             // フィルター適用のモック動作（同一データを返却）
             return imageData;
-        }
-
-        private void InitializeDefaultParameters()
-        {
-            _parameters["Intensity"] = 1.0;
-            _parameters["Enabled"] = true;
-        }
-
-        private int GetChannelCount(ImageFormat format)
-        {
-            return format switch
-            {
-                ImageFormat.Rgb24 => 3,
-                ImageFormat.Rgba32 => 4,
-                ImageFormat.Grayscale8 => 1,
-                _ => throw new ArgumentException($"未サポートのフォーマット: {format}")
-            };
         }
     }
 

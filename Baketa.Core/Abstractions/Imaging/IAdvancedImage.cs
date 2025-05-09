@@ -100,19 +100,6 @@ namespace Baketa.Core.Abstractions.Imaging
         /// <param name="degrees">回転角度（度数法）</param>
         /// <returns>回転された新しい画像</returns>
         Task<IAdvancedImage> RotateAsync(float degrees);
-        
-        /// <summary>
-        /// 画像の強調処理を行います
-        /// </summary>
-        /// <param name="options">強調オプション</param>
-        /// <returns>強調処理された新しい画像</returns>
-        Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options);
-        
-        /// <summary>
-        /// 画像から自動的にテキスト領域を検出します
-        /// </summary>
-        /// <returns>検出されたテキスト領域の矩形リスト</returns>
-        Task<List<Rectangle>> DetectTextRegionsAsync();
     }
     
     /// <summary>
