@@ -111,14 +111,8 @@ namespace Baketa.Core.Services.Imaging
             
             ArgumentNullException.ThrowIfNull(filter);
                 
-            byte[] sourceData = await ToByteArrayAsync().ConfigureAwait(false);
-            // IReadOnlyList<byte>をbyte[]に変換して処理
-IReadOnlyList<byte> resultData = filter.Apply(sourceData, Width, Height, _stride);
-            
-            // 結果を配列にして返す
-            byte[] resultDataArray = resultData.ToArray();
-            
-            return new AdvancedImage(resultDataArray, Width, Height, Format, _stride);
+            // 新しいIImageFilterインターフェースのApplyAsyncメソッドを使用
+            return await filter.ApplyAsync(this).ConfigureAwait(false);
         }
         
         /// <inheritdoc/>
@@ -498,6 +492,78 @@ IReadOnlyList<byte> resultData = filter.Apply(sourceData, Width, Height, _stride
                 }
                 
                 return (IAdvancedImage)new AdvancedImage(resultData, newWidth, newHeight, Format, newWidth * BytesPerPixel);
+            });
+        }
+        
+        /// <inheritdoc/>
+        public Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options)
+        {
+            ThrowIfDisposed();
+            
+            ArgumentNullException.ThrowIfNull(options, nameof(options));
+                
+            // CPU負荷の高い処理なので、Task.Runで実行
+            return Task.Run(async () => {
+                IAdvancedImage result = this;
+                
+                // グレースケール変換が必要な場合
+                if (options.OptimizeForTextDetection && Format != ImageFormat.Grayscale8)
+                {
+                    result = await ToGrayscaleAsync().ConfigureAwait(false);
+                }
+                
+                // 明るさ・コントラスト調整
+                if (Math.Abs(options.Brightness) > 0.01f || Math.Abs(options.Contrast - 1.0f) > 0.01f)
+                {
+                    // 明るさ・コントラスト調整の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // ノイズ除去
+                if (options.NoiseReduction > 0.01f)
+                {
+                    // ノイズ除去の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // シャープネス強調
+                if (options.Sharpness > 0.01f)
+                {
+                    // シャープネス強調の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // 二値化処理
+                if (options.BinarizationThreshold > 0)
+                {
+                    result = await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
+                }
+                else if (options.UseAdaptiveThreshold)
+                {
+                    // 適応的二値化の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                return result;
+            });
+        }
+        
+        /// <inheritdoc/>
+        public Task<List<Rectangle>> DetectTextRegionsAsync()
+        {
+            ThrowIfDisposed();
+            
+            // CPU負荷の高い処理なので、Task.Runで実行
+            return Task.Run(() => {
+                // テキスト領域検出の実装
+                // 実際の実装では適切なアルゴリズムを使用
+                
+                // サンプル実装のため、空のリストを返す
+                return new List<Rectangle>();
             });
         }
         

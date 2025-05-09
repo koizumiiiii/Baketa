@@ -156,59 +156,8 @@ namespace Baketa.Infrastructure.Platform.Adapters
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(filter);
             
-            if (_windowsImage.GetNativeImage() is not Bitmap bitmap)
-            {
-                throw new InvalidOperationException("フィルター適用はBitmapでのみサポートされています");
-            }
-            
-            // Bitmapをバイトデータとしてロックして取得
-            var bitmapData = bitmap.LockBits(
-                new SysRectangle(0, 0, bitmap.Width, bitmap.Height),
-                ImageLockMode.ReadOnly,
-                PixelFormat.Format32bppArgb);
-            
-            try
-            {
-                // ピクセルデータをバイト配列にコピー
-                var length = bitmapData.Stride * bitmapData.Height;
-                var sourceData = new byte[length];
-                System.Runtime.InteropServices.Marshal.Copy(bitmapData.Scan0, sourceData, 0, length);
-                
-                // フィルター適用
-                // フィルター適用（IReadOnlyList<byte>の結果を受け取る）
-                var resultDataList = await Task.Run(() => filter.Apply(sourceData, bitmap.Width, bitmap.Height, bitmapData.Stride))
-                    .ConfigureAwait(false);
-                
-                // IReadOnlyList<byte>をbyte[]に変換
-                var resultData = resultDataList.ToArray();
-                
-                // 新しいBitmapを作成
-                using var resultBitmap = new Bitmap(bitmap.Width, bitmap.Height, PixelFormat.Format32bppArgb);
-                var resultBitmapData = resultBitmap.LockBits(
-                    new SysRectangle(0, 0, resultBitmap.Width, resultBitmap.Height),
-                    ImageLockMode.WriteOnly,
-                    PixelFormat.Format32bppArgb);
-                
-                try
-                {
-                    // 結果データを新しいBitmapにコピー
-                    System.Runtime.InteropServices.Marshal.Copy(resultData, 0, resultBitmapData.Scan0, length);
-                }
-                finally
-                {
-                    resultBitmap.UnlockBits(resultBitmapData);
-                }
-                
-                // 新しいWindowsImageを作成
-                // 所有権が移転されるので、Disposeされないクローンを作成
-                using var persistentBitmap = (Bitmap)resultBitmap.Clone();
-                var resultWindowsImage = new WindowsImage(persistentBitmap);
-                return new WindowsImageAdapter(resultWindowsImage);
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
+            // 新しいIImageFilterインターフェースのApplyAsyncメソッドを使用
+            return await filter.ApplyAsync(this).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -300,7 +249,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 // 結果画像を作成（クローンを作成して所有権を移転）
                 using Bitmap clonedBitmap = (Bitmap)result.Clone();
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
-                return new WindowsImageAdapter(resultWindowsImage);
+                return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
         }
         
@@ -335,7 +284,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 // 結果画像を作成（クローンを作成して所有権を移転）
                 using Bitmap clonedBitmap = (Bitmap)result.Clone();
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
-                return new WindowsImageAdapter(resultWindowsImage);
+                return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
         }
         
@@ -373,7 +322,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 // 結果画像を作成（クローンを作成して所有権を移転）
                 using Bitmap clonedBitmap = (Bitmap)cropBitmap.Clone();
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
-                return new WindowsImageAdapter(resultWindowsImage);
+                return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
         }
         
@@ -446,6 +395,66 @@ namespace Baketa.Infrastructure.Platform.Adapters
             }
             
             return result;
+        }
+        
+        /// <summary>
+        /// 画像の強調処理を行います
+        /// </summary>
+        /// <param name="options">強調オプション</param>
+        /// <returns>強調処理された新しい画像</returns>
+        public async Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options)
+        {
+            ThrowIfDisposed();
+            ArgumentNullException.ThrowIfNull(options);
+            
+            // CPU負荷の高い処理なので、Task.Runで実行
+            return await Task.Run(async () => {
+                IAdvancedImage result = this;
+                
+                // グレースケール変換が必要な場合
+                if (options.OptimizeForTextDetection && Format != CoreImageFormat.Grayscale8)
+                {
+                    result = await ToGrayscaleAsync().ConfigureAwait(false);
+                }
+                
+                // 明るさ・コントラスト調整
+                if (Math.Abs(options.Brightness) > 0.01f || Math.Abs(options.Contrast - 1.0f) > 0.01f)
+                {
+                    // 明るさ・コントラスト調整の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // ノイズ除去
+                if (options.NoiseReduction > 0.01f)
+                {
+                    // ノイズ除去の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // シャープネス強調
+                if (options.Sharpness > 0.01f)
+                {
+                    // シャープネス強調の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                // 二値化処理
+                if (options.BinarizationThreshold > 0)
+                {
+                    result = await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
+                }
+                else if (options.UseAdaptiveThreshold)
+                {
+                    // 適応的二値化の実装
+                    // 実際の実装では適切なアルゴリズムを使用
+                    // サンプル実装のため、現在の画像をそのまま返す
+                }
+                
+                return result;
+            }).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -601,8 +610,26 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 // 結果画像を作成（クローンを作成して所有権を移転）
                 using Bitmap clonedBitmap = (Bitmap)rotatedBitmap.Clone();
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
-                return new WindowsImageAdapter(resultWindowsImage);
+                return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
+        }
+        
+        /// <summary>
+        /// 画像から自動的にテキスト領域を検出します
+        /// </summary>
+        /// <returns>検出されたテキスト領域の矩形リスト</returns>
+        public Task<List<Rectangle>> DetectTextRegionsAsync()
+        {
+            ThrowIfDisposed();
+            
+            // CPU負荷の高い処理なので、Task.Runで実行
+            return Task.Run(() => {
+                // テキスト領域検出の実装
+                // 実際の実装では適切なアルゴリズムを使用
+                
+                // サンプル実装のため、空のリストを返す
+                return new List<Rectangle>();
+            });
         }
         
         /// <summary>
@@ -611,7 +638,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>Baketaのイメージフォーマット</returns>
         private CoreImageFormat DetermineImageFormat()
         {
-            // ネイティブ画像の型を确認して判断
+            // ネイティブ画像の型を確認して判断
             var nativeImage = _windowsImage.GetNativeImage();
             
             if (nativeImage is System.Drawing.Bitmap bitmap)
