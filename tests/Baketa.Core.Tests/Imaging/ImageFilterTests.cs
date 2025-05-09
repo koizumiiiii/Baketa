@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
-using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.Imaging.Filters;
 using Xunit;
 
 namespace Baketa.Core.Tests.Imaging
@@ -17,35 +14,14 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 反転フィルター実装
         /// </summary>
-        private sealed class InvertFilter : ImageFilterBase
+        private sealed class InvertFilter : IImageFilter
         {
-            public override string Name => "反転フィルター";
-            
-            public override string Description => "画像の色を反転（255-値）します";
-            
-            public override FilterCategory Category => FilterCategory.ColorAdjustment;
-            
-            protected override void InitializeDefaultParameters()
-            {
-                // パラメータなし
-            }
-            
-            public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
-            {
-                ArgumentNullException.ThrowIfNull(inputImage);
-                
-                // テスト用のシンプル実装 - バイトデータを取得して反転して返す
-                var imageData = await inputImage.ToByteArrayAsync().ConfigureAwait(false);
-                var result = imageData.Select(b => (byte)(255 - b)).ToArray();
-                
-                // モック実装なので実際には元の画像をそのまま返す
-                return inputImage;
-            }
-            
-            // 互換性のためのレガシーメソッド
             public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
             {
-                ArgumentNullException.ThrowIfNull(imageData);
+                if (imageData == null)
+                {
+                    throw new ArgumentNullException(nameof(imageData));
+                }
                 
                 // 全ピクセルを反転（255-値）
                 return [.. imageData.Select(b => (byte)(255 - b))];
@@ -55,32 +31,14 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 恒等フィルター（何も変更しない）
         /// </summary>
-        private sealed class IdentityFilter : ImageFilterBase
+        private sealed class IdentityFilter : IImageFilter
         {
-            public override string Name => "恒等フィルター";
-            
-            public override string Description => "画像を変更せずにそのまま返します";
-            
-            public override FilterCategory Category => FilterCategory.Effect;
-            
-            protected override void InitializeDefaultParameters()
-            {
-                // パラメータなし
-            }
-            
-            public override Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
-            {
-                ArgumentNullException.ThrowIfNull(inputImage);
-                
-                // 画像をそのまま返す
-                return Task.FromResult(inputImage);
-            }
-            
-            // 互換性のためのレガシーメソッド
             public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
             {
-                ArgumentNullException.ThrowIfNull(imageData);
-                
+                if (imageData == null)
+                {
+                    throw new ArgumentNullException(nameof(imageData));
+                }
                 return [.. imageData];
             }
         }
@@ -88,86 +46,19 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のフィルタークラス - 指定値を返すフィルター
         /// </summary>
-        private sealed class ConstantFilter : ImageFilterBase
+        private sealed class ConstantFilter(byte value) : IImageFilter
         {
-            private readonly byte _value;
-            
-            public ConstantFilter(byte value)
-            {
-                _value = value;
-                InitializeDefaultParameters();
-            }
-            
-            public override string Name => "定数フィルター";
-            
-            public override string Description => $"すべてのピクセルを値 {_value} に設定します";
-            
-            public override FilterCategory Category => FilterCategory.Effect;
-            
-            protected override void InitializeDefaultParameters()
-            {
-                RegisterParameter("Value", _value);
-            }
-            
-            public override Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
-            {
-                ArgumentNullException.ThrowIfNull(inputImage);
-                
-                // 実際のテスト実装では値を置き換えるが、テストなので元の画像を返す
-                return Task.FromResult(inputImage);
-            }
-            
-            // 互換性のためのレガシーメソッド
+        private readonly byte _value = value;
+
             public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
             {
-                ArgumentNullException.ThrowIfNull(imageData);
+                if (imageData == null)
+                {
+                    throw new ArgumentNullException(nameof(imageData));
+                }
                 
                 return [.. Enumerable.Repeat(_value, imageData.Count)];
             }
-        }
-
-        /// <summary>
-        /// モックAdvancedImageクラス
-        /// </summary>
-        private class MockAdvancedImage : IAdvancedImage
-        {
-            private readonly byte[] _data;
-            
-            public MockAdvancedImage(byte[] data, int width = 2, int height = 2)
-            {
-                _data = data;
-                Width = width;
-                Height = height;
-            }
-            
-            public int Width { get; }
-            public int Height { get; }
-            public ImageFormat Format => ImageFormat.Rgb24;
-            
-            public Task<byte[]> ToByteArrayAsync() => Task.FromResult(_data);
-            public IImage Clone() => new MockAdvancedImage(_data, Width, Height);
-            public Task<IImage> ResizeAsync(int _width, int _height) => Task.FromResult<IImage>(this);
-            public Task SaveAsync(string _path, ImageFormat? _format = null) => Task.CompletedTask;
-            public Task<IImage> CropAsync(Rectangle _rectangle) => Task.FromResult<IImage>(this);
-            public Task<byte[]> GetPixelsAsync(int _x, int _y, int _width, int _height) => Task.FromResult(_data);
-            
-            public Color GetPixel(int _x, int _y) => Color.FromArgb(255, 255, 255);
-            public void SetPixel(int _x, int _y, Color _color) { }
-            
-            public Task<IAdvancedImage> ApplyFilterAsync(IImageFilter _filter) => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> _filters) => Task.FromResult<IAdvancedImage>(this);
-            public Task<int[]> ComputeHistogramAsync(ColorChannel _channel = ColorChannel.Luminance) => Task.FromResult(new int[256]);
-            public Task<IAdvancedImage> ToGrayscaleAsync() => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> ToBinaryAsync(byte _threshold) => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> ExtractRegionAsync(Rectangle _rectangle) => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> OptimizeForOcrAsync() => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> OptimizeForOcrAsync(OcrImageOptions _options) => Task.FromResult<IAdvancedImage>(this);
-            public Task<float> CalculateSimilarityAsync(IImage _other) => Task.FromResult(1.0f);
-            public Task<float> EvaluateTextProbabilityAsync(Rectangle _rectangle) => Task.FromResult(0.5f);
-            public Task<IAdvancedImage> RotateAsync(float _degrees) => Task.FromResult<IAdvancedImage>(this);
-            public Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions _options) => Task.FromResult<IAdvancedImage>(this);
-            public Task<List<Rectangle>> DetectTextRegionsAsync() => Task.FromResult(new List<Rectangle>());
-            public void Dispose() { }
         }
 
         [Fact]
@@ -253,69 +144,6 @@ namespace Baketa.Core.Tests.Imaging
 
             // Act & Assert
             Assert.Throws<ArgumentNullException>(() => filter.Apply(imageData!, width, height, stride));
-        }
-        
-        [Fact]
-        public async Task ApplyAsync_InvertFilter_Works()
-        {
-            // Arrange
-            var filter = new InvertFilter();
-            var mockImage = new MockAdvancedImage([0, 100, 200, 255]);
-            
-            // Act
-            var result = await filter.ApplyAsync(mockImage);
-            
-            // Assert
-            Assert.NotNull(result);
-            // モック実装では元の画像を返すので、同一のインスタンスであることを確認
-            Assert.Same(mockImage, result);
-        }
-        
-        [Fact]
-        public async Task ApplyAsync_IdentityFilter_ReturnsSameImage()
-        {
-            // Arrange
-            var filter = new IdentityFilter();
-            var mockImage = new MockAdvancedImage([10, 20, 30, 40]);
-            
-            // Act
-            var result = await filter.ApplyAsync(mockImage);
-            
-            // Assert
-            Assert.NotNull(result);
-            Assert.Same(mockImage, result);
-        }
-        
-        [Fact]
-        public async Task ApplyAsync_ConstantFilter_Works()
-        {
-            // Arrange
-            byte constantValue = 42;
-            var filter = new ConstantFilter(constantValue);
-            var mockImage = new MockAdvancedImage([10, 20, 30, 40]);
-            
-            // Act
-            var result = await filter.ApplyAsync(mockImage);
-            
-            // Assert
-            Assert.NotNull(result);
-            Assert.Same(mockImage, result);
-            
-            // パラメータ取得のテスト
-            var parameters = filter.GetParameters();
-            Assert.Contains("Value", parameters.Keys);
-            Assert.Equal(constantValue, parameters["Value"]);
-        }
-        
-        [Fact]
-        public async Task ApplyAsync_NullInput_ThrowsException()
-        {
-            // Arrange
-            var filter = new IdentityFilter();
-            IAdvancedImage? nullImage = null;
-            
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => filter.ApplyAsync(nullImage!));
         }
     }
 }
