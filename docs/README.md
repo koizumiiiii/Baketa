@@ -31,6 +31,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [モダンC#機能の活用](2-development/coding-standards/modern-csharp.md)
 - [パフォーマンス最適化ガイドライン](2-development/coding-standards/performance.md)
 - [プラットフォーム間相互運用](2-development/coding-standards/platform-interop.md)
+- [.editorconfigガイドライン](2-development/coding-standards/editorconfig-guide.md)
 
 #### 言語機能
 - [C# 12サポートガイド](2-development/language-features/csharp-12-support.md)
@@ -66,6 +67,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [OCR設定UI設計](3-architecture/ocr-system/ocr-settings-ui.md)
 - [OCR実装ガイド](3-architecture/ocr-system/ocr-implementation.md)
 - [OCR前処理システム](3-architecture/ocr-system/preprocessing/index.md)
+- [画像処理フィルター設計と実装](3-architecture/ocr-system/image-filters.md)
 
 #### 翻訳システム
 - [翻訳エンジンインターフェース](3-architecture/translation/translation-interfaces.md)
