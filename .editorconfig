@@ -49,7 +49,7 @@ dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA1816.severity = warning
 
 # 未使用変数/パラメータ関連
-dotnet_diagnostic.IDE0060.severity = suggestion
+dotnet_diagnostic.IDE0060.severity = none
 dotnet_code_quality_unused_parameters = all:suggestion
 dotnet_diagnostic.CS0219.severity = warning
 dotnet_diagnostic.xUnit1026.severity = warning
