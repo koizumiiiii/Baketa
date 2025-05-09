@@ -59,12 +59,13 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             // Arrange
             var profileManager = new PipelineProfileManager(_loggerMock.Object, _fileSystemMock.Object);
 
-            // Act & Assert
+            // Act & Assert - nullの場合はArgumentNullException
+            await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await profileManager.SaveProfileAsync(null!, _pipelineMock.Object));
+                
+            // Act & Assert - 空文字列の場合はArgumentException
             await Assert.ThrowsAsync<ArgumentException>(
                 async () => await profileManager.SaveProfileAsync("", _pipelineMock.Object));
-                
-            await Assert.ThrowsAsync<ArgumentException>(
-                async () => await profileManager.SaveProfileAsync(null!, _pipelineMock.Object));
         }
 
         [Fact]

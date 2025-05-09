@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Baketa.Core.Tests.Imaging.Pipeline
 {
+#pragma warning disable CA1849 // 非同期メソッド内での同期メソッドの使用（テストコードのため抑制）
     public class ImagePipelineTests
     {
         private readonly Mock<ILogger<ImagePipeline>> _loggerMock;
@@ -202,7 +203,7 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
 
             // Act & Assert
             await Assert.ThrowsAsync<OperationCanceledException>(
-                async () => await pipeline.ExecuteAsync(_imageMock.Object, cts.Token));
+                () => pipeline.ExecuteAsync(_imageMock.Object, cts.Token));
         }
 
         [Fact]
@@ -227,15 +228,17 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
 
             // Assert
             Assert.Same(_imageMock.Object, result.Result);
-            // ログ出力の検証
+            
+            // ログ出力の検証 - ステップをスキップしたことがログに記録される
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Warning,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((o, t) => o.ToString().Contains("テストエラー")),
+                    It.Is<It.IsAnyType>((o, t) => o != null && o.ToString()!.Contains("スキップ")), 
                     It.IsAny<Exception>(),
-                    It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
     }
+#pragma warning restore CA1849
 }

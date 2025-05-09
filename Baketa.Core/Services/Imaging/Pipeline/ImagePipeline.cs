@@ -141,12 +141,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// 指定された名前のステップを取得します
         /// </summary>
         /// <param name="name">取得するステップの名前</param>
-        /// <returns>パイプラインステップ</returns>
-        public IImagePipelineStep GetStepByName(string name)
+        /// <returns>パイプラインステップ、見つからない場合はnull</returns>
+        public IImagePipelineStep? GetStepByName(string name)
         {
             ArgumentException.ThrowIfNullOrEmpty(name, nameof(name));
             
-            return _steps.FirstOrDefault(s => s.Name == name) ?? throw new ArgumentException($"名前 '{name}' のステップはパイプラインに存在しません。", nameof(name));
+            // FirstOrDefaultを使用して、見つからない場合はnullを返す
+            return _steps.FirstOrDefault(s => s.Name == name);
         }
 
         /// <summary>
@@ -202,28 +203,80 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 // 各ステップを順番に実行
                 for (int i = 0; i < _steps.Count; i++)
                 {
-                    // キャンセルチェック
-                    if (cancellationToken.IsCancellationRequested)
+                    try
                     {
-                        _logger.LogInformation("パイプラインの実行がキャンセルされました");
-                        cancellationToken.ThrowIfCancellationRequested();
+                        // キャンセルチェック
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            _logger.LogInformation("パイプラインの実行がキャンセルされました");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                        
+                        var step = _steps[i];
+                        _logger.LogDebug("ステップ {StepIndex}/{StepCount} '{StepName}' を実行中...", i + 1, _steps.Count, step.Name);
+                        
+                        // ステップを実行
+                        var stepResult = await step.ExecuteAsync(currentImage, context, cancellationToken).ConfigureAwait(false);
+                        executedStepCount++;
+                        
+                        // 中間結果を保存するかどうかを判断
+                        if (ShouldSaveIntermediateResult(step.Name, context))
+                        {
+                            intermediateResults[step.Name] = stepResult;
+                        }
+                        
+                        // 次のステップの入力として使用
+                        currentImage = stepResult;
                     }
-                    
-                    var step = _steps[i];
-                    _logger.LogDebug("ステップ {StepIndex}/{StepCount} '{StepName}' を実行中...", i + 1, _steps.Count, step.Name);
-                    
-                    // ステップを実行
-                    var stepResult = await step.ExecuteAsync(currentImage, context, cancellationToken).ConfigureAwait(false);
-                    executedStepCount++;
-                    
-                    // 中間結果を保存するかどうかを判断
-                    if (ShouldSaveIntermediateResult(step.Name, context))
+                    catch (OperationCanceledException)
                     {
-                        intermediateResults[step.Name] = stepResult;
+                        // キャンセル例外は上位に伝播
+                        throw;
                     }
-                    
-                    // 次のステップの入力として使用
-                    currentImage = stepResult;
+                    catch (Exception ex)
+                    {
+                        // ステップのエラー処理
+                        context.Logger.LogError(ex, "ステップ '{StepName}' の実行中にエラーが発生しました", _steps[i].Name);
+                        
+                        // エラーハンドリング戦略に基づいた処理
+                        switch (_steps[i].ErrorHandlingStrategy)
+                        {
+                            case StepErrorHandlingStrategy.StopExecution:
+                                throw; // 例外をそのまま伝播
+                                
+                            case StepErrorHandlingStrategy.SkipStep:
+                                context.Logger.LogWarning("ステップ '{StepName}' はスキップされました", _steps[i].Name);
+                                // currentImageをそのまま使用して次のステップへ
+                                break;
+                                
+                            case StepErrorHandlingStrategy.UseFallback:
+                                // フォールバック処理
+                                var fallbackResult = await context.EventListener.OnStepErrorAsync(_steps[i], ex, context).ConfigureAwait(false);
+                                if (fallbackResult != null)
+                                {
+                                    currentImage = fallbackResult;
+                                }
+                                else
+                                {
+                                    context.Logger.LogWarning("ステップ '{StepName}' のフォールバック処理が提供されなかったため、入力をそのまま使用します", _steps[i].Name);
+                                }
+                                break;
+                                
+                            case StepErrorHandlingStrategy.LogAndContinue:
+                                context.Logger.LogWarning("ステップ '{StepName}' でエラーが発生しましたが、処理を継続します", _steps[i].Name);
+                                // currentImageをそのまま使用して次のステップへ
+                                break;
+                                
+                            default:
+                                // 指定されたエラーハンドリング戦略の値が不正
+                                var strategy = _steps[i].ErrorHandlingStrategy;
+                                string paramName = nameof(StepErrorHandlingStrategy);
+                                throw new ArgumentOutOfRangeException(
+                                    paramName,
+                                    strategy,
+                                    $"不明なエラーハンドリング戦略: {strategy}");
+                        }
+                    }
                 }
                 
                 // 結果オブジェクトを作成

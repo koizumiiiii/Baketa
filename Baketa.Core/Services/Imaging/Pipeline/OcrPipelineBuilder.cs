@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Services.Imaging.Filters.OCR;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Pipeline
@@ -11,6 +14,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
     /// <summary>
     /// OCR最適化パイプラインを構築するビルダークラス
     /// </summary>
+#pragma warning disable CA1062 // パラメータの引数チェックはメソッド内で行っているため
     public class OcrPipelineBuilder : IOcrPipelineBuilder
     {
         private readonly IImagePipeline _pipeline;
@@ -61,6 +65,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             _pipeline.ClearSteps();
             
             // 最小限のフィルターを追加
+            ArgumentNullException.ThrowIfNull(_filterFactory);
+            
             var filters = _filterFactory.CreateMinimalOcrPipeline();
             AddFiltersToPipeline(filters);
             
@@ -93,7 +99,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <inheritdoc/>
         public IImagePipeline BuildCustomPipeline(params OcrFilterType[] filterTypes)
         {
-            _logger.LogInformation("カスタムOCRパイプラインを構築しています ({FilterCount}フィルター)", filterTypes.Length);
+            _logger.LogInformation("カスタムOCRパイプラインを構築しています (フィルター数: {FilterCount})", filterTypes.Length);
             
             // パイプラインをクリア
             _pipeline.ClearSteps();
@@ -106,9 +112,14 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 {
                     filters.Add(_filterFactory.CreateFilter(filterType));
                 }
-                catch (Exception ex)
+#pragma warning restore CA1031
+                catch (InvalidOperationException ex)
                 {
                     _logger.LogWarning(ex, "フィルター {FilterType} の作成中にエラーが発生しました。スキップします。", filterType);
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger.LogWarning(ex, "フィルタータイプ {FilterType} が無効です。スキップします。", filterType);
                 }
             }
             
@@ -129,7 +140,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             try
             {
                 // 既存のプロファイルからパイプラインを読み込む
-                var loadedPipeline = await _pipeline.LoadProfileAsync(profileName);
+                var loadedPipeline = await _pipeline.LoadProfileAsync(profileName).ConfigureAwait(false);
                 
                 if (loadedPipeline != null)
                 {
@@ -142,11 +153,33 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                     return BuildStandardPipeline();
                 }
             }
-            catch (Exception ex)
+            catch (FileNotFoundException ex)
             {
-                _logger.LogError(ex, "プロファイル '{ProfileName}' からのパイプライン読み込み中にエラーが発生しました。標準パイプラインを返します", profileName);
+                _logger.LogError(ex, "プロファイル '{ProfileName}' のファイルが見つかりません。標準パイプラインを返します", profileName);
                 return BuildStandardPipeline();
             }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "プロファイル '{ProfileName}' のJSONフォーマットが不正です。標準パイプラインを返します", profileName);
+                return BuildStandardPipeline();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, "プロファイル '{ProfileName}' からのパイプライン読み込み中にアクセス権限エラーが発生しました。標準パイプラインを返します", profileName);
+                return BuildStandardPipeline();
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, "プロファイル '{ProfileName}' からのパイプライン読み込み中にIOエラーが発生しました。標準パイプラインを返します", profileName);
+                return BuildStandardPipeline();
+            }
+#pragma warning disable CA1031 // プロファイルロード中の例外はすべてキャッチし、標準パイプラインを返す必要があるため
+            catch (Exception ex) // すべての例外をキャッチ
+            {
+                _logger.LogError(ex, "プロファイル '{ProfileName}' からのパイプライン読み込み中にエラーが発生しました。標準パイプラインを返します", profileName);
+                return BuildStandardPipeline(); // 例外をスローせず、標準パイプラインを返す
+            }
+#pragma warning restore CA1031
         }
 
         /// <inheritdoc/>
@@ -157,13 +190,28 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             try
             {
                 // 現在のパイプラインをプロファイルとして保存
-                await _pipeline.SaveProfileAsync(profileName);
+                await _pipeline.SaveProfileAsync(profileName).ConfigureAwait(false);
                 _logger.LogInformation("パイプラインをプロファイル '{ProfileName}' として正常に保存しました", profileName);
             }
-            catch (Exception ex)
+            catch (UnauthorizedAccessException ex)
             {
-                _logger.LogError(ex, "パイプラインのプロファイル '{ProfileName}' への保存中にエラーが発生しました", profileName);
-                throw;
+                _logger.LogError(ex, "パイプラインのプロファイル '{ProfileName}' への保存中にアクセス権限エラーが発生しました", profileName);
+                throw new UnauthorizedAccessException($"プロファイル '{profileName}' へのアクセスが拒否されました", ex);
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                _logger.LogError(ex, "プロファイルディレクトリが見つかりません");
+                throw new IOException($"プロファイルの保存先ディレクトリが見つかりません。プロファイル '{profileName}' を保存できません。", ex);
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "パイプラインデータのJSONシリアライズ中にエラーが発生しました");
+                throw new InvalidOperationException($"プロファイル '{profileName}' への保存中にデータ変換エラーが発生しました", ex);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, "パイプラインのプロファイル '{ProfileName}' への保存中にIOエラーが発生しました", profileName);
+                throw new IOException($"プロファイル '{profileName}' への保存に失敗しました", ex);
             }
         }
 
@@ -171,9 +219,14 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// フィルターをパイプラインに追加します
         /// </summary>
         /// <param name="filters">追加するフィルター配列</param>
+#pragma warning disable CA1062 // privateメソッドで引数は内部的に制御されるため
         private void AddFiltersToPipeline(Baketa.Core.Abstractions.Imaging.IImageFilter[] filters)
         {
-            if (filters == null || filters.Length == 0)
+            ArgumentNullException.ThrowIfNull(filters);
+            ArgumentNullException.ThrowIfNull(_pipeline);
+            ArgumentNullException.ThrowIfNull(_logger);
+            
+            if (filters.Length == 0)
             {
                 _logger.LogWarning("追加するフィルターが指定されていません");
                 return;
@@ -181,13 +234,16 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             
             foreach (var filter in filters)
             {
+                ArgumentNullException.ThrowIfNull(filter);
                 // フィルターをパイプラインステップに変換してパイプラインに追加
                 var adapter = new FilterPipelineStepAdapter(filter, _logger);
                 _pipeline.AddStep(adapter);
                 _logger.LogDebug("パイプラインにフィルター '{FilterName}' を追加しました", filter.Name);
             }
             
-            _logger.LogInformation("{Count}個のフィルターをパイプラインに追加しました", filters.Length);
+            _logger.LogInformation("{FilterCount}個のフィルターをパイプラインに追加しました", filters.Length);
         }
+#pragma warning restore CA1062
     }
+#pragma warning restore CA1062
 }
