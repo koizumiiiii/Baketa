@@ -6,6 +6,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
+#pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
+
 namespace Baketa.Core.Services.Imaging.Pipeline
 {
     /// <summary>
@@ -50,9 +52,12 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             IImagePipelineStep trueStep,
             IImagePipelineStep? falseStep = null)
         {
+            ArgumentNullException.ThrowIfNull(condition, nameof(condition));
+            ArgumentNullException.ThrowIfNull(trueStep, nameof(trueStep));
+
             Name = string.IsNullOrEmpty(name) ? $"Conditional({condition.Description})" : name;
-            _condition = condition ?? throw new ArgumentNullException(nameof(condition));
-            _trueStep = trueStep ?? throw new ArgumentNullException(nameof(trueStep));
+            _condition = condition;
+            _trueStep = trueStep;
             _falseStep = falseStep;
             
             Description = _falseStep != null
@@ -77,6 +82,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             try
             {
                 // コンストラクタでnullチェックをしているが、CA1062を満たすためここでも再確認
+                // _condition is already null-checked in constructor, but re-check for CA1062
                 ArgumentNullException.ThrowIfNull(_condition, nameof(_condition));
                 
                 conditionResult = await _condition.EvaluateAsync(input, context).ConfigureAwait(false);
@@ -107,10 +113,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                         return input;
                         
                     default:
-                        throw new ArgumentOutOfRangeException(
-                            nameof(ErrorHandlingStrategy),  // パラメータ名
-                            ErrorHandlingStrategy,        // 実際の値
-                            $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}");  // メッセージ
+                        var errorMsg = $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}";
+                        throw new ArgumentOutOfRangeException(nameof(ErrorHandlingStrategy), ErrorHandlingStrategy, errorMsg);
                 }
             }
             
@@ -141,7 +145,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <param name="value">設定する値</param>
         public void SetParameter(string parameterName, object value)
         {
-            throw new NotSupportedException($"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで設定してください。");
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException("パラメータ名が空またはnullです。", nameof(parameterName));
+            }
+            
+            throw new NotSupportedException(
+                $"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで設定してください。");
         }
 
         /// <summary>
@@ -151,7 +161,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <returns>パラメータ値</returns>
         public object GetParameter(string parameterName)
         {
-            throw new NotSupportedException($"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで取得してください。");
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException("パラメータ名が空またはnullです。", nameof(parameterName));
+            }
+
+            throw new NotSupportedException(
+                $"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで取得してください。");
         }
 
         /// <summary>
@@ -162,7 +178,13 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <returns>パラメータ値</returns>
         public T GetParameter<T>(string parameterName)
         {
-            throw new NotSupportedException($"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで取得してください。");
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException("パラメータ名が空またはnullです。", nameof(parameterName));
+            }
+
+            throw new NotSupportedException(
+                $"条件ステップは直接のパラメータをサポートしていません。パラメータ '{parameterName}' は条件またはサブステップで取得してください。");
         }
 
         /// <summary>
@@ -200,8 +222,10 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 ImageFormat.Png => 4,
                 ImageFormat.Jpeg => 3,
                 ImageFormat.Bmp => 3,
-                _ => throw new ArgumentException($"未サポートの画像フォーマット: {format}", nameof(format))
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, $"未サポートの画像フォーマットです: {format}")
             };
         }
     }
 }
+
+#pragma warning restore CA2208

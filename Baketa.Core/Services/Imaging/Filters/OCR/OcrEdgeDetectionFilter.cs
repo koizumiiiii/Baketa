@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -47,6 +48,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCRエッジ検出フィルターを適用中...");
 
             try
@@ -74,11 +76,11 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 {
                     case "Sobel":
                         // Sobelエッジ検出 - X方向とY方向の勾配を計算
-                        var sobelX = await inputImage.SobelAsync(dx: 1, dy: 0, ksize: apertureSize);
-                        var sobelY = await inputImage.SobelAsync(dx: 0, dy: 1, ksize: apertureSize);
+                        var sobelX = await inputImage.SobelAsync(dx: 1, dy: 0, ksize: apertureSize).ConfigureAwait(false);
+                        var sobelY = await inputImage.SobelAsync(dx: 0, dy: 1, ksize: apertureSize).ConfigureAwait(false);
                         
                         // X方向とY方向の勾配を結合
-                        edgeImage = await sobelX.CombineGradientsAsync(sobelY);
+                        edgeImage = await sobelX.CombineGradientsAsync(sobelY).ConfigureAwait(false);
                         
                         _logger.LogDebug("Sobelエッジ検出を適用しました (アパーチャサイズ:{ApertureSize})", apertureSize);
                         break;
@@ -89,7 +91,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                             threshold1: lowThreshold,
                             threshold2: highThreshold,
                             apertureSize: apertureSize,
-                            L2gradient: l2Gradient);
+                            L2gradient: l2Gradient).ConfigureAwait(false);
                             
                         _logger.LogDebug("Cannyエッジ検出を適用しました (低閾値:{LowThreshold}, 高閾値:{HighThreshold}, アパーチャサイズ:{ApertureSize}, L2勾配:{L2Gradient})",
                             lowThreshold, highThreshold, apertureSize, l2Gradient);
@@ -97,18 +99,18 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
 
                     case "Laplacian":
                         // Laplacianエッジ検出 - 2次微分を使用
-                        edgeImage = await inputImage.LaplacianAsync(ksize: apertureSize);
+                        edgeImage = await inputImage.LaplacianAsync(ksize: apertureSize).ConfigureAwait(false);
                         
                         _logger.LogDebug("Laplacianエッジ検出を適用しました (アパーチャサイズ:{ApertureSize})", apertureSize);
                         break;
 
                     case "Scharr":
                         // Scharrエッジ検出 - Sobelの改良版
-                        var scharrX = await inputImage.ScharrAsync(dx: 1, dy: 0);
-                        var scharrY = await inputImage.ScharrAsync(dx: 0, dy: 1);
+                        var scharrX = await inputImage.ScharrAsync(dx: 1, dy: 0).ConfigureAwait(false);
+                        var scharrY = await inputImage.ScharrAsync(dx: 0, dy: 1).ConfigureAwait(false);
                         
                         // X方向とY方向の勾配を結合
-                        edgeImage = await scharrX.CombineGradientsAsync(scharrY);
+                        edgeImage = await scharrX.CombineGradientsAsync(scharrY).ConfigureAwait(false);
                         
                         _logger.LogDebug("Scharrエッジ検出を適用しました");
                         break;
@@ -124,13 +126,13 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                     if (textModeOnly)
                     {
                         // テキスト検出モードのみ - テキスト特性に合わせた特殊処理
-                        edgeImage = await EnhanceTextEdgesOnlyAsync(edgeImage);
+                        edgeImage = await EnhanceTextEdgesOnlyAsync(edgeImage).ConfigureAwait(false);
                         _logger.LogDebug("テキスト特化のエッジ強調を適用しました");
                     }
                     else
                     {
                         // 一般的なエッジ強調 - OCRに役立つが、すべてのエッジを強調
-                        edgeImage = await EnhanceAllEdgesAsync(edgeImage);
+                        edgeImage = await EnhanceAllEdgesAsync(edgeImage).ConfigureAwait(false);
                         _logger.LogDebug("一般的なエッジ強調を適用しました");
                     }
                 }
@@ -147,13 +149,13 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// テキスト特化のエッジ強調処理
         /// </summary>
-        private async Task<IAdvancedImage> EnhanceTextEdgesOnlyAsync(IAdvancedImage edgeImage)
+        private static async Task<IAdvancedImage> EnhanceTextEdgesOnlyAsync(IAdvancedImage edgeImage)
         {
             // ヒストグラム解析によるテキストエッジ特定
-            var textEdgesMask = await edgeImage.DetectTextLikeEdgesAsync();
+            var textEdgesMask = await edgeImage.DetectTextLikeEdgesAsync().ConfigureAwait(false);
             
             // マスクを使用してテキストエッジのみを強調
-            var enhancedEdges = await edgeImage.EnhanceMaskedRegionsAsync(textEdgesMask, enhancementFactor: 1.5);
+            var enhancedEdges = await edgeImage.EnhanceMaskedRegionsAsync(textEdgesMask, enhancementFactor: 1.5).ConfigureAwait(false);
             
             return enhancedEdges;
         }
@@ -161,10 +163,10 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// すべてのエッジを強調する処理
         /// </summary>
-        private async Task<IAdvancedImage> EnhanceAllEdgesAsync(IAdvancedImage edgeImage)
+        private static async Task<IAdvancedImage> EnhanceAllEdgesAsync(IAdvancedImage edgeImage)
         {
             // シンプルなコントラスト強調でエッジを強調
-            var enhancedEdges = await edgeImage.AdjustContrastAsync(alpha: 1.5, beta: 0);
+            var enhancedEdges = await edgeImage.AdjustContrastAsync(alpha: 1.5, beta: 0).ConfigureAwait(false);
             
             return enhancedEdges;
         }
@@ -172,6 +174,8 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
+            
             // エッジ検出の結果はグレースケール画像
             return new ImageInfo
             {

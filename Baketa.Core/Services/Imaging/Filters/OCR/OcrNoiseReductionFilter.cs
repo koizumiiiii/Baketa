@@ -1,7 +1,9 @@
 using System;
 using System.Threading.Tasks;
+using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -47,6 +49,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCRノイズ除去フィルターを適用中...");
 
             try
@@ -65,32 +68,36 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 if (textAreaOnly)
                 {
                     // テキスト領域を検出
-                    var textRegions = await inputImage.DetectTextRegionsAsync();
+                    var textRegions = await inputImage.DetectTextRegionsAsync().ConfigureAwait(false);
                     
                     if (textRegions.Count == 0)
                     {
                         _logger.LogWarning("テキスト領域が検出されませんでした。画像全体にノイズ除去を適用します。");
                         // テキスト領域が検出されない場合は、画像全体に適用
                         resultImage = await ApplyNoiseReductionMethodAsync(inputImage, method, kernelSize, 
-                            sigmaColor, sigmaSpace, preserveEdges, strengthFactor);
+                            sigmaColor, sigmaSpace, preserveEdges, strengthFactor).ConfigureAwait(false);
                     }
                     else
                     {
                         // 元の画像をクローン
-                        resultImage = inputImage.Clone() as IAdvancedImage;
+                        var clonedImage = inputImage.Clone();
+                        resultImage = clonedImage as IAdvancedImage
+                            ?? throw new InvalidOperationException("Clone結果をIAdvancedImageにキャストできませんでした");
                         
                         // 各テキスト領域に対して処理
                         foreach (var region in textRegions)
                         {
                             // 領域を切り出し
-                            var regionImage = await inputImage.CropAsync(region) as IAdvancedImage;
+                            var croppedImage = await inputImage.CropAsync(region).ConfigureAwait(false);
+                            var regionImage = croppedImage as IAdvancedImage
+                                ?? throw new InvalidOperationException("Crop結果をIAdvancedImageにキャストできませんでした");
                             
                             // ノイズ除去処理を適用
                             var processedRegion = await ApplyNoiseReductionMethodAsync(regionImage, method, kernelSize, 
-                                sigmaColor, sigmaSpace, preserveEdges, strengthFactor);
+                                sigmaColor, sigmaSpace, preserveEdges, strengthFactor).ConfigureAwait(false);
                             
                             // 処理済み領域を元の画像に戻す
-                            await resultImage.ReplaceRegionAsync(region, processedRegion);
+                            await resultImage.ReplaceRegionAsync(region, processedRegion).ConfigureAwait(false);
                         }
                         
                         _logger.LogDebug("{Count}個のテキスト領域にノイズ除去を適用しました", textRegions.Count);
@@ -100,7 +107,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 {
                     // 画像全体に適用
                     resultImage = await ApplyNoiseReductionMethodAsync(inputImage, method, kernelSize, 
-                        sigmaColor, sigmaSpace, preserveEdges, strengthFactor);
+                        sigmaColor, sigmaSpace, preserveEdges, strengthFactor).ConfigureAwait(false);
                 }
 
                 return resultImage;
@@ -126,14 +133,14 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 case "Gaussian":
                     // ガウシアンぼかし
                     double sigma = kernelSize / 5.0 * strengthFactor; // カーネルサイズからシグマを計算
-                    resultImage = await image.GaussianBlurAsync(kernelSize, sigma);
+                    resultImage = await image.GaussianBlurAsync(kernelSize, sigma).ConfigureAwait(false);
                     _logger.LogDebug("ガウシアンぼかしを適用しました (カーネルサイズ:{KernelSize}, シグマ:{Sigma})",
                         kernelSize, sigma);
                     break;
 
                 case "Median":
                     // メディアンフィルタ - 塩コショウノイズに効果的
-                    resultImage = await image.MedianBlurAsync(kernelSize);
+                    resultImage = await image.MedianBlurAsync(kernelSize).ConfigureAwait(false);
                     _logger.LogDebug("メディアンフィルタを適用しました (カーネルサイズ:{KernelSize})", kernelSize);
                     break;
 
@@ -142,7 +149,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                     resultImage = await image.BilateralFilterAsync(
                         d: kernelSize,
                         sigmaColor: sigmaColor * strengthFactor,
-                        sigmaSpace: sigmaSpace * strengthFactor);
+                        sigmaSpace: sigmaSpace * strengthFactor).ConfigureAwait(false);
                     _logger.LogDebug("バイラテラルフィルタを適用しました (D:{D}, SigmaColor:{SigmaColor}, SigmaSpace:{SigmaSpace})",
                         kernelSize, sigmaColor * strengthFactor, sigmaSpace * strengthFactor);
                     break;
@@ -152,7 +159,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                     resultImage = await image.NonLocalMeansFilterAsync(
                         h: 10 * strengthFactor,
                         templateWindowSize: kernelSize,
-                        searchWindowSize: kernelSize * 2 + 1);
+                        searchWindowSize: kernelSize * 2 + 1).ConfigureAwait(false);
                     _logger.LogDebug("Non-Local Meansフィルタを適用しました (H:{H}, TemplateSize:{TemplateSize}, SearchSize:{SearchSize})",
                         10 * strengthFactor, kernelSize, kernelSize * 2 + 1);
                     break;
@@ -165,7 +172,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                         // エッジ保持＋テキスト特化のノイズ除去
                         resultImage = await image.CustomOcrNoiseReductionAsync(
                             strength: strengthFactor,
-                            preserveEdges: true);
+                            preserveEdges: true).ConfigureAwait(false);
                         _logger.LogDebug("エッジ保持型カスタムOCRノイズ除去を適用しました (強度:{Strength})", strengthFactor);
                     }
                     else
@@ -173,7 +180,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                         // テキスト特化のノイズ除去（エッジ保持なし）
                         resultImage = await image.CustomOcrNoiseReductionAsync(
                             strength: strengthFactor,
-                            preserveEdges: false);
+                            preserveEdges: false).ConfigureAwait(false);
                         _logger.LogDebug("標準カスタムOCRノイズ除去を適用しました (強度:{Strength})", strengthFactor);
                     }
                     break;
@@ -190,6 +197,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             // ノイズ除去はフォーマットを変更しない
             return new ImageInfo
             {
@@ -203,7 +211,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// フォーマットからチャネル数を取得
         /// </summary>
-        private int GetChannelCount(ImageFormat format)
+        private static int GetChannelCount(ImageFormat format)
         {
             return format switch
             {

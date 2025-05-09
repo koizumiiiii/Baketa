@@ -7,6 +7,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
+#pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
+
 namespace Baketa.Core.Services.Imaging.Pipeline
 {
     /// <summary>
@@ -100,22 +102,15 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                     case StepErrorHandlingStrategy.UseFallback:
                         // イベントハンドラーのフォールバック処理を使用
                         var fallbackResult = await context.EventListener.OnStepErrorAsync(this, ex, context).ConfigureAwait(false);
-                        if (fallbackResult != null)
-                        {
-                            return fallbackResult;
-                        }
-                        context.Logger.LogWarning("ステップ '{StepName}' のフォールバック処理が提供されなかったため、入力をそのまま返します", Name);
-                        return input;
+                        return fallbackResult ?? input;
                         
                     case StepErrorHandlingStrategy.LogAndContinue:
                         context.Logger.LogWarning("ステップ '{StepName}' でエラーが発生しましたが、処理を継続します", Name);
                         return input;
                         
                     default:
-                        throw new ArgumentOutOfRangeException(
-                            nameof(ErrorHandlingStrategy),  // パラメータ名
-                            ErrorHandlingStrategy,        // 実際の値
-                            $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}");  // メッセージ
+                        var errorMsg = $"不明なエラーハンドリング戦略: {ErrorHandlingStrategy}";
+                        throw new ArgumentOutOfRangeException(nameof(ErrorHandlingStrategy), ErrorHandlingStrategy, errorMsg);
                 }
             }
         }
@@ -127,8 +122,11 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <param name="value">設定する値</param>
         public virtual void SetParameter(string parameterName, object value)
         {
-            ArgumentException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
-            
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException($"パラメータ名が空またはnullです。", nameof(parameterName));
+            }
+
             // パラメータの定義を取得
             var paramDef = _parameterDefinitions.FirstOrDefault(p => p.Name == parameterName)
                 ?? throw new ArgumentException($"パラメータ '{parameterName}' はこのステップでは定義されていません。", nameof(parameterName));
@@ -150,17 +148,18 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <returns>パラメータ値</returns>
         public virtual object GetParameter(string parameterName)
         {
-            ArgumentException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                throw new ArgumentException($"パラメータ名が空またはnullです。", nameof(parameterName));
+            }
             
             if (!_parameters.TryGetValue(parameterName, out var value))
             {
                 // パラメータが設定されていない場合、デフォルト値を取得
-                // パラメータが設定されていない場合、デフォルト値を取得
-                var paramDef = _parameterDefinitions.FirstOrDefault(p => p.Name == parameterName);
+                var paramDef = _parameterDefinitions.FirstOrDefault(p => p.Name == parameterName)
+                    ?? throw new ArgumentException($"パラメータ '{parameterName}' はこのステップでは定義されていません。", nameof(parameterName));
                 
-                return paramDef is null
-                    ? throw new ArgumentException($"パラメータ '{parameterName}' はこのステップでは定義されていません。", nameof(parameterName))
-                    : paramDef.DefaultValue!;
+                return paramDef.DefaultValue!;
             }
             
             return value;
@@ -172,12 +171,17 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <typeparam name="T">取得する型</typeparam>
         /// <param name="parameterName">パラメータ名</param>
         /// <returns>パラメータ値</returns>
+#pragma warning disable IDE0270 // nullチェックの簡素化
         public virtual T GetParameter<T>(string parameterName)
         {
             var value = GetParameter(parameterName);
             
-            return value is T typedValue ? typedValue : throw new InvalidCastException($"パラメータ '{parameterName}' の値を型 {typeof(T).Name} に変換できません。");
+            if (value is T typedValue)
+                return typedValue;
+                
+            throw new InvalidCastException($"パラメータ '{parameterName}' の値を型 {typeof(T).Name} に変換できません。");
         }
+#pragma warning restore IDE0270
         
         /// <summary>
         /// 出力画像情報を取得します
@@ -244,10 +248,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             _parameterDefinitions.Add(parameter);
             
             // デフォルト値を設定
-            if (defaultValue != null)
-            {
-                _parameters[name] = defaultValue;
-            }
+            _parameters[name] = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
         }
         
         /// <summary>
@@ -305,3 +306,5 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         }
     }
 }
+
+#pragma warning restore CA2208

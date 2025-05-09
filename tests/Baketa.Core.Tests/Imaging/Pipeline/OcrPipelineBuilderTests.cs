@@ -158,7 +158,7 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
                 .Returns(_filterMock1.Object);
                 
             _filterFactoryMock.Setup(f => f.CreateFilter(OcrFilterType.Threshold))
-                .Throws(new Exception("テストエラー"));
+                .Throws(new InvalidOperationException("テストエラー"));
                 
             _filterFactoryMock.Setup(f => f.CreateFilter(OcrFilterType.NoiseReduction))
                 .Returns(_filterMock3.Object);
@@ -212,7 +212,7 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             var profileName = "不正なプロファイル";
             
             _pipelineMock.Setup(p => p.LoadProfileAsync(profileName))
-                .ThrowsAsync(new Exception("プロファイル読み込みエラー"));
+                .ThrowsAsync(new InvalidOperationException("プロファイル読み込みエラー"));
                 
             var standardFilters = new[] { _filterMock1.Object };
             _filterFactoryMock.Setup(f => f.CreateStandardOcrPipeline())
@@ -258,10 +258,10 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             var profileName = "不正なプロファイル";
             
             _pipelineMock.Setup(p => p.SaveProfileAsync(profileName))
-                .ThrowsAsync(new Exception("プロファイル保存エラー"));
+                .ThrowsAsync(new InvalidOperationException("プロファイル保存エラー"));
 
             // Act & Assert
-            await Assert.ThrowsAsync<Exception>(
+            await Assert.ThrowsAsync<InvalidOperationException>(
                 async () => await builder.SavePipelineToProfileAsync(profileName));
                 
             _pipelineMock.Verify(p => p.SaveProfileAsync(profileName), Times.Once);

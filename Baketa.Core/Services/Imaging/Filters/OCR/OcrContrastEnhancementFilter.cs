@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR
@@ -46,6 +47,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <inheritdoc/>
         public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
             _logger.LogDebug("OCRコントラスト強調フィルターを適用中...");
 
             try
@@ -59,7 +61,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                 string textEnhanceMode = GetParameterValue<string>("TextEnhanceMode");
 
                 // 1. まず標準的なコントラスト強調を適用
-                var enhancedImage = await inputImage.AdjustContrastAsync(alpha, beta);
+                var enhancedImage = await inputImage.AdjustContrastAsync(alpha, beta).ConfigureAwait(false);
                 _logger.LogDebug("標準コントラスト強調を適用しました (Alpha:{Alpha}, Beta:{Beta})", alpha, beta);
 
                 // 2. 適応的コントラスト強調手法の適用
@@ -71,14 +73,14 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                             // CLAHE (Contrast Limited Adaptive Histogram Equalization)
                             enhancedImage = await enhancedImage.ApplyAdaptiveContrastAsync(
                                 clipLimit: clipLimit,
-                                tileGridSize: tileGridSize);
+                                tileGridSize: tileGridSize).ConfigureAwait(false);
                             _logger.LogDebug("CLAHE適応的コントラスト強調を適用しました (ClipLimit:{ClipLimit}, TileSize:{TileSize})",
                                 clipLimit, tileGridSize);
                             break;
 
                         case "Standard":
                             // 標準的なヒストグラム平坦化
-                            enhancedImage = await enhancedImage.EqualizeHistogramAsync();
+                            enhancedImage = await enhancedImage.EqualizeHistogramAsync().ConfigureAwait(false);
                             _logger.LogDebug("標準ヒストグラム平坦化を適用しました");
                             break;
 
@@ -96,29 +98,29 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
                         case "Auto":
                             // 画像の特性に基づいて自動的に適切なテキスト強調を適用
                             // 平均輝度によってLightかDarkを判断
-                            double avgBrightness = await enhancedImage.GetAverageBrightnessAsync();
+                            double avgBrightness = await enhancedImage.GetAverageBrightnessAsync().ConfigureAwait(false);
                             if (avgBrightness > 127)
                             {
                                 // 明るい背景に暗いテキスト
-                                enhancedImage = await ApplyDarkTextEnhancementAsync(enhancedImage);
+                                enhancedImage = await ApplyDarkTextEnhancementAsync(enhancedImage).ConfigureAwait(false);
                             }
                             else
                             {
                                 // 暗い背景に明るいテキスト
-                                enhancedImage = await ApplyLightTextEnhancementAsync(enhancedImage);
+                                enhancedImage = await ApplyLightTextEnhancementAsync(enhancedImage).ConfigureAwait(false);
                             }
                             _logger.LogDebug("自動テキスト強調を適用しました (平均輝度: {AvgBrightness})", avgBrightness);
                             break;
 
                         case "Light":
                             // 明るいテキスト専用の強調（暗い背景向け）
-                            enhancedImage = await ApplyLightTextEnhancementAsync(enhancedImage);
+                            enhancedImage = await ApplyLightTextEnhancementAsync(enhancedImage).ConfigureAwait(false);
                             _logger.LogDebug("明るいテキスト強調を適用しました");
                             break;
 
                         case "Dark":
                             // 暗いテキスト専用の強調（明るい背景向け）
-                            enhancedImage = await ApplyDarkTextEnhancementAsync(enhancedImage);
+                            enhancedImage = await ApplyDarkTextEnhancementAsync(enhancedImage).ConfigureAwait(false);
                             _logger.LogDebug("暗いテキスト強調を適用しました");
                             break;
 
@@ -140,28 +142,30 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// 明るいテキスト（暗い背景）向けの強調処理
         /// </summary>
-        private async Task<IAdvancedImage> ApplyLightTextEnhancementAsync(IAdvancedImage image)
+        private static async Task<IAdvancedImage> ApplyLightTextEnhancementAsync(IAdvancedImage image)
         {
             // 明るいテキストを強調するカスタム処理
             // この実装はプレースホルダーであり、実際にはIAdvancedImageの拡張によって
             // 提供される必要があります
-            return await image.EnhanceLightTextAsync();
+            return await image.EnhanceLightTextAsync().ConfigureAwait(false);
         }
 
         /// <summary>
         /// 暗いテキスト（明るい背景）向けの強調処理
         /// </summary>
-        private async Task<IAdvancedImage> ApplyDarkTextEnhancementAsync(IAdvancedImage image)
+        private static async Task<IAdvancedImage> ApplyDarkTextEnhancementAsync(IAdvancedImage image)
         {
             // 暗いテキストを強調するカスタム処理
             // この実装はプレースホルダーであり、実際にはIAdvancedImageの拡張によって
             // 提供される必要があります
-            return await image.EnhanceDarkTextAsync();
+            return await image.EnhanceDarkTextAsync().ConfigureAwait(false);
         }
 
         /// <inheritdoc/>
         public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
         {
+            ArgumentNullException.ThrowIfNull(inputImage);
+            
             // コントラスト強調はフォーマットを変更しない
             return new ImageInfo
             {
@@ -175,7 +179,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
         /// <summary>
         /// フォーマットからチャネル数を取得
         /// </summary>
-        private int GetChannelCount(ImageFormat format)
+        private static int GetChannelCount(ImageFormat format)
         {
             return format switch
             {
