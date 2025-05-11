@@ -1,0 +1,3 @@
+# editorconfig for TextRegionDetectorBase.cs
+[*.cs]
+dotnet_diagnostic.CA2254.severity = none

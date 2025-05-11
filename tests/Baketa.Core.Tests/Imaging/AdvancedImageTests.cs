@@ -25,6 +25,15 @@ namespace Baketa.Core.Tests.Imaging
         public int Width { get; }
         public int Height { get; }
         public ImageFormat Format => ImageFormat.Rgba32; // テスト用のデフォルトフォーマット
+        public bool IsGrayscale => false;
+        public int BitsPerPixel => 32;
+        public int ChannelCount => 4;
+        
+        public IAdvancedImage ToGrayscale()
+        {
+            // グレースケール変換の同期版実装
+            return new MockAdvancedImage(Width, Height);
+        }
         
         // コンストラクタ
         public MockAdvancedImage(int width, int height)

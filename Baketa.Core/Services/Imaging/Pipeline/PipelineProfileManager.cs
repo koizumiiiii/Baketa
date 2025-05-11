@@ -374,7 +374,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <summary>
         /// パイプライン構成をシリアライズするためのクラス
         /// </summary>
-        private class PipelineConfiguration
+        private sealed class PipelineConfiguration
         {
             /// <summary>
             /// 中間結果の保存モード
@@ -395,7 +395,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <summary>
         /// パイプラインステップの構成をシリアライズするためのクラス
         /// </summary>
-        private class PipelineStepConfiguration
+        private sealed class PipelineStepConfiguration
         {
             /// <summary>
             /// ステップの名前

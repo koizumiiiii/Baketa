@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
     /// <summary>
     /// テスト用 WindowsImageFactory モック
     /// </summary>
-    internal class WindowsImageFactoryMock : Baketa.Core.Abstractions.Factories.IWindowsImageFactory
+    internal sealed class WindowsImageFactoryMock : Baketa.Core.Abstractions.Factories.IWindowsImageFactory
     {
         public Task<IWindowsImage> CreateFromFileAsync(string filePath) => throw new NotImplementedException();
         public Task<IWindowsImage> CreateFromBytesAsync(byte[] data) => throw new NotImplementedException();
