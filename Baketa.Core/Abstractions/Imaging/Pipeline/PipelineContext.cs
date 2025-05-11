@@ -138,7 +138,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <summary>
         /// 空のイベントリスナー実装
         /// </summary>
-        private class NullPipelineEventListener : IPipelineEventListener
+        private sealed class NullPipelineEventListener : IPipelineEventListener
         {
             public Task OnPipelineStartAsync(IImagePipeline pipeline, IAdvancedImage input) => Task.CompletedTask;
             public Task OnPipelineCompleteAsync(IImagePipeline pipeline, PipelineResult result) => Task.CompletedTask;

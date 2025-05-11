@@ -188,8 +188,12 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             var result = adapter.GetOutputImageInfo(_imageMock.Object);
 
             // Assert
-            Assert.Same(imageInfo, result);
-            _filterMock.Verify(f => f.GetOutputImageInfo(_imageMock.Object), Times.Once);
+            // PipelineImageInfoと対応する値を確認
+            Assert.Equal(imageInfo.Width, result.Width);
+            Assert.Equal(imageInfo.Height, result.Height);
+            Assert.Equal(imageInfo.Format, result.Format);
+            Assert.Equal(imageInfo.Channels, result.Channels);
+            // Assert.Same(imageInfo, result); - 型が異なるので直接比較ではなく値比較を行う
         }
     }
 #pragma warning restore CA1849

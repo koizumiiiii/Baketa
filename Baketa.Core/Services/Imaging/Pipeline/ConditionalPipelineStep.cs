@@ -192,19 +192,21 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="input">入力画像</param>
         /// <returns>出力画像の情報</returns>
-        public ImageInfo GetOutputImageInfo(IAdvancedImage input)
+        public PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
         {
             ArgumentNullException.ThrowIfNull(input);
             
             // 条件の評価結果が不明なので、入力と同じ情報を返す
             // もしくは、trueとfalseの両方のステップの結果を比較して、より大きい方を返すなどの方法も考えられる
-            return new ImageInfo
+            var imageInfo = new Baketa.Core.Abstractions.Imaging.ImageInfo
             {
                 Width = input.Width,
                 Height = input.Height,
                 Format = input.Format,
                 Channels = GetChannelCount(input.Format)
             };
+            
+            return PipelineImageInfo.FromImageInfo(imageInfo, PipelineStage.Processing);
         }
 
         /// <summary>

@@ -31,8 +31,20 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
                 services.Configure<OpenCvOptions>(_ => { /* デフォルト設定を適用 */ });
             }
             
-            // OpenCVラッパーサービスの登録
-            services.TryAddSingleton<IOpenCvWrapper, WindowsOpenCvWrapper>();
+            // 基本サービスの登録
+            services.TryAddSingleton<IWindowsOpenCvLibrary, WindowsOpenCvLibrary>();
+            services.TryAddSingleton<WindowsOpenCvWrapper>();
+            
+            // アダプターの登録
+            services.TryAddSingleton<OpenCvWrapperAdapter>();
+            services.TryAddSingleton<OcrOpenCvWrapperAdapter>();
+            
+            // インターフェース実装の登録
+            services.TryAddSingleton<Baketa.Core.Abstractions.Imaging.IOpenCvWrapper>(sp => 
+                sp.GetRequiredService<OpenCvWrapperAdapter>());
+                
+            services.TryAddSingleton<Baketa.Core.Abstractions.OCR.IOpenCvWrapper>(sp => 
+                sp.GetRequiredService<OcrOpenCvWrapperAdapter>());
             
             return services;
         }
@@ -51,21 +63,21 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// <summary>
         /// MSER検出のデフォルトパラメータ
         /// </summary>
-        public TextDetectionParams DefaultMserParameters { get; set; } = TextDetectionParams.CreateForMethod(TextDetectionMethod.Mser);
+        public TextDetectionParams DefaultMserParameters { get; set; } = TextDetectionParams.CreateForMethod(Baketa.Core.Abstractions.OCR.TextDetectionMethod.Mser);
         
         /// <summary>
         /// 連結成分検出のデフォルトパラメータ
         /// </summary>
-        public TextDetectionParams DefaultConnectedComponentsParameters { get; set; } = TextDetectionParams.CreateForMethod(TextDetectionMethod.ConnectedComponents);
+        public TextDetectionParams DefaultConnectedComponentsParameters { get; set; } = TextDetectionParams.CreateForMethod(Baketa.Core.Abstractions.OCR.TextDetectionMethod.ConnectedComponents);
         
         /// <summary>
         /// 輪郭検出のデフォルトパラメータ
         /// </summary>
-        public TextDetectionParams DefaultContoursParameters { get; set; } = TextDetectionParams.CreateForMethod(TextDetectionMethod.Contours);
+        public TextDetectionParams DefaultContoursParameters { get; set; } = TextDetectionParams.CreateForMethod(Baketa.Core.Abstractions.OCR.TextDetectionMethod.Contours);
         
         /// <summary>
         /// エッジベース検出のデフォルトパラメータ
         /// </summary>
-        public TextDetectionParams DefaultEdgeBasedParameters { get; set; } = TextDetectionParams.CreateForMethod(TextDetectionMethod.EdgeBased);
+        public TextDetectionParams DefaultEdgeBasedParameters { get; set; } = TextDetectionParams.CreateForMethod(Baketa.Core.Abstractions.OCR.TextDetectionMethod.EdgeBased);
     }
 }

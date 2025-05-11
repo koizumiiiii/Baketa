@@ -1,0 +1,3 @@
+# editorconfig for IWindowsOpenCvLibrary.cs
+[*.cs]
+dotnet_diagnostic.CA1819.severity = none

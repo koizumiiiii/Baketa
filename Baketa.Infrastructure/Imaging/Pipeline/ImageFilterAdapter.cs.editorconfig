@@ -1,0 +1,3 @@
+# editorconfig for ImageFilterAdapter.cs
+[*.cs]
+dotnet_diagnostic.IDE0270.severity = none

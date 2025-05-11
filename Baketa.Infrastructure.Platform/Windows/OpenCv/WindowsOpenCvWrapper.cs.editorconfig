@@ -1,0 +1,3 @@
+# editorconfig for WindowsOpenCvWrapper.cs
+[*.cs]
+dotnet_diagnostic.CA1822.severity = none

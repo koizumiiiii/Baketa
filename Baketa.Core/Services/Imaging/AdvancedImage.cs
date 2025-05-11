@@ -16,6 +16,27 @@ namespace Baketa.Core.Services.Imaging
         private readonly byte[] _rawPixelData;
         private readonly int _stride;
         
+        /// <inheritdoc/>
+        public bool IsGrayscale => Format == ImageFormat.Grayscale8;
+        
+        /// <inheritdoc/>
+        public int BitsPerPixel => Format switch
+        {
+            ImageFormat.Grayscale8 => 8,
+            ImageFormat.Rgb24 => 24,
+            ImageFormat.Rgba32 => 32,
+            _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
+        };
+        
+        /// <inheritdoc/>
+        public int ChannelCount => Format switch
+        {
+            ImageFormat.Grayscale8 => 1,
+            ImageFormat.Rgb24 => 3,
+            ImageFormat.Rgba32 => 4,
+            _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
+        };
+        
         /// <summary>
         /// コンストラクタ
         /// </summary>
@@ -192,6 +213,29 @@ namespace Baketa.Core.Services.Imaging
                 
                 return (IAdvancedImage)new AdvancedImage(resultData, Width, Height, ImageFormat.Grayscale8, Width);
             });
+        }
+        
+        /// <inheritdoc/>
+        public IAdvancedImage ToGrayscale()
+        {
+            ThrowIfDisposed();
+            
+            if (Format == ImageFormat.Grayscale8)
+                return this.Clone() as IAdvancedImage;
+                
+            byte[] resultData = new byte[Width * Height];
+            
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    Color pixel = GetPixel(x, y);
+                    byte gray = (byte)((0.299 * pixel.R) + (0.587 * pixel.G) + (0.114 * pixel.B));
+                    resultData[y * Width + x] = gray;
+                }
+            }
+            
+            return new AdvancedImage(resultData, Width, Height, ImageFormat.Grayscale8, Width);
         }
         
         /// <inheritdoc/>

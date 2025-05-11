@@ -23,6 +23,11 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <summary>
         /// エラーをログに記録して続行
         /// </summary>
-        LogAndContinue
+        LogAndContinue,
+
+    /// <summary>
+    /// エラーにかかわらず処理を続行
+    /// </summary>
+    ContinueExecution
     }
 }

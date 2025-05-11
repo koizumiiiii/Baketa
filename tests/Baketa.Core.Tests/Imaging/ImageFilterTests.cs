@@ -143,6 +143,11 @@ namespace Baketa.Core.Tests.Imaging
             public int Width { get; }
             public int Height { get; }
             public ImageFormat Format => ImageFormat.Rgb24;
+            public bool IsGrayscale => false;
+            public int BitsPerPixel => 24;
+            public int ChannelCount => 3;
+            
+            public IAdvancedImage ToGrayscale() => new MockAdvancedImage(_data, Width, Height);
             
             public Task<byte[]> ToByteArrayAsync() => Task.FromResult(_data);
             public IImage Clone() => new MockAdvancedImage(_data, Width, Height);

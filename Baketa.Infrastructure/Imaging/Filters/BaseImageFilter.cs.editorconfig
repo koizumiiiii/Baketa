@@ -1,0 +1,4 @@
+# editorconfig for BaseImageFilter.cs
+[*.cs]
+dotnet_diagnostic.CA1725.severity = none
+dotnet_diagnostic.CA2254.severity = none

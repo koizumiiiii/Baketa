@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+// 名前空間の衝突を避けるためにエイリアスを使用
+using CoreImageFilter = Baketa.Core.Abstractions.Imaging.IImageFilter;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
@@ -12,11 +14,11 @@ using Microsoft.Extensions.Logging;
 namespace Baketa.Core.Services.Imaging.Pipeline
 {
     /// <summary>
-    /// IImageFilterをIImagePipelineStepに適応させるアダプター
+    /// Baketa.Core.Abstractions.Imaging.IImageFilterをIImagePipelineStepに適応させるアダプター
     /// </summary>
     public class FilterPipelineStepAdapter : IImagePipelineStep
     {
-        private readonly IImageFilter _filter;
+        private readonly CoreImageFilter _filter;
         private readonly List<PipelineStepParameter> _parameterDefinitions = new();
         private readonly ILogger _logger;
         
@@ -45,7 +47,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="filter">適応させるフィルター</param>
         /// <param name="logger">ロガー</param>
-        public FilterPipelineStepAdapter(IImageFilter filter, ILogger logger)
+        public FilterPipelineStepAdapter(CoreImageFilter filter, ILogger logger)
         {
             _filter = filter ?? throw new ArgumentNullException(nameof(filter));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,7 +60,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// 新しいFilterPipelineStepAdapterを作成します
         /// </summary>
         /// <param name="filter">適応させるフィルター</param>
-        public FilterPipelineStepAdapter(IImageFilter filter) : this(filter, new Microsoft.Extensions.Logging.Abstractions.NullLogger<FilterPipelineStepAdapter>())
+        public FilterPipelineStepAdapter(CoreImageFilter filter) : this(filter, new Microsoft.Extensions.Logging.Abstractions.NullLogger<FilterPipelineStepAdapter>())
         {
         }
         
@@ -201,12 +203,21 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="input">入力画像</param>
         /// <returns>出力画像の情報</returns>
-        public ImageInfo GetOutputImageInfo(IAdvancedImage input)
+        public PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
         {
             ArgumentNullException.ThrowIfNull(input);
             
             // フィルターの出力情報を取得
-            return _filter.GetOutputImageInfo(input);
+            var imageInfo = _filter.GetOutputImageInfo(input);
+            
+            // ImageInfo を PipelineImageInfo に変換
+            return new PipelineImageInfo(
+                imageInfo.Width,
+                imageInfo.Height,
+                imageInfo.Channels,
+                imageInfo.Format,
+                PipelineStage.Processing
+            );
         }
 
         /// <summary>
