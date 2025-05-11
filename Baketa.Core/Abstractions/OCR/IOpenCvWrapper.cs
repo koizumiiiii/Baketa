@@ -80,12 +80,62 @@ namespace Baketa.Core.Abstractions.OCR
         Task<IAdvancedImage> ApplyMorphologyAsync(IAdvancedImage source, MorphType morphType, Size kernelSize, int iterations = 1);
         
         /// <summary>
-        /// 画像からテキスト領域の候補となる矩形を検出します
+        /// MSER領域を検出します
         /// </summary>
-        /// <param name="source">元画像</param>
-        /// <param name="method">テキスト検出方法</param>
-        /// <param name="parameters">テキスト検出パラメータ（nullの場合はデフォルト値が使用される）</param>
-        /// <returns>検出された矩形のリスト</returns>
-        Task<IReadOnlyList<Rectangle>> DetectTextRegionsAsync(IAdvancedImage source, TextDetectionMethod method, TextDetectionParams? parameters = null);
+        /// <param name="image">検出対象の画像</param>
+        /// <param name="parameters">検出パラメータ</param>
+        /// <returns>検出された領域のポイント配列のリスト</returns>
+        IReadOnlyList<Point[]> DetectMSERRegions(IAdvancedImage image, Dictionary<string, object> parameters);
+        
+        /// <summary>
+        /// ポイント配列に基づくバウンディングボックスを取得します
+        /// </summary>
+        /// <param name="points">ポイント配列</param>
+        /// <returns>バウンディングボックス</returns>
+        Rectangle GetBoundingRect(Point[] points);
+        
+        /// <summary>
+        /// Cannyエッジ検出を実行します
+        /// </summary>
+        /// <param name="image">元画像</param>
+        /// <param name="threshold1">下側閾値</param>
+        /// <param name="threshold2">上側閾値</param>
+        /// <returns>エッジ検出結果画像</returns>
+        IAdvancedImage CannyEdgeDetection(IAdvancedImage image, int threshold1, int threshold2);
+        
+        /// <summary>
+        /// ストローク幅変換を適用します
+        /// </summary>
+        /// <param name="grayImage">グレースケール画像</param>
+        /// <param name="edgeImage">エッジ検出結果画像</param>
+        /// <param name="minStrokeWidth">最小ストローク幅</param>
+        /// <param name="maxStrokeWidth">最大ストローク幅</param>
+        /// <returns>ストローク幅変換結果画像</returns>
+        IAdvancedImage StrokeWidthTransform(IAdvancedImage grayImage, IAdvancedImage edgeImage, float minStrokeWidth, float maxStrokeWidth);
+        
+        /// <summary>
+        /// 連結成分を抽出します
+        /// </summary>
+        /// <param name="image">元画像</param>
+        /// <param name="minComponentSize">最小成分サイズ</param>
+        /// <param name="maxComponentSize">最大成分サイズ</param>
+        /// <returns>抽出された連結成分のリスト</returns>
+        IReadOnlyList<Point[]> ExtractConnectedComponents(IAdvancedImage image, int minComponentSize, int maxComponentSize);
+        
+        /// <summary>
+        /// ストローク幅の分散を計算します
+        /// </summary>
+        /// <param name="swtImage">ストローク幅変換画像</param>
+        /// <param name="region">領域のポイント配列</param>
+        /// <returns>ストローク幅の分散</returns>
+        float CalculateStrokeWidthVariance(IAdvancedImage swtImage, Point[] region);
+        
+        /// <summary>
+        /// 平均ストローク幅を計算します
+        /// </summary>
+        /// <param name="swtImage">ストローク幅変換画像</param>
+        /// <param name="region">領域のポイント配列</param>
+        /// <returns>平均ストローク幅</returns>
+        float CalculateMeanStrokeWidth(IAdvancedImage swtImage, Point[] region);
     }
 }

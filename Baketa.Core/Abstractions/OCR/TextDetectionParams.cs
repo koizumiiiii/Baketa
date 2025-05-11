@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
 namespace Baketa.Core.Abstractions.OCR
 {
     /// <summary>
@@ -6,95 +10,159 @@ namespace Baketa.Core.Abstractions.OCR
     public class TextDetectionParams
     {
         /// <summary>
-        /// MSER: 領域の安定性を決定するパラメータ (5-10が一般的)
+        /// パラメータのディクショナリ
         /// </summary>
-        public int MserDelta { get; set; } = 5;
+        public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
         
         /// <summary>
-        /// MSER: 検出する領域の最小面積
+        /// 検出方法
         /// </summary>
-        public int MserMinArea { get; set; } = 60;
+        public TextDetectionMethod Method { get; set; }
+        
+        // テキスト領域の基本なパラメータ
         
         /// <summary>
-        /// MSER: 検出する領域の最大面積
+        /// 最小幅
         /// </summary>
-        public int MserMaxArea { get; set; } = 14400;
+        public int MinWidth => GetOrDefault<int>("MinWidth", 10);
         
         /// <summary>
-        /// 検出された領域の最小アスペクト比 (幅/高さ)
+        /// 最小高さ
         /// </summary>
-        public float MinAspectRatio { get; set; } = 0.1f;
+        public int MinHeight => GetOrDefault<int>("MinHeight", 10);
         
         /// <summary>
-        /// 検出された領域の最大アスペクト比 (幅/高さ)
+        /// 最小アスペクト比
         /// </summary>
-        public float MaxAspectRatio { get; set; } = 10.0f;
+        public float MinAspectRatio => GetOrDefault<float>("MinAspectRatio", 0.1f);
         
         /// <summary>
-        /// 検出された領域の最小幅（ピクセル）
+        /// 最大アスペクト比
         /// </summary>
-        public int MinWidth { get; set; } = 10;
+        public float MaxAspectRatio => GetOrDefault<float>("MaxAspectRatio", 10.0f);
         
         /// <summary>
-        /// 検出された領域の最小高さ（ピクセル）
+        /// 統合維持閾値
         /// </summary>
-        public int MinHeight { get; set; } = 10;
+        public float MergeThreshold => GetOrDefault<float>("MergeThreshold", 0.5f);
+        
+        // MSER特有パラメータ
         
         /// <summary>
-        /// 重複する領域をマージするための閾値（0.0～1.0）
-        /// 値が大きいほど、より重複度の高い領域のみがマージされる
+        /// MSERのDeltaパラメータ
         /// </summary>
-        public float MergeThreshold { get; set; } = 0.5f;
+        public int MserDelta => GetOrDefault<int>("delta", 5);
         
         /// <summary>
-        /// デフォルトパラメータでインスタンスを作成します
+        /// MSERの最小領域サイズ
         /// </summary>
-        public TextDetectionParams()
+        public int MserMinArea => GetOrDefault<int>("minArea", 60);
+        
+        /// <summary>
+        /// MSERの最大領域サイズ
+        /// </summary>
+        public int MserMaxArea => GetOrDefault<int>("maxArea", 14400);
+        
+        // SWT特有パラメータ
+        
+        /// <summary>
+        /// 暗い背景上の明るいテキストかどうか
+        /// </summary>
+        public bool DarkTextOnLight => GetOrDefault<bool>("darkTextOnLight", true);
+        
+        /// <summary>
+        /// ストローク幅比率
+        /// </summary>
+        public float StrokeWidthRatio => GetOrDefault<float>("strokeWidthRatio", 3.0f);
+        
+        /// <summary>
+        /// 指定した検出方法のデフォルトパラメータを作成します
+        /// </summary>
+        /// <param name="method">検出方法</param>
+        /// <returns>デフォルトパラメータ</returns>
+        public static TextDetectionParams CreateForMethod(TextDetectionMethod method)
         {
-            // デフォルト値はプロパティ初期化子で設定
+            var parameters = new TextDetectionParams { Method = method };
+            
+            // 初期化は既存のプロパティに依存しているため、最初に共通パラメータを定義
+            parameters.Parameters["MinWidth"] = 10;
+            parameters.Parameters["MinHeight"] = 10;
+            parameters.Parameters["MinAspectRatio"] = 0.1f;
+            parameters.Parameters["MaxAspectRatio"] = 10.0f;
+            parameters.Parameters["MergeThreshold"] = 0.5f;
+            
+            switch (method)
+            {
+                case TextDetectionMethod.Mser:
+                    parameters.Parameters["delta"] = 5;
+                    parameters.Parameters["minArea"] = 60;
+                    parameters.Parameters["maxArea"] = 14400;
+                    parameters.Parameters["maxVariation"] = 0.25;
+                    parameters.Parameters["minDiversity"] = 0.2;
+                    break;
+                    
+                case TextDetectionMethod.ConnectedComponents:
+                    parameters.Parameters["minSize"] = 10;
+                    parameters.Parameters["maxSize"] = 10000;
+                    parameters.Parameters["connectivity"] = 8;
+                    break;
+                    
+                case TextDetectionMethod.Contours:
+                    parameters.Parameters["mode"] = 1; // RETR_EXTERNAL
+                    parameters.Parameters["method"] = 2; // CHAIN_APPROX_SIMPLE
+                    parameters.Parameters["minArea"] = 50;
+                    parameters.Parameters["maxArea"] = 10000;
+                    break;
+                    
+                case TextDetectionMethod.EdgeBased:
+                    parameters.Parameters["threshold1"] = 100;
+                    parameters.Parameters["threshold2"] = 200;
+                    parameters.Parameters["apertureSize"] = 3;
+                    break;
+                    
+                case TextDetectionMethod.Swt:
+                    parameters.Parameters["darkTextOnLight"] = true;
+                    parameters.Parameters["strokeWidthRatio"] = 3.0f;
+                    parameters.Parameters["minStrokeWidth"] = 2.0f;
+                    parameters.Parameters["maxStrokeWidth"] = 20.0f;
+                    break;
+                    
+                case TextDetectionMethod.Combined:
+                    // 複合メソッドのデフォルトはMSERと連結成分の組み合わせ
+                    parameters.Parameters["methods"] = new[] { TextDetectionMethod.Mser, TextDetectionMethod.ConnectedComponents };
+                    parameters.Parameters["weights"] = new[] { 0.6, 0.4 };
+                    break;
+            }
+            
+            return parameters;
         }
         
         /// <summary>
-        /// テキスト検出方法に応じたパラメータを設定したインスタンスを作成します
+        /// ディクショナリから値を取得し、存在しない場合はデフォルト値を返します
         /// </summary>
-        /// <param name="method">テキスト検出方法</param>
-        /// <returns>最適化されたパラメータを持つインスタンス</returns>
-        public static TextDetectionParams CreateForMethod(TextDetectionMethod method)
+        private T GetOrDefault<T>(string key, T defaultValue)
         {
-            return method switch
+            if (Parameters.TryGetValue(key, out var value))
             {
-                TextDetectionMethod.Mser => new TextDetectionParams
+                try
                 {
-                    MserDelta = 5,
-                    MserMinArea = 60,
-                    MserMaxArea = 14400,
-                    MinAspectRatio = 0.1f,
-                    MaxAspectRatio = 10.0f
-                },
-                TextDetectionMethod.ConnectedComponents => new TextDetectionParams
+                    return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
+                }
+                catch (InvalidCastException)
                 {
-                    MinWidth = 5,
-                    MinHeight = 5,
-                    MinAspectRatio = 0.1f,
-                    MaxAspectRatio = 15.0f
-                },
-                TextDetectionMethod.Contours => new TextDetectionParams
+                    return defaultValue;
+                }
+                catch (FormatException)
                 {
-                    MinWidth = 8,
-                    MinHeight = 8,
-                    MinAspectRatio = 0.2f,
-                    MaxAspectRatio = 8.0f
-                },
-                TextDetectionMethod.EdgeBased => new TextDetectionParams
+                    return defaultValue;
+                }
+                catch (OverflowException)
                 {
-                    MinWidth = 10,
-                    MinHeight = 10,
-                    MinAspectRatio = 0.2f,
-                    MaxAspectRatio = 5.0f,
-                    MergeThreshold = 0.6f
-                },
-                _ => new TextDetectionParams()
-            };
+                    return defaultValue;
+                }
+            }
+            
+            return defaultValue;
         }
     }
 }
