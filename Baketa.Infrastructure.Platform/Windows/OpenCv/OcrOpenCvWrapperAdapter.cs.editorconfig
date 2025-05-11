@@ -1,0 +1,3 @@
+# editorconfig for OcrOpenCvWrapperAdapter.cs
+[*.cs]
+dotnet_diagnostic.CA2263.severity = none

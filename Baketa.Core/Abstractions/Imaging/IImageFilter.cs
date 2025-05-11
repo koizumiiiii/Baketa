@@ -61,6 +61,6 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         /// <param name="inputImage">入力画像</param>
         /// <returns>出力画像の情報</returns>
-        ImageInfo GetOutputImageInfo(IAdvancedImage inputImage);
+        Baketa.Core.Abstractions.Imaging.ImageInfo GetOutputImageInfo(IAdvancedImage inputImage);
     }
 }

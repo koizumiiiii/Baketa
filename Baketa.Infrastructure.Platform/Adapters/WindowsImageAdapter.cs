@@ -52,6 +52,33 @@ namespace Baketa.Infrastructure.Platform.Adapters
         public CoreImageFormat Format => DetermineImageFormat();
         
         /// <summary>
+        /// 画像がグレースケールかどうかを返します
+        /// </summary>
+        public bool IsGrayscale => Format == CoreImageFormat.Grayscale8;
+        
+        /// <summary>
+        /// ピクセルあたりのビット数
+        /// </summary>
+        public int BitsPerPixel => Format switch
+        {
+            CoreImageFormat.Grayscale8 => 8,
+            CoreImageFormat.Rgb24 => 24,
+            CoreImageFormat.Rgba32 => 32,
+            _ => 0
+        };
+        
+        /// <summary>
+        /// チャンネル数
+        /// </summary>
+        public int ChannelCount => Format switch
+        {
+            CoreImageFormat.Grayscale8 => 1,
+            CoreImageFormat.Rgb24 => 3,
+            CoreImageFormat.Rgba32 => 4,
+            _ => 0
+        };
+        
+        /// <summary>
         /// 画像のクローンを作成します
         /// </summary>
         /// <returns>クローンされた画像</returns>
@@ -220,7 +247,7 @@ namespace Baketa.Infrastructure.Platform.Adapters
         }
         
         /// <summary>
-        /// 画像をグレースケールに変換します
+        /// 画像をグレースケールに変換します (非同期版)
         /// </summary>
         /// <returns>グレースケール変換された新しい画像</returns>
         public async Task<IAdvancedImage> ToGrayscaleAsync()
@@ -251,6 +278,38 @@ namespace Baketa.Infrastructure.Platform.Adapters
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
                 return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 画像をグレースケールに変換します
+        /// </summary>
+        /// <returns>グレースケール変換された新しい画像</returns>
+        public IAdvancedImage ToGrayscale()
+        {
+            ThrowIfDisposed();
+            
+            if (_windowsImage.GetNativeImage() is not Bitmap bitmap)
+            {
+                throw new InvalidOperationException("グレースケール変換はBitmapでのみサポートされています");
+            }
+            
+            using var result = new Bitmap(bitmap.Width, bitmap.Height);
+
+            for (int y = 0; y < bitmap.Height; y++)
+            {
+                for (int x = 0; x < bitmap.Width; x++)
+                {
+                    var pixel = bitmap.GetPixel(x, y);
+                    int gray = (int)(0.299f * pixel.R + 0.587f * pixel.G + 0.114f * pixel.B);
+                    var grayColor = Color.FromArgb(pixel.A, gray, gray, gray);
+                    result.SetPixel(x, y, grayColor);
+                }
+            }
+
+            // 結果画像を作成（クローンを作成して所有権を移転）
+            using Bitmap clonedBitmap = (Bitmap)result.Clone();
+            var resultWindowsImage = new WindowsImage(clonedBitmap);
+            return new WindowsImageAdapter(resultWindowsImage);
         }
         
         /// <summary>

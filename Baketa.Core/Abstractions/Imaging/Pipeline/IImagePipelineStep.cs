@@ -66,6 +66,6 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         /// <param name="input">入力画像</param>
         /// <returns>出力画像の情報</returns>
-        ImageInfo GetOutputImageInfo(IAdvancedImage input);
+        PipelineImageInfo GetOutputImageInfo(IAdvancedImage input);
     }
 }

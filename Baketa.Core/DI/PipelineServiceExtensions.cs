@@ -77,7 +77,7 @@ namespace Baketa.Core.DI
     /// <summary>
     /// AND条件のファクトリークラス
     /// </summary>
-    internal class AndConditionFactory : IAndConditionFactory
+    internal sealed class AndConditionFactory : IAndConditionFactory
     {
         /// <inheritdoc/>
         public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
@@ -103,7 +103,7 @@ namespace Baketa.Core.DI
     /// <summary>
     /// OR条件のファクトリークラス
     /// </summary>
-    internal class OrConditionFactory : IOrConditionFactory
+    internal sealed class OrConditionFactory : IOrConditionFactory
     {
         /// <inheritdoc/>
         public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
@@ -128,7 +128,7 @@ namespace Baketa.Core.DI
     /// <summary>
     /// NOT条件のファクトリークラス
     /// </summary>
-    internal class NotConditionFactory : INotConditionFactory
+    internal sealed class NotConditionFactory : INotConditionFactory
     {
         /// <inheritdoc/>
         public IPipelineCondition Create(IPipelineCondition condition)
@@ -155,7 +155,7 @@ namespace Baketa.Core.DI
     /// <summary>
     /// 画像プロパティ条件のファクトリークラス
     /// </summary>
-    internal class ImagePropertyConditionFactory : IImagePropertyConditionFactory
+    internal sealed class ImagePropertyConditionFactory : IImagePropertyConditionFactory
     {
         /// <inheritdoc/>
         public IPipelineCondition Create(string propertyName, ComparisonOperator comparisonOperator, object value)

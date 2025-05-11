@@ -48,10 +48,31 @@ namespace Baketa.Core.Abstractions.Imaging
         Task<int[]> ComputeHistogramAsync(ColorChannel channel = ColorChannel.Luminance);
         
         /// <summary>
-        /// 画像をグレースケールに変換します
+        /// 画像がグレースケールかどうかを返します
+        /// </summary>
+        bool IsGrayscale { get; }
+        
+        /// <summary>
+        /// 画像をグレースケールに変換します (非同期版)
         /// </summary>
         /// <returns>グレースケール変換された新しい画像</returns>
         Task<IAdvancedImage> ToGrayscaleAsync();
+        
+        /// <summary>
+        /// 画像をグレースケールに変換します
+        /// </summary>
+        /// <returns>グレースケール変換された新しい画像</returns>
+        IAdvancedImage ToGrayscale();
+        
+        /// <summary>
+        /// ピクセルあたりのビット数
+        /// </summary>
+        int BitsPerPixel { get; }
+        
+        /// <summary>
+        /// チャンネル数
+        /// </summary>
+        int ChannelCount { get; }
         
         /// <summary>
         /// 画像を二値化します

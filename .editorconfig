@@ -1,6 +1,3 @@
-# IDE0270: Nullチェックの簡素化
-dotnet_diagnostic.IDE0270.severity = none
-
 # EditorConfig is awesome: https://EditorConfig.org
 
 # top-most EditorConfig file
@@ -15,6 +12,9 @@ dotnet_diagnostic.IDE0028.severity = silent
 # CA1515: 内部クラスの警告拒否
 dotnet_diagnostic.CA1515.severity = none
 
+# CA1812: 明らかにインスタンス化されない内部クラス
+dotnet_diagnostic.CA1812.severity = none
+
 # CA1848: LoggerMessageデリゲートの使用に関する警告抑制
 dotnet_diagnostic.CA1848.severity = none
 
@@ -22,7 +22,7 @@ dotnet_diagnostic.CA1848.severity = none
 dotnet_diagnostic.IDE0290.severity = silent
 
 # IDE0031: Nullチェックの簡素化に関する警告抑制
-dotnet_diagnostic.IDE0031.severity = suggestion
+dotnet_diagnostic.IDE0031.severity = none
 
 # IDE0090: new式の簡素化
 dotnet_style_object_initializer = true:silent
@@ -40,7 +40,6 @@ dotnet_style_coalesce_expression = true:warning
 dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
 dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
 dotnet_style_prefer_auto_properties = true:warning
-dotnet_diagnostic.IDE0270.severity = warning
 
 # usingステートメント関連の設定
 csharp_using_directive_placement = outside_namespace:warning
@@ -61,6 +60,35 @@ dotnet_diagnostic.xUnit1026.severity = warning
 dotnet_style_readonly_field = true:warning
 dotnet_diagnostic.IDE0044.severity = warning
 
+# 警告抑制一覧 - 全プロジェクト共通
+
+# CA1711: Wrapperサフィックスに関する警告抜別
+dotnet_diagnostic.CA1711.severity = none
+
+# CA1721: "Get"で始まるメソッド名の警告抜別 (リファクタリング計画が必要)
+dotnet_diagnostic.CA1721.severity = none
+
+# CA2227: 書き込み可能なコレクションプロパティ
+dotnet_diagnostic.CA2227.severity = none
+
+# CA1725: オーバーライド階層でのパラメーター名の不一致
+dotnet_diagnostic.CA1725.severity = none
+
+# CA2254: ログメッセージテンプレートの動的生成
+dotnet_diagnostic.CA2254.severity = none
+
+# CA1822: インスタンスメソッドをstaticにマーク可能
+dotnet_diagnostic.CA1822.severity = none
+
+# CA1819: プロパティで返される配列は書き込み禁止でない
+dotnet_diagnostic.CA1819.severity = none
+
+# CA2263: ジェネリックオーバーロードの使用
+dotnet_diagnostic.CA2263.severity = none
+
+# IDE0270: Nullチェックの簡素化
+dotnet_diagnostic.IDE0270.severity = none
+
 # プロジェクト固有の設定
 [*.cs]
 # 基本設定（プロジェクトのコーディング規約に合わせて調整）
@@ -70,3 +98,16 @@ end_of_line = crlf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+# 特定ファイルに対する設定
+[*OpenCvWrapper.cs]
+dotnet_diagnostic.CA1711.severity = none
+
+[*ImageFilter*.cs]
+dotnet_diagnostic.CA1721.severity = none
+
+[*TextRegionDetector*.cs]
+dotnet_diagnostic.CA1721.severity = none
+
+[*ImagePipelineTests.cs]
+dotnet_diagnostic.CA1721.severity = none

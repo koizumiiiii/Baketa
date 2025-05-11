@@ -1,10 +1,9 @@
 using System;
-using System.Collections.Generic;
 
 namespace Baketa.Core.Abstractions.Imaging.Pipeline
 {
     /// <summary>
-    /// パイプラインステップのパラメータを表すクラス
+    /// パイプラインステップのパラメータ定義を表すクラス
     /// </summary>
     public class PipelineStepParameter
     {
@@ -29,139 +28,133 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         public object? DefaultValue { get; }
         
         /// <summary>
-        /// 最小値（数値パラメータの場合）
+        /// パラメータが必須かどうか
+        /// </summary>
+        public bool IsRequired { get; }
+        
+        /// <summary>
+        /// パラメータの最小値（数値型パラメータのみ）
         /// </summary>
         public object? MinValue { get; }
         
         /// <summary>
-        /// 最大値（数値パラメータの場合）
+        /// パラメータの最大値（数値型パラメータのみ）
         /// </summary>
         public object? MaxValue { get; }
         
         /// <summary>
-        /// 選択肢（列挙型パラメータの場合）
+        /// パラメータのステップサイズ（数値型パラメータのみ）
         /// </summary>
-        public IReadOnlyCollection<object>? Options { get; }
-
+        public object? StepSize { get; }
+        
         /// <summary>
-        /// パラメータを作成します
+        /// 許容される値のリスト（列挙型や選択肢がある場合）
+        /// </summary>
+        public IReadOnlyCollection<object>? AllowedValues { get; }
+        
+        /// <summary>
+        /// コンストラクタ
         /// </summary>
         /// <param name="name">パラメータ名</param>
         /// <param name="description">パラメータの説明</param>
         /// <param name="parameterType">パラメータの型</param>
         /// <param name="defaultValue">デフォルト値</param>
-        /// <param name="minValue">最小値（数値パラメータの場合）</param>
-        /// <param name="maxValue">最大値（数値パラメータの場合）</param>
-        /// <param name="options">選択肢（列挙型パラメータの場合）</param>
+        /// <param name="minValue">最小値（数値型パラメータのみ）</param>
+        /// <param name="maxValue">最大値（数値型パラメータのみ）</param>
+        /// <param name="allowedValues">許容される値のリスト（列挙型や選択肢がある場合）</param>
         public PipelineStepParameter(
-            string name,
-            string description,
-            Type parameterType,
-            object? defaultValue,
+            string name, 
+            string description, 
+            Type parameterType, 
+            object? defaultValue = null, 
             object? minValue = null,
             object? maxValue = null,
-            IReadOnlyCollection<object>? options = null)
+            IReadOnlyCollection<object>? allowedValues = null)
         {
-            ArgumentException.ThrowIfNullOrEmpty(name, nameof(name));
-            ArgumentNullException.ThrowIfNull(description, nameof(description));
-            ArgumentNullException.ThrowIfNull(parameterType, nameof(parameterType));
-            
-            // defaultValueがnullでなく、かつパラメータ型に代入できない場合はエラー
-            if (defaultValue != null && !parameterType.IsInstanceOfType(defaultValue))
-            {
-                throw new ArgumentException(
-                    $"デフォルト値の型 {defaultValue.GetType().Name} がパラメータ型 {parameterType.Name} と一致しません", 
-                    nameof(defaultValue));
-            }
-
-            Name = name;
-            Description = description;
-            ParameterType = parameterType;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            Description = description ?? throw new ArgumentNullException(nameof(description));
+            ParameterType = parameterType ?? throw new ArgumentNullException(nameof(parameterType));
             DefaultValue = defaultValue;
+            IsRequired = defaultValue == null; // デフォルト値がない場合は必須
             MinValue = minValue;
             MaxValue = maxValue;
-            Options = options;
+            AllowedValues = allowedValues;
         }
-
+        
         /// <summary>
-        /// パラメータが有効な値であるかを検証します
+        /// 値がこのパラメータに対して有効かどうかを検証します
         /// </summary>
         /// <param name="value">検証する値</param>
-        /// <returns>有効な場合はtrue、無効な場合はfalse</returns>
+        /// <returns>有効な場合はtrue、そうでない場合はfalse</returns>
         public bool ValidateValue(object? value)
         {
-            if (value == null)
-            {
-                return !ParameterType.IsValueType || Nullable.GetUnderlyingType(ParameterType) != null;
-            }
-
-            if (!ParameterType.IsInstanceOfType(value))
-            {
+            // 必須パラメータのnullチェック
+            if (IsRequired && value == null)
                 return false;
-            }
-
-            // 数値型の場合、範囲チェック
-            if (IsNumericType(ParameterType) && MinValue != null && MaxValue != null)
+                
+            // null値が許可されている場合
+            if (!IsRequired && value == null)
+                return true;
+                
+            // 型チェック
+            if (value != null && !ParameterType.IsInstanceOfType(value))
+                return false;
+                
+            // 許容値リストのチェック
+            if (AllowedValues != null && AllowedValues.Count > 0)
             {
-                var compareResult = CompareValues(value, MinValue);
-                if (compareResult < 0)
-                {
-                    return false;
-                }
-
-                compareResult = CompareValues(value, MaxValue);
-                if (compareResult > 0)
-                {
-                    return false;
-                }
+                return AllowedValues.Contains(value);
             }
-
-            // 列挙型の場合、選択肢チェック
-            if (Options != null && Options.Count > 0)
+            
+            // 数値型の場合、最小値・最大値のチェック
+            if (value != null && IsNumericType(ParameterType))
             {
-                return Options.Contains(value);
+                // 全てdoubleに変換して比較
+                double doubleValue = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                
+                // 最小値のチェック
+                if (MinValue != null)
+                {
+                    double minValue = Convert.ToDouble(MinValue, System.Globalization.CultureInfo.InvariantCulture);
+                    if (doubleValue < minValue)
+                        return false;
+                }
+                
+                // 最大値のチェック
+                if (MaxValue != null)
+                {
+                    double maxValue = Convert.ToDouble(MaxValue, System.Globalization.CultureInfo.InvariantCulture);
+                    if (doubleValue > maxValue)
+                        return false;
+                }
             }
-
+            
+            // すべてのチェックに通過
             return true;
         }
-
+        
         /// <summary>
-        /// 指定された型が数値型かどうかを判断します
+        /// 指定された型が数値型かどうかを判定します
         /// </summary>
-        /// <param name="type">チェックする型</param>
+        /// <param name="type">判定する型</param>
         /// <returns>数値型の場合はtrue、そうでない場合はfalse</returns>
         private static bool IsNumericType(Type type)
         {
-            // Nullable型の場合は基底型を取得
-            var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
-
-            return underlyingType == typeof(byte)
-                || underlyingType == typeof(sbyte)
-                || underlyingType == typeof(short)
-                || underlyingType == typeof(ushort)
-                || underlyingType == typeof(int)
-                || underlyingType == typeof(uint)
-                || underlyingType == typeof(long)
-                || underlyingType == typeof(ulong)
-                || underlyingType == typeof(float)
-                || underlyingType == typeof(double)
-                || underlyingType == typeof(decimal);
-        }
-
-        /// <summary>
-        /// 2つの値を比較します
-        /// </summary>
-        /// <param name="value1">比較する値1</param>
-        /// <param name="value2">比較する値2</param>
-        /// <returns>比較結果</returns>
-        private static int CompareValues(object value1, object value2)
-        {
-            if (value1 is IComparable comparable && value2 != null)
+            return Type.GetTypeCode(type) switch
             {
-                return comparable.CompareTo(value2);
-            }
-
-            return 0;
+                TypeCode.Byte => true,
+                TypeCode.SByte => true,
+                TypeCode.UInt16 => true,
+                TypeCode.UInt32 => true,
+                TypeCode.UInt64 => true,
+                TypeCode.Int16 => true,
+                TypeCode.Int32 => true,
+                TypeCode.Int64 => true,
+                TypeCode.Decimal => true,
+                TypeCode.Double => true,
+                TypeCode.Single => true,
+                _ => false
+            };
         }
     }
 }

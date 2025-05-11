@@ -219,7 +219,7 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
         /// <summary>
         /// GetOutputImageInfo用の仮想画像クラス
         /// </summary>
-        private class VirtualImage : IAdvancedImage
+        private sealed class VirtualImage : IAdvancedImage
         {
             private readonly ImageInfo _imageInfo;
             
@@ -232,6 +232,23 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
             public int Height => _imageInfo.Height;
             public ImageFormat Format => _imageInfo.Format;
             
+            // IAdvancedImageインターフェース実装
+            public bool IsGrayscale => Format == ImageFormat.Grayscale8;
+            public int BitsPerPixel => Format switch
+            {
+                ImageFormat.Grayscale8 => 8,
+                ImageFormat.Rgb24 => 24,
+                ImageFormat.Rgba32 => 32,
+                _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
+            };
+            public int ChannelCount => Format switch
+            {
+                ImageFormat.Grayscale8 => 1,
+                ImageFormat.Rgb24 => 3,
+                ImageFormat.Rgba32 => 4,
+                _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
+            };
+            
             // 以下は仮想的な実装（実際にはGetOutputImageInfoでのみ使用）
             public Task<byte[]> ToByteArrayAsync() => throw new NotImplementedException();
             public IImage Clone() => throw new NotImplementedException();
@@ -243,6 +260,7 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
             public Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters) => throw new NotImplementedException();
             public Task<int[]> ComputeHistogramAsync(ColorChannel channel = ColorChannel.Luminance) => throw new NotImplementedException();
             public Task<IAdvancedImage> ToGrayscaleAsync() => throw new NotImplementedException();
+            public IAdvancedImage ToGrayscale() => throw new NotImplementedException();
             public Task<IAdvancedImage> ToBinaryAsync(byte threshold) => throw new NotImplementedException();
             public Task<IAdvancedImage> ExtractRegionAsync(Rectangle rectangle) => throw new NotImplementedException();
             public Task<IAdvancedImage> OptimizeForOcrAsync() => throw new NotImplementedException();

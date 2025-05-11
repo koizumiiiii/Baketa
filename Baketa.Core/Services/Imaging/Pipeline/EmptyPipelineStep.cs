@@ -125,12 +125,12 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="input">入力画像</param>
         /// <returns>入力と同じ画像情報</returns>
-        public ImageInfo GetOutputImageInfo(IAdvancedImage input)
+        public PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
         {
             ArgumentNullException.ThrowIfNull(input);
             
             // 入力画像から情報を作成
-            return new ImageInfo
+            var imageInfo = new Baketa.Core.Abstractions.Imaging.ImageInfo
             {
                 Width = input.Width,
                 Height = input.Height,
@@ -138,6 +138,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 Channels = input.Format == ImageFormat.Grayscale8 ? 1 : 
                            input.Format == ImageFormat.Rgb24 ? 3 : 4
             };
+            
+            return PipelineImageInfo.FromImageInfo(imageInfo, PipelineStage.Processing);
         }
 
         /// <summary>

@@ -3,6 +3,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.Platform.Resources;
+using Baketa.Infrastructure.Platform.Windows.OpenCv;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -67,19 +68,16 @@ namespace Baketa.Infrastructure.Platform.DI.Modules
         /// <summary>
         /// 画像処理サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterImageServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterImageServices(IServiceCollection services)
         {
             // Windows画像処理関連の登録
             // 例: services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
             // 例: services.AddSingleton<IImageConverter, WindowsImageConverter>();
             
             // OpenCV関連
-            // 例: services.AddSingleton<IOpenCvImageProcessor, OpenCvImageProcessor>();
-            // 例: services.AddSingleton<IOpenCvImageFactory, OpenCvImageFactory>();
-            
-            // アダプター
-            // 例: services.AddSingleton<WindowsImageAdapter>(); // プラットフォーム間適応用
+            // 拡張メソッドを使用して登録
+            services.AddOpenCvServices();
             
             // ファクトリー
             // 例: services.AddSingleton<IImageFactory>(sp => sp.GetRequiredService<DefaultImageFactory>());

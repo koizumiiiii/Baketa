@@ -1,0 +1,3 @@
+# editorconfig for ImagePipeline.cs
+[*.cs]
+dotnet_diagnostic.CA1725.severity = none

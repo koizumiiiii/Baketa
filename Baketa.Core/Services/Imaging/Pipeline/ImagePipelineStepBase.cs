@@ -188,19 +188,21 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// </summary>
         /// <param name="input">入力画像</param>
         /// <returns>出力画像の情報</returns>
-        public virtual ImageInfo GetOutputImageInfo(IAdvancedImage input)
+        public virtual PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
         {
             ArgumentNullException.ThrowIfNull(input);
             
             // デフォルトでは入力と同じ画像情報を返す
             // 派生クラスでオーバーライドすることを期待
-            return new ImageInfo
+            var imageInfo = new Baketa.Core.Abstractions.Imaging.ImageInfo
             {
                 Width = input.Width,
                 Height = input.Height,
                 Format = input.Format,
                 Channels = GetChannelCount(input.Format)
             };
+            
+            return PipelineImageInfo.FromImageInfo(imageInfo, PipelineStage.Processing);
         }
         
         /// <summary>
@@ -247,8 +249,11 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             
             _parameterDefinitions.Add(parameter);
             
-            // デフォルト値を設定
-            _parameters[name] = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
+            // デフォルト値が指定されていれば設定
+            if (defaultValue != null)
+            {
+                _parameters[name] = defaultValue;
+            }
         }
         
         /// <summary>
@@ -281,8 +286,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 description,
                 typeof(T),
                 defaultValue,
-                minValue,
-                maxValue,
+                minValue as object,
+                maxValue as object,
                 objectOptions);
         }
         

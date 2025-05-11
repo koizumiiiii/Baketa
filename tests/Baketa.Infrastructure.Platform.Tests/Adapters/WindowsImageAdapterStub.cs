@@ -12,7 +12,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
     /// <summary>
     /// テスト用のWindowsImageAdapterスタブクラス
     /// </summary>
-    internal class WindowsImageAdapterStub : DisposableBase, IWindowsImageAdapter
+    internal sealed class WindowsImageAdapterStub : DisposableBase, IWindowsImageAdapter
     {
         public IAdvancedImage ToAdvancedImage(IWindowsImage windowsImage)
         {
