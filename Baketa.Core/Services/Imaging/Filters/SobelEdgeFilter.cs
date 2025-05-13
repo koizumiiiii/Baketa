@@ -47,32 +47,18 @@ namespace Baketa.Core.Services.Imaging.Filters
         {
             ArgumentNullException.ThrowIfNull(inputImage);
             
-            // パラメータを取得
-            int xOrder = GetParameterValue<int>("XOrder");
-            int yOrder = GetParameterValue<int>("YOrder");
-            int kernelSize = GetParameterValue<int>("KernelSize");
-            double scale = GetParameterValue<double>("Scale");
-            double delta = GetParameterValue<double>("Delta");
+            // 現時点では実装が簡略化されているため、大部分のパラメータは使用していない
+            _ = GetParameterValue<int>("XOrder");
+            _ = GetParameterValue<int>("YOrder");
+            _ = GetParameterValue<int>("KernelSize");
+            double scale = GetParameterValue<double>("Scale"); // スケールは使用する
+            _ = GetParameterValue<double>("Delta");
             
-            // パラメータの検証
-            xOrder = Math.Clamp(xOrder, 0, 2);
-            yOrder = Math.Clamp(yOrder, 0, 2);
+            // パラメータの検証（注：実際のOpenCV実装では使用される予定のパラメータ）
+            // 現在は簡易実装のため実際には使用していない
             
-            if (xOrder == 0 && yOrder == 0)
-            {
-                // どちらも0の場合は、少なくとも一方を1に設定
-                xOrder = 1;
-            }
-            
-            // カーネルサイズは奇数のみ許可
-            if (kernelSize % 2 == 0)
-            {
-                kernelSize++;
-            }
-            kernelSize = Math.Max(kernelSize, 3);
-            
-            // スケールとデルタの範囲を制限
-            scale = Math.Max(scale, 0.1);
+            // スケールの範囲を制限（唯一使用するパラメータ）
+            double scaleFactor = Math.Max(scale, 0.1);
             
             // グレースケール変換（エッジ検出はグレースケール画像に対して適用）
             var grayImage = await inputImage.ToGrayscaleAsync().ConfigureAwait(false);
@@ -82,9 +68,9 @@ namespace Baketa.Core.Services.Imaging.Filters
             // 代替手段としてシャープネスやコントラスト調整を使用
             var enhancementOptions = new ImageEnhancementOptions
             {
-                Sharpness = 0.8f,                   // エッジを強調
-                Contrast = (float)(scale * 1.2),    // コントラストを上げてエッジを見やすく
-                NoiseReduction = 0.1f,              // わずかにノイズを減らす
+                Sharpness = 0.8f,                        // エッジを強調
+                Contrast = (float)(scaleFactor * 1.2), // コントラストを上げてエッジを見やすく
+                NoiseReduction = 0.1f,                   // わずかにノイズを減らす
             };
             
             // エッジ検出処理を実行
