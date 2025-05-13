@@ -2,6 +2,126 @@
 
 このドキュメントは、プロジェクト内で `.editorconfig` ファイルにより一時的に抑制されている警告と、将来的なリファクタリングで対応すべき項目を記録しています。これらの項目に対応することでコードの品質とメンテナンス性が向上します。
 
+## 0. 差分検出サブシステム切り戻し事項 (2025年5月12日更新)
+
+差分検出サブシステムのIssue#34対応と警告修正作業で後回しにした項目を下記に記録します。
+
+### 0.1. IReadOnlyList<T>とList<T>の互換性の訳随
+
+**現在の状態**:
+- IDetectionAlgorithm.csのDetectionResultクラスでCA1002警告（継承のためではなく、パフォーマンスのためのジェネリックコレクション）が発生しています。
+- IReadOnlyList<Rectangle>を利用しようとした間に変換問題が発生しました。
+
+**問題点**:
+- 返却値の型としてIReadOnlyList<T>を使用することは適切ですが、実装クラス間の互換性に説明が必要です。
+- Add操作を使用している配列に対してIReadOnlyList<T>を使用するとコンパイルエラーが発生します。
+
+**改善方法**:
+1. DetectionResultクラスを以下のように再設計する：
+
+```csharp
+public class DetectionResult
+{
+    // 内部的にはList<Rectangle>を使用
+    private readonly List<Rectangle> _changedRegions = new List<Rectangle>();
+    private readonly List<Rectangle> _disappearedTextRegions = new List<Rectangle>();
+    
+    // 変化が検出された領域（読み取り専用インターフェースを返却）
+    public IReadOnlyList<Rectangle> ChangedRegions => _changedRegions;
+    
+    // 消失したテキスト領域（読み取り専用インターフェースを返却）
+    public IReadOnlyList<Rectangle> DisappearedTextRegions => _disappearedTextRegions;
+    
+    // 有意な変化があるかどうか
+    public bool HasSignificantChange { get; set; }
+    
+    // 変化の比率 (0.0～1.0)
+    public double ChangeRatio { get; set; }
+    
+    // 領域追加用のメソッド
+    public void AddChangedRegion(Rectangle region)
+    {
+        _changedRegions.Add(region);
+    }
+    
+    // 複数領域追加用のメソッド
+    public void AddChangedRegions(IEnumerable<Rectangle> regions)
+    {
+        _changedRegions.AddRange(regions);
+    }
+    
+    // テキスト消失領域追加用のメソッド
+    public void AddDisappearedTextRegion(Rectangle region)
+    {
+        _disappearedTextRegions.Add(region);
+    }
+    
+    // 複数テキスト消失領域追加用のメソッド
+    public void AddDisappearedTextRegions(IEnumerable<Rectangle> regions)
+    {
+        _disappearedTextRegions.AddRange(regions);
+    }
+}
+```
+
+### 0.2. IImageFactoryの参照の曖昧さの解消
+
+**現在の状態**:
+- `Baketa.Core.Abstractions.Factories.IImageFactory` と `Baketa.Core.Abstractions.Imaging.IImageFactory` の2つの同名インタフェースが同時に存在しています。
+- 一時的にエイリアスで対応していますが、移行期間の一時的な措置です。
+
+**問題点**:
+- 同名のインターフェースが存在すると、曖昧な参照エラーが発生しやすく、エイリアスもコードの設計意図を分かりにくくします。
+
+**改善方法**:
+1. 非推奨のIImageFactoryを除外し、プロジェクト全体で`Baketa.Core.Abstractions.Factories.IImageFactory`だけを使用するようにする。
+2. 必要に応じてインターフェースの名前を変更して区別を明確にする。
+
+### 0.3. CA1814: ジャグ配列の使用回避
+
+**現在の状態**:
+- 差分検出サブシステムでは、一部のクラスが2次元配列`bool[,]`や`byte[,]`を使用しています。
+- CA1814警告としてジャグ配列の使用を避けるよう指摘されています。
+
+**問題点**:
+- ジャグ配列の型`bool[][]`や`byte[][]`の方が効率的な場合があり、特に大きな配列ではメモリ使用の違いが出る可能性があります。
+
+**改善方法**:
+1. 基本戦略: 一部のEdgeDifferenceAlgorithmクラスでは既に実装したように、`List<List<byte>>`のようなジャグ配列を使用する。
+2. BitArrayを使用した最適化: bool型の2次元配列には、以下のようなBitArrayを使用した最適化も検討する:
+
+```csharp
+// 変更前: boolの2次元配列を使用
+bool[,] diffMap = new bool[width, height];
+
+// 変更後: BitArrayの配列を使用
+System.Collections.BitArray[] diffMap = new System.Collections.BitArray[height];
+for (int i = 0; i < height; i++) {
+    diffMap[i] = new System.Collections.BitArray(width);
+}
+```
+
+### 0.4. CA1859: 具象型使用推奨
+
+**現在の状態**:
+- EnhancedDifferenceDetectorやHybridDifferenceAlgorithmなどでインターフェース型を使用している箇所でCA1859警告が発生しています。
+
+**問題点**:
+- インターフェース経由の呼び出しはオーバーヘッドが大きく、パフォーマンスを低下させる可能性があります。
+
+**改善方法**:
+- 可能な場合は具象型を使用してパフォーマンスを改善する:
+
+```csharp
+// 変更前: インターフェース型を使用
+private readonly IEventAggregator _eventAggregator;
+
+// 変更後: 具象型を使用 (実際の実装クラスに合わせる)
+private readonly EventAggregator _eventAggregator;
+```
+
+この場合は依存性の注入原則とトレードオフが発生するため、後述の优先度分類で「中」として扱います。
+
 ## 1. 一時的に抑制中の警告と対応方法
 
 ### 1.1. CA1721: "Get"で始まるメソッド名とプロパティ名の衝突
