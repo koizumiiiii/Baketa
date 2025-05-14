@@ -1,0 +1,183 @@
+using System;
+using System.Collections.Generic;
+
+namespace Baketa.Core.Translation.Models
+{
+    /// <summary>
+    /// 翻訳レスポンスを表すクラス
+    /// </summary>
+    public class TranslationResponse
+    {
+        /// <summary>
+        /// 対応するリクエストのID
+        /// </summary>
+        public required Guid RequestId { get; set; }
+        
+        /// <summary>
+        /// 翻訳元テキスト
+        /// </summary>
+        public required string SourceText { get; set; }
+        
+        /// <summary>
+        /// 翻訳結果テキスト
+        /// </summary>
+        public string? TranslatedText { get; set; }
+        
+        /// <summary>
+        /// 翻訳元言語
+        /// </summary>
+        public required Language SourceLanguage { get; set; }
+        
+        /// <summary>
+        /// 翻訳先言語
+        /// </summary>
+        public required Language TargetLanguage { get; set; }
+        
+        /// <summary>
+        /// 使用された翻訳エンジン名
+        /// </summary>
+        public required string EngineName { get; set; }
+        
+        /// <summary>
+        /// 翻訳の信頼度スコア
+        /// </summary>
+        public float ConfidenceScore { get; set; } = -1.0f;
+        
+        /// <summary>
+        /// 翻訳処理時間（ミリ秒）
+        /// </summary>
+        public long ProcessingTimeMs { get; set; }
+        
+        /// <summary>
+        /// 翻訳が成功したかどうか
+        /// </summary>
+        public bool IsSuccess { get; set; }
+        
+        /// <summary>
+        /// エラー情報
+        /// </summary>
+        public TranslationError? Error { get; set; }
+        
+        /// <summary>
+        /// メタデータ
+        /// </summary>
+        public Dictionary<string, object?> Metadata { get; } = new();
+        
+        /// <summary>
+        /// レスポンスのタイムスタンプ
+        /// </summary>
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// デフォルトコンストラクタ
+        /// </summary>
+        public TranslationResponse()
+        {
+        }
+
+        /// <summary>
+        /// リクエストから初期化
+        /// </summary>
+        /// <param name="request">元となる翻訳リクエスト</param>
+        /// <param name="engineName">翻訳エンジン名</param>
+        public TranslationResponse(TranslationRequest request, string engineName)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(engineName);
+            RequestId = request.RequestId;
+            SourceText = request.SourceText;
+            SourceLanguage = request.SourceLanguage;
+            TargetLanguage = request.TargetLanguage;
+            EngineName = engineName;
+            Timestamp = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// 成功レスポンスを作成
+        /// </summary>
+        /// <param name="request">元となる翻訳リクエスト</param>
+        /// <param name="translatedText">翻訳結果テキスト</param>
+        /// <param name="engineName">翻訳エンジン名</param>
+        /// <param name="processingTimeMs">処理時間（ミリ秒）</param>
+        /// <returns>成功レスポンス</returns>
+        public static TranslationResponse CreateSuccess(
+            TranslationRequest request, 
+            string translatedText, 
+            string engineName, 
+            long processingTimeMs)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(translatedText);
+            ArgumentNullException.ThrowIfNull(engineName);
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                SourceText = request.SourceText,
+                TranslatedText = translatedText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
+                EngineName = engineName,
+                ProcessingTimeMs = processingTimeMs,
+                IsSuccess = true,
+                Timestamp = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
+        /// エラーレスポンスを作成
+        /// </summary>
+        /// <param name="request">元となる翻訳リクエスト</param>
+        /// <param name="error">エラー情報</param>
+        /// <param name="engineName">翻訳エンジン名</param>
+        /// <returns>エラーレスポンス</returns>
+        public static TranslationResponse CreateError(
+            TranslationRequest request, 
+            TranslationError error, 
+            string engineName)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(error);
+            ArgumentNullException.ThrowIfNull(engineName);
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                SourceText = request.SourceText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
+                EngineName = engineName,
+                Error = error,
+                IsSuccess = false,
+                Timestamp = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
+        /// クローンを作成
+        /// </summary>
+        /// <returns>このレスポンスのクローン</returns>
+        public TranslationResponse Clone()
+        {
+            var clone = new TranslationResponse
+            {
+                RequestId = RequestId,
+                SourceText = SourceText,
+                TranslatedText = TranslatedText,
+                SourceLanguage = SourceLanguage,
+                TargetLanguage = TargetLanguage,
+                EngineName = EngineName,
+                ConfidenceScore = ConfidenceScore,
+                ProcessingTimeMs = ProcessingTimeMs,
+                IsSuccess = IsSuccess,
+                Error = Error?.Clone(),
+                Timestamp = Timestamp
+            };
+
+            foreach (var item in Metadata)
+            {
+                clone.Metadata[item.Key] = item.Value;
+            }
+
+            return clone;
+        }
+    }
+}

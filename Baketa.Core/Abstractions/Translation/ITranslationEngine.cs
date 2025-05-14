@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Models.Translation;
+
+// 名前空間エイリアスを定義して曖昧さを回避
+using CoreModels = Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Abstractions.Translation
 {
@@ -30,14 +32,14 @@ namespace Baketa.Core.Abstractions.Translation
         /// サポートしている言語ペアを取得します
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync();
+        Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync();
 
         /// <summary>
         /// 指定された言語ペアをサポートしているかどうかを確認します
         /// </summary>
         /// <param name="languagePair">確認する言語ペア</param>
         /// <returns>サポートしていればtrue</returns>
-        Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair);
+        Task<bool> SupportsLanguagePairAsync(CoreModels.LanguagePair languagePair);
 
         /// <summary>
         /// テキストを翻訳します
@@ -45,8 +47,8 @@ namespace Baketa.Core.Abstractions.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        Task<TranslationResponse> TranslateAsync(
-            TranslationRequest request,
+        Task<CoreModels.TranslationResponse> TranslateAsync(
+            CoreModels.TranslationRequest request,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -55,8 +57,8 @@ namespace Baketa.Core.Abstractions.Translation
         /// <param name="requests">翻訳リクエストのコレクション</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのコレクション</returns>
-        Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
-            IReadOnlyList<TranslationRequest> requests,
+        Task<IReadOnlyList<CoreModels.TranslationResponse>> TranslateBatchAsync(
+            IReadOnlyList<CoreModels.TranslationRequest> requests,
             CancellationToken cancellationToken = default);
 
         /// <summary>

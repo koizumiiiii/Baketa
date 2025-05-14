@@ -1,0 +1,81 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Baketa.Core.Translation.Abstractions;
+using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
+
+namespace Baketa.Core.Translation.Testing
+{
+    /// <summary>
+    /// テスト用の最小限の実装
+    /// </summary>
+    public class MinimalTranslationEngine : TranslationEngineBase
+    {
+        /// <summary>
+        /// エンジン名
+        /// </summary>
+        public override string Name => "MinimalEngine";
+        
+        /// <summary>
+        /// エンジンの説明
+        /// </summary>
+        public override string Description => "最小限の実装（テスト用）";
+        
+        /// <summary>
+        /// ネットワーク接続が必要かどうか
+        /// </summary>
+        public override bool RequiresNetwork => false;
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        public MinimalTranslationEngine()
+            : base(null)
+        {
+        }
+
+        /// <summary>
+        /// 内部翻訳処理
+        /// </summary>
+        protected override Task<TranslationResponse> TranslateInternalAsync(
+            TranslationRequest request, 
+            CancellationToken cancellationToken)
+        {
+            var response = TranslationResponse.CreateSuccess(
+                request,
+                $"[Translated] {request.SourceText}",
+                Name,
+                0);
+                
+            return Task.FromResult(response);
+        }
+
+        /// <summary>
+        /// 内部初期化処理
+        /// </summary>
+        protected override Task<bool> InitializeInternalAsync()
+        {
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// 内部でサポートされている言語ペアを取得する処理
+        /// </summary>
+        protected override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsInternalAsync()
+        {
+            var pairs = new List<LanguagePair>
+            {
+                new LanguagePair 
+                { 
+                    SourceLanguage = Language.Japanese, 
+                    TargetLanguage = Language.English 
+                }
+            };
+            
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(pairs);
+        }
+    }
+}

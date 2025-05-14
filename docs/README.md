@@ -80,6 +80,12 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 #### テストガイドライン
 - [モッキングのベストプラクティス](4-testing/guidelines/mocking-best-practices.md)
 
+### 5. 開発ノート
+
+開発過程での問題解決や注意点を記録したドキュメント集です。
+
+- [翻訳基盤実装ノート](development-notes/translation-implementation-notes.md) - 翻訳基盤実装時の名前空間問題やHttpClient依存関係の解決策
+
 ## ライセンス
 
 Copyright © 2025 Baketa Project
