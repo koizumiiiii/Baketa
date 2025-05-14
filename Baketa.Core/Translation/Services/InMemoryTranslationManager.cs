@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
@@ -153,9 +154,34 @@ namespace Baketa.Core.Translation.Services
                 
                 return record;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex)
             {
-                _logger.LogError(ex, "テキスト「{Text}」の翻訳レコード検索中にエラーが発生しました", sourceText);
+                _logger.LogWarning(ex, "テキスト「{Text}」の翻訳レコード検索がキャンセルされました", sourceText);
+                return null;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "テキスト「{Text}」の翻訳レコード検索操作がキャンセルされました", sourceText);
+                return null;
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "テキスト「{Text}」の翻訳レコード検索中に無効な操作が行われました", sourceText);
+                return null;
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogError(ex, "テキスト「{Text}」の翻訳レコード検索がタイムアウトしました", sourceText);
+                return null;
+            }
+            catch (ArgumentException ex) // 翻訳リポジトリから投げられる可能性のある引数例外
+            {
+                _logger.LogError(ex, "テキスト「{Text}」の翻訳レコード検索中に引数エラーが発生しました", sourceText);
+                return null;
+            }
+            catch (IOException ex) // ファイルシステムなどの入出力例外
+            {
+                _logger.LogError(ex, "テキスト「{Text}」の翻訳レコード検索中にI/Oエラーが発生しました", sourceText);
                 return null;
             }
         }
@@ -178,10 +204,25 @@ namespace Baketa.Core.Translation.Services
                 _logger.LogDebug("{Count} 件の翻訳レコードが見つかりました", records.Count);
                 return records;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex)
             {
-                _logger.LogError(ex, "翻訳レコードの検索中にエラーが発生しました");
-                return Array.Empty<TranslationRecord>();
+                _logger.LogWarning(ex, "翻訳レコードの検索がキャンセルされました");
+                return [];
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "翻訳レコードの検索操作がキャンセルされました");
+                return [];
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "翻訳レコードの検索中に無効な操作が行われました");
+                return [];
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogError(ex, "翻訳レコードの検索中に引数エラーが発生しました");
+                return [];
             }
         }
 
@@ -206,9 +247,24 @@ namespace Baketa.Core.Translation.Services
                 }
                 return result;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex)
             {
-                _logger.LogError(ex, "翻訳レコード {Id} の削除中にエラーが発生しました", id);
+                _logger.LogWarning(ex, "翻訳レコード {Id} の削除がキャンセルされました", id);
+                return false;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "翻訳レコード {Id} の削除操作がキャンセルされました", id);
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "翻訳レコード {Id} の削除中に無効な操作が行われました", id);
+                return false;
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogError(ex, "翻訳レコード {Id} の削除中に引数エラーが発生しました", id);
                 return false;
             }
         }
@@ -231,10 +287,20 @@ namespace Baketa.Core.Translation.Services
                 _logger.LogDebug("翻訳統計を取得しました（トータル: {Total}件）", statistics.TotalRecords);
                 return statistics;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex)
             {
-                _logger.LogError(ex, "翻訳統計の取得中にエラーが発生しました");
-                return new TranslationStatistics();
+                _logger.LogWarning(ex, "翻訳統計の取得がキャンセルされました");
+                return new TranslationStatistics { GeneratedAt = DateTime.UtcNow };
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "翻訳統計の取得操作がキャンセルされました");
+                return new TranslationStatistics { GeneratedAt = DateTime.UtcNow };
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "翻訳統計の取得中に無効な操作が行われました");
+                return new TranslationStatistics { GeneratedAt = DateTime.UtcNow };
             }
         }
 
@@ -256,9 +322,19 @@ namespace Baketa.Core.Translation.Services
                 _logger.LogDebug("翻訳キャッシュをクリアしました（オプション: {ClearOption}）", options.ClearAll ? "すべて" : "一部");
                 return result;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex)
             {
-                _logger.LogError(ex, "翻訳キャッシュのクリア中にエラーが発生しました");
+                _logger.LogWarning(ex, "翻訳キャッシュのクリアがキャンセルされました");
+                return false;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "翻訳キャッシュのクリア操作がキャンセルされました");
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "翻訳キャッシュのクリア中に無効な操作が行われました");
                 return false;
             }
         }

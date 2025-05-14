@@ -378,6 +378,56 @@ namespace Baketa.Core.Translation.Models
         /// 統計の生成日時
         /// </summary>
         public DateTime GeneratedAt { get; set; }
+
+        /// <summary>
+        /// 言語ペア別統計に項目を追加
+        /// </summary>
+        /// <param name="key">言語ペアキー</param>
+        /// <param name="count">カウント数</param>
+        public void AddLanguagePairCount(string key, int count)
+        {
+            _recordsByLanguagePair[key] = count;
+        }
+
+        /// <summary>
+        /// エンジン別統計に項目を追加
+        /// </summary>
+        /// <param name="key">エンジン名</param>
+        /// <param name="count">カウント数</param>
+        public void AddEngineCount(string key, int count)
+        {
+            _recordsByEngine[key] = count;
+        }
+
+        /// <summary>
+        /// ゲームプロファイル別統計に項目を追加
+        /// </summary>
+        /// <param name="key">プロファイルID</param>
+        /// <param name="count">カウント数</param>
+        public void AddGameProfileCount(string key, int count)
+        {
+            _recordsByGameProfile[key] = count;
+        }
+
+        /// <summary>
+        /// タグ別統計に項目を追加
+        /// </summary>
+        /// <param name="key">タグ名</param>
+        /// <param name="count">カウント数</param>
+        public void AddTagCount(string key, int count)
+        {
+            _recordsByTag[key] = count;
+        }
+
+        /// <summary>
+        /// 時間帯別統計に項目を追加
+        /// </summary>
+        /// <param name="key">時間帯</param>
+        /// <param name="count">カウント数</param>
+        public void AddTimeFrameCount(string key, int count)
+        {
+            _recordsByTimeFrame[key] = count;
+        }
     }
 
     /// <summary>

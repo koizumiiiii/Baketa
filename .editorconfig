@@ -1,3 +1,9 @@
+# IDE0037: メンバーの名前を簡素化できます
+dotnet_diagnostic.IDE0037.severity = silent
+
+# IDE0042: 変数の宣言を分解できます
+dotnet_diagnostic.IDE0042.severity = silent
+
 # EditorConfig is awesome: https://EditorConfig.org
 
 # top-most EditorConfig file
