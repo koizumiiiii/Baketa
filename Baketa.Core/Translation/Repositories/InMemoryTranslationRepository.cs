@@ -35,12 +35,112 @@ namespace Baketa.Core.Translation.Repositories
         /// <returns>完了タスク</returns>
         public Task SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default)
         {
+            return SaveRecordWithStrategyAsync(record, MergeStrategy.Overwrite, cancellationToken);
+        }
+        
+        /// <summary>
+        /// 翻訳レコードをマージ戦略を指定して保存します
+        /// </summary>
+        /// <param name="record">翻訳レコード</param>
+        /// <param name="strategy">マージ戦略</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>完了タスク</returns>
+        public Task SaveRecordWithStrategyAsync(TranslationRecord record, MergeStrategy strategy, CancellationToken cancellationToken = default)
+        {
             ArgumentNullException.ThrowIfNull(record);
             
-            _records[record.Id] = record.Clone();
-            _logger.LogDebug("レコード {Id} を保存しました", record.Id);
-            
-            return Task.CompletedTask;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                // 既存の翻訳レコードを検索（同じテキストと言語の組み合わせ）
+                var existingRecord = _records.Values
+                    .Where(r => r.SourceText == record.SourceText && 
+                            r.SourceLanguage.Code.Equals(record.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) && 
+                            r.TargetLanguage.Code.Equals(record.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase) && 
+                            r.Id != record.Id)
+                    .FirstOrDefault();
+                
+                // 既存レコードがない場合はそのまま保存
+                if (existingRecord == null)
+                {
+                    _records[record.Id] = record.Clone();
+                    _logger.LogDebug("レコード {Id} を保存しました", record.Id);
+                    return Task.CompletedTask;
+                }
+                
+                // 既存レコードがある場合は指定されたマージ戦略に基づいて処理
+                switch (strategy)
+                {
+                    case MergeStrategy.Overwrite:
+                        // 上書きモード：単純に新しいレコードで置き換え
+                        _records[record.Id] = record.Clone();
+                        _logger.LogDebug("レコード {Id} を既存レコードを上書きして保存しました", record.Id);
+                        break;
+                    
+                    case MergeStrategy.KeepExisting:
+                        // 既存レコードを保持し、何もしない
+                        _logger.LogDebug("レコード {Id} は既存レコードを優先する設定のため保存されませんでした", record.Id);
+                        break;
+                    
+                    case MergeStrategy.KeepNewer:
+                        // 新しい方を保持
+                        DateTime newRecordTime = record.UpdatedAt ?? record.CreatedAt;
+                        DateTime existingRecordTime = existingRecord.UpdatedAt ?? existingRecord.CreatedAt;
+                        
+                        if (newRecordTime > existingRecordTime)
+                        {
+                            _records[record.Id] = record.Clone();
+                            _logger.LogDebug("レコード {Id} は既存レコードより新しいため保存されました", record.Id);
+                        }
+                        else
+                        {
+                            _logger.LogDebug("レコード {Id} は既存レコードより古いため保存されませんでした", record.Id);
+                        }
+                        break;
+                    
+                    case MergeStrategy.PreferUserEdited:
+                        // ユーザー編集済みを優先
+                        if (record.IsUserEdited && !existingRecord.IsUserEdited)
+                        {
+                            _records[record.Id] = record.Clone();
+                            _logger.LogDebug("レコード {Id} はユーザー編集済みのため保存されました", record.Id);
+                        }
+                        else if (!record.IsUserEdited && existingRecord.IsUserEdited)
+                        {
+                            _logger.LogDebug("レコード {Id} は既存レコードがユーザー編集済みのため保存されませんでした", record.Id);
+                        }
+                        else
+                        {
+                            // 両方ともユーザー編集済みか、両方とも未編集の場合は新しい方を使用
+                            DateTime newTime = record.UpdatedAt ?? record.CreatedAt;
+                            DateTime existingTime = existingRecord.UpdatedAt ?? existingRecord.CreatedAt;
+                            
+                            if (newTime > existingTime)
+                            {
+                                _records[record.Id] = record.Clone();
+                                _logger.LogDebug("レコード {Id} は既存レコードより新しいため保存されました", record.Id);
+                            }
+                            else
+                            {
+                                _logger.LogDebug("レコード {Id} は既存レコードより古いため保存されませんでした", record.Id);
+                            }
+                        }
+                        break;
+                }
+                
+                return Task.CompletedTask;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "レコード {Id} の保存がキャンセルされました", record.Id);
+                throw;
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
+            {
+                _logger.LogError(ex, "レコード {Id} の保存中にエラーが発生しました", record.Id);
+                throw;
+            }
         }
 
         /// <summary>
@@ -105,22 +205,186 @@ namespace Baketa.Core.Translation.Repositories
             ArgumentNullException.ThrowIfNull(targetLanguage);
             
             // 言語とテキストで一致するレコードを検索
-            var matchingRecord = _records.Values
+            var candidateRecords = _records.Values
                 .Where(r => 
                     r.SourceText == sourceText && 
-                    r.SourceLanguage.Code == sourceLanguage.Code &&
-                    r.TargetLanguage.Code == targetLanguage.Code)
-                .OrderByDescending(r => r.LastUsedAt)
-                .FirstOrDefault();
-            
-            if (matchingRecord != null)
+                    r.SourceLanguage.Code.Equals(sourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
+                    r.TargetLanguage.Code.Equals(targetLanguage.Code, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // レコードが見つからない場合
+            if (candidateRecords.Count == 0)
             {
-                _logger.LogDebug("テキスト「{Text}」の翻訳レコードを見つけました", sourceText);
-                return Task.FromResult<TranslationRecord?>(matchingRecord.Clone());
+                _logger.LogDebug("テキスト「{Text}」の翻訳レコードは見つかりませんでした", sourceText);
+                return Task.FromResult<TranslationRecord?>(null);
             }
             
-            _logger.LogDebug("テキスト「{Text}」の翻訳レコードは見つかりませんでした", sourceText);
-            return Task.FromResult<TranslationRecord?>(null);
+            // コンテキストが指定されている場合、コンテキストでフィルタリング
+            TranslationRecord? bestMatch = null;
+            
+            if (context != null)
+            {
+                // コンテキストが完全に一致するレコードを探す
+                var exactContextMatch = candidateRecords
+                    .Where(r => r.Context != null && r.Context.Equals(context))
+                    .OrderByDescending(r => r.UsageCount)
+                    .ThenByDescending(r => r.LastUsedAt)
+                    .FirstOrDefault();
+                
+                if (exactContextMatch != null)
+                {
+                    bestMatch = exactContextMatch;
+                    _logger.LogDebug("テキスト「{Text}」のコンテキスト完全一致レコードを見つけました", sourceText);
+                }
+                else
+                {
+                    // 部分一致を探す（ゲームプロファイルのみ、シーンアカウントのみなど）
+                    var partialContextMatches = candidateRecords
+                        .Where(r => r.Context != null && context != null && IsPartialContextMatch(r.Context, context))
+                        .OrderByDescending(r => CalculateContextMatchScore(r.Context!, context!))
+                        .ThenByDescending(r => r.UsageCount)
+                        .ThenByDescending(r => r.LastUsedAt);
+                    
+                    bestMatch = partialContextMatches.FirstOrDefault();
+                    
+                    if (bestMatch != null)
+                    {
+                        _logger.LogDebug("テキスト「{Text}」のコンテキスト部分一致レコードを見つけました", sourceText);
+                    }
+                }
+            }
+            
+            // コンテキストがないか、コンテキスト一致が見つからなかった場合
+            if (bestMatch == null)
+            {
+                // 最も使用回数が多いレコードを選択
+                bestMatch = candidateRecords
+                    .OrderByDescending(r => r.UsageCount)
+                    .ThenByDescending(r => r.LastUsedAt)
+                    .FirstOrDefault();
+                
+                _logger.LogDebug("テキスト「{Text}」の最適なレコードを選択しました", sourceText);
+            }
+            
+            return Task.FromResult<TranslationRecord?>(bestMatch?.Clone());
+        }
+        
+        /// <summary>
+        /// 部分的なコンテキスト一致を確認します
+        /// </summary>
+        /// <param name="recordContext">レコードのコンテキスト</param>
+        /// <param name="queryContext">クエリのコンテキスト</param>
+        /// <returns>部分一致した場合はtrue</returns>
+        private static bool IsPartialContextMatch(TranslationContext recordContext, TranslationContext queryContext)
+        {
+            // ゲームプロファイルIDの一致
+            if (!string.IsNullOrEmpty(recordContext.GameProfileId) && 
+                !string.IsNullOrEmpty(queryContext.GameProfileId) && 
+                recordContext.GameProfileId == queryContext.GameProfileId)
+            {
+                return true;
+            }
+            
+            // シーンIDの一致
+            if (!string.IsNullOrEmpty(recordContext.SceneId) && 
+                !string.IsNullOrEmpty(queryContext.SceneId) && 
+                recordContext.SceneId == queryContext.SceneId)
+            {
+                return true;
+            }
+            
+            // 会話IDの一致
+            if (!string.IsNullOrEmpty(recordContext.DialogueId) && 
+                !string.IsNullOrEmpty(queryContext.DialogueId) && 
+                recordContext.DialogueId == queryContext.DialogueId)
+            {
+                return true;
+            }
+            
+            // タグの部分一致（共通のタグがある場合）
+            if (recordContext.Tags.Count > 0 && queryContext.Tags.Count > 0)
+            {
+                foreach (var tag in queryContext.Tags)
+                {
+                    if (recordContext.Tags.Contains(tag))
+                    {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// コンテキストの一致スコアを計算します
+        /// </summary>
+        /// <param name="recordContext">レコードのコンテキスト</param>
+        /// <param name="queryContext">クエリのコンテキスト</param>
+        /// <returns>一致スコア（0～100）</returns>
+        private static int CalculateContextMatchScore(TranslationContext recordContext, TranslationContext queryContext)
+        {
+            ArgumentNullException.ThrowIfNull(recordContext);
+            ArgumentNullException.ThrowIfNull(queryContext);
+            
+            int score = 0;
+            int maxScore = 0;
+            
+            // ゲームプロファイルIDの一致（30点）
+            if (!string.IsNullOrEmpty(queryContext.GameProfileId))
+            {
+                maxScore += 30;
+                if (!string.IsNullOrEmpty(recordContext.GameProfileId) && 
+                    recordContext.GameProfileId == queryContext.GameProfileId)
+                {
+                    score += 30;
+                }
+            }
+            
+            // シーンIDの一致（25点）
+            if (!string.IsNullOrEmpty(queryContext.SceneId))
+            {
+                maxScore += 25;
+                if (!string.IsNullOrEmpty(recordContext.SceneId) && 
+                    recordContext.SceneId == queryContext.SceneId)
+                {
+                    score += 25;
+                }
+            }
+            
+            // 会話IDの一致（20点）
+            if (!string.IsNullOrEmpty(queryContext.DialogueId))
+            {
+                maxScore += 20;
+                if (!string.IsNullOrEmpty(recordContext.DialogueId) && 
+                    recordContext.DialogueId == queryContext.DialogueId)
+                {
+                    score += 20;
+                }
+            }
+            
+            // タグの一致（タグ1つにつき5点、最大20点）
+            if (queryContext.Tags.Count > 0)
+            {
+                int tagMaxScore = Math.Min(queryContext.Tags.Count * 5, 20);
+                maxScore += tagMaxScore;
+                
+                int matchingTags = 0;
+                foreach (var tag in queryContext.Tags)
+                {
+                    if (recordContext.Tags.Contains(tag))
+                    {
+                        matchingTags++;
+                    }
+                }
+                
+                // マッチしたタグ数に応じたスコア（最大はタグMaxScore）
+                int tagScore = Math.Min(matchingTags * 5, tagMaxScore);
+                score += tagScore;
+            }
+            
+            // スコアを正規化（0～100）
+            return maxScore == 0 ? 0 : (score * 100) / maxScore;
         }
 
         /// <summary>
@@ -135,77 +399,117 @@ namespace Baketa.Core.Translation.Repositories
         {
             ArgumentNullException.ThrowIfNull(query);
             
-            // クエリに基づいて検索
-            var results = _records.Values.AsEnumerable();
-            
-            // テキストパターンフィルター
-            if (!string.IsNullOrEmpty(query.TextPattern))
+            try
             {
-                results = results.Where(r => r.SourceText.Contains(query.TextPattern, StringComparison.OrdinalIgnoreCase));
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                // クエリに基づいて検索
+                var results = _records.Values.AsEnumerable();
+                
+                // テキストパターンフィルター
+                if (!string.IsNullOrEmpty(query.TextPattern))
+                {
+                    results = results.Where(r => r.SourceText.Contains(query.TextPattern, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                // 言語フィルター
+                if (query.SourceLanguage != null)
+                {
+                    results = results.Where(r => r.SourceLanguage.Code.Equals(query.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                if (query.TargetLanguage != null)
+                {
+                    results = results.Where(r => r.TargetLanguage.Code.Equals(query.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                // エンジン名フィルター
+                if (!string.IsNullOrEmpty(query.EngineName))
+                {
+                    results = results.Where(r => r.TranslationEngine.Contains(query.EngineName, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                // ゲームプロファイルIDフィルター
+                if (!string.IsNullOrEmpty(query.GameProfileId))
+                {
+                    results = results.Where(r => r.Context != null && 
+                                              r.Context.GameProfileId != null && 
+                                              r.Context.GameProfileId.Equals(query.GameProfileId, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                // タグフィルター
+                if (query.Tags.Count > 0)
+                {
+                    results = results.Where(r => r.Context != null && HasAnyMatchingTag(r.Context.Tags, query.Tags));
+                }
+                
+                // ユーザー編集済みフィルター
+                if (query.IsUserEdited.HasValue)
+                {
+                    results = results.Where(r => r.IsUserEdited == query.IsUserEdited.Value);
+                }
+                
+                // 作成日時フィルター
+                if (query.CreatedAfter.HasValue)
+                {
+                    results = results.Where(r => r.CreatedAt >= query.CreatedAfter.Value);
+                }
+                
+                if (query.CreatedBefore.HasValue)
+                {
+                    results = results.Where(r => r.CreatedAt <= query.CreatedBefore.Value);
+                }
+                
+                // 並べ替え
+                results = query.SortField.ToUpperInvariant() switch
+                {
+                    "CREATEDAT" => query.SortAscending 
+                        ? results.OrderBy(r => r.CreatedAt) 
+                        : results.OrderByDescending(r => r.CreatedAt),
+                    "LASTUSEDAT" => query.SortAscending 
+                        ? results.OrderBy(r => r.LastUsedAt) 
+                        : results.OrderByDescending(r => r.LastUsedAt),
+                    "USAGECOUNT" => query.SortAscending 
+                        ? results.OrderBy(r => r.UsageCount) 
+                        : results.OrderByDescending(r => r.UsageCount),
+                    "SOURCETEXT" => query.SortAscending 
+                        ? results.OrderBy(r => r.SourceText) 
+                        : results.OrderByDescending(r => r.SourceText),
+                    _ => query.SortAscending 
+                        ? results.OrderBy(r => r.CreatedAt) 
+                        : results.OrderByDescending(r => r.CreatedAt)
+                };
+                
+                // ページング
+                results = results.Skip(query.Offset).Take(query.Limit);
+                
+                // 結果を取得
+                var finalResults = results.Select(r => r.Clone()).ToList();
+                _logger.LogDebug("{Count} 件のレコードが検索条件に一致しました", finalResults.Count);
+                
+                return Task.FromResult<IReadOnlyList<TranslationRecord>>(finalResults);
             }
-            
-            // 言語フィルター
-            if (query.SourceLanguage != null)
+            catch (OperationCanceledException)
             {
-                results = results.Where(r => r.SourceLanguage.Code == query.SourceLanguage.Code);
+                _logger.LogWarning("検索操作がキャンセルされました");
+                return Task.FromResult<IReadOnlyList<TranslationRecord>>([]);
             }
-            
-            if (query.TargetLanguage != null)
+            catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
             {
-                results = results.Where(r => r.TargetLanguage.Code == query.TargetLanguage.Code);
+                _logger.LogError(ex, "検索中に予期しないエラーが発生しました");
+                return Task.FromResult<IReadOnlyList<TranslationRecord>>([]);
             }
-            
-            // エンジン名フィルター
-            if (!string.IsNullOrEmpty(query.EngineName))
-            {
-                results = results.Where(r => r.TranslationEngine.Contains(query.EngineName, StringComparison.OrdinalIgnoreCase));
-            }
-            
-            // ユーザー編集済みフィルター
-            if (query.IsUserEdited.HasValue)
-            {
-                results = results.Where(r => r.IsUserEdited == query.IsUserEdited.Value);
-            }
-            
-            // 作成日時フィルター
-            if (query.CreatedAfter.HasValue)
-            {
-                results = results.Where(r => r.CreatedAt >= query.CreatedAfter.Value);
-            }
-            
-            if (query.CreatedBefore.HasValue)
-            {
-                results = results.Where(r => r.CreatedAt <= query.CreatedBefore.Value);
-            }
-            
-            // 並べ替え
-            results = query.SortField.ToUpperInvariant() switch
-            {
-                "CREATEDAT" => query.SortAscending 
-                    ? results.OrderBy(r => r.CreatedAt) 
-                    : results.OrderByDescending(r => r.CreatedAt),
-                "LASTUSEDAT" => query.SortAscending 
-                    ? results.OrderBy(r => r.LastUsedAt) 
-                    : results.OrderByDescending(r => r.LastUsedAt),
-                "USAGECOUNT" => query.SortAscending 
-                    ? results.OrderBy(r => r.UsageCount) 
-                    : results.OrderByDescending(r => r.UsageCount),
-                "SOURCETEXT" => query.SortAscending 
-                    ? results.OrderBy(r => r.SourceText) 
-                    : results.OrderByDescending(r => r.SourceText),
-                _ => query.SortAscending 
-                    ? results.OrderBy(r => r.CreatedAt) 
-                    : results.OrderByDescending(r => r.CreatedAt)
-            };
-            
-            // ページング
-            results = results.Skip(query.Offset).Take(query.Limit);
-            
-            // 結果を取得
-            var finalResults = results.Select(r => r.Clone()).ToList();
-            _logger.LogDebug("{Count} 件のレコードが検索条件に一致しました", finalResults.Count);
-            
-            return Task.FromResult<IReadOnlyList<TranslationRecord>>(finalResults);
+        }
+        
+        /// <summary>
+        /// いずれかのタグが一致するか確認します
+        /// </summary>
+        /// <param name="recordTags">レコードのタグリスト</param>
+        /// <param name="queryTags">クエリのタグリスト</param>
+        /// <returns>いずれかのタグが一致する場合はtrue</returns>
+        private static bool HasAnyMatchingTag(IReadOnlyList<string> recordTags, IReadOnlyList<string> queryTags)
+        {
+            return recordTags.Count != 0 && queryTags.Count != 0 && queryTags.Any(queryTag => recordTags.Any(recordTag => recordTag.Equals(queryTag, StringComparison.OrdinalIgnoreCase)));
         }
 
         /// <summary>
@@ -241,52 +545,232 @@ namespace Baketa.Core.Translation.Repositories
             CancellationToken cancellationToken = default)
         {
             options ??= new StatisticsOptions();
-            List<TranslationRecord> filteredRecords = new List<TranslationRecord>(_records.Values);
             
-            // 期間フィルター
-            if (options.StartDate.HasValue)
+            try
             {
-                filteredRecords = filteredRecords.Where(r => r.CreatedAt >= options.StartDate.Value).ToList();
-            }
-            
-            if (options.EndDate.HasValue)
-            {
-                filteredRecords = filteredRecords.Where(r => r.CreatedAt <= options.EndDate.Value).ToList();
-            }
-            
-            // 統計の作成
-            var statistics = new TranslationStatistics
-            {
-                TotalRecords = filteredRecords.Count,
-                UserEditedRecords = filteredRecords.Count(r => r.IsUserEdited),
-                // 平均翻訳時間（メタデータから取得）
-                AverageTranslationTimeMs = filteredRecords
-                    .Where(r => r.Metadata.TryGetValue("ProcessingTimeMs", out var time) && time is long)
-                    .Select(r => (float)(long)r.Metadata["ProcessingTimeMs"]!)
-                    .DefaultIfEmpty(0)
-                    .Average()
-            };
-            
-            // 言語ペア別統計
-            if (options.IncludeLanguagePairStats)
-            {
-                foreach (var group in filteredRecords.GroupBy(r => $"{r.SourceLanguage.Code}-{r.TargetLanguage.Code}"))
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                List<TranslationRecord> filteredRecords = [];
+                if (options.StartDate.HasValue || options.EndDate.HasValue)
                 {
-                    ((Dictionary<string, int>)statistics.RecordsByLanguagePair)[group.Key] = group.Count();
+                    // 期間でフィルターがある場合のみコピーしてフィルタリング
+                    filteredRecords = [.. _records.Values];
+
+                    // 計算対象のレコードを期間でフィルタリング
+                    if (options.StartDate.HasValue)
+                        filteredRecords = filteredRecords.Where(r => r.CreatedAt >= options.StartDate.Value).ToList();
+                    
+                    if (options.EndDate.HasValue)
+                        filteredRecords = filteredRecords.Where(r => r.CreatedAt <= options.EndDate.Value).ToList();
+                }
+                else
+                {
+                    // フィルターがない場合は単純に全レコードを使用
+                    filteredRecords = [.. _records.Values];
+                }
+                
+                // 統計の作成
+                var statistics = new TranslationStatistics
+                {
+                    TotalRecords = filteredRecords.Count,
+                    UserEditedRecords = filteredRecords.Count(r => r.IsUserEdited),
+                    GeneratedAt = DateTime.UtcNow
+                };
+                
+                // 平均翻訳時間の計算（メタデータから取得）
+                if (options.IncludePerformanceStats)
+                {
+                    var processingTimes = new List<float>();
+                    foreach (var record in filteredRecords)
+                    {
+                        if (record.Metadata.TryGetValue("ProcessingTimeMs", out var time) && time is long timeValue)
+                        {
+                            processingTimes.Add((float)timeValue);
+                        }
+                    }
+                    
+                    statistics.AverageTranslationTimeMs = processingTimes.Count > 0 
+                        ? processingTimes.Average() 
+                        : 0f;
+                    
+                    // キャッシュヒット率の計算（メタデータから取得）
+                    int cacheHits = filteredRecords.Count(r => 
+                        r.Metadata.TryGetValue("FromCache", out var fromCache) && 
+                        fromCache is bool fc && fc);
+                    
+                    statistics.CacheHitRate = filteredRecords.Count > 0 
+                        ? (float)cacheHits / filteredRecords.Count 
+                        : 0f;
+                }
+                
+                // 言語ペア別統計
+                if (options.IncludeLanguagePairStats)
+                {
+                    foreach (var group in filteredRecords.GroupBy(r => 
+                        $"{r.SourceLanguage.Code.ToUpperInvariant()}-{r.TargetLanguage.Code.ToUpperInvariant()}"))
+                    {
+                        statistics.AddLanguagePairCount(group.Key, group.Count());
+                    }
+                }
+                
+                // エンジン別統計
+                if (options.IncludeEngineStats)
+                {
+                    foreach (var group in filteredRecords.GroupBy(r => r.TranslationEngine))
+                    {
+                        statistics.AddEngineCount(group.Key, group.Count());
+                    }
+                }
+                
+                // ゲームプロファイル別統計
+                if (options.IncludeGameProfileStats)
+                {
+                    var recordsByGameProfile = filteredRecords
+                        .Where(r => r.Context != null && !string.IsNullOrEmpty(r.Context.GameProfileId))
+                        .GroupBy(r => r.Context!.GameProfileId!);
+                    
+                    foreach (var group in recordsByGameProfile)
+                    {
+                        statistics.AddGameProfileCount(group.Key, group.Count());
+                    }
+                }
+                
+                // タグ別統計
+                if (options.IncludeTagStats)
+                {
+                    Dictionary<string, int> allTags = [];
+                    
+                    foreach (var record in filteredRecords.Where(r => r.Context != null && r.Context.Tags.Count > 0))
+                    {
+                        foreach (var tag in record.Context!.Tags)
+                        {
+                            allTags[tag] = allTags.TryGetValue(tag, out int count) ? count + 1 : 1;
+                        }
+                    }
+                    
+                    foreach (var tag in allTags)
+                    {
+                        statistics.AddTagCount(tag.Key, tag.Value);
+                    }
+                }
+                
+                // 時間帯別統計
+                if (options.IncludeTimeFrameStats && filteredRecords.Count > 0)
+                {
+                    var timeFrames = GenerateTimeFrames(filteredRecords, options);
+                    foreach (var frame in timeFrames)
+                    {
+                        statistics.AddTimeFrameCount(frame.Key, frame.Value);
+                    }
+                }
+                
+                _logger.LogDebug("翻訳統計を生成しました（総数: {Count}件）", statistics.TotalRecords);
+                return Task.FromResult(statistics);
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex, "翻訳統計の生成がキャンセルされました");
+                return Task.FromResult(new TranslationStatistics { GeneratedAt = DateTime.UtcNow });
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
+            {
+                _logger.LogError(ex, "翻訳統計の生成中にエラーが発生しました");
+                return Task.FromResult(new TranslationStatistics { GeneratedAt = DateTime.UtcNow });
+            }
+        }
+        
+        /// <summary>
+        /// 時間帯別統計用のデータを生成します
+        /// </summary>
+        /// <param name="records">翻訳レコードリスト</param>
+        /// <param name="options">統計オプション</param>
+        /// <returns>時間帯別の記録数</returns>
+        private static Dictionary<string, int> GenerateTimeFrames(List<TranslationRecord> records, StatisticsOptions options)
+        {
+            Dictionary<string, int> result = [];
+            
+            // 開始日と終了日を計算
+            DateTime startDate = options.StartDate ?? records.Min(r => r.CreatedAt).Date;
+            DateTime endDate = options.EndDate ?? DateTime.UtcNow;
+            
+            // 日付の差
+            int totalDays = (int)(endDate - startDate).TotalDays + 1;
+            
+            // 適切な時間間隔を決定
+            if (totalDays <= 7) // 1週間以内
+            {
+                // 時間単位でグルーピング
+#pragma warning disable IDE0037 // メンバーの名前を簡素化できます
+                var hourlyGroups = records
+                    .GroupBy(r => new { r.CreatedAt.Date, Hour = r.CreatedAt.Hour })
+                    .Select(g => new { TimeFrame = $"{g.Key.Date:yyyy-MM-dd} {g.Key.Hour:D2}:00", Count = g.Count() })
+                    .OrderBy(g => g.TimeFrame);
+#pragma warning restore IDE0037 // メンバーの名前を簡素化できます
+                
+                foreach (var group in hourlyGroups)
+                {
+                    result[group.TimeFrame] = group.Count;
+                }
+            }
+            else if (totalDays <= 31) // 1ヶ月以内
+            {
+                // 日付単位でグルーピング
+                var dailyGroups = records
+                    .GroupBy(r => r.CreatedAt.Date)
+                    .Select(g => new { TimeFrame = $"{g.Key:yyyy-MM-dd}", Count = g.Count() })
+                    .OrderBy(g => g.TimeFrame);
+                
+                foreach (var group in dailyGroups)
+                {
+                    result[group.TimeFrame] = group.Count;
+                }
+            }
+            else if (totalDays <= 365) // 1年以内
+            {
+                // 週単位でグルーピング
+                var weeklyGroups = records
+                    .GroupBy(r => $"{r.CreatedAt.Year}-W{GetIso8601WeekOfYear(r.CreatedAt)}")
+                    .Select(g => new { TimeFrame = g.Key, Count = g.Count() })
+                    .OrderBy(g => g.TimeFrame);
+                
+                foreach (var group in weeklyGroups)
+                {
+                    result[group.TimeFrame] = group.Count;
+                }
+            }
+            else
+            {
+                // 月単位でグルーピング
+#pragma warning disable IDE0037 // メンバーの名前を簡素化できます
+                var monthlyGroups = records
+                    .GroupBy(r => new { r.CreatedAt.Year, r.CreatedAt.Month })
+                    .Select(g => new { TimeFrame = $"{g.Key.Year}-{g.Key.Month:D2}", Count = g.Count() })
+                    .OrderBy(g => g.TimeFrame);
+#pragma warning restore IDE0037 // メンバーの名前を簡素化できます
+                
+                foreach (var group in monthlyGroups)
+                {
+                    result[group.TimeFrame] = group.Count;
                 }
             }
             
-            // エンジン別統計
-            if (options.IncludeEngineStats)
-            {
-                foreach (var group in filteredRecords.GroupBy(r => r.TranslationEngine))
-                {
-                    ((Dictionary<string, int>)statistics.RecordsByEngine)[group.Key] = group.Count();
-                }
-            }
+            return result;
+        }
+        
+        /// <summary>
+        /// ISO 8601形式で週番号を取得します
+        /// </summary>
+        /// <param name="date">日付</param>
+        /// <returns>週番号</returns>
+        private static int GetIso8601WeekOfYear(DateTime date)
+        {
+            // ISO 8601: 週の始まりは月曜日、運年の最初の週は1月4日を含む週
+            var cal = System.Globalization.CultureInfo.InvariantCulture.Calendar;
             
-            _logger.LogDebug("翻訳統計を生成しました（総数: {Count}件）", statistics.TotalRecords);
-            return Task.FromResult(statistics);
+            // 調整した日付の週番号を返す
+            return cal.GetWeekOfYear(date, 
+                System.Globalization.CalendarWeekRule.FirstFourDayWeek, 
+                DayOfWeek.Monday);
         }
 
         /// <summary>
@@ -301,65 +785,55 @@ namespace Baketa.Core.Translation.Repositories
         {
             options ??= new CacheClearOptions { ClearAll = true };
             
-            if (options.ClearAll)
+            try
             {
-                var count = _records.Count;
-                _records.Clear();
-                _logger.LogDebug("すべてのレコード ({Count}件) をクリアしました", count);
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                if (options.ClearAll)
+                {
+                    var count = _records.Count;
+                    _records.Clear();
+                    _logger.LogDebug("すべてのレコード ({Count}件) をクリアしました", count);
+                    return Task.FromResult(true);
+                }
+                
+                var keysToRemove = _records.Values
+                    .Where(record => 
+                        (options.GameProfileId is null or "" ||  // ゲームプロファイルIDフィルター
+                         (record.Context != null && 
+                          !string.IsNullOrEmpty(record.Context.GameProfileId) &&
+                          record.Context.GameProfileId.Equals(options.GameProfileId, StringComparison.OrdinalIgnoreCase))) &&
+                        (!options.PreserveUserEdited || !record.IsUserEdited) &&  // ユーザー編集済みレコードの保持
+                        (options.SourceLanguage == null ||  // 言語フィルター
+                         record.SourceLanguage.Code.Equals(options.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase)) &&
+                        (options.TargetLanguage == null || 
+                         record.TargetLanguage.Code.Equals(options.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase)) &&
+                        (options.EngineName is null or "" ||  // エンジン名フィルター
+                         record.TranslationEngine.Contains(options.EngineName, StringComparison.OrdinalIgnoreCase)) &&
+                        (!options.OlderThan.HasValue || record.CreatedAt < options.OlderThan.Value)  // 日時フィルター
+                    )
+                    .Select(record => record.Id)
+                    .ToList();
+                
+                // 収集したキーを削除
+                foreach (var key in keysToRemove)
+                {
+                    _records.Remove(key);
+                }
+                
+                _logger.LogDebug("{Count} 件のレコードをクリアしました", keysToRemove.Count);
                 return Task.FromResult(true);
             }
-            
-            // 削除対象のキーを収集
-            var keysToRemove = new List<Guid>();
-            
-            foreach (var record in _records.Values)
+            catch (OperationCanceledException ex)
             {
-                var shouldRemove = true;
-                
-                // ユーザー編集済みレコードの保持
-                if (options.PreserveUserEdited && record.IsUserEdited)
-                {
-                    shouldRemove = false;
-                }
-                
-                // 言語フィルター
-                if (options.SourceLanguage != null && record.SourceLanguage.Code != options.SourceLanguage.Code)
-                {
-                    shouldRemove = false;
-                }
-                
-                if (options.TargetLanguage != null && record.TargetLanguage.Code != options.TargetLanguage.Code)
-                {
-                    shouldRemove = false;
-                }
-                
-                // エンジン名フィルター
-                if (!string.IsNullOrEmpty(options.EngineName) && 
-                    !record.TranslationEngine.Contains(options.EngineName, StringComparison.OrdinalIgnoreCase))
-                {
-                    shouldRemove = false;
-                }
-                
-                // 日時フィルター
-                if (options.OlderThan.HasValue && record.CreatedAt >= options.OlderThan.Value)
-                {
-                    shouldRemove = false;
-                }
-                
-                if (shouldRemove)
-                {
-                    keysToRemove.Add(record.Id);
-                }
+                _logger.LogWarning(ex, "キャッシュクリア操作がキャンセルされました");
+                return Task.FromResult(false);
             }
-            
-            // 収集したキーを削除
-            foreach (var key in keysToRemove)
+            catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
             {
-                _records.Remove(key);
+                _logger.LogError(ex, "キャッシュクリア中にエラーが発生しました");
+                return Task.FromResult(false);
             }
-            
-            _logger.LogDebug("{Count} 件のレコードをクリアしました", keysToRemove.Count);
-            return Task.FromResult(true);
         }
     }
 }
