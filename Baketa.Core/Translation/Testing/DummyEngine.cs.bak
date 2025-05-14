@@ -1,0 +1,38 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Baketa.Core.Translation.Abstractions;
+using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Models;
+
+namespace Baketa.Core.Translation.Testing
+{
+    /// <summary>
+    /// 抽象基底クラスの最小実装用テストクラス
+    /// </summary>
+    public class DummyEngine : TranslationEngineBase
+    {
+        /// <summary>
+        /// 翻訳エンジン名
+        /// </summary>
+        public override string Name => "DummyEngine";
+
+        /// <summary>
+        /// 翻訳エンジンの説明
+        /// </summary>
+        public override string Description => "ダミー実装";
+
+        /// <summary>
+        /// ネットワーク接続が必要か
+        /// </summary>
+        public override bool RequiresNetwork => false;
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        public DummyEngine() : base(null)
+        {
+        }
+    }
+}

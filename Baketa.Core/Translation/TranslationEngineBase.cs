@@ -8,9 +8,11 @@ using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Models.Translation;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+
+// 名前空間エイリアスを定義して曖昧さを回避
+using CoreModels = Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Translation
 {
@@ -45,22 +47,22 @@ namespace Baketa.Core.Translation
         /// <param name="logger">ロガー</param>
         protected TranslationEngineBase(ILogger<TranslationEngineBase> logger)
         {
-        ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(logger);
             _logger = logger;
-    }
+        }
 
         /// <summary>
         /// サポートしている言語ペアを取得します
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        public abstract Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync();
+        public abstract Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync();
 
         /// <summary>
         /// 指定された言語ペアをサポートしているかどうかを確認します
         /// </summary>
         /// <param name="languagePair">確認する言語ペア</param>
         /// <returns>サポートしていればtrue</returns>
-        public virtual async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
+        public virtual async Task<bool> SupportsLanguagePairAsync(CoreModels.LanguagePair languagePair)
         {
             var supportedPairs = await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
             return supportedPairs.Any(pair => pair.Equals(languagePair));
@@ -72,11 +74,11 @@ namespace Baketa.Core.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        public async Task<TranslationResponse> TranslateAsync(
-        TranslationRequest request, 
-        CancellationToken cancellationToken = default)
+        public async Task<CoreModels.TranslationResponse> TranslateAsync(
+            CoreModels.TranslationRequest request, 
+            CancellationToken cancellationToken = default)
         {
-        ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(request);
 
             // エンジンの準備状態を確認
             if (!await IsReadyAsync().ConfigureAwait(false))
@@ -86,19 +88,24 @@ namespace Baketa.Core.Translation
                 {
                     return CreateErrorResponse(
                         request,
-                        TranslationError.ServiceUnavailable,
+                        CoreModels.TranslationError.ServiceUnavailable,
                         $"翻訳エンジン {Name} の初期化に失敗しました。");
                 }
             }
 
             // 言語ペアのサポートを確認
-            var languagePair = LanguagePair.Create(request.SourceLanguage, request.TargetLanguage);
+            var languagePair = new CoreModels.LanguagePair 
+            { 
+                SourceLanguage = request.SourceLanguage, 
+                TargetLanguage = request.TargetLanguage 
+            };
+            
             var isSupported = await SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
             if (!isSupported)
             {
                 return CreateErrorResponse(
                     request,
-                    TranslationError.UnsupportedLanguagePair,
+                    CoreModels.TranslationError.UnsupportedLanguagePair,
                     $"言語ペア {languagePair} はサポートされていません。");
             }
 
@@ -110,7 +117,7 @@ namespace Baketa.Core.Translation
                 {
                     return CreateErrorResponse(
                         request,
-                        TranslationError.NetworkError,
+                        CoreModels.TranslationError.NetworkError,
                         "ネットワーク接続が利用できません。");
                 }
             }
@@ -136,7 +143,7 @@ namespace Baketa.Core.Translation
                 _logger.LogWarning("翻訳がキャンセルされました: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponse(
                     request,
-                    TranslationError.TimeoutError,
+                    CoreModels.TranslationError.TimeoutError,
                     "翻訳処理がキャンセルされました。");
             }
             catch (TimeoutException ex)
@@ -144,7 +151,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳タイムアウト: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.TimeoutError,
+                    CoreModels.TranslationError.TimeoutError,
                     "翻訳処理がタイムアウトしました。",
                     ex);
             }
@@ -153,7 +160,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳の無効な操作: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.InvalidRequest,
+                    CoreModels.TranslationError.InvalidRequest,
                     "翻訳処理中に無効な操作が発生しました。",
                     ex);
             }
@@ -162,7 +169,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳の引数エラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.InvalidRequest,
+                    CoreModels.TranslationError.InvalidRequest,
                     "翻訳処理に無効な引数が提供されました。",
                     ex);
             }
@@ -171,7 +178,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中のHTTPリクエストエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.NetworkError,
+                    CoreModels.TranslationError.NetworkError,
                     "翻訳サービスとの通信中にエラーが発生しました。",
                     ex);
             }
@@ -180,7 +187,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中のI/Oエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.InternalError,
+                    CoreModels.TranslationError.InternalError,
                     "翻訳処理中にI/Oエラーが発生しました。",
                     ex);
             }
@@ -197,7 +204,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中の予期しないエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    TranslationError.InternalError,
+                    CoreModels.TranslationError.InternalError,
                     "翻訳処理中に予期しないエラーが発生しました。",
                     ex);
             }
@@ -209,8 +216,8 @@ namespace Baketa.Core.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        protected abstract Task<TranslationResponse> TranslateInternalAsync(
-            TranslationRequest request,
+        protected abstract Task<CoreModels.TranslationResponse> TranslateInternalAsync(
+            CoreModels.TranslationRequest request,
             CancellationToken cancellationToken);
 
         /// <summary>
@@ -219,14 +226,14 @@ namespace Baketa.Core.Translation
         /// <param name="requests">翻訳リクエストのコレクション</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのコレクション</returns>
-        public virtual async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
-        IReadOnlyList<TranslationRequest> requests, 
-        CancellationToken cancellationToken = default)
+        public virtual async Task<IReadOnlyList<CoreModels.TranslationResponse>> TranslateBatchAsync(
+            IReadOnlyList<CoreModels.TranslationRequest> requests, 
+            CancellationToken cancellationToken = default)
         {
-        ArgumentNullException.ThrowIfNull(requests);
-        
-        if (requests.Count == 0)
-        {
+            ArgumentNullException.ThrowIfNull(requests);
+            
+            if (requests.Count == 0)
+            {
                 throw new ArgumentException("リクエストが空です。", nameof(requests));
             }
 
@@ -332,14 +339,14 @@ namespace Baketa.Core.Translation
                 return false;
             }
             catch (Exception ex) when (ex is not OperationCanceledException && 
-                                  ex is not TimeoutException && 
-                                  ex is not InvalidOperationException && 
-                                  ex is not ArgumentException && 
-                                  ex is not System.Net.Http.HttpRequestException && 
-                                  ex is not System.IO.IOException && 
-                                  ex is not ObjectDisposedException && 
-                                  ex is not NotImplementedException && 
-                                  ex is not NotSupportedException)
+                                      ex is not TimeoutException && 
+                                      ex is not InvalidOperationException && 
+                                      ex is not ArgumentException && 
+                                      ex is not System.Net.Http.HttpRequestException && 
+                                      ex is not System.IO.IOException && 
+                                      ex is not ObjectDisposedException && 
+                                      ex is not NotImplementedException && 
+                                      ex is not NotSupportedException)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化中に予期しないエラーが発生しました", Name);
                 _isInitialized = false;
@@ -365,33 +372,33 @@ namespace Baketa.Core.Translation
             Justification = "ネットワーク診断目的のメソッドであり、あらゆる例外をキャッチして接続不可と判断する必要があるため")]
         protected virtual Task<bool> CheckNetworkConnectivityAsync()
         {
-        // 基本実装 - 継承先で必要に応じてオーバーライド
-        try
-        {
-        using var ping = new Ping();
-        var reply = ping.Send("8.8.8.8", 1000);
-        return Task.FromResult(reply?.Status == IPStatus.Success);
-        }
-        catch (Exception ex) when (ex is PingException || ex is InvalidOperationException)
-        {
-            _logger.LogDebug(ex, "ネットワーク接続確認中にエラーが発生しました");
-            return Task.FromResult(false);
-        }
-        catch (Exception ex) when (ex is SecurityException ||
-                         ex is SocketException ||
-                         ex is NetworkInformationException)
-        {
-            _logger.LogDebug(ex, "ネットワーク接続確認中にネットワーク関連のエラーが発生しました");
-            return Task.FromResult(false);
-        }
-        catch (Exception ex)
-        {
-            // 全ての例外をログ記録し、接続不可として扱う
-            // このメソッドは診断目的のためであり、例外が発生しても致命的ではないため
-            // 汎用的な例外キャッチはここでは適切
-            _logger.LogWarning(ex, "ネットワーク接続確認中に予期しないエラーが発生しました: {ExceptionType}", ex.GetType().Name);
-            return Task.FromResult(false);
-        }
+            // 基本実装 - 継承先で必要に応じてオーバーライド
+            try
+            {
+                using var ping = new Ping();
+                var reply = ping.Send("8.8.8.8", 1000);
+                return Task.FromResult(reply?.Status == IPStatus.Success);
+            }
+            catch (Exception ex) when (ex is PingException || ex is InvalidOperationException)
+            {
+                _logger.LogDebug(ex, "ネットワーク接続確認中にエラーが発生しました");
+                return Task.FromResult(false);
+            }
+            catch (Exception ex) when (ex is SecurityException ||
+                                     ex is SocketException ||
+                                     ex is NetworkInformationException)
+            {
+                _logger.LogDebug(ex, "ネットワーク接続確認中にネットワーク関連のエラーが発生しました");
+                return Task.FromResult(false);
+            }
+            catch (Exception ex)
+            {
+                // 全ての例外をログ記録し、接続不可として扱う
+                // このメソッドは診断目的のためであり、例外が発生しても致命的ではないため
+                // 汎用的な例外キャッチはここでは適切
+                _logger.LogWarning(ex, "ネットワーク接続確認中に予期しないエラーが発生しました: {ExceptionType}", ex.GetType().Name);
+                return Task.FromResult(false);
+            }
         }
 
         /// <summary>
@@ -401,12 +408,12 @@ namespace Baketa.Core.Translation
         /// <returns>処理時間（ミリ秒）</returns>
         protected static async Task<long> MeasureExecutionTimeAsync(Func<Task> action)
         {
-        ArgumentNullException.ThrowIfNull(action);
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        await action().ConfigureAwait(false);
-        sw.Stop();
+            ArgumentNullException.ThrowIfNull(action);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            await action().ConfigureAwait(false);
+            sw.Stop();
             return sw.ElapsedMilliseconds;
-    }
+        }
 
         /// <summary>
         /// 翻訳処理時間を計測します
@@ -416,12 +423,12 @@ namespace Baketa.Core.Translation
         /// <returns>(戻り値, 処理時間（ミリ秒）)のタプル</returns>
         protected static async Task<(T Result, long ElapsedMs)> MeasureExecutionTimeAsync<T>(Func<Task<T>> func)
         {
-        ArgumentNullException.ThrowIfNull(func);
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        var result = await func().ConfigureAwait(false);
-        sw.Stop();
+            ArgumentNullException.ThrowIfNull(func);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await func().ConfigureAwait(false);
+            sw.Stop();
             return (result, sw.ElapsedMilliseconds);
-    }
+        }
 
         /// <summary>
         /// 標準的なエラーレスポンスを作成します
@@ -431,20 +438,21 @@ namespace Baketa.Core.Translation
         /// <param name="message">エラーメッセージ</param>
         /// <param name="details">詳細（オプション）</param>
         /// <returns>エラーを含む翻訳レスポンス</returns>
-        protected TranslationResponse CreateErrorResponse(
-        TranslationRequest request, 
-        string errorCode, 
-        string message,
-        string? details = null)
+        protected CoreModels.TranslationResponse CreateErrorResponse(
+            CoreModels.TranslationRequest request, 
+            string errorCode, 
+            string message,
+            string? details = null)
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentNullException.ThrowIfNull(errorCode);
             ArgumentNullException.ThrowIfNull(message);
+            
             _logger.LogError(
                 "翻訳エラー: {ErrorCode}, {Message}, リクエストID={RequestId}",
                 errorCode, message, request.RequestId);
 
-            return new TranslationResponse
+            return new CoreModels.TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,
@@ -452,7 +460,7 @@ namespace Baketa.Core.Translation
                 TargetLanguage = request.TargetLanguage,
                 EngineName = Name,
                 IsSuccess = false,
-                Error = new TranslationError
+                Error = new CoreModels.TranslationError
                 {
                     ErrorCode = errorCode,
                     Message = message,
@@ -469,21 +477,22 @@ namespace Baketa.Core.Translation
         /// <param name="message">エラーメッセージ</param>
         /// <param name="exception">例外</param>
         /// <returns>エラーを含む翻訳レスポンス</returns>
-        protected TranslationResponse CreateErrorResponseFromException(
-        TranslationRequest request, 
-        string errorCode, 
-        string message, 
-        Exception exception)
+        protected CoreModels.TranslationResponse CreateErrorResponseFromException(
+            CoreModels.TranslationRequest request, 
+            string errorCode, 
+            string message, 
+            Exception exception)
         {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(errorCode);
-        ArgumentNullException.ThrowIfNull(message);
-        ArgumentNullException.ThrowIfNull(exception);
-        _logger.LogError(exception,
-        "翻訳エラー: {ErrorCode}, {Message}, リクエストID={RequestId}",
-        errorCode, message, request.RequestId);
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(errorCode);
+            ArgumentNullException.ThrowIfNull(message);
+            ArgumentNullException.ThrowIfNull(exception);
+            
+            _logger.LogError(exception,
+                "翻訳エラー: {ErrorCode}, {Message}, リクエストID={RequestId}",
+                errorCode, message, request.RequestId);
 
-            return new TranslationResponse
+            return new CoreModels.TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,
@@ -491,7 +500,7 @@ namespace Baketa.Core.Translation
                 TargetLanguage = request.TargetLanguage,
                 EngineName = Name,
                 IsSuccess = false,
-                Error = new TranslationError
+                Error = new CoreModels.TranslationError
                 {
                     ErrorCode = errorCode,
                     Message = message,

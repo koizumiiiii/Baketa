@@ -338,7 +338,56 @@ Issue #1～#6の対応により、旧名前空間のインターフェースは�
    public class MyClass : IImage  // Baketa.Core.Abstractions.Imaging.IImage
    ```
 
-## 7. まとめ
+## 8. 翻訳システムの名前空間構造
+
+翻訳システムにおいて、以下の2つの名前空間が存在します：
+
+```
+Baketa.Core.Models.Translation     // 標準の翻訳モデル名前空間
+Baketa.Core.Translation.Models    // 翻訳機能固有のモデル名前空間
+```
+
+これらは以下のように使い分けられています：
+
+### 8.1 `Baketa.Core.Models.Translation`
+
+- 主に外部サービスとの連携に使用される標準データモデル
+- `TranslationRequest`, `TranslationResponse`, `Language`, `LanguagePair` などの基本モデルを定義
+- アプリケーション全体で共有される翻訳関連の一般的なデータ構造
+
+### 8.2 `Baketa.Core.Translation.Models`
+
+- 翻訳システムの内部実装に特化した拡張モデル
+- `TranslationContext`, `TranslationCacheEntry`, `TranslationManagementOptions` などの詳細実装モデル
+- キャッシュやイベントなど翻訳システムの拡張機能に関連するデータ構造
+
+### 8.3 名前空間の競合を避ける
+
+同じ名前のクラスが複数の名前空間に存在する場合、以下のアプローチを使用して名前空間の競合を避けてください：
+
+```csharp
+// 名前空間エイリアスを定義して曖昧さを回避
+using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
+
+// 使用例
+public Task<CoreModels.TranslationResponse> TranslateAsync(
+    CoreModels.TranslationRequest request,
+    TransModels.TranslationContext context)
+{
+    // 実装
+}
+```
+
+### 8.4 長期的な目標
+
+長期的には、下記のように名前空間を整理していく予定です：
+
+- `Baketa.Core.Models.Translation` を標準名前空間として維持
+- 重複するデータモデルを標準名前空間に統合
+- 標準名前空間に統合できない延長モデルは `Baketa.Core.Translation.Models.機能名` のように分類
+
+## 9. まとめ
 
 新しい名前空間構造は、より明確な責任分担と拡張性の高いアーキテクチャを実現します。このガイドラインに従うことで、一貫性のあるコードベースを維持し、名前空間の衝突や構造上の問題を防ぐことができます。
 
