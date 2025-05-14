@@ -1,6 +1,14 @@
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
-using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Cache;
 using Baketa.Core.Translation.Events;
+using Baketa.Core.Translation.Factories;
+using Baketa.Core.Translation.Repositories;
+using Baketa.Core.Translation.Services;
+using Baketa.Core.Translation.Testing;
+using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -53,7 +61,12 @@ namespace Baketa.Core.Translation.DI
             // HttpClientを登録
             services.AddHttpClient();
             
-            // 各エンジンの登録はInfrastructureレイヤーで実装
+            // 翻訳エンジン登録
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, DummyEngine>();
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, SimpleEngine>();
+            
+            // 翻訳エンジンファクトリーの登録
+            services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
             
             return services;
         }
@@ -71,7 +84,9 @@ namespace Baketa.Core.Translation.DI
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(options);
             
-            // 翻訳結果管理の登録はInfrastructureレイヤーで実装
+            // 翻訳結果管理サービスの登録
+            services.AddSingleton<ITranslationManager, InMemoryTranslationManager>();
+            services.AddSingleton<ITranslationRepository, InMemoryTranslationRepository>();
             
             return services;
         }
@@ -89,7 +104,17 @@ namespace Baketa.Core.Translation.DI
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(options);
             
-            // 翻訳キャッシュの登録はInfrastructureレイヤーで実装
+            // 翻訳キャッシュの登録
+            if (options.EnableMemoryCache)
+            {
+                services.AddSingleton<ITranslationCache, MemoryTranslationCache>();
+            }
+            
+            if (options.EnablePersistentCache)
+            {
+                // 引数の確認のために仮実装を使用
+                services.AddSingleton<ITranslationPersistentCache, DummyPersistentCache>();
+            }
             
             return services;
         }
@@ -110,7 +135,13 @@ namespace Baketa.Core.Translation.DI
             // 基本的なイベント型の登録
             if (options.EnableEvents)
             {
-                // イベントハンドラーの登録はアプリケーションレイヤーで実装
+                // イベントアグリゲーターを登録
+                services.AddSingleton<IEventAggregator, DefaultEventAggregator>();
+
+                // イベントハンドラーを登録
+                services.AddTransient<ITranslationEventHandler<TranslationStartedEvent>, LoggingTranslationEventHandler>();
+                services.AddTransient<ITranslationEventHandler<TranslationCompletedEvent>, LoggingTranslationEventHandler>();
+                services.AddTransient<ITranslationEventHandler<TranslationErrorEvent>, LoggingTranslationEventHandler>();
             }
             
             return services;

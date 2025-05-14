@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
@@ -11,89 +12,77 @@ namespace Baketa.Core.Translation.Abstractions
     public interface ITranslationCache
     {
         /// <summary>
-        /// キャッシュからテキストを取得します
+        /// キャッシュからエントリを取得します
         /// </summary>
         /// <param name="key">キャッシュキー</param>
-        /// <returns>キャッシュされた翻訳結果、存在しない場合はnull</returns>
-        Task<TranslationCacheEntry?> GetAsync(string key);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>キャッシュエントリ（存在しない場合はnull）</returns>
+        Task<TranslationCacheEntry?> GetAsync(string key, CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// 複数のキーに対応するキャッシュを一括取得します
+        /// 複数のキャッシュエントリを取得します
         /// </summary>
-        /// <param name="keys">キャッシュキーのリスト</param>
-        /// <returns>キーと翻訳結果のディクショナリ</returns>
-        Task<IDictionary<string, TranslationCacheEntry>> GetManyAsync(IEnumerable<string> keys);
+        /// <param name="keys">キャッシュキーのコレクション</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>キャッシュエントリの辞書</returns>
+        Task<IDictionary<string, TranslationCacheEntry>> GetManyAsync(
+            IEnumerable<string> keys,
+            CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// テキストをキャッシュに保存します
+        /// キャッシュにエントリを保存します
         /// </summary>
         /// <param name="key">キャッシュキー</param>
         /// <param name="entry">キャッシュエントリ</param>
-        /// <param name="expiration">有効期限（null=無期限）</param>
-        /// <returns>保存が成功したかどうか</returns>
-        Task<bool> SetAsync(string key, TranslationCacheEntry entry, TimeSpan? expiration = null);
+        /// <param name="expiration">有効期限（null=デフォルト）</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>保存に成功した場合はtrue</returns>
+        Task<bool> SetAsync(
+            string key,
+            TranslationCacheEntry entry,
+            TimeSpan? expiration = null,
+            CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// 複数のエントリを一括保存します
+        /// 複数のキャッシュエントリを保存します
         /// </summary>
-        /// <param name="entries">キーとエントリのディクショナリ</param>
-        /// <param name="expiration">有効期限（null=無期限）</param>
-        /// <returns>保存が成功したかどうか</returns>
-        Task<bool> SetManyAsync(IDictionary<string, TranslationCacheEntry> entries, TimeSpan? expiration = null);
+        /// <param name="entries">キャッシュエントリの辞書</param>
+        /// <param name="expiration">有効期限（null=デフォルト）</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>保存に成功した場合はtrue</returns>
+        Task<bool> SetManyAsync(
+            IDictionary<string, TranslationCacheEntry> entries,
+            TimeSpan? expiration = null,
+            CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// キャッシュからアイテムを削除します
+        /// キャッシュからエントリを削除します
         /// </summary>
         /// <param name="key">キャッシュキー</param>
-        /// <returns>削除が成功したかどうか</returns>
-        Task<bool> RemoveAsync(string key);
-        
-        /// <summary>
-        /// 複数のキーに対応するキャッシュを一括削除します
-        /// </summary>
-        /// <param name="keys">キャッシュキーのリスト</param>
-        /// <returns>削除が成功したかどうか</returns>
-        Task<bool> RemoveManyAsync(IEnumerable<string> keys);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>削除に成功した場合はtrue</returns>
+        Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// キャッシュをクリアします
         /// </summary>
-        /// <returns>クリアが成功したかどうか</returns>
-        Task<bool> ClearAsync();
-        
-        /// <summary>
-        /// キャッシュのキー一覧を取得します
-        /// </summary>
-        /// <param name="pattern">検索パターン</param>
-        /// <param name="maxCount">最大取得数</param>
-        /// <returns>キャッシュキーのリスト</returns>
-        Task<IEnumerable<string>> GetKeysAsync(string? pattern = null, int maxCount = 1000);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>クリアに成功した場合はtrue</returns>
+        Task<bool> ClearAsync(CancellationToken cancellationToken = default);
         
         /// <summary>
         /// キャッシュの統計情報を取得します
         /// </summary>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>キャッシュ統計情報</returns>
-        Task<CacheStatistics> GetStatisticsAsync();
-        
-        /// <summary>
-        /// キャッシュを最適化します
-        /// </summary>
-        /// <returns>最適化が成功したかどうか</returns>
-        Task<bool> OptimizeAsync();
-        
-        /// <summary>
-        /// キャッシュをエクスポートします
-        /// </summary>
-        /// <param name="filePath">エクスポート先ファイルパス</param>
-        /// <returns>エクスポートが成功したかどうか</returns>
-        Task<bool> ExportAsync(string filePath);
-        
-        /// <summary>
-        /// キャッシュをインポートします
-        /// </summary>
-        /// <param name="filePath">インポート元ファイルパス</param>
-        /// <param name="mergeStrategy">マージ戦略</param>
-        /// <returns>インポートが成功したかどうか</returns>
-        Task<bool> ImportAsync(string filePath, CacheMergeStrategy mergeStrategy = CacheMergeStrategy.ReplaceExisting);
+        Task<CacheStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default);
+    }
+    
+    /// <summary>
+    /// 永続化キャッシュインターフェース
+    /// </summary>
+    public interface ITranslationPersistentCache : ITranslationCache
+    {
+        // 永続化キャッシュ特有のメソッドがあれば追加
     }
 }
