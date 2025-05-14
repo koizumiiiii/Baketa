@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
@@ -11,92 +12,73 @@ namespace Baketa.Core.Translation.Abstractions
     public interface ITranslationManager
     {
         /// <summary>
-        /// 翻訳結果を保存します
+        /// 翻訳レコードを保存します
         /// </summary>
-        /// <param name="translationResponse">翻訳レスポンス</param>
-        /// <param name="context">翻訳コンテキスト（オプション）</param>
-        /// <returns>保存された翻訳レコード</returns>
-        Task<TranslationRecord> SaveTranslationAsync(
-            TranslationResponse translationResponse, 
-            TranslationContext? context = null);
-            
+        /// <param name="record">翻訳レコード</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>保存に成功した場合はtrue</returns>
+        Task<bool> SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default);
+        
         /// <summary>
-        /// キャッシュから翻訳結果を取得します
+        /// 翻訳レコードを取得します
+        /// </summary>
+        /// <param name="id">レコードID</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>翻訳レコード（存在しない場合はnull）</returns>
+        Task<TranslationRecord?> GetRecordAsync(Guid id, CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// 一致する翻訳レコードを検索します
         /// </summary>
         /// <param name="sourceText">元テキスト</param>
-        /// <param name="sourceLang">元言語</param>
-        /// <param name="targetLang">対象言語</param>
+        /// <param name="sourceLanguage">元言語</param>
+        /// <param name="targetLanguage">対象言語</param>
         /// <param name="context">翻訳コンテキスト（オプション）</param>
-        /// <returns>キャッシュにある場合は翻訳レコード、なければnull</returns>
-        Task<TranslationRecord?> GetTranslationAsync(
-            string sourceText, 
-            Language sourceLang, 
-            Language targetLang, 
-            TranslationContext? context = null);
-            
-        /// <summary>
-        /// 複数のテキストのキャッシュ状態を一括確認します
-        /// </summary>
-        /// <param name="sourceTexts">元テキストのコレクション</param>
-        /// <param name="sourceLang">元言語</param>
-        /// <param name="targetLang">対象言語</param>
-        /// <param name="context">翻訳コンテキスト（オプション）</param>
-        /// <returns>キャッシュ状態マップ（key=sourceText, value=翻訳レコードまたはnull）</returns>
-        Task<IReadOnlyDictionary<string, TranslationRecord?>> GetTranslationStatusAsync(
-            IReadOnlyCollection<string> sourceTexts, 
-            Language sourceLang, 
-            Language targetLang, 
-            TranslationContext? context = null);
-            
-        /// <summary>
-        /// 翻訳結果を更新します
-        /// </summary>
-        /// <param name="recordId">レコードID</param>
-        /// <param name="newTranslatedText">新しい翻訳テキスト</param>
-        /// <returns>更新が成功すればtrue</returns>
-        Task<bool> UpdateTranslationAsync(Guid recordId, string newTranslatedText);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>一致する翻訳レコード（存在しない場合はnull）</returns>
+        Task<TranslationRecord?> FindMatchingRecordAsync(
+            string sourceText,
+            Language sourceLanguage,
+            Language targetLanguage,
+            TranslationContext? context = null,
+            CancellationToken cancellationToken = default);
         
         /// <summary>
-        /// 翻訳結果を削除します
-        /// </summary>
-        /// <param name="recordId">レコードID</param>
-        /// <returns>削除が成功すればtrue</returns>
-        Task<bool> DeleteTranslationAsync(Guid recordId);
-        
-        /// <summary>
-        /// 翻訳履歴を検索します
+        /// 翻訳レコードを検索します
         /// </summary>
         /// <param name="query">検索クエリ</param>
-        /// <returns>検索結果のコレクション</returns>
-        Task<IReadOnlyList<TranslationRecord>> SearchTranslationsAsync(TranslationSearchQuery query);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>検索結果</returns>
+        Task<IReadOnlyList<TranslationRecord>> SearchRecordsAsync(
+            TranslationSearchQuery query,
+            CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// 翻訳レコードを削除します
+        /// </summary>
+        /// <param name="id">レコードID</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>削除に成功した場合はtrue</returns>
+        Task<bool> DeleteRecordAsync(Guid id, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// 翻訳統計を取得します
         /// </summary>
         /// <param name="options">統計オプション</param>
-        /// <returns>翻訳統計データ</returns>
-        Task<TranslationStatistics> GetStatisticsAsync(StatisticsOptions options);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>翻訳統計</returns>
+        Task<TranslationStatistics> GetStatisticsAsync(
+            StatisticsOptions? options = null,
+            CancellationToken cancellationToken = default);
         
         /// <summary>
         /// キャッシュをクリアします
         /// </summary>
         /// <param name="options">クリアオプション</param>
-        /// <returns>クリアされたレコード数</returns>
-        Task<int> ClearCacheAsync(CacheClearOptions options);
-        
-        /// <summary>
-        /// データベースをエクスポートします
-        /// </summary>
-        /// <param name="filePath">エクスポート先ファイルパス</param>
-        /// <returns>エクスポートが成功すればtrue</returns>
-        Task<bool> ExportDatabaseAsync(string filePath);
-        
-        /// <summary>
-        /// データベースをインポートします
-        /// </summary>
-        /// <param name="filePath">インポート元ファイルパス</param>
-        /// <param name="mergeStrategy">マージ戦略</param>
-        /// <returns>インポートが成功すればtrue</returns>
-        Task<bool> ImportDatabaseAsync(string filePath, MergeStrategy mergeStrategy);
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>クリアに成功した場合はtrue</returns>
+        Task<bool> ClearCacheAsync(
+            CacheClearOptions? options = null,
+            CancellationToken cancellationToken = default);
     }
 }
