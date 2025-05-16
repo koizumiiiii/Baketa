@@ -1,124 +1,119 @@
 using System;
 
-namespace Baketa.Core.Translation.Common
+#pragma warning disable CA1805 // 参照型の初期化は処理系によって自動的に行われる
+
+namespace Baketa.Core.Translation
 {
     /// <summary>
-    /// 翻訳サブシステム全体の設定クラス
+    /// 翻訳オプション
     /// </summary>
     public class TranslationOptions
     {
-        /// <summary>
-        /// WebAPI翻訳エンジンの設定
-        /// </summary>
-        public WebApiTranslationOptions WebApiOptions { get; set; } = new();
+        // コンストラクタで初期化
+        public TranslationOptions()
+        {
+            WebApiOptions = new WebApiTranslationOptions();
+            ManagementOptions = new TranslationManagementOptions();
+            CacheOptions = new TranslationCacheOptions();
+            EventOptions = new TranslationEventOptions();
+            PipelineOptions = new TranslationPipelineOptions();
+        }
         
         /// <summary>
-        /// 翻訳結果管理の設定
+        /// WebAPI翻訳オプション
         /// </summary>
-        public TranslationManagementOptions ManagementOptions { get; set; } = new();
+        public WebApiTranslationOptions WebApiOptions { get; set; }
         
         /// <summary>
-        /// 翻訳キャッシュの設定
+        /// 翻訳結果管理オプション
         /// </summary>
-        public TranslationCacheOptions CacheOptions { get; set; } = new();
+        public TranslationManagementOptions ManagementOptions { get; set; }
         
         /// <summary>
-        /// 翻訳イベントの設定
+        /// 翻訳キャッシュオプション
         /// </summary>
-        public TranslationEventOptions EventOptions { get; set; } = new();
+        public TranslationCacheOptions CacheOptions { get; set; }
+        
+        /// <summary>
+        /// 翻訳イベントオプション
+        /// </summary>
+        public TranslationEventOptions EventOptions { get; set; }
+        
+        /// <summary>
+        /// 翻訳パイプラインオプション
+        /// </summary>
+        public TranslationPipelineOptions PipelineOptions { get; set; }
     }
-
+    
     /// <summary>
-    /// WebAPI翻訳エンジンの設定クラス
+    /// WebAPI翻訳オプション
     /// </summary>
     public class WebApiTranslationOptions
     {
-        // デフォルトコンストラクタは自動的に生成されます。プロパティのデフォルト値は宣言時に設定済み。
+        /// <summary>
+        /// 最大リクエスト回数
+        /// </summary>
+        public int MaxRetries { get; set; } = 3;
         
         /// <summary>
-        /// Google翻訳APIを有効にするかどうか
+        /// タイムアウト（秒）
         /// </summary>
-        public bool EnableGoogleTranslate { get; set; } = true;
+        public int TimeoutSeconds { get; set; } = 10;
         
         /// <summary>
-        /// Google翻訳APIキー
+        /// クライアント証明書の検証をスキップするかどうか
         /// </summary>
-        public string GoogleTranslateApiKey { get; set; } = string.Empty;
+        public bool SkipCertificateValidation { get; set; } = false;
         
         /// <summary>
-        /// DeepL APIを有効にするかどうか
+        /// リトライ間隔（秒）
         /// </summary>
-        public bool EnableDeepL { get; set; }
+        public int RetryIntervalSeconds { get; set; } = 1;
         
         /// <summary>
-        /// DeepL APIキー
+        /// プロキシ設定を使用するかどうか
         /// </summary>
-        public string DeepLApiKey { get; set; } = string.Empty;
+        public bool UseProxy { get; set; } = false;
         
         /// <summary>
-        /// リクエストタイムアウト（秒）
+        /// プロキシURL
         /// </summary>
-        public int RequestTimeoutSeconds { get; set; } = 10;
-        
-        /// <summary>
-        /// 最大リトライ回数
-        /// </summary>
-        public int MaxRetryCount { get; set; } = 3;
-        
-        /// <summary>
-        /// リトライ間隔（ミリ秒）
-        /// </summary>
-        public int RetryIntervalMs { get; set; } = 1000;
-        
-        /// <summary>
-        /// ユーザーエージェント
-        /// </summary>
-        public string UserAgent { get; set; } = "Baketa Translation Client/1.0";
-        
-        /// <summary>
-        /// APIリクエストの同時実行数上限
-        /// </summary>
-        public int MaxConcurrentRequests { get; set; } = 5;
+        public Uri? ProxyUri { get; set; }
     }
-
+    
     /// <summary>
-    /// 翻訳結果管理の設定クラス
+    /// 翻訳結果管理オプション
     /// </summary>
     public class TranslationManagementOptions
     {
         /// <summary>
-        /// データベースの接続文字列
+        /// 最大保存レコード数
         /// </summary>
-        public string ConnectionString { get; set; } = "Data Source=translation_results.db";
+        public int MaxStoredRecords { get; set; } = 10000;
         
         /// <summary>
-        /// 最大記録件数
+        /// データベースパス
         /// </summary>
-        public int MaxRecords { get; set; } = 100000;
+        public string DatabasePath { get; set; } = "data/translations.db";
         
         /// <summary>
-        /// 最大保持期間
+        /// 自動エクスポートを有効にするかどうか
         /// </summary>
-        public TimeSpan MaxRetentionPeriod { get; set; } = TimeSpan.FromDays(90);
+        public bool EnableAutoExport { get; set; } = false;
         
         /// <summary>
-        /// 自動クリーンアップを有効にするかどうか
+        /// 自動エクスポート間隔（時間）
         /// </summary>
-        public bool EnableAutoCleanup { get; set; } = true;
+        public int AutoExportIntervalHours { get; set; } = 24;
         
         /// <summary>
-        /// クリーンアップの間隔
+        /// ユーザー編集を優先するかどうか
         /// </summary>
-        public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromDays(7);
-        
-        /// <summary>
-        /// 統計収集を有効にするかどうか
-        /// </summary>
-        public bool EnableStatistics { get; set; } = true;
+        public bool PrioritizeUserEdits { get; set; } = true;
     }
-
+    
     /// <summary>
-    /// 翻訳キャッシュの設定クラス
+    /// 翻訳キャッシュオプション
     /// </summary>
     public class TranslationCacheOptions
     {
@@ -128,9 +123,9 @@ namespace Baketa.Core.Translation.Common
         public bool EnableMemoryCache { get; set; } = true;
         
         /// <summary>
-        /// メモリキャッシュの最大アイテム数
+        /// メモリキャッシュのサイズ（アイテム数）
         /// </summary>
-        public int MemoryCacheMaxItems { get; set; } = 10000;
+        public int MemoryCacheSize { get; set; } = 1000;
         
         /// <summary>
         /// 永続化キャッシュを有効にするかどうか
@@ -138,54 +133,72 @@ namespace Baketa.Core.Translation.Common
         public bool EnablePersistentCache { get; set; } = true;
         
         /// <summary>
-        /// 永続化キャッシュのデータベースパス
+        /// 永続化キャッシュのサイズ（アイテム数）
         /// </summary>
-        public string PersistentCachePath { get; set; } = "translation_cache.db";
+        public int PersistentCacheSize { get; set; } = 10000;
         
         /// <summary>
-        /// 永続化キャッシュの最大サイズ（MB）
+        /// デフォルトの有効期限（時間）
         /// </summary>
-        public int PersistentCacheMaxSizeMB { get; set; } = 500;
-        
-        /// <summary>
-        /// キャッシュの有効期限（null=無期限）
-        /// </summary>
-        public TimeSpan? CacheExpiration { get; set; } = TimeSpan.FromDays(30);
-        
-        /// <summary>
-        /// キャッシュ統計収集を有効にするかどうか
-        /// </summary>
-        public bool EnableCacheStatistics { get; set; } = true;
+        public int DefaultExpirationHours { get; set; } = 72;
     }
-
+    
     /// <summary>
-    /// 翻訳イベントの設定クラス
+    /// 翻訳イベントオプション
     /// </summary>
     public class TranslationEventOptions
     {
         /// <summary>
-        /// イベント処理を有効にするかどうか
+        /// イベントを有効にするかどうか
         /// </summary>
         public bool EnableEvents { get; set; } = true;
         
         /// <summary>
-        /// イベント処理の同時実行数上限
+        /// 詳細イベントを有効にするかどうか
         /// </summary>
-        public int MaxConcurrentEvents { get; set; } = 10;
+        public bool EnableDetailedEvents { get; set; } = false;
         
         /// <summary>
-        /// イベント処理タイムアウト（秒）
+        /// 非同期イベント処理を使用するかどうか
         /// </summary>
-        public int EventProcessingTimeoutSeconds { get; set; } = 30;
+        public bool UseAsyncEventProcessing { get; set; } = true;
         
         /// <summary>
-        /// イベントキューの最大サイズ
+        /// イベントハンドラーの順序を保証するかどうか
         /// </summary>
-        public int MaxEventQueueSize { get; set; } = 1000;
+        public bool GuaranteeEventHandlerOrder { get; set; } = false;
+    }
+    
+    /// <summary>
+    /// 翻訳パイプラインオプション
+    /// </summary>
+    public class TranslationPipelineOptions
+    {
+        /// <summary>
+        /// パイプラインの最大並列度
+        /// </summary>
+        public int MaxConcurrentPipelines { get; set; } = 5;
         
         /// <summary>
-        /// すべてのイベントをログに記録するかどうか
+        /// バッチサイズ
         /// </summary>
-        public bool LogAllEvents { get; set; }
+        public int BatchSize { get; set; } = 10;
+        
+        /// <summary>
+        /// フォールバックエンジン名
+        /// </summary>
+        public string FallbackEngineName { get; set; } = "DummyEngine";
+        
+        /// <summary>
+        /// トランザクションを有効にするかどうか
+        /// </summary>
+        public bool EnableTransactions { get; set; } = false;
+        
+        /// <summary>
+        /// タイムアウト（秒）
+        /// </summary>
+        public int TimeoutSeconds { get; set; } = 30;
     }
 }
+
+#pragma warning restore CA1805

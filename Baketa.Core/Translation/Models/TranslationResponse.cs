@@ -107,13 +107,15 @@ namespace Baketa.Core.Translation.Models
             long processingTimeMs)
         {
             ArgumentNullException.ThrowIfNull(request);
-            ArgumentNullException.ThrowIfNull(translatedText);
+            // null参照チェックを緩和し、nullの場合は空文字列として扱う
+            // ArgumentNullException.ThrowIfNull(translatedText);
+            var safeTranslatedText = translatedText ?? string.Empty;
             ArgumentNullException.ThrowIfNull(engineName);
             return new TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,
-                TranslatedText = translatedText,
+                TranslatedText = safeTranslatedText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
                 EngineName = engineName,

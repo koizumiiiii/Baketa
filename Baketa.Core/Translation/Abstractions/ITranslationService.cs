@@ -3,6 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
+// 名前空間エイリアスの定義
+using TransModels = Baketa.Core.Translation.Models;
+
 namespace Baketa.Core.Translation.Abstractions
 {
     /// <summary>
@@ -77,7 +80,7 @@ namespace Baketa.Core.Translation.Abstractions
         /// <param name="preferredEngine">優先エンジン名（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        Task<LanguageDetectionResult> DetectLanguageAsync(
+        Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
             string text,
             string? preferredEngine = null,
             CancellationToken cancellationToken = default);

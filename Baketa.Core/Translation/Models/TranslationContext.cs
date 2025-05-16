@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
+using System.Collections.ObjectModel;
 
 namespace Baketa.Core.Translation.Models
 {
@@ -34,12 +32,7 @@ namespace Baketa.Core.Translation.Models
         /// <summary>
         /// コンテキストタグ
         /// </summary>
-        private readonly List<string> _tags = new();
-        
-        /// <summary>
-        /// コンテキストタグ
-        /// </summary>
-        public IReadOnlyList<string> Tags => _tags;
+        public Collection<string> Tags { get; } = new Collection<string>();
         
         /// <summary>
         /// コンテキスト優先度（0～100）
@@ -49,164 +42,63 @@ namespace Baketa.Core.Translation.Models
         /// <summary>
         /// 追加コンテキスト情報
         /// </summary>
-        public Dictionary<string, object?> AdditionalContext { get; } = [];
-
+        public Dictionary<string, object?> AdditionalContext { get; } = new();
+        
         /// <summary>
-        /// デフォルトコンストラクタ
+        /// 文字列表現を取得します
         /// </summary>
-        public TranslationContext()
+        /// <returns>文字列表現</returns>
+        public override string ToString()
         {
-            // デフォルトコンストラクタは必要ですが、実際には初期化が不要です
-        }
-
-        /// <summary>
-        /// ゲームプロファイルIDとシーンIDを指定して初期化
-        /// </summary>
-        /// <param name="gameProfileId">ゲームプロファイルID</param>
-        /// <param name="sceneId">シーンID</param>
-        public TranslationContext(string gameProfileId, string? sceneId = null)
-        {
-            GameProfileId = gameProfileId;
-            SceneId = sceneId;
-        }
-
-        /// <summary>
-        /// クローンを作成
-        /// </summary>
-        /// <returns>このコンテキストのクローン</returns>
-        public TranslationContext Clone()
-        {
-            var clone = new TranslationContext
-            {
-                GameProfileId = GameProfileId,
-                SceneId = SceneId,
-                DialogueId = DialogueId,
-                ScreenRegion = ScreenRegion?.Clone(),
-                Priority = Priority
-            };
-
-            // タグのコピー
-            foreach (var tag in Tags)
-            {
-                clone._tags.Add(tag);
-            }
-
-            // 追加コンテキストのコピー
-            foreach (var kv in AdditionalContext)
-            {
-                clone.AdditionalContext[kv.Key] = kv.Value;
-            }
-
-            return clone;
-        }
-
-        /// <summary>
-        /// コンテキストのハッシュ文字列を生成
-        /// </summary>
-        /// <returns>コンテキストハッシュ</returns>
-        public string GetHashString()
-        {
-            var sb = new StringBuilder();
-            
-            // 基本プロパティ
-            sb.Append("G:").Append(GameProfileId ?? "null").Append(';');
-            sb.Append("S:").Append(SceneId ?? "null").Append(';');
-            sb.Append("D:").Append(DialogueId ?? "null").Append(';');
-            
-            // 領域
-            if (ScreenRegion.HasValue)
-            {
-                sb.Append("R:")
-                  .Append(ScreenRegion.Value.X).Append(',')
-                  .Append(ScreenRegion.Value.Y).Append(',')
-                  .Append(ScreenRegion.Value.Width).Append(',')
-                  .Append(ScreenRegion.Value.Height).Append(';');
-            }
-            
-            // タグ
-            if (Tags.Count > 0)
-            {
-                sb.Append("T:");
-                sb.Append(string.Join(",", Tags.OrderBy(t => t)));
-                sb.Append(';');
-            }
-            
-            // 優先度
-            sb.Append("P:").Append(Priority).Append(';');
-            
-            // 追加コンテキスト
-            if (AdditionalContext.Count > 0)
-            {
-                sb.Append("A:");
-                var sortedKeys = AdditionalContext.Keys.OrderBy(k => k).ToList();
-                foreach (var key in sortedKeys)
-                {
-                    var value = AdditionalContext[key]?.ToString() ?? "null";
-                    sb.Append(key).Append('=').Append(value).Append(',');
-                }
-                sb.Remove(sb.Length - 1, 1); // 最後のカンマを削除
-                sb.Append(';');
-            }
-
-            // SHA256ハッシュを計算（効率的なメソッドを使用）
-            byte[] textBytes = Encoding.UTF8.GetBytes(sb.ToString());
-            byte[] hashBytes = SHA256.HashData(textBytes);
-            
-            return Convert.ToBase64String(hashBytes)
-                .Replace("+", "-", StringComparison.Ordinal)
-                .Replace("/", "_", StringComparison.Ordinal)
-                .Replace("=", "", StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// 等価比較をオーバーライド
-        /// </summary>
-        public override bool Equals(object? obj)
-        {
-            if (obj is not TranslationContext other)
-            {
-                return false;
-            }
-
-            return string.Equals(GetHashString(), other.GetHashString(), StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// ハッシュコードを生成
-        /// </summary>
-        public override int GetHashCode()
-        {
-            // ホワイトリスト適用：正確なハッシュ値を取得するためのカスタムロジック
-            string hashString = GetHashString();
-            return StringComparer.Ordinal.GetHashCode(hashString);
+            return $"Context[Game:{GameProfileId}, Scene:{SceneId}, Tags:{string.Join(",", Tags)}]";
         }
     }
-
+    
     /// <summary>
     /// 矩形領域を表す構造体
     /// </summary>
-    public readonly struct Rectangle : IEquatable<Rectangle>
+    public struct Rectangle : IEquatable<Rectangle>
     {
         /// <summary>
         /// X座標
         /// </summary>
-        public readonly int X { get; init; }
+        public int X { get; set; }
         
         /// <summary>
         /// Y座標
         /// </summary>
-        public readonly int Y { get; init; }
+        public int Y { get; set; }
         
         /// <summary>
         /// 幅
         /// </summary>
-        public readonly int Width { get; init; }
+        public int Width { get; set; }
         
         /// <summary>
         /// 高さ
         /// </summary>
-        public readonly int Height { get; init; }
-
+        public int Height { get; set; }
+        
+        /// <summary>
+        /// 左端のX座標
+        /// </summary>
+        public int Left => X;
+        
+        /// <summary>
+        /// 上端のY座標
+        /// </summary>
+        public int Top => Y;
+        
+        /// <summary>
+        /// 右端のX座標
+        /// </summary>
+        public int Right => X + Width;
+        
+        /// <summary>
+        /// 下端のY座標
+        /// </summary>
+        public int Bottom => Y + Height;
+        
         /// <summary>
         /// コンストラクタ
         /// </summary>
@@ -221,62 +113,62 @@ namespace Baketa.Core.Translation.Models
             Width = width;
             Height = height;
         }
-
+        
         /// <summary>
-        /// クローンを作成
+        /// 文字列表現を取得します
         /// </summary>
-        /// <returns>このRectangleのクローン</returns>
-        public Rectangle Clone()
-        {
-            return new Rectangle(X, Y, Width, Height);
-        }
-
-        /// <summary>
-        /// 文字列表現を返す
-        /// </summary>
+        /// <returns>文字列表現</returns>
         public override string ToString()
         {
-            return $"X={X}, Y={Y}, Width={Width}, Height={Height}";
+            return $"({X},{Y},{Width},{Height})";
         }
-
+        
         /// <summary>
-        /// 等価比較
+        /// 型安全な等価性比較を行います
         /// </summary>
+        /// <param name="other">比較対象</param>
+        /// <returns>等しい場合はtrue</returns>
         public bool Equals(Rectangle other)
         {
-            return X == other.X && Y == other.Y && Width == other.Width && Height == other.Height;
+            return X == other.X && 
+                   Y == other.Y && 
+                   Width == other.Width && 
+                   Height == other.Height;
         }
 
         /// <summary>
-        /// 等価比較をオーバーライド
+        /// 等価性比較
         /// </summary>
+        /// <param name="obj">比較対象</param>
+        /// <returns>等しい場合はtrue</returns>
         public override bool Equals(object? obj)
         {
-            return obj is Rectangle rectangle && Equals(rectangle);
+            return obj is Rectangle other && Equals(other);
         }
-
+        
         /// <summary>
-        /// ハッシュコードを生成
+        /// ハッシュコードを取得します
         /// </summary>
+        /// <returns>ハッシュコード</returns>
         public override int GetHashCode()
         {
             return HashCode.Combine(X, Y, Width, Height);
         }
+        
+        /// <summary>
+        /// 等価性比較演算子
+        /// </summary>
+        /// <param name="left">左辺</param>
+        /// <param name="right">右辺</param>
+        /// <returns>等しい場合はtrue</returns>
+        public static bool operator ==(Rectangle left, Rectangle right) => left.Equals(right);
 
         /// <summary>
-        /// 等価演算子
+        /// 非等価性比較演算子
         /// </summary>
-        public static bool operator ==(Rectangle left, Rectangle right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// 非等価演算子
-        /// </summary>
-        public static bool operator !=(Rectangle left, Rectangle right)
-        {
-            return !left.Equals(right);
-        }
+        /// <param name="left">左辺</param>
+        /// <param name="right">右辺</param>
+        /// <returns>等しくない場合はtrue</returns>
+        public static bool operator !=(Rectangle left, Rectangle right) => !(left == right);
     }
 }

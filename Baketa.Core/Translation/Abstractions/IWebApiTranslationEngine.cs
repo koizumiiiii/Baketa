@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+// エイリアスを追加
+using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Abstractions
 {
@@ -54,7 +57,7 @@ namespace Baketa.Core.Translation.Abstractions
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        Task<LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default);
+        new Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default);
     }
     
     /// <summary>

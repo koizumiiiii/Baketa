@@ -1,162 +1,240 @@
 using System;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Models.Translation;
-// using Baketa.Core.Events; // 名前空間の競合を避けるためにコメントアウト
+using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Events
 {
     /// <summary>
-    /// 翻訳イベントの基底クラス
+    /// 翻訳開始イベント
     /// </summary>
-    public abstract class TranslationEventBase : Baketa.Core.Abstractions.Events.IEvent
+    public class TranslationStartedEvent : IEvent
     {
         /// <summary>
         /// イベントID
         /// </summary>
         public Guid Id { get; } = Guid.NewGuid();
-
+        
         /// <summary>
-        /// タイムスタンプ
+        /// イベント発生時刻
         /// </summary>
         public DateTime Timestamp { get; } = DateTime.UtcNow;
-
+        
         /// <summary>
         /// イベント名
         /// </summary>
-        public string Name => GetType().Name;
-
+        public string Name => "TranslationStarted";
+        
         /// <summary>
         /// イベントカテゴリ
         /// </summary>
         public string Category => "Translation";
-
-        /// <summary>
-        /// 翻訳元テキスト
-        /// </summary>
-        public required string SourceText { get; set; }
-
-        /// <summary>
-        /// 翻訳元言語
-        /// </summary>
-        public required Language SourceLanguage { get; set; }
-
-        /// <summary>
-        /// 翻訳先言語
-        /// </summary>
-        public required Language TargetLanguage { get; set; }
-
-        /// <summary>
-        /// 翻訳エンジン名
-        /// </summary>
-        public required string EngineName { get; set; }
-    }
-
-    /// <summary>
-    /// 翻訳開始イベント
-    /// </summary>
-    public class TranslationStartedEvent : TranslationEventBase
-    {
+        
         /// <summary>
         /// リクエストID
         /// </summary>
-        public required Guid RequestId { get; set; }
+        public required string RequestId { get; set; }
+        
+        /// <summary>
+        /// 元テキスト
+        /// </summary>
+        public required string SourceText { get; set; }
+        
+        /// <summary>
+        /// 元言語
+        /// </summary>
+        public required string SourceLanguage { get; set; }
+        
+        /// <summary>
+        /// 対象言語
+        /// </summary>
+        public required string TargetLanguage { get; set; }
+        
+        /// <summary>
+        /// 翻訳コンテキスト
+        /// </summary>
+        public TranslationEventContext? Context { get; set; }
     }
-
+    
     /// <summary>
     /// 翻訳完了イベント
     /// </summary>
-    public class TranslationCompletedEvent : TranslationEventBase
+    public class TranslationCompletedEvent : IEvent
     {
+        /// <summary>
+        /// イベントID
+        /// </summary>
+        public Guid Id { get; } = Guid.NewGuid();
+        
+        /// <summary>
+        /// イベント発生時刻
+        /// </summary>
+        public DateTime Timestamp { get; } = DateTime.UtcNow;
+        
+        /// <summary>
+        /// イベント名
+        /// </summary>
+        public string Name => "TranslationCompleted";
+        
+        /// <summary>
+        /// イベントカテゴリ
+        /// </summary>
+        public string Category => "Translation";
+        
         /// <summary>
         /// リクエストID
         /// </summary>
-        public required Guid RequestId { get; set; }
-
+        public required string RequestId { get; set; }
+        
+        /// <summary>
+        /// 元テキスト
+        /// </summary>
+        public required string SourceText { get; set; }
+        
+        /// <summary>
+        /// 元言語
+        /// </summary>
+        public required string SourceLanguage { get; set; }
+        
+        /// <summary>
+        /// 対象言語
+        /// </summary>
+        public required string TargetLanguage { get; set; }
+        
         /// <summary>
         /// 翻訳結果テキスト
         /// </summary>
-        public string? TranslatedText { get; set; }
-
+        public required string TranslatedText { get; set; }
+        
         /// <summary>
         /// 処理時間（ミリ秒）
         /// </summary>
         public long ProcessingTimeMs { get; set; }
         
         /// <summary>
-        /// キャッシュヒットかどうか
+        /// 使用された翻訳エンジン
         /// </summary>
-        public bool IsCacheHit { get; set; }
+        public required string TranslationEngine { get; set; }
+        
+        /// <summary>
+        /// キャッシュからの取得かどうか
+        /// </summary>
+        public bool FromCache { get; set; }
     }
-
+    
     /// <summary>
     /// 翻訳エラーイベント
     /// </summary>
-    public class TranslationErrorEvent : TranslationEventBase
+    public class TranslationErrorEvent : IEvent
     {
+        /// <summary>
+        /// イベントID
+        /// </summary>
+        public Guid Id { get; } = Guid.NewGuid();
+        
+        /// <summary>
+        /// イベント発生時刻
+        /// </summary>
+        public DateTime Timestamp { get; } = DateTime.UtcNow;
+        
+        /// <summary>
+        /// イベント名
+        /// </summary>
+        public string Name => "TranslationError";
+        
+        /// <summary>
+        /// イベントカテゴリ
+        /// </summary>
+        public string Category => "Translation";
+        
         /// <summary>
         /// リクエストID
         /// </summary>
-        public required Guid RequestId { get; set; }
-
+        public required string RequestId { get; set; }
+        
+        /// <summary>
+        /// 元テキスト
+        /// </summary>
+        public required string SourceText { get; set; }
+        
+        /// <summary>
+        /// 元言語
+        /// </summary>
+        public required string SourceLanguage { get; set; }
+        
+        /// <summary>
+        /// 対象言語
+        /// </summary>
+        public required string TargetLanguage { get; set; }
+        
         /// <summary>
         /// エラーメッセージ
         /// </summary>
         public required string ErrorMessage { get; set; }
-
+        
         /// <summary>
-        /// エラーコード
+        /// エラータイプ
         /// </summary>
-        public string? ErrorCode { get; set; }
-
+        public TranslationErrorType ErrorType { get; set; }
+        
         /// <summary>
-        /// エラーの種類
+        /// 使用された翻訳エンジン（ある場合）
         /// </summary>
-        public TranslationErrorType ErrorType { get; set; } = TranslationErrorType.Unknown;
+        public string? TranslationEngine { get; set; }
+        
+        /// <summary>
+        /// 処理時間（ミリ秒）
+        /// </summary>
+        public long ProcessingTimeMs { get; set; }
     }
-
+    
     /// <summary>
-    /// 翻訳エラーの種類
+    /// キャッシュヒットイベント
     /// </summary>
-    public enum TranslationErrorType
+    public class TranslationCacheHitEvent : IEvent
     {
         /// <summary>
-        /// 不明なエラー
+        /// イベントID
         /// </summary>
-        Unknown,
+        public Guid Id { get; } = Guid.NewGuid();
         
         /// <summary>
-        /// ネットワークエラー
+        /// イベント発生時刻
         /// </summary>
-        Network,
+        public DateTime Timestamp { get; } = DateTime.UtcNow;
         
         /// <summary>
-        /// 認証エラー
+        /// イベント名
         /// </summary>
-        Authentication,
+        public string Name => "TranslationCacheHit";
         
         /// <summary>
-        /// APIエラー
+        /// イベントカテゴリ
         /// </summary>
-        Api,
+        public string Category => "Translation";
         
         /// <summary>
-        /// コンテンツエラー
+        /// リクエストID
         /// </summary>
-        Content,
+        public required string RequestId { get; set; }
         
         /// <summary>
-        /// サーバーエラー
+        /// 元テキスト
         /// </summary>
-        Server,
+        public required string SourceText { get; set; }
         
         /// <summary>
-        /// クライアントエラー
+        /// 元言語
         /// </summary>
-        Client,
+        public required string SourceLanguage { get; set; }
         
         /// <summary>
-        /// タイムアウト
+        /// 対象言語
         /// </summary>
-        Timeout
+        public required string TargetLanguage { get; set; }
+        
+        /// <summary>
+        /// キャッシュから取得された翻訳結果
+        /// </summary>
+        public required string TranslatedText { get; set; }
     }
 }

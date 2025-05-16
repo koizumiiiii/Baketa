@@ -4,6 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
+// 名前空間エイリアスの定義
+using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
+
 namespace Baketa.Core.Translation.Abstractions
 {
     /// <summary>
@@ -70,5 +74,15 @@ namespace Baketa.Core.Translation.Abstractions
         /// </summary>
         /// <returns>初期化に成功した場合はtrue</returns>
         Task<bool> InitializeAsync();
+        
+        /// <summary>
+        /// テキストの言語を自動検出します
+        /// </summary>
+        /// <param name="text">検出対象テキスト</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>検出された言語と信頼度</returns>
+        Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
+            string text,
+            CancellationToken cancellationToken = default);
     }
 }
