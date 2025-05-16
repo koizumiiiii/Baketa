@@ -9,6 +9,9 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+// エイリアスを追加
+using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common
 {
@@ -166,12 +169,12 @@ namespace Baketa.Core.Translation.Common
             ArgumentNullException.ThrowIfNull(requests);
                 
             if (requests.Count == 0)
-                return [];
+                return Array.Empty<TranslationResponse>();
                 
             // バッチ処理をサポートするカスタム実装がある場合は、サブクラスで上書きしてください
             // このデフォルト実装は個別のリクエストを順次処理します
             
-            List<TranslationResponse> results = [];
+            List<TranslationResponse> results = new List<TranslationResponse>();
             
             foreach (var request in requests)
             {
@@ -388,11 +391,50 @@ namespace Baketa.Core.Translation.Common
         /// <returns>サポートされている言語ペアのコレクション</returns>
         protected virtual Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsInternalAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>([]);
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(new List<LanguagePair>());
         }
 
         /// <summary>
-        /// リソースを解放します
+        /// テキストの言語を自動検出します
+        /// </summary>
+        /// <param name="text">検出対象テキスト</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>検出された言語と信頼度</returns>
+        public virtual Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
+            string text, 
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(text);
+            
+            // ベース実装では単純に自動検出言語を返す
+            // 実際の検出機能はサブクラスで実装する
+            Logger?.LogWarning("言語検出は実装されていません: {EngineName}", Name);
+            
+            var result = new TransModels.LanguageDetectionResult
+            {
+                DetectedLanguage = new TransModels.Language { Code = "auto", DisplayName = "自動検出" },
+                Confidence = 0.0f,
+                EngineName = Name
+            };
+            
+            return Task.FromResult(result);
+        }
+
+        /// <summary>
+        /// 内部言語検出処理を実装します
+        /// </summary>
+        /// <param name="text">検出対象テキスト</param>
+        /// <param name="cancellationToken">キャンセレーショントークン</param>
+        /// <returns>検出された言語と信頼度</returns>
+        protected virtual Task<TransModels.LanguageDetectionResult> DetectLanguageInternalAsync(
+            string text, 
+            CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException("子クラスで実装してください");
+        }
+
+        /// <summary>
+        /// リソースを破棄します
         /// </summary>
         public void Dispose()
         {

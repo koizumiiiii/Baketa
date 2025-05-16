@@ -31,6 +31,11 @@ namespace Baketa.Core.Translation.Models
         /// 再試行可能かどうか
         /// </summary>
         public bool IsRetryable { get; set; }
+
+        /// <summary>
+        /// エラーの種類
+        /// </summary>
+        public TranslationErrorType ErrorType { get; set; } = TranslationErrorType.Unknown;
         
         /// <summary>
         /// デフォルトコンストラクタ
@@ -45,13 +50,15 @@ namespace Baketa.Core.Translation.Models
         /// <param name="errorCode">エラーコード</param>
         /// <param name="message">メッセージ</param>
         /// <param name="isRetryable">再試行可能かどうか</param>
-        public TranslationError(string errorCode, string message, bool isRetryable = false)
+        /// <param name="errorType">エラーの種類</param>
+        public TranslationError(string errorCode, string message, bool isRetryable = false, TranslationErrorType errorType = TranslationErrorType.Unknown)
         {
             ArgumentNullException.ThrowIfNull(errorCode);
             ArgumentNullException.ThrowIfNull(message);
             ErrorCode = errorCode;
             Message = message;
             IsRetryable = isRetryable;
+            ErrorType = errorType;
         }
         
         /// <summary>
@@ -60,7 +67,8 @@ namespace Baketa.Core.Translation.Models
         /// <param name="errorCode">エラーコード</param>
         /// <param name="exception">例外</param>
         /// <param name="isRetryable">再試行可能かどうか</param>
-        public TranslationError(string errorCode, Exception exception, bool isRetryable = false)
+        /// <param name="errorType">エラーの種類</param>
+        public TranslationError(string errorCode, Exception exception, bool isRetryable = false, TranslationErrorType errorType = TranslationErrorType.Exception)
         {
             ArgumentNullException.ThrowIfNull(errorCode);
             ArgumentNullException.ThrowIfNull(exception);
@@ -69,6 +77,7 @@ namespace Baketa.Core.Translation.Models
             Exception = exception;
             Details = exception.StackTrace;
             IsRetryable = isRetryable;
+            ErrorType = errorType;
         }
 
         /// <summary>
@@ -83,7 +92,8 @@ namespace Baketa.Core.Translation.Models
                 Message = Message,
                 Details = Details,
                 Exception = Exception,
-                IsRetryable = IsRetryable
+                IsRetryable = IsRetryable,
+                ErrorType = ErrorType
             };
         }
 

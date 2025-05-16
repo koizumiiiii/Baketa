@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Events;
+using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.Events
@@ -50,9 +51,10 @@ namespace Baketa.Core.Translation.Events
             _logger.LogInformation(
                 "翻訳開始: ソーステキスト「{SourceText}」、言語: {SourceLanguage}→{TargetLanguage}、エンジン: {EngineName}",
                 TruncateText(eventData.SourceText, 30),
-                eventData.SourceLanguage.Code,
-                eventData.TargetLanguage.Code,
-                eventData.EngineName);
+                eventData.SourceLanguage,
+                eventData.TargetLanguage,
+                eventData.RequestId);
+            
             
             return Task.CompletedTask;
         }
@@ -70,9 +72,9 @@ namespace Baketa.Core.Translation.Events
                 "翻訳完了: 「{SourceText}」→「{TranslatedText}」、言語: {SourceLanguage}→{TargetLanguage}、エンジン: {EngineName}、処理時間: {ProcessingTimeMs}ms",
                 TruncateText(eventData.SourceText, 30),
                 TruncateText(eventData.TranslatedText ?? "N/A", 30),
-                eventData.SourceLanguage.Code,
-                eventData.TargetLanguage.Code,
-                eventData.EngineName,
+                eventData.SourceLanguage,
+                eventData.TargetLanguage,
+                eventData.TranslationEngine,
                 eventData.ProcessingTimeMs);
             
             return Task.CompletedTask;
@@ -90,9 +92,9 @@ namespace Baketa.Core.Translation.Events
             _logger.LogError(
                 "翻訳エラー: ソーステキスト「{SourceText}」、言語: {SourceLanguage}→{TargetLanguage}、エンジン: {EngineName}、エラー: {ErrorMessage}",
                 TruncateText(eventData.SourceText, 30),
-                eventData.SourceLanguage.Code,
-                eventData.TargetLanguage.Code,
-                eventData.EngineName,
+                eventData.SourceLanguage,
+                eventData.TargetLanguage,
+                eventData.TranslationEngine ?? "Unknown",
                 eventData.ErrorMessage);
             
             return Task.CompletedTask;

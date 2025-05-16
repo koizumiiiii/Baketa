@@ -10,6 +10,9 @@ using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+// エイリアスを追加
+using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common
 {
@@ -89,12 +92,13 @@ namespace Baketa.Core.Translation.Common
         private void ConfigureHttpClientInternal()
         {
             // タイムアウトの設定
-            _httpClient.Timeout = TimeSpan.FromSeconds(_options.RequestTimeoutSeconds);
+            _httpClient.Timeout = _options.RequestTimeoutSeconds();
             
             // UserAgentの設定
-            if (!string.IsNullOrEmpty(_options.UserAgent) && !_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            string userAgent = _options.UserAgent();
+            if (!string.IsNullOrEmpty(userAgent) && !_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
             {
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", _options.UserAgent);
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent);
             }
         }
         
@@ -119,7 +123,16 @@ namespace Baketa.Core.Translation.Common
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        public abstract Task<LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default);
+        public override Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(text);
+            
+            // Web API翻訳エンジンでの言語検出はサブクラスで実装する必要があります
+            // デフォルト実装はディスパッチするためのものです
+            Logger?.LogWarning("WebAPI翻訳エンジンでの言語検出はサブクラスで実装されていません: {EngineName}", Name);
+            
+            return base.DetectLanguageAsync(text, cancellationToken);
+        }
 
         /// <summary>
         /// 初期化時にAPIの接続性を確認します

@@ -1,5 +1,12 @@
+// 大元の実装は別プロジェクトにあるため、ここでは参照しない
+// using Baketa.Application.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Factories;
+
+// 名前空間エイリアスを使用して競合を解決
+using CoreTranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
+using TranslationAbstractionService = Baketa.Core.Translation.Abstractions.ITranslationService;
+
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Cache;
@@ -12,6 +19,7 @@ using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.DI
 {
@@ -41,6 +49,7 @@ namespace Baketa.Core.Translation.DI
             services.AddTranslationManagement(options.ManagementOptions);
             services.AddTranslationCache(options.CacheOptions);
             services.AddTranslationEvents(options.EventOptions);
+            services.AddTranslationPipeline(options);
             
             return services;
         }
@@ -119,6 +128,30 @@ namespace Baketa.Core.Translation.DI
             return services;
         }
         
+        /// <summary>
+        /// 翻訳パイプラインをDIコンテナに登録します
+        /// </summary>
+        /// <param name="services">DIサービスコレクション</param>
+        /// <param name="options">翻訳オプション</param>
+        /// <returns>DIサービスコレクション</returns>
+        public static IServiceCollection AddTranslationPipeline(
+            this IServiceCollection services,
+            TranslationOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(options);
+            
+            // パイプラインとトランザクションマネージャーは別プロジェクトで実装されるため、インターフェースのみ登録
+            services.AddSingleton<ITranslationEngineDiscovery, DefaultTranslationEngineDiscovery>();
+            
+            // 型の依存関係だけ定義
+            services.AddSingleton<ITranslationTransactionManager>(provider => null!);
+            services.AddSingleton<ITranslationPipeline>(provider => null!);
+            services.AddSingleton<CoreTranslationService>(provider => null!);
+            
+            return services;
+        }
+
         /// <summary>
         /// 翻訳イベントをDIコンテナに登録します
         /// </summary>

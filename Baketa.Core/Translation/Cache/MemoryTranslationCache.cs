@@ -34,7 +34,7 @@ namespace Baketa.Core.Translation.Cache
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
-            _logger.LogInformation("メモリキャッシュを初期化しました（最大項目数: {MaxItems}）", _options.MemoryCacheMaxItems);
+            _logger.LogInformation("メモリキャッシュを初期化しました（最大項目数: {MaxItems}）", _options.MemoryCacheMaxItems());
         }
 
         /// <summary>
@@ -130,14 +130,14 @@ namespace Baketa.Core.Translation.Cache
             ArgumentNullException.ThrowIfNull(entry);
             
             // キャッシュが最大容量に達した場合、何もしない
-            if (_cache.Count >= _options.MemoryCacheMaxItems && !_cache.ContainsKey(key))
+            if (_cache.Count >= _options.MemoryCacheMaxItems() && !_cache.ContainsKey(key))
             {
-                _logger.LogWarning("キャッシュが最大容量 ({MaxItems}) に達しました", _options.MemoryCacheMaxItems);
+                _logger.LogWarning("キャッシュが最大容量 ({MaxItems}) に達しました", _options.MemoryCacheMaxItems());
                 return Task.FromResult(false);
             }
             
             // 有効期限を設定
-            var expirationTime = expiration ?? _options.CacheExpiration;
+            var expirationTime = expiration ?? _options.CacheExpiration();
             if (expirationTime.HasValue)
             {
                 entry.ExpiresAt = DateTime.UtcNow.Add(expirationTime.Value);
@@ -183,15 +183,15 @@ namespace Baketa.Core.Translation.Cache
                 }
             }
             
-            if (_cache.Count + newKeysCount > _options.MemoryCacheMaxItems)
+            if (_cache.Count + newKeysCount > _options.MemoryCacheMaxItems())
             {
                 _logger.LogWarning(
                     "キャッシュが最大容量 ({MaxItems}) を超えるため、一部のエントリは保存されません",
-                    _options.MemoryCacheMaxItems);
+                    _options.MemoryCacheMaxItems());
             }
             
             // 有効期限を設定
-            var expirationTime = expiration ?? _options.CacheExpiration;
+            var expirationTime = expiration ?? _options.CacheExpiration();
             DateTime? expiresAt = null;
             if (expirationTime.HasValue)
             {
@@ -207,7 +207,7 @@ namespace Baketa.Core.Translation.Cache
                 }
                 
                 // キャッシュが最大容量に達した場合、既存のキーのみ更新
-                if (_cache.Count >= _options.MemoryCacheMaxItems && !_cache.ContainsKey(key))
+                if (_cache.Count >= _options.MemoryCacheMaxItems() && !_cache.ContainsKey(key))
                 {
                     continue;
                 }
@@ -285,7 +285,7 @@ namespace Baketa.Core.Translation.Cache
                 TotalHits = totalHits,
                 TotalMisses = totalMisses,
                 HitRate = hitRate,
-                MaxEntries = _options.MemoryCacheMaxItems,
+                MaxEntries = _options.MemoryCacheMaxItems(),
                 CurrentSizeBytes = EstimateCurrentSizeBytes(),
                 GeneratedAt = DateTime.UtcNow
             };
