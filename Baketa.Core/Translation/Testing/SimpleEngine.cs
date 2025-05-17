@@ -5,10 +5,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-
-// 名前空間エイリアスを定義して曖昧さを回避
-using CoreModels = Baketa.Core.Models.Translation;
-using TransModels = Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Testing
 {
@@ -17,17 +14,17 @@ namespace Baketa.Core.Translation.Testing
     /// </summary>
     public class SimpleEngine : TranslationEngineBase
     {
-        private static readonly List<CoreModels.LanguagePair> _supportedLanguagePairs = new()
+        private static readonly List<LanguagePair> _supportedLanguagePairs = new()
         {
-            new CoreModels.LanguagePair 
+            new LanguagePair 
             { 
-                SourceLanguage = new CoreModels.Language { Code = "ja", Name = "Japanese" }, 
-                TargetLanguage = new CoreModels.Language { Code = "en", Name = "English" } 
+                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, 
+                TargetLanguage = new Language { Code = "en", DisplayName = "English" } 
             },
-            new CoreModels.LanguagePair 
+            new LanguagePair 
             { 
-                SourceLanguage = new CoreModels.Language { Code = "en", Name = "English" }, 
-                TargetLanguage = new CoreModels.Language { Code = "ja", Name = "Japanese" } 
+                SourceLanguage = new Language { Code = "en", DisplayName = "English" }, 
+                TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } 
             },
         };
 
@@ -57,16 +54,16 @@ namespace Baketa.Core.Translation.Testing
         /// <summary>
         /// サポートされている言語ペアを取得
         /// </summary>
-        public override Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync()
+        public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<CoreModels.LanguagePair>>(_supportedLanguagePairs);
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs);
         }
 
         /// <summary>
         /// エンジン固有の翻訳処理を実装
         /// </summary>
-        protected override Task<CoreModels.TranslationResponse> TranslateInternalAsync(
-            CoreModels.TranslationRequest request,
+        protected override Task<TranslationResponse> TranslateInternalAsync(
+            TranslationRequest request,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -78,7 +75,7 @@ namespace Baketa.Core.Translation.Testing
                 _ => $"[UNK Simple] {request.SourceText}"
             };
 
-            var response = new CoreModels.TranslationResponse
+            var response = new TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,

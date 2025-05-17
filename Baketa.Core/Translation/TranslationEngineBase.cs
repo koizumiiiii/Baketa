@@ -10,10 +10,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
-
-// 名前空間エイリアスを定義して曖昧さを回避
-using CoreModels = Baketa.Core.Models.Translation;
-using TransModels = Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation
 {
@@ -59,30 +56,15 @@ namespace Baketa.Core.Translation
         /// <remarks>
         /// 子クラスでこのメソッドを実装する必要があります
         /// </remarks>
-        public abstract Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync();
+        public abstract Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync();
 
         /// <summary>
         /// サポートしている言語ペアを取得します（インターフェース実装）
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        async Task<IReadOnlyCollection<TransModels.LanguagePair>> ITranslationEngine.GetSupportedLanguagePairsAsync()
+        async Task<IReadOnlyCollection<LanguagePair>> ITranslationEngine.GetSupportedLanguagePairsAsync()
         {
-            var corePairs = await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
-            
-            // CoreModelsからTransModelsに変換
-            return corePairs.Select(p => new TransModels.LanguagePair
-            {
-                SourceLanguage = new TransModels.Language
-                {
-                    Code = p.SourceLanguage.Code,
-                    DisplayName = p.SourceLanguage.Name
-                },
-                TargetLanguage = new TransModels.Language
-                {
-                    Code = p.TargetLanguage.Code,
-                    DisplayName = p.TargetLanguage.Name
-                }
-            }).ToList();
+            return await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -90,7 +72,7 @@ namespace Baketa.Core.Translation
         /// </summary>
         /// <param name="languagePair">確認する言語ペア</param>
         /// <returns>サポートしていればtrue</returns>
-        public virtual async Task<bool> SupportsLanguagePairAsync(CoreModels.LanguagePair languagePair)
+        public virtual async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
         {
             var supportedPairs = await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
             return supportedPairs.Any(pair => pair.Equals(languagePair));
@@ -101,24 +83,9 @@ namespace Baketa.Core.Translation
         /// </summary>
         /// <param name="languagePair">確認する言語ペア</param>
         /// <returns>サポートしていればtrue</returns>
-        async Task<bool> ITranslationEngine.SupportsLanguagePairAsync(TransModels.LanguagePair languagePair)
+        async Task<bool> ITranslationEngine.SupportsLanguagePairAsync(LanguagePair languagePair)
         {
-            // TransModelsからCoreModelsに変換
-            var corePair = new CoreModels.LanguagePair
-            {
-                SourceLanguage = new CoreModels.Language
-                {
-                    Code = languagePair.SourceLanguage.Code,
-                    Name = languagePair.SourceLanguage.DisplayName
-                },
-                TargetLanguage = new CoreModels.Language
-                {
-                    Code = languagePair.TargetLanguage.Code,
-                    Name = languagePair.TargetLanguage.DisplayName
-                }
-            };
-            
-            return await SupportsLanguagePairAsync(corePair).ConfigureAwait(false);
+            return await SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -127,8 +94,8 @@ namespace Baketa.Core.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        public async Task<CoreModels.TranslationResponse> TranslateAsync(
-            CoreModels.TranslationRequest request, 
+        public async Task<TranslationResponse> TranslateAsync(
+            TranslationRequest request, 
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -141,13 +108,13 @@ namespace Baketa.Core.Translation
                 {
                     return CreateErrorResponse(
                         request,
-                        CoreModels.TranslationError.ServiceUnavailable,
+                        TranslationError.ServiceUnavailable,
                         $"翻訳エンジン {Name} の初期化に失敗しました。");
                 }
             }
 
             // 言語ペアのサポートを確認
-            var languagePair = new CoreModels.LanguagePair 
+            var languagePair = new LanguagePair 
             { 
                 SourceLanguage = request.SourceLanguage, 
                 TargetLanguage = request.TargetLanguage 
@@ -158,7 +125,7 @@ namespace Baketa.Core.Translation
             {
                 return CreateErrorResponse(
                     request,
-                    CoreModels.TranslationError.UnsupportedLanguagePair,
+                    TranslationError.UnsupportedLanguagePair,
                     $"言語ペア {languagePair} はサポートされていません。");
             }
 
@@ -170,7 +137,7 @@ namespace Baketa.Core.Translation
                 {
                     return CreateErrorResponse(
                         request,
-                        CoreModels.TranslationError.NetworkError,
+                        TranslationError.NetworkError,
                         "ネットワーク接続が利用できません。");
                 }
             }
@@ -196,7 +163,7 @@ namespace Baketa.Core.Translation
                 _logger.LogWarning("翻訳がキャンセルされました: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponse(
                     request,
-                    CoreModels.TranslationError.TimeoutError,
+                    TranslationError.TimeoutError,
                     "翻訳処理がキャンセルされました。");
             }
             catch (TimeoutException ex)
@@ -204,7 +171,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳タイムアウト: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.TimeoutError,
+                    TranslationError.TimeoutError,
                     "翻訳処理がタイムアウトしました。",
                     ex);
             }
@@ -213,7 +180,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳の無効な操作: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.InvalidRequest,
+                    TranslationError.InvalidRequest,
                     "翻訳処理中に無効な操作が発生しました。",
                     ex);
             }
@@ -222,7 +189,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳の引数エラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.InvalidRequest,
+                    TranslationError.InvalidRequest,
                     "翻訳処理に無効な引数が提供されました。",
                     ex);
             }
@@ -231,7 +198,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中のHTTPリクエストエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.NetworkError,
+                    TranslationError.NetworkError,
                     "翻訳サービスとの通信中にエラーが発生しました。",
                     ex);
             }
@@ -240,7 +207,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中のI/Oエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.InternalError,
+                    TranslationError.InternalError,
                     "翻訳処理中にI/Oエラーが発生しました。",
                     ex);
             }
@@ -257,7 +224,7 @@ namespace Baketa.Core.Translation
                 _logger.LogError(ex, "翻訳中の予期しないエラー: リクエストID={RequestId}", request.RequestId);
                 return CreateErrorResponseFromException(
                     request,
-                    CoreModels.TranslationError.InternalError,
+                    TranslationError.InternalError,
                     "翻訳処理中に予期しないエラーが発生しました。",
                     ex);
             }
@@ -269,56 +236,11 @@ namespace Baketa.Core.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        async Task<TransModels.TranslationResponse> ITranslationEngine.TranslateAsync(
-            TransModels.TranslationRequest request, 
+        async Task<TranslationResponse> ITranslationEngine.TranslateAsync(
+            TranslationRequest request, 
             CancellationToken cancellationToken)
         {
-            // TransModelsからCoreModelsに変換
-            var coreRequest = new CoreModels.TranslationRequest
-            {
-                SourceText = request.SourceText,
-                SourceLanguage = new CoreModels.Language
-                {
-                    Code = request.SourceLanguage.Code,
-                    Name = request.SourceLanguage.DisplayName
-                },
-                TargetLanguage = new CoreModels.Language
-                {
-                    Code = request.TargetLanguage.Code,
-                    Name = request.TargetLanguage.DisplayName
-                },
-                Context = request.Context?.DialogueId
-            };
-            
-            // 翻訳を実行
-            var coreResponse = await TranslateAsync(coreRequest, cancellationToken).ConfigureAwait(false);
-            
-            // CoreModelsからTransModelsに変換
-            return new TransModels.TranslationResponse
-            {
-                RequestId = coreResponse.RequestId,
-                SourceText = coreResponse.SourceText,
-                TranslatedText = coreResponse.TranslatedText,
-                SourceLanguage = new TransModels.Language
-                {
-                    Code = coreResponse.SourceLanguage.Code,
-                    DisplayName = coreResponse.SourceLanguage.Name
-                },
-                TargetLanguage = new TransModels.Language
-                {
-                    Code = coreResponse.TargetLanguage.Code,
-                    DisplayName = coreResponse.TargetLanguage.Name
-                },
-                EngineName = coreResponse.EngineName,
-                ProcessingTimeMs = coreResponse.ProcessingTimeMs,
-                IsSuccess = coreResponse.IsSuccess,
-                Error = coreResponse.Error != null ? new TransModels.TranslationError
-                {
-                    ErrorCode = coreResponse.Error.ErrorCode,
-                    Message = coreResponse.Error.Message,
-                    Details = coreResponse.Error.Details
-                } : null
-            };
+            return await TranslateAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -327,8 +249,8 @@ namespace Baketa.Core.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        protected abstract Task<CoreModels.TranslationResponse> TranslateInternalAsync(
-            CoreModels.TranslationRequest request,
+        protected abstract Task<TranslationResponse> TranslateInternalAsync(
+            TranslationRequest request,
             CancellationToken cancellationToken);
 
         /// <summary>
@@ -337,8 +259,8 @@ namespace Baketa.Core.Translation
         /// <param name="requests">翻訳リクエストのコレクション</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのコレクション</returns>
-        public virtual async Task<IReadOnlyList<CoreModels.TranslationResponse>> TranslateBatchAsync(
-            IReadOnlyList<CoreModels.TranslationRequest> requests, 
+        public virtual async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+            IReadOnlyList<TranslationRequest> requests, 
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(requests);
@@ -361,67 +283,11 @@ namespace Baketa.Core.Translation
         /// <param name="requests">翻訳リクエストのコレクション</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのコレクション</returns>
-        async Task<IReadOnlyList<TransModels.TranslationResponse>> ITranslationEngine.TranslateBatchAsync(
-            IReadOnlyList<TransModels.TranslationRequest> requests, 
+        async Task<IReadOnlyList<TranslationResponse>> ITranslationEngine.TranslateBatchAsync(
+            IReadOnlyList<TranslationRequest> requests, 
             CancellationToken cancellationToken)
         {
-            ArgumentNullException.ThrowIfNull(requests);
-            
-            if (requests.Count == 0)
-            {
-                return Array.Empty<TransModels.TranslationResponse>();
-            }
-
-            // TransModelsからCoreModelsに変換
-            var coreRequests = new List<CoreModels.TranslationRequest>();
-            foreach (var request in requests)
-            {
-                coreRequests.Add(new CoreModels.TranslationRequest
-                {
-                    SourceText = request.SourceText,
-                    SourceLanguage = new CoreModels.Language
-                    {
-                        Code = request.SourceLanguage.Code,
-                        Name = request.SourceLanguage.DisplayName
-                    },
-                    TargetLanguage = new CoreModels.Language
-                    {
-                        Code = request.TargetLanguage.Code,
-                        Name = request.TargetLanguage.DisplayName
-                    },
-                    Context = request.Context?.DialogueId
-                });
-            }
-            
-            // バッチ翻訳を実行
-            var coreResponses = await TranslateBatchAsync(coreRequests, cancellationToken).ConfigureAwait(false);
-            
-            // CoreModelsからTransModelsに変換
-            return coreResponses.Select(coreResponse => new TransModels.TranslationResponse
-            {
-                RequestId = coreResponse.RequestId,
-                SourceText = coreResponse.SourceText,
-                TranslatedText = coreResponse.TranslatedText,
-                SourceLanguage = new TransModels.Language
-                {
-                    Code = coreResponse.SourceLanguage.Code,
-                    DisplayName = coreResponse.SourceLanguage.Name
-                },
-                TargetLanguage = new TransModels.Language
-                {
-                    Code = coreResponse.TargetLanguage.Code,
-                    DisplayName = coreResponse.TargetLanguage.Name
-                },
-                EngineName = coreResponse.EngineName,
-                ProcessingTimeMs = coreResponse.ProcessingTimeMs,
-                IsSuccess = coreResponse.IsSuccess,
-                Error = coreResponse.Error != null ? new TransModels.TranslationError
-                {
-                    ErrorCode = coreResponse.Error.ErrorCode,
-                    Message = coreResponse.Error.Message,
-                    Details = coreResponse.Error.Details
-                } : null
-            }).ToList();
+            return await TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -618,8 +484,8 @@ namespace Baketa.Core.Translation
         /// <param name="message">エラーメッセージ</param>
         /// <param name="details">詳細（オプション）</param>
         /// <returns>エラーを含む翻訳レスポンス</returns>
-        protected CoreModels.TranslationResponse CreateErrorResponse(
-            CoreModels.TranslationRequest request, 
+        protected TranslationResponse CreateErrorResponse(
+            TranslationRequest request, 
             string errorCode, 
             string message,
             string? details = null)
@@ -632,7 +498,7 @@ namespace Baketa.Core.Translation
                 "翻訳エラー: {ErrorCode}, {Message}, リクエストID={RequestId}",
                 errorCode, message, request.RequestId);
 
-            return new CoreModels.TranslationResponse
+            return new TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,
@@ -640,7 +506,7 @@ namespace Baketa.Core.Translation
                 TargetLanguage = request.TargetLanguage,
                 EngineName = Name,
                 IsSuccess = false,
-                Error = new CoreModels.TranslationError
+                Error = new TranslationError
                 {
                     ErrorCode = errorCode,
                     Message = message,
@@ -657,8 +523,8 @@ namespace Baketa.Core.Translation
         /// <param name="message">エラーメッセージ</param>
         /// <param name="exception">例外</param>
         /// <returns>エラーを含む翻訳レスポンス</returns>
-        protected CoreModels.TranslationResponse CreateErrorResponseFromException(
-            CoreModels.TranslationRequest request, 
+        protected TranslationResponse CreateErrorResponseFromException(
+            TranslationRequest request, 
             string errorCode, 
             string message, 
             Exception exception)
@@ -672,7 +538,7 @@ namespace Baketa.Core.Translation
                 "翻訳エラー: {ErrorCode}, {Message}, リクエストID={RequestId}",
                 errorCode, message, request.RequestId);
 
-            return new CoreModels.TranslationResponse
+            return new TranslationResponse
             {
                 RequestId = request.RequestId,
                 SourceText = request.SourceText,
@@ -680,7 +546,7 @@ namespace Baketa.Core.Translation
                 TargetLanguage = request.TargetLanguage,
                 EngineName = Name,
                 IsSuccess = false,
-                Error = new CoreModels.TranslationError
+                Error = new TranslationError
                 {
                     ErrorCode = errorCode,
                     Message = message,
@@ -696,14 +562,14 @@ namespace Baketa.Core.Translation
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出結果</returns>
-        public virtual Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
+        public virtual Task<LanguageDetectionResult> DetectLanguageAsync(
             string text, 
             CancellationToken cancellationToken = default)
         {
             // 基本実装（派生クラスでオーバーライド可能）
-            var result = new TransModels.LanguageDetectionResult
+            var result = new LanguageDetectionResult
             {
-                DetectedLanguage = new TransModels.Language
+                DetectedLanguage = new Language
                 {
                     Code = "auto",
                     DisplayName = "自動検出"

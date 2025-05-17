@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -80,8 +80,7 @@ namespace Baketa.Infrastructure.Tests.Translation
             // 英語 → 中国語（簡体字）のペアが含まれることを確認
             Assert.Contains(pairs, p => 
                 p.SourceLanguage.Code == "en" && 
-                p.TargetLanguage.Code == "zh" &&
-                p.TargetLanguage.RegionCode == "CN");
+                p.TargetLanguage.Code == "zh-CN");
         }
         
         [Fact]
@@ -105,6 +104,7 @@ namespace Baketa.Infrastructure.Tests.Translation
             {
                 Code = "fr",
                 Name = "French",
+                DisplayName = "French",
                 NativeName = "Français"
             };
             var pair = LanguagePair.Create(unsupportedLanguage, Language.Japanese);

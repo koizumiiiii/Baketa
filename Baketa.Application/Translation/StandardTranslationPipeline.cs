@@ -31,7 +31,7 @@ namespace Baketa.Application.Translation
         private readonly ITranslationManager _translationManager;
         private readonly IEventAggregator _eventAggregator;
         private readonly ITranslationTransactionManager _transactionManager;
-        private readonly Baketa.Core.Translation.TranslationOptions _options;
+        private readonly Baketa.Core.Translation.Common.TranslationOptions _options;
 
         /// <summary>
         /// 標準翻訳パイプラインのコンストラクタ
@@ -49,7 +49,7 @@ namespace Baketa.Application.Translation
             ITranslationManager translationManager,
             IEventAggregator eventAggregator,
             ITranslationTransactionManager transactionManager,
-            Baketa.Core.Translation.TranslationOptions options)
+            Baketa.Core.Translation.Common.TranslationOptions options)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
@@ -181,16 +181,17 @@ namespace Baketa.Application.Translation
                 }
                 else
                 {
-                    // null参照を安全に扱うよう修正
-                    var languagePair = new Baketa.Core.Models.Translation.LanguagePair
+                    var languagePair = new Baketa.Core.Translation.Models.LanguagePair
                     {
-                        SourceLanguage = new Baketa.Core.Models.Translation.Language { 
+                        SourceLanguage = new Baketa.Core.Translation.Models.Language { 
                             Code = request.SourceLanguage.Code, 
-                            Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
+                            Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code,
+                            DisplayName = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
                         },
-                        TargetLanguage = new Baketa.Core.Models.Translation.Language { 
+                        TargetLanguage = new Baketa.Core.Translation.Models.Language { 
                             Code = request.TargetLanguage.Code, 
-                            Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
+                            Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code,
+                            DisplayName = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
                         }
                     };
                     engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)
@@ -594,16 +595,17 @@ namespace Baketa.Application.Translation
                     }
                     else
                     {
-                        // null参照を安全に扱うよう修正
-                        var languagePair = new Baketa.Core.Models.Translation.LanguagePair
+                        var languagePair = new Baketa.Core.Translation.Models.LanguagePair
                         {
-                            SourceLanguage = new Baketa.Core.Models.Translation.Language { 
+                            SourceLanguage = new Baketa.Core.Translation.Models.Language { 
                                 Code = sourceLang.Code, 
-                                Name = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code
+                                Name = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code,
+                                DisplayName = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code
                             },
-                            TargetLanguage = new Baketa.Core.Models.Translation.Language { 
+                            TargetLanguage = new Baketa.Core.Translation.Models.Language { 
                                 Code = targetLang.Code, 
-                                Name = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code
+                                Name = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code,
+                                DisplayName = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code
                             }
                         };
                         engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)

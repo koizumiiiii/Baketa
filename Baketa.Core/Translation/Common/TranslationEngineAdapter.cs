@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 // 明示的な名前空間への参照を指定
 using CoreTrEngine = Baketa.Core.Abstractions.Translation.ITranslationEngine;
 using NewTrEngine = Baketa.Core.Translation.Abstractions.ITranslationEngine;
-
-// 名前空間エイリアスを明示的に定義
-using CoreModels = Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
+using Baketa.Core.Abstractions.Translation;
 using TransModels = Baketa.Core.Translation.Models;
+
 
 namespace Baketa.Core.Translation.Common
 {
@@ -52,25 +52,27 @@ namespace Baketa.Core.Translation.Common
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        public async Task<TransModels.TranslationResponse> TranslateAsync(
-            TransModels.TranslationRequest request,
+        public async Task<TranslationResponse> TranslateAsync(
+            TranslationRequest request,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
 
             // コアモデルに変換
-            var coreRequest = new CoreModels.TranslationRequest
+            var coreRequest = new TranslationRequest
             {
                 SourceText = request.SourceText,
-                SourceLanguage = new CoreModels.Language
+                SourceLanguage = new Language
                 { 
                     Code = request.SourceLanguage.Code,
-                    Name = request.SourceLanguage.DisplayName  // DisplayNameの値をNameに設定
+                    Name = request.SourceLanguage.DisplayName,  // DisplayNameの値をNameに設定
+                    DisplayName = request.SourceLanguage.DisplayName
                 },
-                TargetLanguage = new CoreModels.Language
+                TargetLanguage = new Language
                 { 
                     Code = request.TargetLanguage.Code,
-                    Name = request.TargetLanguage.DisplayName  // DisplayNameの値をNameに設定
+                    Name = request.TargetLanguage.DisplayName,  // DisplayNameの値をNameに設定
+                    DisplayName = request.TargetLanguage.DisplayName
                 }
             };
 
@@ -78,20 +80,22 @@ namespace Baketa.Core.Translation.Common
             var coreResponse = await _coreEngine.TranslateAsync(coreRequest, cancellationToken).ConfigureAwait(false);
 
             // レスポンスを変換
-            return new TransModels.TranslationResponse
+            return new TranslationResponse
             {
                 RequestId = Guid.Parse(coreResponse.RequestId.ToString()),
                 SourceText = coreResponse.SourceText,
                 TranslatedText = coreResponse.TranslatedText,
-                SourceLanguage = new TransModels.Language
+                SourceLanguage = new Language
                 { 
                     Code = coreResponse.SourceLanguage.Code,
-                    DisplayName = coreResponse.SourceLanguage.Name // Nameの値をDisplayNameに設定
+                    DisplayName = coreResponse.SourceLanguage.Name, // Nameの値をDisplayNameに設定
+                    Name = coreResponse.SourceLanguage.Name
                 },
-                TargetLanguage = new TransModels.Language
+                TargetLanguage = new Language
                 { 
                     Code = coreResponse.TargetLanguage.Code,
-                    DisplayName = coreResponse.TargetLanguage.Name // Nameの値をDisplayNameに設定
+                    DisplayName = coreResponse.TargetLanguage.Name, // Nameの値をDisplayNameに設定
+                    Name = coreResponse.TargetLanguage.Name
                 },
                 EngineName = coreResponse.EngineName ?? _coreEngine.Name,
                 ProcessingTimeMs = coreResponse.ProcessingTimeMs,
@@ -105,15 +109,15 @@ namespace Baketa.Core.Translation.Common
         /// <param name="requests">翻訳リクエストのリスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのリスト</returns>
-        public async Task<IReadOnlyList<TransModels.TranslationResponse>> TranslateBatchAsync(
-            IReadOnlyList<TransModels.TranslationRequest> requests,
+        public async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+            IReadOnlyList<TranslationRequest> requests,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(requests);
 
             if (requests.Count == 0)
             {
-                return Enumerable.Empty<TransModels.TranslationResponse>().ToArray();
+                return Enumerable.Empty<TranslationResponse>().ToArray();
             }
 
             // 各リクエストを個別に処理する方法に変更
@@ -128,21 +132,23 @@ namespace Baketa.Core.Translation.Common
         /// サポートしている言語ペアを取得します
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        public async Task<IReadOnlyCollection<TransModels.LanguagePair>> GetSupportedLanguagePairsAsync()
+        public async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
         {
             var corePairs = await _coreEngine.GetSupportedLanguagePairsAsync().ConfigureAwait(false);
 
-            return corePairs.Select(p => new TransModels.LanguagePair
+            return corePairs.Select(p => new LanguagePair
             {
-                SourceLanguage = new TransModels.Language
+                SourceLanguage = new Language
                 { 
                     Code = p.SourceLanguage.Code,
-                    DisplayName = p.SourceLanguage.Name // Nameの値をDisplayNameに設定
+                    DisplayName = p.SourceLanguage.Name, // Nameの値をDisplayNameに設定
+                    Name = p.SourceLanguage.Name
                 },
-                TargetLanguage = new TransModels.Language
+                TargetLanguage = new Language
                 { 
                     Code = p.TargetLanguage.Code,
-                    DisplayName = p.TargetLanguage.Name // Nameの値をDisplayNameに設定
+                    DisplayName = p.TargetLanguage.Name, // Nameの値をDisplayNameに設定
+                    Name = p.TargetLanguage.Name
                 }
             }).ToList();
         }
@@ -152,25 +158,27 @@ namespace Baketa.Core.Translation.Common
         /// </summary>
         /// <param name="languagePair">言語ペア</param>
         /// <returns>サポートされている場合はtrue</returns>
-        public async Task<bool> SupportsLanguagePairAsync(TransModels.LanguagePair languagePair)
+        public async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
         {
-            ArgumentNullException.ThrowIfNull(languagePair);
+        ArgumentNullException.ThrowIfNull(languagePair);
 
-            var corePair = new CoreModels.LanguagePair
-            {
-                SourceLanguage = new CoreModels.Language
-                { 
-                    Code = languagePair.SourceLanguage.Code,
-                    Name = languagePair.SourceLanguage.DisplayName // DisplayNameの値をNameに設定
-                },
-                TargetLanguage = new CoreModels.Language
-                { 
-                    Code = languagePair.TargetLanguage.Code,
-                    Name = languagePair.TargetLanguage.DisplayName // DisplayNameの値をNameに設定
-                }
-            };
+        var corePair = new LanguagePair
+        {
+        SourceLanguage = new Language
+        { 
+        Code = languagePair.SourceLanguage.Code,
+        Name = languagePair.SourceLanguage.DisplayName, // DisplayNameの値をNameに設定
+        DisplayName = languagePair.SourceLanguage.DisplayName
+        },
+        TargetLanguage = new Language
+        { 
+        Code = languagePair.TargetLanguage.Code,
+        Name = languagePair.TargetLanguage.DisplayName, // DisplayNameの値をNameに設定
+        DisplayName = languagePair.TargetLanguage.DisplayName
+        }
+        };
 
-            return await _coreEngine.SupportsLanguagePairAsync(corePair).ConfigureAwait(false);
+        return await _coreEngine.SupportsLanguagePairAsync(corePair).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -197,26 +205,26 @@ namespace Baketa.Core.Translation.Common
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        public async Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
-            string text, 
-            CancellationToken cancellationToken = default)
+        public async Task<Models.LanguageDetectionResult> DetectLanguageAsync(
+        string text, 
+        CancellationToken cancellationToken = default)
         {
-            // コアエンジンでは言語検出機能が実装されていない場合、
-            // 今回はコア側にない機能なので、検出機能をここで簡易実装
-            
-            // 簡易検出結果を作成
-            var result = new TransModels.LanguageDetectionResult
-            {
-                DetectedLanguage = new TransModels.Language
-                { 
-                    Code = "auto", 
-                    DisplayName = "自動検出" 
-                },
-                Confidence = 0.5f,
-                EngineName = _coreEngine.Name
-            };
-            
-            return await Task.FromResult(result).ConfigureAwait(false);
+        // コアエンジンでは言語検出機能が実装されていない場合、
+        // 今回はコア側にない機能なので、検出機能をここで簡易実装
+        
+        // 簡易検出結果を作成
+        var result = new Models.LanguageDetectionResult
+        {
+        DetectedLanguage = new Language
+        { 
+        Code = "auto", 
+        DisplayName = "自動検出" 
+        },
+        Confidence = 0.5f,
+        EngineName = _coreEngine.Name
+        };
+        
+        return await Task.FromResult(result).ConfigureAwait(false);
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Factories;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Translation.Models;
 
 // 明示的なエイリアス定義
 using CoreTranslationEngine = Baketa.Core.Abstractions.Translation.ITranslationEngine;
@@ -66,7 +67,7 @@ namespace Baketa.Core.Translation.Services
         /// </summary>
         /// <param name="languagePair">言語ペア</param>
         /// <returns>最適なエンジン、見つからなければnull</returns>
-        public async Task<TranslationEngineInterface?> GetBestEngineForLanguagePairAsync(Translation.Models.LanguagePair languagePair)
+        public async Task<TranslationEngineInterface?> GetBestEngineForLanguagePairAsync(LanguagePair languagePair)
         {
             ArgumentNullException.ThrowIfNull(languagePair, nameof(languagePair));
             
@@ -81,21 +82,23 @@ namespace Baketa.Core.Translation.Services
         /// <param name="sourceLang">元言語</param>
         /// <param name="targetLang">対象言語</param>
         /// <returns>見つかればエンジン、見つからなければnull</returns>
-        public async Task<TranslationEngineInterface?> GetBestEngineForLanguagePairAsync(Translation.Models.Language sourceLang, Translation.Models.Language targetLang)
+        public async Task<TranslationEngineInterface?> GetBestEngineForLanguagePairAsync(Language sourceLang, Language targetLang)
         {
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
             
-            var languagePair = new Core.Models.Translation.LanguagePair
+            var languagePair = new LanguagePair
             {
-                SourceLanguage = new Core.Models.Translation.Language
+                SourceLanguage = new Language
                 {
                     Code = sourceLang.Code,
+                    DisplayName = sourceLang.DisplayName,
                     Name = sourceLang.Code // DisplayNameがないのでCodeを使用
                 },
-                TargetLanguage = new Core.Models.Translation.Language
+                TargetLanguage = new Language
                 {
                     Code = targetLang.Code,
+                    DisplayName = targetLang.DisplayName,
                     Name = targetLang.Code // DisplayNameがないのでCodeを使用
                 }
             };
@@ -110,21 +113,23 @@ namespace Baketa.Core.Translation.Services
         /// <param name="sourceLang">元言語</param>
         /// <param name="targetLang">対象言語</param>
         /// <returns>サポートするエンジン名のリスト</returns>
-        public async Task<IReadOnlyList<string>> GetSupportedEnginesForLanguagePairAsync(Translation.Models.Language sourceLang, Translation.Models.Language targetLang)
+        public async Task<IReadOnlyList<string>> GetSupportedEnginesForLanguagePairAsync(Language sourceLang, Language targetLang)
         {
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
             
-            var languagePair = new Core.Models.Translation.LanguagePair
+            var languagePair = new LanguagePair
             {
-                SourceLanguage = new Core.Models.Translation.Language
+                SourceLanguage = new Language
                 {
                     Code = sourceLang.Code,
+                    DisplayName = sourceLang.DisplayName,
                     Name = sourceLang.Code // DisplayNameがないのでCodeを使用
                 },
-                TargetLanguage = new Core.Models.Translation.Language
+                TargetLanguage = new Language
                 {
                     Code = targetLang.Code,
+                    DisplayName = targetLang.DisplayName,
                     Name = targetLang.Code // DisplayNameがないのでCodeを使用
                 }
             };

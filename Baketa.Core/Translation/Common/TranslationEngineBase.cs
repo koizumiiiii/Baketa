@@ -10,7 +10,7 @@ using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 // エイリアスを追加
-using CoreModels = Baketa.Core.Models.Translation;
+
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common
