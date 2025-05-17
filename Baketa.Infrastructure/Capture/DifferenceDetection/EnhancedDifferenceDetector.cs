@@ -339,7 +339,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
         /// <summary>
         /// 動的テキスト消失イベントクラス
         /// </summary>
-        private class DynamicTextDisappearanceEvent : IEvent
+        private sealed class DynamicTextDisappearanceEvent : IEvent
         {
             public Guid Id { get; } = Guid.NewGuid();
             public string Name => "TextDisappearance";

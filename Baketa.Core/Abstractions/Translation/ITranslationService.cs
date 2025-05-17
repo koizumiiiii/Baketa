@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Abstractions.Translation
 {

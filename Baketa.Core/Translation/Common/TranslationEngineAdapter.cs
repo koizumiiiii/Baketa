@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using CoreTrEngine = Baketa.Core.Abstractions.Translation.ITranslationEngine;
 using NewTrEngine = Baketa.Core.Translation.Abstractions.ITranslationEngine;
 
-// 名前空間エイリアスの定義
-using TransModels = Baketa.Core.Translation.Models;
+// 名前空間エイリアスを明示的に定義
 using CoreModels = Baketa.Core.Models.Translation;
+using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common
 {
@@ -62,13 +62,15 @@ namespace Baketa.Core.Translation.Common
             var coreRequest = new CoreModels.TranslationRequest
             {
                 SourceText = request.SourceText,
-                SourceLanguage = new CoreModels.Language { 
+                SourceLanguage = new CoreModels.Language
+                { 
                     Code = request.SourceLanguage.Code,
-                    Name = request.SourceLanguage.Code  // DisplayNameの代わりにCodeをNameに設定
+                    Name = request.SourceLanguage.DisplayName  // DisplayNameの値をNameに設定
                 },
-                TargetLanguage = new CoreModels.Language { 
+                TargetLanguage = new CoreModels.Language
+                { 
                     Code = request.TargetLanguage.Code,
-                    Name = request.TargetLanguage.Code  // DisplayNameの代わりにCodeをNameに設定
+                    Name = request.TargetLanguage.DisplayName  // DisplayNameの値をNameに設定
                 }
             };
 
@@ -81,11 +83,13 @@ namespace Baketa.Core.Translation.Common
                 RequestId = Guid.Parse(coreResponse.RequestId.ToString()),
                 SourceText = coreResponse.SourceText,
                 TranslatedText = coreResponse.TranslatedText,
-                SourceLanguage = new TransModels.Language { 
+                SourceLanguage = new TransModels.Language
+                { 
                     Code = coreResponse.SourceLanguage.Code,
                     DisplayName = coreResponse.SourceLanguage.Name // Nameの値をDisplayNameに設定
                 },
-                TargetLanguage = new TransModels.Language { 
+                TargetLanguage = new TransModels.Language
+                { 
                     Code = coreResponse.TargetLanguage.Code,
                     DisplayName = coreResponse.TargetLanguage.Name // Nameの値をDisplayNameに設定
                 },
@@ -109,44 +113,15 @@ namespace Baketa.Core.Translation.Common
 
             if (requests.Count == 0)
             {
-                return Array.Empty<TransModels.TranslationResponse>();
+                return Enumerable.Empty<TransModels.TranslationResponse>().ToArray();
             }
 
-            // コアモデルに変換
-            var coreRequests = requests.Select(r => new CoreModels.TranslationRequest
-            {
-                SourceText = r.SourceText,
-                SourceLanguage = new CoreModels.Language { 
-                    Code = r.SourceLanguage.Code,
-                    Name = r.SourceLanguage.Code // DisplayNameの代わりにCodeをNameに設定
-                },
-                TargetLanguage = new CoreModels.Language { 
-                    Code = r.TargetLanguage.Code,
-                    Name = r.TargetLanguage.Code // DisplayNameの代わりにCodeをNameに設定
-                }
-            }).ToList();
+            // 各リクエストを個別に処理する方法に変更
+            // LINQを使用してコレクション初期化を簡素化
+            var tasks = requests.Select(request => TranslateAsync(request, cancellationToken)).ToList();
 
-            // コアエンジンでバッチ翻訳
-            var coreResponses = await _coreEngine.TranslateBatchAsync(coreRequests, cancellationToken).ConfigureAwait(false);
-
-            // レスポンスリストを変換
-            return coreResponses.Select(r => new TransModels.TranslationResponse
-            {
-                RequestId = Guid.Parse(r.RequestId.ToString()),
-                SourceText = r.SourceText,
-                TranslatedText = r.TranslatedText,
-                SourceLanguage = new TransModels.Language { 
-                    Code = r.SourceLanguage.Code,
-                    DisplayName = r.SourceLanguage.Name // Nameの値をDisplayNameに設定
-                },
-                TargetLanguage = new TransModels.Language { 
-                    Code = r.TargetLanguage.Code,
-                    DisplayName = r.TargetLanguage.Name // Nameの値をDisplayNameに設定
-                },
-                EngineName = r.EngineName ?? _coreEngine.Name,
-                ProcessingTimeMs = r.ProcessingTimeMs,
-                IsSuccess = true // プロパティの不一致に対応
-            }).ToList();
+            // すべてのタスクが完了するのを待つ
+            return await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -159,11 +134,13 @@ namespace Baketa.Core.Translation.Common
 
             return corePairs.Select(p => new TransModels.LanguagePair
             {
-                SourceLanguage = new TransModels.Language { 
+                SourceLanguage = new TransModels.Language
+                { 
                     Code = p.SourceLanguage.Code,
                     DisplayName = p.SourceLanguage.Name // Nameの値をDisplayNameに設定
                 },
-                TargetLanguage = new TransModels.Language { 
+                TargetLanguage = new TransModels.Language
+                { 
                     Code = p.TargetLanguage.Code,
                     DisplayName = p.TargetLanguage.Name // Nameの値をDisplayNameに設定
                 }
@@ -181,13 +158,15 @@ namespace Baketa.Core.Translation.Common
 
             var corePair = new CoreModels.LanguagePair
             {
-                SourceLanguage = new CoreModels.Language { 
+                SourceLanguage = new CoreModels.Language
+                { 
                     Code = languagePair.SourceLanguage.Code,
-                    Name = languagePair.SourceLanguage.Code // DisplayNameの代わりにCodeをNameに設定
+                    Name = languagePair.SourceLanguage.DisplayName // DisplayNameの値をNameに設定
                 },
-                TargetLanguage = new CoreModels.Language { 
+                TargetLanguage = new CoreModels.Language
+                { 
                     Code = languagePair.TargetLanguage.Code,
-                    Name = languagePair.TargetLanguage.Code // DisplayNameの代わりにCodeをNameに設定
+                    Name = languagePair.TargetLanguage.DisplayName // DisplayNameの値をNameに設定
                 }
             };
 
@@ -218,25 +197,26 @@ namespace Baketa.Core.Translation.Common
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        public Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default)
+        public async Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(
+            string text, 
+            CancellationToken cancellationToken = default)
         {
-            // 現在のコアエンジンでは言語検出が実装されていないため、簡易的な結果を返す
-            var coreResult = new CoreModels.LanguageDetectionResult()
+            // コアエンジンでは言語検出機能が実装されていない場合、
+            // 今回はコア側にない機能なので、検出機能をここで簡易実装
+            
+            // 簡易検出結果を作成
+            var result = new TransModels.LanguageDetectionResult
             {
-                DetectedLanguage = new CoreModels.Language() { Code = "auto", Name = "自動検出" },
+                DetectedLanguage = new TransModels.Language
+                { 
+                    Code = "auto", 
+                    DisplayName = "自動検出" 
+                },
                 Confidence = 0.5f,
                 EngineName = _coreEngine.Name
             };
             
-            // CoreModelsからTransModelsに変換
-            var result = new TransModels.LanguageDetectionResult
-            {
-                DetectedLanguage = new TransModels.Language { Code = coreResult.DetectedLanguage.Code, DisplayName = coreResult.DetectedLanguage.Name },
-                Confidence = coreResult.Confidence,
-                EngineName = coreResult.EngineName
-            };
-            
-            return Task.FromResult(result);
+            return await Task.FromResult(result).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -259,7 +239,7 @@ namespace Baketa.Core.Translation.Common
                 if (disposing)
                 {
                     // マネージドリソースの破棄
-                    _coreEngine?.Dispose();
+                    (_coreEngine as IDisposable)?.Dispose();
                 }
 
                 _disposed = true;

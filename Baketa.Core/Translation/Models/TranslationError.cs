@@ -88,12 +88,12 @@ namespace Baketa.Core.Translation.Models
         {
             return new TranslationError
             {
-                ErrorCode = ErrorCode,
-                Message = Message,
-                Details = Details,
-                Exception = Exception,
-                IsRetryable = IsRetryable,
-                ErrorType = ErrorType
+                ErrorCode = this.ErrorCode,
+                Message = this.Message,
+                Details = this.Details,
+                Exception = this.Exception,
+                IsRetryable = this.IsRetryable,
+                ErrorType = this.ErrorType
             };
         }
 
@@ -103,6 +103,61 @@ namespace Baketa.Core.Translation.Models
         public override string ToString()
         {
             return $"[{ErrorCode}] {Message}" + (Details != null ? $" - {Details}" : "");
+        }
+        
+        /// <summary>
+        /// エラーオブジェクトを作成します
+        /// </summary>
+        /// <param name="errorCode">エラーコード</param>
+        /// <param name="message">エラーメッセージ</param>
+        /// <param name="isRetryable">再試行可能かどうか</param>
+        /// <param name="errorType">エラー種別</param>
+        /// <returns>新しいエラーオブジェクト</returns>
+        public static TranslationError Create(
+            string errorCode,
+            string message,
+            bool isRetryable = false,
+            TranslationErrorType errorType = TranslationErrorType.Unknown)
+        {
+            ArgumentNullException.ThrowIfNull(errorCode);
+            ArgumentNullException.ThrowIfNull(message);
+            return new TranslationError
+            {
+                ErrorCode = errorCode,
+                Message = message,
+                IsRetryable = isRetryable,
+                ErrorType = errorType
+            };
+        }
+        
+        /// <summary>
+        /// 例外からエラーオブジェクトを作成します
+        /// </summary>
+        /// <param name="errorCode">エラーコード</param>
+        /// <param name="message">エラーメッセージ</param>
+        /// <param name="exception">例外</param>
+        /// <param name="isRetryable">再試行可能かどうか</param>
+        /// <param name="errorType">エラー種別</param>
+        /// <returns>新しいエラーオブジェクト</returns>
+        public static TranslationError FromException(
+            string errorCode,
+            string message,
+            Exception exception,
+            bool isRetryable = false,
+            TranslationErrorType errorType = TranslationErrorType.Exception)
+        {
+            ArgumentNullException.ThrowIfNull(errorCode);
+            ArgumentNullException.ThrowIfNull(message);
+            ArgumentNullException.ThrowIfNull(exception);
+            return new TranslationError
+            {
+                ErrorCode = errorCode,
+                Message = message,
+                Exception = exception,
+                Details = exception.StackTrace,
+                IsRetryable = isRetryable,
+                ErrorType = errorType
+            };
         }
         
         #region 標準エラーコード定数

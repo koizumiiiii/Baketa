@@ -13,8 +13,6 @@ using Baketa.Core.Translation.Cache;
 using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
-using CoreModels = Baketa.Core.Models.Translation;
-using TransModels = Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Translation
@@ -184,15 +182,15 @@ namespace Baketa.Application.Translation
                 else
                 {
                     // null参照を安全に扱うよう修正
-                    var languagePair = new CoreModels.LanguagePair
+                    var languagePair = new Baketa.Core.Models.Translation.LanguagePair
                     {
-                        SourceLanguage = new CoreModels.Language { 
+                        SourceLanguage = new Baketa.Core.Models.Translation.Language { 
                             Code = request.SourceLanguage.Code, 
-                            Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code 
+                            Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
                         },
-                        TargetLanguage = new CoreModels.Language { 
+                        TargetLanguage = new Baketa.Core.Models.Translation.Language { 
                             Code = request.TargetLanguage.Code, 
-                            Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code 
+                            Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
                         }
                     };
                     engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)
@@ -209,18 +207,20 @@ namespace Baketa.Application.Translation
                         : request.SourceText);
 
                 // null参照を安全に扱うよう修正
-                var translationRequest = new Core.Models.Translation.TranslationRequest
+                var translationRequest = new TranslationRequest
                 {
                     SourceText = request.SourceText,
-                    SourceLanguage = new CoreModels.Language { 
+                    SourceLanguage = new Language { 
                         Code = request.SourceLanguage.Code, 
-                        Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code 
+                        Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code,
+                        DisplayName = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
                     },
-                    TargetLanguage = new CoreModels.Language { 
+                    TargetLanguage = new Language { 
                         Code = request.TargetLanguage.Code, 
-                        Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code 
+                        Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code,
+                        DisplayName = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
                     },
-                    Context = request.Context?.ToString()
+                    Context = request.Context != null ? new TranslationContext { DialogueId = request.Context.ToString() } : null
                 };
 
                 var engineResponse = await engine.TranslateAsync(translationRequest, cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("翻訳エンジンからの応答がnullでした。");
@@ -238,11 +238,11 @@ namespace Baketa.Application.Translation
                 {
                     response.IsSuccess = false;
                     response.Error = engineResponse.Error is not null 
-                        ? new TransModels.TranslationError 
+                        ? new TranslationError 
                         { 
                             ErrorCode = engineResponse.Error.ErrorCode, 
                             Message = engineResponse.Error.Message,
-                            ErrorType = TransModels.TranslationErrorType.Unknown
+                            ErrorType = TranslationErrorType.Unknown
                         } 
                         : null;
                 }
@@ -329,7 +329,7 @@ namespace Baketa.Application.Translation
                         SourceLanguage = request.SourceLanguage.Code,
                         TargetLanguage = request.TargetLanguage.Code,
                         ErrorMessage = response.Error?.Message ?? "未知のエラー",
-                        ErrorType = TransModels.TranslationErrorType.Engine,
+                        ErrorType = TranslationErrorType.Engine,
                         TranslationEngine = engine.Name,
                         ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                         // Timestampは読み取り専用プロパティのためコメントアウト
@@ -375,7 +375,7 @@ namespace Baketa.Application.Translation
                     SourceLanguage = request.SourceLanguage.Code,
                     TargetLanguage = request.TargetLanguage.Code,
                     ErrorMessage = ex.Message,
-                    ErrorType = TransModels.TranslationErrorType.Exception,
+                    ErrorType = TranslationErrorType.Exception,
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds
                 };
                 
@@ -384,11 +384,11 @@ namespace Baketa.Application.Translation
                 // キャンセルエラーレスポンスを作成
                 var errorResponse = TranslationResponse.CreateError(
                     request,
-                    new TransModels.TranslationError
+                    new TranslationError
                     {
                         ErrorCode = "OPERATION_CANCELED",
                         Message = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.Exception
+                        ErrorType = TranslationErrorType.Exception
                     },
                     "Error"
                 );
@@ -417,7 +417,7 @@ namespace Baketa.Application.Translation
                     SourceLanguage = request.SourceLanguage.Code,
                     TargetLanguage = request.TargetLanguage.Code,
                     ErrorMessage = ex.Message,
-                    ErrorType = TransModels.TranslationErrorType.Engine, // 翻訳エンジンでの問題が多い
+                    ErrorType = TranslationErrorType.Engine, // 翻訳エンジンでの問題が多い
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds
                 };
                 
@@ -425,11 +425,11 @@ namespace Baketa.Application.Translation
 
                 var errorResponse = TranslationResponse.CreateError(
                     request,
-                    new TransModels.TranslationError
+                    new TranslationError
                     {
                         ErrorCode = "INVALID_OPERATION",
                         Message = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.Engine
+                        ErrorType = TranslationErrorType.Engine
                     },
                     "Error"
                 );
@@ -457,7 +457,7 @@ namespace Baketa.Application.Translation
                     SourceLanguage = request.SourceLanguage.Code,
                     TargetLanguage = request.TargetLanguage.Code,
                     ErrorMessage = ex.Message,
-                    ErrorType = TransModels.TranslationErrorType.InvalidInput,
+                    ErrorType = TranslationErrorType.InvalidInput,
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds
                 };
                 
@@ -465,11 +465,11 @@ namespace Baketa.Application.Translation
 
                 var errorResponse = TranslationResponse.CreateError(
                     request,
-                    new TransModels.TranslationError
+                    new TranslationError
                     {
                         ErrorCode = "INVALID_ARGUMENT",
                         Message = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.InvalidInput
+                        ErrorType = TranslationErrorType.InvalidInput
                     },
                     "Error"
                 );
@@ -497,7 +497,7 @@ namespace Baketa.Application.Translation
                     SourceLanguage = request.SourceLanguage.Code,
                     TargetLanguage = request.TargetLanguage.Code,
                     ErrorMessage = ex.Message,
-                    ErrorType = TransModels.TranslationErrorType.Exception,
+                    ErrorType = TranslationErrorType.Exception,
                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                     // Timestampは読み取り専用プロパティのためコメントアウト
                     // Timestamp = DateTimeOffset.UtcNow
@@ -507,11 +507,11 @@ namespace Baketa.Application.Translation
 
                 var errorResponse = TranslationResponse.CreateError(
                     request,
-                    new TransModels.TranslationError
+                    new TranslationError
                     {
                         ErrorCode = "PIPELINE_ERROR",
                         Message = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.Exception
+                        ErrorType = TranslationErrorType.Exception
                     },
                     "Error"
                 );
@@ -595,15 +595,15 @@ namespace Baketa.Application.Translation
                     else
                     {
                         // null参照を安全に扱うよう修正
-                        var languagePair = new CoreModels.LanguagePair
+                        var languagePair = new Baketa.Core.Models.Translation.LanguagePair
                         {
-                            SourceLanguage = new CoreModels.Language { 
+                            SourceLanguage = new Baketa.Core.Models.Translation.Language { 
                                 Code = sourceLang.Code, 
-                                Name = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code 
+                                Name = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code
                             },
-                            TargetLanguage = new CoreModels.Language { 
+                            TargetLanguage = new Baketa.Core.Models.Translation.Language { 
                                 Code = targetLang.Code, 
-                                Name = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code 
+                                Name = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code
                             }
                         };
                         engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)
@@ -732,21 +732,23 @@ namespace Baketa.Application.Translation
                     // 翻訳が必要なリクエストがある場合
                     if (nonCachedRequests.Count > 0)
                     {
-                        var engineRequests = nonCachedRequests.Select(x => new Core.Models.Translation.TranslationRequest
+                        var engineRequests = nonCachedRequests.Select(x => new TranslationRequest
                         {
                             SourceText = x.Request.SourceText,
-                            SourceLanguage = new CoreModels.Language { 
+                            SourceLanguage = new Language { 
                                 Code = x.Request.SourceLanguage.Code, 
-                                Name = !string.IsNullOrEmpty(x.Request.SourceLanguage.DisplayName) ? x.Request.SourceLanguage.DisplayName : x.Request.SourceLanguage.Code 
+                                Name = !string.IsNullOrEmpty(x.Request.SourceLanguage.DisplayName) ? x.Request.SourceLanguage.DisplayName : x.Request.SourceLanguage.Code,
+                                DisplayName = !string.IsNullOrEmpty(x.Request.SourceLanguage.DisplayName) ? x.Request.SourceLanguage.DisplayName : x.Request.SourceLanguage.Code
                             },
-                            TargetLanguage = new CoreModels.Language { 
+                            TargetLanguage = new Language { 
                                 Code = x.Request.TargetLanguage.Code, 
-                                Name = !string.IsNullOrEmpty(x.Request.TargetLanguage.DisplayName) ? x.Request.TargetLanguage.DisplayName : x.Request.TargetLanguage.Code 
+                                Name = !string.IsNullOrEmpty(x.Request.TargetLanguage.DisplayName) ? x.Request.TargetLanguage.DisplayName : x.Request.TargetLanguage.Code,
+                                DisplayName = !string.IsNullOrEmpty(x.Request.TargetLanguage.DisplayName) ? x.Request.TargetLanguage.DisplayName : x.Request.TargetLanguage.Code
                             },
                             // RequestIdは読み取り専用プロパティなので形式変更
                             // 代入はできないのでここではスキップ
                             // RequestId = x.Request.RequestId, 
-                            Context = x.Request.Context?.ToString()
+                            Context = x.Request.Context != null ? new TranslationContext { DialogueId = x.Request.Context.ToString() } : null
                         }).ToList();
 
                         // 4. 一括翻訳実行
@@ -764,7 +766,7 @@ namespace Baketa.Application.Translation
                             var originalRequest = nonCachedRequests[i].Request;
                             var engineResponse = (i < engineResponses.Count)
                                     ? engineResponses[i] 
-                                    : new Core.Models.Translation.TranslationResponse
+                                    : new TranslationResponse
                                {
                                 // RequestIdはrequiredプロパティで初期化が必要
                                 RequestId = Guid.NewGuid(), // 新しいGUIDを生成して設定
@@ -773,11 +775,11 @@ namespace Baketa.Application.Translation
                                 TargetLanguage = engineRequests[i].TargetLanguage,
                                 IsSuccess = false,
                                 EngineName = "ErrorEngine", // 必須プロパティを追加
-                                Error = new Core.Models.Translation.TranslationError
+                                Error = new TranslationError
                                 {
                                     ErrorCode = "NO_RESPONSE", // 修正：CodeからErrorCodeに変更
                                     Message = "翻訳エンジンからの応答がありませんでした",
-                                    ErrorType = Core.Models.Translation.TranslationErrorType.Unknown
+                                    ErrorType = TranslationErrorType.Unknown
                                 }
                             };
 
@@ -799,7 +801,7 @@ namespace Baketa.Application.Translation
                                     { 
                                         ErrorCode = engineResponse.Error.ErrorCode ?? "UNKNOWN_ERROR", 
                                         Message = engineResponse.Error.Message ?? "不明なエラー",
-                                        ErrorType = TransModels.TranslationErrorType.Unknown
+                                        ErrorType = TranslationErrorType.Unknown
                                     };
                             }
                             response.Metadata["FromCache"] = false;
@@ -865,7 +867,7 @@ namespace Baketa.Application.Translation
                                     SourceLanguage = originalRequest.SourceLanguage.Code,
                                     TargetLanguage = originalRequest.TargetLanguage.Code,
                                     ErrorMessage = response.Error?.Message ?? "未知のエラー",
-                                    ErrorType = response.Error?.ErrorType ?? TransModels.TranslationErrorType.Unknown,
+                                    ErrorType = response.Error?.ErrorType ?? TranslationErrorType.Unknown,
                                     TranslationEngine = engine.Name,
                                     ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                                     // Timestampは読み取り専用プロパティのためコメントアウト
@@ -910,7 +912,7 @@ namespace Baketa.Application.Translation
 
                 // 結果を元のリクエスト順に整列
                 cancellationToken.ThrowIfCancellationRequested(); // 結果整理前にキャンセル確認
-                var orderedResults = new List<TransModels.TranslationResponse>(requests.Count);
+                var orderedResults = new List<TranslationResponse>(requests.Count);
                 foreach (var req in requests)
                 {
                     cancellationToken.ThrowIfCancellationRequested(); // 各ループでキャンセル確認
@@ -951,7 +953,7 @@ namespace Baketa.Application.Translation
                         SourceLanguage = reqItem.SourceLanguage.Code,
                         TargetLanguage = reqItem.TargetLanguage.Code,
                         ErrorMessage = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.Exception,
+                        ErrorType = TranslationErrorType.Exception,
                         ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                         // Timestampは読み取り専用プロパティのためコメントアウト
                         // Timestamp = DateTimeOffset.UtcNow
@@ -960,11 +962,11 @@ namespace Baketa.Application.Translation
                     await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
 
                     // エラーレスポンスの作成
-                    var error = new TransModels.TranslationError
+                    var error = new TranslationError
                     {
                         ErrorCode = "BATCH_PIPELINE_ERROR",
                         Message = ex.Message,
-                        ErrorType = TransModels.TranslationErrorType.Exception
+                        ErrorType = TranslationErrorType.Exception
                     };
                     
                     var errorResponse = TranslationResponse.CreateError(

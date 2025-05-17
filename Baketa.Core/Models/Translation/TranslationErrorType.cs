@@ -1,8 +1,11 @@
+using System;
+
 namespace Baketa.Core.Models.Translation
 {
     /// <summary>
     /// 翻訳エラーの種類
     /// </summary>
+    [Obsolete("代わりに Baketa.Core.Translation.Models.TranslationErrorType を使用してください。", false)]
     public enum TranslationErrorType
     {
         /// <summary>

@@ -14,3 +14,6 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Design", "CA2263:Prefer generic overload", Justification = "将来的なリファクタリングで対応予定", Scope = "module")]
 [assembly: SuppressMessage("Style", "IDE0270:Use coalesce expression", Justification = "将来的なリファクタリングで対応予定", Scope = "module")]
 [assembly: SuppressMessage("Naming", "CA1721:Property names should not match get methods", Justification = "将来的なリファクタリングで対応予定", Scope = "module")]
+
+// CA1852: 型はシールドできます
+[assembly: SuppressMessage("Design", "CA1852:型はシールドできます", Justification = "プロジェクトの方針として、明示的に継承を制限する必要がある場合のみsealedを使用します")]

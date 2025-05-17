@@ -65,6 +65,64 @@ namespace Baketa.Core.Translation.Models
             TargetLanguage = targetLanguage;
             Context = context;
         }
+        
+        /// <summary>
+        /// シンプルな翻訳リクエストを作成します
+        /// </summary>
+        /// <param name="sourceText">翻訳元テキスト</param>
+        /// <param name="sourceLanguage">元言語</param>
+        /// <param name="targetLanguage">対象言語</param>
+        /// <returns>翻訳リクエストインスタンス</returns>
+        public static TranslationRequest Create(string sourceText, Language sourceLanguage, Language targetLanguage)
+        {
+            return new TranslationRequest
+            {
+                SourceText = sourceText,
+                SourceLanguage = sourceLanguage,
+                TargetLanguage = targetLanguage
+            };
+        }
+
+        /// <summary>
+        /// コンテキスト付きの翻訳リクエストを作成します
+        /// </summary>
+        /// <param name="sourceText">翻訳元テキスト</param>
+        /// <param name="sourceLanguage">元言語</param>
+        /// <param name="targetLanguage">対象言語</param>
+        /// <param name="context">翻訳コンテキスト</param>
+        /// <returns>翻訳リクエストインスタンス</returns>
+        public static TranslationRequest CreateWithContext(
+            string sourceText,
+            Language sourceLanguage,
+            Language targetLanguage,
+            TranslationContext context)
+        {
+            return new TranslationRequest
+            {
+                SourceText = sourceText,
+                SourceLanguage = sourceLanguage,
+                TargetLanguage = targetLanguage,
+                Context = context
+            };
+        }
+
+        /// <summary>
+        /// コンテキストID付きの翻訳リクエストを作成します
+        /// </summary>
+        /// <param name="sourceText">翻訳元テキスト</param>
+        /// <param name="sourceLanguage">元言語</param>
+        /// <param name="targetLanguage">対象言語</param>
+        /// <param name="dialogueId">会話ID（テキストコンテキスト）</param>
+        /// <returns>翻訳リクエストインスタンス</returns>
+        public static TranslationRequest CreateWithContextId(
+            string sourceText,
+            Language sourceLanguage,
+            Language targetLanguage,
+            string dialogueId)
+        {
+            var context = new TranslationContext { DialogueId = dialogueId };
+            return CreateWithContext(sourceText, sourceLanguage, targetLanguage, context);
+        }
 
         /// <summary>
         /// クローンを作成
@@ -74,11 +132,11 @@ namespace Baketa.Core.Translation.Models
         {
             var clone = new TranslationRequest
             {
-                SourceText = SourceText,
-                SourceLanguage = SourceLanguage,
-                TargetLanguage = TargetLanguage,
-                Context = Context?.Clone(),
-                Timestamp = Timestamp
+                SourceText = this.SourceText,
+                SourceLanguage = this.SourceLanguage,
+                TargetLanguage = this.TargetLanguage,
+                Context = this.Context?.Clone(),
+                Timestamp = this.Timestamp
             };
 
             foreach (var option in Options)

@@ -5,7 +5,7 @@ namespace Baketa.Core.Translation.Models
     /// <summary>
     /// 翻訳の言語ペア(ソース言語と対象言語のペア)を表すクラス
     /// </summary>
-    public class LanguagePair
+    public class LanguagePair : IEquatable<LanguagePair>
     {
         /// <summary>
         /// ソース言語
@@ -45,18 +45,40 @@ namespace Baketa.Core.Translation.Models
             SourceLanguage = Language.FromCode(sourceLanguageCode);
             TargetLanguage = Language.FromCode(targetLanguageCode);
         }
+        
+        /// <summary>
+        /// 言語ペアを作成します
+        /// </summary>
+        /// <param name="sourceLanguage">元言語</param>
+        /// <param name="targetLanguage">対象言語</param>
+        /// <returns>言語ペアインスタンス</returns>
+        public static LanguagePair Create(Language sourceLanguage, Language targetLanguage)
+        {
+            return new LanguagePair
+            {
+                SourceLanguage = sourceLanguage,
+                TargetLanguage = targetLanguage
+            };
+        }
+        
+        /// <summary>
+        /// 等価比較の実装
+        /// </summary>
+        public bool Equals(LanguagePair? other)
+        {
+            if (other is null)
+                return false;
+
+            return SourceLanguage.Equals(other.SourceLanguage) &&
+                   TargetLanguage.Equals(other.TargetLanguage);
+        }
 
         /// <summary>
         /// 等価比較をオーバーライド
         /// </summary>
         public override bool Equals(object? obj)
         {
-            if (obj is LanguagePair other)
-            {
-                return SourceLanguage.Equals(other.SourceLanguage) &&
-                       TargetLanguage.Equals(other.TargetLanguage);
-            }
-            return false;
+            return Equals(obj as LanguagePair);
         }
 
         /// <summary>
@@ -72,7 +94,8 @@ namespace Baketa.Core.Translation.Models
         /// </summary>
         public override string ToString()
         {
-            return $"{SourceLanguage.Code} → {TargetLanguage.Code}";
+            return $"{SourceLanguage.Code}{(SourceLanguage.RegionCode != null ? $"-{SourceLanguage.RegionCode}" : "")} → " +
+                   $"{TargetLanguage.Code}{(TargetLanguage.RegionCode != null ? $"-{TargetLanguage.RegionCode}" : "")}";
         }
 
         /// <summary>

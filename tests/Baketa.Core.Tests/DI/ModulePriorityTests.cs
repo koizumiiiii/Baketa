@@ -56,7 +56,7 @@ namespace Baketa.Core.Tests.DI
         /// Core優先度を持つテスト用モジュール
         /// </summary>
         [ModulePriority(ModulePriority.Core)]
-        private class CoreModuleWithPriority : ServiceModuleBase
+        private sealed class CoreModuleWithPriority : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {
@@ -67,7 +67,7 @@ namespace Baketa.Core.Tests.DI
         /// Infrastructure優先度を持つテスト用モジュール
         /// </summary>
         [ModulePriority(ModulePriority.Infrastructure)]
-        private class InfrastructureModuleWithPriority : ServiceModuleBase
+        private sealed class InfrastructureModuleWithPriority : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {
@@ -78,7 +78,7 @@ namespace Baketa.Core.Tests.DI
         /// UI優先度を持つテスト用モジュール
         /// </summary>
         [ModulePriority(ModulePriority.UI)]
-        private class UiModuleWithPriority : ServiceModuleBase
+        private sealed class UiModuleWithPriority : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {
@@ -88,7 +88,7 @@ namespace Baketa.Core.Tests.DI
         /// <summary>
         /// 優先度を指定していないテスト用モジュール
         /// </summary>
-        private class CustomModuleWithoutPriority : ServiceModuleBase
+        private sealed class CustomModuleWithoutPriority : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {

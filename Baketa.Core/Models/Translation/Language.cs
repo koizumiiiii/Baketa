@@ -7,6 +7,7 @@ namespace Baketa.Core.Models.Translation
     /// 初期サポート言語は英語、日本語、中国語のみです
     /// 他の言語は将来的なアップデートで対応予定です
     /// </summary>
+    [Obsolete("代わりに Baketa.Core.Translation.Models.Language を使用してください。", false)]
     public class Language
     {
         /// <summary>
@@ -127,6 +128,64 @@ namespace Baketa.Core.Models.Translation
                 return $"{Name} ({Code})";
 
             return $"{Name} ({Code}-{RegionCode})";
+        }
+        /// <summary>
+        /// 暗黙的変換演算子 - 元の言語オブジェクトを新しい名前空間のオブジェクトに変換
+        /// </summary>
+        /// <param name="language">変換する言語オブジェクト</param>
+        public static implicit operator Baketa.Core.Translation.Models.Language(Language language)
+        {
+            if (language == null) return null!;
+            
+            return new Baketa.Core.Translation.Models.Language
+            {
+                Code = language.Code,
+                Name = language.Name,
+                DisplayName = language.NativeName ?? language.Name,
+                NativeName = language.NativeName,
+                RegionCode = language.RegionCode,
+                IsAutoDetect = language.IsAutoDetect,
+                IsRightToLeft = false // 旧名前空間にはこのプロパティは存在しないので、デフォルト値を設定
+            };
+        }
+        
+        /// <summary>
+        /// 新しい名前空間の言語オブジェクトに変換するメソッド
+        /// （暗黙的変換演算子と同等の機能）
+        /// </summary>
+        /// <returns>新しい名前空間の言語オブジェクト</returns>
+        public Baketa.Core.Translation.Models.Language ToLanguage()
+        {
+            return (Baketa.Core.Translation.Models.Language)this;
+        }
+        
+        /// <summary>
+        /// 明示的変換演算子 - 新しい名前空間の言語オブジェクトを元のオブジェクトに変換
+        /// </summary>
+        /// <param name="language">変換する言語オブジェクト</param>
+        public static explicit operator Language(Baketa.Core.Translation.Models.Language language)
+        {
+            if (language == null) return null!;
+            
+            return new Language
+            {
+                Code = language.Code,
+                Name = language.Name,
+                NativeName = language.NativeName ?? language.DisplayName,
+                RegionCode = language.RegionCode,
+                IsAutoDetect = language.IsAutoDetect
+            };
+        }
+        
+        /// <summary>
+        /// 新しい名前空間の言語オブジェクトから変換するメソッド
+        /// （明示的変換演算子と同等の機能）
+        /// </summary>
+        /// <param name="language">新しい名前空間の言語オブジェクト</param>
+        /// <returns>元の言語オブジェクト</returns>
+        public static Language FromLanguage(Baketa.Core.Translation.Models.Language language)
+        {
+            return (Language)language;
         }
     }
 }

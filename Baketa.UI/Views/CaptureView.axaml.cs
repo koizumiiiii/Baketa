@@ -8,7 +8,7 @@ namespace Baketa.UI.Views
     /// <summary>
     /// キャプチャ設定画面のビュー
     /// </summary>
-    internal partial class CaptureView : ReactiveUserControl<CaptureViewModel>
+    internal sealed partial class CaptureView : ReactiveUserControl<CaptureViewModel>
     {
         public CaptureView()
         {

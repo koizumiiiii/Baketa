@@ -6,6 +6,7 @@ namespace Baketa.Core.Models.Translation
     /// <summary>
     /// 翻訳レスポンスを表すクラス
     /// </summary>
+    [Obsolete("代わりに Baketa.Core.Translation.Models.TranslationResponse を使用してください。", false)]
     public class TranslationResponse
     {
         /// <summary>
@@ -195,6 +196,89 @@ namespace Baketa.Core.Models.Translation
                 IsSuccess = false,
                 Error = TranslationError.FromException(errorCode, errorMessage, exception)
             };
+        }
+
+        /// <summary>
+        /// 暗黙的変換演算子 - 元のレスポンスオブジェクトを新しい名前空間のオブジェクトに変換
+        /// </summary>
+        /// <param name="response">変換するレスポンスオブジェクト</param>
+        public static implicit operator Baketa.Core.Translation.Models.TranslationResponse(TranslationResponse response)
+        {
+            if (response == null) return null!;
+            
+            var newResponse = new Baketa.Core.Translation.Models.TranslationResponse
+            {
+                RequestId = response.RequestId,
+                SourceText = response.SourceText,
+                TranslatedText = response.TranslatedText,
+                SourceLanguage = response.SourceLanguage,
+                TargetLanguage = response.TargetLanguage,
+                EngineName = response.EngineName,
+                ConfidenceScore = response.ConfidenceScore,
+                ProcessingTimeMs = response.ProcessingTimeMs,
+                IsSuccess = response.IsSuccess,
+                Error = response.Error
+            };
+            
+            // メタデータのコピー
+            foreach (var item in response.Metadata)
+            {
+                newResponse.Metadata[item.Key] = item.Value;
+            }
+            
+            return newResponse;
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のレスポンスオブジェクトに変換するメソッド
+        /// （暗黙的変換演算子と同等の機能）
+        /// </summary>
+        /// <returns>新しい名前空間のレスポンスオブジェクト</returns>
+        public Baketa.Core.Translation.Models.TranslationResponse ToTranslationResponse()
+        {
+            return (Baketa.Core.Translation.Models.TranslationResponse)this;
+        }
+        
+        /// <summary>
+        /// 明示的変換演算子 - 新しい名前空間のレスポンスオブジェクトを元のオブジェクトに変換
+        /// </summary>
+        /// <param name="response">変換するレスポンスオブジェクト</param>
+        public static explicit operator TranslationResponse(Baketa.Core.Translation.Models.TranslationResponse response)
+        {
+            if (response == null) return null!;
+            
+            var oldResponse = new TranslationResponse
+            {
+                RequestId = response.RequestId,
+                SourceText = response.SourceText,
+                TranslatedText = response.TranslatedText,
+                SourceLanguage = (Language)(object)response.SourceLanguage,
+                TargetLanguage = (Language)(object)response.TargetLanguage,
+                EngineName = response.EngineName,
+                ConfidenceScore = response.ConfidenceScore,
+                ProcessingTimeMs = response.ProcessingTimeMs,
+                IsSuccess = response.IsSuccess,
+                Error = response.Error != null ? (TranslationError)(object)response.Error : null
+            };
+            
+            // メタデータのコピー
+            foreach (var item in response.Metadata)
+            {
+                oldResponse.Metadata[item.Key] = item.Value;
+            }
+            
+            return oldResponse;
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のレスポンスオブジェクトから変換するメソッド
+        /// （明示的変換演算子と同等の機能）
+        /// </summary>
+        /// <param name="response">新しい名前空間のレスポンスオブジェクト</param>
+        /// <returns>元のレスポンスオブジェクト</returns>
+        public static TranslationResponse FromTranslationResponse(Baketa.Core.Translation.Models.TranslationResponse response)
+        {
+            return (TranslationResponse)response;
         }
     }
 }
