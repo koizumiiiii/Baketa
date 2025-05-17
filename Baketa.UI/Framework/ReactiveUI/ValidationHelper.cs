@@ -14,7 +14,12 @@ namespace Baketa.UI.Framework.ReactiveUI
     /// ReactiveUI.Validationのユーティリティクラス
     /// バージョン間の互換性を確保するために独自実装を提供
     /// </summary>
-    public static class Validation
+    /// <remarks>
+    /// 以前は Validation という名前でしたが、CA1724警告に対応して
+    /// 名前空間 Baketa.UI.Framework.Validation との競合を回避するために
+    /// ValidationHelper に名前を変更しました。
+    /// </remarks>
+    public static class ValidationHelper
     {
         /// <summary>
         /// ValidationContextからエラーメッセージを取得します

@@ -15,7 +15,7 @@ namespace Baketa.UI.ViewModels
     /// <summary>
     /// オーバーレイ設定画面のビューモデル
     /// </summary>
-    internal class OverlayViewModel : Framework.ViewModelBase
+    internal sealed class OverlayViewModel : Framework.ViewModelBase
     {
         // オーバーレイの表示位置
         private string _position = "上";

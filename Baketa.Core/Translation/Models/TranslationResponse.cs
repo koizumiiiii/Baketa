@@ -124,6 +124,31 @@ namespace Baketa.Core.Translation.Models
                 Timestamp = DateTime.UtcNow
             };
         }
+        
+        /// <summary>
+        /// 信頼度スコア付きの成功レスポンスを作成します
+        /// </summary>
+        /// <param name="request">元のリクエスト</param>
+        /// <param name="translatedText">翻訳結果テキスト</param>
+        /// <param name="engineName">使用されたエンジン名</param>
+        /// <param name="processingTimeMs">処理時間（ミリ秒）</param>
+        /// <param name="confidenceScore">信頼度スコア（0.0～1.0）</param>
+        /// <returns>成功レスポンスインスタンス</returns>
+        public static TranslationResponse CreateSuccessWithConfidence(
+            TranslationRequest request,
+            string translatedText,
+            string engineName,
+            long processingTimeMs,
+            float confidenceScore)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            var safeTranslatedText = translatedText ?? string.Empty;
+            ArgumentNullException.ThrowIfNull(engineName);
+            
+            var response = CreateSuccess(request, safeTranslatedText, engineName, processingTimeMs);
+            response.ConfidenceScore = confidenceScore;
+            return response;
+        }
 
         /// <summary>
         /// エラーレスポンスを作成
@@ -152,6 +177,34 @@ namespace Baketa.Core.Translation.Models
                 Timestamp = DateTime.UtcNow
             };
         }
+        
+        /// <summary>
+        /// 例外からエラーレスポンスを作成します
+        /// </summary>
+        /// <param name="request">元のリクエスト</param>
+        /// <param name="engineName">使用されたエンジン名</param>
+        /// <param name="errorCode">エラーコード</param>
+        /// <param name="errorMessage">エラーメッセージ</param>
+        /// <param name="exception">例外</param>
+        /// <param name="processingTimeMs">処理時間（ミリ秒）</param>
+        /// <returns>エラーレスポンスインスタンス</returns>
+        public static TranslationResponse CreateErrorFromException(
+            TranslationRequest request,
+            string engineName,
+            string errorCode,
+            string errorMessage,
+            Exception exception,
+            long processingTimeMs = 0)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(engineName);
+            ArgumentNullException.ThrowIfNull(errorCode);
+            ArgumentNullException.ThrowIfNull(errorMessage);
+            ArgumentNullException.ThrowIfNull(exception);
+            
+            var error = TranslationError.FromException(errorCode, errorMessage, exception);
+            return CreateError(request, error, engineName);
+        }
 
         /// <summary>
         /// クローンを作成
@@ -161,17 +214,17 @@ namespace Baketa.Core.Translation.Models
         {
             var clone = new TranslationResponse
             {
-                RequestId = RequestId,
-                SourceText = SourceText,
-                TranslatedText = TranslatedText,
-                SourceLanguage = SourceLanguage,
-                TargetLanguage = TargetLanguage,
-                EngineName = EngineName,
-                ConfidenceScore = ConfidenceScore,
-                ProcessingTimeMs = ProcessingTimeMs,
-                IsSuccess = IsSuccess,
-                Error = Error?.Clone(),
-                Timestamp = Timestamp
+                RequestId = this.RequestId,
+                SourceText = this.SourceText,
+                TranslatedText = this.TranslatedText,
+                SourceLanguage = this.SourceLanguage,
+                TargetLanguage = this.TargetLanguage,
+                EngineName = this.EngineName,
+                ConfidenceScore = this.ConfidenceScore,
+                ProcessingTimeMs = this.ProcessingTimeMs,
+                IsSuccess = this.IsSuccess,
+                Error = this.Error?.Clone(),
+                Timestamp = this.Timestamp
             };
 
             foreach (var item in Metadata)

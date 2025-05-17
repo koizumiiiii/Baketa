@@ -43,12 +43,12 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
+            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
                 // 全ピクセルを反転（255-値）
-                return [.. imageData.Select(b => (byte)(255 - b))];
+                return imageData.Select(b => (byte)(255 - b)).ToArray();
             }
         }
 
@@ -77,11 +77,14 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
+            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
-                return [.. imageData];
+                // Lengthプロパティを使用
+                byte[] result = new byte[imageData.Length];
+                Array.Copy(imageData, result, imageData.Length);
+                return result;
             }
         }
 
@@ -118,11 +121,13 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(IReadOnlyList<byte> imageData, int _1, int _2, int _3)
+            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
-                return [.. Enumerable.Repeat(_value, imageData.Count)];
+                // カウントを明示的に指定
+                int count = imageData.Length;
+                return Enumerable.Repeat(_value, count).ToArray();
             }
         }
 
@@ -180,7 +185,7 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new InvertFilter();
-            byte[] imageData = [0, 100, 200, 255];
+            var imageData = new byte[] {0, 100, 200, 255};
             int width = 2;
             int height = 2;
             int stride = 2;
@@ -189,7 +194,7 @@ namespace Baketa.Core.Tests.Imaging
             var result = filter.Apply(imageData, width, height, stride);
 
             // Assert
-            Assert.Equal([255, 155, 55, 0], result);
+            Assert.Equal(new byte[] {255, 155, 55, 0}, result);
         }
 
         [Fact]
@@ -197,7 +202,7 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new IdentityFilter();
-            byte[] imageData = [10, 20, 30, 40];
+            var imageData = new byte[] {10, 20, 30, 40};
             int width = 2;
             int height = 2;
             int stride = 2;
@@ -216,7 +221,7 @@ namespace Baketa.Core.Tests.Imaging
             // Arrange
             byte constantValue = 42;
             var filter = new ConstantFilter(constantValue);
-            byte[] imageData = [10, 20, 30, 40, 50, 60];
+            var imageData = new byte[] {10, 20, 30, 40, 50, 60};
             int width = 3;
             int height = 2;
             int stride = 3;
@@ -234,13 +239,13 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new IdentityFilter();
-            byte[] imageData = [];
+            var empty = Enumerable.Empty<byte>().ToArray();
             int width = 0;
             int height = 0;
             int stride = 0;
 
             // Act
-            var result = filter.Apply(imageData, width, height, stride);
+            var result = filter.Apply(empty, width, height, stride);
 
             // Assert
             Assert.Empty(result);
@@ -251,7 +256,7 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new IdentityFilter();
-            IReadOnlyList<byte>? imageData = null;
+            byte[]? imageData = null;
             int width = 1;
             int height = 1;
             int stride = 1;
@@ -265,7 +270,7 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new InvertFilter();
-            var mockImage = new MockAdvancedImage([0, 100, 200, 255]);
+            var mockImage = new MockAdvancedImage(new byte[] {0, 100, 200, 255});
             
             // Act
             var result = await filter.ApplyAsync(mockImage);
@@ -281,7 +286,7 @@ namespace Baketa.Core.Tests.Imaging
         {
             // Arrange
             var filter = new IdentityFilter();
-            var mockImage = new MockAdvancedImage([10, 20, 30, 40]);
+            var mockImage = new MockAdvancedImage(new byte[] {10, 20, 30, 40});
             
             // Act
             var result = await filter.ApplyAsync(mockImage);
@@ -297,7 +302,7 @@ namespace Baketa.Core.Tests.Imaging
             // Arrange
             byte constantValue = 42;
             var filter = new ConstantFilter(constantValue);
-            var mockImage = new MockAdvancedImage([10, 20, 30, 40]);
+            var mockImage = new MockAdvancedImage(new byte[] {10, 20, 30, 40});
             
             // Act
             var result = await filter.ApplyAsync(mockImage);
@@ -307,7 +312,7 @@ namespace Baketa.Core.Tests.Imaging
             Assert.Same(mockImage, result);
             
             // パラメータ取得のテスト
-            var parameters = filter.GetParameters();
+            var parameters = (IDictionary<string, object>)filter.GetParameters();
             Assert.Contains("Value", parameters.Keys);
             Assert.Equal(constantValue, parameters["Value"]);
         }

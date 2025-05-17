@@ -5,7 +5,8 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Models.Translation;
+using CoreModels = Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
 
@@ -39,7 +40,7 @@ namespace Baketa.Infrastructure.Translation
         /// <summary>
         /// サポートしている言語ペア
         /// </summary>
-        private readonly HashSet<LanguagePair> _supportedLanguagePairs;
+        private readonly HashSet<CoreModels.LanguagePair> _supportedLanguagePairs;
 
         /// <summary>
         /// コンストラクタ
@@ -57,28 +58,28 @@ namespace Baketa.Infrastructure.Translation
             _simulatedErrorRate = Math.Clamp(simulatedErrorRate, 0.0f, 1.0f);
 
             // サポートする言語ペアを定義
-            _supportedLanguagePairs = new HashSet<LanguagePair>
+            _supportedLanguagePairs = new HashSet<CoreModels.LanguagePair>
             {
                 // 英語 → 日本語
-                LanguagePair.Create(Language.English, Language.Japanese),
+                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.Japanese),
                 // 日本語 → 英語
-                LanguagePair.Create(Language.Japanese, Language.English),
+                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.English),
                 // 英語 → 中国語（簡体字）
-                LanguagePair.Create(Language.English, Language.ChineseSimplified),
+                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.ChineseSimplified),
                 // 中国語（簡体字） → 英語
-                LanguagePair.Create(Language.ChineseSimplified, Language.English),
+                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseSimplified, CoreModels.Language.English),
                 // 日本語 → 中国語（簡体字）
-                LanguagePair.Create(Language.Japanese, Language.ChineseSimplified),
+                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.ChineseSimplified),
                 // 中国語（簡体字） → 日本語
-                LanguagePair.Create(Language.ChineseSimplified, Language.Japanese),
+                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseSimplified, CoreModels.Language.Japanese),
                 // 英語 → 中国語（繁体字）
-                LanguagePair.Create(Language.English, Language.ChineseTraditional),
+                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.ChineseTraditional),
                 // 中国語（繁体字） → 英語
-                LanguagePair.Create(Language.ChineseTraditional, Language.English),
+                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseTraditional, CoreModels.Language.English),
                 // 日本語 → 中国語（繁体字）
-                LanguagePair.Create(Language.Japanese, Language.ChineseTraditional),
+                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.ChineseTraditional),
                 // 中国語（繁体字） → 日本語
-                LanguagePair.Create(Language.ChineseTraditional, Language.Japanese)
+                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseTraditional, CoreModels.Language.Japanese)
             };
 
             // テスト用の翻訳セットを初期化
@@ -141,9 +142,72 @@ namespace Baketa.Infrastructure.Translation
         /// サポートしている言語ペアを取得します
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
+        public override Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs.ToList());
+            return Task.FromResult<IReadOnlyCollection<CoreModels.LanguagePair>>(_supportedLanguagePairs.ToList());
+        }
+        
+        /// <summary>
+        /// 指定された言語ペアをサポートしているかどうかを確認します
+        /// 名前空間移行のため、言語コードベースで比較
+        /// </summary>
+        /// <param name="languagePair">確認する言語ペア</param>
+        /// <returns>サポートしていればtrue</returns>
+        public override async Task<bool> SupportsLanguagePairAsync(CoreModels.LanguagePair languagePair)
+        {
+            ArgumentNullException.ThrowIfNull(languagePair);
+            ArgumentNullException.ThrowIfNull(languagePair.SourceLanguage);
+            ArgumentNullException.ThrowIfNull(languagePair.TargetLanguage);
+            
+            // 言語コードを比較してマッチングする
+            var supportedPairs = await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
+            
+            // 言語コードベースで比較する
+            foreach (var supportedPair in supportedPairs)
+            {
+                bool sourceMatches = string.Equals(supportedPair.SourceLanguage.Code, languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase);
+                bool targetMatches = string.Equals(supportedPair.TargetLanguage.Code, languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase);
+                
+                // 地域コードがある場合はそれも確認
+                if (supportedPair.SourceLanguage.RegionCode != null && languagePair.SourceLanguage.RegionCode != null)
+                {
+                    sourceMatches = sourceMatches && string.Equals(
+                        supportedPair.SourceLanguage.RegionCode, 
+                        languagePair.SourceLanguage.RegionCode, 
+                        StringComparison.OrdinalIgnoreCase);
+                }
+                
+                if (supportedPair.TargetLanguage.RegionCode != null && languagePair.TargetLanguage.RegionCode != null)
+                {
+                    targetMatches = targetMatches && string.Equals(
+                        supportedPair.TargetLanguage.RegionCode, 
+                        languagePair.TargetLanguage.RegionCode, 
+                        StringComparison.OrdinalIgnoreCase);
+                }
+                
+                // フルコード(zh-CN)と分割コード(zh + CN)の両方をサポート
+                if (!sourceMatches && supportedPair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal) && !languagePair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal))
+                {
+                    string[] parts = supportedPair.SourceLanguage.Code.Split('-');
+                    sourceMatches = string.Equals(parts[0], languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
+                                  string.Equals(parts[1], languagePair.SourceLanguage.RegionCode, StringComparison.OrdinalIgnoreCase);
+                }
+                
+                if (!targetMatches && supportedPair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal) && !languagePair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal))
+                {
+                    string[] parts = supportedPair.TargetLanguage.Code.Split('-');
+                    targetMatches = string.Equals(parts[0], languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
+                                  string.Equals(parts[1], languagePair.TargetLanguage.RegionCode, StringComparison.OrdinalIgnoreCase);
+                }
+                
+                if (sourceMatches && targetMatches)
+                {
+                    return true;
+                }
+            }
+            
+            // どの言語ペアもマッチしなかった場合
+            return false;
         }
 
         /// <summary>
@@ -162,8 +226,8 @@ namespace Baketa.Infrastructure.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        protected override async Task<TranslationResponse> TranslateInternalAsync(
-            TranslationRequest request,
+        protected override async Task<CoreModels.TranslationResponse> TranslateInternalAsync(
+            CoreModels.TranslationRequest request,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -179,7 +243,7 @@ namespace Baketa.Infrastructure.Translation
             {
                 return CreateErrorResponse(
                     request,
-                    TranslationError.InternalError,
+                    CoreModels.TranslationError.InternalError,
                     "シミュレートされたランダムエラーが発生しました。");
             }
 
@@ -204,7 +268,7 @@ namespace Baketa.Infrastructure.Translation
                 translatedText = GenerateSimpleMockTranslation(request);
             }
 
-            var response = TranslationResponse.CreateSuccessWithConfidence(
+            var response = CoreModels.TranslationResponse.CreateSuccessWithConfidence(
                 request,
                 translatedText,
                 Name,
@@ -219,7 +283,7 @@ namespace Baketa.Infrastructure.Translation
         /// </summary>
         /// <param name="request">翻訳リクエスト</param>
         /// <returns>モック翻訳テキスト</returns>
-        private static string GenerateSimpleMockTranslation(TranslationRequest request)
+        private static string GenerateSimpleMockTranslation(CoreModels.TranslationRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);
             

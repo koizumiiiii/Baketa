@@ -6,6 +6,7 @@ namespace Baketa.Core.Models.Translation
     /// <summary>
     /// 翻訳リクエストを表すクラス
     /// </summary>
+    [Obsolete("代わりに Baketa.Core.Translation.Models.TranslationRequest を使用してください。", false)]
     public class TranslationRequest
     {
         /// <summary>
@@ -83,6 +84,90 @@ namespace Baketa.Core.Models.Translation
                 TargetLanguage = targetLanguage,
                 Context = context
             };
+        }
+        
+        /// <summary>
+        /// 暗黙的変換演算子 - 元のリクエストオブジェクトを新しい名前空間のオブジェクトに変換
+        /// </summary>
+        /// <param name="request">変換するリクエストオブジェクト</param>
+        public static implicit operator Baketa.Core.Translation.Models.TranslationRequest(TranslationRequest request)
+        {
+            if (request == null) return null!;
+            
+            var newRequest = new Baketa.Core.Translation.Models.TranslationRequest
+            {
+                SourceText = request.SourceText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage
+            };
+            
+            // Contextの変換 - 文字列からTranslationContextオブジェクトへ
+            if (!string.IsNullOrEmpty(request.Context))
+            {
+                newRequest.Context = new Baketa.Core.Translation.Models.TranslationContext
+                {
+                    DialogueId = request.Context
+                };
+            }
+            
+            // オプションのコピー
+            foreach (var option in request.Options)
+            {
+                newRequest.Options[option.Key] = option.Value;
+            }
+            
+            return newRequest;
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のリクエストオブジェクトに変換するメソッド
+        /// （暗黙的変換演算子と同等の機能）
+        /// </summary>
+        /// <returns>新しい名前空間のリクエストオブジェクト</returns>
+        public Baketa.Core.Translation.Models.TranslationRequest ToTranslationRequest()
+        {
+            return (Baketa.Core.Translation.Models.TranslationRequest)this;
+        }
+        
+        /// <summary>
+        /// 明示的変換演算子 - 新しい名前空間のリクエストオブジェクトを元のオブジェクトに変換
+        /// </summary>
+        /// <param name="request">変換するリクエストオブジェクト</param>
+        public static explicit operator TranslationRequest(Baketa.Core.Translation.Models.TranslationRequest request)
+        {
+            if (request == null) return null!;
+            
+            var oldRequest = new TranslationRequest
+            {
+                SourceText = request.SourceText,
+                SourceLanguage = (Language)(object)request.SourceLanguage,
+                TargetLanguage = (Language)(object)request.TargetLanguage
+            };
+            
+            // Contextの変換 - TranslationContextオブジェクトから文字列へ
+            if (request.Context != null)
+            {
+                oldRequest.Context = request.Context.DialogueId ?? request.Context.ToString();
+            }
+            
+            // オプションのコピー
+            foreach (var option in request.Options)
+            {
+                oldRequest.Options[option.Key] = option.Value;
+            }
+            
+            return oldRequest;
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のリクエストオブジェクトから変換するメソッド
+        /// （明示的変換演算子と同等の機能）
+        /// </summary>
+        /// <param name="request">新しい名前空間のリクエストオブジェクト</param>
+        /// <returns>元のリクエストオブジェクト</returns>
+        public static TranslationRequest FromTranslationRequest(Baketa.Core.Translation.Models.TranslationRequest request)
+        {
+            return (TranslationRequest)request;
         }
     }
 }

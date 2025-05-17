@@ -6,8 +6,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
-// 名前空間エイリアスの定義
-using CoreModels = Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Application.Translation
@@ -49,11 +48,11 @@ namespace Baketa.Application.Translation
         /// <param name="options">翻訳オプション（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        public async Task<TransModels.TranslationResponse> TranslateAsync(
+        public async Task<TranslationResponse> TranslateAsync(
             string sourceText,
-            TransModels.Language sourceLanguage,
-            TransModels.Language targetLanguage,
-            TransModels.TranslationContext? context = null,
+            Language sourceLanguage,
+            Language targetLanguage,
+            TranslationContext? context = null,
             string? preferredEngine = null,
             Dictionary<string, object?>? options = null,
             CancellationToken cancellationToken = default)
@@ -63,7 +62,7 @@ namespace Baketa.Application.Translation
                 throw new ArgumentException("翻訳元テキストが無効です。", nameof(sourceText));
             }
 
-            var request = new TransModels.TranslationRequest
+            var request = new TranslationRequest
             {
                 SourceText = sourceText,
                 SourceLanguage = sourceLanguage,
@@ -74,9 +73,10 @@ namespace Baketa.Application.Translation
             // オプションが指定されていれば追加
             if (options != null)
             {
-                foreach (var option in options)
+                // Dictionaryのキー/値ペアをコレクション初期化子を使用して追加
+                foreach (var (key, value) in options)
                 {
-                    request.Options.Add(option.Key, option.Value);
+                    request.Options[key] = value;
                 }
             }
 
@@ -90,8 +90,8 @@ namespace Baketa.Application.Translation
         /// <param name="preferredEngine">優先エンジン名（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        public async Task<TransModels.TranslationResponse> TranslateAsync(
-            TransModels.TranslationRequest request,
+        public async Task<TranslationResponse> TranslateAsync(
+            TranslationRequest request,
             string? preferredEngine = null,
             CancellationToken cancellationToken = default)
         {
@@ -107,8 +107,8 @@ namespace Baketa.Application.Translation
         /// <param name="preferredEngine">優先エンジン名（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンスのリスト</returns>
-        public async Task<IReadOnlyList<TransModels.TranslationResponse>> TranslateBatchAsync(
-            IReadOnlyList<TransModels.TranslationRequest> requests,
+        public async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+            IReadOnlyList<TranslationRequest> requests,
             string? preferredEngine = null,
             CancellationToken cancellationToken = default)
         {
@@ -116,7 +116,7 @@ namespace Baketa.Application.Translation
 
             if (requests.Count == 0)
             {
-                return Array.Empty<TransModels.TranslationResponse>();
+                return Enumerable.Empty<TranslationResponse>().ToArray();
             }
 
             return await _pipeline.ExecuteBatchAsync(requests, preferredEngine, cancellationToken).ConfigureAwait(false);
@@ -138,8 +138,8 @@ namespace Baketa.Application.Translation
         /// <param name="targetLang">対象言語</param>
         /// <returns>サポートする翻訳エンジン名のリスト</returns>
         public async Task<IReadOnlyList<string>> GetSupportedEnginesForLanguagePairAsync(
-            TransModels.Language sourceLang,
-            TransModels.Language targetLang)
+            Language sourceLang,
+            Language targetLang)
         {
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));

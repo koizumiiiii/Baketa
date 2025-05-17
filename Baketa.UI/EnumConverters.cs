@@ -7,7 +7,7 @@ namespace Baketa.UI
     /// <summary>
     /// 列挙型を整数値に変換するコンバーター
     /// </summary>
-    internal class EnumToIntConverter : IValueConverter
+    internal sealed class EnumToIntConverter : IValueConverter
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {

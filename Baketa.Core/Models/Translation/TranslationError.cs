@@ -5,6 +5,7 @@ namespace Baketa.Core.Models.Translation
     /// <summary>
     /// 翻訳エラー情報を表すクラス
     /// </summary>
+    [Obsolete("代わりに Baketa.Core.Translation.Models.TranslationError を使用してください。", false)]
     public class TranslationError
     {
         /// <summary>
@@ -168,6 +169,65 @@ namespace Baketa.Core.Models.Translation
                 Details = exception.StackTrace
             };
             return error;
+        }
+        
+        /// <summary>
+        /// 暗黙的変換演算子 - 元のエラーオブジェクトを新しい名前空間のオブジェクトに変換
+        /// </summary>
+        /// <param name="error">変換するエラーオブジェクト</param>
+        /// <returns>変換後のエラーオブジェクト、またはnull</returns>
+        public static implicit operator Baketa.Core.Translation.Models.TranslationError?(TranslationError? error)
+        {
+            return error == null ? null : new Baketa.Core.Translation.Models.TranslationError
+            {
+                ErrorCode = error.ErrorCode,
+                Message = error.Message,
+                Details = error.Details,
+                Exception = error.Exception,
+                IsRetryable = error.IsRetryable,
+                ErrorType = (Baketa.Core.Translation.Models.TranslationErrorType)(int)error.ErrorType
+            };
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のエラーオブジェクトに変換するメソッド
+        /// （暗黙的変換演算子と同等の機能）
+        /// </summary>
+        /// <returns>新しい名前空間のエラーオブジェクト</returns>
+        public Baketa.Core.Translation.Models.TranslationError ToTranslationError()
+        {
+            // nullチェックは暗黙的変換演算子内で行われるため、このメソッド内では不要
+            // この型のインスタンスメソッドなので、thisがnullになることはない
+            return (Baketa.Core.Translation.Models.TranslationError)this;
+        }
+        
+        /// <summary>
+        /// 明示的変換演算子 - 新しい名前空間のエラーオブジェクトを元のオブジェクトに変換
+        /// </summary>
+        /// <param name="error">変換するエラーオブジェクト</param>
+        /// <returns>変換後のエラーオブジェクト、またはnull</returns>
+        public static explicit operator TranslationError?(Baketa.Core.Translation.Models.TranslationError? error)
+        {
+            return error == null ? null : new TranslationError
+            {
+                ErrorCode = error.ErrorCode,
+                Message = error.Message,
+                Details = error.Details,
+                Exception = error.Exception,
+                IsRetryable = error.IsRetryable,
+                ErrorType = (TranslationErrorType)(int)error.ErrorType
+            };
+        }
+        
+        /// <summary>
+        /// 新しい名前空間のエラーオブジェクトから変換するメソッド
+        /// （明示的変換演算子と同等の機能）
+        /// </summary>
+        /// <param name="error">新しい名前空間のエラーオブジェクト</param>
+        /// <returns>元のエラーオブジェクト</returns>
+        public static TranslationError? FromTranslationError(Baketa.Core.Translation.Models.TranslationError? error)
+        {
+            return (TranslationError?)error;
         }
     }
 }

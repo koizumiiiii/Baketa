@@ -16,7 +16,7 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のモック画像クラス
         /// </summary>
-        private class MockAdvancedImage : IAdvancedImage
+        private sealed class MockAdvancedImage : IAdvancedImage
         {
         private readonly byte[] _imageData;
         private readonly Dictionary<(int x, int y), Color> _pixels = [];

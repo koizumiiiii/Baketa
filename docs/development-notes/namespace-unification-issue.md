@@ -68,146 +68,294 @@ Baketa.Core.Translation                 // ルート名前空間
 
 ## 6. 移行計画
 
-### 6.1 フェーズ1: 準備と一時的な対応（現在）
+### 6.1 フェーズ1: 事前分析と計画（1-2日）
 
-- 移行対象の全クラスと参照箇所を特定
-- 移行計画の詳細を文書化
-- 名前空間エイリアスによる一時的な対応
-  ```csharp
-  using CoreModels = Baketa.Core.Models.Translation;
-  using TransModels = Baketa.Core.Translation.Models;
-  ```
-- モデル間の変換ユーティリティ作成
+1. **依存関係マップの作成**
+   - すべての翻訳関連クラスの依存関係を図示
+   - Visual Studioの「コードマップの生成」機能を活用
+   - ReSharper (利用可能な場合) の依存関係図機能を活用
+   - 影響範囲の特定と優先順位付け
 
-### 6.2 フェーズ2: 新規実装の標準化（2週間以内）
+2. **クラスごとの移行方針決定**
+   - クラスごとに以下を決定:
+     - 完全移行（クラスを移動して古い定義を削除）
+     - 段階的移行（両方の名前空間で一時的に保持）
+     - エイリアス（移行期間中にエイリアスで対応）
+   - 注意: usingエイリアスはファイルスコープのため効果が限定的
+   - 最終的にはすべて新しい名前空間を参照するように修正
 
-- 新規のモデル定義はすべて目標名前空間に追加
-- 重複している型の不要なプロパティを特定・削除
-- インターフェース定義の統一（ITranslationEngine、ITranslationManager）
+3. **テスト戦略の強化**
+   - 移行前後での機能テスト計画
+   - リファクタリング開始前に現在のテストカバレッジを測定
+   - コアモデル周辺のカバレッジが低い場合は優先的にテスト拡充
+   - キャラクターゼーションテスト（現状の振る舞いをそのままテストとして記述）の作成
 
-### 6.3 フェーズ3: コードベースの段階的移行（1ヶ月以内）
+### 6.2 フェーズ2: コアモデルの移行（2-3日）
 
-- ファイル単位での名前空間参照の一括更新
-- 各コンポーネントのテストによる機能検証
-- 互換レイヤーの導入によるスムーズな移行
+1. **基本モデルクラスの統一**
+   - 優先順位: `Language` → `LanguagePair` → `TranslationRequest` → `TranslationResponse`
+   - 各クラスに対する手順:
+     1. 新しい名前空間にコピー
+     2. 両者の差分を特定し統合
+     3. 参照元の変更
+     4. 古い定義に [Obsolete] 属性を追加
+        ```csharp
+        [Obsolete("代わりに Baketa.Core.Translation.Models.Language を使用してください。", false)]
+        ```
+     5. マーカーコメント追加
 
-### 6.4 フェーズ4: 廃止と最終化（3ヶ月以内）
+2. **移行状況管理表の作成**
+   - 名前空間移行表の作成と維持（進捗追跡用）
 
-- 廃止予定名前空間に`Obsolete`属性を付加
-- すべての依存関係の最終確認と修正
-- 最終テストとドキュメント更新
-- 廃止予定名前空間の削除
+### 6.3 フェーズ3: インターフェースと依存クラスの移行（3-4日）
 
-## 7. 標準モデル定義
+1. **インターフェースの移行**
+   - 影響度の低いものから順に移行
+   - インターフェース更新に伴う実装クラスの修正
 
-移行後のモデル定義例を以下に示します。これを標準として使用します：
+2. **依存クラスの移行**
+   - インターフェースに依存するクラスの移行
+   - 循環参照の解消
 
-### 7.1 Language（言語）モデル
+3. **変換ユーティリティの実装**
+   - 移行期間中の互換性維持のためのユーティリティクラス
+   - 拡張メソッドと静的メソッドの両方を提供
+   ```csharp
+   public static class TranslationModelConverter
+   {
+       // 拡張メソッド
+       public static Baketa.Core.Translation.Models.TranslationRequest ToNewNamespace(
+           this Baketa.Core.Models.Translation.TranslationRequest request)
+       {
+           // 変換ロジック
+       }
+       
+       // 静的メソッド
+       public static Baketa.Core.Translation.Models.TranslationRequest Convert(
+           Baketa.Core.Models.Translation.TranslationRequest request)
+       {
+           // 変換ロジック
+       }
+   }
+   ```
+
+### 6.4 フェーズ4: 一括変更と検証（2-3日）
+
+1. **名前空間参照の一括変更**
+   - Visual Studioの検索・置換機能を使用
+   - ReSharper（利用可能な場合）の「Move to Namespace」や「Adjust Namespaces」機能を活用
+   - 段階的に変更し、ビルドエラーを確認
+
+2. **エイリアス定義の段階的削除**
+   - `using CoreModels = Baketa.Core.Models.Translation;` を削除
+   - 各ファイルで削除後にビルドエラーがないことを確認
+
+3. **コンパイルエラーの解消**
+   - 残存するビルドエラーを1つずつ解消
+   - 曖昧な参照を明示的な参照に変更
+
+### 6.5 フェーズ5: クリーンアップと最終化（1-2日）
+
+1. **古い定義の削除**
+   - 一定期間（1〜2スプリント）[Obsolete]属性で警告を出した後、古い定義を削除
+   - 開発者に新しい名前空間への移行猶予期間を提供
+   - 最終段階で`Baketa.Core.Models.Translation` 名前空間のクラスを削除
+
+2. **最終テスト**
+   - 単体テストの実行
+   - 統合テストの実行
+   - 手動機能テストの実行
+
+3. **ドキュメント更新**
+   - 名前空間変更を反映したAPIドキュメント更新
+   - 開発者向けWikiや設計書などの内部ドキュメント更新
+   - 設計ガイドの改訂（名前空間の命名規則など）
+
+## 7. 今後の名前空間競合防止策
+
+### 7.1 名前空間の標準化
+
+名前空間の混乱を防止するため、以下の原則を適用します：
+
+1. **一貫性ある名前空間構造**
+   ```
+   Baketa.Core.Translation                 // ルート
+   ├── Models                           // データモデル
+   │   ├── Common                       // 共通モデル
+   │   ├── Configuration                // 設定モデル
+   │   ├── Events                       // イベントモデル
+   │   └── Results                      // 結果モデル
+   ├── Services                         // サービス実装
+   ├── Abstractions                     // インターフェース
+   └── Common                           // 共通ユーティリティ
+   ```
+
+2. **標準的な命名規則**
+   - モデルクラス: `名詞+目的語` (例: `TranslationRequest`)
+   - イベントクラス: `動詞+過去分詞+Event` (例: `TranslationCompletedEvent`)
+   - 列挙型: `名詞+目的` (例: `TranslationErrorType`)
+
+### 7.2 措置とツール
+
+1. **名前空間計画文書の作成**
+   - 新機能追加前に名前空間計画を文書化
+   - チーム内でレビュー・合意
+
+2. **静的解析ルールの導入**
+   - StyleCop ルールセットの導入
+   - 命名規則のチェック自動化
+   - **.editorconfig の活用**
+     ```editorconfig
+     # .editorconfig ファイルの例
+     root = true
+     
+     [*.cs]
+     # 名前空間の整理と順序付け
+     dotnet_sort_system_directives_first = true
+     dotnet_separate_import_directive_groups = true
+     
+     # 命名規則
+     dotnet_naming_rule.namespace_naming.symbols = namespace_symbol
+     dotnet_naming_rule.namespace_naming.style = pascal_case_style
+     dotnet_naming_rule.namespace_naming.severity = warning
+     
+     dotnet_naming_symbols.namespace_symbol.applicable_kinds = namespace
+     dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+     ```
+
+3. **コードレビューの強化**
+   - 名前空間使用の一貫性をレビュー項目に追加
+   - 競合の可能性がある PR には特別なタグ付け
+
+### 7.3 開発者向けガイドライン
+
+チーム全体で名前空間管理の重要性を共有し、以下のガイドラインを定めます：
+
+1. **新規モデルの追加プロセス**
+   - 新しいデータモデルは必ず `Baketa.Core.Translation.Models` 名前空間に追加
+   - サブカテゴリに応じて適切な子名前空間を利用
+
+2. **既存クラスの拡張プロセス**
+   - 既存クラスを拡張する場合は既存の名前空間を維持
+   - 新しいプロパティは既存クラスに直接追加し、名前空間を分割しない
+
+## 8. 利用する静的解析ツール
+
+### 8.1 Roslyn アナライザー
+
+Roslyn は .NET Compiler Platform の一部で、C# コードを解析するためのツールセットです。名前空間統一作業では特に以下の機能を活用します：
+
+- **エラーと警告**: コンパイル時に曖昧な参照や矛盾を検出
+- **カスタムアナライザー**: プロジェクト固有のルールを適用可能
+- **コード修正提案**: 問題に対する自動修正の提案
+- **ビルドレポート**: 警告とエラーの一覧生成
+
+### 8.2 ReSharper (オプション)
+
+JetBrains 社の ReSharper は強力なリファクタリングツールで、以下の機能が役立ちます：
+
+- **依存関係の可視化**: 参照関係の確認
+- **一括リファクタリング**: 型や名前空間の一括変更
+- **インスペクション**: コードの問題を自動検出
+- **Move to Namespace**: クラスを別名前空間に安全に移動
+- **Adjust Namespaces**: 名前空間の最適化と整理
+
+### 8.3 カスタムツール
+
+独自のメンテナンススクリプトも弾やして配置します：
 
 ```csharp
-namespace Baketa.Core.Translation.Models
-{
-    public class Language
-    {
-        // 必須プロパティ
-        public required string Code { get; set; }
-        public required string Name { get; set; } 
-        public required string DisplayName { get; set; }
-        
-        // 省略可能プロパティ
-        public string? LocalName { get; set; }
-        public bool IsRightToLeft { get; set; }
-        
-        // 静的ヘルパーインスタンス
-        public static Language Auto => new() { 
-            Code = "auto", Name = "Auto", DisplayName = "Auto-detect" 
-        };
-        
-        public static Language Unknown => new() { 
-            Code = "und", Name = "Unknown", DisplayName = "Unknown Language" 
-        };
+// 名前空間の使用状況を検証するPowerShellスクリプト例
+$files = Get-ChildItem -Path "E:\dev\Baketa" -Recurse -Include "*.cs"
+$results = @()
+
+foreach ($file in $files) {
+    $content = Get-Content $file.FullName
+    $oldNamespace = $content | Select-String "Baketa.Core.Models.Translation"
+    $newNamespace = $content | Select-String "Baketa.Core.Translation.Models"
+    
+    if ($oldNamespace -or $newNamespace) {
+        $results += [PSCustomObject]@{
+            File = $file.FullName
+            OldNamespaceCount = ($oldNamespace | Measure-Object).Count
+            NewNamespaceCount = ($newNamespace | Measure-Object).Count
+        }
     }
 }
+
+$results | Format-Table -AutoSize
 ```
 
-### 7.2 TranslationError（翻訳エラー）モデル
+## 9. 実装進捗状況 (2025-05-17更新)
 
-```csharp
-namespace Baketa.Core.Translation.Models
-{
-    public class TranslationError
-    {
-        // 必須プロパティ
-        public required string ErrorCode { get; set; }
-        public required string Message { get; set; }
-        
-        // 省略可能プロパティ
-        public TranslationErrorType ErrorType { get; set; } = TranslationErrorType.Unknown;
-        public string? Details { get; set; }
-        public Exception? Exception { get; set; }
-        public bool IsRetryable { get; set; }
-    }
+### 9.1 分析フェーズ完了
 
-    public enum TranslationErrorType
-    {
-        Unknown = 0,
-        Network = 1,
-        Authentication = 2,
-        QuotaExceeded = 3,
-        Engine = 4,
-        UnsupportedLanguage = 5,
-        InvalidInput = 6,
-        Timeout = 7,
-        Exception = 8
-    }
-}
-```
+名前空間統一化の分析フェーズが完了しました。分析結果は以下のファイルにまとめられています：
 
-## 8. リスクと緩和策
+- `model-diff-analysis.md` - 翻訳モデルの差異分析結果
+- `namespace-unification-plan.md` - 名前空間統一化実装計画
 
-### 8.1 リスク
+### 9.2 コアモデル移行の開始
 
-1. **既存機能の損失**: 名前空間変更によるバグ混入
-2. **開発の遅延**: 移行中の混乱による生産性低下
-3. **テスト不足**: 参照変更によるすべてのケースのテスト困難
+実装計画のフェーズ2（コアモデルの移行）に着手しました。差異分析に基づいた優先順位は以下の通りです：
 
-### 8.2 緩和策
+1. `Language` (最優先) - 現在進行中
+2. `LanguagePair` - 次の実装予定
+3. `TranslationError/TranslationErrorType`
+4. `TranslationRequest`
+5. `TranslationResponse`
 
-1. **段階的移行**: 一度にすべての変更を行わず、モジュール単位で移行
-2. **自動テスト強化**: 移行前に単体テストとシナリオテストの充実
-3. **インターフェース安定**: 公開APIは変更せず、内部実装のみ修正
-4. **ドキュメント更新**: 移行ガイドの提供と開発者間の情報共有
+### 9.3 Language クラスの統合状況
 
-## 9. 実施タイミング
+`Language` クラスの統合作業を開始しました。差異分析から以下の機能を統合する必要があります：
 
-**実装中の機能（#63, #64, #65, #53）が完了した後に実施します。**
+- 旧名前空間のみの機能: `NativeName`, `RegionCode`, `IsAutoDetect`
+- 新名前空間のみの機能: `IsRightToLeft`, `FromCode()`
 
-理由：
-- 現在進行中の実装の中断を避ける
-- 名前空間エイリアスによる一時的な対応で現状問題なく開発を進められる
-- 機能実装完了後にまとめてリファクタリングする方がリスクが少ない
-- テスト済みコードに対してリファクタリングを行う方が安全
+主な実装アプローチ：
 
-## 10. 注意点
+1. 新名前空間のクラスを基準に、旧名前空間の固有機能を統合
+2. 旧名前空間のクラスには `[Obsolete]` 属性を追加し、新名前空間への移行を促進
+3. 互換性のための暗黙的変換演算子を実装
 
-- 名前空間の変更は広範囲にわたるため、慎重に実施する必要があります
-- すべての参照箇所を漏れなく更新するために、検索ツールや静的解析ツールを活用します
-- 変更前後でのテスト結果を比較し、挙動の変化がないことを確認します
-- プルリクエストを小さな単位に分割し、レビューを容易にします
+### 9.4 移行状況追跡表
 
-## 11. 名前空間設計原則
+| クラス名 | 旧名前空間機能 | 新名前空間機能 | 統合方法 | 状態 |
+|---------|--------------|--------------|---------|------|
+| Language | IsAutoDetect, NativeName, RegionCode | DisplayName, IsRightToLeft, FromCode() | 全プロパティ統合、変換演算子追加 | 完了 ⚠️ |
+| LanguagePair | Create(), Equals() | LanguagePair, FromString() | 全機能統合、変換演算子追加 | 完了 ⚠️ |
+| TranslationError | ErrorCode, Message, Create(), FromException() | Clone() | 全機能統合、変換演算子追加 | 完了 ⚠️ |
+| TranslationErrorType | - | - | Obsolete属性のみ追加（完全な属性間互換性あり） | 完了 ⚠️ |
+| TranslationRequest | Create(), CreateWithContext() | Timestamp, Clone(), GenerateCacheKey() | Context型の差異を吸収する変換実装、Create()など追加 | 完了 ⚠️ |
+| TranslationResponse | CreateSuccessWithConfidence(), CreateErrorFromException() | Timestamp, Clone() | 全機能統合、変換演算子追加 | 完了 ⚠️ |
 
-今後の開発では以下の原則を守り、名前空間の混乱を防止します：
+⚠️: Obsolete属性付き、変換演算子実装あり
 
-1. **一貫性**: 機能ごとに単一の名前空間を使用
-2. **命名規則**: 
-   - Models: データモデル
-   - Events: イベント定義
-   - Services: 具体的な実装
-   - Abstractions: インターフェース定義
+### 9.5 次のステップ
 
-## 12. 参考資料
+すべてのクラスの統合が完了し、テストも正常に通過しました。後はこの実装計画に従って以下を行います：
 
-- [翻訳実装エラー修正ガイド](E:\dev\Baketa\docs\development-notes\translation-implementation-error-fix-guide.md)
-- [名前空間移行ガイドライン](E:\dev\Baketa\docs\2-development\guidelines\namespace-migration.md)
-- [翻訳基盤実装ノート](E:\dev\Baketa\docs\development-notes\translation-implementation-notes.md)
+1. 圧縮された旧名前空間の型定義が完全に該当モジュールから不要になったことを確認する
+2. `CoreModels` エイリアスおよび `TransModels` エイリアスの完全な廃止を検討する
+3. 旧名前空間への参照を全て削除する
+
+計画されていた統合作業は予定よりも早く完了しました。はじめに予定していた約2週間の作業は1週間で完了しました。
+
+### 9.6 旧名前空間の型定義の廃止
+
+すべてのクラスに `[Obsolete]` 属性を付与し、満期を迄えたため、次のフェーズでは `Baketa.Core.Models.Translation` 名前空間の型定義を完全に削除します。新名前空間 `Baketa.Core.Translation.Models` にすべての型が移行され、テストも実行されているため、受け入れ準備は整いました。
+
+移行作業中に発生したいくつかの問題点と対処方法：
+
+1. **言語コードの形式の差異**
+   - 旧名前空間: 言語コードと地域コードが分離されていた（例: `Code="zh", RegionCode="CN"`）
+   - 新名前空間: 言語コードに地域コードが含まれることがある（例: `Code="zh-CN"`）
+   - 対処: `SupportsLanguagePairAsync`メソッドをオーバーライドし、フルコードと分割コードの両方をサポート
+
+2. **モデル間の変換の複雑化**
+   - 問題: 名前空間移行中は频繁な変換が必要
+   - 対処: 暗黙的変換演算子の実装、変換ユーティリティメソッドの提供
+
+3. **テストでの型参照の不一致**
+   - 問題: テストが旧名前空間の型を参照していた
+   - 対処: `using文の変更とエイリアス使用で解決
