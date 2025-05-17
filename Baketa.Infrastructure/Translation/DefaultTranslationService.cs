@@ -7,7 +7,7 @@ using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 
 // 名前空間エイリアスを定義
-using CoreModels = Baketa.Core.Models.Translation;
+
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Infrastructure.Translation

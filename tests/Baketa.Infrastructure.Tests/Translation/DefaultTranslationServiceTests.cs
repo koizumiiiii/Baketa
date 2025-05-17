@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using CoreModels = Baketa.Core.Models.Translation;
+
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Microsoft.Extensions.Logging;

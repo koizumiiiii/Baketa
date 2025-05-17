@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 // エイリアスを追加
-using CoreModels = Baketa.Core.Models.Translation;
+
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Abstractions

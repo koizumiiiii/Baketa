@@ -296,7 +296,7 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
         }
         
         // テスト用の拡張されたフィルタークラス
-        private class TestCustomFilter : IImagePipelineFilter
+        private sealed class TestCustomFilter : IImagePipelineFilter
         {
             private readonly Func<IAdvancedImage, IAdvancedImage> _transform;
             

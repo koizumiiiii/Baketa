@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
 // 名前空間エイリアスの定義
-using CoreModels = Baketa.Core.Models.Translation;
+
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Abstractions

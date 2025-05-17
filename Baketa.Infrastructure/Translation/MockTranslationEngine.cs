@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Text;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using CoreModels = Baketa.Core.Models.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
@@ -40,7 +40,7 @@ namespace Baketa.Infrastructure.Translation
         /// <summary>
         /// サポートしている言語ペア
         /// </summary>
-        private readonly HashSet<CoreModels.LanguagePair> _supportedLanguagePairs;
+        private readonly HashSet<LanguagePair> _supportedLanguagePairs;
 
         /// <summary>
         /// コンストラクタ
@@ -58,28 +58,28 @@ namespace Baketa.Infrastructure.Translation
             _simulatedErrorRate = Math.Clamp(simulatedErrorRate, 0.0f, 1.0f);
 
             // サポートする言語ペアを定義
-            _supportedLanguagePairs = new HashSet<CoreModels.LanguagePair>
+            _supportedLanguagePairs = new HashSet<LanguagePair>
             {
                 // 英語 → 日本語
-                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.Japanese),
+                new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } },
                 // 日本語 → 英語
-                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.English),
+                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
                 // 英語 → 中国語（簡体字）
-                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.ChineseSimplified),
+                new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" } },
                 // 中国語（簡体字） → 英語
-                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseSimplified, CoreModels.Language.English),
+                new LanguagePair { SourceLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
                 // 日本語 → 中国語（簡体字）
-                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.ChineseSimplified),
+                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" } },
                 // 中国語（簡体字） → 日本語
-                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseSimplified, CoreModels.Language.Japanese),
+                new LanguagePair { SourceLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } },
                 // 英語 → 中国語（繁体字）
-                CoreModels.LanguagePair.Create(CoreModels.Language.English, CoreModels.Language.ChineseTraditional),
+                new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" } },
                 // 中国語（繁体字） → 英語
-                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseTraditional, CoreModels.Language.English),
+                new LanguagePair { SourceLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
                 // 日本語 → 中国語（繁体字）
-                CoreModels.LanguagePair.Create(CoreModels.Language.Japanese, CoreModels.Language.ChineseTraditional),
+                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" } },
                 // 中国語（繁体字） → 日本語
-                CoreModels.LanguagePair.Create(CoreModels.Language.ChineseTraditional, CoreModels.Language.Japanese)
+                new LanguagePair { SourceLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } }
             };
 
             // テスト用の翻訳セットを初期化
@@ -142,9 +142,9 @@ namespace Baketa.Infrastructure.Translation
         /// サポートしている言語ペアを取得します
         /// </summary>
         /// <returns>サポートされている言語ペアのコレクション</returns>
-        public override Task<IReadOnlyCollection<CoreModels.LanguagePair>> GetSupportedLanguagePairsAsync()
+        public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<CoreModels.LanguagePair>>(_supportedLanguagePairs.ToList());
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs.ToList());
         }
         
         /// <summary>
@@ -153,7 +153,7 @@ namespace Baketa.Infrastructure.Translation
         /// </summary>
         /// <param name="languagePair">確認する言語ペア</param>
         /// <returns>サポートしていればtrue</returns>
-        public override async Task<bool> SupportsLanguagePairAsync(CoreModels.LanguagePair languagePair)
+        public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
         {
             ArgumentNullException.ThrowIfNull(languagePair);
             ArgumentNullException.ThrowIfNull(languagePair.SourceLanguage);
@@ -169,35 +169,81 @@ namespace Baketa.Infrastructure.Translation
                 bool targetMatches = string.Equals(supportedPair.TargetLanguage.Code, languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase);
                 
                 // 地域コードがある場合はそれも確認
-                if (supportedPair.SourceLanguage.RegionCode != null && languagePair.SourceLanguage.RegionCode != null)
+                // RegionCodeプロパティは新しいクラスでは削除されたため、コードから取得
+                string? sourceRegionCode = null;
+                string? targetRegionCode = null;
+                
+                if (supportedPair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal))
                 {
-                    sourceMatches = sourceMatches && string.Equals(
-                        supportedPair.SourceLanguage.RegionCode, 
-                        languagePair.SourceLanguage.RegionCode, 
-                        StringComparison.OrdinalIgnoreCase);
+                    var parts = supportedPair.SourceLanguage.Code.Split('-');
+                    if (parts.Length > 1) sourceRegionCode = parts[1];
                 }
                 
-                if (supportedPair.TargetLanguage.RegionCode != null && languagePair.TargetLanguage.RegionCode != null)
+                if (languagePair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal))
                 {
-                    targetMatches = targetMatches && string.Equals(
-                        supportedPair.TargetLanguage.RegionCode, 
-                        languagePair.TargetLanguage.RegionCode, 
-                        StringComparison.OrdinalIgnoreCase);
+                    var parts = languagePair.SourceLanguage.Code.Split('-');
+                    if (parts.Length > 1) sourceRegionCode = parts[1];
+                }
+                
+                if (supportedPair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal))
+                {
+                    var parts = supportedPair.TargetLanguage.Code.Split('-');
+                    if (parts.Length > 1) targetRegionCode = parts[1];
+                }
+                
+                if (languagePair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal))
+                {
+                    var parts = languagePair.TargetLanguage.Code.Split('-');
+                    if (parts.Length > 1) targetRegionCode = parts[1];
+                }
+                
+                if (sourceRegionCode != null)
+                {
+                    // 地域コードの比較を行う
+                    if (languagePair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal))
+                    {
+                        var parts = languagePair.SourceLanguage.Code.Split('-');
+                        if (parts.Length > 1)
+                        {
+                            string languagePairRegionCode = parts[1];
+                            sourceMatches = sourceMatches && string.Equals(
+                        sourceRegionCode,
+                            languagePairRegionCode,
+                                StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+                }
+                
+                if (targetRegionCode != null)
+                {
+                    // 地域コードの比較を行う
+                    if (languagePair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal))
+                    {
+                        var parts = languagePair.TargetLanguage.Code.Split('-');
+                        if (parts.Length > 1)
+                        {
+                            string languagePairRegionCode = parts[1];
+                            targetMatches = targetMatches && string.Equals(
+                                targetRegionCode,
+                                languagePairRegionCode,
+                                StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
                 }
                 
                 // フルコード(zh-CN)と分割コード(zh + CN)の両方をサポート
                 if (!sourceMatches && supportedPair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal) && !languagePair.SourceLanguage.Code.Contains('-', StringComparison.Ordinal))
                 {
-                    string[] parts = supportedPair.SourceLanguage.Code.Split('-');
-                    sourceMatches = string.Equals(parts[0], languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
-                                  string.Equals(parts[1], languagePair.SourceLanguage.RegionCode, StringComparison.OrdinalIgnoreCase);
+                    string[] codeParts = supportedPair.SourceLanguage.Code.Split('-');
+                    sourceMatches = string.Equals(codeParts[0], languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase);
+
                 }
                 
                 if (!targetMatches && supportedPair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal) && !languagePair.TargetLanguage.Code.Contains('-', StringComparison.Ordinal))
                 {
-                    string[] parts = supportedPair.TargetLanguage.Code.Split('-');
-                    targetMatches = string.Equals(parts[0], languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
-                                  string.Equals(parts[1], languagePair.TargetLanguage.RegionCode, StringComparison.OrdinalIgnoreCase);
+                    string[] codeParts = supportedPair.TargetLanguage.Code.Split('-');
+                    targetMatches = string.Equals(codeParts[0], languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase);
+
                 }
                 
                 if (sourceMatches && targetMatches)
@@ -226,8 +272,8 @@ namespace Baketa.Infrastructure.Translation
         /// <param name="request">翻訳リクエスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳レスポンス</returns>
-        protected override async Task<CoreModels.TranslationResponse> TranslateInternalAsync(
-            CoreModels.TranslationRequest request,
+        protected override async Task<TranslationResponse> TranslateInternalAsync(
+            TranslationRequest request,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -243,7 +289,7 @@ namespace Baketa.Infrastructure.Translation
             {
                 return CreateErrorResponse(
                     request,
-                    CoreModels.TranslationError.InternalError,
+                    TranslationError.InternalError,
                     "シミュレートされたランダムエラーが発生しました。");
             }
 
@@ -253,12 +299,17 @@ namespace Baketa.Infrastructure.Translation
             string key = request.SourceText;
 
             // 中国語の場合は地域コードを含めたキーを使用
-            if (request.TargetLanguage.Code == "zh" && request.TargetLanguage.RegionCode != null)
+            // コードから地域コードを取得
+            if (request.TargetLanguage.Code.StartsWith("zh-", StringComparison.OrdinalIgnoreCase))
             {
-                key = $"{request.SourceText}_{request.TargetLanguage.Code}-{request.TargetLanguage.RegionCode}";
+                string[] parts = request.TargetLanguage.Code.Split('-');
+                if (parts.Length > 1)
+                {
+                    key = $"{request.SourceText}_{request.TargetLanguage.Code}";
+                }
             }
 
-            if (_presetTranslations.TryGetValue(key, out var preset))
+            if (_presetTranslations.TryGetValue(key, out string? preset))
             {
                 translatedText = preset;
             }
@@ -268,7 +319,7 @@ namespace Baketa.Infrastructure.Translation
                 translatedText = GenerateSimpleMockTranslation(request);
             }
 
-            var response = CoreModels.TranslationResponse.CreateSuccessWithConfidence(
+            var response = TranslationResponse.CreateSuccessWithConfidence(
                 request,
                 translatedText,
                 Name,
@@ -283,7 +334,7 @@ namespace Baketa.Infrastructure.Translation
         /// </summary>
         /// <param name="request">翻訳リクエスト</param>
         /// <returns>モック翻訳テキスト</returns>
-        private static string GenerateSimpleMockTranslation(CoreModels.TranslationRequest request)
+        private static string GenerateSimpleMockTranslation(TranslationRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);
             
@@ -294,13 +345,13 @@ namespace Baketa.Infrastructure.Translation
                 {
                     return $"[英→日] {request.SourceText}";
                 }
-                else if (request.TargetLanguage.Code == "zh")
+                else if (request.TargetLanguage.Code.StartsWith("zh-", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (request.TargetLanguage.RegionCode == "CN")
+                    if (request.TargetLanguage.Code.EndsWith("CN", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[英→中(簡)] {request.SourceText}";
                     }
-                    else if (request.TargetLanguage.RegionCode == "TW")
+                    else if (request.TargetLanguage.Code.EndsWith("TW", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[英→中(繁)] {request.SourceText}";
                     }
@@ -312,38 +363,38 @@ namespace Baketa.Infrastructure.Translation
                 {
                     return $"[日→英] {request.SourceText}";
                 }
-                else if (request.TargetLanguage.Code == "zh")
+                else if (request.TargetLanguage.Code.StartsWith("zh-", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (request.TargetLanguage.RegionCode == "CN")
+                    if (request.TargetLanguage.Code.EndsWith("CN", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[日→中(簡)] {request.SourceText}";
                     }
-                    else if (request.TargetLanguage.RegionCode == "TW")
+                    else if (request.TargetLanguage.Code.EndsWith("TW", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[日→中(繁)] {request.SourceText}";
                     }
                 }
             }
-            else if (request.SourceLanguage.Code == "zh")
+            else if (request.SourceLanguage.Code.StartsWith("zh-", StringComparison.OrdinalIgnoreCase))
             {
                 if (request.TargetLanguage.Code == "en")
                 {
-                    if (request.SourceLanguage.RegionCode == "CN")
+                    if (request.SourceLanguage.Code.EndsWith("CN", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[中(簡)→英] {request.SourceText}";
                     }
-                    else if (request.SourceLanguage.RegionCode == "TW")
+                    else if (request.SourceLanguage.Code.EndsWith("TW", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[中(繁)→英] {request.SourceText}";
                     }
                 }
                 else if (request.TargetLanguage.Code == "ja")
                 {
-                    if (request.SourceLanguage.RegionCode == "CN")
+                    if (request.SourceLanguage.Code.EndsWith("CN", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[中(簡)→日] {request.SourceText}";
                     }
-                    else if (request.SourceLanguage.RegionCode == "TW")
+                    else if (request.SourceLanguage.Code.EndsWith("TW", StringComparison.OrdinalIgnoreCase))
                     {
                         return $"[中(繁)→日] {request.SourceText}";
                     }

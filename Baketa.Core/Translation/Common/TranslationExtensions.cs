@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using Baketa.Core.Translation.Events;
-// 名前空間エイリアスを使用して競合を解決
-using CoreModels = Baketa.Core.Models.Translation;
-using TransModels = Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common
 {
@@ -20,22 +18,22 @@ namespace Baketa.Core.Translation.Common
         /// <param name="sourceLanguage">元言語</param>
         /// <param name="targetLanguage">対象言語</param>
         /// <returns>言語ペア</returns>
-        public static CoreModels.LanguagePair ToLanguagePair(this CoreModels.Language sourceLanguage, CoreModels.Language targetLanguage)
+        public static LanguagePair ToLanguagePair(this Models.Language sourceLanguage, Models.Language targetLanguage)
         {
             ArgumentNullException.ThrowIfNull(sourceLanguage);
             ArgumentNullException.ThrowIfNull(targetLanguage);
             
-            return new CoreModels.LanguagePair
+            return new LanguagePair
             {
-                SourceLanguage = new CoreModels.Language
+                SourceLanguage = new Models.Language
                 {
                     Code = sourceLanguage.Code,
-                    Name = sourceLanguage.Name
+                    DisplayName = sourceLanguage.DisplayName
                 },
-                TargetLanguage = new CoreModels.Language
+                TargetLanguage = new Models.Language
                 {
                     Code = targetLanguage.Code,
-                    Name = targetLanguage.Name
+                    DisplayName = targetLanguage.DisplayName
                 }
             };
         }
@@ -46,7 +44,7 @@ namespace Baketa.Core.Translation.Common
         /// <param name="pair1">言語ペア1</param>
         /// <param name="pair2">言語ペア2</param>
         /// <returns>一致する場合はtrue</returns>
-        public static bool Matches(this CoreModels.LanguagePair pair1, CoreModels.LanguagePair pair2)
+        public static bool Matches(this Models.LanguagePair pair1, Models.LanguagePair pair2)
         {
             if (pair1 == null || pair2 == null)
                 return false;
@@ -60,7 +58,7 @@ namespace Baketa.Core.Translation.Common
         /// </summary>
         /// <param name="context">翻訳コンテキスト</param>
         /// <returns>ハッシュ文字列</returns>
-        public static string GetHashString(this TransModels.TranslationContext? context)
+        public static string GetHashString(this Models.TranslationContext? context)
         {
             if (context == null)
             {
@@ -99,11 +97,11 @@ namespace Baketa.Core.Translation.Common
         /// </summary>
         /// <param name="context">元のコンテキスト</param>
         /// <returns>複製されたコンテキスト</returns>
-        public static TransModels.TranslationContext Clone(this TransModels.TranslationContext context)
+        public static Models.TranslationContext Clone(this Models.TranslationContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
             
-            var clone = new TransModels.TranslationContext
+            var clone = new Models.TranslationContext
             {
                 GameProfileId = context.GameProfileId,
                 SceneId = context.SceneId,

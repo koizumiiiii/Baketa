@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
-using CoreModels = Baketa.Core.Models.Translation;
+
 
 namespace Baketa.Core.Translation.Abstractions
 {

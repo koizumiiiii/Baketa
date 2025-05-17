@@ -21,14 +21,14 @@ namespace Baketa.Core.Translation.Models
         /// <summary>
         /// 言語名（英語）
         /// 例: "English", "Japanese", "Chinese"など
-        /// 旧名前空間 Baketa.Core.Models.Translation.Language との互換性のため
+        /// 旧名前空間 Baketa.Core.Translation.Models.Language との互換性のため
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// 言語名（現地語）
         /// 例: "English", "日本語", "中文"など
-        /// 旧名前空間 Baketa.Core.Models.Translation.Language から移植
+        /// 旧名前空間 Baketa.Core.Translation.Models.Language から移植
         /// </summary>
         public string? NativeName { get; set; }
 
@@ -37,13 +37,13 @@ namespace Baketa.Core.Translation.Models
         /// 例: "US", "JP", "CN", "TW"など
         /// 完全な言語コードは '{Code}-{RegionCode}' 形式になります
         /// 例: "en-US", "zh-CN", "zh-TW"など
-        /// 旧名前空間 Baketa.Core.Models.Translation.Language から移植
+        /// 旧名前空間 Baketa.Core.Translation.Models.Language から移植
         /// </summary>
         public string? RegionCode { get; set; }
 
         /// <summary>
         /// 言語が自動検出であるかどうか
-        /// 旧名前空間 Baketa.Core.Models.Translation.Language から移植
+        /// 旧名前空間 Baketa.Core.Translation.Models.Language から移植
         /// </summary>
         public bool IsAutoDetect { get; set; }
 
