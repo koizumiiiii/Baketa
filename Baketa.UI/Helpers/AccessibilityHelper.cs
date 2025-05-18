@@ -4,8 +4,8 @@ using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using System;
 
-namespace Baketa.UI.Helpers
-{
+namespace Baketa.UI.Helpers;
+
     /// <summary>
     /// アクセシビリティ関連のヘルパーメソッドを提供します。
     /// </summary>
@@ -116,4 +116,3 @@ namespace Baketa.UI.Helpers
             return element;
         }
     }
-}

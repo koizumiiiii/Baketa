@@ -9,8 +9,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// ヒストグラムベースの差分検出アルゴリズム
     /// </summary>
@@ -285,4 +285,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             return disappearedRegions;
         }
     }
-}

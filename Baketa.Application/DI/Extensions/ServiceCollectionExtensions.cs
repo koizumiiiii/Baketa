@@ -3,15 +3,14 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-// パッケージ追加済みのため使用可能
 using Microsoft.Extensions.Logging.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace Baketa.Application.DI.Extensions
-{
+namespace Baketa.Application.DI.Extensions;
+
     /// <summary>
     /// サービスコレクション拡張メソッド。
     /// Baketaサービスモジュールの登録を簡略化します。
@@ -254,4 +253,3 @@ namespace Baketa.Application.DI.Extensions
                 .Where(m => m != null)!;
         }
     }
-}

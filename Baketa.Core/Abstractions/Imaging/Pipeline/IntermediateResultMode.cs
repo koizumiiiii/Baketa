@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// 中間結果の保存モード
     /// </summary>
@@ -30,4 +30,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         OnError
     }
-}

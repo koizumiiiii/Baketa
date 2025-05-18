@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events
-{
+namespace Baketa.Core.Events;
+
     /// <summary>
     /// イベント基本実装
     /// </summary>
@@ -28,4 +28,3 @@ namespace Baketa.Core.Events
         /// <inheritdoc />
         public abstract string Category { get; }
     }
-}

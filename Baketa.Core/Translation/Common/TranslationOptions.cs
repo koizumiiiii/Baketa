@@ -2,8 +2,8 @@ using System;
 
 #pragma warning disable CA1805 // 参照型の初期化は処理系によって自動的に行われる
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// 翻訳オプション
     /// </summary>
@@ -199,6 +199,5 @@ namespace Baketa.Core.Translation.Common
         /// </summary>
         public int TimeoutSeconds { get; set; } = 30;
     }
-}
 
 #pragma warning restore CA1805

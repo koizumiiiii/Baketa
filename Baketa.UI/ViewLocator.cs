@@ -6,8 +6,8 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     /// <summary>
     /// ビューとビューモデルの対応関係を解決するビューロケータ
     /// </summary>
@@ -120,4 +120,3 @@ namespace Baketa.UI
             return data is ViewModelBase;
         }
     }
-}

@@ -9,8 +9,8 @@ using Xunit;
 
 using System.Diagnostics.CodeAnalysis;
 
-namespace Baketa.Infrastructure.Tests.Translation
-{
+namespace Baketa.Infrastructure.Tests.Translation;
+
     [SuppressMessage("Style", "CA1707:識別子にアンダースコアを含めることはできません", Justification = "xUnit規約に準拠するテストメソッド名")]
     public class TranslationEngineTests : IDisposable
     {
@@ -241,4 +241,3 @@ namespace Baketa.Infrastructure.Tests.Translation
             // 別のフレーズでテストすることが理想的です
         }
     }
-}

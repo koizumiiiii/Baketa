@@ -7,8 +7,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Cache
-{
+namespace Baketa.Core.Translation.Cache;
+
     /// <summary>
     /// ダミー永続化キャッシュ
     /// </summary>
@@ -140,4 +140,3 @@ namespace Baketa.Core.Translation.Cache
             });
         }
     }
-}

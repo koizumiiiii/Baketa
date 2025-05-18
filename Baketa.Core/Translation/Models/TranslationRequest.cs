@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using Baketa.Core.Translation.Common;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳リクエストを表すクラス
     /// </summary>
@@ -176,4 +176,3 @@ namespace Baketa.Core.Translation.Models
             return text.Trim().Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal);
         }
     }
-}

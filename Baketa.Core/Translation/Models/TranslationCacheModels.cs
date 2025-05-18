@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳キャッシュエントリ
     /// </summary>
@@ -126,4 +126,3 @@ namespace Baketa.Core.Translation.Models
         /// </summary>
         public DateTime GeneratedAt { get; set; }
     }
-}

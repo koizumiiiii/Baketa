@@ -4,8 +4,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Common;
 using Baketa.Core.Extensions;
 
-namespace Baketa.Core.Services.Imaging
-{
+namespace Baketa.Core.Services.Imaging;
+
     /// <summary>
     /// IImageの基本実装
     /// </summary>
@@ -102,4 +102,3 @@ namespace Baketa.Core.Services.Imaging
             _pixelData = [];
         }
     }
-}

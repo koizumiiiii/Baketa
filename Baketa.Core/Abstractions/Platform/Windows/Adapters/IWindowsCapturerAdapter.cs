@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
-{
+namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
+
     /// <summary>
     /// WindowsCapturerをコアキャプチャサービスに変換するアダプターインターフェース
     /// </summary>
@@ -44,4 +44,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
         /// <param name="includeCursor">カーソルを含むかどうか</param>
         void SetCaptureOptions(int quality, bool includeCursor);
     }
-}

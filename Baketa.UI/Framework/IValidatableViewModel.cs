@@ -1,8 +1,8 @@
 using ReactiveUI.Validation.Contexts;
 using ReactiveUI.Validation.Abstractions;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// バリデーション可能なビューモデルのインターフェース
     /// </summary>
@@ -13,4 +13,3 @@ namespace Baketa.UI.Framework
         /// </summary>
         IValidationContext ValidationContext { get; }
     }
-}

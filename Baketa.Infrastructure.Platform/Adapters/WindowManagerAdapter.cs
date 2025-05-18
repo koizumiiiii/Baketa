@@ -11,8 +11,8 @@ using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有のウィンドウマネージャーをプラットフォーム非依存のウィンドウマネージャーに変換するアダプター
     /// ゲームウィンドウ検出機能とウィンドウ種類判定機能を強化しています
@@ -789,4 +789,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             _processWindowMap.Clear();
         }
     }
-}

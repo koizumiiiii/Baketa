@@ -6,8 +6,8 @@ using System.Reflection;
 using ReactiveUI.Validation.Helpers;
 using ReactiveUI.Validation.Contexts;
 
-namespace Baketa.UI.Framework.Validation
-{
+namespace Baketa.UI.Framework.Validation;
+
     /// <summary>
     /// シンプルなバリデーションヘルパー
     /// 特定のインターフェース名に依存しない実装
@@ -134,4 +134,3 @@ namespace Baketa.UI.Framework.Validation
                 : throw new ArgumentException("Expression is not a property expression", nameof(propertyExpression));
         }
     }
-}

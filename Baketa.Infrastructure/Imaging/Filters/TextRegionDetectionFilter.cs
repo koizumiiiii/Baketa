@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
-// PipelineStepParameter使用のための名前空間
 using Baketa.Core.Abstractions.Imaging.Pipeline;
-// 拡張メソッドの使用
 using Baketa.Infrastructure.Imaging.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Filters
-{
+namespace Baketa.Infrastructure.Imaging.Filters;
+
     /// <summary>
     /// テキスト領域検出フィルター
     /// </summary>
@@ -189,4 +186,3 @@ namespace Baketa.Infrastructure.Imaging.Filters
             return filtered;
         }
     }
-}

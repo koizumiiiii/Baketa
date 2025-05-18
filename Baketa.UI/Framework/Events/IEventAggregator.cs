@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// イベント集約器インターフェース
     /// </summary>
@@ -24,4 +24,3 @@ namespace Baketa.UI.Framework.Events
         /// <returns>購読解除可能なDisposable</returns>
         IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : Baketa.Core.Events.IEvent;
     }
-}

@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
-// エイリアスを追加
 
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// WebAPI翻訳エンジン固有の機能を定義するインターフェース
     /// </summary>
@@ -126,4 +125,3 @@ namespace Baketa.Core.Translation.Abstractions
         /// </summary>
         public string EngineName { get; set; } = string.Empty;
     }
-}

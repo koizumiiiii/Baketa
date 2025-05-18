@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// Windows環境でのOpenCVライブラリの機能を提供する実装クラス
     /// </summary>
@@ -97,4 +97,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
             return new List<DetectedRegion>(); // 空のリストを返すだけのスタブ
         }
     }
-}

@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.Navigation
-{
+namespace Baketa.UI.Framework.Navigation;
+
     /// <summary>
     /// ナビゲーション管理クラス
     /// </summary>
@@ -144,4 +144,3 @@ namespace Baketa.UI.Framework.Navigation
         /// <param name="parameter">パラメータ</param>
         void Initialize(TParam parameter);
     }
-}

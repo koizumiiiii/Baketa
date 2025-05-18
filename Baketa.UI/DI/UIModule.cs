@@ -4,8 +4,8 @@ using Baketa.UI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.UI.DI
-{
+namespace Baketa.UI.DI;
+
     /// <summary>
     /// UI関連の依存性注入を設定するモジュール
     /// </summary>
@@ -33,4 +33,3 @@ namespace Baketa.UI.DI
             // services.AddSingleton<INotificationService, NotificationService>();
         }
     }
-}

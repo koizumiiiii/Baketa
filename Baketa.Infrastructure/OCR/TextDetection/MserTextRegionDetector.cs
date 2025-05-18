@@ -5,17 +5,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間表現を明確にする
-// Imaging名前空間のIOpenCvWrapperを使用
 using ImagingOpenCvWrapper = Baketa.Core.Abstractions.Imaging.IOpenCvWrapper;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// MSER (Maximally Stable Extremal Regions) アルゴリズムによるテキスト領域検出器
     /// </summary>
@@ -291,4 +288,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return mergedRegions;
         }
     }
-}

@@ -2,8 +2,8 @@ using Baketa.Core.Abstractions.DI;
 using Baketa.Infrastructure.Capture.DI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.DI.Modules
-{
+namespace Baketa.Infrastructure.DI.Modules;
+
     /// <summary>
     /// キャプチャ関連サービスのDIモジュール
     /// </summary>
@@ -22,4 +22,3 @@ namespace Baketa.Infrastructure.DI.Modules
             // ...
         }
     }
-}

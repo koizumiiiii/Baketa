@@ -3,8 +3,8 @@ using Baketa.Core.Events.Implementation;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// イベント集約機構の拡張メソッドのテスト
     /// </summary>
@@ -34,4 +34,3 @@ namespace Baketa.Core.Tests.Events
             Assert.IsType<EventAggregator>(eventAggregator1);
         }
     }
-}

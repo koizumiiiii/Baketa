@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳エラー情報を表すクラス
     /// </summary>
@@ -204,4 +204,3 @@ namespace Baketa.Core.Translation.Models
         
         #endregion
     }
-}

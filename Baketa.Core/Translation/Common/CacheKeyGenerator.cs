@@ -7,8 +7,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// キャッシュキーの生成に使用するユーティリティクラス
     /// </summary>
@@ -145,4 +145,3 @@ namespace Baketa.Core.Translation.Common
             return (parts[0], parts[1], parts[2], parts[3]);
         }
     }
-}

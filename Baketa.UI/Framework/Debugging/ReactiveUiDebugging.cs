@@ -5,8 +5,8 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.Debugging
-{
+namespace Baketa.UI.Framework.Debugging;
+
     /// <summary>
     /// ReactiveUIデバッグツール統合
     /// </summary>
@@ -92,4 +92,3 @@ namespace Baketa.UI.Framework.Debugging
             }
         }
     }
-}

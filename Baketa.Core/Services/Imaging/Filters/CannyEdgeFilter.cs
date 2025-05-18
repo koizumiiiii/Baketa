@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// Cannyエッジ検出フィルター
     /// </summary>
@@ -49,19 +49,16 @@ namespace Baketa.Core.Services.Imaging.Filters
             // パラメータを取得
             double threshold1 = GetParameterValue<double>("Threshold1");
             double threshold2 = GetParameterValue<double>("Threshold2");
-            int apertureSize = GetParameterValue<int>("ApertureSize");
-            bool l2Gradient = GetParameterValue<bool>("L2Gradient");
+            // 以下のパラメータは使用しないので取得しない
+            // int apertureSize = GetParameterValue<int>("ApertureSize");
+            // bool l2Gradient = GetParameterValue<bool>("L2Gradient");
             
             // パラメータの検証
-            threshold1 = Math.Max(0, threshold1);
-            threshold2 = Math.Max(threshold1, threshold2);
+            // validatedThreshold1は使用されるので変数を定義
+            double validatedThreshold1 = threshold1 < 0 ? 0 : threshold1;
             
-            // アパーチャサイズは奇数のみ許可
-            if (apertureSize % 2 == 0)
-            {
-                apertureSize++;
-            }
-            apertureSize = Math.Max(apertureSize, 3);
+            // threshold2の検証は行うが、値は使用しないのでディスカード変数に代入
+            _ = threshold2 < validatedThreshold1 ? validatedThreshold1 : threshold2;
             
             // グレースケール変換（エッジ検出はグレースケール画像に対して適用）
             var grayImage = await inputImage.ToGrayscaleAsync().ConfigureAwait(false);
@@ -71,10 +68,10 @@ namespace Baketa.Core.Services.Imaging.Filters
             // 代替手段としてシャープネスやコントラスト調整を使用
             var enhancementOptions = new ImageEnhancementOptions
             {
-                Sharpness = 1.0f,                      // エッジを強調
-                Contrast = 1.5f,                       // コントラストを上げてエッジを見やすく
-                NoiseReduction = 0.3f,                 // ノイズを軽減（Cannyはノイズに敏感）
-                BinarizationThreshold = (int)threshold1 // 低閾値を二値化閾値として使用
+                Sharpness = 1.0f,                            // エッジを強調
+                Contrast = 1.5f,                             // コントラストを上げてエッジを見やすく
+                NoiseReduction = 0.3f,                       // ノイズを軽減（Cannyはノイズに敏感）
+                BinarizationThreshold = (int)validatedThreshold1 // 検証済みの閾値を使用
             };
             
             // ガウシアンぼかし（Cannyの最初のステップ）
@@ -88,4 +85,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return await blurredImage.EnhanceAsync(enhancementOptions).ConfigureAwait(false);
         }
     }
-}

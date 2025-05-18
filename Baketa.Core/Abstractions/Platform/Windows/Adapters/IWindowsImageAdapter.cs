@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
-{
+namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
+
     /// <summary>
     /// Windows画像をコア画像に変換するアダプターインターフェース
     /// </summary>
@@ -36,4 +36,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
         /// <returns>Windows画像</returns>
         Task<IWindowsImage> AdaptToWindowsImageAsync(IImage image);
     }
-}

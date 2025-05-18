@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 画像フィルターを表すインターフェース
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// <returns>出力画像の情報</returns>
         Baketa.Core.Abstractions.Imaging.ImageInfo GetOutputImageInfo(IAdvancedImage inputImage);
     }
-}

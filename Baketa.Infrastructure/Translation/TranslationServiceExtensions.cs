@@ -4,8 +4,8 @@ using Baketa.Infrastructure.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure
-{
+namespace Baketa.Infrastructure.Translation;
+
     /// <summary>
     /// 翻訳サービスの依存性注入拡張メソッド
     /// </summary>
@@ -73,4 +73,3 @@ namespace Baketa.Infrastructure
         /// </summary>
         public float SimulatedErrorRate { get; set; }
     }
-}

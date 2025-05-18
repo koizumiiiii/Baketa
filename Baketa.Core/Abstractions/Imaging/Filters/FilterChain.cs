@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Filters
-{
+namespace Baketa.Core.Abstractions.Imaging.Filters;
+
     /// <summary>
     /// フィルターチェーンを表すクラス
     /// </summary>
@@ -275,4 +275,3 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
             public void Dispose() { }
         }
     }
-}

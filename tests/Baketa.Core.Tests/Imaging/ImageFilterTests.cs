@@ -7,8 +7,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging
-{
+namespace Baketa.Core.Tests.Imaging;
+
     /// <summary>
     /// IImageFilterインターフェースの単体テスト
     /// </summary>
@@ -43,7 +43,7 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
+            public byte[] Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
@@ -77,7 +77,7 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
+            public byte[] Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
@@ -121,7 +121,7 @@ namespace Baketa.Core.Tests.Imaging
             }
             
             // 互換性のためのレガシーメソッド
-            public IReadOnlyList<byte> Apply(byte[] imageData, int _1, int _2, int _3)
+            public byte[] Apply(byte[] imageData, int _1, int _2, int _3)
             {
                 ArgumentNullException.ThrowIfNull(imageData);
                 
@@ -230,7 +230,7 @@ namespace Baketa.Core.Tests.Imaging
             var result = filter.Apply(imageData, width, height, stride);
 
             // Assert
-            Assert.Equal(6, result.Count);
+            Assert.Equal(6, result.Length);
             var allMatched = result.All(value => value == constantValue);
             Assert.True(allMatched);
         }
@@ -329,4 +329,3 @@ namespace Baketa.Core.Tests.Imaging
             await Assert.ThrowsAsync<ArgumentNullException>(() => filter.ApplyAsync(nullImage!));
         }
     }
-}

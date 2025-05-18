@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Events.Implementation
-{
+namespace Baketa.Core.Events.Implementation;
+
     /// <summary>
     /// イベント集約機構の実装
     /// </summary>
@@ -382,4 +382,3 @@ namespace Baketa.Core.Events.Implementation
             return true;
         }
     }
-}

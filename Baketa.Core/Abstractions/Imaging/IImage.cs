@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 標準的な画像操作機能を提供するインターフェース
     /// </summary>
@@ -21,4 +21,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// <returns>リサイズされた新しい画像インスタンス</returns>
         Task<IImage> ResizeAsync(int width, int height);
     }
-}

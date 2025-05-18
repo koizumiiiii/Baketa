@@ -9,13 +9,12 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Collections.Generic;
 
-// 名前空間エイリアスで衝突を解決
 using CoreEvents = Baketa.Core.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     internal sealed partial class App : Avalonia.Application
     {
         private ILogger<App>? _logger;
@@ -278,4 +277,3 @@ namespace Baketa.UI
         /// </summary>
         public override string Category => "Application";
     }
-}

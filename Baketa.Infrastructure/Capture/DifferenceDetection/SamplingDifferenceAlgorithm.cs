@@ -10,8 +10,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// サンプリングベースの差分検出アルゴリズム（最も高速）
     /// </summary>
@@ -316,4 +316,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 (maxY - minY + 1) * blockSize);
         }
     }
-}

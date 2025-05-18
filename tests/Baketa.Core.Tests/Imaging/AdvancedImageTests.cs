@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging
-{
+namespace Baketa.Core.Tests.Imaging;
+
     /// <summary>
     /// IAdvancedImageインターフェースの実装に対する単体テスト
     /// </summary>
@@ -503,4 +503,3 @@ namespace Baketa.Core.Tests.Imaging
             Assert.True(probability >= 0f && probability <= 1f);
         }
     }
-}

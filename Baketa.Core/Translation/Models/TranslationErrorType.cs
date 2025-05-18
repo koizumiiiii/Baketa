@@ -1,5 +1,5 @@
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳エラーの種類
     /// </summary>
@@ -50,4 +50,3 @@ namespace Baketa.Core.Translation.Models
         /// </summary>
         Exception = 8
     }
-}

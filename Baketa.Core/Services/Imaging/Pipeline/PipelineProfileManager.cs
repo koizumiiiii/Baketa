@@ -8,8 +8,8 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Abstractions.Platform;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインプロファイルの管理を担当するクラス
     /// </summary>
@@ -425,4 +425,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline
 
         #endregion
     }
-}

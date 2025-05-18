@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳コンテキストを表すクラス
     /// </summary>
@@ -32,7 +32,7 @@ namespace Baketa.Core.Translation.Models
         /// <summary>
         /// コンテキストタグ
         /// </summary>
-        public Collection<string> Tags { get; } = new Collection<string>();
+        public readonly Collection<string> Tags = new Collection<string>();
         
         /// <summary>
         /// コンテキスト優先度（0～100）
@@ -42,7 +42,7 @@ namespace Baketa.Core.Translation.Models
         /// <summary>
         /// 追加コンテキスト情報
         /// </summary>
-        public Dictionary<string, object?> AdditionalContext { get; } = new();
+        public readonly Dictionary<string, object?> AdditionalContext = new();
         
         /// <summary>
         /// 文字列表現を取得します
@@ -171,4 +171,3 @@ namespace Baketa.Core.Translation.Models
         /// <returns>等しくない場合はtrue</returns>
         public static bool operator !=(Rectangle left, Rectangle right) => !(left == right);
     }
-}

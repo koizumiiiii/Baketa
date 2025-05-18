@@ -1,8 +1,8 @@
 using Baketa.Core.Abstractions.Imaging;
 using System;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// OCR失敗イベント
     /// </summary>
@@ -49,4 +49,3 @@ namespace Baketa.Core.Events.EventTypes
         /// <inheritdoc />
         public override string Category => "OCR";
     }
-}

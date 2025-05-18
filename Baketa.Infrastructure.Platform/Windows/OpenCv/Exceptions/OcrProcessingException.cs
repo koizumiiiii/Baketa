@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions;
+
     /// <summary>
     /// OCR処理中に発生した例外を表します
     /// </summary>
@@ -25,4 +25,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions
         /// <param name="innerException">内部例外</param>
         public OcrProcessingException(string message, Exception innerException) : base(message, innerException) { }
     }
-}

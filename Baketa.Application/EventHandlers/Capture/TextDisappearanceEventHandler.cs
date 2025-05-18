@@ -5,8 +5,8 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Capture;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Application.EventHandlers.Capture
-{
+namespace Baketa.Application.EventHandlers.Capture;
+
     /// <summary>
     /// テキスト消失イベントのハンドラー
     /// </summary>
@@ -94,4 +94,3 @@ namespace Baketa.Application.EventHandlers.Capture
         /// </summary>
         public bool SynchronousExecution => false;
     }
-}

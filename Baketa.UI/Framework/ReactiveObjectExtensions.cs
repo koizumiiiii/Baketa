@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// プロパティ変更通知を最適化するエクステンション
     /// </summary>
@@ -76,4 +76,3 @@ namespace Baketa.UI.Framework
             return This.SuppressChangeNotifications();
         }
     }
-}

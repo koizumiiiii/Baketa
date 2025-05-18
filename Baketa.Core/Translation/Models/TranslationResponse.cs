@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳レスポンスを表すクラス
     /// </summary>
@@ -235,4 +235,3 @@ namespace Baketa.Core.Translation.Models
             return clone;
         }
     }
-}

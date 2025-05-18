@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Capture
-{
+namespace Baketa.Core.Abstractions.Capture;
+
     /// <summary>
     /// 差分検出設定を表すクラス
     /// </summary>
@@ -108,4 +108,3 @@ namespace Baketa.Core.Abstractions.Capture
         /// </summary>
         SamplingBased = 5
     }
-}

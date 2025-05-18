@@ -10,8 +10,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Translation
-{
+namespace Baketa.Infrastructure.Translation;
+
     /// <summary>
     /// テスト用のモック翻訳エンジン
     /// </summary>
@@ -435,4 +435,3 @@ namespace Baketa.Infrastructure.Translation
             base.Dispose(disposing);
         }
     }
-}

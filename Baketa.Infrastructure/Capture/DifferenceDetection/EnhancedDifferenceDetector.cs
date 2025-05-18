@@ -12,8 +12,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Events.Capture;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// 拡張差分検出アルゴリズム
     /// </summary>
@@ -359,4 +359,3 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
             }
         }
     }
-}

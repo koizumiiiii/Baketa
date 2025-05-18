@@ -7,11 +7,10 @@ using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアスを使用して衝突を解決
 using UIEvents = Baketa.UI.Framework.Events;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// オーバーレイ設定画面のビューモデル
     /// </summary>
@@ -271,4 +270,3 @@ namespace Baketa.UI.ViewModels
         /// <inheritdoc/>
         public override string Category => "UI.Overlay";
     }
-}

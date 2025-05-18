@@ -12,8 +12,8 @@ using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation
-{
+namespace Baketa.Core.Translation;
+
     /// <summary>
     /// 翻訳エンジンの基本機能を提供する抽象クラス
     /// </summary>
@@ -613,4 +613,3 @@ namespace Baketa.Core.Translation
             _disposed = true;
         }
     }
-}

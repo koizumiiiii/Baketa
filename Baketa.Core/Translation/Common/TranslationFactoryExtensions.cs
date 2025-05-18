@@ -4,13 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Factories;
 
-// 名前空間エイリアスを使用して競合を解決
 using CoreTranslationEngine = Baketa.Core.Abstractions.Translation.ITranslationEngine;
 using FactoryTranslationEngine = Baketa.Core.Abstractions.Factories.ITranslationEngine;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// 翻訳エンジンファクトリーの拡張メソッド
     /// </summary>
@@ -165,4 +164,3 @@ namespace Baketa.Core.Translation.Common
         }
 #pragma warning restore CA1849
     }
-}

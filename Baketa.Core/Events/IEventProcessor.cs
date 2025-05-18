@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events
-{
+namespace Baketa.Core.Events;
+
     /// <summary>
     /// イベント処理インターフェース
     /// </summary>
@@ -15,4 +15,3 @@ namespace Baketa.Core.Events
         /// <returns>処理の完了を表すTask</returns>
         Task HandleAsync(TEvent eventData);
     }
-}

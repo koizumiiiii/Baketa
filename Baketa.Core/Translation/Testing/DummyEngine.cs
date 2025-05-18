@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Baketa.Core.Translation.Models;
 
 
-namespace Baketa.Core.Translation.Testing
-{
+namespace Baketa.Core.Translation.Testing;
+
     /// <summary>
     /// 抽象基底クラスの最小実装用テストクラス
     /// </summary>
@@ -99,4 +99,3 @@ namespace Baketa.Core.Translation.Testing
             return Task.FromResult(true);
         }
     }
-}

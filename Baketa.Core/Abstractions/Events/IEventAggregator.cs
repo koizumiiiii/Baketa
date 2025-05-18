@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Events
-{
+namespace Baketa.Core.Abstractions.Events;
+
     /// <summary>
     /// イベント集約インターフェース
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.Core.Abstractions.Events
             Processor = processor;
         }
     }
-}

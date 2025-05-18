@@ -2,8 +2,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Events;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// 翻訳関連イベントの基本インターフェース
     /// </summary>
@@ -118,4 +118,3 @@ namespace Baketa.Core.Translation.Events
         /// </summary>
         string CacheSource { get; }
     }
-}

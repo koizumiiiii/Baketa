@@ -11,8 +11,8 @@ using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
 using Baketa.UI.Framework.Events;
 
-namespace Baketa.UI.ViewModels.Examples
-{
+namespace Baketa.UI.ViewModels.Examples;
+
     /// <summary>
     /// ReactiveUIパターンの使用例を示すサンプルビューモデル
     /// </summary>
@@ -276,4 +276,3 @@ namespace Baketa.UI.ViewModels.Examples
         /// <inheritdoc/>
         public override string Category => "Data";
     }
-}

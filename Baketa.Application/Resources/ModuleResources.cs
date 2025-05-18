@@ -1,5 +1,5 @@
-namespace Baketa.Application.Resources
-{
+namespace Baketa.Application.Resources;
+
     /// <summary>
     /// モジュール関連のリソース文字列
     /// </summary>
@@ -25,4 +25,3 @@ namespace Baketa.Application.Resources
         /// </summary>
         public const string SampleUIModuleRegistered = "SampleUIModule のサービスを登録しました。";
     }
-}

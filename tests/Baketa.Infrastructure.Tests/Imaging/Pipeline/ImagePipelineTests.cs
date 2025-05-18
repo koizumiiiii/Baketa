@@ -11,8 +11,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
 
     /// <summary>
     /// テスト用のパイプラインフィルターインターフェース実装
@@ -393,4 +392,3 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
             Assert.Equal(StepErrorHandlingStrategy.LogAndContinue, pipeline.GlobalErrorHandlingStrategy);
         }
     }
-}

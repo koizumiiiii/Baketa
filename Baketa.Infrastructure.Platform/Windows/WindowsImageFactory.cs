@@ -6,9 +6,8 @@ using System.Threading.Tasks;
 using IWindowsImageInterface = Baketa.Core.Abstractions.Platform.Windows.IWindowsImage;
 using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 
-namespace Baketa.Infrastructure.Platform.Windows
-{
-    // 注：IWindowsImageFactoryは Baketa.Core.Abstractions.Factories.IWindowsImageFactory に移動しました。
+namespace Baketa.Infrastructure.Platform.Windows;
+
 
     /// <summary>
     /// WindowsImage作成のファクトリ実装
@@ -97,4 +96,3 @@ namespace Baketa.Infrastructure.Platform.Windows
             }).ConfigureAwait(false);
         }
     }
-}

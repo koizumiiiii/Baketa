@@ -9,8 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     internal sealed class Program
     {
         /// <summary>
@@ -79,4 +79,3 @@ namespace Baketa.UI
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
         }
     }
-}

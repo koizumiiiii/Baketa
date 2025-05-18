@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// Windows プラットフォーム用 OpenCV ラッパーの実装
     /// プロジェクト内で使用するが、IOpenCvWrapperインターフェースは直接実装しない
@@ -155,10 +155,10 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
             ArgumentNullException.ThrowIfNull(image);
             ArgumentNullException.ThrowIfNull(parameters);
             
-            // デフォルト値を取得
-            int delta = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
-            int minArea = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
-            int maxArea = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
+            // ディスカード変数を使用してデフォルト値を取得 (迅速化などで将来利用可能性がある値を処理)
+            _ = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
+            _ = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
+            _ = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
             
             return new List<Point[]>();
         }
@@ -547,4 +547,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
             Dispose(false);
         }
     }
-}

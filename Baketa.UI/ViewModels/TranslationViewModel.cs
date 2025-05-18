@@ -7,8 +7,8 @@ using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// 翻訳設定画面のビューモデル
     /// </summary>
@@ -171,4 +171,3 @@ namespace Baketa.UI.ViewModels
             await Task.CompletedTask.ConfigureAwait(true);
         }
     }
-}

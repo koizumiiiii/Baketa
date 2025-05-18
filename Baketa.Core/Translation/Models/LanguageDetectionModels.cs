@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 言語検出結果を表すクラス
     /// </summary>
@@ -156,4 +156,3 @@ namespace Baketa.Core.Translation.Models
             };
         }
     }
-}

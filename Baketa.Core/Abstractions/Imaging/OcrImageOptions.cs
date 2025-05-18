@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// OCR画像最適化オプション
     /// </summary>
@@ -105,4 +105,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         LightText = 3
     }
-}

@@ -11,8 +11,8 @@ using Baketa.Core.Translation.Models;
 using CoreTranslationEngine = Baketa.Core.Abstractions.Translation.ITranslationEngine;
 using TranslationEngineInterface = Baketa.Core.Translation.Abstractions.ITranslationEngine;
 
-namespace Baketa.Core.Translation.Services
-{
+namespace Baketa.Core.Translation.Services;
+
     /// <summary>
     /// 翻訳エンジン検出サービスの実装
     /// </summary>
@@ -156,7 +156,6 @@ namespace Baketa.Core.Translation.Services
             
             if (engine != null)
             {
-                // インターフェースを返すように変更し、CA1859警告を解消
                 TranslationEngineInterface adapter = new TranslationEngineAdapter(engine);
                 return adapter; // このオブジェクトは呼び出し元が破棄責任を持つ
             }
@@ -171,9 +170,7 @@ namespace Baketa.Core.Translation.Services
         /// <returns>アダプトされた翻訳エンジン</returns>
         private static TranslationEngineInterface CreateEngineAdapter(CoreTranslationEngine coreEngine)
         {            
-            // インターフェースを返す形式に変更し、CA1859警告を解消
             TranslationEngineInterface adapter = new TranslationEngineAdapter(coreEngine);
             return adapter;
         }
     }
-}

@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳キャッシュインターフェース
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.Core.Translation.Abstractions
     {
         // 永続化キャッシュ特有のメソッドがあれば追加
     }
-}

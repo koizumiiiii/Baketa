@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Factories
-{
+namespace Baketa.Core.Translation.Factories;
+
     /// <summary>
     /// デフォルトの翻訳エンジンファクトリー実装
     /// </summary>
@@ -95,4 +95,3 @@ namespace Baketa.Core.Translation.Factories
             }
         }
     }
-}

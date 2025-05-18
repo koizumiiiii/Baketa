@@ -1,11 +1,8 @@
-// ファイル: Baketa.Core.Abstractions/Imaging/Pipeline/PipelineImageInfo.cs
-// 修正内容: Pipeline.ImageInfo を PipelineImageInfo にリネーム
-
 using System;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプライン処理における画像情報を表すクラス
     /// 名前空間の衝突を避けるため、ImageInfo から PipelineImageInfo にリネーム
@@ -115,4 +112,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         Output
     }
-}

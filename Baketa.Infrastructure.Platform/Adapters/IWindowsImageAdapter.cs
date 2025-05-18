@@ -5,8 +5,8 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using System.Drawing;
 using System.Drawing.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有の画像実装と抽象化レイヤーの間のアダプターインターフェース
     /// </summary>
@@ -73,4 +73,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <exception cref="ArgumentException">無効な画像データの場合</exception>
         Task<IAdvancedImage> CreateAdvancedImageFromFileAsync(string filePath);
     }
-}

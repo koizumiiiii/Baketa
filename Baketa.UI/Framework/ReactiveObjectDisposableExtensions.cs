@@ -2,8 +2,8 @@ using System;
 using System.Reactive.Disposables;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// ReactiveObjectに対するDisposable拡張メソッド
     /// </summary>
@@ -24,4 +24,3 @@ namespace Baketa.UI.Framework
             return This;
         }
     }
-}

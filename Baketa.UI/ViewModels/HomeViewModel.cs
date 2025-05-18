@@ -9,8 +9,8 @@ using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// ホーム画面のビューモデル
     /// </summary>
@@ -256,4 +256,3 @@ namespace Baketa.UI.ViewModels
             await Task.CompletedTask.ConfigureAwait(false);
         }
     }
-}

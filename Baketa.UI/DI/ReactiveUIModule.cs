@@ -6,8 +6,8 @@ using ReactiveUI;
 using Splat;
 using Splat.Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.UI.DI
-{
+namespace Baketa.UI.DI;
+
     /// <summary>
     /// ReactiveUIサービスを登録するモジュール
     /// </summary>
@@ -49,4 +49,3 @@ namespace Baketa.UI.DI
             return services;
         }
     }
-}

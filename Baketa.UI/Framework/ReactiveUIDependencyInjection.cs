@@ -8,8 +8,8 @@ using ReactiveUI;
 using Splat;
 using Splat.Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// ReactiveUI依存性注入設定
     /// </summary>
@@ -82,4 +82,3 @@ namespace Baketa.UI.Framework
             return services;
         }
     }
-}

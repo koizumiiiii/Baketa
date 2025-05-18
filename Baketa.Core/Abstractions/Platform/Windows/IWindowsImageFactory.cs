@@ -2,8 +2,8 @@ using System;
 using System.Drawing;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Platform.Windows
-{
+namespace Baketa.Core.Abstractions.Platform.Windows;
+
     /// <summary>
     /// Windows画像ファクトリインターフェース
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// <returns>Windows画像</returns>
         Task<IWindowsImage> CreateEmptyAsync(int width, int height, Color? backgroundColor = null);
     }
-}

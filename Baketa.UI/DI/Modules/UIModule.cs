@@ -7,8 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.UI.DI.Modules
-{
+namespace Baketa.UI.DI.Modules;
+
     /// <summary>
     /// UIレイヤーのサービスを登録するモジュール。
     /// ViewModelやUI関連サービスの実装が含まれます。
@@ -121,4 +121,3 @@ namespace Baketa.UI.DI.Modules
             // 他のモジュールはApplicationModuleを通じて間接的に依存
         }
     }
-}

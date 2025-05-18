@@ -6,8 +6,8 @@ using Baketa.Core.Translation.Models;
 // 名前空間エイリアスの定義
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳サービスのインターフェース
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.Core.Translation.Abstractions
             string? preferredEngine = null,
             CancellationToken cancellationToken = default);
     }
-}

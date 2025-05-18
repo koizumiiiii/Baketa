@@ -26,8 +26,8 @@ using IAdvancedImage = Baketa.Core.Abstractions.Imaging.IAdvancedImage;
 using ImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
 using Size = System.Drawing.Size;
 
-namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv;
+
     /// <summary>
     /// WindowsOpenCvWrapperの単体テスト
     /// </summary>
@@ -513,4 +513,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
 
         #endregion
     }
-}

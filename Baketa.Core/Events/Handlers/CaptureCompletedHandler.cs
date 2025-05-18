@@ -2,8 +2,8 @@ using Baketa.Core.Events.EventTypes;
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events.Handlers
-{
+namespace Baketa.Core.Events.Handlers;
+
     /// <summary>
     /// キャプチャ完了イベントハンドラー
     /// </summary>
@@ -38,4 +38,3 @@ namespace Baketa.Core.Events.Handlers
             // ここで次のステップ（OCR処理など）を開始するコードを追加することも可能
         }
     }
-}

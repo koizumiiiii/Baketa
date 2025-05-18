@@ -3,8 +3,8 @@ using Baketa.Core.Models.OCR;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// OCR完了イベント
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Events.EventTypes
         /// <inheritdoc />
         public override string Category => "OCR";
     }
-}

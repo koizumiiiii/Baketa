@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// テキスト検出パラメータ
     /// </summary>
@@ -165,4 +165,3 @@ namespace Baketa.Core.Abstractions.OCR
             return defaultValue;
         }
     }
-}

@@ -10,8 +10,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging.Pipeline
-{
+namespace Baketa.Core.Tests.Imaging.Pipeline;
+
     public class PipelineProfileManagerTests
     {
         private readonly Mock<ILogger<PipelineProfileManager>> _loggerMock;
@@ -207,4 +207,3 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             Assert.Null(exception);
         }
     }
-}

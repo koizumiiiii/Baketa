@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Microsoft.Extensions.Logging;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
-namespace Baketa.Core.Abstractions.OCR.TextDetection
-{
+namespace Baketa.Core.Abstractions.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域検出の基本実装クラス
     /// </summary>
@@ -142,4 +142,3 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection
             return Task.CompletedTask;
         }
     }
-}

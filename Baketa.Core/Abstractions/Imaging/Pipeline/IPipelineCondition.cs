@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインの条件評価を表すインターフェース
     /// </summary>
@@ -20,4 +20,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         string Description { get; }
     }
-}

@@ -6,8 +6,7 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
     /// <summary>
     /// 翻訳エンジン検出サービスのインターフェース
     /// </summary>
@@ -49,4 +48,3 @@ namespace Baketa.Core.Translation.Abstractions
         /// <returns>言語検出エンジン、見つからない場合はnull</returns>
         Task<ITranslationEngine?> GetBestLanguageDetectionEngineAsync();
     }
-}

@@ -5,8 +5,8 @@ using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// 翻訳イベントをログに記録するハンドラー
     /// </summary>
@@ -116,4 +116,3 @@ namespace Baketa.Core.Translation.Events
             return text[..maxLength] + "...";
         }
     }
-}

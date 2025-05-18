@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Common
-{
+namespace Baketa.Core.Abstractions.Common;
+
     /// <summary>
     /// ロガーアダプターインターフェース
     /// </summary>
@@ -96,4 +96,3 @@ namespace Baketa.Core.Abstractions.Common
         /// </summary>
         Fatal
     }
-}

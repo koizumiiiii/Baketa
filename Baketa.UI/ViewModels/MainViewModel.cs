@@ -2,8 +2,8 @@ using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
 using System;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// メインビューモデル
     /// </summary>
@@ -37,4 +37,3 @@ namespace Baketa.UI.ViewModels
             _logInitialized(_logger, null);
         }
     }
-}

@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.DI.Attributes
-{
+namespace Baketa.Core.DI.Attributes;
+
     /// <summary>
     /// アセンブリスキャンによる自動登録の対象となるモジュールを識別する属性。
     /// </summary>
@@ -15,4 +15,3 @@ namespace Baketa.Core.DI.Attributes
         {
         }
     }
-}

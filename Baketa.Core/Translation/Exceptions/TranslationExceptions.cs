@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Translation.Exceptions
-{
+namespace Baketa.Core.Translation.Exceptions;
+
     /// <summary>
     /// 翻訳システムの基底例外クラス
     /// </summary>
@@ -372,4 +372,3 @@ namespace Baketa.Core.Translation.Exceptions
         {
         }
     }
-}

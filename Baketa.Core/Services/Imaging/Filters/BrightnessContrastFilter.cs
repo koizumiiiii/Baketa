@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// 明度・コントラスト調整フィルター
     /// </summary>
@@ -59,4 +59,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return await inputImage.EnhanceAsync(enhancementOptions).ConfigureAwait(false);
         }
     }
-}

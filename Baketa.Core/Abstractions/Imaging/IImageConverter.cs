@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 異なる画像表現間の変換を行うインターフェース
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// <returns>変換器が存在する場合はtrue、そうでない場合はfalse</returns>
         bool HasConverter<TSource, TTarget>();
     }
-}

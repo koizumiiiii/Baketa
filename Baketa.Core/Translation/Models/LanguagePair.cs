@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Translation.Models
-{
+namespace Baketa.Core.Translation.Models;
+
     /// <summary>
     /// 翻訳の言語ペア(ソース言語と対象言語のペア)を表すクラス
     /// </summary>
@@ -119,4 +119,3 @@ namespace Baketa.Core.Translation.Models
             return new LanguagePair { SourceLanguage = Language.FromCode(parts[0]), TargetLanguage = Language.FromCode(parts[1]) };
         }
     }
-}

@@ -5,8 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// イベント集約器の実装
     /// </summary>
@@ -151,4 +151,3 @@ namespace Baketa.UI.Framework.Events
             }
         }
     }
-}

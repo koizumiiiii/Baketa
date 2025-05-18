@@ -12,8 +12,8 @@ using Baketa.Core.Abstractions.Translation;
 using TransModels = Baketa.Core.Translation.Models;
 
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// 翻訳エンジンアダプター
     /// </summary>
@@ -254,4 +254,3 @@ namespace Baketa.Core.Translation.Common
             }
         }
     }
-}

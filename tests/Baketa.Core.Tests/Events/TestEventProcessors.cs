@@ -1,7 +1,7 @@
 using Baketa.Core.Events;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// テスト用イベントプロセッサ
     /// </summary>
@@ -135,4 +135,3 @@ namespace Baketa.Core.Tests.Events
             CompletionCount = 0;
         }
     }
-}

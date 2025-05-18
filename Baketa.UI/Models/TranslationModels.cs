@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.UI.Models
-{
+namespace Baketa.UI.Models;
+
     /// <summary>
     /// 翻訳履歴アイテムのデータモデル
     /// </summary>
@@ -15,4 +15,3 @@ namespace Baketa.UI.Models
         public string Engine { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; } = DateTime.Now;
     }
-}
