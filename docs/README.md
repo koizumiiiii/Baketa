@@ -24,6 +24,8 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [依存性注入ガイドライン](2-development/guidelines/dependency-injection.md)
 - [名前空間構成ガイド](2-development/guidelines/namespace-migration.md)
 - [新名前空間ガイド](2-development/guidelines/new-namespace-guide.md)
+- [翻訳モデル名前空間移行ガイド](2-development/guidelines/translation-namespace-guide.md) *NEW*
+- [名前空間統一状況アップデート](2-development/guidelines/namespace-migration-update.md) *NEW*
 - [イベント集約機構の使用ガイド](2-development/guidelines/event-aggregator-usage.md)
 
 #### コーディング規約
@@ -71,6 +73,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 
 #### 翻訳システム
 - [翻訳エンジンインターフェース](3-architecture/translation/translation-interfaces.md)
+- [名前空間統一による改善](3-architecture/architecture-namespace-unification.md) *NEW*
 
 ### 4. テスト戦略
 
@@ -85,6 +88,13 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 開発過程での問題解決や注意点を記録したドキュメント集です。
 
 - [翻訳基盤実装ノート](development-notes/translation-implementation-notes.md) - 翻訳基盤実装時の名前空間問題やHttpClient依存関係の解決策
+- [名前空間統一の問題と計画](development-notes/namespace-unification-issue.md) - 翻訳モデルの名前空間競合問題とその解決計画
+- [名前空間統一タスク](development-notes/namespace-unification-tasks.md) - 名前空間統一プロジェクトのタスクリスト (完了済み)
+- [名前空間統一完了報告](development-notes/namespace-unification-completion-report.md) *NEW* - 名前空間統一プロジェクトの完了報告と学習した教訓
+
+## 最新の更新情報
+
+**2025年5月18日** - 翻訳モデルの名前空間統一プロジェクトが完了しました。すべての翻訳関連のデータモデルが `Baketa.Core.Translation.Models` 名前空間に統一され、型参照の曖昧さが排除されました。詳細は[名前空間統一完了報告](development-notes/namespace-unification-completion-report.md)を参照してください。
 
 ## ライセンス
 
