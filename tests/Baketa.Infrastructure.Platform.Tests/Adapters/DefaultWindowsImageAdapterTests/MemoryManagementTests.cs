@@ -7,8 +7,8 @@ using Baketa.Infrastructure.Platform.Adapters;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapterTests
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapterTests;
+
     /// <summary>
     /// DefaultWindowsImageAdapterのメモリ管理テスト
     /// </summary>
@@ -227,4 +227,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             GC.SuppressFinalize(this);
         }
     }
-}

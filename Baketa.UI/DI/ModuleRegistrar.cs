@@ -2,8 +2,8 @@ using Baketa.Core.DI;
 using Baketa.Application.DI.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.UI.DI
-{
+namespace Baketa.UI.DI;
+
     /// <summary>
     /// UIモジュール登録クラス
     /// </summary>
@@ -32,4 +32,3 @@ namespace Baketa.UI.DI
             return services;
         }
     }
-}

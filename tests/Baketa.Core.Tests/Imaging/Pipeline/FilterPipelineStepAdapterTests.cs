@@ -10,8 +10,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging.Pipeline
-{
+namespace Baketa.Core.Tests.Imaging.Pipeline;
+
 #pragma warning disable CA1849 // 非同期メソッド内での同期メソッドの使用（テストコードのため抑制）
     public class FilterPipelineStepAdapterTests
     {
@@ -197,4 +197,3 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
         }
     }
 #pragma warning restore CA1849
-}

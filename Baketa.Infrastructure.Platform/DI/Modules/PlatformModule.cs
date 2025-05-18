@@ -8,8 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Infrastructure.Platform.DI.Modules
-{
+namespace Baketa.Infrastructure.Platform.DI.Modules;
+
     /// <summary>
     /// プラットフォーム固有のサービスを登録するモジュール。
     /// Windowsプラットフォーム固有の実装が含まれます。
@@ -125,4 +125,3 @@ namespace Baketa.Infrastructure.Platform.DI.Modules
             // InfrastructureModuleはまだ使用できないため、直接CoreModuleに依存
         }
     }
-}

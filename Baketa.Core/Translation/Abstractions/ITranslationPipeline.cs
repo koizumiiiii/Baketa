@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳パイプラインのインターフェース
     /// 翻訳リクエストの処理フローを定義します
@@ -36,4 +36,3 @@ namespace Baketa.Core.Translation.Abstractions
             string? preferredEngine = null,
             CancellationToken cancellationToken = default);
     }
-}

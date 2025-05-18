@@ -1,7 +1,7 @@
 using Baketa.Core.Abstractions.Services;
 
-namespace Baketa.Core.Abstractions.Factories
-{
+namespace Baketa.Core.Abstractions.Factories;
+
     /// <summary>
     /// 翻訳エンジンファクトリーインターフェース
     /// </summary>
@@ -68,4 +68,3 @@ namespace Baketa.Core.Abstractions.Factories
         /// <returns>サポートされている場合はtrue</returns>
         bool IsLanguageSupported(string languageCode, bool asSource = true);
     }
-}

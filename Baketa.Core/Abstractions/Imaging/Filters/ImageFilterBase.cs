@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Filters
-{
+namespace Baketa.Core.Abstractions.Imaging.Filters;
+
     /// <summary>
     /// 画像フィルターの基底クラス
     /// </summary>
@@ -129,4 +129,3 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
         /// </summary>
         protected abstract void InitializeDefaultParameters();
     }
-}

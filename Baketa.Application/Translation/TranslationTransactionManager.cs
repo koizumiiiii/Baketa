@@ -6,8 +6,8 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Application.Translation
-{
+namespace Baketa.Application.Translation;
+
     /// <summary>
     /// 翻訳トランザクションを管理するクラス
     /// 翻訳処理の一貫性と整合性を確保します
@@ -425,4 +425,3 @@ namespace Baketa.Application.Translation
         /// </summary>
         public Dictionary<Guid, TranslationResponse> Responses { get; } = new();
     }
-}

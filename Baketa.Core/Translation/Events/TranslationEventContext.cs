@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// 翻訳イベント用のコンテキスト情報
     /// </summary>
@@ -96,4 +96,3 @@ namespace Baketa.Core.Translation.Events
             }
         }
     }
-}

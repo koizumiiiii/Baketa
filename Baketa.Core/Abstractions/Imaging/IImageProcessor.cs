@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 画像処理機能を提供するインターフェース
     /// </summary>
@@ -137,4 +137,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         public static bool operator !=(TextRegion left, TextRegion right) => !left.Equals(right);
     }
-}

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインで使用する画像フィルターのインターフェース
     /// IImagePipelineStepを拡張してフィルター固有の機能を提供します
@@ -27,4 +27,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>処理後の画像</returns>
         Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage);
     }
-}

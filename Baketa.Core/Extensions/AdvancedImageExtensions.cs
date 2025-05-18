@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Extensions
-{
+namespace Baketa.Core.Extensions;
+
     /// <summary>
     /// IAdvancedImageインターフェースの拡張メソッド
     /// </summary>
@@ -544,4 +544,3 @@ namespace Baketa.Core.Extensions
 
         #endregion
     }
-}

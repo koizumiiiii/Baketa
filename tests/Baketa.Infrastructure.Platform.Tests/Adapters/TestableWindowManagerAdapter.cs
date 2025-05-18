@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters;
+
     /// <summary>
     /// テスト用のWindowManagerAdapter拡張クラス
     /// モックの代わりにこのテスト用サブクラスを使用します
@@ -55,4 +55,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             return base.GetWindowTypeInternal(handle);
         }
     }
-}

@@ -5,8 +5,8 @@ using System.Linq;
 using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// IWindowManagerAdapterインターフェースの基本スタブ実装
     /// 注：実際の機能実装は後の段階で行います
@@ -144,4 +144,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             return WindowType.Normal;
         }
     }
-}

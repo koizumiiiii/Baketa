@@ -9,8 +9,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Cache
-{
+namespace Baketa.Core.Translation.Cache;
+
     /// <summary>
     /// メモリ内翻訳キャッシュ
     /// </summary>
@@ -138,14 +138,7 @@ namespace Baketa.Core.Translation.Cache
             
             // 有効期限を設定
             var expirationTime = expiration ?? _options.CacheExpiration();
-            if (expirationTime.HasValue)
-            {
-                entry.ExpiresAt = DateTime.UtcNow.Add(expirationTime.Value);
-            }
-            else
-            {
-                entry.ExpiresAt = null;
-            }
+            entry.ExpiresAt = expirationTime.HasValue ? DateTime.UtcNow.Add(expirationTime.Value) : null;
             
             // キャッシュに保存
             _cache[key] = entry.Clone();
@@ -275,9 +268,7 @@ namespace Baketa.Core.Translation.Cache
             var totalEntries = _cache.Count;
             var totalHits = _hits;
             var totalMisses = _misses;
-            var hitRate = totalHits + totalMisses > 0 
-                ? (float)totalHits / (totalHits + totalMisses) 
-                : 0f;
+            var hitRate = totalHits + totalMisses > 0 ? (float)totalHits / (totalHits + totalMisses) : 0f;
             
             var stats = new CacheStatistics
             {
@@ -299,10 +290,7 @@ namespace Baketa.Core.Translation.Cache
         /// </summary>
         /// <param name="entry">キャッシュエントリ</param>
         /// <returns>期限切れの場合はtrue</returns>
-        private static bool IsExpired(TranslationCacheEntry entry)
-        {
-            return entry.ExpiresAt != null && entry.ExpiresAt.Value < DateTime.UtcNow;
-        }
+        private static bool IsExpired(TranslationCacheEntry entry) => entry.ExpiresAt != null && entry.ExpiresAt < DateTime.UtcNow;
 
         /// <summary>
         /// 現在のキャッシュサイズを推定します
@@ -329,4 +317,3 @@ namespace Baketa.Core.Translation.Cache
             return total;
         }
     }
-}

@@ -10,8 +10,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// ピクセルベースの差分検出アルゴリズム（最も高精度だが処理負荷が高い）
     /// </summary>
@@ -403,4 +403,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             return regions;
         }
     }
-}

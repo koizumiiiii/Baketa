@@ -2,8 +2,8 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     /// <summary>
     /// 列挙型を整数値に変換するコンバーター
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.UI
             return null;
         }
     }
-}

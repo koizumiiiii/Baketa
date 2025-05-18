@@ -7,8 +7,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Filters
-{
+namespace Baketa.Infrastructure.Imaging.Filters;
+
     /// <summary>
     /// 画像フィルター実装の基底クラス
     /// </summary>
@@ -76,8 +76,8 @@ namespace Baketa.Infrastructure.Imaging.Filters
         /// <returns>パラメータ定義のコレクション</returns>
         protected virtual IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
         {
-            // サブクラスでオーバーライドして実装
-            return Array.Empty<PipelineStepParameter>();
+        // IDE0300/CA1825警告に対応
+        return Array.Empty<PipelineStepParameter>();
         }
         
         /// <summary>
@@ -245,4 +245,3 @@ namespace Baketa.Infrastructure.Imaging.Filters
             _logger?.Log(logLevel, "{Message}", formattedMessage);
         }
     }
-}

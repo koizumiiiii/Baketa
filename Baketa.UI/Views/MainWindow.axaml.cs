@@ -11,12 +11,11 @@ using Baketa.UI.ViewModels;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアス
 using CoreEvents = Baketa.Core.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// メインウィンドウのコードビハインド
     /// </summary>
@@ -205,4 +204,3 @@ namespace Baketa.UI.Views
             return _mainWindow.OnNotificationReceived(eventData);
         }
     }
-}

@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Platform
-{
+namespace Baketa.Core.Abstractions.Platform;
+
     /// <summary>
     /// プラットフォーム抽象化の基本インターフェース
     /// </summary>
@@ -39,4 +39,3 @@ namespace Baketa.Core.Abstractions.Platform
         /// <returns>取得できた場合はtrue</returns>
         bool TryGetService<T>(out T service) where T : class;
     }
-}

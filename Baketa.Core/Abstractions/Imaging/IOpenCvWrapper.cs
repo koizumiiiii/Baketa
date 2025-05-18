@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// OpenCV機能へのラッパーインターフェース
     /// </summary>
@@ -299,4 +299,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         BlackHat
     }
-}

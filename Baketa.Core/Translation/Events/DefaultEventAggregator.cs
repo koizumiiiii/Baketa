@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// デフォルトイベント集約器
     /// </summary>
@@ -241,4 +241,3 @@ namespace Baketa.Core.Translation.Events
             }
         }
     }
-}

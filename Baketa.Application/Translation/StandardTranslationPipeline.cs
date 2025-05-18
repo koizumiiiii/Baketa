@@ -15,8 +15,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Application.Translation
-{
+namespace Baketa.Application.Translation;
+
     /// <summary>
     /// 標準翻訳パイプライン
     /// 翻訳パイプラインは、翻訳リクエストを受け取り、キャッシュ確認、翻訳実行、
@@ -988,4 +988,3 @@ namespace Baketa.Application.Translation
 #pragma warning restore CA2016
     }
 #pragma warning restore CA2016 // CancellationToken警告の拘束を解除
-}

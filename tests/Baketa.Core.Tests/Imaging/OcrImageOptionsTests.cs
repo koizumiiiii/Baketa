@@ -2,8 +2,8 @@ using System;
 using Baketa.Core.Abstractions.Imaging;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging
-{
+namespace Baketa.Core.Tests.Imaging;
+
     /// <summary>
     /// OcrImageOptionsクラスの単体テスト
     /// </summary>
@@ -112,4 +112,3 @@ namespace Baketa.Core.Tests.Imaging
                 OcrImageOptions.CreatePreset((OcrPreset)999));
         }
     }
-}

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアスを使用して衝突を解決
 using CoreEvents = Baketa.Core.Events;
 using UIEvents = Baketa.UI.Framework.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
@@ -12,8 +11,8 @@ using TranslationEvents = Baketa.Core.Events.TranslationEvents;
 using CaptureEvents = Baketa.Core.Events.CaptureEvents;
 using Baketa.UI.Framework.ReactiveUI; 
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// メインウィンドウのビューモデル
     /// </summary>
@@ -471,7 +470,3 @@ namespace Baketa.UI.ViewModels
             await Task.CompletedTask.ConfigureAwait(false);
         }
     }
-    
-    // 削除: OpenAccessibilitySettingsRequestedEventを直接定義する代わりに
-    // Core.Eventsまたは他の一貫した場所で定義する
-}

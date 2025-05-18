@@ -1,8 +1,8 @@
 using System;
 using System.Drawing;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// オーバーレイ更新イベント
     /// </summary>
@@ -62,4 +62,3 @@ namespace Baketa.Core.Events.EventTypes
         /// <inheritdoc />
         public override string Category => "UI";
     }
-}

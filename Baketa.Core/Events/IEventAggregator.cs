@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events
-{
+namespace Baketa.Core.Events;
+
     /// <summary>
     /// イベント集約インターフェース
     /// </summary>
@@ -29,4 +29,3 @@ namespace Baketa.Core.Events
         /// <param name="processor">イベントプロセッサ</param>
         void Unsubscribe<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
-}

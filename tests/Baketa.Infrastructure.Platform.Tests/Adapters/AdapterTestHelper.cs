@@ -6,8 +6,8 @@ using System.Drawing.Imaging;
 using System.Reflection;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters;
+
     /// <summary>
     /// アダプターテスト用のヘルパークラス
     /// </summary>
@@ -165,4 +165,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             bitmap.Save(filePath, ImageFormat.Png);
         }
     }
-}

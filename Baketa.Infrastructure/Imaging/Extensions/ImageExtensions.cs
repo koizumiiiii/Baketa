@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Imaging.Extensions
-{
+namespace Baketa.Infrastructure.Imaging.Extensions;
+
     /// <summary>
     /// 画像操作に関する拡張メソッド
     /// </summary>
@@ -123,4 +123,3 @@ namespace Baketa.Infrastructure.Imaging.Extensions
             _metadataStorage.Remove(image);
         }
     }
-}

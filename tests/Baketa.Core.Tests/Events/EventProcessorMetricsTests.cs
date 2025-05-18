@@ -2,8 +2,8 @@ using Baketa.Core.Events.Implementation;
 using System.Diagnostics;
 using Xunit;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// イベントプロセッサメトリクスのテスト
     /// </summary>
@@ -114,4 +114,3 @@ namespace Baketa.Core.Tests.Events
 #pragma warning restore CS8625
         }
     }
-}

@@ -4,8 +4,8 @@ using System.Linq.Expressions;
 using ReactiveUI.Validation.Helpers;
 using Baketa.UI.Framework.ReactiveUI;
 
-namespace Baketa.UI.Framework.Validation
-{
+namespace Baketa.UI.Framework.Validation;
+
     /// <summary>
     /// シンプルなバリデーションヘルパー
     /// </summary>
@@ -29,4 +29,3 @@ namespace Baketa.UI.Framework.Validation
                 validationObject, propertyExpression);
         }
     }
-}

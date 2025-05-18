@@ -5,13 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間の衝突を避けるために完全修飾名を使用
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Imaging.Pipeline;
+
     /// <summary>
     /// 画像処理パイプラインの実装
     /// </summary>
@@ -277,24 +276,13 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
         /// <summary>
         /// フィルターエラーを処理するヘルパーメソッド
         /// </summary>
-        private async Task HandleFilterErrorAsync(
+        private async Task<IAdvancedImage?> HandleFilterErrorAsync(
             IImagePipelineFilter filter,
             Exception ex,
-            PipelineContext context,
-            IAdvancedImage currentImage,
-            Dictionary<string, IAdvancedImage> intermediateResults,
-            Stopwatch stopwatch,
-            int stepIndex,
-            IntermediateResultMode resultMode)
+            PipelineContext context)
         {
             // 非同期メソッドを使用
-            var errorResult = await EventListener.OnStepErrorAsync(filter, ex, context).ConfigureAwait(false);
-            
-            // エラーハンドラーから代替画像が提供された場合
-            if (errorResult != null)
-            {
-                currentImage = errorResult;
-            }
+            return await EventListener.OnStepErrorAsync(filter, ex, context).ConfigureAwait(false);
         }
         
         /// <summary>
@@ -658,4 +646,3 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
             return _wrappedStep.GetOutputImageInfo(input);
         }
     }
-}

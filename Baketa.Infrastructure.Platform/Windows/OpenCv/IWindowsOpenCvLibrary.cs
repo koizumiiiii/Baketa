@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// Windows環境でのOpenCVライブラリの機能を提供するインターフェース
     /// </summary>
@@ -96,4 +96,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// </summary>
         public float StrokeWidth { get; set; }
     }
-}

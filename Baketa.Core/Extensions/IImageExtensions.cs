@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Extensions
-{
+namespace Baketa.Core.Extensions;
+
     /// <summary>
     /// IImage インターフェースの拡張メソッド
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Extensions
             return await image.ToByteArrayAsync().ConfigureAwait(false);
         }
     }
-}

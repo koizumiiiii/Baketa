@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Capture
-{
+namespace Baketa.Core.Abstractions.Capture;
+
     /// <summary>
     /// 画像間の差分を検出するインターフェース
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.Core.Abstractions.Capture
         /// <returns>消失したテキスト領域のリスト</returns>
         Task<IReadOnlyList<Rectangle>> DetectTextDisappearanceAsync(IImage previousImage, IImage currentImage, CancellationToken cancellationToken = default);
     }
-}

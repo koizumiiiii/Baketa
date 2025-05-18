@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Abstractions.Translation
-{
+namespace Baketa.Core.Abstractions.Translation;
+
     /// <summary>
     /// 翻訳サービスの機能を定義するインターフェース
     /// アプリケーション層でこのサービスを使用して、適切なエンジンを選択し翻訳を実行します
@@ -64,4 +64,3 @@ namespace Baketa.Core.Abstractions.Translation
             string? context = null,
             CancellationToken cancellationToken = default);
     }
-}

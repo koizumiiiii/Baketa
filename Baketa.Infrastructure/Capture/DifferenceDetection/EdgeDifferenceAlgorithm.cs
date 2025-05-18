@@ -10,8 +10,8 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Imaging;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// エッジベースの差分検出アルゴリズム（テキスト領域に特化）
     /// </summary>
@@ -260,4 +260,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             return disappearedRegions.AsReadOnly();
         }
     }
-}

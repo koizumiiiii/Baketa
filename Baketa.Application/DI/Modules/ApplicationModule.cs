@@ -8,8 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// アプリケーションレイヤーのサービスを登録するモジュール。
     /// ビジネスロジックやユースケースの実装が含まれます。
@@ -148,4 +148,3 @@ namespace Baketa.Application.DI.Modules
             // 現時点ではInfrastructureModuleは参照できない
         }
     }
-}

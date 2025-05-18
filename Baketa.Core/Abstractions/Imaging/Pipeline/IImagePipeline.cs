@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// 画像処理パイプラインを表すインターフェース
     /// </summary>
@@ -96,4 +96,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         IPipelineEventListener EventListener { get; set; }
     }
-}

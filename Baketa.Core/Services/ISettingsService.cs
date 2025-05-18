@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Services
-{
+namespace Baketa.Core.Services;
+
     /// <summary>
     /// 設定管理サービスインターフェース
     /// </summary>
@@ -50,4 +50,3 @@ namespace Baketa.Core.Services
         /// <returns>読み込みタスク</returns>
         Task ReloadAsync();
     }
-}

@@ -8,8 +8,8 @@ using Baketa.Core.DI.Attributes;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Baketa.Core.Tests.DI
-{
+namespace Baketa.Core.Tests.DI;
+
     /// <summary>
     /// モジュール優先順位機能の単体テスト
     /// </summary>
@@ -97,4 +97,3 @@ namespace Baketa.Core.Tests.DI
 
         #endregion
     }
-}

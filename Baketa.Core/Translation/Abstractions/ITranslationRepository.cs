@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳結果リポジトリインターフェース
     /// </summary>
@@ -107,4 +107,3 @@ namespace Baketa.Core.Translation.Abstractions
         Task<bool> ImportDatabaseAsync(string filePath, MergeStrategy mergeStrategy);
         */
     }
-}

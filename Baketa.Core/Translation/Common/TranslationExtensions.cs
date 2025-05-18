@@ -5,8 +5,8 @@ using System.Text;
 using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// 翻訳関連モデルの拡張メソッド
     /// </summary>
@@ -226,4 +226,3 @@ namespace Baketa.Core.Translation.Common
             return language?.Code ?? "Unknown";
         }
     }
-}

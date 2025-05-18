@@ -6,12 +6,10 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 
-// 名前空間エイリアスを定義
-
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Infrastructure.Translation
-{
+namespace Baketa.Infrastructure.Translation;
+
     /// <summary>
     /// 翻訳サービスの標準実装
     /// </summary>
@@ -166,4 +164,3 @@ namespace Baketa.Infrastructure.Translation
                 .ConfigureAwait(false);
         }
     }
-}

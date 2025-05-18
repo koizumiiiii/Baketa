@@ -4,13 +4,12 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域集約実装クラス
     /// </summary>
@@ -293,19 +292,12 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             
             if (aspectRatio >= 0.2f && aspectRatio <= 20.0f)
             {
-                // 横長のテキストに高いスコア（一般的なテキスト行はやや横長）
-                if (aspectRatio > 1.0f && aspectRatio < 10.0f)
-                {
-                    aspectScore = 1.0f - (Math.Min(aspectRatio - 1.0f, 9.0f) / 9.0f) * 0.5f;
-                }
-                else if (aspectRatio <= 1.0f && aspectRatio >= 0.2f)
-                {
-                    aspectScore = 0.5f + (aspectRatio - 0.2f) / (1.0f - 0.2f) * 0.5f;
-                }
-                else
-                {
-                    aspectScore = 0.5f;
-                }
+                // 横長のテキストに高いスコアの計算を三項演算子で実装
+                aspectScore = aspectRatio > 1.0f && aspectRatio < 10.0f ?
+                    1.0f - (Math.Min(aspectRatio - 1.0f, 9.0f) / 9.0f) * 0.5f :
+                    aspectRatio <= 1.0f && aspectRatio >= 0.2f ?
+                        0.5f + (aspectRatio - 0.2f) / (1.0f - 0.2f) * 0.5f :
+                        0.5f;
             }
             
             // サイズ評価
@@ -318,9 +310,9 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             if (region.Contour != null)
             {
                 // 輪郭の長さと面積の比率から複雑さを評価
-                // Point配列の長さはCount プロパティを使用
-                float perimeter = region.Contour.Count;
-                float perimeterAreaRatio = perimeter / Math.Max(area, 1.0f);
+                // ディスカード変数を使用してパフォーマンスを維持
+                _ = region.Contour.Count; // 輪郭の長さ
+                float perimeterAreaRatio = region.Contour.Count / Math.Max(area, 1.0f);
                 
                 complexityScore = Math.Max(0.0f, 1.0f - Math.Min(perimeterAreaRatio * 0.1f, 1.0f));
             }
@@ -337,13 +329,16 @@ namespace Baketa.Infrastructure.OCR.TextDetection
         /// <returns>空間配置スコア（0.0～1.0）</returns>
         private static float CalculateSpatialScore(OCRTextRegion region, IReadOnlyList<OCRTextRegion> allRegions)
         {
-            if (allRegions.Count <= 1)
-                return 0.5f; // デフォルト値
+            return allRegions.Count <= 1 ? 0.5f : CalculateSpatialScoreInternal(region, allRegions); // デフォルト値または計算値
                 
-            // 水平方向の整列スコア
-            float alignmentScore = 0.0f;
-            float proximityScore = 0.0f;
-            
+        }
+        
+        /// <summary>
+        /// 空間配置スコアの内部計算メソッド
+        /// </summary>
+        private static float CalculateSpatialScoreInternal(OCRTextRegion region, IReadOnlyList<OCRTextRegion> allRegions)
+        {
+            // 水平方向の整列をカウントする変数
             int alignedCount = 0;
             int closeCount = 0;
             
@@ -375,13 +370,9 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 }
             }
             
-            // 整列スコアを計算
-            alignmentScore = Math.Min(alignedCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
-            
-            // 近接スコアを計算
-            proximityScore = Math.Min(closeCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
-            
-            // 総合スコア
+            // 各スコアを計算して総合スコアを返す
+            float alignmentScore = Math.Min(alignedCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
+            float proximityScore = Math.Min(closeCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
             return alignmentScore * 0.6f + proximityScore * 0.4f;
         }
         
@@ -470,4 +461,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return mergedRegions;
         }
     }
-}

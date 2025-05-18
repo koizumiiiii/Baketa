@@ -9,8 +9,7 @@ using Microsoft.Extensions.Logging;
 
 #pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
     /// <summary>
     /// パイプラインステップの基底クラス
     /// </summary>
@@ -310,6 +309,5 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             };
         }
     }
-}
 
 #pragma warning restore CA2208

@@ -1,8 +1,8 @@
 using System;
 using Baketa.Core.Common;
 
-namespace Baketa.Core.Examples
-{
+namespace Baketa.Core.Examples;
+
     /// <summary>
     /// IDisposableパターンの適切な実装例
     /// </summary>
@@ -65,4 +65,3 @@ namespace Baketa.Core.Examples
             // リソースを使用するロジック
         }
     }
-}

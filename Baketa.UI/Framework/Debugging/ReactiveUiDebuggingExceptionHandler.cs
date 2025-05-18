@@ -1,8 +1,8 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.UI.Framework.Debugging
-{
+namespace Baketa.UI.Framework.Debugging;
+
     /// <summary>
     /// ReactiveUIのデバッグ用例外ハンドラー
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.UI.Framework.Debugging
             #endif
         }
     }
-}

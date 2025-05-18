@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Common
-{
+namespace Baketa.Core.Abstractions.Common;
+
     /// <summary>
     /// 初期化可能なオブジェクトを表すインターフェース
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Abstractions.Common
         /// </summary>
         Task ShutdownAsync();
     }
-}

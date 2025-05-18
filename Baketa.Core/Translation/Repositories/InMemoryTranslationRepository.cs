@@ -8,8 +8,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Repositories
-{
+namespace Baketa.Core.Translation.Repositories;
+
     /// <summary>
     /// インメモリ翻訳リポジトリ
     /// </summary>
@@ -906,4 +906,3 @@ namespace Baketa.Core.Translation.Repositories
             }
         }
     }
-}

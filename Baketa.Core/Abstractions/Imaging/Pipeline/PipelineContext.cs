@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプライン実行コンテキスト
     /// </summary>
@@ -154,4 +154,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             public Task OnPipelineErrorAsync(IImagePipeline pipeline, Exception exception, PipelineContext context) => Task.CompletedTask;
         }
     }
-}

@@ -6,8 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Infrastructure.DI.Modules
-{
+namespace Baketa.Infrastructure.DI.Modules;
+
     /// <summary>
     /// インフラストラクチャレイヤーのサービスを登録するモジュール。
     /// 外部サービス連携やプラットフォーム非依存の実装が含まれます。
@@ -125,4 +125,3 @@ namespace Baketa.Infrastructure.DI.Modules
             yield return typeof(CoreModule);
         }
     }
-}

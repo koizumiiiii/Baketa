@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 画像強調オプション
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         public bool OptimizeForTextDetection { get; set; }
     }
-}

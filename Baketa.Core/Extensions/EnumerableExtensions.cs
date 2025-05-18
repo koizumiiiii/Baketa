@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
-namespace Baketa.Core.Extensions
-{
+namespace Baketa.Core.Extensions;
+
     /// <summary>
     /// IEnumerable拡張メソッドを提供します
     /// </summary>
@@ -98,4 +98,3 @@ namespace Baketa.Core.Extensions
             return concreteList.Any(predicate);
         }
     }
-}

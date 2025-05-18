@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Capture
-{
+namespace Baketa.Core.Abstractions.Capture;
+
     /// <summary>
     /// 差分検出アルゴリズムインターフェース
     /// </summary>
@@ -57,4 +57,3 @@ namespace Baketa.Core.Abstractions.Capture
         /// </summary>
         public IReadOnlyList<Rectangle> DisappearedTextRegions { get; set; } = new List<Rectangle>();
     }
-}

@@ -10,8 +10,8 @@ using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// 差分検出の可視化ツール（デバッグ用）
     /// </summary>
@@ -233,4 +233,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             // 例: await image.DrawTextAsync(text, x, y, textColor, backgroundColor)
         }
     }
-}

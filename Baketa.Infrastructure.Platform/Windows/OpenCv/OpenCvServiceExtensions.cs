@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// OpenCVサービスの登録に関する拡張メソッドを提供します
     /// </summary>
@@ -80,4 +80,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// </summary>
         public TextDetectionParams DefaultEdgeBasedParameters { get; set; } = TextDetectionParams.CreateForMethod(Baketa.Core.Abstractions.OCR.TextDetectionMethod.EdgeBased);
     }
-}

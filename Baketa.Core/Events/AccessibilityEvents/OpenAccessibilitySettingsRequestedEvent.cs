@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events.AccessibilityEvents
-{
+namespace Baketa.Core.Events.AccessibilityEvents;
+
     /// <summary>
     /// アクセシビリティ設定画面を開くリクエストイベント
     /// </summary>
@@ -17,4 +17,3 @@ namespace Baketa.Core.Events.AccessibilityEvents
         /// </summary>
         public override string Category => "UI.Navigation";
     }
-}

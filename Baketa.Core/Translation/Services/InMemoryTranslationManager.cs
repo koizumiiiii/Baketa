@@ -8,8 +8,8 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.Services
-{
+namespace Baketa.Core.Translation.Services;
+
     /// <summary>
     /// インメモリ翻訳マネージャー
     /// </summary>
@@ -339,4 +339,3 @@ namespace Baketa.Core.Translation.Services
             }
         }
     }
-}

@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// 翻訳イベントハンドラーインターフェース
     /// </summary>
@@ -55,4 +55,3 @@ namespace Baketa.Core.Translation.Events
             return _handler.HandleAsync(eventData);
         }
     }
-}

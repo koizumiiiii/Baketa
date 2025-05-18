@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Platform
-{
+namespace Baketa.Core.Abstractions.Platform;
+
     /// <summary>
     /// ファイルシステム操作のためのサービスインターフェース
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.Core.Abstractions.Platform
         /// <returns>ファイルパスの配列</returns>
         Task<string[]> GetFilesAsync(string directory, string searchPattern);
     }
-}

@@ -9,8 +9,8 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging.Filters.OCR;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// OCR最適化パイプラインを構築するビルダークラス
     /// </summary>
@@ -246,4 +246,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline
 #pragma warning restore CA1062
     }
 #pragma warning restore CA1062
-}

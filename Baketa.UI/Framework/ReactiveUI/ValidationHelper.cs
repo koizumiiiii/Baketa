@@ -8,8 +8,8 @@ using ReactiveUI.Validation.Components;
 using DynamicData;
 using System.Reflection;
 
-namespace Baketa.UI.Framework.ReactiveUI
-{
+namespace Baketa.UI.Framework.ReactiveUI;
+
     /// <summary>
     /// ReactiveUI.Validationのユーティリティクラス
     /// バージョン間の互換性を確保するために独自実装を提供
@@ -131,4 +131,3 @@ namespace Baketa.UI.Framework.ReactiveUI
             throw new ArgumentException("Expression is not a property expression", nameof(propertyExpression));
         }
     }
-}

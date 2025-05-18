@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳エンジンの基本実装を提供する機能を定義するインターフェース
     /// </summary>
@@ -32,4 +32,3 @@ namespace Baketa.Core.Translation.Abstractions
         /// <returns>サポートされている言語ペアのコレクション</returns>
         Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsInternalAsync();
     }
-}

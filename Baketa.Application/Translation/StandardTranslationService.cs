@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Translation.Models;
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Application.Translation
-{
+namespace Baketa.Application.Translation;
+
     /// <summary>
     /// 標準翻訳サービス
     /// 翻訳パイプラインを使用してITranslationServiceを実装します
@@ -180,4 +180,3 @@ namespace Baketa.Application.Translation
             };
         }
     }
-}

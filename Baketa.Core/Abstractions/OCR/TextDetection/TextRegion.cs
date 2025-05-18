@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.OCR.TextDetection
-{
+namespace Baketa.Core.Abstractions.OCR.TextDetection;
+
     /// <summary>
     /// 検出されたテキスト領域を表すクラス
     /// </summary>
@@ -132,4 +132,3 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection
             return $"TextRegion [ID={RegionId.ToString()[..8]}..., Bounds={{{Bounds.X}, {Bounds.Y}, {Bounds.Width}, {Bounds.Height}}}, Type={RegionType}, Confidence={ConfidenceScore:F2}]";
         }
     }
-}

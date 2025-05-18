@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Core.DI.Modules
-{
+namespace Baketa.Core.DI.Modules;
+
     /// <summary>
     /// コアレイヤーのサービスを登録するモジュール。
     /// 最も基本的なサービスとインターフェースが含まれます。
@@ -78,4 +78,3 @@ namespace Baketa.Core.DI.Modules
             // 例: services.AddSingleton<IProfileManager, ProfileManager>();
         }
     }
-}

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインプロファイルの管理を担当するインターフェース
     /// </summary>
@@ -41,4 +41,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// </summary>
         void ClearCache();
     }
-}

@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Events
-{
+namespace Baketa.Core.Abstractions.Events;
+
     /// <summary>
     /// イベント処理インターフェース
     /// </summary>
@@ -24,4 +24,3 @@ namespace Baketa.Core.Abstractions.Events
         /// </summary>
         bool SynchronousExecution { get; }
     }
-}

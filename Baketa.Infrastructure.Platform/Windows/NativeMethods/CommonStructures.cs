@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 
-namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
-{
+namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
+
     /// <summary>
     /// RECT構造体
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
         
         public override string ToString() => $"{Width}x{Height}";
     }
-}

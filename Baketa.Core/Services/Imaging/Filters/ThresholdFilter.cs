@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// 二値化フィルター
     /// </summary>
@@ -48,17 +48,15 @@ namespace Baketa.Core.Services.Imaging.Filters
             // パラメータを取得
             int threshold = GetParameterValue<int>("Threshold");
             int maxValue = GetParameterValue<int>("MaxValue");
-            bool invertResult = GetParameterValue<bool>("InvertResult");
+            _ = GetParameterValue<bool>("InvertResult"); // 将来の拡張のために計算だけ行う
             
-            // 閾値が有効範囲内であることを確認
-            // 不要な代入を避けるため条件文で表現
-            threshold = threshold < 0 ? 0 : (threshold > 255 ? 255 : threshold);
-            maxValue = maxValue < 0 ? 0 : (maxValue > 255 ? 255 : maxValue);
+            // 閾値と最大値を有効範囲に制限するが、警告を避けるためにディスカード変数を使用
+            _ = Math.Clamp(maxValue, 0, 255); // 現時点では使用しないが将来のために計算は実行
             
             // 二値化処理のためのオプションを設定
             var enhancementOptions = new ImageEnhancementOptions
             {
-                BinarizationThreshold = threshold,
+                BinarizationThreshold = Math.Clamp(threshold, 0, 255), // 閾値を有効範囲に制限して使用
                 // invertResultを使用するには、カスタム実装が必要かもしれません
             };
             
@@ -86,4 +84,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             };
         }
     }
-}

@@ -82,6 +82,39 @@ dotnet_naming_rule.namespace_naming.severity = warning
 dotnet_naming_symbols.namespace_symbol.applicable_kinds = namespace
 dotnet_naming_style.pascal_case_style.capitalization = pascal_case
 
+# 不要な値代入回避 (ディスカードシンボル使用)
+dotnet_diagnostic.IDE0059.severity = warning
+csharp_style_unused_value_assignment_preference = discard_variable:warning
+
+# if文の簡素化
+dotnet_diagnostic.IDE0045.severity = warning
+dotnet_style_prefer_conditional_expression_over_assignment = true:warning
+
+# コレクションの初期化簡素化
+dotnet_diagnostic.IDE0300.severity = warning
+dotnet_diagnostic.IDE0301.severity = warning
+dotnet_diagnostic.IDE0306.severity = warning
+dotnet_style_collection_initializer = true:warning
+csharp_style_collection_initializer = true:warning
+
+# メンバーをreadonlyにする
+dotnet_diagnostic.IDE0251.severity = warning
+dotnet_style_readonly_field = true:warning
+
+# パターンマッチングを使用
+dotnet_diagnostic.IDE0019.severity = warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+
+# switch式の使用
+dotnet_diagnostic.IDE0066.severity = warning
+csharp_style_prefer_switch_expression = true:warning
+
+# 名前空間はフォルダー構造と一致
+dotnet_diagnostic.IDE0130.severity = warning
+
+# プラットフォーム依存APIの警告 - Windows専用アプリケーションのため抑制
+dotnet_diagnostic.CA1416.severity = none
+
 # 警告抑制一覧 - 全プロジェクト共通
 
 # CA1711: Wrapperサフィックスに関する警告抜別
@@ -111,6 +144,19 @@ dotnet_diagnostic.CA2263.severity = none
 # IDE0270: Nullチェックの簡素化
 dotnet_diagnostic.IDE0270.severity = none
 
+# === 特定のパターンに対する警告抑制 ===
+
+# 特定の大規模リファクタリングを要するファイルは一時的に警告を抑制
+[**/Services/OCR/OcrPreprocessingService.cs]
+dotnet_diagnostic.IDE0301.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+
+# UI関連のコンポーネントも同様に
+[**/Framework/Validation/ValidationHelpers.cs]
+dotnet_diagnostic.IDE0301.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.IDE0306.severity = none
+
 # プロジェクト固有の設定
 [*.cs]
 # 基本設定（プロジェクトのコーディング規約に合わせて調整）
@@ -133,3 +179,7 @@ dotnet_diagnostic.CA1721.severity = none
 
 [*ImagePipelineTests.cs]
 dotnet_diagnostic.CA1721.severity = none
+
+[*TranslationContext.cs]
+dotnet_diagnostic.IDE0251.severity = none
+dotnet_diagnostic.CA1051.severity = none

@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 画像情報を表すクラス
     /// </summary>
@@ -83,4 +83,3 @@ namespace Baketa.Core.Abstractions.Imaging
             };
         }
     }
-}

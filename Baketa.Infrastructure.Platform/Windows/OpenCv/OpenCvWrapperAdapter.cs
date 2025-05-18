@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// WindowsOpenCvWrapperをIOpenCvWrapperインターフェースに適応させるアダプタークラス
     /// </summary>
@@ -196,4 +196,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
             Dispose(false);
         }
     }
-}

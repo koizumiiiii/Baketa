@@ -1,11 +1,11 @@
 using System;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// キャプチャ設定画面を開くリクエストイベント
     /// </summary>
-    internal class OpenCaptureSettingsRequestedEvent : UIEventBase
+    internal sealed class OpenCaptureSettingsRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "OpenCaptureSettingsRequested";
@@ -17,7 +17,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// 翻訳設定画面を開くリクエストイベント
     /// </summary>
-    internal class OpenTranslationSettingsRequestedEvent : UIEventBase
+    internal sealed class OpenTranslationSettingsRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "OpenTranslationSettingsRequested";
@@ -29,7 +29,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// 履歴画面を開くリクエストイベント
     /// </summary>
-    internal class OpenHistoryViewRequestedEvent : UIEventBase
+    internal sealed class OpenHistoryViewRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "OpenHistoryViewRequested";
@@ -41,7 +41,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// アクセシビリティ設定を開くリクエストイベント
     /// </summary>
-    internal class OpenAccessibilitySettingsRequestedEvent : UIEventBase
+    internal sealed class OpenAccessibilitySettingsRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "OpenAccessibilitySettingsRequested";
@@ -53,7 +53,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// アプリケーション終了リクエストイベント
     /// </summary>
-    internal class ApplicationExitRequestedEvent : UIEventBase
+    internal sealed class ApplicationExitRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "ApplicationExitRequested";
@@ -65,7 +65,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// キャプチャ開始リクエストイベント
     /// </summary>
-    internal class StartCaptureRequestedEvent : UIEventBase
+    internal sealed class StartCaptureRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "StartCaptureRequested";
@@ -77,7 +77,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// キャプチャ停止リクエストイベント
     /// </summary>
-    internal class StopCaptureRequestedEvent : UIEventBase
+    internal sealed class StopCaptureRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "StopCaptureRequested";
@@ -89,7 +89,7 @@ namespace Baketa.UI.Framework.Events
     /// <summary>
     /// トレイに最小化リクエストイベント
     /// </summary>
-    internal class MinimizeToTrayRequestedEvent : UIEventBase
+    internal sealed class MinimizeToTrayRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "MinimizeToTrayRequested";
@@ -97,4 +97,3 @@ namespace Baketa.UI.Framework.Events
         /// <inheritdoc/>
         public override string Category => "UI.App";
     }
-}

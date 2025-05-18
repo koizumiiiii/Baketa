@@ -3,8 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 using Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions;
 using Xunit;
 
-namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv;
+
     /// <summary>
     /// OcrProcessingExceptionクラスの単体テスト
     /// </summary>
@@ -63,4 +63,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
             Assert.IsAssignableFrom<Exception>(original);
         }
     }
-}

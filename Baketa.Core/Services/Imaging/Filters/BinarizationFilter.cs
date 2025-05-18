@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// 二値化フィルター
     /// </summary>
@@ -112,4 +112,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return resultData;
         }
     }
-}

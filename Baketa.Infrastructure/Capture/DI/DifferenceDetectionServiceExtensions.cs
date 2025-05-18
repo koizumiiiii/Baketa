@@ -3,8 +3,8 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Infrastructure.Capture.DifferenceDetection;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.Capture.DI
-{
+namespace Baketa.Infrastructure.Capture.DI;
+
     /// <summary>
     /// 差分検出サービスの依存性注入拡張
     /// </summary>
@@ -44,4 +44,3 @@ namespace Baketa.Infrastructure.Capture.DI
             return services;
         }
     }
-}

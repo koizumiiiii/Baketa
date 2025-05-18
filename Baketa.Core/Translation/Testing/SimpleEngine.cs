@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Testing
-{
+namespace Baketa.Core.Translation.Testing;
+
     /// <summary>
     /// 極めて単純な実装テスト用
     /// </summary>
@@ -98,4 +98,3 @@ namespace Baketa.Core.Translation.Testing
             return Task.FromResult(true);
         }
     }
-}

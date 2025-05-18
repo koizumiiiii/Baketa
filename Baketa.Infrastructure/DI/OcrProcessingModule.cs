@@ -9,8 +9,8 @@ using Baketa.Infrastructure.Imaging.Pipeline;
 using Baketa.Infrastructure.OCR.TextDetection;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.DI
-{
+namespace Baketa.Infrastructure.DI;
+
     /// <summary>
     /// OCR処理関連のサービス登録モジュール
     /// </summary>
@@ -134,4 +134,3 @@ namespace Baketa.Infrastructure.DI
             return Task.FromResult<IAdvancedImage?>(null);
         }
     }
-}

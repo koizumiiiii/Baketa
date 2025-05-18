@@ -3,8 +3,8 @@ using System.Reactive;
 using System.Reactive.Linq;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.Navigation
-{
+namespace Baketa.UI.Framework.Navigation;
+
     /// <summary>
     /// RoutingStateをIScreenとして使用するためのアダプター
     /// ReactiveUI 20.1.63用に最適化
@@ -30,4 +30,3 @@ namespace Baketa.UI.Framework.Navigation
         // ReactiveUI 20.xでは、IScreenインターフェースにはRouter一つのみがあり、
         // 以前のバージョンにあったNavigateやNavigateBackはなくなった
     }
-}

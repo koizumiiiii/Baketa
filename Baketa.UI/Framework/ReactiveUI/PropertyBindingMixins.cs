@@ -3,8 +3,8 @@ using System.Linq.Expressions;
 using System.Reactive.Disposables;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.ReactiveUI
-{
+namespace Baketa.UI.Framework.ReactiveUI;
+
     /// <summary>
     /// ReactiveUIのPropertyBindingMixinsのラッパークラス
     /// バージョン間の互換性を確保するために独自実装を提供
@@ -82,4 +82,3 @@ namespace Baketa.UI.Framework.ReactiveUI
                 viewToVmConverter);
         }
     }
-}

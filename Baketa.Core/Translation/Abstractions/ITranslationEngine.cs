@@ -8,8 +8,8 @@ using Baketa.Core.Translation.Models;
 
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳エンジンの基本機能を定義するインターフェース
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.Core.Translation.Abstractions
             string text,
             CancellationToken cancellationToken = default);
     }
-}

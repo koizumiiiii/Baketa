@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions
-{
+namespace Baketa.Core.Translation.Abstractions;
+
     /// <summary>
     /// 翻訳結果管理インターフェース
     /// </summary>
@@ -81,4 +81,3 @@ namespace Baketa.Core.Translation.Abstractions
             CacheClearOptions? options = null,
             CancellationToken cancellationToken = default);
     }
-}

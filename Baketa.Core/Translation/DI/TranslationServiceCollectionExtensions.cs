@@ -21,8 +21,8 @@ using Microsoft.Extensions.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Translation.DI
-{
+namespace Baketa.Core.Translation.DI;
+
     /// <summary>
     /// 翻訳サービスのDI拡張メソッド
     /// </summary>
@@ -180,4 +180,3 @@ namespace Baketa.Core.Translation.DI
             return services;
         }
     }
-}

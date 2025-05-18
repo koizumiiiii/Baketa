@@ -10,13 +10,12 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Windows;
-// 名前空間の衝突を解決するためのエイリアス
 using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 using CoreImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
 using SysRectangle = System.Drawing.Rectangle;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// WindowsイメージをIAdvancedImageインターフェースに変換するアダプター
     /// </summary>
@@ -729,4 +728,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             }
         }
     }
-}

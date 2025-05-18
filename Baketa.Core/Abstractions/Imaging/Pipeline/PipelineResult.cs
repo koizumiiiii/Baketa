@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプライン実行結果を表すクラス
     /// </summary>
@@ -130,4 +130,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             Dispose(false);
         }
     }
-}

@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// UI関連イベントの基底クラス
     /// </summary>
@@ -12,4 +12,3 @@ namespace Baketa.UI.Framework.Events
         /// </summary>
         public Guid EventId => Id;
     }
-}

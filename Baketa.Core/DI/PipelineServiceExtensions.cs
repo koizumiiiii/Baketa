@@ -5,8 +5,8 @@ using Baketa.Core.Services.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging.Pipeline.Conditions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Core.DI
-{
+namespace Baketa.Core.DI;
+
     /// <summary>
     /// パイプライン関連サービスの登録拡張メソッドを提供します
     /// </summary>
@@ -166,4 +166,3 @@ namespace Baketa.Core.DI
                 value);
         }
     }
-}

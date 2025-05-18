@@ -7,8 +7,8 @@ using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Adapters;
 using Moq;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters;
+
     /// <summary>
     /// テスト用のWindowsImageAdapterスタブクラス
     /// </summary>
@@ -61,4 +61,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             // テスト用スタブなので特に何もする必要はない
         }
     }
-}

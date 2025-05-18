@@ -3,8 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Baketa.UI.ViewModels;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// アクセシビリティ設定ビューのコードビハインド
     /// </summary>
@@ -23,4 +23,3 @@ namespace Baketa.UI.Views
             AvaloniaXamlLoader.Load(this);
         }
     }
-}

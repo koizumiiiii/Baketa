@@ -4,8 +4,8 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Capture;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// キャプチャイベント関連のDIモジュール
     /// </summary>
@@ -62,4 +62,3 @@ namespace Baketa.Application.DI.Modules
         /// </summary>
         void Register<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
-}

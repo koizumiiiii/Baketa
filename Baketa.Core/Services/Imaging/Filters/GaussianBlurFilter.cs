@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// ガウシアンぼかしフィルター
     /// </summary>
@@ -55,12 +55,10 @@ namespace Baketa.Core.Services.Imaging.Filters
             }
             
             // カーネルサイズが3以上であることを確認
-            // 以下のように宣言すると不要な代入を避けられる
-            kernelSize = kernelSize < 3 ? 3 : kernelSize;
+            var _ = Math.Max(3, kernelSize);
             
             // 標準偏差が正の値であることを確認
-            // 不要な代入を避けるため以下のように書く
-            sigma = sigma < 0.1 ? 0.1 : sigma;
+            sigma = Math.Max(0.1, sigma);
             
             // ぼかし処理のためのオプションを設定
             var enhancementOptions = new ImageEnhancementOptions
@@ -74,4 +72,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return await inputImage.EnhanceAsync(enhancementOptions).ConfigureAwait(false);
         }
     }
-}

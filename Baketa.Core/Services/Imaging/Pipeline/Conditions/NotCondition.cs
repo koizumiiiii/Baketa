@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 
-namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
-{
+namespace Baketa.Core.Services.Imaging.Pipeline.Conditions;
+
     /// <summary>
     /// 条件の否定を表す条件
     /// </summary>
@@ -43,4 +43,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
             return !result;
         }
     }
-}

@@ -15,8 +15,8 @@ using ReactiveUI.Validation;
 using ReactiveUI.Validation.Contexts;
 using ReactiveUI.Validation.Abstractions;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// ビューとビューモデルをバインドするヘルパー
     /// </summary>
@@ -488,4 +488,3 @@ namespace Baketa.UI.Framework
                 : throw new ArgumentException("Expression is not a property expression", nameof(propertyExpression));
         }
     }
-}

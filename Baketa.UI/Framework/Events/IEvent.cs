@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// イベント集約機構で使用される全てのイベントの基底インターフェース
     /// </summary>
@@ -14,4 +14,3 @@ namespace Baketa.UI.Framework.Events
         // string Name { get; }
         // string Category { get; }
     }
-}

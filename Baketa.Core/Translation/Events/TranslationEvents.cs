@@ -2,8 +2,8 @@ using System;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Events
-{
+namespace Baketa.Core.Translation.Events;
+
     /// <summary>
     /// 翻訳開始イベント
     /// </summary>
@@ -237,4 +237,3 @@ namespace Baketa.Core.Translation.Events
         /// </summary>
         public required string TranslatedText { get; set; }
     }
-}

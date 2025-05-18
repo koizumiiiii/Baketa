@@ -3,8 +3,8 @@ using Avalonia.ReactiveUI;
 using Baketa.UI.ViewModels;
 using ReactiveUI;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// キャプチャ設定画面のビュー
     /// </summary>
@@ -20,4 +20,3 @@ namespace Baketa.UI.Views
             });
         }
     }
-}

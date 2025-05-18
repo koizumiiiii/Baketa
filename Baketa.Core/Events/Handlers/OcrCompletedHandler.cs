@@ -3,8 +3,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events.Handlers
-{
+namespace Baketa.Core.Events.Handlers;
+
     /// <summary>
     /// OCR完了イベントハンドラー
     /// </summary>
@@ -65,4 +65,3 @@ namespace Baketa.Core.Events.Handlers
             }
         }
     }
-}

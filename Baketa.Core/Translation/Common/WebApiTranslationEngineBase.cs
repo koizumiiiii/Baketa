@@ -10,12 +10,11 @@ using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
-// エイリアスを追加
 
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// WebAPI翻訳エンジンの基本実装を提供する抽象クラス
     /// </summary>
@@ -315,4 +314,3 @@ namespace Baketa.Core.Translation.Common
             throw new InvalidOperationException("予期しないエラーが発生しました");
         }
     }
-}

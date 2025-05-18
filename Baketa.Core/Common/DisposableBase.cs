@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Common
-{
+namespace Baketa.Core.Common;
+
     /// <summary>
     /// IDisposableパターンを正しく実装するための基底クラス
     /// </summary>
@@ -77,4 +77,3 @@ namespace Baketa.Core.Common
             Dispose(false);
         }
     }
-}

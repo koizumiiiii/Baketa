@@ -6,8 +6,8 @@ using Baketa.Core.DI.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Baketa.Core.Tests.DI
-{
+namespace Baketa.Core.Tests.DI;
+
     /// <summary>
     /// ServiceModuleBase クラスの単体テスト
     /// </summary>
@@ -138,4 +138,3 @@ namespace Baketa.Core.Tests.DI
 
         #endregion
     }
-}

@@ -7,8 +7,8 @@ using Baketa.UI.Models;
 using ReactiveUI;
 using System;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// 翻訳履歴画面のビュー
     /// </summary>
@@ -48,4 +48,3 @@ namespace Baketa.UI.Views
             }
         }
     }
-}

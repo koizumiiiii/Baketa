@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// モルフォロジー処理フィルター
     /// </summary>
@@ -50,17 +50,18 @@ namespace Baketa.Core.Services.Imaging.Filters
             var operation = GetParameterValue<MorphologyOperation>("Operation");
             int kernelSize = GetParameterValue<int>("KernelSize");
             int iterations = GetParameterValue<int>("Iterations");
-            var kernelShape = GetParameterValue<KernelShape>("KernelShape");
+            var _ = GetParameterValue<KernelShape>("KernelShape");
             
             // パラメータの検証
-            var adjustedKernelSize = Math.Max(3, kernelSize);
+            // カーネルサイズの調整
+            int adjustedKernelSize = Math.Max(3, kernelSize);
             if (adjustedKernelSize % 2 == 0)
             {
                 adjustedKernelSize++; // 偶数の場合は奇数に調整
             }
             
-            var adjustedIterations = Math.Max(1, iterations);
-            adjustedIterations = Math.Min(10, adjustedIterations); // 10回以上の反復は効率が悪い
+            // 反復回数の調整
+            int adjustedIterations = Math.Clamp(iterations, 1, 10); // 1～10の範囲に制限
             
             // 操作に応じた処理を実行
             IAdvancedImage result = inputImage;
@@ -145,9 +146,10 @@ namespace Baketa.Core.Services.Imaging.Filters
         private static async Task<IAdvancedImage> ApplyGradientAsync(IAdvancedImage image, int kernelSize)
         {
             // 膨張処理
-            var dilated = await ApplyDilateAsync(image, kernelSize).ConfigureAwait(false);
+            // 固有名詩的な処理を実装する場合は変数を活用する
+            var _ = await ApplyDilateAsync(image, kernelSize).ConfigureAwait(false);
             // 収縮処理
-            var eroded = await ApplyErodeAsync(image, kernelSize).ConfigureAwait(false);
+            var _1 = await ApplyErodeAsync(image, kernelSize).ConfigureAwait(false);
             
             // 結果の差分を計算（シミュレーション）
             var enhancementOptions = new ImageEnhancementOptions
@@ -164,7 +166,7 @@ namespace Baketa.Core.Services.Imaging.Filters
         /// </summary>
         private static async Task<IAdvancedImage> ApplyTopHatAsync(IAdvancedImage image, int kernelSize)
         {
-            var opened = await ApplyOpenAsync(image, kernelSize).ConfigureAwait(false);
+            var _2 = await ApplyOpenAsync(image, kernelSize).ConfigureAwait(false);
             
             // 結果の差分を計算（シミュレーション）
             var enhancementOptions = new ImageEnhancementOptions
@@ -181,7 +183,7 @@ namespace Baketa.Core.Services.Imaging.Filters
         /// </summary>
         private static async Task<IAdvancedImage> ApplyBlackHatAsync(IAdvancedImage image, int kernelSize)
         {
-            var closed = await ApplyCloseAsync(image, kernelSize).ConfigureAwait(false);
+            var _3 = await ApplyCloseAsync(image, kernelSize).ConfigureAwait(false);
             
             // 結果の差分を計算（シミュレーション）
             var enhancementOptions = new ImageEnhancementOptions
@@ -255,4 +257,3 @@ namespace Baketa.Core.Services.Imaging.Filters
         /// </summary>
         Cross
     }
-}

@@ -9,12 +9,11 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
-// エイリアスを追加
 
 using TransModels = Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Common
-{
+namespace Baketa.Core.Translation.Common;
+
     /// <summary>
     /// 翻訳エンジンの基本実装を提供する抽象クラス
     /// </summary>
@@ -174,7 +173,7 @@ namespace Baketa.Core.Translation.Common
             // バッチ処理をサポートするカスタム実装がある場合は、サブクラスで上書きしてください
             // このデフォルト実装は個別のリクエストを順次処理します
             
-            List<TranslationResponse> results = new List<TranslationResponse>();
+            var results = new List<TranslationResponse>();
             
             foreach (var request in requests)
             {
@@ -391,7 +390,8 @@ namespace Baketa.Core.Translation.Common
         /// <returns>サポートされている言語ペアのコレクション</returns>
         protected virtual Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsInternalAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(new List<LanguagePair>());
+            // IDE0301/CA1825警告対策
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(Array.Empty<LanguagePair>());
         }
 
         /// <summary>
@@ -410,14 +410,17 @@ namespace Baketa.Core.Translation.Common
             // 実際の検出機能はサブクラスで実装する
             Logger?.LogWarning("言語検出は実装されていません: {EngineName}", Name);
             
-            var result = new TransModels.LanguageDetectionResult
+            // 単純な生成方法で返却
+            return Task.FromResult(new TransModels.LanguageDetectionResult
             {
-                DetectedLanguage = new TransModels.Language { Code = "auto", DisplayName = "自動検出" },
+                DetectedLanguage = new TransModels.Language
+                {
+                    Code = "auto",
+                    DisplayName = "自動検出"
+                },
                 Confidence = 0.0f,
                 EngineName = Name
-            };
-            
-            return Task.FromResult(result);
+            });
         }
 
         /// <summary>
@@ -459,4 +462,3 @@ namespace Baketa.Core.Translation.Common
             }
         }
     }
-}

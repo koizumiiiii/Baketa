@@ -2,8 +2,8 @@ using System.Drawing;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Xunit;
 
-namespace Baketa.Core.Tests.OCR.TextDetection
-{
+namespace Baketa.Core.Tests.OCR.TextDetection;
+
     public class TextRegionTests
     {
         [Fact]
@@ -133,4 +133,3 @@ namespace Baketa.Core.Tests.OCR.TextDetection
             Assert.Contains("0.75", result);
         }
     }
-}

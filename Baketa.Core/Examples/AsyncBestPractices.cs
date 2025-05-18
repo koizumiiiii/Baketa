@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Examples
-{
+namespace Baketa.Core.Examples;
+
     /// <summary>
     /// 非同期プログラミングのベストプラクティス実装例
     /// </summary>
@@ -56,4 +56,3 @@ namespace Baketa.Core.Examples
             return Task.FromResult(data);
         }
     }
-}
