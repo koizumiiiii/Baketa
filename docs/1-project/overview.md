@@ -1,6 +1,6 @@
 # Baketaプロジェクト概要
 
-*最終更新: 2025年4月18日*
+*最終更新: 2025年5月18日*
 
 ## 1. プロジェクト概要
 
@@ -33,10 +33,12 @@ Baketaプロジェクトは5つの主要レイヤーから構成されるクリ�
 Baketa/
 ├── Baketa.Core/               # コア機能と抽象化
 │   ├── Common/                # 共通ユーティリティ
-│   ├── Abstractions/            # インターフェース
-│   │   ├── Image/             # 画像抽象化インターフェース
+│   ├── Abstractions/          # インターフェース
+│   │   ├── Imaging/           # 画像抽象化インターフェース
 │   │   └── Platform/          # プラットフォーム抽象化インターフェース
-│   └── Models/                # モデルクラス
+│   ├── Models/                # モデルクラス
+│   └── Translation/           # 翻訳関連機能
+│       └── Models/            # 翻訳モデル
 │
 ├── Baketa.Infrastructure/     # インフラストラクチャ層
 │   ├── OCR/                   # OCR機能実装
@@ -71,6 +73,7 @@ Baketa/
 - データモデル
 - イベント集約機構
 - 共通ユーティリティ
+- 翻訳関連モデル（Baketa.Core.Translation.Models）
 
 ### 2.2 Baketa.Infrastructure
 
@@ -227,3 +230,20 @@ Baketaプロジェクトは、内部設計として抽象化レイヤーを採�
    - インストーラー作成
    - 更新システム構築
    - エラー報告・診断システム
+
+## 8. 最近の改善点
+
+### 8.1 名前空間統一プロジェクト（2025年5月完了）
+
+翻訳関連のデータモデルが以下の2つの名前空間に分散していた問題を解決：
+
+- `Baketa.Core.Models.Translation` (旧)
+- `Baketa.Core.Translation.Models` (新・統一)
+
+主な改善点：
+- すべての翻訳関連モデルを `Baketa.Core.Translation.Models` に統一
+- 名前空間の衝突と型の曖昧参照を排除
+- 言語コードの表現を国際標準（ISO 639-1/ISO 3166）に準拠（例: `zh-CN`形式）
+- 整理された命名規則とクラス設計
+
+詳細は[名前空間統一完了報告](../development-notes/namespace-unification-completion-report.md)を参照してください。

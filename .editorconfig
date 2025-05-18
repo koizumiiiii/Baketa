@@ -52,6 +52,10 @@ csharp_using_directive_placement = outside_namespace:warning
 csharp_prefer_simple_using_statement = true:warning
 dotnet_diagnostic.IDE0063.severity = warning
 
+# using ステートメントの整理（名前空間関連）
+dotnet_sort_system_directives_first = true:warning
+dotnet_separate_import_directive_groups = true:warning
+
 # リソース管理関連の設定
 dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA1816.severity = warning
@@ -65,6 +69,18 @@ dotnet_diagnostic.xUnit1026.severity = warning
 # readonlyフィールド関連
 dotnet_style_readonly_field = true:warning
 dotnet_diagnostic.IDE0044.severity = warning
+
+# 名前空間宣言の設定
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0161.severity = warning
+
+# 名前空間命名規則
+dotnet_naming_rule.namespace_naming.symbols = namespace_symbol
+dotnet_naming_rule.namespace_naming.style = pascal_case_style
+dotnet_naming_rule.namespace_naming.severity = warning
+
+dotnet_naming_symbols.namespace_symbol.applicable_kinds = namespace
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
 
 # 警告抑制一覧 - 全プロジェクト共通
 
