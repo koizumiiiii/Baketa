@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -58,7 +59,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     public GeminiTranslationEngine(
         HttpClient httpClient,
         IOptions<GeminiEngineOptions> options,
-        ILogger<GeminiTranslationEngine> logger)
+        ILogger<GeminiTranslationEngine> logger) : base(logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
@@ -82,7 +83,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     }
     
     /// <inheritdoc/>
-    public override async Task<bool> InitializeAsync()
+    protected override async Task<bool> InitializeInternalAsync()
     {
         try
         {
@@ -174,7 +175,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     }
     
     /// <inheritdoc/>
-    public override async Task<TranslationResponse> TranslateAsync(
+    protected override async Task<TranslationResponse> TranslateInternalAsync(
         TranslationRequest request, 
         CancellationToken cancellationToken = default)
     {

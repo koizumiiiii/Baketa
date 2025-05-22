@@ -17,12 +17,16 @@ namespace Baketa.Core.Translation;
     /// <summary>
     /// 翻訳エンジンの基本機能を提供する抽象クラス
     /// </summary>
-    public abstract class TranslationEngineBase : ITranslationEngine
+    public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposable
     {
-        private readonly ILogger<TranslationEngineBase> _logger;
-        private bool _isInitialized;
+        private readonly ILogger _logger;
         private SemaphoreSlim _initializationLock = new(1, 1);
         private bool _disposed;
+
+        /// <summary>
+        /// エンジンが初期化されているかどうか
+        /// </summary>
+        protected bool IsInitialized { get; set; }
 
         /// <summary>
         /// エンジン名
@@ -43,7 +47,7 @@ namespace Baketa.Core.Translation;
         /// コンストラクタ
         /// </summary>
         /// <param name="logger">ロガー</param>
-        protected TranslationEngineBase(ILogger<TranslationEngineBase> logger)
+        protected TranslationEngineBase(ILogger logger)
         {
             ArgumentNullException.ThrowIfNull(logger);
             _logger = logger;
@@ -296,7 +300,7 @@ namespace Baketa.Core.Translation;
         /// <returns>準備ができていればtrue</returns>
         public virtual Task<bool> IsReadyAsync()
         {
-            return Task.FromResult(_isInitialized);
+            return Task.FromResult(IsInitialized);
         }
 
         /// <summary>
@@ -306,7 +310,7 @@ namespace Baketa.Core.Translation;
         public virtual async Task<bool> InitializeAsync()
         {
             // 既に初期化済みなら何もしない
-            if (_isInitialized)
+            if (IsInitialized)
             {
                 return true;
             }
@@ -317,7 +321,7 @@ namespace Baketa.Core.Translation;
             try
             {
                 // ロック取得後に再チェック
-                if (_isInitialized)
+                if (IsInitialized)
                 {
                     return true;
                 }
@@ -335,7 +339,7 @@ namespace Baketa.Core.Translation;
                 }
 
                 var result = await InitializeInternalAsync().ConfigureAwait(false);
-                _isInitialized = result;
+                IsInitialized = result;
 
                 if (result)
                 {
@@ -351,37 +355,37 @@ namespace Baketa.Core.Translation;
             catch (OperationCanceledException ex)
             {
                 _logger.LogWarning(ex, "翻訳エンジン {EngineName} の初期化がキャンセルされました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (TimeoutException ex)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化がタイムアウトしました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化中に無効な操作が発生しました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (ArgumentException ex)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化に無効な引数が提供されました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (System.Net.Http.HttpRequestException ex)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化中にHTTPリクエストエラーが発生しました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (System.IO.IOException ex)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化中にI/Oエラーが発生しました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             catch (Exception ex) when (ex is not OperationCanceledException && 
@@ -395,7 +399,7 @@ namespace Baketa.Core.Translation;
                                       ex is not NotSupportedException)
             {
                 _logger.LogError(ex, "翻訳エンジン {EngineName} の初期化中に予期しないエラーが発生しました", Name);
-                _isInitialized = false;
+                IsInitialized = false;
                 return false;
             }
             finally
@@ -516,6 +520,23 @@ namespace Baketa.Core.Translation;
         }
 
         /// <summary>
+        /// TranslationErrorTypeを使用したエラーレスポンスを作成します
+        /// </summary>
+        /// <param name="request">元のリクエスト</param>
+        /// <param name="errorType">エラータイプ</param>
+        /// <param name="message">エラーメッセージ</param>
+        /// <param name="details">詳細（オプション）</param>
+        /// <returns>エラーを含む翻訳レスポンス</returns>
+        protected TranslationResponse CreateErrorResponse(
+            TranslationRequest request, 
+            TranslationErrorType errorType, 
+            string message,
+            string? details = null)
+        {
+            return CreateErrorResponse(request, errorType.ToString(), message, details);
+        }
+
+        /// <summary>
         /// 例外から標準的なエラーレスポンスを作成します
         /// </summary>
         /// <param name="request">元のリクエスト</param>
@@ -603,13 +624,44 @@ namespace Baketa.Core.Translation;
             
             if (disposing)
             {
-                // マネージドリソースの解放
-                _initializationLock?.Dispose();
-                _initializationLock = null!;
+                DisposeManagedResources();
             }
             
             // アンマネージドリソースの解放（必要な場合）
             
             _disposed = true;
+        }
+
+        /// <summary>
+        /// マネージドリソースの解放（派生クラスでオーバーライド可能）
+        /// </summary>
+        protected virtual void DisposeManagedResources()
+        {
+            _initializationLock?.Dispose();
+            _initializationLock = null!;
+        }
+
+        /// <summary>
+        /// 非同期リソースの解放（派生クラスでオーバーライド可能）
+        /// </summary>
+        protected virtual async ValueTask DisposeAsyncCore()
+        {
+            if (_initializationLock != null)
+            {
+                _initializationLock.Dispose();
+                _initializationLock = null!;
+            }
+            
+            await Task.CompletedTask.ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 非同期リソースの解放
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore().ConfigureAwait(false);
+            Dispose(false);
+            GC.SuppressFinalize(this);
         }
     }
