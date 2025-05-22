@@ -15,7 +15,7 @@ namespace Baketa.Core.Events.Implementation;
     {
         private readonly ILogger<EventAggregator>? _logger;
         // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）
-        private readonly Dictionary<Type, List<object>> _processors = new Dictionary<Type, List<object>>();
+        private readonly Dictionary<Type, List<object>> _processors = [];
         private readonly object _syncRoot = new object();
 
         /// <summary>
@@ -41,7 +41,7 @@ namespace Baketa.Core.Events.Implementation;
             {
                 if (_processors.TryGetValue(eventType, out var handlers))
                 {
-                    eventProcessors = handlers.ToList(); // スレッドセーフにするため複製
+                    eventProcessors = [.. handlers]; // スレッドセーフにするため複製
                 }
             }
             
@@ -112,7 +112,7 @@ namespace Baketa.Core.Events.Implementation;
             {
                 if (_processors.TryGetValue(eventType, out var handlers))
                 {
-                    eventProcessors = handlers.ToList(); // スレッドセーフにするため複製
+                    eventProcessors = [.. handlers]; // スレッドセーフにするため複製
                 }
             }
             
@@ -180,7 +180,7 @@ namespace Baketa.Core.Events.Implementation;
                 if (!_processors.TryGetValue(eventType, out var handlers))
                 {
                     // List<object> そのままの実装を使用（IDE0028を拒否）
-                    handlers = new List<object>();
+                    handlers = [];
                     _processors[eventType] = handlers;
                 }
                 

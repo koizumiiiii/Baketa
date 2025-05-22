@@ -54,7 +54,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline;
             int executedStepCount)
         {
             Result = result ?? throw new ArgumentNullException(nameof(result));
-            _intermediateResults = intermediateResults ?? new Dictionary<string, IAdvancedImage>();
+            _intermediateResults = intermediateResults ?? [];
             ProcessingTimeMs = processingTimeMs;
             IntermediateResultMode = intermediateResultMode;
             ExecutedStepCount = executedStepCount;

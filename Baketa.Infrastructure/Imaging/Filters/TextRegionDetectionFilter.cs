@@ -66,8 +66,8 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// <returns>パラメータ定義のコレクション</returns>
         protected override IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
         {
-            return new PipelineStepParameter[]
-            {
+            return 
+            [
                 new PipelineStepParameter(
                     "MinConfidence",
                     "検出結果として採用する最小信頼度スコア（0.0～1.0）",
@@ -92,7 +92,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
                     50,
                     1,
                     1000)
-            };
+            ];
         }
         
         /// <summary>
@@ -164,25 +164,10 @@ namespace Baketa.Infrastructure.Imaging.Filters;
             float minConfidence,
             int maxRegions)
         {
-            // 信頼度でフィルタリング
-            var filtered = new List<OCRTextRegion>();
-            foreach (var region in regions)
-            {
-                if (region.ConfidenceScore >= minConfidence)
-                {
-                    filtered.Add(region);
-                }
-            }
-            
-            // 信頼度スコアで降順ソート
-            filtered.Sort((a, b) => b.ConfidenceScore.CompareTo(a.ConfidenceScore));
-            
-            // 最大数に制限
-            if (filtered.Count > maxRegions)
-            {
-                filtered = filtered.GetRange(0, maxRegions);
-            }
-            
-            return filtered;
+            // LINQを使用してフィルタリング、ソート、制限を一度に実行
+            return [.. regions
+                .Where(region => region.ConfidenceScore >= minConfidence)
+                .OrderByDescending(region => region.ConfidenceScore)
+                .Take(maxRegions)];
         }
     }

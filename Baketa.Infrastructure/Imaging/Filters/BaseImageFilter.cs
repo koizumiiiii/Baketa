@@ -14,7 +14,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
     /// </summary>
     public abstract class BaseImageFilter : IImageFilter, IImagePipelineStep
     {
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         private readonly ILogger? _logger;
         
         /// <summary>
@@ -76,8 +76,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// <returns>パラメータ定義のコレクション</returns>
         protected virtual IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
         {
-        // IDE0300/CA1825警告に対応
-        return Array.Empty<PipelineStepParameter>();
+        return [];
         }
         
         /// <summary>

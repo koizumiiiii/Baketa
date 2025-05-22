@@ -85,8 +85,8 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                 else if (hasSignificantChange)
                 {
                     // 画面全体を変化領域とする
-                    var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
-                    result.ChangedRegions = regions.AsReadOnly();
+                    IReadOnlyList<Rectangle> regions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)];
+                    result.ChangedRegions = regions;
                 }
                 
                 return result;
@@ -125,12 +125,12 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// <returns>エラー時の検出結果</returns>
         private DetectionResult CreateErrorResult(IImage currentImage)
         {
-            var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+            IReadOnlyList<Rectangle> regions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)];
             return new DetectionResult
             {
                 HasSignificantChange = true,
                 ChangeRatio = 1.0,
-                ChangedRegions = regions.AsReadOnly()
+                ChangedRegions = regions
             };
         }
         
@@ -190,8 +190,8 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             if (hasSignificantChange)
             {
                 // 簡易検出では画面全体を変化領域とする
-                var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
-                result.ChangedRegions = regions.AsReadOnly();
+                IReadOnlyList<Rectangle> regions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)];
+                result.ChangedRegions = regions;
             }
             
             return result;
@@ -256,10 +256,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             // 実際の実装ではOpenCVの差分検出を使用
             // ここではモック実装で領域を返す
             
-            var regions = new List<Rectangle>();
-            
-            // テスト用のダミー領域
-            regions.Add(new Rectangle(100, 100, 200, 50));
+            List<Rectangle> regions = [new Rectangle(100, 100, 200, 50)];
             
             await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
             
@@ -275,10 +272,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             DifferenceDetectionSettings settings)
         {
             // テキスト消失検出（実装例）
-            var disappearedRegions = new List<Rectangle>();
-            
-            // テスト用のダミー領域
-            disappearedRegions.Add(new Rectangle(100, 100, 200, 50));
+            List<Rectangle> disappearedRegions = [new Rectangle(100, 100, 200, 50)];
             
             await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
             

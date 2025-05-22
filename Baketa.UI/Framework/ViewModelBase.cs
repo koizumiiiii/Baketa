@@ -50,7 +50,7 @@ namespace Baketa.UI.Framework;
         /// <summary>
         /// リソース破棄用コレクション
         /// </summary>
-        protected readonly CompositeDisposable _disposables = new();
+        protected readonly CompositeDisposable _disposables = [];
         
         /// <summary>
         /// 廃棄フラグ

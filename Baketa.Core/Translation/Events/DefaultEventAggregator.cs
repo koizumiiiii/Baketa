@@ -14,7 +14,7 @@ namespace Baketa.Core.Translation.Events;
     public class DefaultEventAggregator : IEventAggregator
     {
         private readonly ILogger<DefaultEventAggregator> _logger;
-        private readonly ConcurrentDictionary<Type, List<object>> _handlers = new();
+        private readonly ConcurrentDictionary<Type, List<object>> _handlers = [];
 
         /// <summary>
         /// イベント処理の実行時に発生するエラーイベント
@@ -98,7 +98,7 @@ namespace Baketa.Core.Translation.Events;
             var eventType = typeof(TEvent);
             _handlers.AddOrUpdate(
                 eventType,
-                _ => new List<object> { handler },
+                _ => [handler],
                 (_, list) =>
                 {
                     lock (list)
@@ -149,7 +149,7 @@ namespace Baketa.Core.Translation.Events;
             var eventType = typeof(TEvent);
             _handlers.AddOrUpdate(
                 eventType,
-                _ => new List<object> { processor },
+                _ => [processor],
                 (_, list) =>
                 {
                     lock (list)

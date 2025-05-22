@@ -12,8 +12,8 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline;
     /// </summary>
     public class PipelineContext
     {
-        private readonly Dictionary<string, object> _data = new();
-        private readonly HashSet<string> _stepsToSaveResults = new();
+        private readonly Dictionary<string, object> _data = [];
+        private readonly HashSet<string> _stepsToSaveResults = [];
         
         /// <summary>
         /// パイプライン実行に関連するデータを保存する辞書

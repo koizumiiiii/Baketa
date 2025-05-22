@@ -36,7 +36,7 @@ namespace Baketa.Core.Tests.Imaging;
                 
                 // テスト用のシンプル実装 - バイトデータを取得して反転して返す
                 var imageData = await inputImage.ToByteArrayAsync().ConfigureAwait(false);
-                var result = imageData.Select(b => (byte)(255 - b)).ToArray();
+                byte[] result = [..imageData.Select(static b => (byte)(255 - b))];
                 
                 // モック実装なので実際には元の画像をそのまま返す
                 return inputImage;
@@ -48,7 +48,7 @@ namespace Baketa.Core.Tests.Imaging;
                 ArgumentNullException.ThrowIfNull(imageData);
                 
                 // 全ピクセルを反転（255-値）
-                return imageData.Select(b => (byte)(255 - b)).ToArray();
+                return [..imageData.Select(static b => (byte)(255 - b))];
             }
         }
 
@@ -126,7 +126,7 @@ namespace Baketa.Core.Tests.Imaging;
                 ArgumentNullException.ThrowIfNull(imageData);
                 
                 // カウントを明示的に指定
-                return Enumerable.Repeat(_value, imageData.Length).ToArray();
+                return [..Enumerable.Repeat(_value, imageData.Length)];
             }
         }
 
@@ -193,7 +193,7 @@ namespace Baketa.Core.Tests.Imaging;
             var result = filter.Apply(imageData, width, height, stride);
 
             // Assert
-            var expected = new[] { (byte)255, (byte)155, (byte)55, (byte)0 };
+            byte[] expected = [255, 155, 55, 0];
             Assert.Equal(expected, result);
         }
 

@@ -15,7 +15,7 @@ namespace Baketa.Core.Translation.Factories;
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DefaultTranslationEngineFactory> _logger;
-        private readonly Dictionary<TranslationEngine, ITranslationEngine> _engineCache = new();
+        private readonly Dictionary<TranslationEngine, ITranslationEngine> _engineCache = [];
 
         /// <summary>
         /// コンストラクタ
@@ -65,7 +65,7 @@ namespace Baketa.Core.Translation.Factories;
         /// <returns>利用可能な翻訳エンジンの種類の配列</returns>
         public TranslationEngine[] GetAvailableEngines()
         {
-            return _engineCache.Keys.ToArray();
+            return [.. _engineCache.Keys];
         }
 
         /// <summary>

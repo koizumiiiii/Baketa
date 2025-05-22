@@ -193,25 +193,24 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// </summary>
         private DetectionResult CreateErrorResult(IImage currentImage)
         {
-            // エラー時は変化ありとして画面全体を返す
-            var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+            IReadOnlyList<Rectangle> regions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)];
             return new DetectionResult
             {
                 HasSignificantChange = true,
                 ChangeRatio = 1.0,
-                ChangedRegions = regions.AsReadOnly()
+                ChangedRegions = regions
             };
         }
         
         /// <summary>
         /// 変化ポイントをクラスタリングして領域に変換します
         /// </summary>
-        private IReadOnlyList<Rectangle> ClusterChangedPoints(List<Point> changedPoints, int width, int height, int blockSize)
+        private static List<Rectangle> ClusterChangedPoints(List<Point> changedPoints, int width, int height, int blockSize)
         {
             ArgumentNullException.ThrowIfNull(changedPoints, nameof(changedPoints));
                 
             if (changedPoints.Count == 0)
-                return new List<Rectangle>();
+                return [];
                 
             // シンプルなグリッドベースのクラスタリング
             int gridWidth = (width + blockSize - 1) / blockSize;
@@ -236,7 +235,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             }
             
             // 連結成分のラベリング（簡易版）
-            var regions = new List<Rectangle>();
+            List<Rectangle> regions = [];
             // 訪問済みセルを記録 - ジャグ配列に変更
             var visited = new bool[gridHeight][];
             for (int i = 0; i < gridHeight; i++)
@@ -262,13 +261,13 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                 .Where(r => r.Width * r.Height >= blockSize * blockSize * 5)
                 .ToList();
                 
-            return filteredRegions.AsReadOnly();
+            return filteredRegions;
         }
         
         /// <summary>
         /// 連結成分を探索して領域を決定します
         /// </summary>
-        private Rectangle ExploreComponent(
+        private static Rectangle ExploreComponent(
             bool[][] changedCells, 
             bool[][] visited, 
             int startX, 

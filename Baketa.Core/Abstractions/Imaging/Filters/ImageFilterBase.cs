@@ -9,7 +9,7 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
     /// </summary>
     public abstract class ImageFilterBase : IImageFilter
     {
-        private readonly Dictionary<string, object> _parameters = new();
+        private readonly Dictionary<string, object> _parameters = [];
         
         /// <summary>
         /// フィルターの名前

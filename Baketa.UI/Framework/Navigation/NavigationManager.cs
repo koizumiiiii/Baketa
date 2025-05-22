@@ -10,7 +10,7 @@ namespace Baketa.UI.Framework.Navigation;
     /// <summary>
     /// ナビゲーション管理クラス
     /// </summary>
-    internal class NavigationManager(System.IServiceProvider serviceProvider, ILogger<NavigationManager>? logger = null) : ReactiveObject, INavigationHost
+    internal sealed class NavigationManager(System.IServiceProvider serviceProvider, ILogger<NavigationManager>? logger = null) : ReactiveObject, INavigationHost
     {
         private readonly System.IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly ILogger<NavigationManager>? _logger = logger;

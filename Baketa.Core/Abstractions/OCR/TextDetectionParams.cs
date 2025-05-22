@@ -12,7 +12,7 @@ namespace Baketa.Core.Abstractions.OCR;
         /// <summary>
         /// パラメータのディクショナリ
         /// </summary>
-        public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
+        public Dictionary<string, object> Parameters { get; set; } = [];
         
         /// <summary>
         /// 検出方法

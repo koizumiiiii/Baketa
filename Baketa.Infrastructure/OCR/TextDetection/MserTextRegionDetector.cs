@@ -82,17 +82,14 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                     var grayImage = image.IsGrayscale ? image : image.ToGrayscale();
                     
                     // MSER検出実行
-                    // パラメータを辽ててDictionaryとして渡す
-                    var mserParams = new Dictionary<string, object>
-                    {
-                        { "delta", delta },
-                        { "minArea", minArea },
-                        { "maxArea", maxArea }
-                    };
+                    Dictionary<string, object> mserParams = [];
+                    mserParams["delta"] = delta;
+                    mserParams["minArea"] = minArea;
+                    mserParams["maxArea"] = maxArea;
                     var mserRegions = _openCvWrapper.DetectMSERRegions(grayImage, mserParams);
                     
                     // 検出結果を処理
-                    var textRegions = new List<OCRTextRegion>();
+                    List<OCRTextRegion> textRegions = [];
                     
                     foreach (var region in mserRegions)
                     {
@@ -114,7 +111,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                         var textRegion = new OCRTextRegion(bounds, confidenceScore)
                         {
                             RegionType = ClassifyRegionType(bounds, aspectRatio),
-                            Contour = region.ToArray()
+                            Contour = [.. region]
                         };
                         
                         textRegions.Add(textRegion);
@@ -272,7 +269,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                     var mergedRegion = new OCRTextRegion(currentBounds, maxScore, currentRegion.RegionType);
                     if (mergedContour != null)
                     {
-                        mergedRegion.Contour = mergedContour.ToArray();
+                        mergedRegion.Contour = [.. mergedContour];
                     }
                     mergedRegions.Add(mergedRegion);
                 }

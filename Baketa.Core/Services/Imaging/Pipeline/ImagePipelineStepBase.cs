@@ -15,8 +15,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
     /// </summary>
     public abstract class ImagePipelineStepBase : IImagePipelineStep
     {
-        private readonly Dictionary<string, object> _parameters = new();
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly Dictionary<string, object> _parameters = [];
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         
         /// <summary>
         /// ステップの名前
@@ -277,7 +277,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
             
             if (options != null)
             {
-                objectOptions = options.Cast<object>().ToList();
+                objectOptions = [.. options.Cast<object>()];
             }
             
             RegisterParameter(

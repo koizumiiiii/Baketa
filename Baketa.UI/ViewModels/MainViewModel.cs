@@ -7,7 +7,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// メインビューモデル
     /// </summary>
-    internal class MainViewModel : ViewModelBase
+    internal sealed class MainViewModel : ViewModelBase
     {
         private readonly ILogger<MainViewModel> _logger;
         private readonly IEventAggregator _eventAggregator;

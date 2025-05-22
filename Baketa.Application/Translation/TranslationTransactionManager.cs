@@ -17,7 +17,7 @@ namespace Baketa.Application.Translation;
         private readonly ILogger<TranslationTransactionManager> _logger;
         private readonly ITranslationManager _translationManager;
         private readonly SemaphoreSlim _transactionLock = new(1, 1);
-        private readonly Dictionary<Guid, TranslationTransaction> _activeTransactions = new();
+        private readonly Dictionary<Guid, TranslationTransaction> _activeTransactions = [];
 
         /// <summary>
         /// コンストラクタ
@@ -418,10 +418,10 @@ namespace Baketa.Application.Translation;
         /// <summary>
         /// 翻訳リクエストのリスト
         /// </summary>
-        public List<TranslationRequest> Requests { get; } = new();
+        public List<TranslationRequest> Requests { get; } = [];
         
         /// <summary>
         /// リクエストIDに対応する翻訳レスポンスのディクショナリ
         /// </summary>
-        public Dictionary<Guid, TranslationResponse> Responses { get; } = new();
+        public Dictionary<Guid, TranslationResponse> Responses { get; } = [];
     }

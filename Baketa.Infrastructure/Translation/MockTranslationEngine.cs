@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Translation;
     /// </summary>
     public class MockTranslationEngine : TranslationEngineBase
     {
-        private readonly Dictionary<string, string> _presetTranslations = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _presetTranslations = [];
         private readonly RandomNumberGenerator _rng = RandomNumberGenerator.Create();
         private readonly int _simulatedDelayMs;
         private readonly float _simulatedErrorRate;
@@ -58,8 +58,7 @@ namespace Baketa.Infrastructure.Translation;
             _simulatedErrorRate = Math.Clamp(simulatedErrorRate, 0.0f, 1.0f);
 
             // サポートする言語ペアを定義
-            _supportedLanguagePairs = new HashSet<LanguagePair>
-            {
+            _supportedLanguagePairs = [
                 // 英語 → 日本語
                 new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } },
                 // 日本語 → 英語
@@ -80,7 +79,7 @@ namespace Baketa.Infrastructure.Translation;
                 new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" } },
                 // 中国語（繁体字） → 日本語
                 new LanguagePair { SourceLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } }
-            };
+            ];
 
             // テスト用の翻訳セットを初期化
             InitializePresetTranslations();
@@ -144,7 +143,7 @@ namespace Baketa.Infrastructure.Translation;
         /// <returns>サポートされている言語ペアのコレクション</returns>
         public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
         {
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs.ToList());
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>([.. _supportedLanguagePairs]);
         }
         
         /// <summary>
@@ -413,7 +412,7 @@ namespace Baketa.Infrastructure.Translation;
         {
             ArgumentNullException.ThrowIfNull(rng);
             
-            byte[] randomBytes = new byte[4];
+            byte[] randomBytes = [0, 0, 0, 0];
             rng.GetBytes(randomBytes);
             uint randomUInt = BitConverter.ToUInt32(randomBytes, 0);
             return randomUInt / (double)uint.MaxValue;

@@ -10,8 +10,8 @@ namespace Baketa.Core.Translation.Events;
     /// </summary>
     public class TranslationEventContext
     {
-        private readonly List<string> _tags = new();
-        private readonly Dictionary<string, object?> _additionalContext = new();
+        private readonly List<string> _tags = [];
+        private readonly Dictionary<string, object?> _additionalContext = [];
         
         /// <summary>
         /// 元のコンテキストからイベント用コンテキストを作成

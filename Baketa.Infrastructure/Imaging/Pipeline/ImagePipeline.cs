@@ -16,7 +16,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
     /// </summary>
     public class ImagePipeline : IImagePipeline
     {
-        private readonly List<IImagePipelineFilter> _filters = new List<IImagePipelineFilter>();
+        private readonly List<IImagePipelineFilter> _filters = [];
         private readonly ILogger<ImagePipeline>? _logger;
         
         /// <summary>
@@ -58,7 +58,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
         /// すべてのステップを取得します
         /// </summary>
         public IReadOnlyList<IImagePipelineStep> Steps => 
-            _filters.Select(f => f as IImagePipelineStep).ToList().AsReadOnly();
+            [.._filters.Select(f => f as IImagePipelineStep)];
         
         /// <summary>
         /// コンストラクタ
@@ -577,7 +577,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             var applyMethod = _wrappedStep.GetType().GetMethod("ApplyAsync");
             if (applyMethod != null)
             {
-                var result = applyMethod.Invoke(_wrappedStep, new object[] { inputImage });
+                var result = applyMethod.Invoke(_wrappedStep, [inputImage]);
                 if (result is Task<IAdvancedImage> typedResult)
                 {
                     return typedResult;

@@ -16,8 +16,8 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
     public sealed class ImageFilterAdapter : IImagePipelineFilter
     {
         private readonly IImageFilter _originalFilter;
-        private readonly Dictionary<string, object> _parameters = new();
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly Dictionary<string, object> _parameters = [];
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         
         /// <summary>
         /// コンストラクタ
@@ -105,13 +105,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             var originalParams = _originalFilter.GetParameters();
             
             // 新しいDictionaryを作成して返す
-            var result = new Dictionary<string, object>();
-            foreach (var param in originalParams)
-            {
-                result[param.Key] = param.Value;
-            }
-            
-            return result;
+            return originalParams.ToDictionary(param => param.Key, param => param.Value);
         }
         
         /// <summary>
@@ -159,7 +153,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 if (getMethod == null)
                     throw new InvalidOperationException($"メソッド'GetParameter'が{_originalFilter.GetType().Name}に見つかりません");
                     
-                var originalParam = getMethod.Invoke(_originalFilter, new object[] { parameterName });
+                var originalParam = getMethod.Invoke(_originalFilter, [parameterName]);
                 return originalParam ?? throw new KeyNotFoundException($"パラメータ'{parameterName}'が見つかりません");
             }
             catch (InvalidOperationException ex)
@@ -212,11 +206,13 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             foreach (var param in originalParams)
             {
                 var type = param.Value?.GetType() ?? typeof(object);
+                
+                // パラメータ定義を追加
                 _parameterDefinitions.Add(new PipelineStepParameter(
-                    param.Key, 
-                    $"{param.Key} parameter", // 説明が必要
-                    type,
-                    param.Value));
+                    name: param.Key, 
+                    description: $"{param.Key} parameter",
+                    parameterType: type,
+                    defaultValue: param.Value));
                 
                 // パラメータ値の初期化
                 if (param.Value != null)
