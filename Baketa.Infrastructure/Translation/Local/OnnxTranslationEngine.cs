@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Local;
@@ -61,7 +62,7 @@ public class OnnxTranslationEngine : TranslationEngineBase, ILocalTranslationEng
         IModelLoader modelLoader,
         ITokenizer tokenizer,
         OnnxTranslationOptions options,
-        ILogger<OnnxTranslationEngine> logger)
+        ILogger<OnnxTranslationEngine> logger) : base(logger)
     {
         ModelPath = modelPath ?? throw new ArgumentNullException(nameof(modelPath));
         ModelLanguagePair = languagePair ?? throw new ArgumentNullException(nameof(languagePair));
@@ -77,7 +78,7 @@ public class OnnxTranslationEngine : TranslationEngineBase, ILocalTranslationEng
     }
     
     /// <inheritdoc/>
-    public override async Task<bool> InitializeAsync()
+    protected override async Task<bool> InitializeInternalAsync()
     {
         try
         {
@@ -176,7 +177,7 @@ public class OnnxTranslationEngine : TranslationEngineBase, ILocalTranslationEng
     }
     
     /// <inheritdoc/>
-    public override async Task<TranslationResponse> TranslateAsync(
+    protected override async Task<TranslationResponse> TranslateInternalAsync(
         TranslationRequest request, 
         CancellationToken cancellationToken = default)
     {
