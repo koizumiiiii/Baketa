@@ -114,7 +114,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                         swtImage, minComponentSize, maxComponentSize);
                     
                     // テキスト領域として抽出
-                    var textRegions = new List<OCRTextRegion>();
+                    List<OCRTextRegion> textRegions = [];
                     
                     foreach (var component in components)
                     {
@@ -149,7 +149,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                         var textRegion = new OCRTextRegion(bounds, confidenceScore)
                         {
                             RegionType = ClassifyRegionType(bounds, aspectRatio, meanStrokeWidth),
-                            Contour = component.ToArray()
+                            Contour = [.. component]
                         };
                         
                         // メタデータに追加情報を保存
@@ -438,11 +438,11 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
         private static TextRegionType DetermineGroupRegionType(List<OCRTextRegion> regions)
         {
             // 最も多い領域タイプを選択
-            var typeCounts = new Dictionary<TextRegionType, int>();
+            Dictionary<TextRegionType, int> typeCounts = [];
             
             foreach (var region in regions)
             {
-                // Dictionaryのインデクサによる代入を使用
+                // Dictionaryのインデクサ表記を使用
                 typeCounts[region.RegionType] = typeCounts.TryGetValue(region.RegionType, out int count) ? count + 1 : 1;
             }
             
@@ -527,7 +527,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
                     var mergedRegion = new OCRTextRegion(currentBounds, maxScore, currentRegion.RegionType);
                     if (mergedContour != null)
                     {
-                        mergedRegion.Contour = mergedContour.ToArray();
+                        mergedRegion.Contour = [.. mergedContour];
                     }
                     mergedRegions.Add(mergedRegion);
                 }

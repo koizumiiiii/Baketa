@@ -16,7 +16,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
     /// </summary>
     public class ImagePipeline : IImagePipeline
     {
-        private readonly List<IImagePipelineStep> _steps = new();
+        private readonly List<IImagePipelineStep> _steps = [];
         private readonly ILogger<ImagePipeline> _logger;
         
         /// <summary>
@@ -164,7 +164,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
             var stopwatch = Stopwatch.StartNew();
             
             // 中間結果を保存するディクショナリ
-            var intermediateResults = new Dictionary<string, IAdvancedImage>();
+            var intermediateResults = new Dictionary<string, IAdvancedImage>([]);
             
             try
             {

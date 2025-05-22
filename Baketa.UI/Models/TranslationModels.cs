@@ -5,7 +5,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 翻訳履歴アイテムのデータモデル
     /// </summary>
-    internal class TranslationHistoryItem
+    internal sealed class TranslationHistoryItem
     {
         public string Id { get; set; } = string.Empty;
         public string SourceText { get; set; } = string.Empty;

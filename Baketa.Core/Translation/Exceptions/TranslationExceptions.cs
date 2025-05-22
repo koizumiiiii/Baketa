@@ -1,11 +1,13 @@
 using System;
+using System.Runtime.Serialization;
 
 namespace Baketa.Core.Translation.Exceptions;
 
-    /// <summary>
-    /// 翻訳システムの基底例外クラス
-    /// </summary>
-    public abstract class TranslationBaseException : Exception
+/// <summary>
+/// 翻訳システムの基底例外クラス
+/// </summary>
+[Serializable]
+public abstract class TranslationBaseException : Exception
     {
         /// <summary>
         /// エラーコード
@@ -70,11 +72,41 @@ namespace Baketa.Core.Translation.Exceptions;
             LocationInfo = locationInfo;
             IsRetryable = isRetryable;
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationBaseException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+            // シリアライズされたプロパティを取得
+            ErrorCode = info.GetString(nameof(ErrorCode)) ?? "UNKNOWN";
+            LocationInfo = info.GetString(nameof(LocationInfo)) ?? string.Empty;
+            IsRetryable = info.GetBoolean(nameof(IsRetryable));
+        }
+        
+        /// <summary>
+        /// シリアライズ時にオブジェクトデータを保存
+        /// </summary>
+        [System.Security.SecurityCritical]
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            ArgumentNullException.ThrowIfNull(info, nameof(info));
+                
+            info.AddValue(nameof(ErrorCode), ErrorCode);
+            info.AddValue(nameof(LocationInfo), LocationInfo);
+            info.AddValue(nameof(IsRetryable), IsRetryable);
+            
+            base.GetObjectData(info, context);
+        }
     }
     
     /// <summary>
     /// 翻訳データ処理に関する例外
     /// </summary>
+    [Serializable]
     public class TranslationDataException : TranslationBaseException
     {
         /// <summary>
@@ -113,11 +145,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationDataException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳ネットワーク通信に関する例外
     /// </summary>
+    [Serializable]
     public class TranslationNetworkException : TranslationBaseException
     {
         /// <summary>
@@ -156,11 +198,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationNetworkException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳設定に関する例外
     /// </summary>
+    [Serializable]
     public class TranslationConfigurationException : TranslationBaseException
     {
         /// <summary>
@@ -199,11 +251,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationConfigurationException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳キャッシュに関する例外
     /// </summary>
+    [Serializable]
     public class TranslationCacheException : TranslationDataException
     {
         /// <summary>
@@ -242,11 +304,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationCacheException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳エンジンに関する例外
     /// </summary>
+    [Serializable]
     public class TranslationEngineException : TranslationBaseException
     {
         /// <summary>
@@ -285,11 +357,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationEngineException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳リポジトリに関する例外
     /// </summary>
+    [Serializable]
     public class TranslationRepositoryException : TranslationDataException
     {
         /// <summary>
@@ -328,11 +410,21 @@ namespace Baketa.Core.Translation.Exceptions;
             : base(message, errorCode, locationInfo, isRetryable, innerException)
         {
         }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationRepositoryException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
     }
     
     /// <summary>
     /// 翻訳イベントに関する例外
     /// </summary>
+    [Serializable]
     public class TranslationEventException : TranslationBaseException
     {
         /// <summary>
@@ -369,6 +461,15 @@ namespace Baketa.Core.Translation.Exceptions;
             bool isRetryable = false,
             Exception? innerException = null)
             : base(message, errorCode, locationInfo, isRetryable, innerException)
+        {
+        }
+        
+        /// <summary>
+        /// シリアライズ用コンストラクタ
+        /// </summary>
+        [Obsolete("This API supports obsolete formatter-based serialization.", DiagnosticId = "SYSLIB0051")]
+        protected TranslationEventException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
         {
         }
     }

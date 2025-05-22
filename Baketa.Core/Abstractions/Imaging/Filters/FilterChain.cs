@@ -11,7 +11,7 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
     /// </summary>
     public class FilterChain : IImageFilter
     {
-        private readonly List<IImageFilter> _filters = new();
+        private readonly List<IImageFilter> _filters = [];
         
         /// <summary>
         /// フィルターの名前
@@ -162,7 +162,7 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
         public IDictionary<string, object> GetParameters()
         {
             // フィルターチェーンでは個別フィルターのパラメータを直接公開しない
-            return new Dictionary<string, object>();
+            return new Dictionary<string, object> { };
         }
         
         /// <summary>

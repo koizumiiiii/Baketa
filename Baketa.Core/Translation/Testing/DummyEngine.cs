@@ -15,8 +15,8 @@ namespace Baketa.Core.Translation.Testing;
     /// </summary>
     public class DummyEngine : TranslationEngineBase
     {
-        private static readonly List<LanguagePair> _supportedLanguagePairs = new()
-        {
+        private static readonly List<LanguagePair> _supportedLanguagePairs =
+        [
             new LanguagePair 
             { 
                 SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, 
@@ -27,7 +27,7 @@ namespace Baketa.Core.Translation.Testing;
                 SourceLanguage = new Language { Code = "en", DisplayName = "English" }, 
                 TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } 
             },
-        };
+        ];
 
         /// <summary>
         /// 翻訳エンジン名

@@ -52,7 +52,7 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         /// <summary>
         /// 追加のメタデータ
         /// </summary>
-        public Dictionary<string, object> Metadata { get; } = new Dictionary<string, object>();
+        public Dictionary<string, object> Metadata { get; } = [];
         
         /// <summary>
         /// デフォルトコンストラクタ

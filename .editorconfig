@@ -12,8 +12,8 @@ root = true
 # .NET code style settings
 [*.{cs,vb}]
 # IDE0028: コレクション初期化の簡素化
-dotnet_style_collection_initializer = true:silent
-dotnet_diagnostic.IDE0028.severity = silent
+dotnet_style_collection_initializer = true:warning
+dotnet_diagnostic.IDE0028.severity = warning
 
 # CA1515: 内部クラスの警告拒否
 dotnet_diagnostic.CA1515.severity = none
@@ -35,7 +35,7 @@ dotnet_style_object_initializer = true:silent
 dotnet_diagnostic.IDE0090.severity = silent
 
 # IDE0305: コレクション初期化の簡素化
-dotnet_diagnostic.IDE0305.severity = silent
+dotnet_diagnostic.IDE0305.severity = warning
 
 # CA1305: IFormatProviderの指定
 dotnet_diagnostic.CA1305.severity = warning
@@ -156,6 +156,8 @@ dotnet_diagnostic.IDE0300.severity = none
 dotnet_diagnostic.IDE0301.severity = none
 dotnet_diagnostic.IDE0300.severity = none
 dotnet_diagnostic.IDE0306.severity = none
+
+# 現在警告が出ているファイルに対する警告抑制はリファクタリング完了のため削除
 
 # プロジェクト固有の設定
 [*.cs]

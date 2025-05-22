@@ -33,7 +33,7 @@ namespace Baketa.Core.Extensions;
             }
 
             // それ以外は新しいリストを作成して読み取り専用にラップ
-            return new ReadOnlyCollection<T>(source.ToList());
+            return new ReadOnlyCollection<T>([.. source]);
         }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace Baketa.Core.Extensions;
             }
 
             // 具体化されたコレクションの場合は新しい配列を作成
-            return source.ToArray();
+            return [.. source];
         }
 
         /// <summary>

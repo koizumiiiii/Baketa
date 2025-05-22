@@ -44,7 +44,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         private readonly Dictionary<string, IntPtr> _rememberedGameWindows = new(10);
         
         // プロセスIDとウィンドウハンドルのマッピング（キャッシュ）
-        private readonly Dictionary<int, List<IntPtr>> _processWindowMap = new();
+        private readonly Dictionary<int, List<IntPtr>> _processWindowMap = [];
         private DateTime _lastProcessMapUpdate = DateTime.MinValue;
         
         /// <summary>
@@ -667,7 +667,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                         {
                             if (!_processWindowMap.TryGetValue(process.Id, out var windowHandles))
                             {
-                                windowHandles = new List<IntPtr>();
+                                windowHandles = [];
                                 _processWindowMap[process.Id] = windowHandles;
                             }
                             windowHandles.Add(process.MainWindowHandle);

@@ -117,7 +117,7 @@ namespace Baketa.Core.Translation.Common;
 
             if (requests.Count == 0)
             {
-                return Enumerable.Empty<TranslationResponse>().ToArray();
+                return [];
             }
 
             // 各リクエストを個別に処理する方法に変更
@@ -136,7 +136,7 @@ namespace Baketa.Core.Translation.Common;
         {
             var corePairs = await _coreEngine.GetSupportedLanguagePairsAsync().ConfigureAwait(false);
 
-            return corePairs.Select(p => new LanguagePair
+            return [.. corePairs.Select(p => new LanguagePair
             {
                 SourceLanguage = new Language
                 { 
@@ -150,7 +150,7 @@ namespace Baketa.Core.Translation.Common;
                     DisplayName = p.TargetLanguage.Name, // Nameの値をDisplayNameに設定
                     Name = p.TargetLanguage.Name
                 }
-            }).ToList();
+            })];
         }
 
         /// <summary>

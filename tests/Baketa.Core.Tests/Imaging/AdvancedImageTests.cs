@@ -184,7 +184,7 @@ namespace Baketa.Core.Tests.Imaging;
         public string Description => "テスト用のモックフィルター実装";
         public FilterCategory Category => FilterCategory.Effect;
 
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
 
         public MockImageFilter()
         {

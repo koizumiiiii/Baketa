@@ -160,7 +160,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
             _ = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
             _ = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
             
-            return new List<Point[]>();
+            return [];
         }
         
         /// <summary>
@@ -283,7 +283,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
             ArgumentNullException.ThrowIfNull(image);
             
             // スタブ実装
-            return new List<Point[]>();
+            return [];
         }
         
         /// <summary>
@@ -386,7 +386,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
                 maxArea);
 
             // 検出結果をTextRegionに変換
-            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>();
+            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
             foreach (var region in regions)
             {
                 textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion
@@ -417,7 +417,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
                 strokeWidthRatio);
 
             // 検出結果をTextRegionに変換
-            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>();
+            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
             foreach (var region in regions)
             {
                 textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion

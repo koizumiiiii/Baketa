@@ -14,7 +14,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
     /// </summary>
     public class TestableWindowManagerAdapter : WindowManagerAdapter
     {
-        private readonly Dictionary<IntPtr, WindowType> _windowTypes = new Dictionary<IntPtr, WindowType>();
+        private readonly Dictionary<IntPtr, WindowType> _windowTypes = [];
         
         /// <summary>
         /// テスト用のWindowManagerAdapterコンストラクタ

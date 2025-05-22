@@ -61,7 +61,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// メタデータ
         /// </summary>
-        public Dictionary<string, object?> Metadata { get; } = new();
+        public Dictionary<string, object?> Metadata { get; } = [];
         
         /// <summary>
         /// レスポンスのタイムスタンプ

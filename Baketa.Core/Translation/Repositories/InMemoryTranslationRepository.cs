@@ -15,7 +15,7 @@ namespace Baketa.Core.Translation.Repositories;
     /// </summary>
     public class InMemoryTranslationRepository : ITranslationRepository
     {
-        private readonly Dictionary<Guid, TranslationRecord> _records = new();
+        private readonly Dictionary<Guid, TranslationRecord> _records = [];
         private readonly ILogger<InMemoryTranslationRepository> _logger;
 
         /// <summary>
@@ -420,7 +420,9 @@ namespace Baketa.Core.Translation.Repositories;
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 // リストを事前に固定し、検索条件を適用して複数列挙の可能性を排除
-                var allRecords = new List<TranslationRecord>(_records.Values);
+                List<TranslationRecord> allRecords = [
+                    .. _records.Values
+                ];
                 var results = allRecords.AsEnumerable();
                 
                 // テキストパターンフィルター
@@ -458,23 +460,14 @@ namespace Baketa.Core.Translation.Repositories;
                 if (query.Tags.Count > 0)
                 {
                     // タグ一覧を作成し、複数列挙を回避
-                    var queryTagSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var tag in query.Tags)
-                    {
-                        queryTagSet.Add(tag);
-                    }
+                    HashSet<string> queryTagSet = query.Tags.Count > 0 
+                        ? new HashSet<string>(query.Tags, StringComparer.OrdinalIgnoreCase) 
+                        : [];
                     
                     // 各レコードのタグを効率的にチェック
                     results = results.Where(r => {
                     // リストを作成して抽出した要素を格納
-                    var recordTags = new List<string>();
-                    if (r.Context != null && r.Context.Tags.Count > 0)
-                    {
-                        foreach (var tag in r.Context.Tags)
-                        {
-                            recordTags.Add(tag);
-                        }
-                    }
+                    List<string> recordTags = r.Context?.Tags.Count > 0 ? [.. r.Context.Tags] : [];
                     return recordTags.Any(tag => queryTagSet.Contains(tag));
                     });
                 }
@@ -548,20 +541,15 @@ namespace Baketa.Core.Translation.Repositories;
         /// <returns>いずれかのタグが一致する場合はtrue</returns>
         private static bool HasAnyMatchingTag(IEnumerable<string> recordTags, IEnumerable<string> queryTags)
         {
-            var recordTagList = new List<string>();
-            if (recordTags != null)
-                recordTagList.AddRange(recordTags);
-                
-            var queryTagList = new List<string>();
-            if (queryTags != null)
-                queryTagList.AddRange(queryTags);
+            var recordTagList = recordTags != null ? new List<string>(recordTags) : [];
+            var queryTagList = queryTags != null ? new List<string>(queryTags) : [];
             
             // 空の場合は早期返却
             if (recordTagList.Count == 0 || queryTagList.Count == 0)
                 return false;
             
             // 大文字小文字を区別しないHashSetを作成
-            var recordTagSet = new HashSet<string>(recordTagList, StringComparer.OrdinalIgnoreCase);
+            var recordTagSet = recordTagList.Count > 0 ? new HashSet<string>(recordTagList, StringComparer.OrdinalIgnoreCase) : [];
             
             // いずれかのクエリタグがrecordTagSetに含まれるかチェック
             return queryTagList.Any(recordTagSet.Contains);
@@ -609,18 +597,16 @@ namespace Baketa.Core.Translation.Repositories;
                 List<TranslationRecord> filteredRecords;
                 if (options.StartDate.HasValue || options.EndDate.HasValue)
                 {
-                    // 期間でフィルターがある場合のみコピーしてフィルタリング
-                    filteredRecords = _records.Values.ToList();
-
-                        // 効率的にフィルタリング（一度のループで複数条件を適用）
-                    filteredRecords = filteredRecords.Where(r => 
-                        (!options.StartDate.HasValue || r.CreatedAt >= options.StartDate.Value) &&
-                        (!options.EndDate.HasValue || r.CreatedAt <= options.EndDate.Value)
-                    ).ToList();
+                // 期間でフィルターがある場合のみコピーしてフィルタリング
+                    filteredRecords = [
+                        .. _records.Values.Where(r => 
+                            (!options.StartDate.HasValue || r.CreatedAt >= options.StartDate.Value) &&
+                            (!options.EndDate.HasValue || r.CreatedAt <= options.EndDate.Value))
+                    ];
                 }
                 else
                 {
-                    filteredRecords = _records.Values.ToList();
+                    filteredRecords = [.. _records.Values];
                 }
                 
                 // 統計の作成
@@ -679,25 +665,31 @@ namespace Baketa.Core.Translation.Repositories;
                 // ゲームプロファイル別統計
                 if (options.IncludeGameProfileStats)
                 {
-                    var recordsByGameProfile = filteredRecords
+                    var gameProfiles = filteredRecords
                         .Where(r => r.Context != null && !string.IsNullOrEmpty(r.Context.GameProfileId))
-                        .GroupBy(r => r.Context!.GameProfileId!);
+                        .Select(r => r.Context!.GameProfileId!)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
                     
-                    foreach (var group in recordsByGameProfile)
-                    {
-                        statistics.AddGameProfileCount(group.Key, group.Count());
+                foreach (var profileId in gameProfiles)
+                {
+                    int count = filteredRecords.Count(r => 
+                            r.Context != null && 
+                                !string.IsNullOrEmpty(r.Context.GameProfileId) && 
+                                StringComparer.OrdinalIgnoreCase.Equals(r.Context.GameProfileId, profileId));
+                                
+                            statistics.AddGameProfileCount(profileId, count);
+                        }
                     }
-                }
                 
                 // タグ別統計
                 if (options.IncludeTagStats)
                 {
-                    Dictionary<string, int> allTags = new();
+                    Dictionary<string, int> allTags = [];
                     
                     // 一度メモリに保持して複数列挙を回避
-                    var recordsWithTags = filteredRecords
-                .Where(r => r.Context != null && r.Context.Tags.Count > 0)
-                .ToList();
+                    List<TranslationRecord> recordsWithTags = [
+                        .. filteredRecords.Where(r => r.Context != null && r.Context.Tags.Count > 0)
+                    ];
                 
             foreach (var record in recordsWithTags)
             {
@@ -746,7 +738,7 @@ namespace Baketa.Core.Translation.Repositories;
         /// <returns>時間帯別の記録数</returns>
         private static Dictionary<string, int> GenerateTimeFrames(List<TranslationRecord> records, StatisticsOptions options)
         {
-            var result = new Dictionary<string, int>();
+            Dictionary<string, int> result = [];
             
             // 開始日と終了日を計算（空のリストチェックを追加）
             DateTime startDate = options.StartDate ?? (records.Count > 0 ? records.Min(r => r.CreatedAt).Date : DateTime.UtcNow);

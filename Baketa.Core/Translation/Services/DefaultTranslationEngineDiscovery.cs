@@ -41,7 +41,7 @@ namespace Baketa.Core.Translation.Services;
         public async Task<IReadOnlyList<string>> GetAvailableEngineNamesAsync()
         {
             var engines = await _engineFactory.GetAvailableEnginesAsync().ConfigureAwait(false);
-            return engines.Select(e => e.Name).ToList();
+            return [.. engines.Select(e => e.Name)];
         }
         
         /// <summary>
@@ -135,7 +135,7 @@ namespace Baketa.Core.Translation.Services;
             };
             
             var engines = await _engineFactory.GetEnginesForLanguagePairAsync(languagePair).ConfigureAwait(false);
-            return engines.Select(e => e.Name).ToList();
+            return [.. engines.Select(e => e.Name)];
         }
         
         /// <summary>

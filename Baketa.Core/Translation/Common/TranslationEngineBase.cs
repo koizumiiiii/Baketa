@@ -168,7 +168,7 @@ namespace Baketa.Core.Translation.Common;
             ArgumentNullException.ThrowIfNull(requests);
                 
             if (requests.Count == 0)
-                return Array.Empty<TranslationResponse>();
+                return [];
                 
             // バッチ処理をサポートするカスタム実装がある場合は、サブクラスで上書きしてください
             // このデフォルト実装は個別のリクエストを順次処理します
@@ -390,8 +390,7 @@ namespace Baketa.Core.Translation.Common;
         /// <returns>サポートされている言語ペアのコレクション</returns>
         protected virtual Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsInternalAsync()
         {
-            // IDE0301/CA1825警告対策
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(Array.Empty<LanguagePair>());
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>([]);
         }
 
         /// <summary>

@@ -45,7 +45,7 @@ namespace Baketa.Core.Abstractions.Capture;
         /// <summary>
         /// 変化が検出された領域
         /// </summary>
-        public IReadOnlyList<Rectangle> ChangedRegions { get; set; } = new List<Rectangle>();
+        public IReadOnlyList<Rectangle> ChangedRegions { get; set; } = [];
         
         /// <summary>
         /// 変化の比率 (0.0～1.0)
@@ -55,5 +55,5 @@ namespace Baketa.Core.Abstractions.Capture;
         /// <summary>
         /// 消失したテキスト領域
         /// </summary>
-        public IReadOnlyList<Rectangle> DisappearedTextRegions { get; set; } = new List<Rectangle>();
+        public IReadOnlyList<Rectangle> DisappearedTextRegions { get; set; } = [];
     }

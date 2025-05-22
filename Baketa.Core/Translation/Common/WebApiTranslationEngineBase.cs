@@ -11,8 +11,6 @@ using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 
-using TransModels = Baketa.Core.Translation.Models;
-
 namespace Baketa.Core.Translation.Common;
 
     /// <summary>
@@ -122,7 +120,7 @@ namespace Baketa.Core.Translation.Common;
         /// <param name="text">検出対象テキスト</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>検出された言語と信頼度</returns>
-        public override Task<TransModels.LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default)
+        public override Task<LanguageDetectionResult> DetectLanguageAsync(string text, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(text);
             
@@ -156,7 +154,7 @@ namespace Baketa.Core.Translation.Common;
                 if (status.IsAvailable)
                 {
                     // クォータ情報の保存
-                    QuotaRemaining = status.QuotaRemaining;
+                    QuotaRemaining = status.RemainingQuota;
                     QuotaResetTime = status.QuotaResetTime;
                     
                     Logger?.LogInformation("APIステータスの確認が完了しました: {EngineName}, Status: {Status}", 

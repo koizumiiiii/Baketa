@@ -539,17 +539,13 @@ namespace Baketa.Application.Translation;
 
             if (requests.Count == 0)
             {
-#pragma warning disable IDE0301 // コレクションの初期化を簡素化できます
-                return Array.Empty<TranslationResponse>();
-#pragma warning restore IDE0301
+                return [];
             }
 
             if (requests.Count == 1)
             {
-#pragma warning disable IDE0300 // コレクションの初期化を簡素化できます
                 var response = await ExecuteAsync(requests[0], preferredEngine, cancellationToken).ConfigureAwait(false);
-                return new TranslationResponse[] { response };
-#pragma warning restore IDE0300
+                return [response];
             }
 
             // バッチ処理のパフォーマンス計測開始
@@ -728,7 +724,7 @@ namespace Baketa.Application.Translation;
                     {
                         // キャッシュ無効の場合は全てのリクエストを翻訳
                         cancellationToken.ThrowIfCancellationRequested(); // 手動キャンセルチェック
-                        nonCachedRequests = groupRequests.Select((r, i) => (r, i)).ToList();
+                        nonCachedRequests = [.. groupRequests.Select((r, i) => (r, i))];
                     }
                     
                     // 翻訳が必要なリクエストがある場合

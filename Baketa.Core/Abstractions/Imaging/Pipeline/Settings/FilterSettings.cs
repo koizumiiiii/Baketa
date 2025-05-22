@@ -36,7 +36,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
         /// フィルターパラメータ
         /// </summary>
         [JsonPropertyName("parameters")]
-        public Dictionary<string, object> Parameters { get; private set; } = new Dictionary<string, object>();
+        public Dictionary<string, object> Parameters { get; private set; } = [];
         
         /// <summary>
         /// フィルターのエラーハンドリング戦略

@@ -46,11 +46,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
                 BindingFlags.NonPublic | BindingFlags.Instance) 
                 ?? throw new InvalidOperationException("_rememberedGameWindowsフィールドが見つかりません。クラス定義が変更された可能性があります。");
             
-            // フィールドに直接値を設定
-            var rememberedWindows = new Dictionary<string, IntPtr>
-            {
-                { gameTitle, gameHandle }
-            };
+            Dictionary<string, IntPtr> rememberedWindows = [];
+            rememberedWindows[gameTitle] = gameHandle;
             field.SetValue(_adapter, rememberedWindows);
             
             // GetWindowTitleが呼ばれたら値を返すよう設定
@@ -78,11 +75,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
                 BindingFlags.NonPublic | BindingFlags.Instance)
                 ?? throw new InvalidOperationException("_rememberedGameWindowsフィールドが見つかりません。クラス定義が変更された可能性があります。");
             
-            // フィールドに直接値を設定
-            var rememberedWindows = new Dictionary<string, IntPtr>
-            {
-                { gameTitle, gameHandle }
-            };
+            Dictionary<string, IntPtr> rememberedWindows = [];
             field.SetValue(_adapter, rememberedWindows);
             
             // GetWindowTitleが呼ばれたら例外をスローするよう設定
@@ -91,7 +84,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             
             // GetRunningApplicationWindowsが呼ばれたら空のディクショナリを返すよう設定
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
-                .Returns(new Dictionary<IntPtr, string>());
+                .Returns([]);
             
             // Act
             var result = _adapter.FindGameWindow(gameTitle);
@@ -114,11 +107,9 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             var otherHandle = new IntPtr(67890);
             
             // GetRunningApplicationWindowsで返すウィンドウリスト
-            var windows = new Dictionary<IntPtr, string>
-            {
-                { gameHandle, "Test Game Window" },
-                { otherHandle, "Other Window" }
-            };
+            Dictionary<IntPtr, string> windows = [];
+            windows[gameHandle] = "Test Game Window";
+            windows[otherHandle] = "Other Window";
             
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
                 .Returns(windows);
@@ -146,7 +137,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             
             // GetRunningApplicationWindowsで返す空のウィンドウリスト
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
-                .Returns(new Dictionary<IntPtr, string>());
+                .Returns([]);
             
             // GetWindowTypeをテスト用アダプターで設定
             _adapter.SetWindowType(activeHandle, WindowType.Game);
@@ -167,11 +158,9 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             var handle2 = new IntPtr(67890);
             
             // GetRunningApplicationWindowsで返すウィンドウリスト
-            var windows = new Dictionary<IntPtr, string>
-            {
-                { handle1, "Window 1" },
-                { handle2, "Window 2" }
-            };
+            Dictionary<IntPtr, string> windows = [];
+            windows[handle1] = "Window 1";
+            windows[handle2] = "Window 2";
             
             _mockWindowsManager.Setup(w => w.GetRunningApplicationWindows())
                 .Returns(windows);

@@ -32,7 +32,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// リクエストオプション
         /// </summary>
-        public Dictionary<string, object?> Options { get; } = new();
+        public Dictionary<string, object?> Options { get; } = [];
         
         /// <summary>
         /// リクエストのユニークID

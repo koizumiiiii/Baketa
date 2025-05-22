@@ -16,7 +16,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
     /// </summary>
     public abstract class TextRegionDetectorBase : ITextRegionDetector
     {
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         
         /// <summary>
         /// ロガーを取得します

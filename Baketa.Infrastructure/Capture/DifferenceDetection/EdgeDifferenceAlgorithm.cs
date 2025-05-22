@@ -123,12 +123,12 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         private DetectionResult CreateErrorResult(IImage currentImage)
         {
             // エラー時は変化ありとして画面全体を返す
-            var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+            IReadOnlyList<Rectangle> regions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)];
             return new DetectionResult
             {
                 HasSignificantChange = true,
                 ChangeRatio = 1.0,
-                ChangedRegions = regions.AsReadOnly()
+                ChangedRegions = regions
             };
         }
         
@@ -166,8 +166,8 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                 int width = previousImage.Width / 2;
                 int height = previousImage.Height / 2;
                 
-                var regions = new List<Rectangle> { new Rectangle(x, y, width, height) };
-                result.ChangedRegions = regions.AsReadOnly();
+                IReadOnlyList<Rectangle> regions = [new Rectangle(x, y, width, height)];
+                result.ChangedRegions = regions;
             }
             
             return result;
@@ -217,15 +217,11 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             int randomValue = BitConverter.ToInt32(bytes, 0) & 0x7FFFFFFF;
             double changeRatio = randomValue % 200 / 1000.0;
             
-            // モック：変化領域を生成
-            var regions = new List<Rectangle>();
-            
-            // モック：画面中央に変化領域を設定
-            regions.Add(new Rectangle(width / 4, height / 4, width / 2, height / 2));
+            IReadOnlyList<Rectangle> regions = [new Rectangle(width / 4, height / 4, width / 2, height / 2)];
             
             await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
             
-            return (changeRatio, regions.AsReadOnly(), diffMap);
+            return (changeRatio, regions, diffMap);
         }
         
         /// <summary>
@@ -244,19 +240,16 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             
             // モック実装：実際にはエッジの減少を分析してテキスト消失を検出
             
-            var disappearedRegions = new List<Rectangle>();
-            
-            // 消失検出は複雑なため、モックで1つの領域を返す
-            disappearedRegions.Add(new Rectangle(
+            IReadOnlyList<Rectangle> disappearedRegions = [new Rectangle(
                 prevGray.Width / 4,
                 prevGray.Height / 4,
                 prevGray.Width / 2,
-                50)); // テキスト行の高さとして50ピクセルを想定
+                50)]; // テキスト行の高さとして50ピクセルを想定
                 
             await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
             
             _logger?.LogDebug("テキスト消失検出: {Count}個の領域を検出", disappearedRegions.Count);
             
-            return disappearedRegions.AsReadOnly();
+            return disappearedRegions;
         }
     }

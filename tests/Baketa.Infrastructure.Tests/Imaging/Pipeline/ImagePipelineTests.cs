@@ -23,13 +23,12 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
         public string Category { get; set; } = "Effect";
         public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
         
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         
         public IReadOnlyCollection<PipelineStepParameter> Parameters => 
-            new List<PipelineStepParameter> 
-            {
-                new PipelineStepParameter("param1", "Parameter 1", typeof(string), "default") 
-            };
+            [
+                new PipelineStepParameter("param1", "Parameter 1", typeof(string), "default")
+            ];
             
         public TestIPipelineImageFilter(string name, string description, string category)
         {
@@ -310,7 +309,7 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
             public string Category => "Test";
             public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
             
-            public IReadOnlyCollection<PipelineStepParameter> Parameters => new List<PipelineStepParameter>();
+            public IReadOnlyCollection<PipelineStepParameter> Parameters => [];
             
             public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
             {

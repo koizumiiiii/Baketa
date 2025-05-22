@@ -65,7 +65,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                 int stride = width * bytesPerPixel;
                 
                 // 差分のあるブロックを追跡
-                var changedBlocks = new List<Rectangle>();
+                List<Rectangle> changedBlocks = [];
                 int changedBlockCount = 0;
                 
                 // 各ブロックを処理
@@ -116,7 +116,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                     .ToList();
                 
                 // テキスト消失の検出（必要に応じて実装）
-                List<Rectangle> disappearedTextRegions = new List<Rectangle>();
+                List<Rectangle> disappearedTextRegions = [];
                 
                 return new DetectionResult
                 {
@@ -213,7 +213,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             {
                 HasSignificantChange = true,
                 ChangeRatio = 1.0,
-                ChangedRegions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) }
+                ChangedRegions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)]
             };
         }
         

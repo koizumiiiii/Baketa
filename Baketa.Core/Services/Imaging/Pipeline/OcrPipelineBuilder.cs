@@ -105,7 +105,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
             _pipeline.ClearSteps();
             
             // カスタムフィルターを追加
-            var filters = new List<IImageFilter>();
+            var filters = new List<IImageFilter>([]);
             foreach (var filterType in filterTypes)
             {
                 try
@@ -123,7 +123,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
                 }
             }
             
-            AddFiltersToPipeline(filters.ToArray());
+            AddFiltersToPipeline([.. filters]);
             
             // グローバル設定を構成
             _pipeline.IntermediateResultMode = IntermediateResultMode.None;

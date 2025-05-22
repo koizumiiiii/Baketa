@@ -40,7 +40,7 @@ namespace Baketa.Core.Tests.Imaging.Pipeline;
             // パイプラインモックのセットアップ
             _pipelineMock.Setup(p => p.IntermediateResultMode).Returns(IntermediateResultMode.All);
             _pipelineMock.Setup(p => p.GlobalErrorHandlingStrategy).Returns(StepErrorHandlingStrategy.LogAndContinue);
-            _pipelineMock.Setup(p => p.Steps).Returns(new List<IImagePipelineStep>());
+            _pipelineMock.Setup(p => p.Steps).Returns([]);
 
             // Act
             var result = await profileManager.SaveProfileAsync(profileName, _pipelineMock.Object);

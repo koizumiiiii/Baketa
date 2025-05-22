@@ -27,7 +27,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
         /// <summary>
         /// ステップのパラメータ定義
         /// </summary>
-        public IReadOnlyCollection<PipelineStepParameter> Parameters => new List<PipelineStepParameter>();
+        public IReadOnlyCollection<PipelineStepParameter> Parameters => [];
 
         /// <summary>
         /// ステップのエラーハンドリング戦略

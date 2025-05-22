@@ -18,7 +18,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
     public class FilterPipelineStepAdapter : IImagePipelineStep
     {
         private readonly CoreImageFilter _filter;
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         private readonly ILogger _logger;
         
         /// <summary>

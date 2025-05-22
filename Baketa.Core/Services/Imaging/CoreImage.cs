@@ -43,14 +43,14 @@ namespace Baketa.Core.Services.Imaging;
         public Task<byte[]> ToByteArrayAsync()
         {
             ThrowIfDisposed();
-            return Task.FromResult(_pixelData.ToArray());
+            return Task.FromResult<byte[]>([.. _pixelData]);
         }
         
         /// <summary>
         /// 画像データのバイト配列を取得します
         /// </summary>
         /// <returns>画像データのバイト配列</returns>
-        public IReadOnlyList<byte> Bytes => _pixelData.ToArray();
+        public IReadOnlyList<byte> Bytes => [.. _pixelData];
         
         /// <inheritdoc/>
         public IImage Clone()

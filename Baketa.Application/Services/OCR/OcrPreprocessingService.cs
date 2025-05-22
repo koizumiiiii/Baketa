@@ -27,7 +27,7 @@ namespace Baketa.Application.Services.OCR;
         private readonly ILogger<OcrPreprocessingService> _logger;
         private readonly IServiceProvider _serviceProvider;
         
-        private readonly Dictionary<string, IImagePipeline> _pipelineCache = new Dictionary<string, IImagePipeline>();
+        private readonly Dictionary<string, IImagePipeline> _pipelineCache = [];
         
         /// <summary>
         /// コンストラクタ

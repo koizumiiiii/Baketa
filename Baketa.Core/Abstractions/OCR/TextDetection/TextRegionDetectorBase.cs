@@ -16,7 +16,7 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         /// <summary>
         /// パラメータを格納するディクショナリ
         /// </summary>
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         
         /// <summary>
         /// ロガーを取得します

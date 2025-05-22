@@ -25,7 +25,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
         /// </summary>
         [JsonPropertyName("filters")]
         public IReadOnlyList<FilterSettings> Filters => _filters;
-        private readonly List<FilterSettings> _filters = new List<FilterSettings>();
+        private readonly List<FilterSettings> _filters = [];
         
         /// <summary>
         /// フィルター設定を追加します
@@ -60,7 +60,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
         /// 追加のメタデータ
         /// </summary>
         [JsonPropertyName("metadata")]
-        public Dictionary<string, string> Metadata { get; private set; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Metadata { get; private set; } = [];
         
         /// <summary>
         /// デフォルトコンストラクタ

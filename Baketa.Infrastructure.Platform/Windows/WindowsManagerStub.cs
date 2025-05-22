@@ -140,6 +140,6 @@ namespace Baketa.Infrastructure.Platform.Windows;
         public Dictionary<IntPtr, string> GetRunningApplicationWindows()
         {
             // スタブ実装では空のディクショナリを返す
-            return new Dictionary<IntPtr, string>();
+            return [];
         }
     }

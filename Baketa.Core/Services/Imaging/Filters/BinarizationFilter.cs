@@ -94,7 +94,7 @@ namespace Baketa.Core.Services.Imaging.Filters;
             ArgumentNullException.ThrowIfNull(imageData, nameof(imageData));
             
             // IReadOnlyList<byte>をbyte[]に変換して処理
-            byte[] sourceData = imageData.ToArray();
+            byte[] sourceData = [.. imageData];
                 
             // 結果配列の作成
             byte[] resultData = new byte[sourceData.Length];
