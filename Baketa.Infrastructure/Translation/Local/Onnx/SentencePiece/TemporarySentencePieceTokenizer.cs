@@ -6,15 +6,16 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Translation.Local.Onnx;
+namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 
 /// <summary>
 /// 暫定的なSentencePieceトークナイザー実装
-/// （後で実際のSentencePieceライブラリに置き換える予定）
+/// （実際のSentencePieceライブラリに置き換え済み - 後方互換性のために残す）
 /// </summary>
-public class SentencePieceTokenizer : ITokenizer, IDisposable
+[Obsolete("Use RealSentencePieceTokenizer instead. This is a temporary implementation.")]
+public class TemporarySentencePieceTokenizer : ITokenizer, IDisposable
 {
-    private readonly ILogger<SentencePieceTokenizer> _logger;
+    private readonly ILogger<TemporarySentencePieceTokenizer> _logger;
     private bool _disposed;
     private bool _initialized;
 
@@ -38,14 +39,14 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     /// <param name="modelPath">SentencePiece モデルファイルのパス</param>
     /// <param name="name">トークナイザー名</param>
     /// <param name="logger">ロガー</param>
-    public SentencePieceTokenizer(string modelPath, string name, ILogger<SentencePieceTokenizer> logger)
+    public TemporarySentencePieceTokenizer(string modelPath, string name, ILogger<TemporarySentencePieceTokenizer> logger)
     {
         ArgumentException.ThrowIfNullOrEmpty(modelPath, nameof(modelPath));
         ArgumentException.ThrowIfNullOrEmpty(name, nameof(name));
 
         ModelPath = modelPath;
         Name = name;
-        TokenizerId = $"SentencePiece_{Path.GetFileNameWithoutExtension(modelPath)}";
+        TokenizerId = $"TempSentencePiece_{Path.GetFileNameWithoutExtension(modelPath)}";
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 暫定的な実装では、ファイルの存在チェックをスキップ
@@ -58,7 +59,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     /// <returns>初期化が成功したかどうか</returns>
     public async Task<bool> InitializeAsync()
     {
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         try
         {
@@ -95,7 +96,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     {
         ArgumentNullException.ThrowIfNull(text, nameof(text));
 
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         if (!_initialized)
         {
@@ -135,7 +136,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tokens, nameof(tokens));
 
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         if (!_initialized)
         {
@@ -162,7 +163,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     /// <inheritdoc/>
     public string DecodeToken(int token)
     {
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         if (!_initialized)
         {
@@ -187,7 +188,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     /// <returns>特殊トークンの情報</returns>
     public SpecialTokens GetSpecialTokens()
     {
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         try
         {
@@ -218,7 +219,7 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
     {
         ArgumentNullException.ThrowIfNull(text, nameof(text));
 
-        ObjectDisposedException.ThrowIf(_disposed, nameof(SentencePieceTokenizer));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TemporarySentencePieceTokenizer));
 
         if (!_initialized)
         {
@@ -258,30 +259,4 @@ public class SentencePieceTokenizer : ITokenizer, IDisposable
             _logger.LogDebug("暫定SentencePieceTokenizerを破棄しました");
         }
     }
-}
-
-/// <summary>
-/// 特殊トークンの情報
-/// </summary>
-public class SpecialTokens
-{
-    /// <summary>
-    /// 未知トークンの ID
-    /// </summary>
-    public int UnknownId { get; set; } = -1;
-
-    /// <summary>
-    /// 文開始トークンの ID
-    /// </summary>
-    public int BeginOfSentenceId { get; set; } = -1;
-
-    /// <summary>
-    /// 文終了トークンの ID
-    /// </summary>
-    public int EndOfSentenceId { get; set; } = -1;
-
-    /// <summary>
-    /// パディングトークンの ID
-    /// </summary>
-    public int PaddingId { get; set; } = -1;
 }
