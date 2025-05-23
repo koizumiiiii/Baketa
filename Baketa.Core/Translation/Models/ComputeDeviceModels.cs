@@ -58,6 +58,43 @@ public class ComputeDevice
         IsAvailable = true,
         Priority = 100
     };
+    
+    /// <summary>
+    /// CPUデバイスを作成
+    /// </summary>
+    /// <returns>CPUデバイス</returns>
+    public static ComputeDevice CreateCpu() => new ComputeDevice
+    {
+        DeviceId = "cpu-0",
+        Name = "CPU",
+        DeviceType = ComputeDeviceType.Cpu,
+        IsAvailable = true,
+        Priority = 100
+    };
+    
+    /// <summary>
+    /// GPUデバイスを作成
+    /// </summary>
+    /// <param name="deviceId">デバイスID</param>
+    /// <param name="name">デバイス名</param>
+    /// <param name="deviceType">デバイスタイプ</param>
+    /// <returns>GPUデバイス</returns>
+    public static ComputeDevice CreateGpu(int deviceId, string name, ComputeDeviceType deviceType = ComputeDeviceType.Cuda) => new ComputeDevice
+    {
+        DeviceId = $"gpu-{deviceId}",
+        Name = name,
+        DeviceType = deviceType,
+        IsAvailable = true,
+        Priority = 1
+    };
+    
+    /// <summary>
+    /// CUDAデバイスを作成
+    /// </summary>
+    /// <param name="deviceId">デバイスID</param>
+    /// <param name="name">デバイス名</param>
+    /// <returns>CUDAデバイス</returns>
+    public static ComputeDevice CreateGpu(int deviceId, string name) => CreateGpu(deviceId, name, ComputeDeviceType.Cuda);
 }
 
 /// <summary>

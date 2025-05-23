@@ -18,6 +18,11 @@
 		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+		<!-- ONNX Runtime パッケージ -->
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.1" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
+		<!-- SentencePiece トークナイザー -->
+		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />
 	</ItemGroup>
 
 </Project>
