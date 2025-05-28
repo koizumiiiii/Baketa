@@ -26,8 +26,10 @@ public static class SentencePieceTokenizerFactory
     {
         if (useTemporary)
         {
+#pragma warning disable CS0618 // 型またはメンバーが旧式式です
             var tempLogger = loggerFactory.CreateLogger<TemporarySentencePieceTokenizer>();
             return new TemporarySentencePieceTokenizer(modelPath, name, tempLogger);
+#pragma warning restore CS0618
         }
 
         try
@@ -36,15 +38,19 @@ public static class SentencePieceTokenizerFactory
             var realLogger = loggerFactory.CreateLogger<RealSentencePieceTokenizer>();
             return new RealSentencePieceTokenizer(modelPath, realLogger);
         }
+#pragma warning disable CA1031 // 一般的な例外をキャッチしない
         catch (Exception ex)
+#pragma warning restore CA1031
         {
             // フォールバック: 暫定実装を使用
+#pragma warning disable CS0618 // 型またはメンバーが旧式式です
             var logger = loggerFactory.CreateLogger<TemporarySentencePieceTokenizer>();
             logger.LogWarning(ex,
                 "実際のSentencePieceトークナイザーの作成に失敗しました。暫定実装にフォールバックします: {ModelPath}",
                 modelPath);
             
             return new TemporarySentencePieceTokenizer(modelPath, name, logger);
+#pragma warning restore CS0618
         }
     }
 }
