@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
@@ -13,7 +14,7 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 /// （実際のSentencePieceライブラリに置き換え済み - 後方互換性のために残す）
 /// </summary>
 [Obsolete("Use RealSentencePieceTokenizer instead. This is a temporary implementation.")]
-public class TemporarySentencePieceTokenizer : ITokenizer, IDisposable
+public class TemporarySentencePieceTokenizer : Baketa.Core.Translation.Models.ITokenizer, IDisposable
 {
     private readonly ILogger<TemporarySentencePieceTokenizer> _logger;
     private bool _disposed;

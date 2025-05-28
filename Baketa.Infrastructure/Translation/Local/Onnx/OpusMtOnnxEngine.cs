@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
@@ -15,8 +16,8 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx;
 /// </summary>
 public class OpusMtOnnxEngine : OnnxTranslationEngine
 {
-    private readonly OnnxModelLoader _onnxModelLoader;
-    private readonly SentencePieceTokenizer _sentencePieceTokenizer;
+    private readonly Baketa.Core.Translation.Models.IModelLoader _modelLoader;
+    private readonly Baketa.Core.Translation.Models.ITokenizer _tokenizer;
 
     /// <summary>
     /// コンストラクタ
@@ -43,8 +44,8 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
             loggerFactory.CreateLogger<OpusMtOnnxEngine>())
     {
         Logger = loggerFactory.CreateLogger<OpusMtOnnxEngine>();
-        _onnxModelLoader = (OnnxModelLoader)GetModelLoader();
-        _sentencePieceTokenizer = (SentencePieceTokenizer)GetTokenizer();
+        _modelLoader = GetModelLoader();
+        _tokenizer = GetTokenizer();
     }
 
     /// <inheritdoc/>
@@ -59,12 +60,15 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
     /// <param name="tokenizerPath">トークナイザーモデルのパス</param>
     /// <param name="loggerFactory">ロガーファクトリー</param>
     /// <returns>トークナイザーインスタンス</returns>
-    private static SentencePieceTokenizer CreateTokenizer(string tokenizerPath, ILoggerFactory loggerFactory)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:可能な場合は具象型を使用します", Justification = "将来的に異なる実装を返す可能性があるため、インターフェース型を使用")]
+    private static Baketa.Core.Translation.Models.ITokenizer CreateTokenizer(string tokenizerPath, ILoggerFactory loggerFactory)
     {
-        var tokenizer = new SentencePieceTokenizer(
+#pragma warning disable CS0618 // 型またはメンバーが旧式式です
+        var tokenizer = new TemporarySentencePieceTokenizer(
             tokenizerPath,
             "OPUS-MT SentencePiece",
-            loggerFactory.CreateLogger<SentencePieceTokenizer>());
+            loggerFactory.CreateLogger<TemporarySentencePieceTokenizer>());
+#pragma warning restore CS0618
 
         if (!tokenizer.Initialize())
         {
@@ -79,7 +83,7 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
     {
         ArgumentNullException.ThrowIfNull(inputTokens, nameof(inputTokens));
 
-        if (!_onnxModelLoader.IsModelLoaded())
+        if (!_modelLoader.IsModelLoaded())
         {
             throw new InvalidOperationException("ONNX モデルがロードされていません");
         }
@@ -94,7 +98,13 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
             try
             {
                 // ONNX 推論の実行
-                outputs = await Task.Run(() => _onnxModelLoader.Run(inputs), cancellationToken).ConfigureAwait(false);
+                // OnnxModelLoaderのRunメソッドはIModelLoaderインターフェースに含まれていないため、
+                // キャストしてアクセス
+                if (_modelLoader is not OnnxModelLoader onnxLoader)
+                {
+                    throw new InvalidOperationException("ModelLoaderがOnnxModelLoaderではありません");
+                }
+                outputs = await Task.Run(() => onnxLoader.Run(inputs), cancellationToken).ConfigureAwait(false);
 
                 // 出力テンソルから結果を抽出
                 var outputTokens = await ExtractOutputTokensAsync(outputs, cancellationToken).ConfigureAwait(false);
@@ -191,7 +201,14 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
                 var token = (int)longTensor.GetValue(i);
                 
                 // 終了トークンの場合は処理を終了
-                var specialTokens = _sentencePieceTokenizer.GetSpecialTokens();
+                // SpecialTokensを取得するためにキャスト
+#pragma warning disable CS0618 // 型またはメンバーが旧式式です
+                if (_tokenizer is not TemporarySentencePieceTokenizer tempTokenizer)
+                {
+                    throw new InvalidOperationException("TokenizerがTemporarySentencePieceTokenizerではありません");
+                }
+                var specialTokens = tempTokenizer.GetSpecialTokens();
+#pragma warning restore CS0618
                 if (token == specialTokens.EndOfSentenceId)
                 {
                     break;
@@ -233,7 +250,14 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
             var vocabSize = shape[^1];      // 最後の次元（語彙サイズ）
 
             List<int> resultTokens = [];
-            var specialTokens = _sentencePieceTokenizer.GetSpecialTokens();
+            // SpecialTokensを取得するためにキャスト
+#pragma warning disable CS0618 // 型またはメンバーが旧式式です
+            if (_tokenizer is not TemporarySentencePieceTokenizer tempTokenizer)
+            {
+                throw new InvalidOperationException("TokenizerがTemporarySentencePieceTokenizerではありません");
+            }
+            var specialTokens = tempTokenizer.GetSpecialTokens();
+#pragma warning restore CS0618
 
             for (int seq = 0; seq < sequenceLength; seq++)
             {
@@ -357,8 +381,15 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
     {
         try
         {
-            _sentencePieceTokenizer?.Dispose();
-            _onnxModelLoader?.Dispose();
+            // IDisposableの場合のみ破棄
+            if (_tokenizer is IDisposable disposableTokenizer)
+            {
+                disposableTokenizer.Dispose();
+            }
+            if (_modelLoader is IDisposable disposableLoader)
+            {
+                disposableLoader.Dispose();
+            }
         }
         finally
         {
@@ -371,8 +402,15 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
     {
         try
         {
-            _sentencePieceTokenizer?.Dispose();
-            _onnxModelLoader?.Dispose();
+            // IDisposableの場合のみ破棄
+            if (_tokenizer is IDisposable disposableTokenizer)
+            {
+                disposableTokenizer.Dispose();
+            }
+            if (_modelLoader is IDisposable disposableLoader)
+            {
+                disposableLoader.Dispose();
+            }
         }
         finally
         {

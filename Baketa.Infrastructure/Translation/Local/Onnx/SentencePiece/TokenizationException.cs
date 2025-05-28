@@ -23,7 +23,33 @@ public class TokenizationException : Exception
     public string ModelName { get; init; } = string.Empty;
 
     /// <summary>
-    /// コンストラクタ
+    /// デフォルトコンストラクタ
+    /// </summary>
+    public TokenizationException()
+    {
+    }
+
+    /// <summary>
+    /// メッセージ付きコンストラクタ
+    /// </summary>
+    /// <param name="message">エラーメッセージ</param>
+    public TokenizationException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>
+    /// メッセージと内部例外付きコンストラクタ
+    /// </summary>
+    /// <param name="message">エラーメッセージ</param>
+    /// <param name="innerException">内部例外</param>
+    public TokenizationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    /// <summary>
+    /// 完全な情報付きコンストラクタ
     /// </summary>
     /// <param name="message">エラーメッセージ</param>
     /// <param name="inputText">入力テキスト</param>

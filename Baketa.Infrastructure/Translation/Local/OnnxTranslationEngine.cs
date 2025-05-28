@@ -10,6 +10,7 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
+
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Local;
@@ -513,13 +514,13 @@ public class OnnxTranslationEngine : TranslationEngineBase, ILocalTranslationEng
     }
     
     /// <inheritdoc/>
-    public IModelLoader GetModelLoader()
+    public Baketa.Core.Translation.Models.IModelLoader GetModelLoader()
     {
         return _modelLoader;
     }
     
     /// <inheritdoc/>
-    public ITokenizer GetTokenizer()
+    public Baketa.Core.Translation.Models.ITokenizer GetTokenizer()
     {
         return _tokenizer;
     }

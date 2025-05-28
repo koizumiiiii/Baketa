@@ -18,6 +18,7 @@ public class SentencePieceOptions
     /// <summary>
     /// モデルダウンロード用のURL（{0}にモデル名が入る）
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1056:Uri プロパティはstringではなくSystem.Uriである必要があります", Justification = "String.Formatで使用するURLテンプレートのためstringを使用")]
     public string DownloadUrl { get; set; } = "https://your-storage.blob.core.windows.net/models/{0}.model";
 
     /// <summary>

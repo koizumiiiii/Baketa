@@ -14,13 +14,14 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 /// <summary>
 /// SentencePieceモデルファイルの管理
 /// </summary>
-public class SentencePieceModelManager
+public class SentencePieceModelManager : IDisposable
 {
     private readonly SentencePieceOptions _options;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<SentencePieceModelManager> _logger;
     private readonly SemaphoreSlim _downloadSemaphore = new(1);
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+    private bool _disposed;
 
     /// <summary>
     /// コンストラクタ
@@ -56,30 +57,30 @@ public class SentencePieceModelManager
         var metadataPath = Path.Combine(_options.ModelsDirectory, $"{modelName}.metadata.json");
 
         // モデルの存在とバージョンチェック
-        if (File.Exists(modelPath) && await IsModelValidAsync(modelPath, metadataPath, cancellationToken))
+        if (File.Exists(modelPath) && await IsModelValidAsync(modelPath, metadataPath, cancellationToken).ConfigureAwait(false))
         {
-            await UpdateLastAccessedAsync(metadataPath);
+            await UpdateLastAccessedAsync(metadataPath).ConfigureAwait(false);
             return modelPath;
         }
 
         // 同時ダウンロード防止
-        await _downloadSemaphore.WaitAsync(cancellationToken);
+        await _downloadSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             // 再チェック（他のスレッドがダウンロード済みの可能性）
-            if (File.Exists(modelPath) && await IsModelValidAsync(modelPath, metadataPath, cancellationToken))
+            if (File.Exists(modelPath) && await IsModelValidAsync(modelPath, metadataPath, cancellationToken).ConfigureAwait(false))
             {
-                await UpdateLastAccessedAsync(metadataPath);
+                await UpdateLastAccessedAsync(metadataPath).ConfigureAwait(false);
                 return modelPath;
             }
 
             // ダウンロード実行
-            await DownloadModelAsync(modelName, modelPath, metadataPath, cancellationToken);
+            await DownloadModelAsync(modelName, modelPath, metadataPath, cancellationToken).ConfigureAwait(false);
 
             // 自動クリーンアップの実行
             if (_options.EnableAutoCleanup)
             {
-                await CleanupOldModelsAsync();
+                await CleanupOldModelsAsync().ConfigureAwait(false);
             }
         }
         finally
@@ -99,12 +100,12 @@ public class SentencePieceModelManager
         string metadataPath,
         CancellationToken cancellationToken)
     {
-        var url = string.Format(_options.DownloadUrl, modelName);
+        var url = string.Format(System.Globalization.CultureInfo.InvariantCulture, _options.DownloadUrl, modelName);
         var tempPath = $"{modelPath}.tmp";
 
         _logger.LogInformation("モデルのダウンロードを開始します: {ModelName} from {Url}", modelName, url);
 
-        using var client = _httpClientFactory.CreateClient();
+        using var client = _httpClientFactory.CreateClient(string.Empty);
         client.Timeout = TimeSpan.FromMinutes(_options.DownloadTimeoutMinutes);
 
         Exception? lastException = null;
@@ -113,20 +114,20 @@ public class SentencePieceModelManager
             try
             {
                 // プログレス付きダウンロード
-                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var response = await client.GetAsync(new Uri(url), HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
 
                 var totalBytes = response.Content.Headers.ContentLength ?? -1;
 
                 using (var fileStream = File.Create(tempPath))
-                using (var httpStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                using (var httpStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    await CopyWithProgressAsync(httpStream, fileStream, totalBytes, modelName, cancellationToken);
+                    await CopyWithProgressAsync(httpStream, fileStream, totalBytes, modelName, cancellationToken).ConfigureAwait(false);
                 }
 
                 // チェックサム計算
                 var checksum = _options.EnableChecksumValidation
-                    ? await CalculateChecksumAsync(tempPath, cancellationToken)
+                    ? await CalculateChecksumAsync(tempPath, cancellationToken).ConfigureAwait(false)
                     : string.Empty;
 
                 // メタデータ保存
@@ -138,10 +139,10 @@ public class SentencePieceModelManager
                     Size = new FileInfo(tempPath).Length,
                     Checksum = checksum,
                     LastAccessedAt = DateTime.UtcNow,
-                    SourceUrl = url
+                    SourceUrl = new Uri(url)
                 };
 
-                await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, _jsonOptions), cancellationToken);
+                await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, _jsonOptions), cancellationToken).ConfigureAwait(false);
 
                 // アトミックな移動
                 File.Move(tempPath, modelPath, true);
@@ -152,7 +153,19 @@ public class SentencePieceModelManager
 
                 return;
             }
-            catch (Exception ex)
+            catch (TaskCanceledException)
+            {
+                // キャンセルは再スロー
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                lastException = ex;
+                _logger.LogWarning(ex,
+                    "HTTPリクエストエラー (試行 {Attempt}/{MaxAttempts}): {ModelName}",
+                    attempt, _options.MaxDownloadRetries, modelName);
+            }
+            catch (IOException ex)
             {
                 lastException = ex;
                 _logger.LogWarning(ex,
@@ -162,12 +175,25 @@ public class SentencePieceModelManager
                 // 一時ファイルのクリーンアップ
                 if (File.Exists(tempPath))
                 {
-                    try { File.Delete(tempPath); } catch { }
+                    try 
+                    { 
+                        File.Delete(tempPath); 
+                    } 
+                    catch (IOException)
+                    { 
+                        // 一時ファイル削除の失敗は無視
+                        _logger.LogDebug("一時ファイルの削除に失敗しました: {Path}", tempPath);
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // アクセス権限がない場合も無視
+                        _logger.LogDebug("一時ファイルへのアクセスが拒否されました: {Path}", tempPath);
+                    }
                 }
 
                 if (attempt < _options.MaxDownloadRetries)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -192,9 +218,9 @@ public class SentencePieceModelManager
         var lastProgressReport = DateTime.UtcNow;
         int bytesRead;
 
-        while ((bytesRead = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) != 0)
+        while ((bytesRead = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false)) != 0)
         {
-            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
             totalBytesRead += bytesRead;
 
             // 1秒ごとに進捗報告
@@ -220,8 +246,10 @@ public class SentencePieceModelManager
     {
         using var sha256 = SHA256.Create();
         using var stream = File.OpenRead(filePath);
-        var hash = await sha256.ComputeHashAsync(stream, cancellationToken);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        var hash = await sha256.ComputeHashAsync(stream, cancellationToken).ConfigureAwait(false);
+#pragma warning disable CA1308 // 文字列を大文字に正規化する - ハッシュ値は慣習的に小文字で表現
+        return Convert.ToHexString(hash).ToLowerInvariant();
+#pragma warning restore CA1308
     }
 
     /// <summary>
@@ -240,7 +268,7 @@ public class SentencePieceModelManager
 
         try
         {
-            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken);
+            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken).ConfigureAwait(false);
             var metadata = JsonSerializer.Deserialize<ModelMetadata>(json);
 
             if (metadata == null)
@@ -271,7 +299,7 @@ public class SentencePieceModelManager
             // チェックサム検証（有効な場合）
             if (_options.EnableChecksumValidation && !string.IsNullOrEmpty(metadata.Checksum))
             {
-                var actualChecksum = await CalculateChecksumAsync(modelPath, cancellationToken);
+                var actualChecksum = await CalculateChecksumAsync(modelPath, cancellationToken).ConfigureAwait(false);
                 if (actualChecksum != metadata.Checksum)
                 {
                     _logger.LogWarning(
@@ -284,9 +312,14 @@ public class SentencePieceModelManager
             _logger.LogDebug("モデルは有効です: {ModelName}", metadata.ModelName);
             return true;
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "モデルメタデータの検証エラー: {Path}", metadataPath);
+            _logger.LogError(ex, "JSONパースエラー: {Path}", metadataPath);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "ファイル読み込みエラー: {Path}", metadataPath);
             return false;
         }
     }
@@ -298,18 +331,29 @@ public class SentencePieceModelManager
     {
         try
         {
-            var json = await File.ReadAllTextAsync(metadataPath);
+            var json = await File.ReadAllTextAsync(metadataPath).ConfigureAwait(false);
             var metadata = JsonSerializer.Deserialize<ModelMetadata>(json);
             
             if (metadata != null)
             {
                 metadata.LastAccessedAt = DateTime.UtcNow;
-                await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, _jsonOptions));
+                await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, _jsonOptions)).ConfigureAwait(false);
             }
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
-            _logger.LogWarning(ex, "最終アクセス日時の更新に失敗しました: {Path}", metadataPath);
+            // ファイルI/Oエラーは警告として記録（非致命的）
+            _logger.LogWarning(ex, "ファイルI/Oエラー: {Path}", metadataPath);
+        }
+        catch (JsonException ex)
+        {
+            // JSONエラーも警告として記録（非致命的）
+            _logger.LogWarning(ex, "JSONパースエラー: {Path}", metadataPath);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // アクセス権限エラーも警告として記録（非致命的）
+            _logger.LogWarning(ex, "アクセス権限エラー: {Path}", metadataPath);
         }
     }
 
@@ -327,7 +371,7 @@ public class SentencePieceModelManager
             {
                 try
                 {
-                    var json = await File.ReadAllTextAsync(metadataPath);
+                    var json = await File.ReadAllTextAsync(metadataPath).ConfigureAwait(false);
                     var metadata = JsonSerializer.Deserialize<ModelMetadata>(json);
 
                     if (metadata != null && metadata.LastAccessedAt < cutoffDate)
@@ -346,15 +390,23 @@ public class SentencePieceModelManager
                             metadata.ModelName, metadata.LastAccessedAt);
                     }
                 }
-                catch (Exception ex)
+                catch (IOException ex)
                 {
-                    _logger.LogWarning(ex, "モデルクリーンアップエラー: {Path}", metadataPath);
+                    _logger.LogWarning(ex, "クリーンアップ中のI/Oエラー: {Path}", metadataPath);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger.LogWarning(ex, "クリーンアップ中のアクセス権限エラー: {Path}", metadataPath);
                 }
             }
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
-            _logger.LogError(ex, "モデルクリーンアップ中にエラーが発生しました");
+            _logger.LogError(ex, "モデルクリーンアップ中のI/Oエラー");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "モデルクリーンアップ中のアクセス権限エラー");
         }
     }
 
@@ -371,7 +423,7 @@ public class SentencePieceModelManager
         {
             try
             {
-                var json = await File.ReadAllTextAsync(metadataPath);
+                var json = await File.ReadAllTextAsync(metadataPath).ConfigureAwait(false);
                 var metadata = JsonSerializer.Deserialize<ModelMetadata>(json);
                 
                 if (metadata != null)
@@ -379,12 +431,41 @@ public class SentencePieceModelManager
                     models.Add(metadata);
                 }
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
-                _logger.LogWarning(ex, "メタデータ読み込みエラー: {Path}", metadataPath);
+                _logger.LogWarning(ex, "メタデータのJSONパースエラー: {Path}", metadataPath);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "メタデータ読み込み中のI/Oエラー: {Path}", metadataPath);
             }
         }
 
-        return models.OrderBy(m => m.ModelName).ToArray();
+        return [.. models.OrderBy(m => m.ModelName)];
+    }
+
+    /// <summary>
+    /// リソースの破棄
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// リソースの破棄
+    /// </summary>
+    /// <param name="disposing">マネージドリソースを破棄するかどうか</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _downloadSemaphore?.Dispose();
+            }
+            _disposed = true;
+        }
     }
 }
