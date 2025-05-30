@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+using Baketa.Infrastructure.Translation.Local.Onnx.Chinese;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
@@ -18,6 +19,8 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
 {
     private readonly Baketa.Core.Translation.Models.IModelLoader _modelLoader;
     private readonly Baketa.Core.Translation.Models.ITokenizer _tokenizer;
+    private readonly ChineseLanguageProcessor _chineseProcessor;
+    private ChineseTranslationEngine? _chineseEngine;
 
     /// <summary>
     /// コンストラクタ
@@ -46,6 +49,7 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
         Logger = loggerFactory.CreateLogger<OpusMtOnnxEngine>();
         _modelLoader = GetModelLoader();
         _tokenizer = GetTokenizer();
+        _chineseProcessor = new ChineseLanguageProcessor(loggerFactory.CreateLogger<ChineseLanguageProcessor>());
     }
 
     /// <inheritdoc/>
@@ -76,6 +80,60 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
         }
 
         return tokenizer;
+    }
+
+    /// <summary>
+    /// 翻訳リクエストに対して中国語プレフィックス処理を適用した翻訳を実行
+    /// </summary>
+    /// <param name="request">翻訳リクエスト</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>翻訳結果</returns>
+    protected override async Task<TranslationResponse> TranslateInternalAsync(
+        TranslationRequest request, 
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request, nameof(request));
+
+        // 中国語のプレフィックス処理を適用
+        var processedText = ApplyChinesePrefixIfNeeded(request.SourceText, request.TargetLanguage);
+        
+        // 処理されたテキストで新しいリクエストを作成
+        var processedRequest = TranslationRequest.Create(processedText, request.SourceLanguage, request.TargetLanguage);
+        
+        // 元のリクエストのコンテキストをコピー
+        if (request.Context != null)
+        {
+            processedRequest.Context = request.Context;
+        }
+
+        // 基底クラスの翻訳処理を実行
+        return await base.TranslateInternalAsync(processedRequest, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 必要に応じて中国語プレフィックスをテキストに追加
+    /// </summary>
+    /// <param name="text">元のテキスト</param>
+    /// <param name="targetLanguage">ターゲット言語</param>
+    /// <returns>プレフィックス処理されたテキスト</returns>
+    private string ApplyChinesePrefixIfNeeded(string text, Language targetLanguage)
+    {
+        if (string.IsNullOrWhiteSpace(text) || targetLanguage == null)
+        {
+            return text ?? string.Empty;
+        }
+
+        // 中国語系の言語の場合のみプレフィックスを追加
+        if (_chineseProcessor.IsChineseLanguageCode(targetLanguage.Code))
+        {
+            var prefixedText = _chineseProcessor.AddPrefixToText(text, targetLanguage);
+            Logger.LogDebug("中国語プレフィックス処理: '{OriginalText}' -> '{ProcessedText}'", 
+                text[..Math.Min(text.Length, 50)],
+                prefixedText[..Math.Min(prefixedText.Length, 50)]);
+            return prefixedText;
+        }
+
+        return text;
     }
 
     /// <inheritdoc/>
@@ -299,6 +357,106 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
     }
 
     /// <summary>
+    /// 中国語の文字体系を自動検出し、適切なプレフィックスを決定
+    /// </summary>
+    /// <param name="text">入力テキスト</param>
+    /// <returns>検出された文字体系に基づく言語オブジェクト</returns>
+    public Language DetectChineseScriptType(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return Language.ChineseSimplified; // デフォルトは簡体字
+        }
+
+        var scriptType = _chineseProcessor.DetectScriptType(text);
+        
+        return scriptType switch
+        {
+            ChineseScriptType.Simplified => Language.ChineseSimplified,
+            ChineseScriptType.Traditional => Language.ChineseTraditional,
+            ChineseScriptType.Mixed => Language.ChineseSimplified, // 混合の場合は簡体字をデフォルト
+            _ => Language.ChineseSimplified // 不明な場合は簡体字をデフォルト
+        };
+    }
+
+    /// <summary>
+    /// サポートされている中国語言語コードを取得
+    /// </summary>
+    /// <returns>サポートされている中国語言語コードのリスト</returns>
+    public IReadOnlyList<string> GetSupportedChineseLanguageCodes()
+    {
+        return _chineseProcessor.GetSupportedLanguageCodes();
+    }
+
+    /// <summary>
+    /// 中国語変種を指定した翻訳（Chinese variant support）
+    /// </summary>
+    /// <param name="text">翻訳するテキスト</param>
+    /// <param name="sourceLang">ソース言語コード</param>
+    /// <param name="targetLang">ターゲット言語コード</param>
+    /// <param name="variant">中国語変種</param>
+    /// <returns>翻訳結果</returns>
+    public async Task<string> TranslateWithChineseVariantAsync(
+        string text, 
+        string sourceLang, 
+        string targetLang, 
+        Baketa.Core.Translation.Models.ChineseVariant variant = Baketa.Core.Translation.Models.ChineseVariant.Auto)
+    {
+        if (_chineseEngine == null)
+        {
+            Logger.LogWarning("中国語エンジンが初期化されていません。標準翻訳を使用します。");
+            
+            // 標準の翻訳リクエストを作成して実行
+            var standardRequest = TranslationRequest.Create(
+                text, 
+                Language.FromCode(sourceLang), 
+                Language.FromCode(targetLang)
+            );
+            
+            var response = await TranslateInternalAsync(standardRequest).ConfigureAwait(false);
+            return response.TranslatedText ?? string.Empty;
+        }
+
+        return await _chineseEngine.TranslateAsync(text, sourceLang, targetLang, variant).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 中国語エンジンを初期化（DI設定での使用）
+    /// </summary>
+    /// <param name="chineseEngine">中国語翻訳エンジン</param>
+    public void InitializeChineseEngine(ChineseTranslationEngine chineseEngine)
+    {
+        _chineseEngine = chineseEngine ?? throw new ArgumentNullException(nameof(chineseEngine));
+        Logger.LogInformation("中国語翻訳エンジンが統合されました: {EngineName}", chineseEngine.Name);
+    }
+
+    /// <summary>
+    /// 中国語変種別翻訳結果を取得
+    /// </summary>
+    /// <param name="text">翻訳するテキスト</param>
+    /// <param name="sourceLang">ソース言語コード</param>
+    /// <param name="targetLang">ターゲット言語コード</param>
+    /// <returns>変種別翻訳結果</returns>
+    public async Task<ChineseVariantTranslationResult> TranslateAllChineseVariantsAsync(
+        string text, 
+        string sourceLang, 
+        string targetLang)
+    {
+        if (_chineseEngine == null)
+        {
+            throw new InvalidOperationException("中国語エンジンが初期化されていません。InitializeChineseEngineを呼び出してください。");
+        }
+
+        return await _chineseEngine.TranslateAllVariantsAsync(text, sourceLang, targetLang).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 中国語エンジンが利用可能かどうかを確認
+    /// </summary>
+    /// <returns>利用可能な場合はtrue</returns>
+    public bool IsChineseEngineAvailable => _chineseEngine != null;
+
+    /// <summary>
     /// 前処理: 入力テキストの言語固有の調整
     /// </summary>
     /// <param name="text">入力テキスト</param>
@@ -328,6 +486,11 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
             {
                 // 英語の前処理
                 processed = NormalizeEnglishText(processed);
+            }
+            else if (_chineseProcessor.IsChineseLanguageCode(ModelLanguagePair.SourceLanguage.Code))
+            {
+                // 中国語の前処理
+                processed = NormalizeChineseText(processed);
             }
 
             return processed;
@@ -369,6 +532,29 @@ public class OpusMtOnnxEngine : OnnxTranslationEngine
             .Replace("\u201D", "\"", StringComparison.Ordinal)   // 右ダブルクォートを標準に
             .Replace("\u2018", "'", StringComparison.Ordinal)     // 左シングルクォートを標準に
             .Replace("\u2019", "'", StringComparison.Ordinal);    // 右シングルクォートを標準に
+    }
+
+    /// <summary>
+    /// 中国語テキストの正規化
+    /// </summary>
+    /// <param name="text">中国語テキスト</param>
+    /// <returns>正規化されたテキスト</returns>
+    private string NormalizeChineseText(string text)
+    {
+        // 基本的な中国語正規化
+        return text
+            .Replace("　", " ", StringComparison.Ordinal)      // 全角スペースを半角に
+            .Replace("（", "(", StringComparison.Ordinal)      // 全角左括弧を半角に
+            .Replace("）", ")", StringComparison.Ordinal)      // 全角右括弧を半角に
+            .Replace("，", ",", StringComparison.Ordinal)      // 全角カンマを半角に
+            .Replace("：", ":", StringComparison.Ordinal)      // 全角コロンを半角に
+            .Replace("；", ";", StringComparison.Ordinal)      // 全角セミコロンを半角に
+            .Replace("？", "?", StringComparison.Ordinal)      // 全角クエスチョンマークを半角に
+            .Replace("！", "!", StringComparison.Ordinal)      // 全角エクスクラメーションマークを半角に
+            .Replace("“", "\"", StringComparison.Ordinal)    // 左ダブルクォートを標準に
+            .Replace("”", "\"", StringComparison.Ordinal)    // 右ダブルクォートを標準に
+            .Replace("‘", "'", StringComparison.Ordinal)     // 左シングルクォートを標準に
+            .Replace("’", "'", StringComparison.Ordinal);    // 右シングルクォートを標準に
     }
 
     /// <summary>
