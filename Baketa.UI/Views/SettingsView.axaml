@@ -58,6 +58,14 @@
                         </StackPanel>
                     </ListBoxItem>
                     
+                    <!-- 翻訳エンジン設定 -->
+                    <ListBoxItem x:Name="TranslationEngineSettingItem">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource TranslateIcon}" Width="16" Height="16"/>
+                            <TextBlock Text="翻訳エンジン" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    
                     <!-- ホットキー設定 -->
                     <ListBoxItem x:Name="HotkeysSettingItem">
                         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -167,6 +175,94 @@
                                           SelectedItem="{Binding TranslationLanguage}" 
                                           HorizontalAlignment="Left" 
                                           Width="200"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- 翻訳エンジン設定 -->
+                        <StackPanel IsVisible="{Binding SelectedCategory, 
+                                    Converter={StaticResource EnumComparisonConverter}, 
+                                    ConverterParameter={x:Static vm:SettingsViewModel+SettingCategory.TranslationEngine}}"
+                                    Spacing="20" Margin="10">
+                            <TextBlock Text="翻訳エンジン選択" 
+                                       Classes="SubtitleTextBlockStyle"  
+                                       Margin="0,0,0,10"/>
+                            
+                            <!-- エンジン選択ラジオボタン -->
+                            <StackPanel Spacing="15">
+                                
+                                <RadioButton GroupName="TranslationEngine" 
+                                             IsChecked="{Binding IsLocalOnlySelected}"
+                                             Classes="engine-radio">
+                                    <StackPanel>
+                                        <TextBlock Text="LocalOnly（ローカル翻訳）" FontWeight="Bold"/>
+                                        <TextBlock Text="• OPUS-MT専用" Classes="description"/>
+                                        <TextBlock Text="• 高速・無料・オフライン対応" Classes="description"/>
+                                        <TextBlock Text="• 適用: 短いテキスト、一般的翻訳" Classes="description"/>
+                                        <TextBlock Text="平均レイテンシ: &lt; 50ms" Classes="performance"/>
+                                    </StackPanel>
+                                </RadioButton>
+                                
+                                <RadioButton GroupName="TranslationEngine" 
+                                             IsChecked="{Binding IsCloudOnlySelected}"
+                                             Classes="engine-radio">
+                                    <StackPanel>
+                                        <TextBlock Text="CloudOnly（クラウド翻訳）" FontWeight="Bold"/>
+                                        <TextBlock Text="• Gemini API専用" Classes="description"/>
+                                        <TextBlock Text="• 高品質・有料・ネットワーク必須" Classes="description"/>
+                                        <TextBlock Text="• 適用: 複雑なテキスト、専門用語" Classes="description"/>
+                                        <TextBlock Text="平均レイテンシ: &lt; 2000ms" Classes="performance"/>
+                                    </StackPanel>
+                                </RadioButton>
+                                
+                            </StackPanel>
+                            
+                            <!-- 選択されたエンジンの詳細情報 -->
+                            <Border Classes="info-border">
+                                <StackPanel>
+                                    <TextBlock Text="選択中のエンジン詳細" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding SelectedEngineDescription}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding EstimatedCostInfo}" Classes="cost-info" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            
+                            <!-- フォールバック設定 -->
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="自動フォールバック設定" FontWeight="Bold"/>
+                                <TextBlock Text="CloudOnly選択時に以下の状況でLocalOnlyに自動切り替え" 
+                                           Classes="description"/>
+                                
+                                <CheckBox IsChecked="{Binding EnableRateLimitFallback}"
+                                          Content="レート制限時の自動フォールバック"/>
+                                
+                                <CheckBox IsChecked="{Binding EnableNetworkErrorFallback}"
+                                          Content="ネットワークエラー時の自動フォールバック"/>
+                                
+                                <CheckBox IsChecked="{Binding EnableApiErrorFallback}"
+                                          Content="APIエラー時の自動フォールバック"/>
+                                
+                                <CheckBox IsChecked="{Binding ShowFallbackNotifications}"
+                                          Content="フォールバック発生時の通知表示"/>
+                                
+                                <!-- フォールバック詳細設定 -->
+                                <Expander Header="詳細設定" IsExpanded="False" Margin="0,10,0,0">
+                                    <StackPanel Spacing="5">
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="フォールバック判定タイムアウト:"/>
+                                            <NumericUpDown Value="{Binding FallbackTimeoutSeconds}" 
+                                                           Minimum="5" Maximum="60" Increment="5" Width="60"/>
+                                            <TextBlock Text="秒"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="自動復旧チェック間隔:"/>
+                                            <NumericUpDown Value="{Binding RecoveryCheckIntervalMinutes}" 
+                                                           Minimum="1" Maximum="30" Increment="1" Width="60"/>
+                                            <TextBlock Text="分"/>
+                                        </StackPanel>
+                                        
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
                         </StackPanel>
                         
