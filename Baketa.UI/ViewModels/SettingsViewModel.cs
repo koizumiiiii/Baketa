@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using Baketa.Core.Events;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.ReactiveUI;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ReactiveUI;
+using DynamicData;
 
 // 名前空間エイリアスを使用して衝突を解決
 using CoreEvents = Baketa.Core.Events;
@@ -46,12 +48,19 @@ namespace Baketa.UI.ViewModels
                 new EventId(3, nameof(_logSettingsFileError)),
                 "設定ファイルの操作中にエラーが発生しました: {Message}");
 
+        // サービス依存関係
+        private readonly ITranslationEngineStatusService? _statusService;
+        
+        // 状態監視関連のフィールド
+        private IDisposable? _statusUpdateSubscription;
+
         // 設定カテゴリ
         public enum SettingCategory
         {
             General,
             Appearance,
             Language,
+            LanguagePairs,
             TranslationEngine,
             Hotkeys,
             Advanced,
@@ -298,33 +307,168 @@ namespace Baketa.UI.ViewModels
         
         // アクセシビリティ設定ビューモデル
         public AccessibilitySettingsViewModel AccessibilityViewModel { get; }
+        
+        // 言語ペア設定ビューモデル
+        public LanguagePairsViewModel LanguagePairsViewModel { get; }
+        
+        // ==== エンジン状態監視関連 ====
+        
+        /// <summary>
+        /// LocalOnlyエンジンの状態
+        /// </summary>
+        public TranslationEngineStatus? LocalEngineStatus => _statusService?.LocalEngineStatus;
+        
+        /// <summary>
+        /// CloudOnlyエンジンの状態
+        /// </summary>
+        public TranslationEngineStatus? CloudEngineStatus => _statusService?.CloudEngineStatus;
+        
+        /// <summary>
+        /// ネットワーク接続状態
+        /// </summary>
+        public NetworkConnectionStatus? NetworkStatus => _statusService?.NetworkStatus;
+        
+        /// <summary>
+        /// 最後のフォールバック情報
+        /// </summary>
+        public FallbackInfo? LastFallbackInfo => _statusService?.LastFallback;
+        
+        // 状態監視機能有効化
+        private bool _isStatusMonitoringEnabled;
+        public bool IsStatusMonitoringEnabled
+        {
+            get => _isStatusMonitoringEnabled;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _isStatusMonitoringEnabled, value);
+        }
+        
+        // リアルタイム状態表示用プロパティ
+        
+        /// <summary>
+        /// LocalOnlyエンジンの状態テキスト
+        /// </summary>
+        public string LocalEngineStatusText
+        {
+            get
+            {
+                if (LocalEngineStatus == null) return "状態不明";
+                
+                return LocalEngineStatus.OverallStatus switch
+                {
+                    EngineHealthStatus.Healthy => "✅ 正常動作中",
+                    EngineHealthStatus.Warning => "⚠️ 警告",
+                    EngineHealthStatus.Error => "❌ エラー",
+                    EngineHealthStatus.Offline => "🔴 オフライン",
+                    _ => "状態不明"
+                };
+            }
+        }
+        
+        /// <summary>
+        /// CloudOnlyエンジンの状態テキスト
+        /// </summary>
+        public string CloudEngineStatusText
+        {
+            get
+            {
+                if (CloudEngineStatus == null) return "状態不明";
+                
+                var statusText = CloudEngineStatus.OverallStatus switch
+                {
+                    EngineHealthStatus.Healthy => "✅ 正常動作中",
+                    EngineHealthStatus.Warning => "⚠️ 警告",
+                    EngineHealthStatus.Error => "❌ エラー",
+                    EngineHealthStatus.Offline => "🔴 オフライン",
+                    _ => "状態不明"
+                };
+                
+                // レート制限情報を追加
+                if (CloudEngineStatus.IsOnline && CloudEngineStatus.RemainingRequests >= 0)
+                {
+                    statusText += $" (残り: {CloudEngineStatus.RemainingRequests}回)";
+                }
+                
+                return statusText;
+            }
+        }
+        
+        /// <summary>
+        /// ネットワーク状態テキスト
+        /// </summary>
+        public string NetworkStatusText
+        {
+            get
+            {
+                if (NetworkStatus == null) return "状態不明";
+                
+                if (!NetworkStatus.IsConnected)
+                {
+                    return "🔴 オフライン";
+                }
+                
+                var latencyText = NetworkStatus.LatencyMs > 0 ? $" ({NetworkStatus.LatencyMs}ms)" : "";
+                return $"✅ 接続中{latencyText}";
+            }
+        }
+        
+        /// <summary>
+        /// 最後のフォールバック情報テキスト
+        /// </summary>
+        public string LastFallbackText
+        {
+            get
+            {
+                if (LastFallbackInfo == null) return "フォールバックなし";
+                
+                var timeAgo = DateTime.Now - LastFallbackInfo.OccurredAt;
+                var timeText = timeAgo.TotalMinutes < 1 ? "つい先ほど" :
+                              timeAgo.TotalHours < 1 ? $"{(int)timeAgo.TotalMinutes}分前" :
+                              $"{(int)timeAgo.TotalHours}時間前";
+                
+                return $"{LastFallbackInfo.FromEngine}→{LastFallbackInfo.ToEngine} ({timeText})";
+            }
+        }
 
         // コマンド
         public ReactiveCommand<Unit, Unit> SaveCommand { get; }
         public ReactiveCommand<Unit, Unit> CancelCommand { get; }
         public ReactiveCommand<Unit, Unit> ResetToDefaultsCommand { get; }
         public ReactiveCommand<SettingCategory, Unit> SelectCategoryCommand { get; }
+        public ReactiveCommand<Unit, Unit> StartStatusMonitoringCommand { get; }
+        public ReactiveCommand<Unit, Unit> StopStatusMonitoringCommand { get; }
+        public ReactiveCommand<Unit, Unit> RefreshStatusCommand { get; }
 
         /// <summary>
         /// 新しいSettingsViewModelを初期化します
         /// </summary>
         /// <param name="eventAggregator">イベント集約器</param>
         /// <param name="accessibilityViewModel">アクセシビリティ設定ビューモデル</param>
+        /// <param name="languagePairsViewModel">言語ペア設定ビューモデル</param>
+        /// <param name="statusService">翻訳エンジン状態監視サービス</param>
         /// <param name="logger">ロガー</param>
         public SettingsViewModel(
             UIEvents.IEventAggregator eventAggregator, 
             AccessibilitySettingsViewModel accessibilityViewModel,
+            LanguagePairsViewModel languagePairsViewModel,
+            ITranslationEngineStatusService? statusService = null,
             ILogger? logger = null)
             : base(eventAggregator, logger)
         {
             AccessibilityViewModel = accessibilityViewModel 
                 ?? throw new ArgumentNullException(nameof(accessibilityViewModel));
             
+            LanguagePairsViewModel = languagePairsViewModel
+                ?? throw new ArgumentNullException(nameof(languagePairsViewModel));
+            
+            _statusService = statusService;
+            
             // コマンドの初期化
             SaveCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteSaveAsync);
             CancelCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteCancelAsync);
             ResetToDefaultsCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteResetToDefaultsAsync);
             SelectCategoryCommand = ReactiveCommand.Create<SettingCategory>(ExecuteSelectCategory);
+            StartStatusMonitoringCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteStartStatusMonitoringAsync);
+            StopStatusMonitoringCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteStopStatusMonitoringAsync);
+            RefreshStatusCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteRefreshStatusAsync);
 
             // プロパティの変更を監視して設定変更フラグを設定
             // ReactiveUIのWhenAnyValueの制限により、監視を複数に分割
@@ -378,6 +522,141 @@ namespace Baketa.UI.ViewModels
                 SelectedCategory = SettingCategory.Accessibility;
                 await Task.CompletedTask.ConfigureAwait(false);
             });
+            
+            // 状態監視サービスの初期化と購読
+            InitializeStatusMonitoring();
+        }
+        
+        /// <summary>
+        /// 状態監視の初期化
+        /// </summary>
+        private void InitializeStatusMonitoring()
+        {
+            if (_statusService == null)
+            {
+                return;
+            }
+            
+            // 状態更新イベントの購読
+            _statusUpdateSubscription = _statusService.StatusUpdates
+                .Subscribe(OnStatusUpdate);
+            
+            // 状態オブジェクトのプロパティ変更を監視
+            if (_statusService.LocalEngineStatus != null)
+            {
+                _statusService.LocalEngineStatus.WhenAnyValue(
+                    x => x.IsOnline,
+                    x => x.IsHealthy,
+                    x => x.RemainingRequests,
+                    x => x.LastError)
+                    .Subscribe(_ => 
+                    {
+                        this.RaisePropertyChanged(nameof(LocalEngineStatusText));
+                        this.RaisePropertyChanged(nameof(LocalEngineStatus));
+                    });
+            }
+            
+            if (_statusService.CloudEngineStatus != null)
+            {
+                _statusService.CloudEngineStatus.WhenAnyValue(
+                    x => x.IsOnline,
+                    x => x.IsHealthy,
+                    x => x.RemainingRequests,
+                    x => x.LastError)
+                    .Subscribe(_ => 
+                    {
+                        this.RaisePropertyChanged(nameof(CloudEngineStatusText));
+                        this.RaisePropertyChanged(nameof(CloudEngineStatus));
+                    });
+            }
+            
+            if (_statusService.NetworkStatus != null)
+            {
+                _statusService.NetworkStatus.WhenAnyValue(
+                    x => x.IsConnected,
+                    x => x.LatencyMs)
+                    .Subscribe(_ => 
+                    {
+                        this.RaisePropertyChanged(nameof(NetworkStatusText));
+                        this.RaisePropertyChanged(nameof(NetworkStatus));
+                    });
+            }
+            
+            // 状態監視を自動開始
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _statusService.StartMonitoringAsync().ConfigureAwait(false);
+                    IsStatusMonitoringEnabled = true;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger?.LogError(ex, "状態監視サービスが既に実行中です");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger?.LogError(ex, "状態監視の開始権限がありません");
+                }
+                catch (TimeoutException ex)
+                {
+                    _logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
+                }
+            });
+        }
+        
+        /// <summary>
+        /// 状態更新イベントの処理
+        /// </summary>
+        private void OnStatusUpdate(TranslationEngineStatusUpdate update)
+        {
+            try
+            {
+                // フォールバック情報の更新
+                this.RaisePropertyChanged(nameof(LastFallbackInfo));
+                this.RaisePropertyChanged(nameof(LastFallbackText));
+                
+                // エンジン別の状態更新
+                switch (update.EngineName)
+                {
+                    case "LocalOnly":
+                        this.RaisePropertyChanged(nameof(LocalEngineStatus));
+                        this.RaisePropertyChanged(nameof(LocalEngineStatusText));
+                        break;
+                        
+                    case "CloudOnly":
+                        this.RaisePropertyChanged(nameof(CloudEngineStatus));
+                        this.RaisePropertyChanged(nameof(CloudEngineStatusText));
+                        break;
+                        
+                    case "Network":
+                        this.RaisePropertyChanged(nameof(NetworkStatus));
+                        this.RaisePropertyChanged(nameof(NetworkStatusText));
+                        break;
+                }
+                
+                // フォールバック発生時の特別処理
+                if (update.UpdateType == StatusUpdateType.FallbackTriggered)
+                {
+                    _logger?.LogInformation(
+                        "フォールバックが発生しました: {EngineName} at {UpdatedAt}",
+                        update.EngineName, update.UpdatedAt);
+                        
+                    // フォールバック通知を表示する必要がある場合
+                    if (ShowFallbackNotifications)
+                    {
+                        // TODO: トースト通知の実装
+                    }
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                _logger?.LogError(ex, "状態更新イベントのパラメータが無効です");
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger?.LogError(ex, "状態更新イベントの処理中に無効な操作が発生しました");
+            }
         }
 
         /// <summary>
@@ -532,6 +811,151 @@ namespace Baketa.UI.ViewModels
         private void ExecuteSelectCategory(SettingCategory category)
         {
             SelectedCategory = category;
+        }
+        
+        /// <summary>
+        /// 状態監視開始コマンド実行
+        /// </summary>
+        private async Task ExecuteStartStatusMonitoringAsync()
+        {
+            if (_statusService == null)
+            {
+                ErrorMessage = "状態監視サービスが利用できません";
+                return;
+            }
+            
+            IsLoading = true;
+            try
+            {
+                await _statusService.StartMonitoringAsync().ConfigureAwait(false);
+                IsStatusMonitoringEnabled = true;
+                ErrorMessage = string.Empty;
+                
+                _logger?.LogInformation("状態監視を手動で開始しました");
+            }
+            catch (InvalidOperationException ex)
+            {
+                ErrorMessage = $"状態監視が既に実行中です: {ex.Message}";
+                _logger?.LogError(ex, "状態監視が既に実行中です");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                ErrorMessage = $"状態監視の開始権限がありません: {ex.Message}";
+                _logger?.LogError(ex, "状態監視の開始権限がありません");
+            }
+            catch (TimeoutException ex)
+            {
+                ErrorMessage = $"状態監視の開始がタイムアウトしました: {ex.Message}";
+                _logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+        
+        /// <summary>
+        /// 状態監視停止コマンド実行
+        /// </summary>
+        private async Task ExecuteStopStatusMonitoringAsync()
+        {
+            if (_statusService == null)
+            {
+                return;
+            }
+            
+            IsLoading = true;
+            try
+            {
+                await _statusService.StopMonitoringAsync().ConfigureAwait(false);
+                IsStatusMonitoringEnabled = false;
+                ErrorMessage = string.Empty;
+                
+                _logger?.LogInformation("状態監視を手動で停止しました");
+            }
+            catch (InvalidOperationException ex)
+            {
+                ErrorMessage = $"状態監視が実行中ではありません: {ex.Message}";
+                _logger?.LogError(ex, "状態監視が実行中ではありません");
+            }
+            catch (TimeoutException ex)
+            {
+                ErrorMessage = $"状態監視の停止がタイムアウトしました: {ex.Message}";
+                _logger?.LogError(ex, "状態監視の停止がタイムアウトしました");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+        
+        /// <summary>
+        /// 状態リフレッシュコマンド実行
+        /// </summary>
+        private async Task ExecuteRefreshStatusAsync()
+        {
+            if (_statusService == null)
+            {
+                ErrorMessage = "状態監視サービスが利用できません";
+                return;
+            }
+            
+            IsLoading = true;
+            try
+            {
+                await _statusService.RefreshStatusAsync().ConfigureAwait(false);
+                ErrorMessage = string.Empty;
+                
+                _logger?.LogDebug("状態を手動でリフレッシュしました");
+            }
+            catch (InvalidOperationException ex)
+            {
+                ErrorMessage = $"状態リフレッシュが無効な状態です: {ex.Message}";
+                _logger?.LogError(ex, "状態リフレッシュが無効な状態です");
+            }
+            catch (TimeoutException ex)
+            {
+                ErrorMessage = $"状態リフレッシュがタイムアウトしました: {ex.Message}";
+                _logger?.LogError(ex, "状態リフレッシュがタイムアウトしました");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+        
+        /// <summary>
+        /// リソースを解放します
+        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 状態更新購読を解除
+                _statusUpdateSubscription?.Dispose();
+                
+                // 状態監視を停止
+                if (_statusService != null && IsStatusMonitoringEnabled)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _statusService.StopMonitoringAsync().ConfigureAwait(false);
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            _logger?.LogWarning(ex, "ViewModel破棄時に状態監視が既に停止していました");
+                        }
+                        catch (TimeoutException ex)
+                        {
+                            _logger?.LogWarning(ex, "ViewModel破棄時の状態監視停止がタイムアウトしました");
+                        }
+                    });
+                }
+            }
+            
+            base.Dispose(disposing);
         }
     }
 

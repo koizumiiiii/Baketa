@@ -3,7 +3,7 @@
              x:Class="Baketa.UI.App"
              xmlns:local="using:Baketa.UI"
              xmlns:vm="using:Baketa.UI.ViewModels"
-             xmlns:conv="clr-namespace:Baketa.UI.Converters;assembly=Baketa.UI"
+             xmlns:conv="using:Baketa.UI.Converters"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
@@ -32,6 +32,14 @@
             <!-- コンバーター -->
             <local:EnumToIntConverter x:Key="EnumToIntConverter" />
             <local:EnumComparisonConverter x:Key="EnumComparisonConverter" />
+            
+            <!-- 言語ペア設定用コンバーター -->
+            <conv:LanguageCodeToLanguageInfoConverter x:Key="LanguageCodeToLanguageInfoConverter" />
+            <conv:TranslationStrategyConverter x:Key="TranslationStrategyConverter" />
+            <conv:ChineseVariantConverter x:Key="ChineseVariantConverter" />
+            <conv:BoolToBackgroundConverter x:Key="BoolToBackgroundConverter" />
+            <conv:CollectionCountConverter x:Key="CollectionCountConverter" />
+            <conv:CollectionAverageConverter x:Key="CollectionAverageConverter" />
             
             <!-- アクセシビリティ設定 -->
             <x:Boolean x:Key="AnimationsEnabled">True</x:Boolean>

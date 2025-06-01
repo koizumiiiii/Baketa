@@ -1,10 +1,13 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using Avalonia;
 using Avalonia.ReactiveUI;
 using Baketa.Application.DI.Extensions;
 using Baketa.Core.DI;
 using Baketa.UI.DI;
+using Microsoft.Extensions.Configuration;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -48,8 +51,20 @@ namespace Baketa.UI;
                 ? BaketaEnvironment.Development 
                 : BaketaEnvironment.Production;
             
+            // 設定ファイルの読み込み
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+            
             // DIコンテナの構成
             var services = new ServiceCollection();
+            
+            // Configurationを登録
+            services.AddSingleton<IConfiguration>(configuration);
+            
+            // appsettings.jsonから設定を読み込み
+            services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
+                configuration.GetSection("TranslationEngineStatus"));
             
             // ロギングの設定
             services.AddLogging(builder => 
