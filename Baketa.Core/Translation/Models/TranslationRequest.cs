@@ -30,6 +30,11 @@ namespace Baketa.Core.Translation.Models;
         public TranslationContext? Context { get; set; }
         
         /// <summary>
+        /// 優先する翻訳エンジン名（オプション）
+        /// </summary>
+        public string? PreferredEngine { get; set; }
+        
+        /// <summary>
         /// リクエストオプション
         /// </summary>
         public Dictionary<string, object?> Options { get; } = [];
