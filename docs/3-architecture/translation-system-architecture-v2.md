@@ -290,6 +290,77 @@ var fallbackResponse = await translationService.TranslateAsync(request, "Hybrid"
 
 ### 7.1 Phase 4: UI統合
 
+#### 7.1.1 エンジン選択UI設計
+
+**戦略簡素化に伴うUI変更**：
+
+**従来の設計（廃止）**：
+- ❌ OPUS-MT vs Gemini API vs Hybrid（3択）
+
+**新しい設計（実装対象）**：
+- ✅ **LocalOnly** vs **CloudOnly**（2択）+ 自動フォールバック
+
+**UI構成要素**：
+```
+翻訳エンジン設定
+├── エンジン選択 (RadioButton)
+│   ├── ◉ LocalOnly  - 高速・無料・オフライン対応
+│   └── ○ CloudOnly - 高品質・有料・ネットワーク必須
+├── フォールバック設定 (CheckBox)
+│   ├── ☑ レート制限時の自動フォールバック
+│   ├── ☑ ネットワークエラー時の自動フォールバック
+│   └── ☑ API エラー時の自動フォールバック
+└── フォールバック状態表示 (StatusIndicator)
+    ├── 🟢 正常動作中 (選択されたエンジン)
+    ├── 🟡 フォールバック中 (LocalOnlyに自動切り替え)
+    └── 🔴 エラー状態 (翻訳不可)
+```
+
+**エンジン選択の詳細説明**：
+
+| エンジン | 特徴 | 用途 | レイテンシ | コスト | オフライン |
+|---------|------|------|-----------|--------|-----------|
+| **LocalOnly** | OPUS-MT専用 | 短いテキスト、一般的翻訳 | < 50ms | 無料 | ✅ 対応 |
+| **CloudOnly** | Gemini API専用 | 複雑なテキスト、高品質翻訳 | < 2000ms | 有料 | ❌ 非対応 |
+
+**フォールバック動作の明示**：
+- CloudOnlyでレート制限・ネットワークエラー発生時は自動的にLocalOnlyに切り替え
+- フォールバック発生時はUI上で明確に状態を表示
+- ユーザーはフォールバック発生理由を確認可能
+
+#### 7.1.2 実装ファイル構成
+
+**UIファイル（Avalonia UI）**：
+```
+Baketa.UI/Views/Settings/
+├── TranslationSettingsView.axaml     - メイン設定画面
+├── EngineSelectionControl.axaml      - エンジン選択コントロール
+└── FallbackStatusControl.axaml       - フォールバック状態表示
+
+Baketa.UI/ViewModels/Settings/
+├── TranslationSettingsViewModel.cs   - 設定画面ViewModel
+├── EngineSelectionViewModel.cs       - エンジン選択ViewModel
+└── FallbackStatusViewModel.cs        - フォールバック状態ViewModel
+```
+
+**設定データバインディング**：
+```csharp
+public class EngineSelectionViewModel : ViewModelBase
+{
+    public TranslationStrategy SelectedStrategy { get; set; } = TranslationStrategy.LocalOnly;
+    public bool EnableRateLimitFallback { get; set; } = true;
+    public bool EnableNetworkErrorFallback { get; set; } = true;
+    public bool EnableApiErrorFallback { get; set; } = true;
+    
+    public string EngineDescription => SelectedStrategy switch
+    {
+        TranslationStrategy.LocalOnly => "OPUS-MT専用 - 高速・無料・オフライン対応",
+        TranslationStrategy.CloudOnly => "Gemini API専用 - 高品質・有料・ネットワーク必須",
+        _ => "不明なエンジン"
+    };
+}
+```
+
 - 翻訳設定画面での中国語変種選択機能
 - リアルタイム翻訳結果表示の改善
 - エラー状態のユーザー通知機能強化

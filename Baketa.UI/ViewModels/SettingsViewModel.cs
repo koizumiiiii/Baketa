@@ -52,6 +52,7 @@ namespace Baketa.UI.ViewModels
             General,
             Appearance,
             Language,
+            TranslationEngine,
             Hotkeys,
             Advanced,
             Accessibility
@@ -120,6 +121,124 @@ namespace Baketa.UI.ViewModels
 
         // 翻訳言語の選択肢
         public ObservableCollection<string> TranslationLanguageOptions { get; } = new() { "日本語", "英語", "簡体字中国語", "繁体字中国語", "韓国語" };
+
+        // ==== 翻訳エンジン設定 ====
+        
+        // 選択された翻訳エンジン
+        private string _selectedTranslationEngine = "LocalOnly";
+        public string SelectedTranslationEngine
+        {
+            get => _selectedTranslationEngine;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _selectedTranslationEngine, value);
+        }
+
+        // 翻訳エンジンの選択肢
+        public ObservableCollection<string> TranslationEngineOptions { get; } = new() { "LocalOnly", "CloudOnly" };
+
+        // LocalOnly選択状態
+        public bool IsLocalOnlySelected
+        {
+            get => SelectedTranslationEngine == "LocalOnly";
+            set
+            {
+                if (value) SelectedTranslationEngine = "LocalOnly";
+            }
+        }
+
+        // CloudOnly選択状態
+        public bool IsCloudOnlySelected
+        {
+            get => SelectedTranslationEngine == "CloudOnly";
+            set
+            {
+                if (value) SelectedTranslationEngine = "CloudOnly";
+            }
+        }
+
+        // フォールバック設定
+        private bool _enableRateLimitFallback = true;
+        public bool EnableRateLimitFallback
+        {
+            get => _enableRateLimitFallback;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _enableRateLimitFallback, value);
+        }
+
+        private bool _enableNetworkErrorFallback = true;
+        public bool EnableNetworkErrorFallback
+        {
+            get => _enableNetworkErrorFallback;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _enableNetworkErrorFallback, value);
+        }
+
+        private bool _enableApiErrorFallback = true;
+        public bool EnableApiErrorFallback
+        {
+            get => _enableApiErrorFallback;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _enableApiErrorFallback, value);
+        }
+
+        private bool _showFallbackNotifications = true;
+        public bool ShowFallbackNotifications
+        {
+            get => _showFallbackNotifications;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _showFallbackNotifications, value);
+        }
+
+        private int _fallbackTimeoutSeconds = 10;
+        public int FallbackTimeoutSeconds
+        {
+            get => _fallbackTimeoutSeconds;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _fallbackTimeoutSeconds, value);
+        }
+
+        private int _recoveryCheckIntervalMinutes = 5;
+        public int RecoveryCheckIntervalMinutes
+        {
+            get => _recoveryCheckIntervalMinutes;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _recoveryCheckIntervalMinutes, value);
+        }
+
+        // エンジンの説明テキスト
+        public string SelectedEngineDescription
+        {
+            get
+            {
+                return SelectedTranslationEngine switch
+                {
+                    "LocalOnly" =>
+                        "OPUS-MT専用エンジン\n" +
+                        "✅ 高速処理（50ms以下）\n" +
+                        "✅ 完全無料\n" +
+                        "✅ オフライン対応\n" +
+                        "📝 適用: 短いテキスト、一般的な翻訳\n" +
+                        "🎯 品質: 標準品質",
+                    "CloudOnly" =>
+                        "Gemini API専用エンジン\n" +
+                        "✅ 高品質翻訳\n" +
+                        "✅ 専門用語対応\n" +
+                        "✅ 文脈理解\n" +
+                        "💰 課金制\n" +
+                        "🌐 ネットワーク必須\n" +
+                        "📝 適用: 複雑なテキスト、専門分野\n" +
+                        "🎯 品質: 高品質",
+                    _ => "不明なエンジン"
+                };
+            }
+        }
+
+        // コスト情報
+        public string EstimatedCostInfo
+        {
+            get
+            {
+                return SelectedTranslationEngine switch
+                {
+                    "LocalOnly" => "📊 コスト: 無料（モデルダウンロード時のみ通信）",
+                    "CloudOnly" => "📊 コスト: 約 $0.01-0.05 / 1000文字（文字数により変動）",
+                    _ => ""
+                };
+            }
+        }
 
         // キャプチャホットキー
         private string _captureHotkey = "Ctrl+Alt+C";
@@ -208,20 +327,50 @@ namespace Baketa.UI.ViewModels
             SelectCategoryCommand = ReactiveCommand.Create<SettingCategory>(ExecuteSelectCategory);
 
             // プロパティの変更を監視して設定変更フラグを設定
+            // ReactiveUIのWhenAnyValueの制限により、監視を複数に分割
+            
+            // 基本設定の監視
             this.WhenAnyValue(
                 x => x.IsDarkTheme,
                 x => x.UIScale,
                 x => x.UILanguage,
                 x => x.OCRLanguage,
                 x => x.TranslationLanguage,
+                x => x.SelectedTranslationEngine,
+                x => x.EnableRateLimitFallback,
+                x => x.EnableNetworkErrorFallback,
+                (darkTheme, uiScale, uiLang, ocrLang, transLang, transEngine, rateLimitFallback, networkErrorFallback) => true
+            ).Subscribe(_ => HasChanges = true);
+            
+            // フォールバック設定の監視
+            this.WhenAnyValue(
+                x => x.EnableApiErrorFallback,
+                x => x.ShowFallbackNotifications,
+                x => x.FallbackTimeoutSeconds,
+                x => x.RecoveryCheckIntervalMinutes,
                 x => x.CaptureHotkey,
                 x => x.TranslateHotkey,
                 x => x.ResetHotkey,
                 x => x.StartWithWindows,
+                (apiErrorFallback, showFallbackNotifications, fallbackTimeout, recoveryInterval, captureHotkey, translateHotkey, resetHotkey, startWithWindows) => true
+            ).Subscribe(_ => HasChanges = true);
+            
+            // その他の設定の監視
+            this.WhenAnyValue(
                 x => x.MinimizeToTray,
                 x => x.EnableDebugLogs,
-                (darkTheme, uiScale, uiLang, ocrLang, transLang, captureHotkey, translateHotkey, resetHotkey, startWithWindows, minimizeToTray, enableDebugLogs) => true
+                (minimizeToTray, enableDebugLogs) => true
             ).Subscribe(_ => HasChanges = true);
+            
+            // 翻訳エンジン選択変更時の監視
+            this.WhenAnyValue(x => x.SelectedTranslationEngine)
+                .Subscribe(_ => 
+                {
+                    this.RaisePropertyChanged(nameof(IsLocalOnlySelected));
+                    this.RaisePropertyChanged(nameof(IsCloudOnlySelected));
+                    this.RaisePropertyChanged(nameof(SelectedEngineDescription));
+                    this.RaisePropertyChanged(nameof(EstimatedCostInfo));
+                });
             
             // アクセシビリティ設定開始イベントの購読
             SubscribeToEvent<CoreEvents.AccessibilityEvents.OpenAccessibilitySettingsRequestedEvent>(async _ =>
@@ -288,6 +437,19 @@ namespace Baketa.UI.ViewModels
                 };
                 await PublishEventAsync(hotkeyEvent).ConfigureAwait(false);
 
+                // 翻訳エンジン設定の変更を通知
+                var translationEngineEvent = new TranslationEngineSettingsChangedEvent
+                {
+                    SelectedEngine = SelectedTranslationEngine,
+                    EnableRateLimitFallback = EnableRateLimitFallback,
+                    EnableNetworkErrorFallback = EnableNetworkErrorFallback,
+                    EnableApiErrorFallback = EnableApiErrorFallback,
+                    ShowFallbackNotifications = ShowFallbackNotifications,
+                    FallbackTimeoutSeconds = FallbackTimeoutSeconds,
+                    RecoveryCheckIntervalMinutes = RecoveryCheckIntervalMinutes
+                };
+                await PublishEventAsync(translationEngineEvent).ConfigureAwait(false);
+
                 // 一般設定の変更を通知
                 var generalEvent = new GeneralSettingsChangedEvent
                 {
@@ -344,6 +506,13 @@ namespace Baketa.UI.ViewModels
             UILanguage = "日本語";
             OCRLanguage = "日本語";
             TranslationLanguage = "英語";
+            SelectedTranslationEngine = "LocalOnly";
+            EnableRateLimitFallback = true;
+            EnableNetworkErrorFallback = true;
+            EnableApiErrorFallback = true;
+            ShowFallbackNotifications = true;
+            FallbackTimeoutSeconds = 10;
+            RecoveryCheckIntervalMinutes = 5;
             CaptureHotkey = "Ctrl+Alt+C";
             TranslateHotkey = "Ctrl+Alt+T";
             ResetHotkey = "Ctrl+Alt+R";
@@ -441,6 +610,53 @@ internal sealed class HotkeySettingsChangedEvent : CoreEvents.EventBase
     /// リセットホットキー
     /// </summary>
     public string ResetHotkey { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 翻訳エンジン設定変更イベント
+/// </summary>
+internal sealed class TranslationEngineSettingsChangedEvent : CoreEvents.EventBase
+{
+    /// <inheritdoc/>
+    public override string Name => "TranslationEngineSettingsChanged";
+    
+    /// <inheritdoc/>
+    public override string Category => "UI.Settings";
+    
+    /// <summary>
+    /// 選択されたエンジン
+    /// </summary>
+    public string SelectedEngine { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// レート制限時のフォールバック有効化
+    /// </summary>
+    public bool EnableRateLimitFallback { get; set; }
+    
+    /// <summary>
+    /// ネットワークエラー時のフォールバック有効化
+    /// </summary>
+    public bool EnableNetworkErrorFallback { get; set; }
+    
+    /// <summary>
+    /// APIエラー時のフォールバック有効化
+    /// </summary>
+    public bool EnableApiErrorFallback { get; set; }
+    
+    /// <summary>
+    /// フォールバック通知表示
+    /// </summary>
+    public bool ShowFallbackNotifications { get; set; }
+    
+    /// <summary>
+    /// フォールバック判定タイムアウト（秒）
+    /// </summary>
+    public int FallbackTimeoutSeconds { get; set; }
+    
+    /// <summary>
+    /// 復旧チェック間隔（分）
+    /// </summary>
+    public int RecoveryCheckIntervalMinutes { get; set; }
 }
 
 /// <summary>

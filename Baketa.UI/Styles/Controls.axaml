@@ -199,6 +199,59 @@
         <Setter Property="BoxShadow" Value="0 2 4 #20000000" />
     </Style>
 
+    <!-- 翻訳エンジン設定専用スタイル -->
+    
+    <!-- エンジン選択ラジオボタン -->
+    <Style Selector="RadioButton.engine-radio">
+        <Setter Property="Margin" Value="0,0,0,15" />
+        <Setter Property="Padding" Value="15" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+    </Style>
+
+    <Style Selector="RadioButton.engine-radio:checked">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource PrimaryVeryLightBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
+    <Style Selector="RadioButton.engine-radio:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}" />
+    </Style>
+
+    <!-- 説明テキスト -->
+    <Style Selector="TextBlock.description">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+
+    <!-- パフォーマンス情報 -->
+    <Style Selector="TextBlock.performance">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="0,5,0,0" />
+    </Style>
+
+    <!-- 情報境界 -->
+    <Style Selector="Border.info-border">
+        <Setter Property="Background" Value="{DynamicResource BackgroundVeryLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
+    <!-- コスト情報 -->
+    <Style Selector="TextBlock.cost-info">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+        <Setter Property="FontStyle" Value="Italic" />
+    </Style>
+
     <!-- ナビゲーションヘッダースタイル -->
     <Style Selector="Border.navigationHeader">
         <Setter Property="Background" Value="{DynamicResource HeaderBackground}" />
