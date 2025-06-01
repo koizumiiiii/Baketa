@@ -251,6 +251,90 @@
         <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
         <Setter Property="FontStyle" Value="Italic" />
     </Style>
+    
+    <!-- ==== リアルタイム状態表示用スタイル ==== -->
+    
+    <!-- エンジン状態テキスト -->
+    <Style Selector="TextBlock.engine-status">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource InfoBrush}" />
+    </Style>
+    
+    <!-- 状態パネル -->
+    <Style Selector="Border.status-panel">
+        <Setter Property="Background" Value="{DynamicResource BackgroundVeryLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="15" />
+    </Style>
+    
+    <!-- 状態アイテム -->
+    <Style Selector="Border.status-item">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="8" />
+    </Style>
+    
+    <!-- 状態テキスト -->
+    <Style Selector="TextBlock.status-text">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    
+    <!-- コンパクトボタン -->
+    <Style Selector="Button.compact">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+    
+    <Style Selector="ToggleButton.compact">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+    
+    <!-- ==== 言語ペア設定用スタイル ==== -->
+    
+    <!-- 言語ペアアイテム -->
+    <Style Selector="Border.language-pair-item">
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="5" />
+    </Style>
+    
+    <Style Selector="Border.language-pair-item:pointerover">
+        <Setter Property="Background" Value="{DynamicResource PrimaryVeryLightBrush}" />
+    </Style>
+    
+    <!-- ミニボタン -->
+    <Style Selector="Button.mini">
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="MinWidth" Value="30" />
+        <Setter Property="FontSize" Value="10" />
+    </Style>
+    
+    <Style Selector="Button.mini.secondary">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="Button.mini.danger">
+        <Setter Property="Background" Value="{DynamicResource ErrorBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+    
+    <Style Selector="Button.mini.danger:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ErrorDarkBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ErrorDarkBrush}" />
+    </Style>
 
     <!-- ナビゲーションヘッダースタイル -->
     <Style Selector="Border.navigationHeader">
