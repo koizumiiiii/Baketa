@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -51,9 +52,9 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     public CloudProviderType ProviderType => CloudProviderType.Gemini;
     
     /// <summary>
-    /// コンストラクタ
+    /// コンストラクタ（HttpClientFactory対応）
     /// </summary>
-    /// <param name="httpClient">HTTPクライアント</param>
+    /// <param name="httpClient">HTTPクライアント（HttpClientFactoryで管理）</param>
     /// <param name="options">エンジンオプション</param>
     /// <param name="logger">ロガー</param>
     public GeminiTranslationEngine(
@@ -67,19 +68,27 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
         
         _apiKey = _options.ApiKey ?? throw new ArgumentException("APIキーが設定されていません", nameof(options));
         
-        // APIベースURLの設定
+        // APIベースURLの設定（HttpClientFactoryで設定済みの場合はスキップ）
         var baseUrl = _options.ApiEndpoint ?? DEFAULT_API_ENDPOINT;
-        if (!baseUrl.EndsWith('/'))
+#pragma warning disable CA1865 // EndsWith メソッドには char 引数のオーバーロードが存在しないため
+        if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
+#pragma warning restore CA1865
         {
-            baseUrl += '/';
+            baseUrl += "/";
         }
         ApiBaseUrl = new Uri(baseUrl);
         
-        // HTTPクライアントの設定
-        _httpClient.BaseAddress = ApiBaseUrl;
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(
-            new MediaTypeWithQualityHeaderValue("application/json"));
+        // HTTPクライアントの設定（HttpClientFactoryで未設定の場合のみ）
+        if (_httpClient.BaseAddress == null)
+        {
+            _httpClient.BaseAddress = ApiBaseUrl;
+        }
+        if (_httpClient.DefaultRequestHeaders.Accept.Count == 0)
+        {
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+        }
     }
     
     /// <inheritdoc/>
@@ -818,8 +827,8 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     {
         // Geminiでサポートする言語ペアリスト
         // 注: Geminiは多くの言語をサポートしているが、最適な結果のために主要言語ペアのみ定義
-        var pairs = new List<LanguagePair>
-        {
+        List<LanguagePair> pairs =
+        [
             new LanguagePair 
             { 
                 SourceLanguage = new Language { Code = "en", DisplayName = "English" }, 
@@ -900,7 +909,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
                 SourceLanguage = new Language { Code = "de", DisplayName = "German" }, 
                 TargetLanguage = new Language { Code = "fr", DisplayName = "French" } 
             }
-        };
+        ];
         
         // 非同期メソッドの正しい成續である Task<IReadOnlyCollection<LanguagePair>> を返す
         await Task.CompletedTask.ConfigureAwait(false); // 非同期コンテキストを確保
@@ -1040,7 +1049,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
             
             if (request.Context.Tags.Count > 0)
             {
-                promptBuilder.AppendLine(string.Format(CultureInfo.InvariantCulture, "- タグ: {0}", string.Join(", ", request.Context.Tags)));
+                promptBuilder.AppendLine(string.Format(CultureInfo.InvariantCulture, "- タグ: {0}", string.Join(',', request.Context.Tags)));
             }
             
             promptBuilder.AppendLine();
@@ -1196,7 +1205,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     private sealed class GeminiApiRequest
     {
         [JsonPropertyName("contents")]
-        public List<GeminiContent> Contents { get; set; } = [];
+        public List<GeminiContent> Contents { get; set; } = null!;
         
         [JsonPropertyName("generationConfig")]
         public GeminiGenerationConfig? GenerationConfig { get; set; }
@@ -1214,7 +1223,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
         public string? Role { get; set; }
         
         [JsonPropertyName("parts")]
-        public List<GeminiPart> Parts { get; set; } = [];
+        public List<GeminiPart> Parts { get; set; } = null!;
     }
     
     /// <summary>
@@ -1345,6 +1354,7 @@ public class GeminiEngineOptions
     /// <summary>
     /// APIキー
     /// </summary>
+    [Required(ErrorMessage = "Gemini APIキーは必須です")]
     public string? ApiKey { get; set; }
     
     /// <summary>
@@ -1360,15 +1370,83 @@ public class GeminiEngineOptions
     /// <summary>
     /// タイムアウト（秒）
     /// </summary>
+    [Range(5, 300, ErrorMessage = "タイムアウトは5秒から300秒の間で設定してください")]
     public int TimeoutSeconds { get; set; } = 30;
     
     /// <summary>
     /// リトライ回数
     /// </summary>
+    [Range(0, 10, ErrorMessage = "リトライ回数は0回から10回の間で設定してください")]
     public int RetryCount { get; set; } = 3;
     
     /// <summary>
     /// リトライ間隔（秒）
     /// </summary>
+    [Range(0, 60, ErrorMessage = "リトライ間隔は0秒から60秒の間で設定してください")]
     public int RetryDelaySeconds { get; set; } = 1;
+    
+    /// <summary>
+    /// 1分あたりのレート制限
+    /// </summary>
+    [Range(1, 1000, ErrorMessage = "レート制限は1から1000回の間で設定してください")]
+    public int RateLimitPerMinute { get; set; } = 60;
+    
+    /// <summary>
+    /// 最大トークン数
+    /// </summary>
+    [Range(100, 8192, ErrorMessage = "最大トークン数は100から8192の間で設定してください")]
+    public int MaxTokens { get; set; } = 1000;
+    
+    /// <summary>
+    /// デフォルト温度パラメータ
+    /// </summary>
+    [Range(0.0, 2.0, ErrorMessage = "温度パラメータは0.0から2.0の間で設定してください")]
+    public double Temperature { get; set; } = 0.3;
+    
+    /// <summary>
+    /// フォールバック有効フラグ
+    /// </summary>
+    public bool EnableFallback { get; set; } = true;
+    
+    /// <summary>
+    /// キャッシュ有効フラグ
+    /// </summary>
+    public bool EnableCache { get; set; } = true;
+    
+    /// <summary>
+    /// キャッシュ有効期限（分）
+    /// </summary>
+    [Range(1, 1440, ErrorMessage = "キャッシュ有効期限は1分から1440分（24時間）の間で設定してください")]
+    public int CacheExpirationMinutes { get; set; } = 60;
+    
+    /// <summary>
+    /// 使用量ログ有効フラグ
+    /// </summary>
+    public bool EnableUsageLogging { get; set; } = true;
+    
+    /// <summary>
+    /// コスト監視有効フラグ
+    /// </summary>
+    public bool EnableCostMonitoring { get; set; } = true;
+    
+    /// <summary>
+    /// 1日の最大コスト制限（USD）
+    /// </summary>
+    [Range(0.01, 1000.0, ErrorMessage = "最大コスト制限は0.01USDから1000USDの間で設定してください")]
+    public decimal MaxDailyCostUsd { get; set; } = 10.0m;
+    
+    /// <summary>
+    /// プロンプト最適化有効フラグ
+    /// </summary>
+    public bool EnablePromptOptimization { get; set; } = true;
+    
+    /// <summary>
+    /// 応答検証有効フラグ
+    /// </summary>
+    public bool EnableResponseValidation { get; set; } = true;
+    
+    /// <summary>
+    /// デバッグログ有効フラグ
+    /// </summary>
+    public bool EnableDebugLogging { get; set; }
 }
