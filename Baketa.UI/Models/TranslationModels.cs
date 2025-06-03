@@ -7,7 +7,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 翻訳履歴アイテムのデータモデル
     /// </summary>
-    internal sealed class TranslationHistoryItem
+    public sealed class TranslationHistoryItem
     {
         public string Id { get; set; } = string.Empty;
         public string SourceText { get; set; } = string.Empty;
@@ -21,7 +21,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 言語ペア設定のデータモデル
     /// </summary>
-    internal sealed class LanguagePairConfiguration : ReactiveObject
+    public sealed class LanguagePairConfiguration : ReactiveObject
     {
         private string _sourceLanguage = string.Empty;
         private string _targetLanguage = string.Empty;
@@ -177,7 +177,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 翻訳戦略の列挙型
     /// </summary>
-    internal enum TranslationStrategy
+    public enum TranslationStrategy
     {
         /// <summary>直接翻訳</summary>
         Direct,
@@ -188,7 +188,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 中国語変種の列挙型
     /// </summary>
-    internal enum ChineseVariant
+    public enum ChineseVariant
     {
         /// <summary>自動選択</summary>
         Auto,
@@ -203,12 +203,12 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 利用可能な言語の定義
     /// </summary>
-    internal static class AvailableLanguages
+    public static class AvailableLanguages
     {
         /// <summary>
         /// サポートされている言語のリスト
         /// </summary>
-        public static readonly List<LanguageInfo> SupportedLanguages =
+        public static readonly IReadOnlyList<LanguageInfo> SupportedLanguages =
         [
             new() { Code = "auto", DisplayName = "自動検出", NativeName = "Auto Detect", Flag = "🌍", IsAutoDetect = true },
             new() { Code = "ja", DisplayName = "日本語", NativeName = "日本語", Flag = "🇯🇵", RegionCode = "JP" },
@@ -228,7 +228,7 @@ namespace Baketa.UI.Models;
         /// <summary>
         /// 現在サポートされている言語ペア
         /// </summary>
-        public static readonly List<string> SupportedLanguagePairs =
+        public static readonly IReadOnlyList<string> SupportedLanguagePairs =
         [
             "ja-en",   // 日本語 → 英語
             "en-ja",   // 英語 → 日本語
@@ -244,7 +244,7 @@ namespace Baketa.UI.Models;
     /// <summary>
     /// 言語情報
     /// </summary>
-    internal sealed class LanguageInfo
+    public sealed class LanguageInfo
     {
         /// <summary>言語コード</summary>
         public string Code { get; set; } = string.Empty;

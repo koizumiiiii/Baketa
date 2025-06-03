@@ -2,20 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.UI.Configuration;
+using Baketa.UI.Models;
 
 namespace Baketa.UI.Services;
 
 /// <summary>
 /// ローカライゼーションサービスの実装
 /// </summary>
-public class LocalizationService : ILocalizationService
+public class LocalizationService : ILocalizationService, IDisposable
 {
     private readonly ILogger<LocalizationService> _logger;
     private readonly TranslationUIOptions _options;
+    private readonly BehaviorSubject<CultureInfo> _currentLanguageSubject;
     
     private static readonly Dictionary<char, bool> SimplifiedChars = new()
     {
@@ -47,12 +50,16 @@ public class LocalizationService : ILocalizationService
         // システム言語を検出して初期化
         var detectedLanguage = DetectSystemLanguage();
         CurrentCulture = new CultureInfo(detectedLanguage);
+        _currentLanguageSubject = new BehaviorSubject<CultureInfo>(CurrentCulture);
         
         _logger.LogInformation("LocalizationService initialized with culture: {Culture}", CurrentCulture.Name);
     }
 
     /// <inheritdoc />
     public CultureInfo CurrentCulture { get; private set; }
+
+    /// <inheritdoc />
+    public System.IObservable<CultureInfo> CurrentLanguageChanged => _currentLanguageSubject;
 
     /// <inheritdoc />
     public IReadOnlyList<SupportedLanguage> SupportedLanguages { get; } = new List<SupportedLanguage>
@@ -92,6 +99,9 @@ public class LocalizationService : ILocalizationService
             CurrentCulture = newCulture;
             CultureInfo.CurrentCulture = newCulture;
             CultureInfo.CurrentUICulture = newCulture;
+            
+            // オブザーバブルに変更を通知
+            _currentLanguageSubject.OnNext(newCulture);
             
             _logger.LogInformation("Language changed from {OldCulture} to {NewCulture}", 
                 oldCulture.Name, newCulture.Name);
@@ -170,4 +180,25 @@ public class LocalizationService : ILocalizationService
 
     /// <inheritdoc />
     public event EventHandler<LanguageChangedEventArgs>? LanguageChanged;
+
+    /// <summary>
+    /// リソースの解放
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// リソースの解放
+    /// </summary>
+    /// <param name="disposing">マネージドリソースの解放フラグ</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _currentLanguageSubject?.Dispose();
+        }
+    }
 }

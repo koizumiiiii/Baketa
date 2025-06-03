@@ -2,6 +2,6 @@ using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
 
-    internal abstract class ViewModelBase : ReactiveObject
+    public abstract class ViewModelBase : ReactiveObject
     {
     }
