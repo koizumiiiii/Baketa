@@ -58,6 +58,13 @@ public class AvaloniaNotificationService : INotificationService
     }
 
     /// <inheritdoc />
+    public async Task ShowInfoAsync(string title, string message, int duration = 4000)
+    {
+        // ShowInformationAsync への委譲
+        await ShowInformationAsync(title, message, duration).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task ShowWarningAsync(string title, string message, int duration = 5000)
     {
         if (!_options.EnableNotifications)

@@ -30,11 +30,14 @@ public static class UIServiceCollectionExtensions
         // 設定オプションの登録
         services.Configure<TranslationUIOptions>(
             configuration.GetSection(TranslationUIOptions.SectionName));
+        services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
+            configuration.GetSection("TranslationEngineStatus"));
 
         // 基本サービスの登録
         services.AddSingleton<IUserPlanService, UserPlanService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
+        services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
 
         // ViewModelの登録（後で追加）
         services.AddTranslationSettingsViewModels();
@@ -50,14 +53,12 @@ public static class UIServiceCollectionExtensions
     public static IServiceCollection AddTranslationSettingsViewModels(
         this IServiceCollection services)
     {
-        // ViewModelの登録（一時的にコメントアウト、Phase 2で実装）
-        /*
-        services.AddTransient<TranslationSettingsViewModel>();
-        services.AddTransient<EngineSelectionViewModel>();
-        services.AddTransient<LanguagePairSelectionViewModel>();
-        services.AddTransient<TranslationStrategyViewModel>();
-        services.AddTransient<EngineStatusViewModel>();
-        */
+        // ViewModelの登録
+        services.AddTransient<Baketa.UI.ViewModels.Settings.TranslationSettingsViewModel>();
+        services.AddTransient<Baketa.UI.ViewModels.Settings.EngineSelectionViewModel>();
+        services.AddTransient<Baketa.UI.ViewModels.Settings.LanguagePairSelectionViewModel>();
+        services.AddTransient<Baketa.UI.ViewModels.Settings.TranslationStrategyViewModel>();
+        services.AddTransient<Baketa.UI.ViewModels.Settings.EngineStatusViewModel>();
 
         return services;
     }
@@ -83,10 +84,19 @@ public static class UIServiceCollectionExtensions
             options.DefaultTranslationStrategy = "Direct";
         });
 
+        services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(options =>
+        {
+            options.MonitoringIntervalSeconds = 5; // テスト用に短縮
+            options.NetworkTimeoutMs = 2000;
+            options.RateLimitWarningThreshold = 5;
+            options.EnableHealthChecks = true;
+        });
+
         // テスト用サービス
         services.AddSingleton<IUserPlanService, UserPlanService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
+        services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
 
         return services;
     }

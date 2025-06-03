@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using Baketa.UI.Models;
 
 namespace Baketa.UI.Services;
 
@@ -38,12 +39,17 @@ public interface ILocalizationService
     /// </summary>
     /// <param name="text">判定対象テキスト</param>
     /// <returns>中国語変種</returns>
-    ChineseVariant DetectChineseVariant(string text);
+    Models.ChineseVariant DetectChineseVariant(string text);
 
     /// <summary>
     /// 言語変更イベント
     /// </summary>
     event EventHandler<LanguageChangedEventArgs> LanguageChanged;
+
+    /// <summary>
+    /// 現在の言語変更監視用オブザーバブル
+    /// </summary>
+    System.IObservable<CultureInfo> CurrentLanguageChanged { get; }
 }
 
 /// <summary>
@@ -55,31 +61,7 @@ public record SupportedLanguage(
     string EnglishName,
     bool IsRightToLeft = false);
 
-/// <summary>
-/// 中国語変種
-/// </summary>
-public enum ChineseVariant
-{
-    /// <summary>
-    /// 自動判定
-    /// </summary>
-    Auto,
-
-    /// <summary>
-    /// 簡体字
-    /// </summary>
-    Simplified,
-
-    /// <summary>
-    /// 繁体字
-    /// </summary>
-    Traditional,
-
-    /// <summary>
-    /// 広東語（将来対応）
-    /// </summary>
-    Cantonese
-}
+// ChineseVariantはBaketa.UI.Models名前空間で定義されています
 
 /// <summary>
 /// 言語変更イベント引数

@@ -25,6 +25,14 @@ public interface INotificationService
     Task ShowInformationAsync(string title, string message, int duration = 4000);
 
     /// <summary>
+    /// 情報メッセージを表示（省略形）
+    /// </summary>
+    /// <param name="title">タイトル</param>
+    /// <param name="message">メッセージ</param>
+    /// <param name="duration">表示時間（ミリ秒）</param>
+    Task ShowInfoAsync(string title, string message, int duration = 4000);
+
+    /// <summary>
     /// 警告メッセージを表示
     /// </summary>
     /// <param name="title">タイトル</param>
