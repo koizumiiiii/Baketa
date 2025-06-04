@@ -86,7 +86,7 @@ namespace Baketa.UI;
             
             // Baketaの標準モジュールを登録
             // UIモジュールを含む全モジュールを登録
-            services.AddUIModule(environment);
+            services.AddUIModule(environment, configuration);
             
             // サービスプロバイダーの構築
             ServiceProvider = services.BuildServiceProvider();
