@@ -38,6 +38,11 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
+        services.AddSingleton<SettingsFileManager>();
+        
+        // ファイルダイアログ・エクスポート/インポートサービスの登録
+        services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
+        services.AddSingleton<SettingsExportImportService>();
 
         // ViewModelの登録（後で追加）
         services.AddTranslationSettingsViewModels();
@@ -97,6 +102,11 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
+        services.AddSingleton<SettingsFileManager>();
+        
+        // ファイルダイアログ・エクスポート/インポートサービスの登録
+        services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
+        services.AddSingleton<SettingsExportImportService>();
 
         return services;
     }
@@ -117,7 +127,9 @@ public static class UIServiceCollectionExtensions
             typeof(IUserPlanService),
             typeof(ILocalizationService),
             typeof(INotificationService),
-            typeof(ITranslationEngineStatusService)
+            typeof(ITranslationEngineStatusService),
+            typeof(IFileDialogService),
+            typeof(SettingsExportImportService)
         };
 
         foreach (var serviceType in requiredServices)

@@ -241,7 +241,7 @@ namespace Baketa.UI;
     }
     
     // イベントプロセッサの実装
-    internal class AccessibilitySettingsEventProcessor(App app) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
+    internal sealed class AccessibilitySettingsEventProcessor(App app) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
     {
         private readonly App _app = app ?? throw new ArgumentNullException(nameof(app));
         
@@ -252,7 +252,7 @@ namespace Baketa.UI;
     }
     
     // イベント定義
-    internal class ApplicationStartupEvent : CoreEvents.EventBase
+    internal sealed class ApplicationStartupEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名
@@ -265,7 +265,7 @@ namespace Baketa.UI;
         public override string Category => "Application";
     }
 
-    internal class ApplicationShutdownEvent : CoreEvents.EventBase
+    internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名

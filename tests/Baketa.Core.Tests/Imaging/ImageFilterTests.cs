@@ -133,7 +133,7 @@ namespace Baketa.Core.Tests.Imaging;
         /// <summary>
         /// モックAdvancedImageクラス
         /// </summary>
-        private class MockAdvancedImage : IAdvancedImage
+        private sealed class MockAdvancedImage : IAdvancedImage
         {
             private readonly byte[] _data;
             

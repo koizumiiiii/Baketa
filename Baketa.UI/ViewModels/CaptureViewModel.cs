@@ -12,7 +12,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// キャプチャ設定画面のビューモデル
     /// </summary>
-    internal class CaptureViewModel : Framework.ViewModelBase
+    internal sealed class CaptureViewModel : Framework.ViewModelBase
     {
         // キャプチャ状態
         private bool _isCapturing;

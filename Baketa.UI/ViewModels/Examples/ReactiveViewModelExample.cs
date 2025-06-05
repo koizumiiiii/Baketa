@@ -16,7 +16,7 @@ namespace Baketa.UI.ViewModels.Examples;
     /// <summary>
     /// ReactiveUIパターンの使用例を示すサンプルビューモデル
     /// </summary>
-    internal class ReactiveViewModelExample : Baketa.UI.Framework.ViewModelBase, IValidatableViewModel
+    internal sealed class ReactiveViewModelExample : global::Baketa.UI.Framework.ViewModelBase, IValidatableViewModel
     {
         // LoggerMessage デリゲートを定義
         private static readonly Action<ILogger, string, Exception?> _logCommandExecuted =
@@ -108,7 +108,7 @@ namespace Baketa.UI.ViewModels.Examples;
             _disposables.Add(_canSave);
                 
             // コマンドの作成
-            SaveCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
+            SaveCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
                     ExecuteSaveAsync,
                     this.WhenAnyValue(x => x.CanSave));
             
@@ -117,7 +117,7 @@ namespace Baketa.UI.ViewModels.Examples;
                 _ => {
                     if (_logger != null)
                         _logCommandExecuted(_logger, "Save", null);
-                    MessageBus.Current.SendMessage(new Baketa.UI.Framework.ExecuteCommandMessage("Save"));
+                    MessageBus.Current.SendMessage(new global::Baketa.UI.Framework.ExecuteCommandMessage("Save"));
                 });
 
             SaveCommand.ThrownExceptions.Subscribe(
@@ -128,7 +128,7 @@ namespace Baketa.UI.ViewModels.Examples;
             
             _disposables.Add(SaveCommand);
                 
-            ResetCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
+            ResetCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
                     ExecuteResetAsync);
                     
             // コマンドにログ機能を追加
@@ -136,7 +136,7 @@ namespace Baketa.UI.ViewModels.Examples;
                 _ => {
                     if (_logger != null)
                         _logCommandExecuted(_logger, "Reset", null);
-                    MessageBus.Current.SendMessage(new Baketa.UI.Framework.ExecuteCommandMessage("Reset"));
+                    MessageBus.Current.SendMessage(new global::Baketa.UI.Framework.ExecuteCommandMessage("Reset"));
                 });
 
             ResetCommand.ThrownExceptions.Subscribe(
@@ -251,7 +251,7 @@ namespace Baketa.UI.ViewModels.Examples;
     /// データ保存イベント
     /// </summary>
     /// <param name="name">データ名</param>
-    internal class DataSavedEvent(string name) : UIEventBase
+    internal sealed class DataSavedEvent(string name) : UIEventBase
     {
         /// <summary>
         /// 保存されたデータ名
@@ -268,7 +268,7 @@ namespace Baketa.UI.ViewModels.Examples;
     /// <summary>
     /// データリクエストイベント
     /// </summary>
-    internal class DataRequestEvent : UIEventBase
+    internal sealed class DataRequestEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "DataRequest";

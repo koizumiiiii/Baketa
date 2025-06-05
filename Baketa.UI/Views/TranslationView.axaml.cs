@@ -8,7 +8,7 @@ namespace Baketa.UI.Views;
     /// <summary>
     /// 翻訳設定画面のビュー
     /// </summary>
-    internal partial class TranslationView : ReactiveUserControl<TranslationViewModel>
+    internal sealed partial class TranslationView : ReactiveUserControl<TranslationViewModel>
     {
         public TranslationView()
         {
