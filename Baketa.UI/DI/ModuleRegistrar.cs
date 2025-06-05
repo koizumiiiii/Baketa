@@ -1,4 +1,6 @@
 using Baketa.Core.DI;
+using Baketa.Core.DI.Modules;
+using Baketa.Infrastructure.DI.Modules;
 using Baketa.Application.DI.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,8 +24,16 @@ namespace Baketa.UI.DI;
             BaketaEnvironment environment = BaketaEnvironment.Production,
             IConfiguration? configuration = null)
         {
-            // アプリケーションモジュールを追加
-            services.AddBaketaApplicationModules(environment);
+            // CoreModuleを直接登録（IEventAggregatorなどの基本サービス）
+            var coreModule = new CoreModule();
+            coreModule.RegisterServices(services);
+            
+            // InfrastructureModuleを直接登録（ISettingsServiceなどのインフラサービス）
+            var infrastructureModule = new InfrastructureModule();
+            infrastructureModule.RegisterServices(services);
+            
+            // Baketaのその他のサービスモジュールを追加
+            services.AddBaketaServices(environment: environment);
             
             // ReactiveUIサービスをモジュール経由で登録
             var enableDebugMode = environment == BaketaEnvironment.Development;

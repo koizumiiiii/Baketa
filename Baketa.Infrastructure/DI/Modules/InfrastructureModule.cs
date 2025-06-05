@@ -2,6 +2,8 @@ using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
+using Baketa.Core.Services;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -90,12 +92,13 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// データ永続化サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
+        /// <param name="services">サービスコレクション</param>
         /// <param name="environment">アプリケーション実行環境</param>
-        private static void RegisterPersistenceServices(IServiceCollection _, Core.DI.BaketaEnvironment environment)
+        private static void RegisterPersistenceServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
         {
             // 設定保存サービス
-            // 例: services.AddSingleton<ISettingsStorage, JsonSettingsStorage>();
+            services.AddSingleton<ISettingsService, JsonSettingsService>();
+            
             // 例: services.AddSingleton<IProfileStorage, JsonProfileStorage>();
             
             // 環境に応じたキャッシュ実装の選択

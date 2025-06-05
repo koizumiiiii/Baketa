@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI.Attributes;
+using Baketa.Core.Events.Implementation;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -50,12 +51,11 @@ namespace Baketa.Core.DI.Modules;
         /// <summary>
         /// イベント集約システムを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterEventAggregator(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterEventAggregator(IServiceCollection services)
         {
             // イベント集約システムの登録
-            // 例: services.AddSingleton<IEventAggregator, EventAggregator>();
-            // 例: services.AddSingleton<IEventDispatcher, EventDispatcher>();
+            services.AddEventAggregator();
             
             // 基本的なイベント処理用サービス
             // 例: services.AddTransient<IEventExceptionHandler, LoggingEventExceptionHandler>();

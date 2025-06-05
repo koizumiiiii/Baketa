@@ -25,13 +25,29 @@ namespace Baketa.UI.DI;
             // イベント集約器
             services.AddSingleton<IEventAggregator, EventAggregator>();
             
-            // ビューモデル
-            services.AddSingleton<MainWindowViewModel>();
+            // 基本ビューモデル（依存関係なし）
             services.AddSingleton<HomeViewModel>();
             services.AddSingleton<CaptureViewModel>();
             services.AddSingleton<TranslationViewModel>();
             services.AddSingleton<OverlayViewModel>();
             services.AddSingleton<HistoryViewModel>();
+            
+            // 依存関係付きビューモデル
+            services.AddSingleton<LanguagePairsViewModel>(provider => 
+                new LanguagePairsViewModel(
+                    provider.GetRequiredService<IEventAggregator>(),
+                    provider.GetService<ILogger<LanguagePairsViewModel>>()));
+            services.AddSingleton<AccessibilitySettingsViewModel>();
+            services.AddSingleton<SettingsViewModel>(provider =>
+                new SettingsViewModel(
+                    provider.GetRequiredService<IEventAggregator>(),
+                    provider.GetRequiredService<AccessibilitySettingsViewModel>(),
+                    provider.GetRequiredService<LanguagePairsViewModel>(),
+                    null, // ITranslationEngineStatusService はオプショナル
+                    provider.GetService<ILogger<SettingsViewModel>>()));
+            
+            // MainWindowViewModel（全依存関係解決後に登録）
+            services.AddSingleton<MainWindowViewModel>();
             
             // 翻訳設定UI関連サービス
             if (configuration != null)
