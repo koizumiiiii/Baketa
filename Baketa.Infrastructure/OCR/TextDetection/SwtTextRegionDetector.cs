@@ -5,17 +5,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間表現を明確にする
-// Imaging名前空間のIOpenCvWrapperを使用
 using ImagingOpenCvWrapper = Baketa.Core.Abstractions.Imaging.IOpenCvWrapper;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// SWT (Stroke Width Transform) アルゴリズムによるテキスト領域検出器
     /// </summary>
@@ -117,7 +114,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                         swtImage, minComponentSize, maxComponentSize);
                     
                     // テキスト領域として抽出
-                    var textRegions = new List<OCRTextRegion>();
+                    List<OCRTextRegion> textRegions = [];
                     
                     foreach (var component in components)
                     {
@@ -152,7 +149,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                         var textRegion = new OCRTextRegion(bounds, confidenceScore)
                         {
                             RegionType = ClassifyRegionType(bounds, aspectRatio, meanStrokeWidth),
-                            Contour = component.ToArray()
+                            Contour = [.. component]
                         };
                         
                         // メタデータに追加情報を保存
@@ -252,29 +249,17 @@ namespace Baketa.Infrastructure.OCR.TextDetection
         {
             // ストローク幅から文字の大きさを推測
             if (strokeWidth > 8.0f && bounds.Width > 200)
-            {
                 return TextRegionType.Title;
-            }
-            else if (strokeWidth > 5.0f && bounds.Width > 100)
-            {
+            if (strokeWidth > 5.0f && bounds.Width > 100)
                 return TextRegionType.Heading;
-            }
-            else if (bounds.Width > 300 && bounds.Height > 50)
-            {
+            if (bounds.Width > 300 && bounds.Height > 50)
                 return TextRegionType.Paragraph;
-            }
-            else if (bounds.Width < 150 && aspectRatio > 3.0f)
-            {
+            if (bounds.Width < 150 && aspectRatio > 3.0f)
                 return TextRegionType.Button;
-            }
-            else if (bounds.Width < 100 && bounds.Height < 40)
-            {
+            if (bounds.Width < 100 && bounds.Height < 40)
                 return TextRegionType.Label;
-            }
-            else
-            {
-                return TextRegionType.Unknown;
-            }
+                
+            return TextRegionType.Unknown;
         }
         
         /// <summary>
@@ -453,18 +438,12 @@ namespace Baketa.Infrastructure.OCR.TextDetection
         private static TextRegionType DetermineGroupRegionType(List<OCRTextRegion> regions)
         {
             // 最も多い領域タイプを選択
-            var typeCounts = new Dictionary<TextRegionType, int>();
+            Dictionary<TextRegionType, int> typeCounts = [];
             
             foreach (var region in regions)
             {
-                if (typeCounts.TryGetValue(region.RegionType, out int count))
-                {
-                    typeCounts[region.RegionType] = count + 1;
-                }
-                else
-                {
-                    typeCounts[region.RegionType] = 1;
-                }
+                // Dictionaryのインデクサ表記を使用
+                typeCounts[region.RegionType] = typeCounts.TryGetValue(region.RegionType, out int count) ? count + 1 : 1;
             }
             
             // 最も多いタイプを取得
@@ -476,12 +455,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             var combinedBounds = CombineBounds(regions.Select(r => r.Bounds));
             
             // 大きなグループは段落または本文と判定
-            if (combinedBounds.Width > 300 && combinedBounds.Height > 100)
-            {
-                return TextRegionType.Paragraph;
-            }
-            
-            return mostCommonType;
+            return (combinedBounds.Width > 300 && combinedBounds.Height > 100) ? TextRegionType.Paragraph : mostCommonType;
         }
         
         /// <summary>
@@ -553,7 +527,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                     var mergedRegion = new OCRTextRegion(currentBounds, maxScore, currentRegion.RegionType);
                     if (mergedContour != null)
                     {
-                        mergedRegion.Contour = mergedContour.ToArray();
+                        mergedRegion.Contour = [.. mergedContour];
                     }
                     mergedRegions.Add(mergedRegion);
                 }
@@ -569,4 +543,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return mergedRegions;
         }
     }
-}

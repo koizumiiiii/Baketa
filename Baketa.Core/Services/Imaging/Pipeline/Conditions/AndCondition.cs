@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
-{
+namespace Baketa.Core.Services.Imaging.Pipeline.Conditions;
+
     /// <summary>
     /// 複数の条件をAND演算で結合する条件
     /// </summary>
@@ -76,4 +76,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
             return true;
         }
     }
-}

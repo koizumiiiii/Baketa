@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Common
-{
+namespace Baketa.Core.Abstractions.Common;
+
     /// <summary>
     /// 設定可能なオブジェクトを表すインターフェース
     /// </summary>
@@ -29,4 +29,3 @@ namespace Baketa.Core.Abstractions.Common
         /// </summary>
         void ResetConfiguration();
     }
-}

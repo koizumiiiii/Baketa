@@ -5,17 +5,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間表現を明確にする
-// Imaging名前空間のIOpenCvWrapperを使用
 using ImagingOpenCvWrapper = Baketa.Core.Abstractions.Imaging.IOpenCvWrapper;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// MSER (Maximally Stable Extremal Regions) アルゴリズムによるテキスト領域検出器
     /// </summary>
@@ -85,17 +82,14 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                     var grayImage = image.IsGrayscale ? image : image.ToGrayscale();
                     
                     // MSER検出実行
-                    // パラメータを辽ててDictionaryとして渡す
-                    var mserParams = new Dictionary<string, object>
-                    {
-                        { "delta", delta },
-                        { "minArea", minArea },
-                        { "maxArea", maxArea }
-                    };
+                    Dictionary<string, object> mserParams = [];
+                    mserParams["delta"] = delta;
+                    mserParams["minArea"] = minArea;
+                    mserParams["maxArea"] = maxArea;
                     var mserRegions = _openCvWrapper.DetectMSERRegions(grayImage, mserParams);
                     
                     // 検出結果を処理
-                    var textRegions = new List<OCRTextRegion>();
+                    List<OCRTextRegion> textRegions = [];
                     
                     foreach (var region in mserRegions)
                     {
@@ -117,7 +111,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                         var textRegion = new OCRTextRegion(bounds, confidenceScore)
                         {
                             RegionType = ClassifyRegionType(bounds, aspectRatio),
-                            Contour = region.ToArray()
+                            Contour = [.. region]
                         };
                         
                         textRegions.Add(textRegion);
@@ -275,7 +269,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                     var mergedRegion = new OCRTextRegion(currentBounds, maxScore, currentRegion.RegionType);
                     if (mergedContour != null)
                     {
-                        mergedRegion.Contour = mergedContour.ToArray();
+                        mergedRegion.Contour = [.. mergedContour];
                     }
                     mergedRegions.Add(mergedRegion);
                 }
@@ -291,4 +285,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return mergedRegions;
         }
     }
-}

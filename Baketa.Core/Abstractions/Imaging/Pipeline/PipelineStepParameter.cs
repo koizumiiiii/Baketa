@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインステップのパラメータ定義を表すクラス
     /// </summary>
@@ -157,4 +157,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             };
         }
     }
-}

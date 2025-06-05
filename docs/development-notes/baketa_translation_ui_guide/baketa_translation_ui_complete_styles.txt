@@ -1,0 +1,765 @@
+<!-- Styles/TranslationSettingsStyles.axaml - 完全スタイル定義 -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- カラーリソース定義 -->
+  <Style.Resources>
+    <!-- Primary Colors -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#1976D2"/>
+    <SolidColorBrush x:Key="PrimaryLightBrush" Color="#42A5F5"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="#0D47A1"/>
+    
+    <!-- Secondary Colors -->
+    <SolidColorBrush x:Key="SecondaryBrush" Color="#FF9800"/>
+    <SolidColorBrush x:Key="SecondaryLightBrush" Color="#FFB74D"/>
+    <SolidColorBrush x:Key="SecondaryDarkBrush" Color="#F57C00"/>
+    
+    <!-- Status Colors -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FF9800"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="#F44336"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#2196F3"/>
+    
+    <!-- Background Colors -->
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="White"/>
+    <SolidColorBrush x:Key="CardBrush" Color="White"/>
+    
+    <!-- Text Colors -->
+    <SolidColorBrush x:Key="PrimaryTextBrush" Color="#212121"/>
+    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#757575"/>
+    <SolidColorBrush x:Key="DisabledTextBrush" Color="#BDBDBD"/>
+    
+    <!-- Border Colors -->
+    <SolidColorBrush x:Key="BorderBrush" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="#EEEEEE"/>
+    
+    <!-- Interactive Colors -->
+    <SolidColorBrush x:Key="HoverBrush" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="PressedBrush" Color="#EEEEEE"/>
+    <SolidColorBrush x:Key="SelectedBrush" Color="#E3F2FD"/>
+    
+    <!-- Special Colors -->
+    <SolidColorBrush x:Key="PremiumBrush" Color="#FF9800"/>
+    <SolidColorBrush x:Key="FreeBrush" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="LocalBrush" Color="#2196F3"/>
+    <SolidColorBrush x:Key="CloudBrush" Color="#9C27B0"/>
+  </Style.Resources>
+
+  <!-- ======================== -->
+  <!-- ページレベルスタイル       -->
+  <!-- ======================== -->
+
+  <!-- ヘッダーセクション -->
+  <Style Selector="Border.header-section">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    <Setter Property="Padding" Value="20"/>
+    <Setter Property="Margin" Value="0,0,0,10"/>
+  </Style>
+
+  <!-- ページタイトル -->
+  <Style Selector="TextBlock.page-title">
+    <Setter Property="FontSize" Value="24"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+  </Style>
+
+  <!-- ページ説明 -->
+  <Style Selector="TextBlock.page-description">
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- セクションスタイル         -->
+  <!-- ======================== -->
+
+  <!-- 設定セクション -->
+  <Style Selector="Border.setting-section">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="20"/>
+    <Setter Property="BoxShadow" Value="0 2 4 0 #00000010"/>
+  </Style>
+
+  <!-- セクションタイトル -->
+  <Style Selector="TextBlock.section-title">
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+  </Style>
+
+  <!-- アクションセクション -->
+  <Style Selector="Border.action-section">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+    <Setter Property="Padding" Value="20"/>
+    <Setter Property="Margin" Value="0,10,0,0"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- エンジン選択スタイル       -->
+  <!-- ======================== -->
+
+  <!-- プラン情報 -->
+  <Style Selector="Border.plan-info">
+    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="15"/>
+    <Setter Property="Margin" Value="0,0,0,15"/>
+  </Style>
+
+  <!-- プランバッジ -->
+  <Style Selector="Border.plan-badge">
+    <Setter Property="Background" Value="{DynamicResource SuccessBrush}"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style Selector="Border.plan-badge TextBlock">
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+
+  <!-- プレミアムバッジ -->
+  <Style Selector="Border.premium-badge">
+    <Setter Property="Background" Value="{DynamicResource PremiumBrush}"/>
+    <Setter Property="CornerRadius" Value="3"/>
+    <Setter Property="Padding" Value="4,2"/>
+  </Style>
+
+  <!-- エンジン選択オプション -->
+  <Style Selector="RadioButton.engine-option">
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="16"/>
+    <Setter Property="Margin" Value="0,8"/>
+    <Setter Property="MinHeight" Value="80"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.2"/>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+        <ThicknessTransition Property="BorderThickness" Duration="0:0:0.2"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="RadioButton.engine-option:pointerover">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}"/>
+  </Style>
+
+  <Style Selector="RadioButton.engine-option:checked">
+    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="BorderThickness" Value="2"/>
+  </Style>
+
+  <Style Selector="RadioButton.engine-option:disabled">
+    <Setter Property="Opacity" Value="0.6"/>
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="Cursor" Value="Arrow"/>
+  </Style>
+
+  <!-- エンジン詳細インライン -->
+  <Style Selector="Border.engine-detail-inline">
+    <Setter Property="Background" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="Background" Value="#E3F2FD"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12"/>
+  </Style>
+
+  <!-- アップグレードプロンプト -->
+  <Style Selector="Border.upgrade-prompt">
+    <Setter Property="Background" Value="#FFF3E0"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12"/>
+  </Style>
+
+  <!-- 選択サマリー -->
+  <Style Selector="Border.selection-summary">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="15"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- 言語ペア選択スタイル       -->
+  <!-- ======================== -->
+
+  <!-- 情報パネル -->
+  <Style Selector="Border.info-panel">
+    <Setter Property="Background" Value="#E1F5FE"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="BorderThickness" Value="1,1,1,3"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="15"/>
+  </Style>
+
+  <!-- 言語ペア項目 -->
+  <Style Selector="Border.language-pair-item">
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="12"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Border.language-pair-item:pointerover">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+  </Style>
+
+  <!-- タイプバッジ -->
+  <Style Selector="Border.type-badge">
+    <Setter Property="Background" Value="{DynamicResource SecondaryBrush}"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="Padding" Value="6,2"/>
+  </Style>
+
+  <Style Selector="TextBlock.type-text">
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+
+  <!-- ペア詳細 -->
+  <Style Selector="Border.pair-detail">
+    <Setter Property="Background" Value="#F3F9FF"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="BorderThickness" Value="1,0,0,0"/>
+    <Setter Property="Padding" Value="10"/>
+  </Style>
+
+  <!-- 中国語変種セクション -->
+  <Style Selector="Border.chinese-variant-section">
+    <Setter Property="Background" Value="#FFF8E1"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="15"/>
+  </Style>
+
+  <!-- 変種オプション -->
+  <Style Selector="RadioButton.variant-option">
+    <Setter Property="Padding" Value="10"/>
+    <Setter Property="Margin" Value="0,4"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+  </Style>
+
+  <Style Selector="RadioButton.variant-option:checked">
+    <Setter Property="Background" Value="#FFF3E0"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+  </Style>
+
+  <!-- 変種情報 -->
+  <Style Selector="Border.variant-info">
+    <Setter Property="Background" Value="#E8F5E8"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+    <Setter Property="BorderThickness" Value="1,0,0,0"/>
+    <Setter Property="Padding" Value="10"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- 翻訳戦略スタイル           -->
+  <!-- ======================== -->
+
+  <!-- 戦略オプション -->
+  <Style Selector="RadioButton.strategy-option">
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="15"/>
+    <Setter Property="Margin" Value="0,8"/>
+    <Setter Property="MinHeight" Value="70"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <Style Selector="RadioButton.strategy-option:checked">
+    <Setter Property="Background" Value="#F1F8E9"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+    <Setter Property="BorderThickness" Value="2"/>
+  </Style>
+
+  <!-- パフォーマンスバッジ -->
+  <Style Selector="Border.performance-badge">
+    <Setter Property="Background" Value="{DynamicResource LocalBrush}"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style Selector="TextBlock.performance-value">
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+
+  <!-- 品質バッジ -->
+  <Style Selector="Border.quality-badge">
+    <Setter Property="Background" Value="{DynamicResource CloudBrush}"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style Selector="TextBlock.quality-value">
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+
+  <!-- 戦略詳細 -->
+  <Style Selector="Border.strategy-detail">
+    <Setter Property="Background" Value="#E8F5E8"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12"/>
+  </Style>
+
+  <!-- フォールバックセクション -->
+  <Style Selector="Border.fallback-section">
+    <Setter Property="Background" Value="#FFF8E1"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="15"/>
+  </Style>
+
+  <!-- フォールバック詳細 -->
+  <Style Selector="Border.fallback-detail">
+    <Setter Property="Background" Value="#E1F5FE"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="BorderThickness" Value="1,0,0,0"/>
+    <Setter Property="Padding" Value="10"/>
+  </Style>
+
+  <!-- 戦略サマリー -->
+  <Style Selector="Border.strategy-summary">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="15"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- エンジン状態スタイル       -->
+  <!-- ======================== -->
+
+  <!-- 現在の状態 -->
+  <Style Selector="Border.current-status">
+    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="16"/>
+    <Setter Property="BoxShadow" Value="0 1 3 0 #00000015"/>
+  </Style>
+
+  <!-- 基本統計 -->
+  <Style Selector="Border.basic-stats">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="16"/>
+  </Style>
+
+  <!-- フォールバック通知 -->
+  <Style Selector="Border.fallback-notification">
+    <Setter Property="Background" Value="#FFF3CD"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="12"/>
+  </Style>
+
+  <!-- エラー通知 -->
+  <Style Selector="Border.error-notification">
+    <Setter Property="Background" Value="#FFEBEE"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="12"/>
+  </Style>
+
+  <!-- 状態エクスパンダー -->
+  <Style Selector="Expander.status-expander">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+    <Setter Property="Padding" Value="0,8,0,0"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- テキストスタイル           -->
+  <!-- ======================== -->
+
+  <!-- 説明テキスト -->
+  <Style Selector="TextBlock.description">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="LineHeight" Value="1.4"/>
+  </Style>
+
+  <!-- 詳細説明 -->
+  <Style Selector="TextBlock.detail-description">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="LineHeight" Value="1.3"/>
+  </Style>
+
+  <!-- サマリー説明 -->
+  <Style Selector="TextBlock.summary-description">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+    <Setter Property="LineHeight" Value="1.4"/>
+  </Style>
+
+  <!-- パフォーマンステキスト -->
+  <Style Selector="TextBlock.performance-text">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <!-- 情報テキスト -->
+  <Style Selector="TextBlock.info-text">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="#0277BD"/>
+    <Setter Property="LineHeight" Value="1.3"/>
+  </Style>
+
+  <!-- エンジン情報 -->
+  <Style Selector="TextBlock.engine-info">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+  </Style>
+
+  <!-- コスト情報 -->
+  <Style Selector="TextBlock.cost-info">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="FontStyle" Value="Italic"/>
+  </Style>
+
+  <!-- アップグレード説明 -->
+  <Style Selector="TextBlock.upgrade-description">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="#E65100"/>
+    <Setter Property="LineHeight" Value="1.3"/>
+  </Style>
+
+  <!-- ペア説明 -->
+  <Style Selector="TextBlock.pair-description">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+  </Style>
+
+  <!-- 変種説明 -->
+  <Style Selector="TextBlock.variant-description">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="#E65100"/>
+  </Style>
+
+  <!-- 詳細テキスト -->
+  <Style Selector="TextBlock.detail-text">
+    <Setter Property="FontSize" Value="10"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="FontStyle" Value="Italic"/>
+  </Style>
+
+  <!-- 例文テキスト -->
+  <Style Selector="TextBlock.example-text">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="#424242"/>
+    <Setter Property="FontFamily" Value="Consolas, monospace"/>
+  </Style>
+
+  <!-- 機能ハイライト -->
+  <Style Selector="TextBlock.feature-highlight">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+  </Style>
+
+  <Style Selector="TextBlock.feature-text">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+  </Style>
+
+  <!-- ターゲット言語 -->
+  <Style Selector="TextBlock.target-language">
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+  </Style>
+
+  <!-- パフォーマンス期待値 -->
+  <Style Selector="TextBlock.performance-expectation">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource LocalBrush}"/>
+  </Style>
+
+  <Style Selector="TextBlock.quality-expectation">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource CloudBrush}"/>
+  </Style>
+
+  <Style Selector="TextBlock.speed-expectation">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+  </Style>
+
+  <!-- 統計ラベル -->
+  <Style Selector="TextBlock.stat-label">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- 統計値 -->
+  <Style Selector="TextBlock.stat-value">
+    <Setter Property="FontSize" Value="16"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- 統計サマリー -->
+  <Style Selector="TextBlock.stats-summary">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="FontStyle" Value="Italic"/>
+  </Style>
+
+  <!-- 更新時間 -->
+  <Style Selector="TextBlock.update-time">
+    <Setter Property="FontSize" Value="10"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="FontStyle" Value="Italic"/>
+  </Style>
+
+  <!-- 詳細情報 -->
+  <Style Selector="TextBlock.detailed-info">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+    <Setter Property="FontFamily" Value="Consolas, monospace"/>
+  </Style>
+
+  <!-- フォールバック理由 -->
+  <Style Selector="TextBlock.fallback-reason">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="#E65100"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <Style Selector="TextBlock.fallback-duration">
+    <Setter Property="FontSize" Value="10"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="FontStyle" Value="Italic"/>
+  </Style>
+
+  <!-- エラーメッセージ -->
+  <Style Selector="TextBlock.error-message">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+    <Setter Property="LineHeight" Value="1.3"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- ボタンスタイル             -->
+  <!-- ======================== -->
+
+  <!-- プライマリボタン -->
+  <Style Selector="Button.primary-button">
+    <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.2"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.primary-button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}"/>
+  </Style>
+
+  <Style Selector="Button.primary-button:pressed">
+    <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
+  </Style>
+
+  <!-- セカンダリボタン -->
+  <Style Selector="Button.secondary-button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <Style Selector="Button.secondary-button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
+  </Style>
+
+  <!-- アップグレードボタン -->
+  <Style Selector="Button.upgrade-button">
+    <Setter Property="Background" Value="{DynamicResource PremiumBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <Style Selector="Button.upgrade-button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SecondaryDarkBrush}"/>
+  </Style>
+
+  <!-- テストボタン -->
+  <Style Selector="Button.test-button">
+    <Setter Property="Background" Value="{DynamicResource InfoBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <!-- リフレッシュボタン -->
+  <Style Selector="Button.refresh-button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="8"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <Style Selector="Button.refresh-button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+  </Style>
+
+  <!-- フォールバック詳細ボタン -->
+  <Style Selector="Button.fallback-detail-button">
+    <Setter Property="Background" Value="{DynamicResource WarningBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="3"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="FontSize" Value="11"/>
+  </Style>
+
+  <!-- 再試行ボタン -->
+  <Style Selector="Button.retry-button">
+    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="3"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="FontSize" Value="11"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- チェックボックススタイル   -->
+  <!-- ======================== -->
+
+  <!-- フォールバックチェックボックス -->
+  <Style Selector="CheckBox.fallback-checkbox">
+    <Setter Property="Margin" Value="0,5"/>
+    <Setter Property="Padding" Value="8"/>
+  </Style>
+
+  <!-- チェックボックス説明 -->
+  <Style Selector="TextBlock.checkbox-description">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}"/>
+  </Style>
+
+  <!-- ======================== -->
+  <!-- アニメーション             -->
+  <!-- ======================== -->
+
+  <!-- フェードイン -->
+  <Style Selector="Border.setting-section">
+    <Style.Animations>
+      <Animation Duration="0:0:0.3" FillMode="Forward">
+        <KeyFrame Cue="0%">
+          <Setter Property="Opacity" Value="0"/>
+          <Setter Property="(TranslateTransform.Y)" Value="20"/>
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="Opacity" Value="1"/>
+          <Setter Property="(TranslateTransform.Y)" Value="0"/>
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- ホバーアニメーション -->
+  <Style Selector="Border.language-pair-item">
+    <Style.Animations>
+      <Animation Duration="0:0:0.15" FillMode="Forward">
+        <KeyFrame Cue="0%">
+          <Setter Property="(TranslateTransform.Y)" Value="0"/>
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="(TranslateTransform.Y)" Value="-2"/>
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <Style Selector="Border.language-pair-item:not(:pointerover)">
+    <Style.Animations>
+      <Animation Duration="0:0:0.15" FillMode="Forward">
+        <KeyFrame Cue="0%">
+          <Setter Property="(TranslateTransform.Y)" Value="-2"/>
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="(TranslateTransform.Y)" Value="0"/>
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+</Styles>

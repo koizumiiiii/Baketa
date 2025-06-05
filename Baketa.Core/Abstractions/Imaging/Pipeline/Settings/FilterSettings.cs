@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
+
     /// <summary>
     /// フィルター設定を表すクラス
     /// </summary>
@@ -36,7 +36,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings
         /// フィルターパラメータ
         /// </summary>
         [JsonPropertyName("parameters")]
-        public Dictionary<string, object> Parameters { get; private set; } = new Dictionary<string, object>();
+        public Dictionary<string, object> Parameters { get; private set; } = [];
         
         /// <summary>
         /// フィルターのエラーハンドリング戦略
@@ -73,4 +73,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline.Settings
             Description = description;
         }
     }
-}

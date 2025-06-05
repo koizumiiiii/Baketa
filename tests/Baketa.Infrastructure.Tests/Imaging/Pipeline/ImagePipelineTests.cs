@@ -11,8 +11,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
 
     /// <summary>
     /// テスト用のパイプラインフィルターインターフェース実装
@@ -24,13 +23,12 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
         public string Category { get; set; } = "Effect";
         public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
         
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         
         public IReadOnlyCollection<PipelineStepParameter> Parameters => 
-            new List<PipelineStepParameter> 
-            {
-                new PipelineStepParameter("param1", "Parameter 1", typeof(string), "default") 
-            };
+            [
+                new PipelineStepParameter("param1", "Parameter 1", typeof(string), "default")
+            ];
             
         public TestIPipelineImageFilter(string name, string description, string category)
         {
@@ -296,7 +294,7 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
         }
         
         // テスト用の拡張されたフィルタークラス
-        private class TestCustomFilter : IImagePipelineFilter
+        private sealed class TestCustomFilter : IImagePipelineFilter
         {
             private readonly Func<IAdvancedImage, IAdvancedImage> _transform;
             
@@ -311,7 +309,7 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
             public string Category => "Test";
             public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
             
-            public IReadOnlyCollection<PipelineStepParameter> Parameters => new List<PipelineStepParameter>();
+            public IReadOnlyCollection<PipelineStepParameter> Parameters => [];
             
             public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
             {
@@ -393,4 +391,3 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline
             Assert.Equal(StepErrorHandlingStrategy.LogAndContinue, pipeline.GlobalErrorHandlingStrategy);
         }
     }
-}

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
-namespace Baketa.Core.Abstractions.Imaging.Filters
-{
+namespace Baketa.Core.Abstractions.Imaging.Filters;
+
     /// <summary>
     /// OCR最適化フィルターの種類
     /// </summary>
@@ -74,4 +74,3 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
         /// <returns>フィルターの配列</returns>
         Baketa.Core.Abstractions.Imaging.IImageFilter[] CreateEdgeBasedOcrPipeline();
     }
-}

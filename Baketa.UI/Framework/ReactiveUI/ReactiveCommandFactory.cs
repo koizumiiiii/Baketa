@@ -3,8 +3,8 @@ using System.Reactive;
 using System.Threading.Tasks;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.ReactiveUI
-{
+namespace Baketa.UI.Framework.ReactiveUI;
+
     /// <summary>
     /// ReactiveCommandを作成するファクトリークラス
     /// バージョン互換性を吸収するためのラッパー
@@ -80,4 +80,3 @@ namespace Baketa.UI.Framework.ReactiveUI
             return ReactiveCommand.CreateFromTask<TParam, TResult>(execute);
         }
     }
-}

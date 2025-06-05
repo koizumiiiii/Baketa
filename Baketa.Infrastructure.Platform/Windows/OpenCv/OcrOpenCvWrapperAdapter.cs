@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// WindowsOpenCvWrapperをOCR.IOpenCvWrapperインターフェースに適応させるアダプタークラス
     /// </summary>
@@ -209,4 +209,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
             Dispose(false);
         }
     }
-}

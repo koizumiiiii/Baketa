@@ -12,8 +12,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Events.Capture;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// 拡張差分検出アルゴリズム
     /// </summary>
@@ -42,7 +42,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             _eventAggregator = eventAggregator;
             _logger = logger;
             _settings = new DifferenceDetectionSettings();
-            _previousTextRegions = new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+            _previousTextRegions = new ReadOnlyCollection<Rectangle>([]);
         }
         
         /// <summary>
@@ -123,7 +123,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
             {
                 // サイズが異なる場合は画面全体を変化領域とする
                 var entireRegion = new Rectangle(0, 0, currentImage.Width, currentImage.Height);
-                return new ReadOnlyCollection<Rectangle>(new List<Rectangle> { entireRegion });
+                return new ReadOnlyCollection<Rectangle>([ entireRegion ]);
             }
             
             try
@@ -184,7 +184,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
             if (_previousTextRegions.Count == 0)
             {
                 _logger?.LogDebug("前回のテキスト領域が設定されていないため、テキスト消失検出をスキップします");
-                return new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+                return new ReadOnlyCollection<Rectangle>([]);
             }
             
             try
@@ -216,17 +216,17 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
             catch (ArgumentException ex)
             {
                 _logger?.LogError(ex, "テキスト消失検出中に引数エラーが発生しました: {Message}", ex.Message);
-                return new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+                return new ReadOnlyCollection<Rectangle>([]);
             }
             catch (InvalidOperationException ex)
             {
                 _logger?.LogError(ex, "テキスト消失検出中に操作エラーが発生しました: {Message}", ex.Message);
-                return new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+                return new ReadOnlyCollection<Rectangle>([]);
             }
             catch (IOException ex)
             {
                 _logger?.LogError(ex, "テキスト消失検出中にIO例外が発生しました: {Message}", ex.Message);
-                return new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+                return new ReadOnlyCollection<Rectangle>([]);
             }
             catch (Exception ex) when (ex is not ApplicationException)
             {
@@ -273,7 +273,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
         /// </summary>
         public void SetPreviousTextRegions(IReadOnlyList<Rectangle> textRegions)
         {
-            _previousTextRegions = textRegions ?? new ReadOnlyCollection<Rectangle>(new List<Rectangle>());
+            _previousTextRegions = textRegions ?? new ReadOnlyCollection<Rectangle>([]);
             _logger?.LogDebug("前回のテキスト領域を {Count} 個設定", _previousTextRegions.Count);
         }
         
@@ -300,7 +300,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
         /// </summary>
         private ReadOnlyCollection<Rectangle> CreateEntireRegionResult(IImage currentImage)
         {
-            return new ReadOnlyCollection<Rectangle>(new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) });
+            return new ReadOnlyCollection<Rectangle>([ new Rectangle(0, 0, currentImage.Width, currentImage.Height) ]);
         }
         
         /// <summary>
@@ -339,7 +339,7 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
         /// <summary>
         /// 動的テキスト消失イベントクラス
         /// </summary>
-        private class DynamicTextDisappearanceEvent : IEvent
+        private sealed class DynamicTextDisappearanceEvent : IEvent
         {
             public Guid Id { get; } = Guid.NewGuid();
             public string Name => "TextDisappearance";
@@ -359,4 +359,3 @@ ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
             }
         }
     }
-}

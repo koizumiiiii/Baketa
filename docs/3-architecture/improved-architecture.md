@@ -56,6 +56,15 @@ Baketa.Core/
 │   ├── Translation/      # 翻訳抽象化
 │   └── Common/           # 共通抽象化
 ├── Models/               # データモデル
+├── Translation/          # 翻訳関連機能
+│   ├── Abstractions/     # 翻訳インターフェース定義
+│   ├── Models/           # 翻訳モデル定義
+│   │   ├── Common/       # 共通モデル
+│   │   ├── Requests/     # リクエスト関連
+│   │   ├── Responses/    # レスポンス関連
+│   │   └── Events/       # イベント関連
+│   ├── Services/         # 翻訳サービス
+│   └── Common/           # 翻訳共通ユーティリティ
 ├── Services/             # コアサービス実装
 │   ├── Imaging/          # 画像処理サービス
 │   ├── Capture/          # キャプチャサービス
@@ -186,6 +195,7 @@ tests/
 | アプリケーション層 | `Baketa.Application.[機能]` | `Baketa.Application.Services.OCR` |
 | UI層 | `Baketa.UI.[フレームワーク].[機能]` | `Baketa.UI.Avalonia.ViewModels` |
 | 抽象化 | `[レイヤー].Abstractions.[機能]` | `Baketa.Core.Abstractions.Imaging` |
+| 機能ドメイン | `Baketa.Core.[機能ドメイン]` | `Baketa.Core.Translation.Models` |
 
 ## 5. インターフェース設計の例
 
@@ -403,7 +413,217 @@ namespace Baketa.Core.Abstractions.Imaging
 }
 ```
 
-### 5.2 Windows画像インターフェース
+### 5.2 翻訳モデルの名前空間構造
+
+2025年5月に完了した名前空間統一プロジェクトにより、翻訳関連のデータモデルはすべて `Baketa.Core.Translation.Models` 名前空間に統一されました。
+
+```csharp
+namespace Baketa.Core.Translation.Models
+{
+    /// <summary>
+    /// 言語情報を表すクラス
+    /// </summary>
+    public class Language
+    {
+        /// <summary>
+        /// 言語コード（例: "en-US", "ja-JP", "zh-CN"）
+        /// </summary>
+        public string Code { get; set; }
+        
+        /// <summary>
+        /// 表示名（例: "英語 (米国)", "日本語", "中国語 (簡体字)"）
+        /// </summary>
+        public string DisplayName { get; set; }
+        
+        /// <summary>
+        /// 現地語での言語名（例: "English", "日本語", "中文"）
+        /// </summary>
+        public string NativeName { get; set; }
+        
+        /// <summary>
+        /// 自動検出フラグ
+        /// </summary>
+        public bool IsAutoDetect { get; set; }
+        
+        /// <summary>
+        /// 右から左への書字方向かどうか
+        /// </summary>
+        public bool IsRightToLeft { get; set; }
+        
+        /// <summary>
+        /// 言語コードから新しいインスタンスを作成
+        /// </summary>
+        public static Language FromCode(string code)
+        {
+            // 実装
+        }
+    }
+    
+    /// <summary>
+    /// 言語ペアを表すクラス
+    /// </summary>
+    public class LanguagePair
+    {
+        /// <summary>
+        /// ソース言語
+        /// </summary>
+        public Language Source { get; set; }
+        
+        /// <summary>
+        /// ターゲット言語
+        /// </summary>
+        public Language Target { get; set; }
+        
+        /// <summary>
+        /// 言語コードから言語ペアを作成
+        /// </summary>
+        public static LanguagePair Create(string sourceCode, string targetCode)
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// "en-US:ja-JP" 形式の文字列から言語ペアを作成
+        /// </summary>
+        public static LanguagePair FromString(string pairString)
+        {
+            // 実装
+        }
+    }
+    
+    /// <summary>
+    /// 翻訳リクエストを表すクラス
+    /// </summary>
+    public class TranslationRequest
+    {
+        /// <summary>
+        /// 翻訳元テキスト
+        /// </summary>
+        public string Text { get; set; }
+        
+        /// <summary>
+        /// 言語ペア
+        /// </summary>
+        public LanguagePair Languages { get; set; }
+        
+        /// <summary>
+        /// リクエスト作成タイムスタンプ
+        /// </summary>
+        public DateTime Timestamp { get; set; }
+        
+        /// <summary>
+        /// 翻訳コンテキスト
+        /// </summary>
+        public TranslationContext Context { get; set; }
+        
+        /// <summary>
+        /// テキストと言語ペアから翻訳リクエストを作成
+        /// </summary>
+        public static TranslationRequest Create(string text, LanguagePair languages)
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// コンテキスト情報を含む翻訳リクエストを作成
+        /// </summary>
+        public static TranslationRequest CreateWithContext(
+            string text, LanguagePair languages, TranslationContext context)
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// リクエストのクローンを作成
+        /// </summary>
+        public TranslationRequest Clone()
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// キャッシュキーを生成
+        /// </summary>
+        public string GenerateCacheKey()
+        {
+            // 実装
+        }
+    }
+    
+    /// <summary>
+    /// 翻訳レスポンスを表すクラス
+    /// </summary>
+    public class TranslationResponse
+    {
+        /// <summary>
+        /// 元のリクエスト
+        /// </summary>
+        public TranslationRequest Request { get; set; }
+        
+        /// <summary>
+        /// 翻訳結果テキスト
+        /// </summary>
+        public string TranslatedText { get; set; }
+        
+        /// <summary>
+        /// 翻訳の成功フラグ
+        /// </summary>
+        public bool Success { get; set; }
+        
+        /// <summary>
+        /// レスポンス作成タイムスタンプ
+        /// </summary>
+        public DateTime Timestamp { get; set; }
+        
+        /// <summary>
+        /// エラー情報（失敗時）
+        /// </summary>
+        public TranslationError Error { get; set; }
+        
+        /// <summary>
+        /// 翻訳信頼度（0.0〜1.0）
+        /// </summary>
+        public float Confidence { get; set; }
+        
+        /// <summary>
+        /// レスポンスのクローンを作成
+        /// </summary>
+        public TranslationResponse Clone()
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// 成功レスポンスを作成
+        /// </summary>
+        public static TranslationResponse CreateSuccess(
+            TranslationRequest request, string translatedText)
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// 信頼度付きの成功レスポンスを作成
+        /// </summary>
+        public static TranslationResponse CreateSuccessWithConfidence(
+            TranslationRequest request, string translatedText, float confidence)
+        {
+            // 実装
+        }
+        
+        /// <summary>
+        /// エラーレスポンスを作成
+        /// </summary>
+        public static TranslationResponse CreateError(
+            TranslationRequest request, TranslationError error)
+        {
+            // 実装
+        }
+    }
+}
+```
+
+### 5.3 Windows画像インターフェース
 
 ```csharp
 namespace Baketa.Infrastructure.Platform.Abstractions
@@ -454,70 +674,6 @@ namespace Baketa.Infrastructure.Platform.Abstractions
         /// <param name="data">画像データ</param>
         /// <returns>Windows画像</returns>
         Task<IWindowsImage> CreateFromBytesAsync(byte[] data);
-    }
-}
-```
-
-### 5.3 Windows画像実装
-
-```csharp
-namespace Baketa.Infrastructure.Platform.Windows.Imaging
-{
-    /// <summary>
-    /// Windows固有の画像実装
-    /// </summary>
-    public class WindowsImage : IWindowsImage
-    {
-        private readonly Bitmap _bitmap;
-        private bool _disposed;
-
-        public WindowsImage(Bitmap bitmap)
-        {
-            _bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
-        }
-
-        public int Width => _bitmap.Width;
-        public int Height => _bitmap.Height;
-
-        public Bitmap GetNativeImage() => _bitmap;
-
-        public Task SaveAsync(string path)
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(WindowsImage));
-                
-            _bitmap.Save(path);
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _bitmap.Dispose();
-                _disposed = true;
-            }
-            GC.SuppressFinalize(this);
-        }
-    }
-
-    /// <summary>
-    /// Windows画像ファクトリ
-    /// </summary>
-    public class WindowsImageFactory : IWindowsImageFactory
-    {
-        public Task<IWindowsImage> CreateFromFileAsync(string path)
-        {
-            var bitmap = new Bitmap(path);
-            return Task.FromResult<IWindowsImage>(new WindowsImage(bitmap));
-        }
-
-        public Task<IWindowsImage> CreateFromBytesAsync(byte[] data)
-        {
-            using var stream = new MemoryStream(data);
-            var bitmap = new Bitmap(stream);
-            return Task.FromResult<IWindowsImage>(new WindowsImage(bitmap));
-        }
     }
 }
 ```
@@ -849,257 +1005,27 @@ namespace Baketa.Core.Events.Implementation
 }
 ```
 
-### 7.3 パフォーマンス測定機能
+この革新的なイベント集約機構は、モジュール間の疎結合なコミュニケーションを実現し、系統だったイベント処理を可能にします。
 
-イベント処理のパフォーマンスを詳細に測定するための`EventProcessorMetrics`クラスも実装されています：
+## 8. 翻訳名前空間の最適化（2025年5月更新）
 
-```csharp
-namespace Baketa.Core.Events.Implementation
-{
-    /// <summary>
-    /// イベントプロセッサのパフォーマンスメトリクス
-    /// </summary>
-    public class EventProcessorMetrics
-    {
-        // パフォーマンス測定機能の実装
-        // - 処理時間の測定
-        // - 成功率の計算
-        // - 95パーセンタイルなどの統計情報
-        // - レポート生成機能
-    }
-    
-    /// <summary>
-    /// プロセッサのメトリクス情報
-    /// </summary>
-    public class ProcessorMetric
-    {
-        // メトリック情報を格納するプロパティ
-    }
-}
-```
+2025年5月に完了した名前空間統一プロジェクトにより、以下の改善が実現されました：
 
-### 7.4 依存性注入の統合
+1. **名前空間の統一**
+   - 翻訳関連のすべてのモデルが `Baketa.Core.Translation.Models` に統一
+   - 型参照の曖昧さを完全に排除
+   - 名前空間エイリアスが不要に
 
-DIコンテナでの登録は以下のように実装されています：
+2. **標準的な表現方法の採用**
+   - 言語コードの表現を国際標準（ISO 639-1/ISO 3166）に準拠
+   - 例: `zh-CN` 形式での一貫した表現
 
-```csharp
-namespace Baketa.Core.Events.Implementation
-{
-    /// <summary>
-    /// イベント集約機構のサービス登録拡張メソッド
-    /// </summary>
-    public static class EventAggregatorServiceExtensions
-    {
-        /// <summary>
-        /// イベント集約機構をサービスコレクションに登録します
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        /// <returns>設定済みのサービスコレクション</returns>
-        public static IServiceCollection AddEventAggregator(this IServiceCollection services)
-        {
-            // イベント集約機構をシングルトンとして登録
-            services.AddSingleton<IEventAggregator, EventAggregator>();
-            
-            return services;
-        }
-    }
-}
-```
+3. **機能強化と統合**
+   - `Language`クラスに `IsRightToLeft` プロパティなどの機能を追加
+   - `TranslationRequest`に `Timestamp` や `Context` のサポートを追加
+   - 全体的なAPIの一貫性と使いやすさの向上
 
-### 7.5 イベント使用例
-
-イベント集約機構の使用例：
-
-```csharp
-// イベント定義
-public class CaptureCompletedEvent : EventBase
-{
-    public CaptureCompletedEvent(IImage capturedImage)
-    {
-        CapturedImage = capturedImage;
-    }
-    
-    public IImage CapturedImage { get; }
-    
-    public override string Name => "CaptureCompleted";
-    
-    public override string Category => "Capture";
-}
-
-// イベントプロセッサ
-public class CaptureProcessor : IEventProcessor<CaptureCompletedEvent>
-{
-    private readonly IOcrService _ocrService;
-    
-    public CaptureProcessor(IOcrService ocrService)
-    {
-        _ocrService = ocrService;
-    }
-    
-    public async Task HandleAsync(CaptureCompletedEvent eventData)
-    {
-        // キャプチャ画像に対してOCR処理を実行
-        await _ocrService.ProcessImageAsync(eventData.CapturedImage);
-    }
-}
-
-// 登録と発行
-public class SampleService
-{
-    private readonly IEventAggregator _eventAggregator;
-    private readonly ICaptureService _captureService;
-    private readonly CaptureProcessor _captureProcessor;
-    
-    public SampleService(
-        IEventAggregator eventAggregator,
-        ICaptureService captureService,
-        CaptureProcessor captureProcessor)
-    {
-        _eventAggregator = eventAggregator;
-        _captureService = captureService;
-        _captureProcessor = captureProcessor;
-        
-        // プロセッサを登録
-        _eventAggregator.Subscribe(_captureProcessor);
-    }
-    
-    public async Task ExecuteAsync()
-    {
-        // 画面をキャプチャ
-        var image = await _captureService.CaptureScreenAsync();
-        
-        // イベントを発行
-        await _eventAggregator.PublishAsync(new CaptureCompletedEvent(image));
-    }
-}
-```
-
-このイベント集約機構は、モジュール間の疎結合なコミュニケーションを実現し、系統だったイベント処理を可能にします。
-
-## 8. 依存性注入の最適化
-
-### 8.1 モジュールベースのDI
-
-```csharp
-namespace Baketa.Application.DI
-{
-    /// <summary>
-    /// サービス登録モジュールインターフェース
-    /// </summary>
-    public interface IServiceModule
-    {
-        /// <summary>
-        /// サービスの登録
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        void RegisterServices(IServiceCollection services);
-    }
-
-    /// <summary>
-    /// コアサービスモジュール
-    /// </summary>
-    public class CoreModule : IServiceModule
-    {
-        public void RegisterServices(IServiceCollection services)
-        {
-            // コアサービスの登録
-            services.AddSingleton<IEventAggregator, EventAggregator>();
-            services.AddSingleton<IImageFactory, ImageFactory>();
-            // ...その他のコアサービス
-        }
-    }
-
-    /// <summary>
-    /// インフラストラクチャサービスモジュール
-    /// </summary>
-    public class InfrastructureModule : IServiceModule
-    {
-        public void RegisterServices(IServiceCollection services)
-        {
-            // 基本インフラサービスの登録
-            services.AddSingleton<ISettingsService, SettingsService>();
-            services.AddSingleton<ITranslationCache, TranslationCache>();
-            // ...その他のインフラサービス
-            
-            // Windows固有サービスの登録
-            services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
-            services.AddSingleton<IWindowsCaptureService, WindowsCaptureService>();
-        }
-    }
-
-    /// <summary>
-    /// アプリケーションサービスモジュール
-    /// </summary>
-    public class ApplicationModule : IServiceModule
-    {
-        public void RegisterServices(IServiceCollection services)
-        {
-            // アプリケーションサービスの登録
-            services.AddSingleton<ICaptureService, CaptureService>();
-            services.AddSingleton<ITranslationService, TranslationService>();
-            services.AddSingleton<IOcrService, OcrService>();
-            // ...その他のアプリケーションサービス
-        }
-    }
-
-    /// <summary>
-    /// UIサービスモジュール
-    /// </summary>
-    public class UIModule : IServiceModule
-    {
-        public void RegisterServices(IServiceCollection services)
-        {
-            // ViewModelの登録
-            services.AddSingleton<MainViewModel>();
-            services.AddSingleton<SettingsViewModel>();
-            services.AddTransient<OverlayViewModel>();
-            
-            // UIサービスの登録
-            services.AddSingleton<IDialogService, AvaloniaDialogService>();
-            services.AddSingleton<INotificationService, AvaloniaNotificationService>();
-            // ...その他のUIサービス
-        }
-    }
-}
-```
-
-### 8.2 統合DIコンテナの設定
-
-```csharp
-namespace Baketa.Application.DI
-{
-    /// <summary>
-    /// 依存性注入拡張メソッド
-    /// </summary>
-    public static class DependencyInjectionExtensions
-    {
-        /// <summary>
-        /// Baketaサービスの登録
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        /// <returns>サービスコレクション</returns>
-        public static IServiceCollection AddBaketaServices(this IServiceCollection services)
-        {
-            // すべてのモジュールを登録
-            var modules = new IServiceModule[]
-            {
-                new CoreModule(),
-                new InfrastructureModule(),
-                new ApplicationModule(),
-                new UIModule()
-            };
-            
-            // 各モジュールのサービスを登録
-            foreach (var module in modules)
-            {
-                module.RegisterServices(services);
-            }
-            
-            return services;
-        }
-    }
-}
-```
+詳細は[名前空間統一完了報告](../development-notes/namespace-unification-completion-report.md)を参照してください。
 
 ## 9. 名前空間の衝突が起きにくいようにする提案
 
@@ -1121,61 +1047,17 @@ Baketa.Infrastructure.Platform.Windows
 
 明確な接頭辞/接尾辞のパターンを使用することで、同名の衝突を防ぎます。
 
-### 9.3 モジュール単位のアセンブリ分割
+### 9.3 機能ドメインに基づく名前空間構造
 
-各機能を独立したアセンブリ（DLL）に分割します：
-- `Baketa.Core.Abstractions.dll`
-- `Baketa.Core.Services.dll`
-- `Baketa.Infrastructure.Platform.Windows.dll`
-
-これにより、参照関係が明確になり、循環参照も防止できます。
-
-### 9.4 アダプターレイヤーの集中管理
-
-異なる実装間の変換を行うアダプターは、専用の名前空間に集約します：
-```csharp
-Baketa.Infrastructure.Adapters
+```
+Baketa.Core.[機能ドメイン]                 // 例: Translation, OCR, Imaging
+├── Baketa.Core.[機能ドメイン].Abstractions // インターフェース定義
+├── Baketa.Core.[機能ドメイン].Models       // モデル定義
+├── Baketa.Core.[機能ドメイン].Services     // サービス実装
+└── Baketa.Core.[機能ドメイン].Common       // 共通ユーティリティ
 ```
 
-### 9.5 グローバル名前空間の明示的な使用
-
-```csharp
-using CoreImage = global::Baketa.Core.Abstractions.Imaging.IImage;
-using WindowsImage = global::Baketa.Infrastructure.Platform.Windows.Imaging.IWindowsImage;
-```
-
-衝突が予想される型には、エイリアスを使用して明示的に区別します。
-
-### 9.6 アセンブリ強い名前の使用
-
-プロジェクトに強い名前（署名）を付けることで、アセンブリレベルでの衝突を防ぎます。
-
-### 9.7 依存性注入コンテナのモジュール分割
-
-```csharp
-public static IServiceCollection AddBaketaCoreServices(this IServiceCollection services)
-public static IServiceCollection AddBaketaInfrastructureServices(this IServiceCollection services)
-```
-
-サービス登録も機能ごとに分離することで、依存関係の管理が容易になります。
-
-### 9.8 バージョン管理の導入
-
-```csharp
-namespace Baketa.Core.Abstractions.V1.Imaging
-namespace Baketa.Core.Abstractions.V2.Imaging
-```
-
-主要なAPIの変更がある場合、バージョンを名前空間に含めることで旧バージョンとの互換性を保持できます。
-
-### 9.9 ドメイン駆動設計の境界コンテキスト導入
-
-機能を論理的な「境界コンテキスト」で区切り、各コンテキスト内での命名は独立させます：
-
-```csharp
-Baketa.OCR.Domain
-Baketa.Translation.Domain
-```
+この構造により、名前空間競合を早期に検出し対応できるようになります。
 
 ## 10. まとめ
 
@@ -1187,4 +1069,4 @@ Baketa.Translation.Domain
 4. **拡張性**: インターフェースを通じた機能拡張が容易
 5. **テスト容易性**: 依存関係が明確で、各コンポーネントの単体テストが容易
 
-この改善されたアーキテクチャにより、Baketaプロジェクトのメンテナンス性と拡張性が大幅に向上します。なお、本プロジェクトはWindows専用アプリケーションとして開発を継続し、OCR最適化にはOpenCVのみを使用します。
+2025年5月に完了した名前空間統一プロジェクトにより、特に翻訳モデル関連の名前空間の問題が解決され、コードベースの一貫性と保守性が大幅に向上しました。今後も新機能の追加時には、ここで提案した設計原則を遵守することで、名前空間の衝突を防ぎ、保守性の高いコードベースを維持していくことが可能です。

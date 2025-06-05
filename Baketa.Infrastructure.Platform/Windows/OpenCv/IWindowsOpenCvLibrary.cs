@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// Windows環境でのOpenCVライブラリの機能を提供するインターフェース
     /// </summary>
@@ -84,7 +84,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// <summary>
         /// 領域を構成するポイント配列
         /// </summary>
-        public Point[] Points { get; set; } = Array.Empty<Point>();
+        public Point[] Points { get; set; } = [];
         
         /// <summary>
         /// 検出信頼度
@@ -96,4 +96,3 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         /// </summary>
         public float StrokeWidth { get; set; }
     }
-}

@@ -4,20 +4,19 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域集約実装クラス
     /// </summary>
     public class TextRegionAggregator : ITextRegionAggregator
     {
         private readonly ILogger<TextRegionAggregator>? _logger;
-        private List<OCRTextRegion> _previousRegions = new List<OCRTextRegion>();
+        private readonly List<OCRTextRegion> _previousRegions = [];
         
         /// <summary>
         /// コンストラクタ
@@ -40,21 +39,14 @@ namespace Baketa.Infrastructure.OCR.TextDetection
         {
             ArgumentNullException.ThrowIfNull(detectionResults, nameof(detectionResults));
                 
-            // 全ての検出結果を一つのリストにまとめる
-            var allRegions = new List<OCRTextRegion>();
-            
-            foreach (var result in detectionResults)
-            {
-                if (result != null)
-                {
-                    allRegions.AddRange(result);
-                }
-            }
+            List<OCRTextRegion> allRegions = [.. detectionResults
+                .Where(result => result != null)
+                .SelectMany(result => result)];
             
             if (allRegions.Count == 0)
             {
                 _logger?.LogInformation("集約する検出結果がありません");
-                return Array.Empty<OCRTextRegion>();
+                return [];
             }
             
             _logger?.LogDebug("テキスト領域集約を開始 (合計: {TotalCount}個の領域)", allRegions.Count);
@@ -78,7 +70,8 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 var trackedRegions = await TrackRegionsAsync(scoredRegions, _previousRegions, cancellationToken).ConfigureAwait(false);
                 
                 // 結果をキャッシュ（次回フレーム用）
-                _previousRegions = trackedRegions.ToList();
+                _previousRegions.Clear();
+                _previousRegions.AddRange(trackedRegions);
                 
                 _logger?.LogDebug("テキスト領域集約が完了 (統合後: {MergedCount}個の領域)", trackedRegions.Count);
                 
@@ -124,9 +117,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     
-                    var trackedRegions = new List<OCRTextRegion>();
-                    
-                    foreach (var currentRegion in currentRegions)
+                    return currentRegions.Select(currentRegion => 
                     {
                         // 前フレームの対応する領域を検索
                         OCRTextRegion? matchedPrevRegion = null;
@@ -138,14 +129,14 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                             var intersection = Rectangle.Intersect(currentRegion.Bounds, prevRegion.Bounds);
                             if (intersection.IsEmpty)
                                 continue;
-                                
+
                             float intersectionArea = intersection.Width * intersection.Height;
                             float currentArea = currentRegion.Bounds.Width * currentRegion.Bounds.Height;
                             float prevArea = prevRegion.Bounds.Width * prevRegion.Bounds.Height;
                             float unionArea = currentArea + prevArea - intersectionArea;
-                            
+
                             float iou = intersectionArea / unionArea;
-                            
+
                             if (iou > maxIoU)
                             {
                                 maxIoU = iou;
@@ -158,7 +149,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                         {
                             // 新しい領域を作成し、元の領域の信頼度を補正
                             float newConfidence = currentRegion.ConfidenceScore * 0.7f + matchedPrevRegion.ConfidenceScore * 0.3f;
-                            
+
                             var trackedRegion = new OCRTextRegion(
                                 currentRegion.Bounds,
                                 newConfidence,
@@ -169,21 +160,19 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                             };
                             
                             // 一時的な消失を許容するためのメタデータ
-                            trackedRegion.Metadata["TrackingFrameCount"] = 
+                            trackedRegion.Metadata["TrackingFrameCount"] =
                                 matchedPrevRegion.Metadata.TryGetValue("TrackingFrameCount", out var frameCount) ?
                                 (int)frameCount + 1 : 1;
-                                
-                            trackedRegions.Add(trackedRegion);
+
+                            return trackedRegion;
                         }
                         else
                         {
                             // 新規領域
                             currentRegion.Metadata["TrackingFrameCount"] = 1;
-                            trackedRegions.Add(currentRegion);
+                            return currentRegion;
                         }
-                    }
-                    
-                    return trackedRegions;
+                    }).ToList();
                     
                 }, cancellationToken).ConfigureAwait(false);
             }
@@ -213,60 +202,60 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 
             if (regions.Count == 0)
             {
-                return Array.Empty<OCRTextRegion>();
+                return [];
             }
             
             _logger?.LogDebug("テキスト領域スコアリングを開始 (対象: {RegionCount}個の領域)", regions.Count);
                 
             try
             {
-                return await Task.Run(() => 
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    var scoredRegions = new List<OCRTextRegion>();
-                    
-                    foreach (var region in regions)
+                    return await Task.Run<IReadOnlyList<OCRTextRegion>>(() => 
                     {
-                        // 基本スコア（すでに設定されたもの）
-                        float baseScore = region.ConfidenceScore;
+                        cancellationToken.ThrowIfCancellationRequested();
                         
-                        // テキスト特性スコア（テキストらしさ）
-                        float textFeatureScore = CalculateTextFeatureScore(region);
-                        
-                        // 空間配置スコア（整列など）
-                        float spatialScore = CalculateSpatialScore(region, regions);
-                        
-                        // 最終スコアの計算（重み付け）
-                        float finalScore = baseScore * 0.5f + textFeatureScore * 0.3f + spatialScore * 0.2f;
-                        
-                        // 新しいスコアリング済み領域を作成
-                        var scoredRegion = new OCRTextRegion(
-                            region.Bounds,
-                            finalScore,
-                            region.RegionType)
+                        // Selectの結果を一時変数に格納
+                        var regionResults = regions.Select(region => 
                         {
-                            Contour = region.Contour,
-                            ProcessedImage = region.ProcessedImage
-                        };
+                            // 基本スコア（すでに設定されたもの）
+                            float baseScore = region.ConfidenceScore;
+                            
+                            // テキスト特性スコア（テキストらしさ）
+                            float textFeatureScore = CalculateTextFeatureScore(region);
+                            
+                            // 空間配置スコア（整列など）
+                            float spatialScore = CalculateSpatialScore(region, regions);
+                            
+                            // 最終スコアの計算（重み付け）
+                            float finalScore = baseScore * 0.5f + textFeatureScore * 0.3f + spatialScore * 0.2f;
+                            
+                            // 新しいスコアリング済み領域を作成
+                            var scoredRegion = new OCRTextRegion(
+                                region.Bounds,
+                                finalScore,
+                                region.RegionType)
+                            {
+                                Contour = region.Contour,
+                                ProcessedImage = region.ProcessedImage
+                            };
+                            
+                            // メタデータの継承
+                            foreach (var item in region.Metadata)
+                            {
+                                scoredRegion.Metadata[item.Key] = item.Value;
+                            }
+                            
+                            // スコアリング詳細の追加
+                            scoredRegion.Metadata["BaseScore"] = baseScore;
+                            scoredRegion.Metadata["TextFeatureScore"] = textFeatureScore;
+                            scoredRegion.Metadata["SpatialScore"] = spatialScore;
+                            
+                            return scoredRegion;
+                        });
                         
-                        // メタデータの継承
-                        foreach (var item in region.Metadata)
-                        {
-                            scoredRegion.Metadata[item.Key] = item.Value;
-                        }
+                        // コレクション式を使用して結果を返す
+                        return [.. regionResults];
                         
-                        // スコアリング詳細の追加
-                        scoredRegion.Metadata["BaseScore"] = baseScore;
-                        scoredRegion.Metadata["TextFeatureScore"] = textFeatureScore;
-                        scoredRegion.Metadata["SpatialScore"] = spatialScore;
-                        
-                        scoredRegions.Add(scoredRegion);
-                    }
-                    
-                    return scoredRegions;
-                    
-                }, cancellationToken).ConfigureAwait(false);
+                    }, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -293,19 +282,12 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             
             if (aspectRatio >= 0.2f && aspectRatio <= 20.0f)
             {
-                // 横長のテキストに高いスコア（一般的なテキスト行はやや横長）
-                if (aspectRatio > 1.0f && aspectRatio < 10.0f)
-                {
-                    aspectScore = 1.0f - (Math.Min(aspectRatio - 1.0f, 9.0f) / 9.0f) * 0.5f;
-                }
-                else if (aspectRatio <= 1.0f && aspectRatio >= 0.2f)
-                {
-                    aspectScore = 0.5f + (aspectRatio - 0.2f) / (1.0f - 0.2f) * 0.5f;
-                }
-                else
-                {
-                    aspectScore = 0.5f;
-                }
+                // 横長のテキストに高いスコアの計算を三項演算子で実装
+                aspectScore = aspectRatio > 1.0f && aspectRatio < 10.0f ?
+                    1.0f - (Math.Min(aspectRatio - 1.0f, 9.0f) / 9.0f) * 0.5f :
+                    aspectRatio <= 1.0f && aspectRatio >= 0.2f ?
+                        0.5f + (aspectRatio - 0.2f) / (1.0f - 0.2f) * 0.5f :
+                        0.5f;
             }
             
             // サイズ評価
@@ -318,9 +300,9 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             if (region.Contour != null)
             {
                 // 輪郭の長さと面積の比率から複雑さを評価
-                // Point配列の長さはCount プロパティを使用
-                float perimeter = region.Contour.Count;
-                float perimeterAreaRatio = perimeter / Math.Max(area, 1.0f);
+                // ディスカード変数を使用してパフォーマンスを維持
+                _ = region.Contour.Count; // 輪郭の長さ
+                float perimeterAreaRatio = region.Contour.Count / Math.Max(area, 1.0f);
                 
                 complexityScore = Math.Max(0.0f, 1.0f - Math.Min(perimeterAreaRatio * 0.1f, 1.0f));
             }
@@ -337,13 +319,16 @@ namespace Baketa.Infrastructure.OCR.TextDetection
         /// <returns>空間配置スコア（0.0～1.0）</returns>
         private static float CalculateSpatialScore(OCRTextRegion region, IReadOnlyList<OCRTextRegion> allRegions)
         {
-            if (allRegions.Count <= 1)
-                return 0.5f; // デフォルト値
+            return allRegions.Count <= 1 ? 0.5f : CalculateSpatialScoreInternal(region, allRegions); // デフォルト値または計算値
                 
-            // 水平方向の整列スコア
-            float alignmentScore = 0.0f;
-            float proximityScore = 0.0f;
-            
+        }
+        
+        /// <summary>
+        /// 空間配置スコアの内部計算メソッド
+        /// </summary>
+        private static float CalculateSpatialScoreInternal(OCRTextRegion region, IReadOnlyList<OCRTextRegion> allRegions)
+        {
+            // 水平方向の整列をカウントする変数
             int alignedCount = 0;
             int closeCount = 0;
             
@@ -375,13 +360,9 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 }
             }
             
-            // 整列スコアを計算
-            alignmentScore = Math.Min(alignedCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
-            
-            // 近接スコアを計算
-            proximityScore = Math.Min(closeCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
-            
-            // 総合スコア
+            // 各スコアを計算して総合スコアを返す
+            float alignmentScore = Math.Min(alignedCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
+            float proximityScore = Math.Min(closeCount / (float)Math.Max(allRegions.Count - 1, 1), 1.0f);
             return alignmentScore * 0.6f + proximityScore * 0.4f;
         }
         
@@ -397,7 +378,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                 return regions;
                 
             // 結果用リスト
-            var mergedRegions = new List<OCRTextRegion>();
+            List<OCRTextRegion> mergedRegions = [];
             // 処理済みフラグ
             var processed = new bool[regions.Count];
             
@@ -454,7 +435,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection
                     var mergedRegion = new OCRTextRegion(currentBounds, maxScore, currentRegion.RegionType);
                     if (mergedContour != null)
                     {
-                        mergedRegion.Contour = mergedContour.ToArray();
+                        mergedRegion.Contour = [.. mergedContour];
                     }
                     mergedRegions.Add(mergedRegion);
                 }
@@ -470,4 +451,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return mergedRegions;
         }
     }
-}

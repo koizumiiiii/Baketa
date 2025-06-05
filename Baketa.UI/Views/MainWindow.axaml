@@ -10,261 +10,47 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="Baketa - ゲーム翻訳オーバーレイ"
         MinWidth="600" MinHeight="400"
-        WindowStartupLocation="CenterScreen"
-        AutomationProperties.Name="Baketa メインウィンドウ"
-        AutomationProperties.HelpText="Baketaアプリケーションのメインウィンドウです">
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Window.Styles>
-        <!-- アニメーション無効時のスタイルオーバーライド -->
-        <Style Selector="Control.fadeIn">
-            <Style.Animations>
-                <!-- アニメーション無効時は空のアニメーション定義で上書き -->
-                <Animation Duration="0" FillMode="Both">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="1" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
-    </Window.Styles>
-    
     <Grid RowDefinitions="Auto,*,Auto">
-        <!-- ヘッダー (アニメーション付き) -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Background="{DynamicResource HeaderBackground}"
-              Classes="fadeIn">
+        <!-- ヘッダー -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Background="LightBlue">
             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,5">
-                <Image Source="/Assets/avalonia-logo.ico" Width="24" Height="24" Margin="0,0,10,0"
-                       AutomationProperties.Name="Baketaロゴ" />
                 <TextBlock Text="Baketa" 
                            VerticalAlignment="Center" 
                            FontWeight="Bold"
-                           FontFamily="{DynamicResource PrimaryFontFamily}"
-                           Foreground="{DynamicResource TextOnPrimaryBrush}"
-                           AutomationProperties.Name="アプリケーション名" />
-            </StackPanel>
-            
-            <Menu Grid.Column="1" Margin="20,0" Foreground="{DynamicResource TextOnPrimaryBrush}">
-                <MenuItem x:Name="FileMenuItem" Header="ファイル" AutomationProperties.Name="ファイルメニュー">
-                    <MenuItem Header="設定" Command="{Binding OpenSettingsCommand}" 
-                              AutomationProperties.Name="設定"
-                              AutomationProperties.HelpText="アプリケーション設定を開きます">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource SettingsIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator/>
-                    <MenuItem Header="終了" Command="{Binding ExitCommand}" 
-                              AutomationProperties.Name="終了"
-                              AutomationProperties.HelpText="アプリケーションを終了します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource ExitIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </MenuItem>
-                <MenuItem x:Name="CaptureMenuItem" Header="キャプチャ" AutomationProperties.Name="キャプチャメニュー">
-                    <MenuItem Header="キャプチャ開始" Command="{Binding StartCaptureCommand}" 
-                              AutomationProperties.Name="キャプチャ開始"
-                              AutomationProperties.HelpText="画面キャプチャを開始します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource CaptureIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <MenuItem Header="キャプチャ停止" Command="{Binding StopCaptureCommand}" 
-                              AutomationProperties.Name="キャプチャ停止"
-                              AutomationProperties.HelpText="画面キャプチャを停止します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource CaptureIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <MenuItem Header="領域選択" Command="{Binding SelectRegionCommand}" 
-                              AutomationProperties.Name="領域選択"
-                              AutomationProperties.HelpText="キャプチャする画面領域を選択します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource OverlayIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </MenuItem>
-                <MenuItem x:Name="ToolsMenuItem" Header="ツール" AutomationProperties.Name="ツールメニュー">
-                    <MenuItem Header="ログビューア" Command="{Binding OpenLogViewerCommand}"
-                              AutomationProperties.Name="ログビューア"
-                              AutomationProperties.HelpText="アプリケーションログを表示します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource HistoryIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <MenuItem Header="翻訳履歴" Command="{Binding OpenTranslationHistoryCommand}"
-                              AutomationProperties.Name="翻訳履歴"
-                              AutomationProperties.HelpText="過去の翻訳履歴を表示します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource HistoryIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </MenuItem>
-                <MenuItem x:Name="HelpMenuItem" Header="ヘルプ" AutomationProperties.Name="ヘルプメニュー">
-                    <MenuItem Header="使い方" Command="{Binding OpenHelpCommand}"
-                              AutomationProperties.Name="使い方"
-                              AutomationProperties.HelpText="ヘルプドキュメントを開きます">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource HelpIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <MenuItem Header="バージョン情報" Command="{Binding OpenAboutCommand}"
-                              AutomationProperties.Name="バージョン情報"
-                              AutomationProperties.HelpText="アプリケーションのバージョン情報を表示します">
-                        <MenuItem.Icon>
-                            <PathIcon Data="{StaticResource InfoIcon}"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </MenuItem>
-            </Menu>
-            
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,5">
-                <Button Command="{Binding MinimizeToTrayCommand}" 
-                        ToolTip.Tip="トレイに最小化"
-                        Classes="headerIcon"
-                        AutomationProperties.Name="トレイに最小化ボタン"
-                        AutomationProperties.HelpText="アプリケーションをシステムトレイに最小化します">
-                    <PathIcon Data="{StaticResource MinimizeIcon}"/>
-                </Button>
+                           Foreground="Black" />
             </StackPanel>
         </Grid>
 
-        <!-- メインコンテンツエリア (ページ遷移アニメーション付き) -->
+        <!-- メインコンテンツエリア -->
         <TabControl Grid.Row="1" TabStripPlacement="Left" SelectedIndex="{Binding SelectedTabIndex}">
-            <TabControl.ContentTemplate>
-                <DataTemplate>
-                    <ContentControl Content="{Binding}" Classes="pageTransition" />
-                </DataTemplate>
-            </TabControl.ContentTemplate>
-            
             <!-- ホームタブ -->
-            <TabItem x:Name="HomeTab" ToolTip.Tip="ホーム画面"
-                     AutomationProperties.Name="ホーム画面"
-                     AutomationProperties.HelpText="アプリケーションのホーム画面を表示します"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource HomeIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="ホーム" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:HomeView DataContext="{Binding HomeViewModel}"/>
+            <TabItem Header="ホーム">
+                <TextBlock Text="ホーム画面" VerticalAlignment="Center" HorizontalAlignment="Center" />
             </TabItem>
 
             <!-- キャプチャタブ -->
-            <TabItem x:Name="CaptureTab" ToolTip.Tip="キャプチャ設定"
-                     AutomationProperties.Name="キャプチャ設定"
-                     AutomationProperties.HelpText="キャプチャ領域と設定の管理を行います"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource CaptureIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="キャプチャ" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:CaptureView DataContext="{Binding CaptureViewModel}"/>
+            <TabItem Header="キャプチャ">
+                <TextBlock Text="キャプチャ設定" VerticalAlignment="Center" HorizontalAlignment="Center" />
             </TabItem>
 
             <!-- 翻訳タブ -->
-            <TabItem x:Name="TranslationTab" ToolTip.Tip="翻訳設定"
-                     AutomationProperties.Name="翻訳設定"
-                     AutomationProperties.HelpText="翻訳エンジンと言語設定を管理します"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource TranslationIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="翻訳" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:TranslationView DataContext="{Binding TranslationViewModel}"/>
-            </TabItem>
-
-            <!-- オーバーレイタブ -->
-            <TabItem x:Name="OverlayTab" ToolTip.Tip="オーバーレイ設定"
-                     AutomationProperties.Name="オーバーレイ設定"
-                     AutomationProperties.HelpText="翻訳結果表示のオーバーレイ設定を管理します"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource OverlayIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="オーバーレイ" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:OverlayView DataContext="{Binding OverlayViewModel}"/>
-            </TabItem>
-
-            <!-- 履歴タブ -->
-            <TabItem x:Name="HistoryTab" ToolTip.Tip="翻訳履歴"
-                     AutomationProperties.Name="翻訳履歴"
-                     AutomationProperties.HelpText="過去の翻訳履歴を表示します"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource HistoryIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="履歴" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:HistoryView DataContext="{Binding HistoryViewModel}"/>
-            </TabItem>
-            
-            <!-- 設定タブ -->
-            <TabItem x:Name="SettingsTab" ToolTip.Tip="アプリケーション設定"
-                     AutomationProperties.Name="設定"
-                     AutomationProperties.HelpText="アプリケーション設定を管理します"
-                     KeyboardNavigation.TabNavigation="Local">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource SettingsIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="設定" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <local:SettingsView DataContext="{Binding SettingsViewModel}"/>
+            <TabItem Header="翻訳">
+                <TextBlock Text="翻訳設定" VerticalAlignment="Center" HorizontalAlignment="Center" />
             </TabItem>
         </TabControl>
         
-        <!-- ステータスバー (通知アニメーション付き) -->
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Background="{DynamicResource StatusBarBackground}"
-              Classes="fadeIn">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,2">
-                <TextBlock x:Name="StatusText" Text="{Binding StatusMessage}" 
+        <!-- ステータスバー -->
+        <Grid Grid.Row="2" Background="LightGray">
+            <StackPanel Orientation="Horizontal" Margin="10,2">
+                <TextBlock Text="{Binding StatusMessage, FallbackValue='準備完了'}" 
                            VerticalAlignment="Center"
-                           Classes="StatusBarTextBlockStyle"
-                           Foreground="{DynamicResource TextOnPrimaryBrush}"
-                           AutomationProperties.Name="ステータスメッセージ" />
-            </StackPanel>
-            
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,2">
-                <TextBlock Text="{Binding TranslationEngine}" 
-                           Margin="0,0,10,0" 
-                           VerticalAlignment="Center"
-                           Classes="StatusBarTextBlockStyle"
-                           Foreground="{DynamicResource TextOnPrimaryBrush}"
-                           AutomationProperties.Name="使用中の翻訳エンジン" />
-                <TextBlock Text="{Binding CaptureStatus}" 
-                           Margin="0,0,10,0" 
-                           VerticalAlignment="Center"
-                           Classes="StatusBarTextBlockStyle"
-                           Foreground="{DynamicResource TextOnPrimaryBrush}"
-                           AutomationProperties.Name="キャプチャ状態" />
-                <ProgressBar x:Name="ProgressIndicator" Value="{Binding Progress}" 
-                             Width="100" 
-                             Height="16" 
-                             Margin="0,0,10,0"
-                             IsVisible="{Binding IsProcessing}"
-                             AutomationProperties.Name="処理進捗状況" />
-                
-                <!-- 通知 (スライドインとフェードアウトアニメーション付き) -->
-                <Border Classes="notification" IsVisible="{Binding IsNotificationVisible}"
-                        Background="{DynamicResource NotificationBackground}"
-                        CornerRadius="4" Padding="8,4" Margin="0,0,10,0"
-                        AutomationProperties.Name="通知メッセージ">
-                    <TextBlock Text="{Binding NotificationMessage}"
-                               Foreground="{DynamicResource NotificationForeground}" />
-                </Border>
+                           Foreground="Black" />
             </StackPanel>
         </Grid>
     </Grid>

@@ -10,8 +10,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// ピクセルベースの差分検出アルゴリズム（最も高精度だが処理負荷が高い）
     /// </summary>
@@ -81,7 +81,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                         {
                             HasSignificantChange = false,
                             ChangeRatio = 0.0,
-                            ChangedRegions = new List<Rectangle>()
+                            ChangedRegions = []
                         };
                     }
                 }
@@ -160,7 +160,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                     .ToList();
                 
                 // テキスト消失の検出
-                List<Rectangle> disappearedTextRegions = new List<Rectangle>();
+                List<Rectangle> disappearedTextRegions = [];
                 
                 return new DetectionResult
                 {
@@ -179,7 +179,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 {
                     HasSignificantChange = true,
                     ChangeRatio = 1.0,
-                    ChangedRegions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) }
+                    ChangedRegions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)]
                 };
             }
             catch (InvalidOperationException ex)
@@ -190,7 +190,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 {
                     HasSignificantChange = true,
                     ChangeRatio = 1.0,
-                    ChangedRegions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) }
+                    ChangedRegions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)]
                 };
             }
             catch (IOException ex)
@@ -201,7 +201,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 {
                     HasSignificantChange = true,
                     ChangeRatio = 1.0,
-                    ChangedRegions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) }
+                    ChangedRegions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)]
                 };
             }
             catch (Exception ex) when (ex is not ApplicationException)
@@ -212,7 +212,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 {
                     HasSignificantChange = true,
                     ChangeRatio = 1.0,
-                    ChangedRegions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) }
+                    ChangedRegions = [new Rectangle(0, 0, currentImage.Width, currentImage.Height)]
                 };
             }
         }
@@ -298,7 +298,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                 labels[i] = new int[width];
             }
             int nextLabel = 1;
-            Dictionary<int, List<Point>> labelPoints = new Dictionary<int, List<Point>>();
+            Dictionary<int, List<Point>> labelPoints = [];
             
             // 第1パス：ラベリング
             for (int y = 0; y < height; y++)
@@ -309,7 +309,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                         continue;
                         
                     // 周囲のラベルをチェック
-                    HashSet<int> neighborLabels = new HashSet<int>();
+                    HashSet<int> neighborLabels = [];
                     
                     if (x > 0 && diffMap[y][x - 1] && labels[y][x - 1] > 0)
                         neighborLabels.Add(labels[y][x - 1]);
@@ -327,7 +327,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
                     {
                         // 新しいラベルを割り当て
                         labels[y][x] = nextLabel;
-                        labelPoints[nextLabel] = new List<Point> { new Point(x, y) };
+                        labelPoints[nextLabel] = [new Point(x, y)];
                         nextLabel++;
                     }
                     else
@@ -363,7 +363,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             }
             
             // 各ラベルの領域を計算
-            List<Rectangle> regions = new List<Rectangle>();
+            List<Rectangle> regions = [];
             
             foreach (var labelGroup in labelPoints.Values)
             {
@@ -403,4 +403,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             return regions;
         }
     }
-}

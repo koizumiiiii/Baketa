@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 画像フォーマット
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         Bmp = 12
     }
-}

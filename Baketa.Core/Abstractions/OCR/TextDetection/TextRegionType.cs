@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR.TextDetection
-{
+namespace Baketa.Core.Abstractions.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域のタイプを表す列挙型
     /// </summary>
@@ -55,4 +55,3 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection
         /// </summary>
         Dialogue = 9
     }
-}

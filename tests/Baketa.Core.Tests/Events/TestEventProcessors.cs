@@ -1,13 +1,13 @@
 using Baketa.Core.Events;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// テスト用イベントプロセッサ
     /// </summary>
     public class TestEventProcessor : IEventProcessor<TestEvent>
     {
-        private readonly List<string> _processedEvents = new List<string>();
+        private readonly List<string> _processedEvents = [];
 
         /// <summary>
         /// 処理されたイベントのデータリスト
@@ -135,4 +135,3 @@ namespace Baketa.Core.Tests.Events
             CompletionCount = 0;
         }
     }
-}

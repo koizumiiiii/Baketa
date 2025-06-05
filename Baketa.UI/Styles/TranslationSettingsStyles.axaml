@@ -1,0 +1,188 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- 翻訳設定UI用カスタムスタイル -->
+    
+    <!-- 設定パネル用スタイル -->
+    <Style Selector="Border.SettingsPanel">
+        <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Margin" Value="8"/>
+    </Style>
+    
+    <!-- セクションヘッダー用スタイル -->
+    <Style Selector="TextBlock.SectionHeader">
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Margin" Value="0,8,0,4"/>
+        <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+    </Style>
+    
+    <!-- セクションコンテンツ用スタイル -->
+    <Style Selector="Border.SectionContent">
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,4,0,8"/>
+        <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltMediumBrush}"/>
+        <Setter Property="CornerRadius" Value="3"/>
+    </Style>
+    
+    <!-- エンジン選択ボタン用スタイル -->
+    <Style Selector="RadioButton.EngineSelectionButton">
+        <Setter Property="Margin" Value="4"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="MinWidth" Value="100"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+    
+    <!-- 中国語変種選択ボタン用スタイル -->
+    <Style Selector="RadioButton.ChineseVariantButton">
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="MinWidth" Value="80"/>
+    </Style>
+    
+    <!-- 翻訳戦略選択ボタン用スタイル -->
+    <Style Selector="RadioButton.TranslationStrategyButton">
+        <Setter Property="Margin" Value="4"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="MinWidth" Value="100"/>
+    </Style>
+    
+    <!-- 状態インジケーター用スタイル -->
+    <Style Selector="Ellipse.StatusIndicator">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Height" Value="12"/>
+        <Setter Property="Margin" Value="4"/>
+    </Style>
+    
+    <!-- オンライン状態（緑） -->
+    <Style Selector="Ellipse.StatusIndicator.Online">
+        <Setter Property="Fill" Value="#4CAF50"/>
+    </Style>
+    
+    <!-- オフライン状態（赤） -->
+    <Style Selector="Ellipse.StatusIndicator.Offline">
+        <Setter Property="Fill" Value="#F44336"/>
+    </Style>
+    
+    <!-- 警告状態（黄） -->
+    <Style Selector="Ellipse.StatusIndicator.Warning">
+        <Setter Property="Fill" Value="#FF9800"/>
+    </Style>
+    
+    <!-- 不明状態（グレー） -->
+    <Style Selector="Ellipse.StatusIndicator.Unknown">
+        <Setter Property="Fill" Value="#9E9E9E"/>
+    </Style>
+    
+    <!-- 状態テキスト用スタイル -->
+    <Style Selector="TextBlock.StatusText">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="4,0"/>
+    </Style>
+    
+    <!-- 状態テキスト - オンライン -->
+    <Style Selector="TextBlock.StatusText.Online">
+        <Setter Property="Foreground" Value="#4CAF50"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+    
+    <!-- 状態テキスト - オフライン -->
+    <Style Selector="TextBlock.StatusText.Offline">
+        <Setter Property="Foreground" Value="#F44336"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+    
+    <!-- 状態テキスト - 警告 -->
+    <Style Selector="TextBlock.StatusText.Warning">
+        <Setter Property="Foreground" Value="#FF9800"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+    
+    <!-- ヘルプテキスト用スタイル -->
+    <Style Selector="TextBlock.HelpText">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="4,4,4,8"/>
+    </Style>
+    
+    <!-- 設定保存ボタン用スタイル -->
+    <Style Selector="Button.SaveButton">
+        <Setter Property="Background" Value="#2196F3"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Margin" Value="8"/>
+        <Setter Property="MinWidth" Value="100"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    
+    <!-- キャンセルボタン用スタイル -->
+    <Style Selector="Button.CancelButton">
+        <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Margin" Value="8"/>
+        <Setter Property="MinWidth" Value="100"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    
+    <!-- リセットボタン用スタイル -->
+    <Style Selector="Button.ResetButton">
+        <Setter Property="Background" Value="#FF9800"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Margin" Value="4"/>
+        <Setter Property="MinWidth" Value="80"/>
+        <Setter Property="CornerRadius" Value="3"/>
+    </Style>
+    
+    <!-- フォールバック情報パネル用スタイル -->
+    <Style Selector="Border.FallbackInfoPanel">
+        <Setter Property="Background" Value="#FFF3E0"/>
+        <Setter Property="BorderBrush" Value="#FF9800"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="8,4"/>
+    </Style>
+    
+    <!-- エラー情報パネル用スタイル -->
+    <Style Selector="Border.ErrorInfoPanel">
+        <Setter Property="Background" Value="#FFEBEE"/>
+        <Setter Property="BorderBrush" Value="#F44336"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="8,4"/>
+    </Style>
+    
+    <!-- 成功情報パネル用スタイル -->
+    <Style Selector="Border.SuccessInfoPanel">
+        <Setter Property="Background" Value="#E8F5E8"/>
+        <Setter Property="BorderBrush" Value="#4CAF50"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="8,4"/>
+    </Style>
+    
+    <!-- アニメーション：フェードイン -->
+    <Style Selector="Border.FadeIn">
+        <Style.Animations>
+            <Animation Duration="0:0:0.3" FillMode="Forward">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="0"/>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="1"/>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    
+</Styles>

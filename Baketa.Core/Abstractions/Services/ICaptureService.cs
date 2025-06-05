@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Services
-{
+namespace Baketa.Core.Abstractions.Services;
+
     /// <summary>
     /// キャプチャサービスインターフェース
     /// </summary>
@@ -89,4 +89,3 @@ namespace Baketa.Core.Abstractions.Services
         /// </summary>
         public int OptimizationLevel { get; set; } = 1;
     }
-}

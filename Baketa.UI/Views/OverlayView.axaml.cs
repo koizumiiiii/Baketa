@@ -3,12 +3,12 @@ using Avalonia.ReactiveUI;
 using Baketa.UI.ViewModels;
 using ReactiveUI;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// オーバーレイ設定画面のビュー
     /// </summary>
-    internal partial class OverlayView : ReactiveUserControl<OverlayViewModel>
+    internal sealed partial class OverlayView : ReactiveUserControl<OverlayViewModel>
     {
         public OverlayView()
         {
@@ -20,4 +20,3 @@ namespace Baketa.UI.Views
             });
         }
     }
-}

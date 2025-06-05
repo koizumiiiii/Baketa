@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// ソーベルエッジ検出フィルター
     /// </summary>
@@ -78,4 +78,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return await grayImage.EnhanceAsync(enhancementOptions).ConfigureAwait(false);
         }
     }
-}

@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Factories
-{
+namespace Baketa.Core.Abstractions.Factories;
+
     /// <summary>
     /// ファクトリーインターフェースの基本型
     /// </summary>
@@ -44,4 +44,3 @@ namespace Baketa.Core.Abstractions.Factories
         /// <returns>作成されたエンティティ</returns>
         TEntity Create(TParameter1 parameter1, TParameter2 parameter2);
     }
-}

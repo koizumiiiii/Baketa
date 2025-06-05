@@ -26,8 +26,8 @@ using IAdvancedImage = Baketa.Core.Abstractions.Imaging.IAdvancedImage;
 using ImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
 using Size = System.Drawing.Size;
 
-namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv;
+
     /// <summary>
     /// WindowsOpenCvWrapperの単体テスト
     /// </summary>
@@ -72,22 +72,20 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
             // 型変換問題を解決するため、DetectedRegion型を返すよう変更
             _mockOpenCvLib.Setup(lib => lib.FindConnectedComponents(It.IsAny<IAdvancedImage>(), It.IsAny<int>(), It.IsAny<int>()))
                 // 接続可能なPoint配列の空リストを返す
-                .Returns(new List<DrawingPoint[]>());
+                .Returns(new List<DrawingPoint[]>([]));
                 
             _mockOpenCvLib.Setup(lib => lib.DetectMserRegions(It.IsAny<IAdvancedImage>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns(new List<DetectedRegion>
-                {
+                .Returns([
                     new DetectedRegion
                     { 
                         Bounds = new Rectangle(10, 10, 50, 50),
                         Points = [new DrawingPoint(10, 10), new DrawingPoint(60, 60)],
                         Confidence = 0.8f
                     }
-                });
+                ]);
                 
             _mockOpenCvLib.Setup(lib => lib.DetectSwtRegions(It.IsAny<IAdvancedImage>(), It.IsAny<bool>(), It.IsAny<float>()))
-                .Returns(new List<DetectedRegion>
-                {
+                .Returns([
                     new DetectedRegion
                     { 
                         Bounds = new Rectangle(10, 10, 50, 50),
@@ -95,7 +93,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
                         Confidence = 0.8f,
                         StrokeWidth = 2.5f
                     }
-                });
+                ]);
 
             // IImageFactory設定 - CreateFromBytesAsyncをモック化
             _mockImageFactory
@@ -513,4 +511,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
 
         #endregion
     }
-}

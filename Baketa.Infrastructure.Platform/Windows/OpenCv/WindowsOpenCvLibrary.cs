@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
+
     /// <summary>
     /// Windows環境でのOpenCVライブラリの機能を提供する実装クラス
     /// </summary>
@@ -67,7 +67,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         {
             // 実際の実装ではOpenCVのネイティブ関数を呼び出します
             // ここではスタブ実装
-            return new List<Point[]>(); // 空のリストを返すだけのスタブ
+            return []; // 空のリストを返すだけのスタブ
         }
         
         /// <summary>
@@ -81,7 +81,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         {
             // 実際の実装ではOpenCVのネイティブ関数を呼び出します
             // ここではスタブ実装
-            return new List<DetectedRegion>(); // 空のリストを返すだけのスタブ
+            return []; // 空のリストを返すだけのスタブ
         }
         
         /// <summary>
@@ -94,7 +94,6 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv
         {
             // 実際の実装ではOpenCVのネイティブ関数を呼び出します
             // ここではスタブ実装
-            return new List<DetectedRegion>(); // 空のリストを返すだけのスタブ
+            return []; // 空のリストを返すだけのスタブ
         }
     }
-}

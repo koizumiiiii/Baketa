@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 using System.Threading;
 using Xunit;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// イベント集約機構のテスト
     /// </summary>
@@ -205,4 +205,3 @@ namespace Baketa.Core.Tests.Events
             Assert.Equal(1, _testProcessor.CallCount);
         }
     }
-}

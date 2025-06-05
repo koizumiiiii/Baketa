@@ -1,5 +1,5 @@
-namespace Baketa.UI.Helpers
-{
+namespace Baketa.UI.Helpers;
+
     /// <summary>
     /// アクセシビリティの役割を定義する列挙型
     /// Avalonia UIのAutomationControlTypeに相当
@@ -191,4 +191,3 @@ namespace Baketa.UI.Helpers
         /// </summary>
         Custom = 36
     }
-}

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 高度な画像処理機能を提供するインターフェース
     /// </summary>
@@ -166,4 +166,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         Luminance
     }
-}

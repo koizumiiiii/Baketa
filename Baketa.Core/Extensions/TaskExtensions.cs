@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Extensions
-{
+namespace Baketa.Core.Extensions;
+
     /// <summary>
     /// Taskクラスに対する拡張メソッドを提供します
     /// </summary>
@@ -17,4 +17,3 @@ namespace Baketa.Core.Extensions
         /// </code>
         /// </remarks>
     }
-}

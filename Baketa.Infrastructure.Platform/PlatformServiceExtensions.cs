@@ -4,8 +4,8 @@ using Baketa.Core.Abstractions.Platform;
 using Baketa.Infrastructure.Platform.DI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.Platform
-{
+namespace Baketa.Infrastructure.Platform;
+
     public static class PlatformServiceExtensions
     {
         /// <summary>
@@ -45,4 +45,3 @@ namespace Baketa.Infrastructure.Platform
             return services;
         }
     }
-}

@@ -9,8 +9,8 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Imaging;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Capture.DifferenceDetection
-{
+namespace Baketa.Infrastructure.Capture.DifferenceDetection;
+
     /// <summary>
     /// ハイブリッド差分検出アルゴリズム（複数アルゴリズムの組み合わせ）
     /// </summary>
@@ -248,4 +248,3 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection
             return new Rectangle(x, y, right - x, bottom - y);
         }
     }
-}

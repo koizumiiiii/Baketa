@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// フィルターカテゴリを表す列挙型
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// </summary>
         Composite
     }
-}

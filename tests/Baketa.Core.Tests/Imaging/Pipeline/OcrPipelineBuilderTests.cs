@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging.Pipeline
-{
+namespace Baketa.Core.Tests.Imaging.Pipeline;
+
     public class OcrPipelineBuilderTests
     {
         private readonly Mock<ILogger<OcrPipelineBuilder>> _loggerMock;
@@ -267,4 +267,3 @@ namespace Baketa.Core.Tests.Imaging.Pipeline
             _pipelineMock.Verify(p => p.SaveProfileAsync(profileName), Times.Once);
         }
     }
-}

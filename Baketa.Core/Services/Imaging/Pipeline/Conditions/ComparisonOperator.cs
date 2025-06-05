@@ -1,5 +1,5 @@
-namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
-{
+namespace Baketa.Core.Services.Imaging.Pipeline.Conditions;
+
     /// <summary>
     /// 比較演算子を表す列挙型
     /// </summary>
@@ -50,4 +50,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline.Conditions
         /// </summary>
         EndsWith
     }
-}

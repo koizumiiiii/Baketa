@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// モルフォロジー演算タイプ
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Core.Abstractions.OCR
         /// </summary>
         BlackHat
     }
-}

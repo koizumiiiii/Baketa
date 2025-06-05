@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// ステップのエラーハンドリング戦略
     /// </summary>
@@ -30,4 +30,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
     /// </summary>
     ContinueExecution
     }
-}

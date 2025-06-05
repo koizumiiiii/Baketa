@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Platform
-{
+namespace Baketa.Core.Abstractions.Platform;
+
     /// <summary>
     /// 画面キャプチャインターフェース
     /// </summary>
@@ -64,4 +64,3 @@ namespace Baketa.Core.Abstractions.Platform
         /// </summary>
         public int CaptureInterval { get; set; }
     }
-}

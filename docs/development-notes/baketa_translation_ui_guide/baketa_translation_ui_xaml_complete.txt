@@ -1,0 +1,711 @@
+<!-- TranslationSettingsView.axaml - メイン設定画面 -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Views.Settings"
+             x:Class="Baketa.UI.Views.Settings.TranslationSettingsView"
+             x:DataType="vm:TranslationSettingsViewModel">
+
+  <Design.DataContext>
+    <vm:TranslationSettingsViewModel />
+  </Design.DataContext>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="20" Margin="20">
+      
+      <!-- ヘッダー -->
+      <Border Classes="header-section">
+        <StackPanel Spacing="10">
+          <TextBlock Text="翻訳設定" Classes="page-title"/>
+          <TextBlock Text="Baketaの翻訳エンジンと言語設定を管理します" 
+                     Classes="page-description"/>
+        </StackPanel>
+      </Border>
+      
+      <!-- エンジン選択セクション -->
+      <Border Classes="setting-section">
+        <StackPanel Spacing="15">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="🔧" FontSize="20"/>
+            <TextBlock Text="翻訳エンジン選択" Classes="section-title"/>
+          </StackPanel>
+          <controls:EngineSelectionControl DataContext="{Binding EngineSelection}"/>
+        </StackPanel>
+      </Border>
+      
+      <!-- 言語ペア選択セクション -->
+      <Border Classes="setting-section">
+        <StackPanel Spacing="15">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="🌐" FontSize="20"/>
+            <TextBlock Text="言語設定" Classes="section-title"/>
+          </StackPanel>
+          <controls:LanguagePairSelectionControl DataContext="{Binding LanguagePairSelection}"/>
+        </StackPanel>
+      </Border>
+      
+      <!-- 翻訳戦略選択セクション -->
+      <Border Classes="setting-section">
+        <StackPanel Spacing="15">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="⚡" FontSize="20"/>
+            <TextBlock Text="翻訳戦略" Classes="section-title"/>
+          </StackPanel>
+          <controls:TranslationStrategyControl DataContext="{Binding TranslationStrategy}"/>
+        </StackPanel>
+      </Border>
+      
+      <!-- エンジン状態表示セクション -->
+      <Border Classes="setting-section">
+        <StackPanel Spacing="15">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="📊" FontSize="20"/>
+            <TextBlock Text="翻訳エンジン状態" Classes="section-title"/>
+          </StackPanel>
+          <controls:EngineStatusControl DataContext="{Binding EngineStatus}"/>
+        </StackPanel>
+      </Border>
+      
+      <!-- アクションボタン -->
+      <Border Classes="action-section">
+        <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
+          <Button Content="リセット" 
+                  Classes="secondary-button"
+                  Command="{Binding ResetSettingsCommand}"
+                  ToolTip.Tip="設定をデフォルト値に戻します"/>
+          <Button Content="保存" 
+                  Classes="primary-button"
+                  Command="{Binding SaveSettingsCommand}"
+                  ToolTip.Tip="現在の設定を保存します"/>
+        </StackPanel>
+      </Border>
+      
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+
+<!-- EngineSelectionControl.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             x:Class="Baketa.UI.Views.Settings.EngineSelectionControl"
+             x:DataType="vm:EngineSelectionViewModel">
+
+  <StackPanel Spacing="15">
+    
+    <!-- プラン情報表示 -->
+    <Border Classes="plan-info" 
+            IsVisible="{Binding ShowPlanInfo}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="現在のプラン:" FontWeight="SemiBold"/>
+          <Border Classes="plan-badge">
+            <TextBlock Text="{Binding CurrentPlan}"/>
+          </Border>
+        </StackPanel>
+        
+        <Button Grid.Column="2"
+                Content="アップグレード" 
+                IsVisible="{Binding IsFreePlan}"
+                Classes="upgrade-button"
+                Command="{Binding UpgradeCommand}"
+                ToolTip.Tip="有料プランでCloudOnly翻訳をご利用いただけます"/>
+      </Grid>
+    </Border>
+    
+    <!-- エンジン選択オプション -->
+    <StackPanel Spacing="12">
+      
+      <!-- LocalOnly選択 -->
+      <RadioButton GroupName="Engine" 
+                   IsChecked="{Binding IsLocalOnlySelected}"
+                   Classes="engine-option">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+          
+          <!-- エンジン名と基本情報 -->
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="5">
+            <TextBlock Text="LocalOnly（ローカル翻訳）" 
+                       FontWeight="Bold" FontSize="16"/>
+            <TextBlock Text="• OPUS-MT専用・高速・無料・オフライン対応" 
+                       Classes="description"/>
+            <TextBlock Text="• 適用: 短いテキスト、一般的翻訳、基本的な品質" 
+                       Classes="description"/>
+          </StackPanel>
+          
+          <!-- 状態インジケーター -->
+          <StackPanel Grid.Column="1" Grid.Row="0" 
+                      HorizontalAlignment="Right" 
+                      VerticalAlignment="Top"
+                      Spacing="5">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Ellipse Width="12" Height="12" 
+                       Fill="{Binding LocalEngineStatusColor}"/>
+              <TextBlock Text="{Binding LocalEnginePerformance}" 
+                         Classes="performance-text"
+                         FontSize="12"/>
+            </StackPanel>
+          </StackPanel>
+          
+          <!-- 詳細説明（選択時のみ表示） -->
+          <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
+                  Classes="engine-detail-inline"
+                  IsVisible="{Binding IsLocalOnlySelected}"
+                  Margin="0,10,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="💡 LocalOnlyエンジンの特徴" FontWeight="SemiBold"/>
+              <TextBlock Text="オフライン動作するOPUS-MTモデルを使用。インターネット接続なしで高速翻訳を提供します。"
+                         TextWrapping="Wrap" Classes="detail-description"/>
+              <StackPanel Orientation="Horizontal" Spacing="15">
+                <TextBlock Text="⚡ 平均速度: 50ms以下" Classes="feature-text"/>
+                <TextBlock Text="💰 コスト: 完全無料" Classes="feature-text"/>
+                <TextBlock Text="📶 接続: 不要" Classes="feature-text"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          
+        </Grid>
+      </RadioButton>
+      
+      <!-- CloudOnly選択 -->
+      <RadioButton GroupName="Engine" 
+                   IsChecked="{Binding IsCloudOnlySelected}"
+                   IsEnabled="{Binding IsCloudOnlyAvailable}"
+                   Classes="engine-option">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+          
+          <!-- エンジン名と基本情報 -->
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="5">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Text="CloudOnly（クラウド翻訳）" 
+                         FontWeight="Bold" FontSize="16"/>
+              <Border Classes="premium-badge" 
+                      IsVisible="{Binding IsFreePlan}">
+                <TextBlock Text="有料" FontSize="10" Foreground="White"/>
+              </Border>
+            </StackPanel>
+            <TextBlock Text="• Gemini API専用・高品質・文脈理解・専門用語対応" 
+                       Classes="description"/>
+            <TextBlock Text="• 適用: 複雑なテキスト、専門分野、高品質が必要な翻訳" 
+                       Classes="description"/>
+          </StackPanel>
+          
+          <!-- 状態インジケーター -->
+          <StackPanel Grid.Column="1" Grid.Row="0" 
+                      HorizontalAlignment="Right" 
+                      VerticalAlignment="Top"
+                      Spacing="5">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Ellipse Width="12" Height="12" 
+                       Fill="{Binding CloudEngineStatusColor}"/>
+              <TextBlock Text="{Binding CloudEnginePerformance}" 
+                         Classes="performance-text"
+                         FontSize="12"/>
+            </StackPanel>
+          </StackPanel>
+          
+          <!-- 詳細説明（選択時のみ表示） -->
+          <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
+                  Classes="engine-detail-inline"
+                  IsVisible="{Binding IsCloudOnlySelected}"
+                  Margin="0,10,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="🎯 CloudOnlyエンジンの特徴" FontWeight="SemiBold"/>
+              <TextBlock Text="Google Gemini APIを使用した高品質翻訳。文脈を理解し、専門用語や複雑な表現に対応します。"
+                         TextWrapping="Wrap" Classes="detail-description"/>
+              <StackPanel Orientation="Horizontal" Spacing="15">
+                <TextBlock Text="🎯 品質: 高品質" Classes="feature-text"/>
+                <TextBlock Text="💰 コスト: 従量課金" Classes="feature-text"/>
+                <TextBlock Text="📶 接続: 必要" Classes="feature-text"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          
+          <!-- 無効時の説明（無料プランの場合） -->
+          <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="2"
+                  Classes="upgrade-prompt"
+                  IsVisible="{Binding !IsCloudOnlyAvailable}"
+                  Margin="0,10,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="🔒 有料プランでご利用いただけます" FontWeight="SemiBold"/>
+              <TextBlock Text="高品質な翻訳をお試しいただくために、有料プランへのアップグレードをご検討ください。"
+                         TextWrapping="Wrap" Classes="upgrade-description"/>
+            </StackPanel>
+          </Border>
+          
+        </Grid>
+      </RadioButton>
+      
+    </StackPanel>
+    
+    <!-- 現在の選択に関する総合情報 -->
+    <Border Classes="selection-summary">
+      <StackPanel Spacing="10">
+        <TextBlock Text="選択中のエンジン情報" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding SelectedEngineDescription}" 
+                   TextWrapping="Wrap" 
+                   Classes="summary-description"/>
+        <TextBlock Text="{Binding CostEstimation}" 
+                   Classes="cost-info"
+                   FontStyle="Italic"/>
+      </StackPanel>
+    </Border>
+    
+  </StackPanel>
+</UserControl>
+
+<!-- LanguagePairSelectionControl.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             x:Class="Baketa.UI.Views.Settings.LanguagePairSelectionControl"
+             x:DataType="vm:LanguagePairSelectionViewModel">
+
+  <StackPanel Spacing="15">
+    
+    <!-- アプリ言語連動の説明 -->
+    <Border Classes="info-panel">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="💡" FontSize="16"/>
+          <TextBlock Text="翻訳先言語について" FontWeight="SemiBold"/>
+        </StackPanel>
+        <TextBlock Text="翻訳先言語は、アプリケーションの表示言語と自動連動しています。" 
+                   Classes="info-text"/>
+        <StackPanel Orientation="Horizontal" Spacing="5">
+          <TextBlock Text="現在の翻訳先言語:" Classes="info-text"/>
+          <TextBlock Text="{Binding CurrentTargetLanguage}" 
+                     FontWeight="SemiBold"
+                     Classes="target-language"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+    
+    <!-- 対応言語ペア一覧 -->
+    <StackPanel Spacing="12">
+      <TextBlock Text="対応言語ペア" FontWeight="SemiBold" FontSize="16"/>
+      
+      <ItemsControl ItemsSource="{Binding AvailableLanguagePairs}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Classes="language-pair-item" Margin="0,3">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" 
+                    RowDefinitions="Auto,Auto">
+                
+                <!-- チェックボックス -->
+                <CheckBox Grid.Column="0" Grid.Row="0"
+                          IsChecked="{Binding IsEnabled}"
+                          IsEnabled="{Binding IsAvailable}"
+                          Margin="0,0,15,0"
+                          VerticalAlignment="Center"/>
+                
+                <!-- 言語ペア情報 -->
+                <StackPanel Grid.Column="1" Grid.Row="0" Spacing="3">
+                  <TextBlock Text="{Binding DisplayName}" 
+                             FontWeight="SemiBold" FontSize="14"/>
+                  <TextBlock Text="{Binding Description}" 
+                             Classes="pair-description"
+                             FontSize="12"/>
+                </StackPanel>
+                
+                <!-- 翻訳タイプ表示 -->
+                <Border Grid.Column="2" Grid.Row="0"
+                        Classes="type-badge"
+                        Margin="10,0">
+                  <TextBlock Text="{Binding Type}" 
+                             Classes="type-text"
+                             FontSize="10"/>
+                </Border>
+                
+                <!-- 状態インジケーター -->
+                <Ellipse Grid.Column="3" Grid.Row="0"
+                         Width="10" Height="10" 
+                         Fill="{Binding StatusColor}"
+                         Margin="10,0"
+                         VerticalAlignment="Center"/>
+                
+                <!-- パフォーマンス表示 -->
+                <TextBlock Grid.Column="4" Grid.Row="0"
+                           Text="{Binding PerformanceText}"
+                           Classes="performance-text"
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
+                
+                <!-- 詳細説明（有効時のみ表示） -->
+                <Border Grid.Column="1" Grid.ColumnSpan="4" Grid.Row="1"
+                        Classes="pair-detail"
+                        IsVisible="{Binding IsEnabled}"
+                        Margin="0,8,0,0">
+                  <TextBlock Text="{Binding DetailedDescription}" 
+                             Classes="detail-text"
+                             TextWrapping="Wrap"
+                             FontSize="11"/>
+                </Border>
+                
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+    
+    <!-- 中国語変種設定 -->
+    <Border Classes="chinese-variant-section" 
+            IsVisible="{Binding HasChinesePairs}">
+      <StackPanel Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="🇨🇳" FontSize="16"/>
+          <TextBlock Text="中国語変種設定" FontWeight="SemiBold"/>
+        </StackPanel>
+        
+        <StackPanel Spacing="10">
+          <RadioButton GroupName="ChineseVariant" 
+                       IsChecked="{Binding IsSimplifiedSelected}"
+                       Classes="variant-option">
+            <StackPanel Spacing="3">
+              <TextBlock Text="简体字（簡体字）" FontWeight="SemiBold"/>
+              <TextBlock Text="中国大陸で主に使用される文字体系" 
+                         Classes="variant-description"/>
+            </StackPanel>
+          </RadioButton>
+          
+          <RadioButton GroupName="ChineseVariant" 
+                       IsChecked="{Binding IsTraditionalSelected}"
+                       Classes="variant-option">
+            <StackPanel Spacing="3">
+              <TextBlock Text="繁體字（繁体字）" FontWeight="SemiBold"/>
+              <TextBlock Text="台湾・香港・マカオで主に使用される文字体系" 
+                         Classes="variant-description"/>
+            </StackPanel>
+          </RadioButton>
+        </StackPanel>
+        
+        <Border Classes="variant-info">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="💡" FontSize="14"/>
+            <TextBlock Text="変種選択により、適切な中国語翻訳結果を提供します" 
+                       Classes="info-text" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+    
+  </StackPanel>
+</UserControl>
+
+<!-- TranslationStrategyControl.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             x:Class="Baketa.UI.Views.Settings.TranslationStrategyControl"
+             x:DataType="vm:TranslationStrategyViewModel">
+
+  <StackPanel Spacing="15">
+    
+    <!-- 戦略選択 -->
+    <StackPanel Spacing="12">
+      
+      <!-- Direct戦略 -->
+      <RadioButton GroupName="Strategy" 
+                   IsChecked="{Binding IsDirectSelected}"
+                   Classes="strategy-option">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+          
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="5">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="⚡" FontSize="16"/>
+              <TextBlock Text="Direct（直接翻訳）" FontWeight="Bold" FontSize="15"/>
+            </StackPanel>
+            <TextBlock Text="• 単一モデルでの直接翻訳" Classes="description"/>
+            <TextBlock Text="• 高速・低遅延・リアルタイム対応" Classes="description"/>
+            <TextBlock Text="• 対応: ja⇔en, zh⇔en, zh→ja" Classes="description"/>
+          </StackPanel>
+          
+          <Border Grid.Column="1" Grid.Row="0"
+                  Classes="performance-badge"
+                  VerticalAlignment="Top">
+            <TextBlock Text="< 50ms" Classes="performance-value"/>
+          </Border>
+          
+          <!-- 詳細説明（選択時のみ） -->
+          <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
+                  Classes="strategy-detail"
+                  IsVisible="{Binding IsDirectSelected}"
+                  Margin="0,10,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="🎯 Direct翻訳の特徴" FontWeight="SemiBold"/>
+              <TextBlock Text="単一のOPUS-MTモデルを使用した最も高速な翻訳方式。リアルタイム翻訳に最適です。"
+                         TextWrapping="Wrap" Classes="detail-description"/>
+              <StackPanel Orientation="Horizontal" Spacing="15">
+                <TextBlock Text="⚡ 超高速" Classes="feature-highlight"/>
+                <TextBlock Text="🎯 標準品質" Classes="feature-highlight"/>
+                <TextBlock Text="📱 リアルタイム" Classes="feature-highlight"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          
+        </Grid>
+      </RadioButton>
+      
+      <!-- TwoStage戦略 -->
+      <RadioButton GroupName="Strategy" 
+                   IsChecked="{Binding IsTwoStageSelected}"
+                   Classes="strategy-option">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+          
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="5">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="🎯" FontSize="16"/>
+              <TextBlock Text="TwoStage（2段階翻訳）" FontWeight="Bold" FontSize="15"/>
+            </StackPanel>
+            <TextBlock Text="• 英語を中継言語とした2段階翻訳" Classes="description"/>
+            <TextBlock Text="• 高品質・文脈保持・意味精度向上" Classes="description"/>
+            <TextBlock Text="• 対応: ja→zh（日本語→英語→中国語）" Classes="description"/>
+          </StackPanel>
+          
+          <Border Grid.Column="1" Grid.Row="0"
+                  Classes="quality-badge"
+                  VerticalAlignment="Top">
+            <TextBlock Text="高品質" Classes="quality-value"/>
+          </Border>
+          
+          <!-- 詳細説明（選択時のみ） -->
+          <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
+                  Classes="strategy-detail"
+                  IsVisible="{Binding IsTwoStageSelected}"
+                  Margin="0,10,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="🔄 TwoStage翻訳の仕組み" FontWeight="SemiBold"/>
+              <TextBlock Text="直接翻訳モデルが存在しない言語ペアを英語経由で翻訳。より正確で自然な翻訳を提供します。"
+                         TextWrapping="Wrap" Classes="detail-description"/>
+              <StackPanel Spacing="5">
+                <TextBlock Text="例: 日本語 → 英語 → 中国語" Classes="example-text"/>
+                <TextBlock Text="「こんにちは、元気ですか？」→「Hello, how are you?」→「你好，你好吗？」" 
+                           Classes="example-text" FontStyle="Italic"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="15">
+                <TextBlock Text="🎯 高品質" Classes="feature-highlight"/>
+                <TextBlock Text="⏱️ 100-200ms" Classes="feature-highlight"/>
+                <TextBlock Text="🔄 2段階" Classes="feature-highlight"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          
+        </Grid>
+      </RadioButton>
+      
+    </StackPanel>
+    
+    <!-- フォールバック設定 -->
+    <Border Classes="fallback-section">
+      <StackPanel Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="🔄" FontSize="16"/>
+          <TextBlock Text="自動フォールバック設定" FontWeight="SemiBold"/>
+        </StackPanel>
+        
+        <CheckBox IsChecked="{Binding EnableCloudToLocalFallback}"
+                  Classes="fallback-checkbox">
+          <StackPanel Spacing="3">
+            <TextBlock Text="CloudOnly → LocalOnly 自動切り替え" FontWeight="SemiBold"/>
+            <TextBlock Text="クラウドサービス障害時にローカルエンジンに自動切り替え" 
+                       Classes="checkbox-description"/>
+          </StackPanel>
+        </CheckBox>
+        
+        <Border Classes="fallback-detail" 
+                IsVisible="{Binding EnableCloudToLocalFallback}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="以下の場合にLocalOnlyに自動切り替えします:" 
+                       FontWeight="SemiBold" Classes="info-text"/>
+            <StackPanel Spacing="3" Margin="15,0,0,0">
+              <TextBlock Text="• ネットワークエラー・接続障害" Classes="info-text"/>
+              <TextBlock Text="• APIレート制限・使用量上限" Classes="info-text"/>
+              <TextBlock Text="• クラウドサービス一時障害" Classes="info-text"/>
+              <TextBlock Text="• 応答タイムアウト（10秒以上）" Classes="info-text"/>
+            </StackPanel>
+            <TextBlock Text="💡 フォールバック時は通知でお知らせします" 
+                       Classes="info-text" FontStyle="Italic"/>
+          </StackPanel>
+        </Border>
+        
+      </StackPanel>
+    </Border>
+    
+    <!-- 選択中戦略の総合情報 -->
+    <Border Classes="strategy-summary">
+      <StackPanel Spacing="10">
+        <TextBlock Text="選択中の翻訳戦略" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding SelectedStrategyDescription}" 
+                   TextWrapping="Wrap" 
+                   Classes="summary-description"/>
+        <StackPanel Orientation="Horizontal" Spacing="15">
+          <TextBlock Text="{Binding PerformanceExpectation}" 
+                     Classes="performance-expectation"/>
+          <TextBlock Text="品質重視" 
+                     Classes="quality-expectation"
+                     IsVisible="{Binding IsTwoStageSelected}"/>
+          <TextBlock Text="速度重視" 
+                     Classes="speed-expectation"
+                     IsVisible="{Binding IsDirectSelected}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+    
+  </StackPanel>
+</UserControl>
+
+<!-- EngineStatusControl.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             x:Class="Baketa.UI.Views.Settings.EngineStatusControl"
+             x:DataType="vm:EngineStatusViewModel">
+
+  <StackPanel Spacing="15">
+    
+    <!-- 現在の状態表示 -->
+    <Border Classes="current-status">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+        
+        <!-- 状態インジケーターと基本情報 -->
+        <StackPanel Grid.Column="0" Grid.Row="0" 
+                    Orientation="Horizontal" Spacing="12">
+          <Ellipse Width="16" Height="16" 
+                   Fill="{Binding CurrentStatusColor}"
+                   VerticalAlignment="Center"/>
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding CurrentStatusText}" 
+                       FontWeight="SemiBold" FontSize="15"/>
+            <TextBlock Text="{Binding CurrentEngineInfo}" 
+                       Classes="engine-info" FontSize="12"/>
+          </StackPanel>
+        </StackPanel>
+        
+        <!-- 最終更新時間 -->
+        <TextBlock Grid.Column="1" Grid.Row="0"
+                   Text="{Binding LastUpdateTime}"
+                   Classes="update-time"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+        
+        <!-- リフレッシュボタン -->
+        <Button Grid.Column="2" Grid.Row="0"
+                Content="🔄"
+                Classes="refresh-button"
+                Command="{Binding RefreshStatusCommand}"
+                ToolTip.Tip="状態を更新"
+                VerticalAlignment="Center"/>
+        
+        <!-- テストボタン -->
+        <Button Grid.Column="3" Grid.Row="0"
+                Content="テスト"
+                Classes="test-button"
+                Command="{Binding TestEngineCommand}"
+                ToolTip.Tip="翻訳テストを実行"
+                VerticalAlignment="Center"/>
+        
+        <!-- 詳細情報（展開可能） -->
+        <Expander Grid.Column="0" Grid.ColumnSpan="4" Grid.Row="1"
+                  Header="詳細情報"
+                  Classes="status-expander"
+                  Margin="0,10,0,0">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding DetailedStatusInfo}" 
+                       TextWrapping="Wrap" 
+                       Classes="detailed-info"/>
+          </StackPanel>
+        </Expander>
+        
+      </Grid>
+    </Border>
+    
+    <!-- 基本統計情報 -->
+    <Border Classes="basic-stats">
+      <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto">
+        
+        <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="3">
+          <TextBlock Text="平均速度" Classes="stat-label"/>
+          <TextBlock Text="{Binding AverageLatency}" Classes="stat-value"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="3">
+          <TextBlock Text="成功率" Classes="stat-label"/>
+          <TextBlock Text="{Binding SuccessRate}" Classes="stat-value"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="3">
+          <TextBlock Text="エンジン状態" Classes="stat-label"/>
+          <TextBlock Text="{Binding EngineHealth}" Classes="stat-value"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Column="3" HorizontalAlignment="Center" Spacing="3">
+          <TextBlock Text="今日の翻訳数" Classes="stat-label"/>
+          <TextBlock Text="{Binding TodayTranslationCount}" Classes="stat-value"/>
+        </StackPanel>
+        
+        <!-- 統計詳細（第二行） -->
+        <TextBlock Grid.Column="0" Grid.ColumnSpan="4" Grid.Row="1"
+                   Text="{Binding StatisticsSummary}"
+                   Classes="stats-summary"
+                   HorizontalAlignment="Center"
+                   Margin="0,10,0,0"/>
+        
+      </Grid>
+    </Border>
+    
+    <!-- フォールバック通知 -->
+    <Border Classes="fallback-notification" 
+            IsVisible="{Binding HasActiveFallback}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        
+        <TextBlock Grid.Column="0" 
+                   Text="⚠️" FontSize="18" 
+                   VerticalAlignment="Center"/>
+        
+        <StackPanel Grid.Column="1" Margin="10,0">
+          <TextBlock Text="フォールバック中" 
+                     FontWeight="SemiBold" FontSize="14"/>
+          <TextBlock Text="{Binding FallbackReason}" 
+                     Classes="fallback-reason"/>
+          <TextBlock Text="{Binding FallbackDuration}" 
+                     Classes="fallback-duration"
+                     FontSize="11"/>
+        </StackPanel>
+        
+        <Button Grid.Column="2" 
+                Content="詳細"
+                Classes="fallback-detail-button"
+                Command="{Binding ShowFallbackDetailsCommand}"
+                VerticalAlignment="Center"/>
+        
+      </Grid>
+    </Border>
+    
+    <!-- エラー状態表示 -->
+    <Border Classes="error-notification" 
+            IsVisible="{Binding HasError}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        
+        <TextBlock Grid.Column="0" 
+                   Text="❌" FontSize="18" 
+                   VerticalAlignment="Center"/>
+        
+        <StackPanel Grid.Column="1" Margin="10,0">
+          <TextBlock Text="エラーが発生しています" 
+                     FontWeight="SemiBold" FontSize="14"/>
+          <TextBlock Text="{Binding LastErrorMessage}" 
+                     Classes="error-message"
+                     TextWrapping="Wrap"/>
+        </StackPanel>
+        
+        <Button Grid.Column="2" 
+                Content="再試行"
+                Classes="retry-button"
+                Command="{Binding RetryCommand}"
+                VerticalAlignment="Center"/>
+        
+      </Grid>
+    </Border>
+    
+  </StackPanel>
+</UserControl>

@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework.Navigation
-{
+namespace Baketa.UI.Framework.Navigation;
+
     /// <summary>
     /// ナビゲーションホストのインターフェース
     /// </summary>
@@ -35,4 +35,3 @@ namespace Baketa.UI.Framework.Navigation
         /// <returns>画面遷移タスク</returns>
         Task NavigateBackAsync();
     }
-}

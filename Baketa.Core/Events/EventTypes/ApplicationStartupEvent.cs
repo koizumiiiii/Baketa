@@ -1,8 +1,8 @@
 using Baketa.Core.Events;
 using System;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// アプリケーション起動完了時に発行されるイベント
     /// </summary>
@@ -28,4 +28,3 @@ namespace Baketa.Core.Events.EventTypes
         /// </summary>
         public string Category => "Application";
     }
-}

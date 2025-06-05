@@ -2,8 +2,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Factories
-{
+namespace Baketa.Core.Abstractions.Factories;
+
     /// <summary>
     /// 画像オブジェクトの生成を担当するファクトリーインターフェース
     /// </summary>
@@ -45,4 +45,3 @@ namespace Baketa.Core.Abstractions.Factories
         /// <returns>高度な画像処理機能を持つ画像インスタンス</returns>
         IAdvancedImage ConvertToAdvancedImage(IImage image);
     }
-}

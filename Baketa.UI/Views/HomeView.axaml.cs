@@ -3,12 +3,12 @@ using Avalonia.ReactiveUI;
 using Baketa.UI.ViewModels;
 using ReactiveUI;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// ホーム画面のビュー
     /// </summary>
-    internal partial class HomeView : ReactiveUserControl<HomeViewModel>
+    internal sealed partial class HomeView : ReactiveUserControl<HomeViewModel>
     {
         public HomeView()
         {
@@ -20,4 +20,3 @@ namespace Baketa.UI.Views
             });
         }
     }
-}

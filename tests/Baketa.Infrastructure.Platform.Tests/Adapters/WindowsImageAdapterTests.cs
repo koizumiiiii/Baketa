@@ -6,8 +6,8 @@ using Baketa.Infrastructure.Platform.Adapters;
 using Moq;
 using Xunit;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters;
+
     /// <summary>
     /// WindowsImageAdapterのテストクラス
     /// </summary>
@@ -109,4 +109,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters
             await Assert.ThrowsAsync<ArgumentNullException>(() => adapter.CreateAdvancedImageFromFileAsync(null!));
         }
     }
-}

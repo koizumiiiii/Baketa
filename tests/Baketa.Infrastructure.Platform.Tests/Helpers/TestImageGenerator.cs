@@ -5,8 +5,8 @@ using System.IO;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Tests.Helpers
-{
+namespace Baketa.Infrastructure.Platform.Tests.Helpers;
+
     /// <summary>
     /// テスト用のサンプル画像を生成するヘルパークラス
     /// </summary>
@@ -297,4 +297,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Helpers
             }
         }
     }
-}

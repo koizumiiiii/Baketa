@@ -4,8 +4,8 @@ using System.Drawing;
 using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有のウィンドウ管理機能と抽象化レイヤーの間のアダプターインターフェース
     /// </summary>
@@ -190,4 +190,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// </summary>
         Unknown
     }
-}

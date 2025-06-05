@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
 
-namespace Baketa.Core.Services.Imaging
-{
+namespace Baketa.Core.Services.Imaging;
+
     /// <summary>
     /// IAdvancedImageの実装
     /// </summary>
@@ -646,4 +646,3 @@ namespace Baketa.Core.Services.Imaging
             }
         }
     }
-}

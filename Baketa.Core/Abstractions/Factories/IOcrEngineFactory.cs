@@ -1,7 +1,7 @@
 using Baketa.Core.Abstractions.Services;
 
-namespace Baketa.Core.Abstractions.Factories
-{
+namespace Baketa.Core.Abstractions.Factories;
+
     /// <summary>
     /// OCRエンジンファクトリーインターフェース
     /// </summary>
@@ -70,4 +70,3 @@ namespace Baketa.Core.Abstractions.Factories
         /// <param name="settings">OCR設定</param>
         void Configure(OcrSettings settings);
     }
-}

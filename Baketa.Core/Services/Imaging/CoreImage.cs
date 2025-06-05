@@ -4,8 +4,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Common;
 using Baketa.Core.Extensions;
 
-namespace Baketa.Core.Services.Imaging
-{
+namespace Baketa.Core.Services.Imaging;
+
     /// <summary>
     /// IImageの基本実装
     /// </summary>
@@ -43,14 +43,14 @@ namespace Baketa.Core.Services.Imaging
         public Task<byte[]> ToByteArrayAsync()
         {
             ThrowIfDisposed();
-            return Task.FromResult(_pixelData.ToArray());
+            return Task.FromResult<byte[]>([.. _pixelData]);
         }
         
         /// <summary>
         /// 画像データのバイト配列を取得します
         /// </summary>
         /// <returns>画像データのバイト配列</returns>
-        public IReadOnlyList<byte> Bytes => _pixelData.ToArray();
+        public IReadOnlyList<byte> Bytes => [.. _pixelData];
         
         /// <inheritdoc/>
         public IImage Clone()
@@ -102,4 +102,3 @@ namespace Baketa.Core.Services.Imaging
             _pixelData = [];
         }
     }
-}

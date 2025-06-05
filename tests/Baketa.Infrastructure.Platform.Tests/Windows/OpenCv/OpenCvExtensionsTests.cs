@@ -5,8 +5,8 @@ using Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions;
 using OpenCvSharp;
 using Xunit;
 
-namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
-{
+namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv;
+
     /// <summary>
     /// OpenCvExtensionsクラスの単体テスト
     /// </summary>
@@ -122,4 +122,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.OpenCv
 
         #endregion
     }
-}

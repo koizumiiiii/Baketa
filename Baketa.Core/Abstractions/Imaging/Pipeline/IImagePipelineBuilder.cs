@@ -1,7 +1,7 @@
 using Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインビルダーインターフェース
     /// </summary>
@@ -68,4 +68,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>構築されたパイプライン</returns>
         IImagePipeline Build();
     }
-}

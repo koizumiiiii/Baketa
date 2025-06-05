@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインイベントリスナーを表すインターフェース
     /// </summary>
@@ -61,4 +61,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>非同期タスク</returns>
         Task OnPipelineErrorAsync(IImagePipeline pipeline, Exception exception, PipelineContext context);
     }
-}

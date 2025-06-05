@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Models.Translation;
 
-namespace Baketa.Core.Abstractions.Translation
-{
+using Baketa.Core.Translation.Models;
+
+namespace Baketa.Core.Abstractions.Translation;
+
     /// <summary>
     /// 翻訳エンジンの機能を定義するインターフェース
     /// </summary>
@@ -71,4 +72,3 @@ namespace Baketa.Core.Abstractions.Translation
         /// <returns>初期化が成功すればtrue</returns>
         Task<bool> InitializeAsync();
     }
-}

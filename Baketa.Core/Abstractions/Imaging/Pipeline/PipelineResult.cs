@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプライン実行結果を表すクラス
     /// </summary>
@@ -54,7 +54,7 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             int executedStepCount)
         {
             Result = result ?? throw new ArgumentNullException(nameof(result));
-            _intermediateResults = intermediateResults ?? new Dictionary<string, IAdvancedImage>();
+            _intermediateResults = intermediateResults ?? [];
             ProcessingTimeMs = processingTimeMs;
             IntermediateResultMode = intermediateResultMode;
             ExecutedStepCount = executedStepCount;
@@ -130,4 +130,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             Dispose(false);
         }
     }
-}

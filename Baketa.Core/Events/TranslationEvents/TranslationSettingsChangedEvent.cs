@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events.TranslationEvents
-{
+namespace Baketa.Core.Events.TranslationEvents;
+
     /// <summary>
     /// 翻訳設定変更イベント
     /// </summary>
@@ -47,4 +47,3 @@ namespace Baketa.Core.Events.TranslationEvents
         /// </summary>
         public override string Category => "Translation";
     }
-}

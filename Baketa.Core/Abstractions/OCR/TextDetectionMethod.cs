@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// テキスト検出方法
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Core.Abstractions.OCR
         /// </summary>
         Contours = 6
     }
-}

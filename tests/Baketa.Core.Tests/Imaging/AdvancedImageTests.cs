@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Xunit;
 
-namespace Baketa.Core.Tests.Imaging
-{
+namespace Baketa.Core.Tests.Imaging;
+
     /// <summary>
     /// IAdvancedImageインターフェースの実装に対する単体テスト
     /// </summary>
@@ -16,7 +16,7 @@ namespace Baketa.Core.Tests.Imaging
         /// <summary>
         /// テスト用のモック画像クラス
         /// </summary>
-        private class MockAdvancedImage : IAdvancedImage
+        private sealed class MockAdvancedImage : IAdvancedImage
         {
         private readonly byte[] _imageData;
         private readonly Dictionary<(int x, int y), Color> _pixels = [];
@@ -178,13 +178,13 @@ namespace Baketa.Core.Tests.Imaging
     /// <summary>
     /// テスト用の画像フィルタークラス
     /// </summary>
-    private class MockImageFilter : IImageFilter
+    private sealed class MockImageFilter : IImageFilter
     {
         public string Name => "モックフィルター";
         public string Description => "テスト用のモックフィルター実装";
         public FilterCategory Category => FilterCategory.Effect;
 
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
 
         public MockImageFilter()
         {
@@ -503,4 +503,3 @@ namespace Baketa.Core.Tests.Imaging
             Assert.True(probability >= 0f && probability <= 1f);
         }
     }
-}

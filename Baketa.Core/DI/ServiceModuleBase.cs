@@ -5,8 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Baketa.Core.DI
-{
+namespace Baketa.Core.DI;
+
     /// <summary>
     /// サービス登録モジュールの基本実装。
     /// 共通の依存関係解決ロジックを提供します。
@@ -113,4 +113,3 @@ namespace Baketa.Core.DI
             }
         }
     }
-}

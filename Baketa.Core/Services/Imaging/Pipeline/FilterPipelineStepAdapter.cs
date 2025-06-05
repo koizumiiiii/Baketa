@@ -4,22 +4,21 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間の衝突を避けるためにエイリアスを使用
 using CoreImageFilter = Baketa.Core.Abstractions.Imaging.IImageFilter;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
 #pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// Baketa.Core.Abstractions.Imaging.IImageFilterをIImagePipelineStepに適応させるアダプター
     /// </summary>
     public class FilterPipelineStepAdapter : IImagePipelineStep
     {
         private readonly CoreImageFilter _filter;
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         private readonly ILogger _logger;
         
         /// <summary>
@@ -243,6 +242,5 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             }
         }
     }
-}
 
 #pragma warning restore CA2208

@@ -4,21 +4,19 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// 名前空間表現を明確にする
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域検出器の基底クラス
     /// </summary>
     public abstract class TextRegionDetectorBase : ITextRegionDetector
     {
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         
         /// <summary>
         /// ロガーを取得します
@@ -189,4 +187,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             Logger?.Log(level, "{Message}", formattedMessage);
         }
     }
-}

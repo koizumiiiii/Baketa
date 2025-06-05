@@ -7,12 +7,12 @@ using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// 翻訳設定画面のビューモデル
     /// </summary>
-    internal class TranslationViewModel : Framework.ViewModelBase
+    internal sealed class TranslationViewModel : Framework.ViewModelBase
     {
         // 翻訳先言語
         private string _targetLanguage = "英語";
@@ -171,4 +171,3 @@ namespace Baketa.UI.ViewModels
             await Task.CompletedTask.ConfigureAwait(true);
         }
     }
-}

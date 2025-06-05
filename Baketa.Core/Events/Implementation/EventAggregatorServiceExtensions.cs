@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Core.Events.Implementation
-{
+namespace Baketa.Core.Events.Implementation;
+
     /// <summary>
     /// イベント集約機構のサービス登録拡張メソッド
     /// </summary>
@@ -20,4 +20,3 @@ namespace Baketa.Core.Events.Implementation
             return services;
         }
     }
-}

@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// サンプルのUIモジュール実装。
     /// </summary>
@@ -39,4 +39,3 @@ namespace Baketa.Application.DI.Modules
             // 間接的に他のすべてのモジュールにも依存しています
         }
     }
-}

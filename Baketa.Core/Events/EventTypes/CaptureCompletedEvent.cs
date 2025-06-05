@@ -2,8 +2,8 @@ using Baketa.Core.Abstractions.Imaging;
 using System;
 using System.Drawing;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// キャプチャ完了イベント
     /// </summary>
@@ -44,4 +44,3 @@ namespace Baketa.Core.Events.EventTypes
         /// <inheritdoc />
         public override string Category => "Capture";
     }
-}

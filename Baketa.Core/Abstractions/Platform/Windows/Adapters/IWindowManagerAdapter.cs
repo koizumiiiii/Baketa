@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 
-namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
-{
+namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
+
     /// <summary>
     /// WindowManagerをコアウィンドウ管理サービスに変換するアダプターインターフェース
     /// </summary>
@@ -92,4 +92,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
         /// </summary>
         public bool IsMaximized { get; set; }
     }
-}

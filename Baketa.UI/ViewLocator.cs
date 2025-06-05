@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Baketa.UI.Framework;
@@ -6,8 +7,8 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     /// <summary>
     /// ビューとビューモデルの対応関係を解決するビューロケータ
     /// </summary>
@@ -93,20 +94,25 @@ namespace Baketa.UI
             LogTypeLoadFailed(_logger ?? NullLogger.Instance, ex.Message, ex);
             return new TextBlock { Text = $"ビュー型の読み込みに失敗しました: {ex.Message}" };
             }
-        catch (MissingMethodException ex)
-        {
+            catch (MissingMethodException ex)
+            {
             LogConstructorNotFound(_logger ?? NullLogger.Instance, ex.Message, ex);
             return new TextBlock { Text = $"ビューのコンストラクタが見つかりません: {ex.Message}" };
-        }
-        catch (InvalidCastException ex)
-        {
+            }
+            catch (InvalidCastException ex)
+            {
             LogInvalidCast(_logger ?? NullLogger.Instance, ex.Message, ex);
             return new TextBlock { Text = $"ビューの型変換に失敗しました: {ex.Message}" };
-        }
-        catch (Exception ex) when (ex is not TypeLoadException && ex is not MissingMethodException && ex is not InvalidCastException)
-        {
+            }
+            catch (ArgumentException ex)
+            {
             LogBuildFailed(_logger ?? NullLogger.Instance, ex.Message, ex);
             return new TextBlock { Text = $"ビューの構築に失敗しました: {ex.Message}" };
+            }
+        catch (TargetInvocationException ex)
+        {
+            LogBuildFailed(_logger ?? NullLogger.Instance, ex.Message, ex);
+            return new TextBlock { Text = $"ビューのコンストラクタ呼び出しに失敗しました: {ex.InnerException?.Message ?? ex.Message}" };
         }
         }
 
@@ -120,4 +126,3 @@ namespace Baketa.UI
             return data is ViewModelBase;
         }
     }
-}

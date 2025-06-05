@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging
-{
+namespace Baketa.Core.Abstractions.Imaging;
+
     /// <summary>
     /// 基本的な画像プロパティを提供する基底インターフェース
     /// </summary>
@@ -29,4 +29,3 @@ namespace Baketa.Core.Abstractions.Imaging
         /// <returns>画像データを表すバイト配列</returns>
         Task<byte[]> ToByteArrayAsync();
     }
-}

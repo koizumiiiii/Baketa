@@ -1,7 +1,7 @@
 using Baketa.Core.Events;
 
-namespace Baketa.Core.Tests.Events
-{
+namespace Baketa.Core.Tests.Events;
+
     /// <summary>
     /// テスト用イベント
     /// </summary>
@@ -60,4 +60,3 @@ namespace Baketa.Core.Tests.Events
         /// <inheritdoc />
         public override string Category => "Test";
     }
-}

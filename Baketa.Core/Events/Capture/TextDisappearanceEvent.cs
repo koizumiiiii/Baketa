@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using Baketa.Core.Abstractions.Events;
 
-namespace Baketa.Core.Events.Capture
-{
+namespace Baketa.Core.Events.Capture;
+
     /// <summary>
     /// テキスト消失イベント
     /// </summary>
@@ -56,4 +56,3 @@ namespace Baketa.Core.Events.Capture
             Timestamp = DateTime.Now;
         }
     }
-}

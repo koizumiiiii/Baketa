@@ -4,13 +4,11 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.Platform.DI.Modules;
-// UIモジュールは別アセンブリから参照するため直接参照しない
-// using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 
-namespace Baketa.Application.DI.Extensions
-{
+namespace Baketa.Application.DI.Extensions;
+
     /// <summary>
     /// Baketaの標準モジュールを登録するための拡張メソッドを提供します。
     /// </summary>
@@ -118,4 +116,3 @@ namespace Baketa.Application.DI.Extensions
             return services.AddBaketaModules(false, BaketaEnvironment.Test);
         }
     }
-}

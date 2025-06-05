@@ -3,12 +3,14 @@ using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
+using Baketa.UI.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.UI.DI.Modules
-{
+namespace Baketa.UI.DI.Modules;
+
     /// <summary>
     /// UIレイヤーのサービスを登録するモジュール。
     /// ViewModelやUI関連サービスの実装が含まれます。
@@ -63,7 +65,10 @@ namespace Baketa.UI.DI.Modules
         /// <param name="services">サービスコレクション</param>
         private static void RegisterUIServices(IServiceCollection services)
         {
-            // 現在は実装されていないため空のメソッドとして残す
+            // 翻訳エンジン状態監視サービス
+            // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
+            services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
+            
             // 将来的に実装される予定の内容：
             
             // ダイアログサービスやナビゲーションサービス
@@ -79,8 +84,6 @@ namespace Baketa.UI.DI.Modules
             
             // UIヘルパー
             // 例: services.AddSingleton<IClipboardService, AvaloniaClipboardService>();
-            
-            _ = services; // 未使用警告の抑制
         }
         
         /// <summary>
@@ -89,11 +92,12 @@ namespace Baketa.UI.DI.Modules
         /// <param name="services">サービスコレクション</param>
         private static void RegisterSettingsUI(IServiceCollection services)
         {
-            // 現在は実装されていないため空のメソッドとして残す
-            // 将来的に実装される予定の内容：
-            
             // 設定ViewModelと関連サービス
-            // 例: services.AddTransient<SettingsViewModel>();
+            services.AddTransient<SettingsViewModel>();
+            services.AddTransient<AccessibilitySettingsViewModel>();
+            services.AddTransient<LanguagePairsViewModel>();
+            
+            // 将来的に実装される予定の内容：
             // 例: services.AddTransient<GeneralSettingsViewModel>();
             // 例: services.AddTransient<OcrSettingsViewModel>();
             // 例: services.AddTransient<TranslationSettingsViewModel>();
@@ -107,8 +111,6 @@ namespace Baketa.UI.DI.Modules
             
             // リアルタイムプレビュー
             // 例: services.AddSingleton<IPreviewService, PreviewService>();
-            
-            _ = services; // 未使用警告の抑制
         }
         
         /// <summary>
@@ -121,4 +123,3 @@ namespace Baketa.UI.DI.Modules
             // 他のモジュールはApplicationModuleを通じて間接的に依存
         }
     }
-}

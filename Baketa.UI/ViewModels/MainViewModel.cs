@@ -2,12 +2,12 @@ using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
 using System;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// メインビューモデル
     /// </summary>
-    internal class MainViewModel : ViewModelBase
+    internal sealed class MainViewModel : ViewModelBase
     {
         private readonly ILogger<MainViewModel> _logger;
         private readonly IEventAggregator _eventAggregator;
@@ -37,4 +37,3 @@ namespace Baketa.UI.ViewModels
             _logInitialized(_logger, null);
         }
     }
-}

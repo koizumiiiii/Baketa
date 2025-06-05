@@ -1,23 +1,109 @@
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-// パッケージ追加済みのため使用可能
 using Microsoft.Extensions.Logging.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace Baketa.Application.DI.Extensions
-{
+namespace Baketa.Application.DI.Extensions;
+
     /// <summary>
     /// サービスコレクション拡張メソッド。
     /// Baketaサービスモジュールの登録を簡略化します。
     /// </summary>
     public static class ServiceCollectionExtensions
     {
+        /// <summary>
+        /// UI層の全サービスモジュールを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
+        /// <param name="configuration">設定</param>
+        /// <returns>サービスコレクション</returns>
+        public static IServiceCollection AddUIModule(
+            this IServiceCollection services,
+            BaketaEnvironment environment,
+            IConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(configuration);
+
+            // 環境設定をサービスコンテナに登録
+            services.AddSingleton(new BaketaEnvironmentSettings { Environment = environment });
+            
+            // 設定を登録
+            services.AddSingleton<IConfiguration>(configuration);
+            
+            // 環境固有のサービス設定
+            ConfigureEnvironmentSpecificServices(services, environment);
+            
+            // UI関連サービスの登録
+            RegisterUIServices(services, configuration);
+            
+            // 翻訳設定UIサービスの登録
+            RegisterTranslationUIServices(services, configuration);
+            
+            return services;
+        }
+        
+        /// <summary>
+        /// UI関連サービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="configuration">設定</param>
+        private static void RegisterUIServices(IServiceCollection services, IConfiguration configuration)
+        {
+            // UI層のイベント集約器とViewModelを登録
+            try
+            {
+                var uiModuleType = Type.GetType("Baketa.UI.DI.UIModule, Baketa.UI");
+                if (uiModuleType != null)
+                {
+                    var method = uiModuleType.GetMethod("RegisterUIServices", 
+                        BindingFlags.Public | BindingFlags.Static);
+                    method?.Invoke(null, [services, configuration]);
+                }
+            }
+            catch (Exception ex) when (ex is not (TargetInvocationException or ArgumentException or TypeLoadException))
+            {
+                // UIモジュール登録に失敗した場合のフォールバック
+                Console.WriteLine($"UIモジュール登録でエラーが発生しました: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 翻訳設定UI関連サービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="configuration">設定</param>
+        private static void RegisterTranslationUIServices(IServiceCollection services, IConfiguration configuration)
+        {
+            // UIServiceCollectionExtensionsを使用して翻訳UI関連サービスを登録
+            try
+            {
+                var extensionType = Type.GetType("Baketa.UI.Extensions.UIServiceCollectionExtensions, Baketa.UI");
+                if (extensionType != null)
+                {
+                    var method = extensionType.GetMethod("AddTranslationSettingsUI",
+                        BindingFlags.Public | BindingFlags.Static,
+                        null,
+                        [typeof(IServiceCollection), typeof(IConfiguration)],
+                        null);
+                    method?.Invoke(null, [services, configuration]);
+                }
+            }
+            catch (Exception ex) when (ex is not (TargetInvocationException or ArgumentException or TypeLoadException))
+            {
+                // 翻訳UIサービス登録に失敗した場合のフォールバック
+                Console.WriteLine($"翻訳UIサービス登録でエラーが発生しました: {ex.Message}");
+            }
+        }
+        
         /// <summary>
         /// Baketaの全サービスモジュールを登録します。
         /// </summary>
@@ -254,4 +340,3 @@ namespace Baketa.Application.DI.Extensions
                 .Where(m => m != null)!;
         }
     }
-}

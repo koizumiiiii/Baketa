@@ -8,8 +8,8 @@ using Baketa.Infrastructure.Imaging.Filters;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Imaging.Pipeline;
+
     /// <summary>
     /// フィルターファクトリー実装
     /// </summary>
@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<FilterFactory>? _logger;
-        private readonly Dictionary<string, Type> _filterTypes = new Dictionary<string, Type>();
+        private readonly Dictionary<string, Type> _filterTypes = [];
         
         /// <summary>
         /// コンストラクタ
@@ -78,9 +78,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
                 if (_filterTypes.TryGetValue(typeName, out var filterType))
                 {
                     // DI経由でフィルターを生成
-                    var filter = _serviceProvider.GetService(filterType) as IImageFilter;
-                    
-                    if (filter != null)
+                    if (_serviceProvider.GetService(filterType) is IImageFilter filter)
                     {
                         // パラメータを設定
                         foreach (var param in parameters)
@@ -93,13 +91,10 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
                 }
                 
                 // 完全修飾名による検索
-                var type = Type.GetType(typeName);
-                if (type != null && typeof(IImageFilter).IsAssignableFrom(type))
+                if (Type.GetType(typeName) is { } t && typeof(IImageFilter).IsAssignableFrom(t))
                 {
                     // Activatorを使用してインスタンス化
-                    var filter = ActivatorUtilities.CreateInstance(_serviceProvider, type) as IImageFilter;
-                    
-                    if (filter != null)
+                    if (ActivatorUtilities.CreateInstance(_serviceProvider, t) is IImageFilter filter)
                     {
                         // パラメータを設定
                         foreach (var param in parameters)
@@ -142,7 +137,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
         /// <returns>フィルタータイプ名のリスト</returns>
         public IEnumerable<string> GetAvailableFilterTypes()
         {
-            return _filterTypes.Keys;
+            return [.. _filterTypes.Keys];
         }
         
         /// <summary>
@@ -152,10 +147,10 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
         /// <returns>フィルタータイプ名のリスト</returns>
         public IEnumerable<string> GetFilterTypesByCategory(FilterCategory category)
         {
-            // カテゴリを判別するには各フィルターのインスタンスが必要
             // 現在の実装では対応していないため、空リストを返す
             _logger?.LogWarning("カテゴリによるフィルター検索は現在実装されていません");
-            return Enumerable.Empty<string>();
+            // IDE0300/CA1825警告に対応
+            return [];
+            // return Array.Empty<string>();
         }
     }
-}

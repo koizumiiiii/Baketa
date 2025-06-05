@@ -7,8 +7,8 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows.NativeMethods;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Platform.Windows.Capture
-{
+namespace Baketa.Infrastructure.Platform.Windows.Capture;
+
     /// <summary>
     /// GDIベースの画面キャプチャ実装
     /// </summary>
@@ -305,4 +305,3 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture
             _disposed = true;
         }
     }
-}

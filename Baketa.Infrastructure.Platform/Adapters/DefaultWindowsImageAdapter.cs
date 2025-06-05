@@ -21,7 +21,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
 public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
 {
     // WindowsImageAdapterのインスタンスを追跡するためのフィールド
-    private readonly System.Collections.Generic.HashSet<WindowsImageAdapter> _createdAdapters = new();
+    private readonly System.Collections.Generic.HashSet<WindowsImageAdapter> _createdAdapters = [];
     // 再利用可能なメモリストリーム（メモリ割り当てを減らすため）
     private readonly ThreadLocal<MemoryStream> _recycledMemoryStream = new(() => new MemoryStream(1024 * 1024)); // 初期サイズ1MB
 

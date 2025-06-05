@@ -2,11 +2,10 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
-// TextRegionの名前空間衝突を解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
-namespace Baketa.Core.Abstractions.OCR.TextDetection
-{
+namespace Baketa.Core.Abstractions.OCR.TextDetection;
+
     /// <summary>
     /// テキスト領域検出インターフェース
     /// </summary>
@@ -77,4 +76,3 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection
         /// <returns>非同期タスク</returns>
         Task LoadProfileAsync(string profileName);
     }
-}

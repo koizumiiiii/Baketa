@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// 適応的閾値処理のタイプ
     /// </summary>
@@ -15,4 +15,3 @@ namespace Baketa.Core.Abstractions.OCR
         /// </summary>
         Gaussian
     }
-}

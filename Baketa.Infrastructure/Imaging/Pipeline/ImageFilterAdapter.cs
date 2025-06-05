@@ -1,22 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 
-namespace Baketa.Infrastructure.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Imaging.Pipeline;
+
     /// <summary>
     /// IImageFilterをIImagePipelineFilterに変換するアダプター
     /// </summary>
     public sealed class ImageFilterAdapter : IImagePipelineFilter
     {
         private readonly IImageFilter _originalFilter;
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new List<PipelineStepParameter>();
+        private readonly Dictionary<string, object> _parameters = [];
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         
         /// <summary>
         /// コンストラクタ
@@ -104,14 +105,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
             var originalParams = _originalFilter.GetParameters();
             
             // 新しいDictionaryを作成して返す
-            // IDictionary<string, object>型で返すように変更
-            var result = new Dictionary<string, object>();
-            foreach (var param in originalParams)
-            {
-                result[param.Key] = param.Value;
-            }
-            
-            return result;
+            return originalParams.ToDictionary(param => param.Key, param => param.Value);
         }
         
         /// <summary>
@@ -159,7 +153,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
                 if (getMethod == null)
                     throw new InvalidOperationException($"メソッド'GetParameter'が{_originalFilter.GetType().Name}に見つかりません");
                     
-                var originalParam = getMethod.Invoke(_originalFilter, new object[] { parameterName });
+                var originalParam = getMethod.Invoke(_originalFilter, [parameterName]);
                 return originalParam ?? throw new KeyNotFoundException($"パラメータ'{parameterName}'が見つかりません");
             }
             catch (InvalidOperationException ex)
@@ -208,16 +202,19 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
             // 元のフィルターのパラメータから定義を作成
             var originalParams = _originalFilter.GetParameters();
             
+            _parameterDefinitions.Clear();
             foreach (var param in originalParams)
             {
                 var type = param.Value?.GetType() ?? typeof(object);
+                
+                // パラメータ定義を追加
                 _parameterDefinitions.Add(new PipelineStepParameter(
-                    param.Key, 
-                    $"{param.Key} parameter", // 説明が必要
-                    type,
-                    param.Value));
-                    
-                // パラメータ値も保持、nullチェック追加
+                    name: param.Key, 
+                    description: $"{param.Key} parameter",
+                    parameterType: type,
+                    defaultValue: param.Value));
+                
+                // パラメータ値の初期化
                 if (param.Value != null)
                 {
                     _parameters[param.Key] = param.Value;
@@ -231,4 +228,3 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
             }
         }
     }
-}

@@ -5,8 +5,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有の画面キャプチャ実装と抽象化レイヤーの間のアダプターインターフェース
     /// </summary>
@@ -72,4 +72,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// <returns>Windows固有のキャプチャオプション</returns>
         WindowsCaptureOptions ConvertToWindowsOptions(CaptureOptions coreOptions);
     }
-}

@@ -1,0 +1,193 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:converters="using:Baketa.UI.Converters"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+             x:Class="Baketa.UI.Views.Settings.TranslationStrategyControl"
+             x:DataType="vm:TranslationStrategyViewModel">
+
+  <Design.DataContext>
+    <vm:TranslationStrategyViewModel />
+  </Design.DataContext>
+
+  <Border Classes="Card">
+    <StackPanel Spacing="16">
+      <!-- ヘッダー -->
+      <TextBlock Text="翻訳戦略選択" 
+                 FontWeight="SemiBold" 
+                 FontSize="16" />
+
+      <!-- 戦略選択 -->
+      <StackPanel Spacing="12">
+        <!-- Direct 戦略 -->
+        <Border Classes="StrategyOption">
+          <RadioButton GroupName="TranslationStrategy"
+                       IsChecked="{Binding SelectedStrategy, Converter={x:Static converters:EnumToBoolConverter.Instance}, ConverterParameter=Direct}"
+                       Command="{Binding SelectStrategyCommand}"
+                       CommandParameter="Direct">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <!-- アイコン -->
+              <Border Classes="StrategyIcon Direct" Grid.Column="0">
+                <TextBlock Text="⚡" FontSize="18" />
+              </Border>
+
+              <!-- 情報 -->
+              <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                <TextBlock Text="直接翻訳 (Direct)" 
+                           FontWeight="Medium" 
+                           FontSize="14" />
+                <TextBlock Text="単一モデル • 最高速度 • 全言語ペア対応"
+                           FontSize="12"
+                           Opacity="0.8" />
+                <TextBlock Text="推定レイテンシ: 50ms未満"
+                           FontSize="11"
+                           Opacity="0.6" />
+              </StackPanel>
+
+              <!-- 詳細ボタン -->
+              <Button Grid.Column="2"
+                      Classes="Icon Small"
+                      Command="{Binding ShowStrategyDetailsCommand}"
+                      CommandParameter="Direct"
+                      ToolTip.Tip="詳細を表示">
+                <TextBlock Text="ℹ️" FontSize="12" />
+              </Button>
+            </Grid>
+          </RadioButton>
+        </Border>
+
+        <!-- TwoStage 戦略 -->
+        <Border Classes="StrategyOption">
+          <RadioButton GroupName="TranslationStrategy"
+                       IsChecked="{Binding SelectedStrategy, Converter={x:Static converters:EnumToBoolConverter.Instance}, ConverterParameter=TwoStage}"
+                       Command="{Binding SelectStrategyCommand}"
+                       CommandParameter="TwoStage"
+                       IsEnabled="{Binding IsTwoStageAvailable}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <!-- アイコン -->
+              <Border Classes="StrategyIcon TwoStage" Grid.Column="0">
+                <TextBlock Text="🔄" FontSize="18" />
+              </Border>
+
+              <!-- 情報 -->
+              <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                <TextBlock Text="2段階翻訳 (TwoStage)" 
+                           FontWeight="Medium" 
+                           FontSize="14" />
+                <TextBlock Text="中継言語経由 • 高品質 • ja→zh専用"
+                           FontSize="12"
+                           Opacity="0.8" />
+                <TextBlock Text="推定レイテンシ: 100ms未満"
+                           FontSize="11"
+                           Opacity="0.6" />
+              </StackPanel>
+
+              <!-- 詳細ボタン -->
+              <Button Grid.Column="2"
+                      Classes="Icon Small"
+                      Command="{Binding ShowStrategyDetailsCommand}"
+                      CommandParameter="TwoStage"
+                      ToolTip.Tip="詳細を表示">
+                <TextBlock Text="ℹ️" FontSize="12" />
+              </Button>
+            </Grid>
+          </RadioButton>
+        </Border>
+      </StackPanel>
+
+      <!-- 2段階翻訳利用不可の説明 -->
+      <Border Classes="InfoMessage" IsVisible="{Binding !IsTwoStageAvailable}">
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Grid.Column="0" 
+                     Text="ℹ️" 
+                     FontSize="14" 
+                     VerticalAlignment="Top" />
+          <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+            <TextBlock Text="2段階翻訳について"
+                       FontWeight="Medium"
+                       FontSize="12" />
+            <TextBlock Text="2段階翻訳は日本語→中国語の言語ペアでのみ利用可能です。他の言語ペアでは直接翻訳をご利用ください。"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       LineHeight="1.4"
+                       Opacity="0.8" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- フォールバック設定 -->
+      <Border Classes="OptionGroup">
+        <StackPanel Spacing="12">
+          <TextBlock Text="フォールバック設定" 
+                     FontWeight="Medium" 
+                     FontSize="13" />
+          
+          <CheckBox IsChecked="{Binding EnableFallback}"
+                    Command="{Binding ToggleFallbackCommand}"
+                    CommandParameter="{Binding !EnableFallback}">
+            <StackPanel Spacing="4">
+              <TextBlock Text="自動フォールバックを有効にする"
+                         FontSize="12" />
+              <TextBlock Text="エンジンでエラーが発生した場合、自動的に利用可能なエンジンに切り替えます"
+                         FontSize="11"
+                         Opacity="0.7"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+          </CheckBox>
+        </StackPanel>
+      </Border>
+
+      <!-- 選択された戦略の説明 -->
+      <Border Classes="StrategyDescription">
+        <StackPanel Spacing="8">
+          <TextBlock Text="選択した戦略について" 
+                     FontWeight="Medium" 
+                     FontSize="13" />
+          <TextBlock Text="{Binding SelectedStrategyDescription}"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     LineHeight="1.4" />
+        </StackPanel>
+      </Border>
+
+      <!-- 戦略警告 -->
+      <Border Classes="WarningMessage" IsVisible="{Binding HasStrategyWarning}">
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Grid.Column="0" 
+                     Text="⚠️" 
+                     FontSize="14" 
+                     VerticalAlignment="Top" />
+          <TextBlock Grid.Column="1" 
+                     Text="{Binding StrategyWarningMessage}"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     Margin="8,0,0,0" />
+        </Grid>
+      </Border>
+
+      <!-- リセットボタン -->
+      <Border Classes="ActionBar">
+        <Button Classes="Secondary"
+                Content="デフォルトに戻す"
+                Command="{Binding ResetToDefaultCommand}"
+                HorizontalAlignment="Left"
+                FontSize="12" />
+      </Border>
+
+      <!-- ローディング表示 -->
+      <Border Classes="LoadingIndicator" IsVisible="{Binding IsLoading}">
+        <Grid ColumnDefinitions="Auto,*">
+          <Border Grid.Column="0" Classes="Spinner" />
+          <TextBlock Grid.Column="1" 
+                     Text="戦略を変更中..."
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Margin="8,0,0,0" />
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+
+</UserControl>

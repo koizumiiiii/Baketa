@@ -4,8 +4,8 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Capture;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// キャプチャイベント関連のDIモジュール
     /// </summary>
@@ -37,7 +37,7 @@ namespace Baketa.Application.DI.Modules
     /// <summary>
     /// イベント登録ヘルパークラス
     /// </summary>
-    internal class EventRegistrar : IEventRegistrar
+    internal sealed class EventRegistrar : IEventRegistrar
     {
         private readonly IEventAggregator _eventAggregator;
         
@@ -62,4 +62,3 @@ namespace Baketa.Application.DI.Modules
         /// </summary>
         void Register<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent;
     }
-}

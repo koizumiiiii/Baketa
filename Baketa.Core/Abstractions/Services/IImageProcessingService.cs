@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Services
-{
+namespace Baketa.Core.Abstractions.Services;
+
     /// <summary>
     /// 画像処理サービスインターフェース
     /// </summary>
@@ -171,4 +171,3 @@ namespace Baketa.Core.Abstractions.Services
         /// </summary>
         Grid = 2
     }
-}

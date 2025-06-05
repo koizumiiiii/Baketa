@@ -6,8 +6,8 @@ using Baketa.Infrastructure.Platform.Adapters;
 using Baketa.Infrastructure.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.Platform.DependencyInjection
-{
+namespace Baketa.Infrastructure.Platform.DependencyInjection;
+
     /// <summary>
     /// プラットフォームサービス拡張メソッド
     /// </summary>
@@ -32,4 +32,3 @@ namespace Baketa.Infrastructure.Platform.DependencyInjection
             return services;
         }
     }
-}

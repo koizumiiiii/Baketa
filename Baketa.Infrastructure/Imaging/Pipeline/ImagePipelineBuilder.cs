@@ -5,8 +5,8 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Pipeline
-{
+namespace Baketa.Infrastructure.Imaging.Pipeline;
+
     /// <summary>
     /// 画像処理パイプラインビルダーの実装
     /// </summary>
@@ -182,4 +182,3 @@ namespace Baketa.Infrastructure.Imaging.Pipeline
             return _pipeline;
         }
     }
-}

@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
-{
+namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
+
     /// <summary>
     /// Windows固有実装とコア抽象化レイヤー間のアダプター基本インターフェース
     /// </summary>
@@ -30,4 +30,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters
         /// <returns>変換成功時はtrue</returns>
         bool TryConvert<TSource, TTarget>(TSource source, out TTarget target) where TSource : class where TTarget : class;
     }
-}

@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Filters
-{
+namespace Baketa.Core.Abstractions.Imaging.Filters;
+
     /// <summary>
     /// 画像フィルターの基底クラス
     /// </summary>
     public abstract class ImageFilterBase : IImageFilter
     {
-        private readonly Dictionary<string, object> _parameters = new();
+        private readonly Dictionary<string, object> _parameters = [];
         
         /// <summary>
         /// フィルターの名前
@@ -129,4 +129,3 @@ namespace Baketa.Core.Abstractions.Imaging.Filters
         /// </summary>
         protected abstract void InitializeDefaultParameters();
     }
-}
