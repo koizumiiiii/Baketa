@@ -43,7 +43,7 @@ public sealed class JsonSettingsService : ISettingsService
             ReadCommentHandling = JsonCommentHandling.Skip
         };
         
-        _settings = new Dictionary<string, object>();
+        _settings = [];
         
         // 設定ディレクトリを作成
         EnsureSettingsDirectoryExists();
@@ -55,9 +55,25 @@ public sealed class JsonSettingsService : ISettingsService
             {
                 await ReloadAsync().ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (FileNotFoundException)
             {
-                _logger.LogWarning(ex, "初期設定の読み込みに失敗しました");
+                _logger.LogDebug("設定ファイルが見つかりません。初回起動時の正常な状態です");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                _logger.LogDebug("設定ディレクトリが見つかりません。初回起動時の正常な状態です");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, "設定ファイルへのアクセス権限がありません");
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, "設定ファイルの入出力エラーが発生しました");
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "設定ファイルの形式が無効です。デフォルト設定を使用します");
             }
         });
     }
@@ -92,11 +108,31 @@ public sealed class JsonSettingsService : ISettingsService
                     }
                     
                     // その他の型変換
-                    return (T)Convert.ChangeType(value, typeof(T));
+                    return (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
                 }
-                catch (Exception ex)
+                catch (InvalidCastException ex)
                 {
                     _logger.LogWarning(ex, "設定値の型変換に失敗しました: Key={Key}, Type={Type}", key, typeof(T).Name);
+                    return defaultValue;
+                }
+                catch (FormatException ex)
+                {
+                    _logger.LogWarning(ex, "設定値の形式が無効です: Key={Key}, Type={Type}", key, typeof(T).Name);
+                    return defaultValue;
+                }
+                catch (OverflowException ex)
+                {
+                    _logger.LogWarning(ex, "設定値が範囲外です: Key={Key}, Type={Type}", key, typeof(T).Name);
+                    return defaultValue;
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger.LogWarning(ex, "設定値の引数が無効です: Key={Key}, Type={Type}", key, typeof(T).Name);
+                    return defaultValue;
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "JSONデシリアライゼーションに失敗しました: Key={Key}, Type={Type}", key, typeof(T).Name);
                     return defaultValue;
                 }
             }
@@ -265,7 +301,19 @@ public sealed class JsonSettingsService : ISettingsService
                 _ => JsonSerializer.Deserialize<T>(jsonElement.GetRawText())!
             };
         }
-        catch
+        catch (JsonException)
+        {
+            return defaultValue;
+        }
+        catch (InvalidOperationException)
+        {
+            return defaultValue;
+        }
+        catch (FormatException)
+        {
+            return defaultValue;
+        }
+        catch (InvalidCastException)
         {
             return defaultValue;
         }
@@ -306,9 +354,17 @@ public sealed class JsonSettingsService : ISettingsService
                 _logger.LogDebug("バックアップを作成しました: {BackupPath}", backupPath);
             }
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException ex)
         {
-            _logger.LogWarning(ex, "バックアップの作成に失敗しました");
+            _logger.LogWarning(ex, "バックアップファイルへのアクセスが拒否されました");
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "バックアップディレクトリが見つかりません");
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "バックアップファイルの入出力エラーが発生しました");
         }
         
         await Task.CompletedTask.ConfigureAwait(false);
@@ -323,15 +379,23 @@ public sealed class JsonSettingsService : ISettingsService
         {
             if (File.Exists(_settingsFilePath))
             {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
                 var corruptBackupPath = $"{_settingsFilePath}.corrupt.{timestamp}";
                 File.Copy(_settingsFilePath, corruptBackupPath, true);
                 _logger.LogWarning("破損した設定ファイルのバックアップを作成しました: {BackupPath}", corruptBackupPath);
             }
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException ex)
         {
-            _logger.LogWarning(ex, "破損ファイルのバックアップ作成に失敗しました");
+            _logger.LogWarning(ex, "破損ファイルのバックアップ作成権限がありません");
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "破損ファイルのバックアップディレクトリが見つかりません");
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "破損ファイルのバックアップ作成中に入出力エラーが発生しました");
         }
         
         await Task.CompletedTask.ConfigureAwait(false);
