@@ -13,7 +13,7 @@ namespace Baketa.UI;
         {
             if (value is Enum enumValue)
             {
-                return System.Convert.ToInt32(enumValue, CultureInfo.InvariantCulture);
+                return global::System.Convert.ToInt32(enumValue, CultureInfo.InvariantCulture);
             }
             return 0;
         }
@@ -37,7 +37,7 @@ namespace Baketa.UI;
     /// <summary>
     /// 列挙型の比較を行うコンバーター
     /// </summary>
-    internal class EnumComparisonConverter : IValueConverter
+    internal sealed class EnumComparisonConverter : IValueConverter
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {

@@ -12,7 +12,7 @@ namespace Baketa.UI.Views;
     /// <summary>
     /// 翻訳履歴画面のビュー
     /// </summary>
-    internal partial class HistoryView : ReactiveUserControl<HistoryViewModel>
+    internal sealed partial class HistoryView : ReactiveUserControl<HistoryViewModel>
     {
         public HistoryView()
         {

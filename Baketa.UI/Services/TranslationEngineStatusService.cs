@@ -1,9 +1,12 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -351,39 +354,323 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
     }
 
     /// <summary>
-    /// LocalOnlyエンジンのヘルスチェック（実装予定）
+    /// LocalOnlyエンジンのヘルスチェック
     /// </summary>
     private async Task<bool> CheckLocalEngineHealthAsync()
     {
-        // TODO: 実際のローカルエンジンヘルスチェック実装
-        // - モデルファイルの存在確認
-        // - メモリ使用量チェック
-        // - 簡単な翻訳テスト
-        
-        await Task.Delay(10, _cancellationTokenSource.Token).ConfigureAwait(false);
-        return true; // 暫定的に常に健康とする
+        try
+        {
+            // 1. 基本的なモデルファイル存在確認
+            var modelsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "SentencePiece");
+            
+            if (!Directory.Exists(modelsDirectory))
+            {
+                _logger.LogWarning("モデルディレクトリが存在しません: {Directory}", modelsDirectory);
+                return false;
+            }
+            
+            // 2. 主要なモデルファイルの存在確認
+            var criticalModels = new[] { "opus-mt-ja-en.model", "opus-mt-en-ja.model" };
+            var availableModels = 0;
+            
+            foreach (var modelName in criticalModels)
+            {
+                var modelPath = Path.Combine(modelsDirectory, modelName);
+                if (File.Exists(modelPath))
+                {
+                    try
+                    {
+                        // 3. ファイルサイズとアクセス可能性の確認
+                        var fileInfo = new FileInfo(modelPath);
+                        if (fileInfo.Length > 0 && fileInfo.Length < 50 * 1024 * 1024) // 50MB未満の合理的なサイズ
+                        {
+                            // 4. ファイル読み取り可能性の確認
+                            using var fileStream = File.OpenRead(modelPath);
+                            var buffer = new byte[1024];
+                            await fileStream.ReadAsync(buffer.AsMemory(0, Math.Min(1024, (int)fileInfo.Length)), 
+                                _cancellationTokenSource.Token).ConfigureAwait(false);
+                            
+                            availableModels++;
+                            _logger.LogDebug("モデルファイル確認成功: {Model} ({Size:N0} bytes)", 
+                                modelName, fileInfo.Length);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("モデルファイルサイズ異常: {Model} ({Size:N0} bytes)", 
+                                modelName, fileInfo.Length);
+                        }
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        _logger.LogWarning(ex, "モデルファイルアクセス権限エラー: {Model}", modelName);
+                    }
+                    catch (IOException ex)
+                    {
+                        _logger.LogWarning(ex, "モデルファイルI/Oエラー: {Model}", modelName);
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("モデルファイルが見つかりません: {Model}", modelName);
+                }
+            }
+            
+            // 5. メモリ使用量チェック（基本的な確認）
+            var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+            var memoryUsageMB = currentProcess.WorkingSet64 / (1024 * 1024);
+            
+            if (memoryUsageMB > 2048) // 2GB以上の場合は警告
+            {
+                _logger.LogWarning("メモリ使用量が高い: {MemoryMB}MB", memoryUsageMB);
+            }
+            else
+            {
+                _logger.LogDebug("メモリ使用量正常: {MemoryMB}MB", memoryUsageMB);
+            }
+            
+            // 6. ヘルス判定
+            var isHealthy = availableModels >= 1; // 最低1つのモデルがあれば健康
+            
+            _logger.LogDebug("LocalOnlyエンジンヘルスチェック完了: {IsHealthy} (利用可能モデル: {Count}/{Total})", 
+                isHealthy, availableModels, criticalModels.Length);
+                
+            return isHealthy;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("LocalOnlyエンジンヘルスチェックがキャンセルされました");
+            return false;
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "LocalOnlyエンジンヘルスチェック - ディレクトリが見つかりません");
+            return false;
+        }
+        catch (SecurityException ex)
+        {
+            _logger.LogError(ex, "LocalOnlyエンジンヘルスチェック - セキュリティエラー");
+            return false;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "LocalOnlyエンジンヘルスチェック - アクセス権限不足");
+            return false;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "LocalOnlyエンジンヘルスチェック - ファイルI/Oエラー");
+            return false;
+        }
+        catch (OutOfMemoryException ex)
+        {
+            _logger.LogError(ex, "LocalOnlyエンジンヘルスチェック - メモリ不足");
+            return false;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            _logger.LogError(ex, "LocalOnlyエンジンヘルスチェック - システムエラー");
+            return false;
+        }
     }
 
     /// <summary>
-    /// CloudOnlyエンジンのヘルスチェック（実装予定）
+    /// CloudOnlyエンジンのヘルスチェック
     /// </summary>
     private async Task<CloudEngineHealthResult> CheckCloudEngineHealthAsync()
     {
-        // TODO: 実際のクラウドエンジンAPI呼び出し実装
-        // - Gemini APIのヘルスチェック
-        // - レート制限情報取得
-        // - 簡単なAPI呼び出しテスト
-        
-        await Task.Delay(100, _cancellationTokenSource.Token).ConfigureAwait(false);
-        
-        return new CloudEngineHealthResult
+        try
         {
-            IsOnline = NetworkStatus.IsConnected,
-            IsHealthy = NetworkStatus.IsConnected,
-            RemainingRequests = 1000, // 暫定値
-            RateLimitReset = TimeSpan.FromHours(1),
-            LastError = string.Empty
-        };
+            // 1. ネットワーク接続前提チェック
+            if (!NetworkStatus.IsConnected)
+            {
+                _logger.LogDebug("CloudOnlyエンジンヘルスチェック - ネットワーク接続なし");
+                return new CloudEngineHealthResult
+                {
+                    IsOnline = false,
+                    IsHealthy = false,
+                    RemainingRequests = 0,
+                    RateLimitReset = TimeSpan.Zero,
+                    LastError = "ネットワーク接続なし"
+                };
+            }
+            
+            // 2. Gemini API軽量ヘルスチェック
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10); // 短いタイムアウト
+            
+            // 3. APIキー設定の確認（実際の設定から取得を試みる）
+            var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? "demo_key";
+            
+            if (string.IsNullOrEmpty(apiKey) || apiKey == "demo_key")
+            {
+                _logger.LogWarning("CloudOnlyエンジンヘルスチェック - APIキーが設定されていません");
+                return new CloudEngineHealthResult
+                {
+                    IsOnline = false,
+                    IsHealthy = false,
+                    RemainingRequests = 0,
+                    RateLimitReset = TimeSpan.Zero,
+                    LastError = "APIキー未設定"
+                };
+            }
+            
+            // 4. 軽量なモデル情報リクエストでAPI状態確認
+            var apiUrl = new Uri("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro?key=" + apiKey);
+            
+            using var response = await httpClient.GetAsync(apiUrl, _cancellationTokenSource.Token).ConfigureAwait(false);
+            
+            var isOnline = response.IsSuccessStatusCode;
+            var isHealthy = isOnline;
+            var remainingRequests = 1000; // Gemini APIでは明示的なレート制限情報なし
+            var rateLimitReset = TimeSpan.FromHours(1);
+            var lastError = string.Empty;
+            
+            // 5. レスポンス詳細分析
+            if (response.IsSuccessStatusCode)
+            {
+                // 6. レート制限ヘッダーの確認（存在する場合）
+                if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remainingValues))
+                {
+                    if (int.TryParse(remainingValues.FirstOrDefault(), out var remaining))
+                    {
+                        remainingRequests = remaining;
+                    }
+                }
+                
+                if (response.Headers.TryGetValues("X-RateLimit-Reset", out var resetValues))
+                {
+                    if (long.TryParse(resetValues.FirstOrDefault(), out var resetTime))
+                    {
+                        var resetDateTime = DateTimeOffset.FromUnixTimeSeconds(resetTime);
+                        rateLimitReset = resetDateTime - DateTimeOffset.UtcNow;
+                        if (rateLimitReset < TimeSpan.Zero) rateLimitReset = TimeSpan.Zero;
+                    }
+                }
+                
+                _logger.LogDebug("CloudOnlyエンジンヘルスチェック成功: レスポンス {StatusCode}", 
+                    response.StatusCode);
+            }
+            else
+            {
+                // 7. エラー状況の詳細分析
+                lastError = response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized => "認証エラー（APIキー無効）",
+                    System.Net.HttpStatusCode.Forbidden => "アクセス拒否（権限不足）",
+                    System.Net.HttpStatusCode.TooManyRequests => "レート制限超過",
+                    System.Net.HttpStatusCode.ServiceUnavailable => "サービス利用不可",
+                    System.Net.HttpStatusCode.BadGateway => "ゲートウェイエラー",
+                    System.Net.HttpStatusCode.GatewayTimeout => "ゲートウェイタイムアウト",
+                    _ => $"HTTPエラー: {response.StatusCode}"
+                };
+                
+                // レート制限の場合はオンラインだが非健康状態
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    isOnline = true;
+                    isHealthy = false;
+                    remainingRequests = 0;
+                }
+                else
+                {
+                    isOnline = false;
+                    isHealthy = false;
+                }
+                
+                _logger.LogWarning("CloudOnlyエンジンヘルスチェック失敗: {StatusCode} - {Error}", 
+                    response.StatusCode, lastError);
+            }
+            
+            return new CloudEngineHealthResult
+            {
+                IsOnline = isOnline,
+                IsHealthy = isHealthy,
+                RemainingRequests = remainingRequests,
+                RateLimitReset = rateLimitReset,
+                LastError = lastError
+            };
+        }
+        catch (TaskCanceledException ex) when (ex.CancellationToken == _cancellationTokenSource.Token)
+        {
+            _logger.LogDebug("CloudOnlyエンジンヘルスチェックがキャンセルされました");
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = "ヘルスチェックキャンセル"
+            };
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex, "CloudOnlyエンジンヘルスチェック - タイムアウト");
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = "接続タイムアウト"
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "CloudOnlyエンジンヘルスチェック - HTTP通信エラー");
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = $"HTTP通信エラー: {ex.Message}"
+            };
+        }
+        catch (UriFormatException ex)
+        {
+            _logger.LogError(ex, "CloudOnlyエンジンヘルスチェック - URIフォーマットエラー");
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = $"URIフォーマットエラー: {ex.Message}"
+            };
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(ex, "CloudOnlyエンジンヘルスチェック - 引数エラー");
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = $"引数エラー: {ex.Message}"
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            // ObjectDisposedExceptionもここでキャッチされる
+            if (ex is ObjectDisposedException)
+            {
+                _logger.LogDebug(ex, "CloudOnlyエンジンヘルスチェック - オブジェクトが破棄済み");
+            }
+            else
+            {
+                _logger.LogError(ex, "CloudOnlyエンジンヘルスチェック - 無効な操作");
+            }
+            
+            return new CloudEngineHealthResult
+            {
+                IsOnline = false,
+                IsHealthy = false,
+                RemainingRequests = 0,
+                RateLimitReset = TimeSpan.Zero,
+                LastError = ex is ObjectDisposedException ? "オブジェクト破棄済み" : $"操作エラー: {ex.Message}"
+            };
+        }
     }
 
     /// <summary>

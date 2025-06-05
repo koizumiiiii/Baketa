@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
 using Baketa.UI.Configuration;
+using Baketa.UI.Models;
 using Baketa.UI.Services;
 
 namespace Baketa.UI.ViewModels.Settings;
@@ -510,17 +511,6 @@ public sealed class EngineSelectionViewModel : ViewModelBase, IActivatableViewMo
     {
         _disposables?.Dispose();
     }
-}
-
-/// <summary>
-/// 翻訳エンジンタイプ
-/// </summary>
-public enum TranslationEngine
-{
-    /// <summary>ローカル専用</summary>
-    LocalOnly,
-    /// <summary>クラウド専用</summary>
-    CloudOnly
 }
 
 /// <summary>

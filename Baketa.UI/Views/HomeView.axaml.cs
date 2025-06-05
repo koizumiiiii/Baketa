@@ -8,7 +8,7 @@ namespace Baketa.UI.Views;
     /// <summary>
     /// ホーム画面のビュー
     /// </summary>
-    internal partial class HomeView : ReactiveUserControl<HomeViewModel>
+    internal sealed partial class HomeView : ReactiveUserControl<HomeViewModel>
     {
         public HomeView()
         {

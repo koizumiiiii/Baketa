@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using Avalonia;
 using Avalonia.ReactiveUI;
-using Baketa.Application.DI.Extensions;
 using Baketa.Core.DI;
 using Baketa.UI.DI;
 using Microsoft.Extensions.Configuration;

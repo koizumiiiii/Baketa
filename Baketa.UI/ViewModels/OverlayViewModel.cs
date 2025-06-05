@@ -177,10 +177,10 @@ namespace Baketa.UI.ViewModels;
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            SaveSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
-            PreviewOverlayCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
-            ResetToDefaultsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
-            ResetSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
+            SaveSettingsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
+            PreviewOverlayCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
+            ResetToDefaultsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
+            ResetSettingsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
         }
         
         // 設定保存コマンド実行
@@ -232,12 +232,12 @@ namespace Baketa.UI.ViewModels;
     /// <param name="fontColor">フォント色</param>
     /// <param name="backgroundColor">背景色</param>
     /// <param name="backgroundOpacity">背景透過度</param>
-    internal class OverlaySettingsChangedEvent(
+    internal sealed class OverlaySettingsChangedEvent(
         string position,
         int fontSize,
         string fontColor,
         string backgroundColor,
-        double backgroundOpacity) : Baketa.UI.Framework.Events.UIEventBase
+        double backgroundOpacity) : global::Baketa.UI.Framework.Events.UIEventBase
     {
         /// <summary>
         /// 位置

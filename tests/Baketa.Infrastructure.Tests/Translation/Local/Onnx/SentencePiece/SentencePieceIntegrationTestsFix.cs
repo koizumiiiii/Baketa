@@ -300,7 +300,7 @@ pieces { piece: ""World"" score: -1.1 type: NORMAL }
     /// <summary>
     /// テスト用のHttpClientFactory実装
     /// </summary>
-    private class TestHttpClientFactory : IHttpClientFactory
+    private sealed class TestHttpClientFactory : IHttpClientFactory
     {
         private readonly HttpClient _client;
 

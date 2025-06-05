@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -21,6 +23,9 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
     private readonly INotificationService _notificationService;
     private readonly ILogger<TranslationSettingsViewModel> _logger;
     private readonly TranslationUIOptions _options;
+    private readonly SettingsFileManager _settingsFileManager;
+    private readonly IFileDialogService _fileDialogService;
+    private readonly SettingsExportImportService _exportImportService;
     private readonly CompositeDisposable _disposables = [];
 
     private bool _hasChanges;
@@ -148,6 +153,9 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
         TranslationStrategyViewModel translationStrategy,
         EngineStatusViewModel engineStatus,
         INotificationService notificationService,
+        SettingsFileManager settingsFileManager,
+        IFileDialogService fileDialogService,
+        SettingsExportImportService exportImportService,
         IOptions<TranslationUIOptions> options,
         ILogger<TranslationSettingsViewModel> logger)
     {
@@ -156,6 +164,9 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
         ArgumentNullException.ThrowIfNull(translationStrategy);
         ArgumentNullException.ThrowIfNull(engineStatus);
         ArgumentNullException.ThrowIfNull(notificationService);
+        ArgumentNullException.ThrowIfNull(settingsFileManager);
+        ArgumentNullException.ThrowIfNull(fileDialogService);
+        ArgumentNullException.ThrowIfNull(exportImportService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
         
@@ -164,6 +175,9 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
         TranslationStrategy = translationStrategy;
         EngineStatus = engineStatus;
         _notificationService = notificationService;
+        _settingsFileManager = settingsFileManager;
+        _fileDialogService = fileDialogService;
+        _exportImportService = exportImportService;
         _logger = logger;
         _options = options.Value;
 
@@ -416,32 +430,67 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
     {
         try
         {
+            StatusMessage = "ファイル保存ダイアログを表示中...";
+
+            // ファイル保存ダイアログを表示
+            var fileTypeFilters = new List<FileTypeFilter>
+            {
+                new("翻訳設定ファイル", ["json"]),
+                new("すべてのファイル", ["*"])
+            };
+
+            var filePath = await _fileDialogService.ShowSaveFileDialogAsync(
+                "翻訳設定をエクスポート",
+                $"Baketa_Settings_{DateTime.Now:yyyyMMdd_HHmmss}.json",
+                fileTypeFilters).ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                StatusMessage = "エクスポートがキャンセルされました";
+                return;
+            }
+
             StatusMessage = "設定をエクスポート中...";
 
-            var settings = CreateSettingsSummary();
-            var exportData = CreateExportData(settings);
+            // 現在の設定をエクスポート用データに変換
+            var currentSettings = CreateSettingsSummary();
+            var exportableSettings = new ExportableTranslationSettings
+            {
+                SelectedEngine = currentSettings.SelectedEngine,
+                SelectedLanguagePair = currentSettings.SelectedLanguagePair,
+                SelectedChineseVariant = currentSettings.SelectedChineseVariant,
+                SelectedStrategy = currentSettings.SelectedStrategy,
+                EnableFallback = currentSettings.EnableFallback,
+                LastSaved = currentSettings.LastSaved,
+                Comments = "Baketa翻訳設定のエクスポート"
+            };
 
-            // TODO: ファイル保存ダイアログの実装
-            await _notificationService.ShowInfoAsync(
-                "エクスポート",
-                "設定のエクスポート機能は今後実装予定です。\n" +
-                "現在の設定:\n" + exportData).ConfigureAwait(false);
+            // ファイルにエクスポート
+            await _exportImportService.ExportSettingsAsync(
+                exportableSettings, 
+                filePath,
+                "手動エクスポート").ConfigureAwait(false);
 
             StatusMessage = "エクスポート完了";
-            _logger.LogInformation("Settings export completed");
+            
+            await _notificationService.ShowSuccessAsync(
+                "エクスポート完了",
+                $"翻訳設定を正常にエクスポートしました。\nファイル: {Path.GetFileName(filePath)}").ConfigureAwait(false);
+                
+            _logger.LogInformation("Settings export completed: {FilePath}", filePath);
         }
-        catch (UnauthorizedAccessException ex)
+        catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "Unauthorized access when exporting settings");
-            StatusMessage = "アクセス拒否";
+            _logger.LogError(ex, "Operation error when exporting settings");
+            StatusMessage = "エクスポートエラー";
             await _notificationService.ShowErrorAsync(
-                "アクセスエラー",
-                "エクスポート先への書き込み権限がありません。").ConfigureAwait(false);
+                "エクスポートエラー",
+                ex.Message).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not UnauthorizedAccessException)
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
-            _logger.LogError(ex, "Failed to export settings");
-            StatusMessage = "エクスポートに失敗しました";
+            _logger.LogError(ex, "Unexpected error when exporting settings");
+            StatusMessage = "予期しないエラー";
             
             await _notificationService.ShowErrorAsync(
                 "エクスポートエラー",
@@ -456,29 +505,104 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
     {
         try
         {
+            StatusMessage = "ファイル選択ダイアログを表示中...";
+
+            // ファイル選択ダイアログを表示
+            var fileTypeFilters = new List<FileTypeFilter>
+            {
+                new("翻訳設定ファイル", ["json"]),
+                new("すべてのファイル", ["*"])
+            };
+
+            var selectedFiles = await _fileDialogService.ShowOpenFileDialogAsync(
+                "翻訳設定をインポート",
+                fileTypeFilters,
+                false).ConfigureAwait(false);
+
+            if (selectedFiles == null || selectedFiles.Count == 0)
+            {
+                StatusMessage = "インポートがキャンセルされました";
+                return;
+            }
+
+            var filePath = selectedFiles[0];
             StatusMessage = "設定をインポート中...";
 
-            // TODO: ファイル選択ダイアログの実装
-            await _notificationService.ShowInfoAsync(
-                "インポート",
-                "設定のインポート機能は今後実装予定です。").ConfigureAwait(false);
+            // ファイルからインポート
+            var importResult = await _exportImportService.ImportSettingsAsync(filePath).ConfigureAwait(false);
+            
+            if (!importResult.Success)
+            {
+                StatusMessage = "インポートに失敗しました";
+                await _notificationService.ShowErrorAsync(
+                    "インポートエラー",
+                    importResult.ErrorMessage ?? "不明なエラーが発生しました").ConfigureAwait(false);
+                return;
+            }
 
-            StatusMessage = "インポート機能は準備中です";
-            _logger.LogInformation("Settings import requested");
+            if (importResult.Settings == null)
+            {
+                StatusMessage = "インポートに失敗しました";
+                await _notificationService.ShowErrorAsync(
+                    "インポートエラー",
+                    "設定データが見つかりませんでした").ConfigureAwait(false);
+                return;
+            }
+
+            // 警告または自動修正の通知
+            if (importResult.HasAutoCorrections)
+            {
+                await _notificationService.ShowWarningAsync(
+                    "設定の自動修正",
+                    $"一部の設定が自動修正されました:\n{importResult.AutoCorrectionDetails}").ConfigureAwait(false);
+            }
+            else if (!string.IsNullOrEmpty(importResult.WarningMessage))
+            {
+                await _notificationService.ShowWarningAsync(
+                    "インポート警告",
+                    importResult.WarningMessage).ConfigureAwait(false);
+            }
+
+            // インポートされた設定を適用
+            await ApplyImportedSettingsAsync(importResult.Settings).ConfigureAwait(false);
+
+            HasChanges = true;
+            StatusMessage = "インポート完了";
+            
+            await _notificationService.ShowSuccessAsync(
+                "インポート完了",
+                $"翻訳設定を正常にインポートしました。\nファイル: {Path.GetFileName(filePath)}").ConfigureAwait(false);
+                
+            _logger.LogInformation("Settings import completed: {FilePath}", filePath);
         }
         catch (FileNotFoundException ex)
         {
-            _logger.LogError(ex, "Import file not found");
+            _logger.LogError(ex, "Settings file not found when importing");
             StatusMessage = "ファイルが見つかりません";
             await _notificationService.ShowErrorAsync(
                 "ファイルエラー",
-                "インポートするファイルが見つかりません。").ConfigureAwait(false);
+                "選択されたファイルが見つかりません。").ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not FileNotFoundException)
+        catch (UnauthorizedAccessException ex)
         {
-            _logger.LogError(ex, "Failed to import settings");
-            StatusMessage = "インポートに失敗しました";
-            
+            _logger.LogError(ex, "Unauthorized access when importing settings");
+            StatusMessage = "アクセス拒否";
+            await _notificationService.ShowErrorAsync(
+                "アクセスエラー",
+                "ファイルへのアクセスが拒否されました。").ConfigureAwait(false);
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Invalid file format when importing settings");
+            StatusMessage = "ファイル形式エラー";
+            await _notificationService.ShowErrorAsync(
+                "形式エラー",
+                "ファイルの形式が正しくありません。").ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not (FileNotFoundException or UnauthorizedAccessException or FormatException))
+        {
+            _logger.LogError(ex, "Unexpected error when importing settings");
+            StatusMessage = "予期しないエラー";
             await _notificationService.ShowErrorAsync(
                 "インポートエラー",
                 $"設定のインポートに失敗しました: {ex.Message}").ConfigureAwait(false);
@@ -670,41 +794,163 @@ public sealed class TranslationSettingsViewModel : ViewModelBase, IActivatableVi
                $"最終保存: {settings.LastSaved:yyyy/MM/dd HH:mm:ss}";
     }
 
-    // 設定保存・読み込みの実装（プレースホルダー）
+    /// <summary>
+    /// インポートされた設定を適用します
+    /// </summary>
+    private async Task ApplyImportedSettingsAsync(ExportableTranslationSettings settings)
+    {
+        try
+        {
+            _logger.LogDebug("インポートされた設定を適用中...");
+
+            // エンジン設定を適用
+            EngineSelection.SelectedEngine = settings.SelectedEngine;
+
+            // 翻訳戦略設定を適用
+            TranslationStrategy.SelectedStrategy = settings.SelectedStrategy;
+            TranslationStrategy.EnableFallback = settings.EnableFallback;
+
+            // 中国語変種設定を適用
+            LanguagePairSelection.SelectedChineseVariant = settings.SelectedChineseVariant;
+
+            // 言語ペア設定を適用
+            if (!string.IsNullOrWhiteSpace(settings.SelectedLanguagePair))
+            {
+                var languagePair = LanguagePairSelection.LanguagePairs
+                    .FirstOrDefault(p => p.LanguagePairKey.Equals(settings.SelectedLanguagePair, StringComparison.OrdinalIgnoreCase));
+                
+                if (languagePair != null)
+                {
+                    LanguagePairSelection.SelectedLanguagePair = languagePair;
+                }
+                else
+                {
+                    _logger.LogWarning("インポートされた言語ペアが見つかりません: {LanguagePair}", settings.SelectedLanguagePair);
+                }
+            }
+
+            // 必要に応じてUI更新を通知
+            this.RaisePropertyChanged(nameof(CurrentSettings));
+
+            _logger.LogInformation("インポートされた設定を正常に適用しました");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "インポートされた設定の適用中にエラーが発生しました");
+            throw;
+        }
+
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    // 設定保存・読み込みの実装
     private async Task SaveEngineSettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の保存処理のシミュレーション
-        // TODO: 実際の設定永続化実装
+        try
+        {
+            await _settingsFileManager.SaveEngineSettingsAsync(EngineSelection.SelectedEngine).ConfigureAwait(false);
+            _logger.LogDebug("エンジン設定を保存しました: {Engine}", EngineSelection.SelectedEngine);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "エンジン設定の保存に失敗しました");
+            throw;
+        }
     }
 
     private async Task SaveLanguagePairSettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の保存処理のシミュレーション
-        // TODO: 実際の設定永続化実装
+        try
+        {
+            var languagePair = LanguagePairSelection.SelectedLanguagePair?.LanguagePairKey ?? "ja-en";
+            var chineseVariant = LanguagePairSelection.SelectedChineseVariant;
+            
+            await _settingsFileManager.SaveLanguagePairSettingsAsync(languagePair, chineseVariant).ConfigureAwait(false);
+            _logger.LogDebug("言語ペア設定を保存しました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "言語ペア設定の保存に失敗しました");
+            throw;
+        }
     }
 
     private async Task SaveStrategySettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の保存処理のシミュレーション
-        // TODO: 実際の設定永続化実装
+        try
+        {
+            await _settingsFileManager.SaveStrategySettingsAsync(
+                TranslationStrategy.SelectedStrategy, 
+                TranslationStrategy.EnableFallback).ConfigureAwait(false);
+                
+            _logger.LogDebug("翻訳戦略設定を保存しました: {Strategy}, Fallback: {EnableFallback}", 
+                TranslationStrategy.SelectedStrategy, TranslationStrategy.EnableFallback);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "翻訳戦略設定の保存に失敗しました");
+            throw;
+        }
     }
 
     private async Task LoadEngineSettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の読み込み処理のシミュレーション
-        // TODO: 実際の設定読み込み実装
+        try
+        {
+            var engine = await _settingsFileManager.LoadEngineSettingsAsync().ConfigureAwait(false);
+            EngineSelection.SelectedEngine = engine;
+            
+            _logger.LogDebug("エンジン設定を読み込みました: {Engine}", engine);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "エンジン設定の読み込みに失敗しました");
+            throw;
+        }
     }
 
     private async Task LoadLanguagePairSettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の読み込み処理のシミュレーション
-        // TODO: 実際の設定読み込み実装
+        try
+        {
+            var (languagePair, chineseVariant) = await _settingsFileManager.LoadLanguagePairSettingsAsync().ConfigureAwait(false);
+            
+            // 言語ペアを検索して設定
+            var selectedPair = LanguagePairSelection.LanguagePairs
+                .FirstOrDefault(p => p.LanguagePairKey == languagePair);
+            
+            if (selectedPair != null)
+            {
+                LanguagePairSelection.SelectedLanguagePair = selectedPair;
+            }
+            
+            LanguagePairSelection.SelectedChineseVariant = chineseVariant;
+            
+            _logger.LogDebug("言語ペア設定を読み込みました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "言語ペア設定の読み込みに失敗しました");
+            throw;
+        }
     }
 
     private async Task LoadStrategySettingsAsync()
     {
-        await Task.Delay(50).ConfigureAwait(false); // 実際の読み込み処理のシミュレーション
-        // TODO: 実際の設定読み込み実装
+        try
+        {
+            var (strategy, enableFallback) = await _settingsFileManager.LoadStrategySettingsAsync().ConfigureAwait(false);
+            
+            TranslationStrategy.SelectedStrategy = strategy;
+            TranslationStrategy.EnableFallback = enableFallback;
+            
+            _logger.LogDebug("翻訳戦略設定を読み込みました: {Strategy}, Fallback: {EnableFallback}", strategy, enableFallback);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "翻訳戦略設定の読み込みに失敗しました");
+            throw;
+        }
     }
 
     /// <inheritdoc/>

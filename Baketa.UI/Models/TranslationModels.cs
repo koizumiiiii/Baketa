@@ -186,6 +186,17 @@ namespace Baketa.UI.Models;
     }
 
     /// <summary>
+    /// 翻訳エンジンの列挙型
+    /// </summary>
+    public enum TranslationEngine
+    {
+        /// <summary>ローカルエンジンのみ（OPUS-MT）</summary>
+        LocalOnly,
+        /// <summary>クラウドエンジンのみ（Gemini API等）</summary>
+        CloudOnly
+    }
+
+    /// <summary>
     /// 中国語変種の列挙型
     /// </summary>
     public enum ChineseVariant

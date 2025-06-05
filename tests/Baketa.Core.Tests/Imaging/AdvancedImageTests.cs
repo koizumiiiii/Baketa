@@ -178,7 +178,7 @@ namespace Baketa.Core.Tests.Imaging;
     /// <summary>
     /// テスト用の画像フィルタークラス
     /// </summary>
-    private class MockImageFilter : IImageFilter
+    private sealed class MockImageFilter : IImageFilter
     {
         public string Name => "モックフィルター";
         public string Description => "テスト用のモックフィルター実装";
