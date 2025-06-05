@@ -2,8 +2,8 @@ using System;
 using System.Drawing;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Platform.Windows
-{
+namespace Baketa.Core.Abstractions.Platform.Windows;
+
     /// <summary>
     /// Windows画面キャプチャインターフェース
     /// </summary>
@@ -79,4 +79,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// </summary>
         public bool UseDwmCapture { get; set; } = true;
     }
-}

@@ -4,8 +4,8 @@ using System.Linq.Expressions;
 using ReactiveUI.Validation.Helpers;
 using Baketa.UI.Framework.ReactiveUI;
 
-namespace Baketa.UI.Framework.Validation
-{
+namespace Baketa.UI.Framework.Validation;
+
     /// <summary>
     /// シンプルなバリデーションヘルパー
     /// </summary>
@@ -24,9 +24,8 @@ namespace Baketa.UI.Framework.Validation
             Expression<Func<TViewModel, TProperty>> propertyExpression)
             where TViewModel : class
         {
-            // シンプルなリダイレクトとしてReactiveUI名前空間のValidationクラスを使用
-            return Baketa.UI.Framework.ReactiveUI.Validation.GetErrorMessages(
+            // シンプルなリダイレクトとしてReactiveUI名前空間のValidationHelperクラスを使用
+            return Baketa.UI.Framework.ReactiveUI.ValidationHelper.GetErrorMessages(
                 validationObject, propertyExpression);
         }
     }
-}

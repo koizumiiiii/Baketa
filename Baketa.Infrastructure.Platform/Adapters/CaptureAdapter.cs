@@ -6,8 +6,8 @@ using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有のキャプチャサービスと抽象化レイヤーの間のアダプターインターフェース実装
     /// 差分検出およびキャプチャ最適化機能を提供します
@@ -427,4 +427,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
         /// </summary>
         Task<bool> HasSignificantDifferenceAsync(IImage image1, IImage image2, float threshold = 0.05f);
     }
-}

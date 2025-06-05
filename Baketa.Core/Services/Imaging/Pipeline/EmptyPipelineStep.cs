@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// テスト用の空のパイプラインステップ
     /// </summary>
@@ -27,7 +27,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         /// <summary>
         /// ステップのパラメータ定義
         /// </summary>
-        public IReadOnlyCollection<PipelineStepParameter> Parameters => new List<PipelineStepParameter>();
+        public IReadOnlyCollection<PipelineStepParameter> Parameters => [];
 
         /// <summary>
         /// ステップのエラーハンドリング戦略
@@ -153,4 +153,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline
         }
     }
 #pragma warning restore CS8603, CS8600, CA1031, CA2263
-}

@@ -5,15 +5,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプライン実行コンテキスト
     /// </summary>
     public class PipelineContext
     {
-        private readonly Dictionary<string, object> _data = new();
-        private readonly HashSet<string> _stepsToSaveResults = new();
+        private readonly Dictionary<string, object> _data = [];
+        private readonly HashSet<string> _stepsToSaveResults = [];
         
         /// <summary>
         /// パイプライン実行に関連するデータを保存する辞書
@@ -154,4 +154,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
             public Task OnPipelineErrorAsync(IImagePipeline pipeline, Exception exception, PipelineContext context) => Task.CompletedTask;
         }
     }
-}

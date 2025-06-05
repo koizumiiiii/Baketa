@@ -5,8 +5,8 @@ using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Events.Implementation
-{
+namespace Baketa.Core.Events.Implementation;
+
     /// <summary>
     /// イベントプロセッサのパフォーマンスメトリクス
     /// </summary>
@@ -226,4 +226,3 @@ namespace Baketa.Core.Events.Implementation
         /// </summary>
         public double SuccessRate => InvocationCount > 0 ? 100 * (InvocationCount - ErrorCount) / (double)InvocationCount : 0;
     }
-}

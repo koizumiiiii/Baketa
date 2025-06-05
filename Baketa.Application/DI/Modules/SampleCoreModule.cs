@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// サンプルのコアモジュール実装。
     /// </summary>
@@ -28,4 +28,3 @@ namespace Baketa.Application.DI.Modules
             Console.WriteLine(Resources.ModuleResources.SampleCoreModuleRegistered);
         }
     }
-}

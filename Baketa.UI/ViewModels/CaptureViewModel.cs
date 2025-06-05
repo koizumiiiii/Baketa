@@ -5,15 +5,14 @@ using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアスを使用して衝突を解決
 using UIEvents = Baketa.UI.Framework.Events;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// キャプチャ設定画面のビューモデル
     /// </summary>
-    internal class CaptureViewModel : Framework.ViewModelBase
+    internal sealed class CaptureViewModel : Framework.ViewModelBase
     {
         // キャプチャ状態
         private bool _isCapturing;
@@ -144,4 +143,3 @@ namespace Baketa.UI.ViewModels
             await Task.CompletedTask.ConfigureAwait(false);
         }
     }
-}

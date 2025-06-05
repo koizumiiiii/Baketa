@@ -2,65 +2,68 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace Baketa.UI
+namespace Baketa.UI;
+
+/// <summary>
+/// 列挙型から整数への変換コンバーター
+/// </summary>
+internal sealed class EnumToIntConverter : IValueConverter
 {
-    /// <summary>
-    /// 列挙型を整数値に変換するコンバーター
-    /// </summary>
-    internal class EnumToIntConverter : IValueConverter
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        if (value is Enum enumValue)
         {
-            if (value is Enum enumValue)
-            {
-                return System.Convert.ToInt32(enumValue, CultureInfo.InvariantCulture);
-            }
-            return 0;
+            return System.Convert.ToInt32(enumValue, CultureInfo.InvariantCulture);
         }
-
-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            if (value is int intValue && targetType.IsEnum)
-            {
-                return Enum.ToObject(targetType, intValue);
-            }
-
-            if (targetType.IsEnum)
-            {
-                return Enum.GetValues(targetType).GetValue(0)!;
-            }
-
-            return null;
-        }
+        return 0;
     }
 
-    /// <summary>
-    /// 列挙型の比較を行うコンバーター
-    /// </summary>
-    internal class EnumComparisonConverter : IValueConverter
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        if (value is int intValue && targetType.IsEnum)
         {
-            if (value != null && parameter != null)
-            {
-                return value.Equals(parameter);
-            }
+            return Enum.ToObject(targetType, intValue);
+        }
+        return Enum.GetValues(targetType).GetValue(0);
+    }
+}
+
+/// <summary>
+/// 列挙型の比較コンバーター
+/// </summary>
+internal sealed class EnumComparisonConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value == null || parameter == null)
             return false;
-        }
 
-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        if (value is Enum enumValue && parameter is string parameterString)
         {
-            if (value is bool boolValue && boolValue && parameter != null)
+            // パラメーターが文字列の場合、列挙値に変換
+            if (Enum.TryParse(enumValue.GetType(), parameterString, out var parameterEnum))
             {
-                return parameter;
+                return enumValue.Equals(parameterEnum);
             }
-
-            if (targetType.IsEnum)
-            {
-                return Enum.GetValues(targetType).GetValue(0)!;
-            }
-
-            return null;
         }
+
+        // 直接比較
+        return value.Equals(parameter);
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is bool isSelected && isSelected && parameter != null)
+        {
+            if (parameter is string parameterString && targetType.IsEnum)
+            {
+                if (Enum.TryParse(targetType, parameterString, out var enumValue))
+                {
+                    return enumValue;
+                }
+            }
+            return parameter;
+        }
+        return Enum.GetValues(targetType).GetValue(0);
     }
 }

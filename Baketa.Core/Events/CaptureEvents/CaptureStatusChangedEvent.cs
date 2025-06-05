@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events.CaptureEvents
-{
+namespace Baketa.Core.Events.CaptureEvents;
+
     /// <summary>
     /// キャプチャ状態変更イベント
     /// </summary>
@@ -52,4 +52,3 @@ namespace Baketa.Core.Events.CaptureEvents
         /// </summary>
         public override string Category => "Capture";
     }
-}

@@ -9,8 +9,8 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// Windows固有の画面キャプチャ実装と抽象化レイヤーの間のアダプター
     /// パフォーマンスと差分検出機能を強化した実装
@@ -445,4 +445,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             base.Dispose(disposing);
         }
     }
-}

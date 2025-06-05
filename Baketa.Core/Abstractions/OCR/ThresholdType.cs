@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// 閾値処理のタイプ
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Core.Abstractions.OCR
         /// </summary>
         Adaptive
     }
-}

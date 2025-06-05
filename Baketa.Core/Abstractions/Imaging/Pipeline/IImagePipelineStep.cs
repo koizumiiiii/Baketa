@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインの個別処理ステップを表すインターフェース
     /// </summary>
@@ -68,4 +68,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>出力画像の情報</returns>
         PipelineImageInfo GetOutputImageInfo(IAdvancedImage input);
     }
-}

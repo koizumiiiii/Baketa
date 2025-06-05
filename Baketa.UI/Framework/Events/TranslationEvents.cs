@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.UI.Framework.Events
-{
+namespace Baketa.UI.Framework.Events;
+
     /// <summary>
     /// 翻訳設定変更イベント
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.UI.Framework.Events
         /// <inheritdoc/>
         public override string Category => "Translation";
     }
-}

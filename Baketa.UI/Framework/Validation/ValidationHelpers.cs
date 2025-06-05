@@ -6,8 +6,8 @@ using System.Reflection;
 using ReactiveUI.Validation.Helpers;
 using ReactiveUI.Validation.Contexts;
 
-namespace Baketa.UI.Framework.Validation
-{
+namespace Baketa.UI.Framework.Validation;
+
     /// <summary>
     /// シンプルなバリデーションヘルパー
     /// 特定のインターフェース名に依存しない実装
@@ -50,7 +50,7 @@ namespace Baketa.UI.Framework.Validation
                 var result = method.Invoke(context, new object[] { propertyName });
                 
                 // 戻り値から必要な情報を抽出
-                List<string> errorList = new List<string>();
+                List<string> errorList = [];
                 if (result is IEnumerable<object> validationStates)
                 {
                 foreach (var state in validationStates)
@@ -73,7 +73,7 @@ namespace Baketa.UI.Framework.Validation
                 
                 // 代替手段：すべてのエラーを取得してプロパティでフィルター
                 // 初期値を設定するための変数
-                List<string> errors = new List<string>();
+                List<string> errors = [];
                 
                 // IsValidプロパティを使って無効な場合のみエラーを収集
                 var isValidProp = contextType.GetProperty("IsValid");
@@ -88,7 +88,7 @@ namespace Baketa.UI.Framework.Validation
                         {
                             if (textMethod.Invoke(context, null) is IEnumerable<string> allErrors)
                             {
-                                errors = new List<string>(allErrors);
+                                errors = [.. allErrors];
                             }
                         }
                     }
@@ -134,4 +134,3 @@ namespace Baketa.UI.Framework.Validation
                 : throw new ArgumentException("Expression is not a property expression", nameof(propertyExpression));
         }
     }
-}

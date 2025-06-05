@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Models.Translation;
+
+using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -11,8 +12,8 @@ using Xunit;
 
 using System.Diagnostics.CodeAnalysis;
 
-namespace Baketa.Infrastructure.Tests.Translation
-{
+namespace Baketa.Infrastructure.Tests.Translation;
+
     [SuppressMessage("Style", "CA1707:識別子にアンダースコアを含めることはできません", Justification = "xUnit規約に準拠するテストメソッド名")]
 [SuppressMessage("Style", "IDE0028:コレクションの初期化を簡素化できます", Justification = "プロジェクトのC#バージョンとの互換性を確保")]
     public class DefaultTranslationServiceTests : IDisposable
@@ -167,4 +168,3 @@ namespace Baketa.Infrastructure.Tests.Translation
             Assert.Equal("さようなら", responses[2].TranslatedText);
         }
     }
-}

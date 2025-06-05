@@ -3,8 +3,8 @@ using System.Reactive;
 using System.Threading.Tasks;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// コマンド作成ヘルパー
     /// </summary>
@@ -64,4 +64,3 @@ namespace Baketa.UI.Framework
             return Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(execute, canExecute);
         }
     }
-}

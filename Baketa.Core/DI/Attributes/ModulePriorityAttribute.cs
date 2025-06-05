@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.DI.Attributes
-{
+namespace Baketa.Core.DI.Attributes;
+
     /// <summary>
     /// モジュールの登録優先順位を指定する属性。
     /// 優先順位が高いモジュールが先に登録されます。
@@ -60,4 +60,3 @@ namespace Baketa.Core.DI.Attributes
         /// </summary>
         Custom = 100
     }
-}

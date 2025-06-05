@@ -4,11 +4,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Models.Translation;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Translation
-{
+using TransModels = Baketa.Core.Translation.Models;
+
+namespace Baketa.Infrastructure.Translation;
+
     /// <summary>
     /// 翻訳サービスの標準実装
     /// </summary>
@@ -96,21 +97,27 @@ namespace Baketa.Infrastructure.Translation
         /// <param name="context">翻訳コンテキスト（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳結果</returns>
-        public async Task<TranslationResponse> TranslateAsync(
+        public async Task<TransModels.TranslationResponse> TranslateAsync(
             string text,
-            Language sourceLang,
-            Language targetLang,
+            TransModels.Language sourceLang,
+            TransModels.Language targetLang,
             string? context = null,
             CancellationToken cancellationToken = default)
         {
-            var request = new TranslationRequest
+            ArgumentNullException.ThrowIfNull(text, nameof(text));
+            ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
+            ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
+
+            // TransModelsをそのまま使用
+            var request = new TransModels.TranslationRequest
             {
                 SourceText = text,
                 SourceLanguage = sourceLang,
                 TargetLanguage = targetLang,
-                Context = context
+                Context = context != null ? new TransModels.TranslationContext { DialogueId = context } : null
             };
 
+            // 翻訳実行
             return await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
@@ -123,27 +130,37 @@ namespace Baketa.Infrastructure.Translation
         /// <param name="context">翻訳コンテキスト（オプション）</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>翻訳結果のコレクション</returns>
-        public async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+        public async Task<IReadOnlyList<TransModels.TranslationResponse>> TranslateBatchAsync(
             IReadOnlyList<string> texts,
-            Language sourceLang,
-            Language targetLang,
+            TransModels.Language sourceLang,
+            TransModels.Language targetLang,
             string? context = null,
             CancellationToken cancellationToken = default)
         {
-            if (texts == null || texts.Count == 0)
+            ArgumentNullException.ThrowIfNull(texts, nameof(texts));
+            ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
+            ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
+
+            if (texts.Count == 0)
             {
-                throw new ArgumentException("テキストのコレクションが空または無効です。", nameof(texts));
+                throw new ArgumentException("テキストのコレクションが空です。", nameof(texts));
             }
 
-            var requests = texts.Select(text => new TranslationRequest
+            // リクエスト作成
+            var transRequests = new List<TransModels.TranslationRequest>();
+            foreach (var text in texts)
             {
-                SourceText = text,
-                SourceLanguage = sourceLang,
-                TargetLanguage = targetLang,
-                Context = context
-            }).ToList();
+                transRequests.Add(new TransModels.TranslationRequest
+                {
+                    SourceText = text,
+                    SourceLanguage = sourceLang,
+                    TargetLanguage = targetLang,
+                    Context = context != null ? new TransModels.TranslationContext { DialogueId = context } : null
+                });
+            }
 
-            return await ActiveEngine.TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
+            // 翻訳実行
+            return await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
-}

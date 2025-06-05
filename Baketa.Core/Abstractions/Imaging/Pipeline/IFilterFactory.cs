@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// フィルターファクトリーインターフェース
     /// </summary>
@@ -35,4 +35,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>フィルタータイプ名のリスト</returns>
         IEnumerable<string> GetFilterTypesByCategory(FilterCategory category);
     }
-}

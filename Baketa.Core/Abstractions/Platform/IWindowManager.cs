@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 
-namespace Baketa.Core.Abstractions.Platform
-{
+namespace Baketa.Core.Abstractions.Platform;
+
     /// <summary>
     /// ウィンドウ管理インターフェース
     /// </summary>
@@ -85,4 +85,3 @@ namespace Baketa.Core.Abstractions.Platform
         /// <returns>ウィンドウハンドルとタイトルのディクショナリ</returns>
         Dictionary<IntPtr, string> GetRunningApplicationWindows();
     }
-}

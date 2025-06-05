@@ -8,15 +8,14 @@ using Baketa.Core.Events;
 using Baketa.Core.Services;
 using Baketa.UI.Framework.ReactiveUI;
 
-// 名前空間エイリアスを使用して衝突を解決
 using UIEvents = Baketa.UI.Framework.Events;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// アクセシビリティ設定を管理するビューモデル
     /// </summary>
-    internal class AccessibilitySettingsViewModel : Framework.ViewModelBase
+    internal sealed class AccessibilitySettingsViewModel : Framework.ViewModelBase
     {
         private readonly ISettingsService _settingsService;
         
@@ -160,4 +159,3 @@ namespace Baketa.UI.ViewModels
             }
         }
     }
-}

@@ -2,8 +2,8 @@ using Baketa.Core.Events.EventTypes;
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events.Handlers
-{
+namespace Baketa.Core.Events.Handlers;
+
     /// <summary>
     /// 通知イベントハンドラー
     /// </summary>
@@ -34,4 +34,3 @@ namespace Baketa.Core.Events.Handlers
             return Task.CompletedTask;
         }
     }
-}

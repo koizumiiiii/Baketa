@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Abstractions.Imaging.Pipeline.Settings;
-// 名前空間の衝突を明示的に解決するためのエイリアス
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
@@ -14,8 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Baketa.Infrastructure.Imaging.Filters;
 using Baketa.Infrastructure.Imaging.Extensions;
 
-namespace Baketa.Application.Services.OCR
-{
+namespace Baketa.Application.Services.OCR;
+
     /// <summary>
     /// OCR前処理サービス
     /// </summary>
@@ -28,7 +27,7 @@ namespace Baketa.Application.Services.OCR
         private readonly ILogger<OcrPreprocessingService> _logger;
         private readonly IServiceProvider _serviceProvider;
         
-        private readonly Dictionary<string, IImagePipeline> _pipelineCache = new Dictionary<string, IImagePipeline>();
+        private readonly Dictionary<string, IImagePipeline> _pipelineCache = [];
         
         /// <summary>
         /// コンストラクタ
@@ -260,34 +259,19 @@ if (metadataObj is IReadOnlyList<OCRTextRegion> regions)
             }
             
             // 指定されたプロファイルに基づいてパイプラインを作成
-            IImagePipeline pipeline;
             
             // 大文字への標準化を使用（小文字化では国際化に問題がある可能性がある）
             string normalizedProfile = profileName.ToUpperInvariant();
             
-            switch (normalizedProfile)
+            var pipeline = normalizedProfile switch
             {
-                case "GAMEUI":
-                    pipeline = CreateGameUiPipeline();
-                    break;
-                    
-                case "DARKTEXT":
-                    pipeline = CreateDarkTextPipeline();
-                    break;
-                    
-                case "LIGHTTEXT":
-                    pipeline = CreateLightTextPipeline();
-                    break;
-                    
-                case "MINIMAL":
-                    pipeline = CreateMinimalPipeline();
-                    break;
-                    
-                case "DEFAULT":
-                default:
-                    pipeline = CreateStandardPipeline();
-                    break;
-            }
+                "GAMEUI" => CreateGameUiPipeline(),
+                "DARKTEXT" => CreateDarkTextPipeline(),
+                "LIGHTTEXT" => CreateLightTextPipeline(),
+                "MINIMAL" => CreateMinimalPipeline(),
+                "DEFAULT" => CreateStandardPipeline(),
+                _ => CreateStandardPipeline()
+            };
             
             // パイプラインをキャッシュ
             _pipelineCache[profileName] = pipeline;
@@ -463,4 +447,3 @@ if (metadataObj is IReadOnlyList<OCRTextRegion> regions)
             DetectedRegions = detectedRegions ?? Array.Empty<OCRTextRegion>();
         }
     }
-}

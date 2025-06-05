@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events.EventTypes
-{
+namespace Baketa.Core.Events.EventTypes;
+
     /// <summary>
     /// 通知メッセージの種類
     /// </summary>
@@ -88,4 +88,3 @@ namespace Baketa.Core.Events.EventTypes
             };
         }
     }
-}

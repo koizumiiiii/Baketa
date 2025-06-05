@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインで使用する画像フィルターを表すインターフェース
     /// IImagePipelineStepを継承し、画像処理パイプラインで使用可能な処理を定義します
@@ -34,4 +34,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>パラメータのディクショナリ</returns>
         IReadOnlyDictionary<string, object> GetParameters();
     }
-}

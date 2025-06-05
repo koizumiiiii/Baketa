@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Factories;
 
-namespace Baketa.Core.Abstractions.Platform.Windows
-{
+namespace Baketa.Core.Abstractions.Platform.Windows;
+
     /// <summary>
     /// Windows固有のプラットフォーム機能を提供するインターフェース
     /// </summary>
@@ -117,4 +117,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// </summary>
         public bool IsPrimary { get; set; }
     }
-}

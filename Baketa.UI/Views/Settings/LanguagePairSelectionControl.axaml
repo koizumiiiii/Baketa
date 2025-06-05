@@ -1,0 +1,231 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:converters="using:Baketa.UI.Converters"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
+             x:Class="Baketa.UI.Views.Settings.LanguagePairSelectionControl"
+             x:DataType="vm:LanguagePairSelectionViewModel">
+
+  <Design.DataContext>
+    <vm:LanguagePairSelectionViewModel />
+  </Design.DataContext>
+
+  <Border Classes="Card">
+    <StackPanel Spacing="16">
+      <!-- ヘッダー -->
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="言語ペア選択" 
+                   FontWeight="SemiBold" 
+                   FontSize="16" />
+        <Button Grid.Column="1"
+                Classes="Icon"
+                Command="{Binding RefreshLanguagePairsCommand}"
+                ToolTip.Tip="言語ペアを更新">
+          <TextBlock Text="🔄" FontSize="14" />
+        </Button>
+      </Grid>
+
+      <!-- 検索・フィルター -->
+      <Border Classes="SearchBox">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <TextBlock Grid.Column="0" 
+                     Text="🔍" 
+                     FontSize="14" 
+                     VerticalAlignment="Center"
+                     Margin="8,0,0,0" />
+          <TextBox Grid.Column="1"
+                   Text="{Binding FilterText}"
+                   Watermark="言語ペアを検索..."
+                   Classes="Borderless"
+                   Margin="4,0,0,0" />
+          <Button Grid.Column="2"
+                  Classes="Icon Clear"
+                  Command="{Binding ClearFilterCommand}"
+                  IsVisible="{Binding FilterText, Converter={x:Static converters:StringToBoolConverter.Instance}}"
+                  ToolTip.Tip="検索をクリア">
+            <TextBlock Text="✕" FontSize="12" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- 言語ペア一覧 -->
+      <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding LanguagePairs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="LanguagePairItem" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                  <!-- 言語フラグ -->
+                  <StackPanel Grid.Column="0" 
+                              Orientation="Horizontal" 
+                              Spacing="4"
+                              VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SourceLanguage, Converter={x:Static converters:LanguageToFlagConverter.Instance}}"
+                               FontSize="16" />
+                    <TextBlock Text="→" FontSize="12" Opacity="0.6" />
+                    <TextBlock Text="{Binding TargetLanguage, Converter={x:Static converters:LanguageToFlagConverter.Instance}}"
+                               FontSize="16" />
+                  </StackPanel>
+
+                  <!-- 言語ペア情報 -->
+                  <StackPanel Grid.Column="1" 
+                              Spacing="2" 
+                              Margin="12,0,0,0"
+                              VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DisplayName}"
+                               FontWeight="Medium" 
+                               FontSize="13" />
+                    <TextBlock Text="{Binding Description}"
+                               FontSize="11"
+                               Opacity="0.7"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+
+                  <!-- 選択ラジオボタン -->
+                  <RadioButton Grid.Column="2"
+                               GroupName="LanguagePair"
+                               IsChecked="{Binding $parent[ItemsControl].((vm:LanguagePairSelectionViewModel)DataContext).SelectedLanguagePair, Converter={x:Static converters:ObjectEqualsConverter.Instance}, ConverterParameter={Binding}}"
+                               Command="{Binding $parent[ItemsControl].((vm:LanguagePairSelectionViewModel)DataContext).SelectLanguagePairCommand}"
+                               CommandParameter="{Binding}"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" />
+
+                  <!-- 有効/無効トグル -->
+                  <ToggleSwitch Grid.Column="3"
+                                IsChecked="{Binding IsEnabled}"
+                                Command="{Binding $parent[ItemsControl].((vm:LanguagePairSelectionViewModel)DataContext).ToggleLanguagePairCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="言語ペアの有効/無効を切り替え"
+                                Width="48"
+                                Height="24"
+                                Margin="8,0,0,0" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <!-- 中国語変種選択 -->
+      <Border Classes="ChineseVariantSection" IsVisible="{Binding IsChineseRelatedPair}">
+        <StackPanel Spacing="12">
+          <TextBlock Text="中国語変種選択" 
+                     FontWeight="Medium" 
+                     FontSize="13" />
+          
+          <ItemsControl ItemsSource="{Binding AvailableChineseVariants}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="12" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Classes="ChineseVariantOption">
+                  <RadioButton GroupName="ChineseVariant"
+                               IsChecked="{Binding $parent[ItemsControl].((vm:LanguagePairSelectionViewModel)DataContext).SelectedChineseVariant, Converter={x:Static converters:EnumToBoolConverter.Instance}, ConverterParameter={Binding Variant}}"
+                               Command="{Binding $parent[ItemsControl].((vm:LanguagePairSelectionViewModel)DataContext).SelectChineseVariantCommand}"
+                               CommandParameter="{Binding Variant}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Flag}" FontSize="16" />
+                      <StackPanel>
+                        <TextBlock Text="{Binding DisplayName}" 
+                                   FontSize="12" 
+                                   FontWeight="Medium" />
+                        <TextBlock Text="{Binding NativeName}" 
+                                   FontSize="10" 
+                                   Opacity="0.7" />
+                      </StackPanel>
+                    </StackPanel>
+                  </RadioButton>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          
+          <TextBlock Text="選択した変種は中国語関連の翻訳に適用されます"
+                     FontSize="11"
+                     Opacity="0.6"
+                     FontStyle="Italic" />
+        </StackPanel>
+      </Border>
+
+      <!-- 選択中の言語ペア情報 -->
+      <Border Classes="SelectedPairInfo" IsVisible="{Binding SelectedLanguagePair, Converter={x:Static converters:ObjectToBoolConverter.Instance}}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="選択中の言語ペア" 
+                     FontWeight="Medium" 
+                     FontSize="13" />
+          <Grid ColumnDefinitions="*,*,*,*">
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="言語ペア" FontSize="11" Opacity="0.7" />
+              <TextBlock Text="{Binding SelectedLanguagePair.DisplayName}" 
+                         FontSize="12" 
+                         FontWeight="Medium" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="2">
+              <TextBlock Text="翻訳戦略" FontSize="11" Opacity="0.7" />
+              <TextBlock Text="{Binding SelectedLanguagePair.Strategy, Converter={x:Static converters:StrategyToDisplayConverter.Instance}}" 
+                         FontSize="12" 
+                         FontWeight="Medium" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="2">
+              <TextBlock Text="推定レイテンシ" FontSize="11" Opacity="0.7" />
+              <TextBlock Text="{Binding SelectedLanguagePair.LatencyDisplayText}" 
+                         FontSize="12" 
+                         FontWeight="Medium" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Spacing="2" IsVisible="{Binding SelectedLanguagePair.IsChineseRelated}">
+              <TextBlock Text="中国語変種" FontSize="11" Opacity="0.7" />
+              <TextBlock Text="{Binding SelectedChineseVariant, Converter={x:Static converters:ChineseVariantToDisplayConverter.Instance}}" 
+                         FontSize="12" 
+                         FontWeight="Medium" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- 統計情報 -->
+      <Border Classes="StatsInfo">
+        <Grid ColumnDefinitions="*,*,*">
+          <StackPanel Grid.Column="0" Spacing="2">
+            <TextBlock Text="利用可能" FontSize="11" Opacity="0.7" />
+            <TextBlock Text="{Binding LanguagePairs.Count}" 
+                       FontSize="14" 
+                       FontWeight="Bold" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="2">
+            <TextBlock Text="有効" FontSize="11" Opacity="0.7" />
+            <TextBlock FontSize="14" FontWeight="Bold">
+              <TextBlock.Text>
+                <Binding Path="LanguagePairs" Converter="{x:Static converters:EnabledCountConverter.Instance}" />
+              </TextBlock.Text>
+            </TextBlock>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="2">
+            <TextBlock Text="選択中" FontSize="11" Opacity="0.7" />
+            <TextBlock Text="{Binding SelectedLanguagePair.LanguagePairKey, FallbackValue='なし'}" 
+                       FontSize="14" 
+                       FontWeight="Bold" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- ローディング表示 -->
+      <Border Classes="LoadingIndicator" IsVisible="{Binding IsLoading}">
+        <Grid ColumnDefinitions="Auto,*">
+          <Border Grid.Column="0" Classes="Spinner" />
+          <TextBlock Grid.Column="1" 
+                     Text="言語ペアを読み込み中..."
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Margin="8,0,0,0" />
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+
+</UserControl>

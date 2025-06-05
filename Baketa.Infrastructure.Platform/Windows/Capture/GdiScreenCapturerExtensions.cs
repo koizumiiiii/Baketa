@@ -1,8 +1,8 @@
 using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.Platform.Windows.Capture
-{
+namespace Baketa.Infrastructure.Platform.Windows.Capture;
+
     /// <summary>
     /// GDIスクリーンキャプチャ機能のサービス登録拡張メソッド
     /// </summary>
@@ -20,4 +20,3 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture
             return services;
         }
     }
-}

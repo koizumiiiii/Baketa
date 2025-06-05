@@ -3,12 +3,12 @@ using Avalonia.ReactiveUI;
 using Baketa.UI.ViewModels;
 using ReactiveUI;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// キャプチャ設定画面のビュー
     /// </summary>
-    internal partial class CaptureView : ReactiveUserControl<CaptureViewModel>
+    internal sealed partial class CaptureView : ReactiveUserControl<CaptureViewModel>
     {
         public CaptureView()
         {
@@ -20,4 +20,3 @@ namespace Baketa.UI.Views
             });
         }
     }
-}

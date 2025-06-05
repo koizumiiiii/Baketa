@@ -9,8 +9,8 @@ using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters.CaptureAdapterTests
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters.CaptureAdapterTests;
+
     /// <summary>
     /// CaptureAdapterの基本機能テスト
     /// </summary>
@@ -354,4 +354,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.CaptureAdapterTests
             Dispose(false);
         }
     }
-}

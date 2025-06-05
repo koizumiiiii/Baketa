@@ -5,8 +5,8 @@ using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// Baketaアプリケーション用のビューモデル基底クラス
     /// </summary>
@@ -50,7 +50,7 @@ namespace Baketa.UI.Framework
         /// <summary>
         /// リソース破棄用コレクション
         /// </summary>
-        protected readonly CompositeDisposable _disposables = new();
+        protected readonly CompositeDisposable _disposables = [];
         
         /// <summary>
         /// 廃棄フラグ
@@ -145,4 +145,3 @@ namespace Baketa.UI.Framework
             return subscription;
         }
     }
-}

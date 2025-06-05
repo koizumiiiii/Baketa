@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Events
-{
+namespace Baketa.Core.Events;
+
     /// <summary>
     /// アクセシビリティ設定変更イベント
     /// </summary>
@@ -75,4 +75,3 @@ namespace Baketa.Core.Events
     }
     
     // NotificationEventクラスは削除 - Baketa.Core.Events.EventTypes.NotificationEventを使用
-}

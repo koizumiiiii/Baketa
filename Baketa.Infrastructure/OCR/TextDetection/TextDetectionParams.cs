@@ -1,8 +1,8 @@
 using System;
 using DetectionMethod = Baketa.Core.Abstractions.OCR.TextDetectionMethod;
 
-namespace Baketa.Infrastructure.OCR.TextDetection
-{
+namespace Baketa.Infrastructure.OCR.TextDetection;
+
     /// <summary>
     /// テキスト検出パラメータのデフォルト値を提供するクラス
     /// </summary>
@@ -120,4 +120,3 @@ namespace Baketa.Infrastructure.OCR.TextDetection
             return parameters;
         }
     }
-}

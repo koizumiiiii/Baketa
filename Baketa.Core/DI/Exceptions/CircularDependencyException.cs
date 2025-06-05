@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
-namespace Baketa.Core.DI.Exceptions
-{
+namespace Baketa.Core.DI.Exceptions;
+
     /// <summary>
     /// モジュール間の循環依存が検出された場合にスローされる例外。
     /// </summary>
@@ -60,4 +60,3 @@ namespace Baketa.Core.DI.Exceptions
         }
 #pragma warning restore SYSLIB0051
     }
-}

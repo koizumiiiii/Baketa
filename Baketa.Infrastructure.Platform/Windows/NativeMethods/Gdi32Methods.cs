@@ -2,8 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
-{
+namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
+
     /// <summary>
     /// Gdi32.dll P/Invoke定義
     /// </summary>
@@ -40,4 +40,3 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
     {
         SRCCOPY = 0x00CC0020
     }
-}

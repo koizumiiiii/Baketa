@@ -1,25 +1,24 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Avalonia.Styling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
-using System.Linq;
-using System.Collections.Generic;
 
-// 名前空間エイリアスで衝突を解決
 using CoreEvents = Baketa.Core.Events;
+using UIEvents = Baketa.UI.Framework.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     internal sealed partial class App : Avalonia.Application
     {
         private ILogger<App>? _logger;
-        private CoreEvents.IEventAggregator? _eventAggregator;
+        private UIEvents.IEventAggregator? _eventAggregator;
         
         // LoggerMessageデリゲートの定義
         private static readonly Action<ILogger, Exception?> _logInitializing =
@@ -42,12 +41,6 @@ namespace Baketa.UI
             LoggerMessage.Define(LogLevel.Error, new EventId(5, nameof(OnShutdownRequested)),
                 "シャットダウン中にエラーが発生しました");
 
-        private static readonly Action<ILogger, bool, bool, double, bool, double, Exception?> _logAccessibilitySettingsChanged =
-            LoggerMessage.Define<bool, bool, double, bool, double>(
-                LogLevel.Information,
-                new EventId(6, "AccessibilitySettingsChanged"),
-                "アクセシビリティ設定が変更されました: アニメーション無効={DisableAnimations}, ハイコントラスト={HighContrastMode}, フォント倍率={FontScaleFactor}, フォーカス表示={AlwaysShowKeyboardFocus}, ナビゲーション速度={KeyboardNavigationSpeed}");
-        
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -58,11 +51,7 @@ namespace Baketa.UI
             }
             
             // イベント集約器を取得
-            _eventAggregator = Program.ServiceProvider?.GetService<CoreEvents.IEventAggregator>();
-            
-            // アクセシビリティ設定変更イベントの購読
-            _eventAggregator?.Subscribe<CoreEvents.AccessibilitySettingsChangedEvent>(
-                new AccessibilitySettingsEventProcessor(this));
+            _eventAggregator = Program.ServiceProvider?.GetService<UIEvents.IEventAggregator>();
         }
 
         public override void OnFrameworkInitializationCompleted()
@@ -75,7 +64,7 @@ namespace Baketa.UI
                     var serviceProvider = Program.ServiceProvider 
                         ?? throw new InvalidOperationException("サービスプロバイダーが初期化されていません");
                     
-                    _eventAggregator = serviceProvider.GetRequiredService<CoreEvents.IEventAggregator>();
+                    _eventAggregator = serviceProvider.GetRequiredService<UIEvents.IEventAggregator>();
                     
                     // MainWindowViewModelを取得
                     var mainWindowViewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
@@ -97,7 +86,39 @@ namespace Baketa.UI
                     // シャットダウンイベントハンドラーの登録
                     desktop.ShutdownRequested += OnShutdownRequested;
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
+                {
+                    if (_logger != null)
+                    {
+                        _logStartupError(_logger, ex);
+                    }
+                    throw; // 致命的なエラーなので再スロー
+                }
+                catch (ArgumentNullException ex)
+                {
+                    if (_logger != null)
+                    {
+                        _logStartupError(_logger, ex);
+                    }
+                    throw; // 致命的なエラーなので再スロー
+                }
+                catch (TypeInitializationException ex)
+                {
+                    if (_logger != null)
+                    {
+                        _logStartupError(_logger, ex);
+                    }
+                    throw; // 致命的なエラーなので再スロー
+                }
+                catch (FileNotFoundException ex)
+                {
+                    if (_logger != null)
+                    {
+                        _logStartupError(_logger, ex);
+                    }
+                    throw; // 致命的なエラーなので再スロー
+                }
+                catch (TargetInvocationException ex)
                 {
                     if (_logger != null)
                     {
@@ -108,99 +129,6 @@ namespace Baketa.UI
             }
 
             base.OnFrameworkInitializationCompleted();
-        }
-        
-        /// <summary>
-        /// アクセシビリティ設定変更イベントのハンドラー
-        /// </summary>
-        internal async Task OnAccessibilitySettingsChanged(CoreEvents.AccessibilitySettingsChangedEvent @event)
-        {
-            if (_logger != null)
-            {
-                _logAccessibilitySettingsChanged(
-                    _logger,
-                    @event.DisableAnimations,
-                    @event.HighContrastMode,
-                    @event.FontScaleFactor,
-                    @event.AlwaysShowKeyboardFocus,
-                    @event.KeyboardNavigationSpeed,
-                    null);
-            }
-            
-            // UIスレッドでリソースを更新
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                try
-                {
-                    // アニメーション有効化/無効化
-                    Resources["AnimationsEnabled"] = !@event.DisableAnimations;
-                    
-                    // ハイコントラストモード
-                    bool isDarkTheme = RequestedThemeVariant?.Key == ThemeVariant.Dark.Key;
-                    if (@event.HighContrastMode)
-                    {
-                        RequestedThemeVariant = ThemeVariant.Dark;
-                        
-                        // カスタムハイコントラスト設定を適用
-                        // (Colors.axamlのHighContrastリソース辞書が自動的に選択される)
-                    }
-                    else if (isDarkTheme)
-                    {
-                        // 通常のダークテーマに戻す - HighContrastチェックを削除
-                        RequestedThemeVariant = ThemeVariant.Dark;
-                    }
-                    
-                    // フォントサイズ倍率適用
-                    ApplyFontScaling(@event.FontScaleFactor);
-                    
-                    // キーボードフォーカス表示設定
-                    ApplyKeyboardFocusSettings(@event.AlwaysShowKeyboardFocus);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _logger?.LogError(ex, "アクセシビリティ設定の適用中に操作エラーが発生しました");
-                }
-                catch (ArgumentException ex)
-                {
-                    _logger?.LogError(ex, "アクセシビリティ設定の適用中に引数エラーが発生しました");
-                }
-                catch (KeyNotFoundException ex)
-                {
-                    _logger?.LogError(ex, "アクセシビリティ設定の適用中にリソースが見つかりませんでした");
-                }
-                catch (NullReferenceException ex)
-                {
-                    _logger?.LogError(ex, "アクセシビリティ設定の適用中にヌル参照エラーが発生しました");
-                }
-            });
-        }
-        
-        /// <summary>
-        /// フォントサイズスケーリングを適用します
-        /// </summary>
-        private void ApplyFontScaling(double scaleFactor)
-        {
-            // リソースからベースサイズを取得
-            if (Resources.TryGetResource("FontSizeNormal", ThemeVariant.Default, out var baseSizeObj) && 
-                baseSizeObj is double baseSize)
-            {
-                // フォントサイズを倍率に応じて設定
-                Resources["FontSizeSmall"] = baseSize * 0.85 * scaleFactor;
-                Resources["FontSizeNormal"] = baseSize * scaleFactor;
-                Resources["FontSizeLarge"] = baseSize * 1.2 * scaleFactor;
-                Resources["FontSizeHeader"] = baseSize * 1.5 * scaleFactor;
-            }
-        }
-        
-        /// <summary>
-        /// キーボードフォーカス表示設定を適用します
-        /// </summary>
-        private void ApplyKeyboardFocusSettings(bool alwaysShowFocus)
-        {
-            Resources["AlwaysShowKeyboardFocus"] = alwaysShowFocus;
-            
-            // キーボードフォーカス表示のスタイル設定（BasicStyles.axaml内で参照される）
-            Resources["KeyboardFocusOpacity"] = alwaysShowFocus ? 1.0 : 0.0;
         }
         
         /// <summary>
@@ -241,19 +169,8 @@ namespace Baketa.UI
         }
     }
     
-    // イベントプロセッサの実装
-    internal class AccessibilitySettingsEventProcessor(App app) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
-    {
-        private readonly App _app = app ?? throw new ArgumentNullException(nameof(app));
-        
-        public Task HandleAsync(CoreEvents.AccessibilitySettingsChangedEvent eventData)
-        {
-            return _app.OnAccessibilitySettingsChanged(eventData);
-        }
-    }
-    
     // イベント定義
-    internal class ApplicationStartupEvent : CoreEvents.EventBase
+    internal sealed class ApplicationStartupEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名
@@ -266,7 +183,7 @@ namespace Baketa.UI
         public override string Category => "Application";
     }
 
-    internal class ApplicationShutdownEvent : CoreEvents.EventBase
+    internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名
@@ -278,4 +195,3 @@ namespace Baketa.UI
         /// </summary>
         public override string Category => "Application";
     }
-}

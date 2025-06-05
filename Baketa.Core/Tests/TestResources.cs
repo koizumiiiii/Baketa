@@ -1,5 +1,5 @@
-namespace Baketa.Core.Tests
-{
+namespace Baketa.Core.Tests;
+
     /// <summary>
     /// テスト用リソース文字列
     /// </summary>
@@ -20,4 +20,3 @@ namespace Baketa.Core.Tests
         /// </summary>
         public static string PositionMessage => "位置：{0}, {1}";
     }
-}

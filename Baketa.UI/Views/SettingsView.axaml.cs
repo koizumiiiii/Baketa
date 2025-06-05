@@ -8,8 +8,8 @@ using System;
 using System.Reactive;
 using System.Reactive.Disposables;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// 設定画面のビュー
     /// </summary>
@@ -88,4 +88,3 @@ namespace Baketa.UI.Views
             }
         }
     }
-}

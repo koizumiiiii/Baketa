@@ -1,7 +1,7 @@
 using System.Drawing;
 
-namespace Baketa.Core.Models.OCR
-{
+namespace Baketa.Core.Models.OCR;
+
     /// <summary>
     /// OCR処理の結果を表すクラス
     /// </summary>
@@ -35,4 +35,3 @@ namespace Baketa.Core.Models.OCR
             Confidence = confidence;
         }
     }
-}

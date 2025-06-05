@@ -2,8 +2,8 @@ using System;
 using System.Drawing;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Platform.Windows
-{
+namespace Baketa.Core.Abstractions.Platform.Windows;
+
     /// <summary>
     /// Windows固有の画像インターフェース
     /// </summary>
@@ -61,4 +61,3 @@ namespace Baketa.Core.Abstractions.Platform.Windows
         /// <returns>画像データのバイト配列</returns>
         Task<byte[]> ToByteArrayAsync(System.Drawing.Imaging.ImageFormat? format = null);
     }
-}

@@ -1,5 +1,5 @@
-namespace Baketa.Core.Abstractions.OCR.TextDetection
-{
+namespace Baketa.Core.Abstractions.OCR.TextDetection;
+
     /// <summary>
     /// テキスト検出方法を表す列挙型
     /// </summary>
@@ -35,4 +35,3 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection
         /// </summary>
         Combined = 5
     }
-}

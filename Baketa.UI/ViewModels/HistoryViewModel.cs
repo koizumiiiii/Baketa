@@ -9,12 +9,12 @@ using Baketa.UI.Models;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// 翻訳履歴画面のビューモデル
     /// </summary>
-    internal class HistoryViewModel : Framework.ViewModelBase
+    internal sealed class HistoryViewModel : Framework.ViewModelBase
     {
         // 検索関連
         private string _searchText = string.Empty;
@@ -217,4 +217,3 @@ namespace Baketa.UI.ViewModels
             });
         }
     }
-}

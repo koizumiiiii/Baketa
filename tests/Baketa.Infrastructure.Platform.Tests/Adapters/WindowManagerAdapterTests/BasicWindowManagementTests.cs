@@ -8,8 +8,8 @@ using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTests
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTests;
+
     /// <summary>
     /// WindowManagerAdapterの基本ウィンドウ管理機能テスト
     /// </summary>
@@ -267,4 +267,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.WindowManagerAdapterTest
             Dispose(false);
         }
     }
-}

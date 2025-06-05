@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:converters="using:Baketa.UI.Converters"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="200"
+             x:Class="Baketa.UI.Views.Settings.EngineStatusControl"
+             x:DataType="vm:EngineStatusViewModel">
+
+  <Design.DataContext>
+    <vm:EngineStatusViewModel />
+  </Design.DataContext>
+
+  <Border Classes="Card">
+    <StackPanel Spacing="16">
+      <!-- ヘッダー -->
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="エンジン状態" 
+                   FontWeight="SemiBold" 
+                   FontSize="16" />
+        <Button Grid.Column="1" 
+                Classes="Icon"
+                Command="{Binding RefreshStatusCommand}"
+                ToolTip.Tip="状態を更新">
+          <TextBlock Text="🔄" FontSize="14" />
+        </Button>
+      </Grid>
+
+      <!-- LocalOnlyエンジン -->
+      <Border Classes="StatusCard">
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+          <!-- ステータスアイコン -->
+          <Border Grid.RowSpan="2" 
+                  Classes="StatusIndicator"
+                  Classes.Healthy="{Binding IsLocalEngineHealthy}"
+                  Classes.Error="{Binding !IsLocalEngineHealthy}">
+            <TextBlock Text="{Binding IsLocalEngineHealthy, Converter={x:Static converters:BoolToIconConverter.Instance}}"
+                       FontSize="16" />
+          </Border>
+
+          <!-- エンジン名 -->
+          <TextBlock Grid.Column="1" 
+                     Text="LocalOnly エンジン"
+                     FontWeight="Medium" 
+                     VerticalAlignment="Center" />
+
+          <!-- 状態テキスト -->
+          <TextBlock Grid.Column="2" 
+                     Text="{Binding LocalEngineStatusText}"
+                     Classes="StatusText"
+                     Classes.Healthy="{Binding IsLocalEngineHealthy}"
+                     Classes.Error="{Binding !IsLocalEngineHealthy}"
+                     VerticalAlignment="Center" />
+
+          <!-- 詳細情報 -->
+          <TextBlock Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1"
+                     Text="OPUS-MT • 高速 • オフライン対応"
+                     FontSize="12"
+                     Opacity="0.7"
+                     Margin="0,4,0,0" />
+        </Grid>
+      </Border>
+
+      <!-- CloudOnlyエンジン -->
+      <Border Classes="StatusCard">
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+          <!-- ステータスアイコン -->
+          <Border Grid.RowSpan="2" 
+                  Classes="StatusIndicator"
+                  Classes.Healthy="{Binding IsCloudEngineHealthy}"
+                  Classes.Error="{Binding !IsCloudEngineHealthy}">
+            <TextBlock Text="{Binding IsCloudEngineHealthy, Converter={x:Static converters:BoolToIconConverter.Instance}}"
+                       FontSize="16" />
+          </Border>
+
+          <!-- エンジン名 -->
+          <TextBlock Grid.Column="1" 
+                     Text="CloudOnly エンジン"
+                     FontWeight="Medium" 
+                     VerticalAlignment="Center" />
+
+          <!-- 状態テキスト -->
+          <TextBlock Grid.Column="2" 
+                     Text="{Binding CloudEngineStatusText}"
+                     Classes="StatusText"
+                     Classes.Healthy="{Binding IsCloudEngineHealthy}"
+                     Classes.Error="{Binding !IsCloudEngineHealthy}"
+                     VerticalAlignment="Center" />
+
+          <!-- 詳細情報 -->
+          <TextBlock Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1"
+                     Text="Gemini API • 高品質 • プレミアム必須"
+                     FontSize="12"
+                     Opacity="0.7"
+                     Margin="0,4,0,0" />
+        </Grid>
+      </Border>
+
+      <!-- 最終更新時刻 -->
+      <TextBlock Text="{Binding LastUpdateTime, StringFormat='最終更新: {0}'}"
+                 FontSize="11"
+                 Opacity="0.6"
+                 HorizontalAlignment="Right" />
+    </StackPanel>
+  </Border>
+
+</UserControl>

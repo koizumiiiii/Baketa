@@ -9,8 +9,8 @@ using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapterTests
-{
+namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapterTests;
+
     /// <summary>
     /// DefaultWindowsImageAdapterの基本変換機能のテスト
     /// </summary>
@@ -239,4 +239,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             Dispose(false);
         }
     }
-}

@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.UI.Framework
-{
+namespace Baketa.UI.Framework;
+
     /// <summary>
     /// コマンド実行メッセージ（デバッグ用）
     /// </summary>
@@ -22,4 +22,3 @@ namespace Baketa.UI.Framework
             CommandName = commandName;
         }
     }
-}

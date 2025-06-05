@@ -5,8 +5,8 @@ using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Filters.OCR
-{
+namespace Baketa.Core.Services.Imaging.Filters.OCR;
+
     /// <summary>
     /// OCR処理に最適化されたグレースケールフィルター
     /// </summary>
@@ -110,4 +110,3 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR
             };
         }
     }
-}

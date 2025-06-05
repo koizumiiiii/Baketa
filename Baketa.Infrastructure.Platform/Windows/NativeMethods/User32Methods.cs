@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 
-namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
-{
+namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
+
     /// <summary>
     /// User32.dll P/Invoke定義
     /// </summary>
@@ -78,4 +78,3 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods
         SM_CXSCREEN = 0,
         SM_CYSCREEN = 1
     }
-}

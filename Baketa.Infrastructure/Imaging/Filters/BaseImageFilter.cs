@@ -7,14 +7,14 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Imaging.Filters
-{
+namespace Baketa.Infrastructure.Imaging.Filters;
+
     /// <summary>
     /// 画像フィルター実装の基底クラス
     /// </summary>
     public abstract class BaseImageFilter : IImageFilter, IImagePipelineStep
     {
-        private readonly Dictionary<string, object> _parameters = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _parameters = [];
         private readonly ILogger? _logger;
         
         /// <summary>
@@ -76,8 +76,7 @@ namespace Baketa.Infrastructure.Imaging.Filters
         /// <returns>パラメータ定義のコレクション</returns>
         protected virtual IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
         {
-            // サブクラスでオーバーライドして実装
-            return Array.Empty<PipelineStepParameter>();
+        return [];
         }
         
         /// <summary>
@@ -245,4 +244,3 @@ namespace Baketa.Infrastructure.Imaging.Filters
             _logger?.Log(logLevel, "{Message}", formattedMessage);
         }
     }
-}

@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Windows
-{
+namespace Baketa.Infrastructure.Platform.Windows;
+
     /// <summary>
     /// IWindowsCapturerインターフェースのスタブ実装
     /// 注：実際の機能実装は後の段階で行います
@@ -87,4 +87,3 @@ namespace Baketa.Infrastructure.Platform.Windows
             return _options;
         }
     }
-}

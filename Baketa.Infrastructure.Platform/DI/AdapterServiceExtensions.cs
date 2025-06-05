@@ -3,8 +3,8 @@ using Baketa.Infrastructure.Platform.Adapters;
 using Baketa.Infrastructure.Platform.Adapters.Factory;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Infrastructure.Platform.DI
-{
+namespace Baketa.Infrastructure.Platform.DI;
+
     /// <summary>
     /// アダプターサービスの登録を行う拡張メソッド群
     /// </summary>
@@ -110,4 +110,3 @@ namespace Baketa.Infrastructure.Platform.DI
             return services;
         }
     }
-}

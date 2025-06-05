@@ -2,16 +2,15 @@ using System;
 using System.Collections.Generic;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Infrastructure.Imaging.Extensions
-{
+namespace Baketa.Infrastructure.Imaging.Extensions;
+
     /// <summary>
     /// 画像操作に関する拡張メソッド
     /// </summary>
     public static class ImageExtensions
     {
         // メタデータを保持するための一時的なストレージ（実際の実装では画像インスタンスに保持するべき）
-        private static readonly Dictionary<IAdvancedImage, Dictionary<string, object>> _metadataStorage = 
-            new Dictionary<IAdvancedImage, Dictionary<string, object>>();
+        private static readonly Dictionary<IAdvancedImage, Dictionary<string, object>> _metadataStorage = [];
             
         /// <summary>
         /// 画像にメタデータを設定します
@@ -30,7 +29,7 @@ namespace Baketa.Infrastructure.Imaging.Extensions
             // ストレージにメタデータを追加
             if (!_metadataStorage.TryGetValue(image, out var metadata))
             {
-                metadata = new Dictionary<string, object>();
+                metadata = [];
                 _metadataStorage[image] = metadata;
             }
             
@@ -123,4 +122,3 @@ namespace Baketa.Infrastructure.Imaging.Extensions
             _metadataStorage.Remove(image);
         }
     }
-}

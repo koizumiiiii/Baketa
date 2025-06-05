@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
-// Deprecatedな方は使用せず、新しい名前空間のみインポート
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
@@ -12,8 +11,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
-namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
-{
+namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture;
+
     /// <summary>
     /// テスト用 WindowsImageFactory モック
     /// </summary>
@@ -123,4 +122,3 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture
                 capturer.CaptureWindowAsync(IntPtr.Zero));
         }
     }
-}

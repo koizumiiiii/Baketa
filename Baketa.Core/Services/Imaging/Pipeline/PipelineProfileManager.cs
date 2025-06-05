@@ -8,8 +8,8 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Abstractions.Platform;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// パイプラインプロファイルの管理を担当するクラス
     /// </summary>
@@ -17,7 +17,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
     {
         private readonly ILogger<PipelineProfileManager> _logger;
         private readonly IFileSystemService _fileSystem;
-        private readonly Dictionary<string, IImagePipeline> _cachedPipelines = new();
+        private readonly Dictionary<string, IImagePipeline> _cachedPipelines = [];
         private readonly JsonSerializerOptions _serializerOptions;
 
         private const string ProfilesDirectoryName = "PipelineProfiles";
@@ -181,18 +181,18 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             catch (DirectoryNotFoundException ex)
             {
                 _logger.LogError(ex, "プロファイルディレクトリが見つかりません");
-                return new List<string>();
+                return [];
             }
 #pragma warning restore CA2017
             catch (UnauthorizedAccessException ex)
             {
                 _logger.LogError(ex, "利用可能なプロファイルリストの取得中にアクセス権限エラーが発生しました");
-                return new List<string>();
+                return [];
             }
             catch (IOException ex)
             {
                 _logger.LogError(ex, "利用可能なプロファイルリストの取得中にIOエラーが発生しました");
-                return new List<string>();
+                return [];
             }
         }
 
@@ -307,7 +307,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             {
                 IntermediateResultMode = pipeline.IntermediateResultMode,
                 GlobalErrorHandlingStrategy = pipeline.GlobalErrorHandlingStrategy,
-                Steps = new List<PipelineStepConfiguration>()
+                Steps = []
             };
 
             // 各ステップの情報を保存
@@ -319,7 +319,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                     Description = step.Description,
                     Type = step.GetType().FullName,
                     ErrorHandlingStrategy = step.ErrorHandlingStrategy,
-                    Parameters = new Dictionary<string, object>()
+                    Parameters = []
                 };
 
                 // パラメータ情報を保存
@@ -389,7 +389,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             /// <summary>
             /// パイプラインステップの構成情報のリスト
             /// </summary>
-            public List<PipelineStepConfiguration> Steps { get; set; } = new();
+            public List<PipelineStepConfiguration> Steps { get; set; } = [];
         }
 
         /// <summary>
@@ -420,9 +420,8 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             /// <summary>
             /// ステップのパラメータ
             /// </summary>
-            public Dictionary<string, object> Parameters { get; set; } = new();
+            public Dictionary<string, object> Parameters { get; set; } = [];
         }
 
         #endregion
     }
-}

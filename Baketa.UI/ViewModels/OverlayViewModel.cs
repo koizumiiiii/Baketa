@@ -7,15 +7,14 @@ using Baketa.UI.Framework.ReactiveUI;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアスを使用して衝突を解決
 using UIEvents = Baketa.UI.Framework.Events;
 
-namespace Baketa.UI.ViewModels
-{
+namespace Baketa.UI.ViewModels;
+
     /// <summary>
     /// オーバーレイ設定画面のビューモデル
     /// </summary>
-    internal class OverlayViewModel : Framework.ViewModelBase
+    internal sealed class OverlayViewModel : Framework.ViewModelBase
     {
         // オーバーレイの表示位置
         private string _position = "上";
@@ -178,10 +177,10 @@ namespace Baketa.UI.ViewModels
             : base(eventAggregator, logger)
         {
             // コマンドの初期化
-            SaveSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
-            PreviewOverlayCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
-            ResetToDefaultsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
-            ResetSettingsCommand = Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
+            SaveSettingsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
+            PreviewOverlayCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
+            ResetToDefaultsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync);
+            ResetSettingsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteResetToDefaultsAsync); // CS8618対応
         }
         
         // 設定保存コマンド実行
@@ -233,12 +232,12 @@ namespace Baketa.UI.ViewModels
     /// <param name="fontColor">フォント色</param>
     /// <param name="backgroundColor">背景色</param>
     /// <param name="backgroundOpacity">背景透過度</param>
-    internal class OverlaySettingsChangedEvent(
+    internal sealed class OverlaySettingsChangedEvent(
         string position,
         int fontSize,
         string fontColor,
         string backgroundColor,
-        double backgroundOpacity) : Baketa.UI.Framework.Events.UIEventBase
+        double backgroundOpacity) : global::Baketa.UI.Framework.Events.UIEventBase
     {
         /// <summary>
         /// 位置
@@ -271,4 +270,3 @@ namespace Baketa.UI.ViewModels
         /// <inheritdoc/>
         public override string Category => "UI.Overlay";
     }
-}

@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Platform
-{
+namespace Baketa.Core.Abstractions.Platform;
+
     /// <summary>
     /// プラットフォーム検出インターフェース
     /// </summary>
@@ -33,4 +33,3 @@ namespace Baketa.Core.Abstractions.Platform
         /// <returns>サポートされている場合はtrue</returns>
         bool IsPlatformFeatureSupported(string featureName);
     }
-}

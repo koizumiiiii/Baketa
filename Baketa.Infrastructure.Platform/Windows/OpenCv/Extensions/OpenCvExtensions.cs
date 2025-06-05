@@ -2,9 +2,8 @@ using System;
 using Baketa.Core.Abstractions.OCR;
 using OpenCvSharp;
 
-namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions
-{
-    // 内部クラスをテスト用に public に変更
+namespace Baketa.Infrastructure.Platform.Windows.OpenCv.Extensions;
+
 public static class OpenCvExtensions
     {
         /// <summary>
@@ -77,4 +76,3 @@ public static class OpenCvExtensions
             };
         }
     }
-}

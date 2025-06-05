@@ -1,16 +1,18 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using Avalonia;
 using Avalonia.ReactiveUI;
-using Baketa.Application.DI.Extensions;
 using Baketa.Core.DI;
 using Baketa.UI.DI;
+using Microsoft.Extensions.Configuration;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 
-namespace Baketa.UI
-{
+namespace Baketa.UI;
+
     internal sealed class Program
     {
         /// <summary>
@@ -48,8 +50,22 @@ namespace Baketa.UI
                 ? BaketaEnvironment.Development 
                 : BaketaEnvironment.Production;
             
+            // 設定ファイルの読み込み
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{(environment == BaketaEnvironment.Development ? "Development" : "Production")}.json", optional: true, reloadOnChange: true)
+                .Build();
+            
             // DIコンテナの構成
             var services = new ServiceCollection();
+            
+            // Configurationを登録
+            services.AddSingleton<IConfiguration>(configuration);
+            
+            // appsettings.jsonから設定を読み込み
+            services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
+                configuration.GetSection("TranslationEngineStatus"));
             
             // ロギングの設定
             services.AddLogging(builder => 
@@ -71,7 +87,7 @@ namespace Baketa.UI
             
             // Baketaの標準モジュールを登録
             // UIモジュールを含む全モジュールを登録
-            services.AddUIModule(environment);
+            services.AddUIModule(environment, configuration);
             
             // サービスプロバイダーの構築
             ServiceProvider = services.BuildServiceProvider();
@@ -79,4 +95,3 @@ namespace Baketa.UI
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
         }
     }
-}

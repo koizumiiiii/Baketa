@@ -7,8 +7,8 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
+namespace Baketa.Infrastructure.Platform.Adapters;
+
     /// <summary>
     /// IWindowsImageAdapterインターフェースの基本スタブ実装
     /// 注：実際の機能実装は後の段階で行います
@@ -170,4 +170,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             }
         }
     }
-}

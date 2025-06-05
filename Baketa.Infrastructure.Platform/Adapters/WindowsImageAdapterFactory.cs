@@ -8,9 +8,8 @@ using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindow
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Adapters
-{
-    // 注：IImageFactoryインターフェースは Baketa.Core.Abstractions.Factories.IImageFactory に移動しました
+namespace Baketa.Infrastructure.Platform.Adapters;
+
 
     /// <summary>
     /// WindowsImageAdapterFactory - Windows画像をIImageに変換するファクトリー
@@ -168,4 +167,3 @@ namespace Baketa.Infrastructure.Platform.Adapters
             throw new NotImplementedException("テスト用ファクトリは実装が必要です");
         }
     }
-}

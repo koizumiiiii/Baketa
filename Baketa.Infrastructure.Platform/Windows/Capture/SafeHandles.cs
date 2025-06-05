@@ -2,8 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using Baketa.Infrastructure.Platform.Windows.NativeMethods;
 
-namespace Baketa.Infrastructure.Platform.Windows.Capture
-{
+namespace Baketa.Infrastructure.Platform.Windows.Capture;
+
     /// <summary>
     /// デバイスコンテキストハンドルの安全な管理を行うクラス
     /// </summary>
@@ -61,4 +61,3 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture
             return true;
         }
     }
-}

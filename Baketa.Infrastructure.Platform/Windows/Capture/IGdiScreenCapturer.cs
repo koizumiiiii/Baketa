@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Windows.Capture
-{
+namespace Baketa.Infrastructure.Platform.Windows.Capture;
+
     /// <summary>
     /// GDIベースの画面キャプチャ機能を提供するインターフェース
     /// </summary>
@@ -30,4 +30,3 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture
         /// <returns>キャプチャした画像</returns>
         Task<IWindowsImage> CaptureRegionAsync(Rectangle region);
     }
-}

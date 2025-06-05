@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Abstractions.Imaging.Pipeline
-{
+namespace Baketa.Core.Abstractions.Imaging.Pipeline;
+
     /// <summary>
     /// OCR最適化パイプラインを構築するビルダーインターフェース
     /// </summary>
@@ -47,4 +47,3 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline
         /// <returns>非同期タスク</returns>
         Task SavePipelineToProfileAsync(string profileName);
     }
-}

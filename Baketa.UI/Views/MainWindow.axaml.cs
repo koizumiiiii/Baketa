@@ -11,16 +11,15 @@ using Baketa.UI.ViewModels;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// 名前空間エイリアス
 using CoreEvents = Baketa.Core.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
 
-namespace Baketa.UI.Views
-{
+namespace Baketa.UI.Views;
+
     /// <summary>
     /// メインウィンドウのコードビハインド
     /// </summary>
-    internal partial class MainWindow : ReactiveWindow<MainWindowViewModel>
+    internal sealed partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     {
         // ロガー
         private readonly ILogger<MainWindow>? _logger;
@@ -182,7 +181,7 @@ namespace Baketa.UI.Views
     /// アクセシビリティ設定変更イベントプロセッサー
     /// </summary>
     /// <param name="mainWindow">メインウィンドウ</param>
-    internal class AccessibilitySettingsProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
+    internal sealed class AccessibilitySettingsProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
     {
         private readonly MainWindow _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         
@@ -196,7 +195,7 @@ namespace Baketa.UI.Views
     /// 通知イベントプロセッサー
     /// </summary>
     /// <param name="mainWindow">メインウィンドウ</param>
-    internal class NotificationProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<EventTypes.NotificationEvent>
+    internal sealed class NotificationProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<EventTypes.NotificationEvent>
     {
         private readonly MainWindow _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         
@@ -205,4 +204,3 @@ namespace Baketa.UI.Views
             return _mainWindow.OnNotificationReceived(eventData);
         }
     }
-}

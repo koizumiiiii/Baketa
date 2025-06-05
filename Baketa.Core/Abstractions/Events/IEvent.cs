@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.Abstractions.Events
-{
+namespace Baketa.Core.Abstractions.Events;
+
     /// <summary>
     /// 基本イベントインターフェース
     /// </summary>
@@ -27,4 +27,3 @@ namespace Baketa.Core.Abstractions.Events
         /// </summary>
         string Category { get; }
     }
-}

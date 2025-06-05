@@ -1,8 +1,7 @@
-﻿using ReactiveUI;
+using ReactiveUI;
 
-namespace Baketa.UI.ViewModels
-{
-    internal abstract class ViewModelBase : ReactiveObject
+namespace Baketa.UI.ViewModels;
+
+    public abstract class ViewModelBase : ReactiveObject
     {
     }
-}

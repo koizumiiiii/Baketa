@@ -6,8 +6,8 @@ using Baketa.Core.DI.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Baketa.Core.Tests.DI
-{
+namespace Baketa.Core.Tests.DI;
+
     /// <summary>
     /// ServiceModuleBase クラスの単体テスト
     /// </summary>
@@ -78,7 +78,7 @@ namespace Baketa.Core.Tests.DI
         /// <summary>
         /// 依存関係のないテスト用モジュール
         /// </summary>
-        private class TestModuleWithoutDependencies : ServiceModuleBase
+        private sealed class TestModuleWithoutDependencies : ServiceModuleBase
         {
             public bool RegisterServicesCalled { get; private set; }
 
@@ -91,7 +91,7 @@ namespace Baketa.Core.Tests.DI
         /// <summary>
         /// 依存関係のあるテスト用モジュール
         /// </summary>
-        private class TestModuleWithDependencies : ServiceModuleBase
+        private sealed class TestModuleWithDependencies : ServiceModuleBase
         {
             public bool RegisterServicesCalled { get; private set; }
 
@@ -109,7 +109,7 @@ namespace Baketa.Core.Tests.DI
         /// <summary>
         /// 循環依存関係のあるテスト用モジュールA
         /// </summary>
-        private class TestModuleWithCircularDependencyA : ServiceModuleBase
+        private sealed class TestModuleWithCircularDependencyA : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {
@@ -124,7 +124,7 @@ namespace Baketa.Core.Tests.DI
         /// <summary>
         /// 循環依存関係のあるテスト用モジュールB
         /// </summary>
-        private class TestModuleWithCircularDependencyB : ServiceModuleBase
+        private sealed class TestModuleWithCircularDependencyB : ServiceModuleBase
         {
             public override void RegisterServices(IServiceCollection services)
             {
@@ -138,4 +138,3 @@ namespace Baketa.Core.Tests.DI
 
         #endregion
     }
-}

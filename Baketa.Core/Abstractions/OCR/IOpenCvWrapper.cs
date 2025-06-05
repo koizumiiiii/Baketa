@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.OCR
-{
+namespace Baketa.Core.Abstractions.OCR;
+
     /// <summary>
     /// OpenCV機能へのアクセスを提供するインターフェース
     /// </summary>
@@ -138,4 +138,3 @@ namespace Baketa.Core.Abstractions.OCR
         /// <returns>平均ストローク幅</returns>
         float CalculateMeanStrokeWidth(IAdvancedImage swtImage, Point[] region);
     }
-}

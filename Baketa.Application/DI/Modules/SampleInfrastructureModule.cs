@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Application.DI.Modules
-{
+namespace Baketa.Application.DI.Modules;
+
     /// <summary>
     /// サンプルのインフラストラクチャモジュール実装。
     /// </summary>
@@ -37,4 +37,3 @@ namespace Baketa.Application.DI.Modules
             yield return typeof(SampleCoreModule);
         }
     }
-}

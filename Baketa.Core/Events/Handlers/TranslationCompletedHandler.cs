@@ -3,8 +3,8 @@ using System;
 using System.Drawing;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Events.Handlers
-{
+namespace Baketa.Core.Events.Handlers;
+
     /// <summary>
     /// 翻訳完了イベントハンドラー
     /// </summary>
@@ -49,4 +49,3 @@ namespace Baketa.Core.Events.Handlers
             await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);
         }
     }
-}

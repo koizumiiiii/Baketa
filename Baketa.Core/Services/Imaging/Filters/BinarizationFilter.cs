@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 
-namespace Baketa.Core.Services.Imaging.Filters
-{
+namespace Baketa.Core.Services.Imaging.Filters;
+
     /// <summary>
     /// 二値化フィルター
     /// </summary>
@@ -94,7 +94,7 @@ namespace Baketa.Core.Services.Imaging.Filters
             ArgumentNullException.ThrowIfNull(imageData, nameof(imageData));
             
             // IReadOnlyList<byte>をbyte[]に変換して処理
-            byte[] sourceData = imageData.ToArray();
+            byte[] sourceData = [.. imageData];
                 
             // 結果配列の作成
             byte[] resultData = new byte[sourceData.Length];
@@ -112,4 +112,3 @@ namespace Baketa.Core.Services.Imaging.Filters
             return resultData;
         }
     }
-}

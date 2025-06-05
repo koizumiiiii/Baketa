@@ -9,15 +9,14 @@ using Microsoft.Extensions.Logging;
 
 #pragma warning disable CA2208 // ArgumentExceptionを正しくインスタンス化する
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
     /// <summary>
     /// パイプラインステップの基底クラス
     /// </summary>
     public abstract class ImagePipelineStepBase : IImagePipelineStep
     {
-        private readonly Dictionary<string, object> _parameters = new();
-        private readonly List<PipelineStepParameter> _parameterDefinitions = new();
+        private readonly Dictionary<string, object> _parameters = [];
+        private readonly List<PipelineStepParameter> _parameterDefinitions = [];
         
         /// <summary>
         /// ステップの名前
@@ -278,7 +277,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             
             if (options != null)
             {
-                objectOptions = options.Cast<object>().ToList();
+                objectOptions = [.. options.Cast<object>()];
             }
             
             RegisterParameter(
@@ -310,6 +309,5 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             };
         }
     }
-}
 
 #pragma warning restore CA2208

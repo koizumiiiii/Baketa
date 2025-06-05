@@ -1,7 +1,7 @@
 using System;
 
-namespace Baketa.Core.DI
-{
+namespace Baketa.Core.DI;
+
     /// <summary>
     /// Baketaアプリケーションの実行環境を表す列挙型。
     /// </summary>
@@ -22,4 +22,3 @@ namespace Baketa.Core.DI
         /// </summary>
         Production
     }
-}

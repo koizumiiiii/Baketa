@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Baketa.Core.Abstractions.DI
-{
+namespace Baketa.Core.Abstractions.DI;
+
     /// <summary>
     /// サービス登録モジュールのインターフェース。
     /// モジュール化された依存性注入パターンを実現するための基盤となります。
@@ -24,4 +24,3 @@ namespace Baketa.Core.Abstractions.DI
         /// <returns>依存モジュールの型のコレクション</returns>
         IEnumerable<Type> GetDependentModules() => [];
     }
-}

@@ -1,8 +1,8 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Infrastructure.Translation
-{
+namespace Baketa.Infrastructure.Translation;
+
     /// <summary>
     /// カスタム名を持つモック翻訳エンジン
     /// </summary>
@@ -32,4 +32,3 @@ namespace Baketa.Infrastructure.Translation
             _customName = customName ?? throw new ArgumentNullException(nameof(customName));
         }
     }
-}

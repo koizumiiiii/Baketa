@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
-namespace Baketa.Core.Abstractions.Services
-{
+namespace Baketa.Core.Abstractions.Services;
+
     /// <summary>
     /// OCR (光学式文字認識) サービスインターフェース
     /// </summary>
@@ -177,4 +177,3 @@ namespace Baketa.Core.Abstractions.Services
         /// </summary>
         Custom = 3
     }
-}

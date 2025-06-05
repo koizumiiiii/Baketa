@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using Baketa.Core.Abstractions.Platform.Windows;
 
-namespace Baketa.Infrastructure.Platform.Windows
-{
+namespace Baketa.Infrastructure.Platform.Windows;
+
     /// <summary>
     /// IWindowManagerインターフェースのWindows特化実装のスタブ
     /// 注：実際の機能実装は後の段階で行います
@@ -140,7 +140,6 @@ namespace Baketa.Infrastructure.Platform.Windows
         public Dictionary<IntPtr, string> GetRunningApplicationWindows()
         {
             // スタブ実装では空のディクショナリを返す
-            return new Dictionary<IntPtr, string>();
+            return [];
         }
     }
-}

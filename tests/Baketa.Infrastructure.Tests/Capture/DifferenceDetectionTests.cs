@@ -12,8 +12,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Baketa.Infrastructure.Tests.Capture
-{
+namespace Baketa.Infrastructure.Tests.Capture;
+
     public class DifferenceDetectionTests
     {
         private readonly Mock<IImage> _mockImage1;
@@ -43,11 +43,11 @@ namespace Baketa.Infrastructure.Tests.Capture
             var mockSamplingAlgo = new Mock<IDetectionAlgorithm>();
             mockSamplingAlgo.Setup(a => a.AlgorithmType).Returns(DifferenceDetectionAlgorithm.SamplingBased);
             
-            _mockAlgorithms = new List<IDetectionAlgorithm>
-            {
+            _mockAlgorithms =
+            [
                 mockHistogramAlgo.Object,
                 mockSamplingAlgo.Object
-            };
+            ];
         }
         
         [Fact]
@@ -94,7 +94,7 @@ namespace Baketa.Infrastructure.Tests.Capture
                 .ReturnsAsync(mockResult);
                 
             var detector = new EnhancedDifferenceDetector(
-                new List<IDetectionAlgorithm> { mockAlgo.Object }, 
+                [mockAlgo.Object], 
                 _mockEventAggregator.Object, 
                 _mockLogger.Object);
                 
@@ -207,7 +207,7 @@ namespace Baketa.Infrastructure.Tests.Capture
                 .ReturnsAsync(mockResult);
             
             var detector = new EnhancedDifferenceDetector(
-                new List<IDetectionAlgorithm> { mockAlgo.Object },
+                [mockAlgo.Object],
                 _mockEventAggregator.Object,
                 _mockLogger.Object);
             
@@ -244,4 +244,3 @@ namespace Baketa.Infrastructure.Tests.Capture
             Assert.NotNull(task);
         }
     }
-}

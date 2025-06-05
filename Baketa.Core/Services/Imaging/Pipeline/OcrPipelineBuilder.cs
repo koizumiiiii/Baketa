@@ -9,8 +9,8 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging.Filters.OCR;
 using Microsoft.Extensions.Logging;
 
-namespace Baketa.Core.Services.Imaging.Pipeline
-{
+namespace Baketa.Core.Services.Imaging.Pipeline;
+
     /// <summary>
     /// OCR最適化パイプラインを構築するビルダークラス
     /// </summary>
@@ -105,7 +105,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
             _pipeline.ClearSteps();
             
             // カスタムフィルターを追加
-            var filters = new List<IImageFilter>();
+            var filters = new List<IImageFilter>([]);
             foreach (var filterType in filterTypes)
             {
                 try
@@ -123,7 +123,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline
                 }
             }
             
-            AddFiltersToPipeline(filters.ToArray());
+            AddFiltersToPipeline([.. filters]);
             
             // グローバル設定を構成
             _pipeline.IntermediateResultMode = IntermediateResultMode.None;
@@ -246,4 +246,3 @@ namespace Baketa.Core.Services.Imaging.Pipeline
 #pragma warning restore CA1062
     }
 #pragma warning restore CA1062
-}

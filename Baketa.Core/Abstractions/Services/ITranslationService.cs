@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Baketa.Core.Abstractions.Services
-{
+namespace Baketa.Core.Abstractions.Services;
+
     /// <summary>
     /// 翻訳サービスインターフェース
     /// </summary>
@@ -203,4 +203,3 @@ namespace Baketa.Core.Abstractions.Services
         /// </summary>
         public int CacheExpirationHours { get; set; } = 24;
     }
-}
