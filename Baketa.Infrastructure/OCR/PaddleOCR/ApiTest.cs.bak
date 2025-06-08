@@ -1,0 +1,59 @@
+// PaddleOCR API確認用のテストコード - 修正版
+// 実際のAPI構造を段階的に確認
+
+using Sdcb.PaddleOCR;
+using Sdcb.PaddleOCR.Models.Local;
+using System.Reflection;
+
+namespace Baketa.Infrastructure.OCR.PaddleOCR.ApiTest;
+
+public static class PaddleOcrApiTest
+{
+    public static void TestApi()
+    {
+        try
+        {
+            Console.WriteLine("=== PaddleOCR API Structure Test ===");
+            
+            // 利用可能な型を調査
+            var assembly = typeof(PaddleOcrAll).Assembly;
+            var types = assembly.GetTypes()
+                .Where(t => t.Name.Contains("Paddle") || t.Name.Contains("Device"))
+                .Take(10);
+                
+            Console.WriteLine("Available types:");
+            foreach (var type in types)
+            {
+                Console.WriteLine($"  {type.FullName}");
+            }
+            
+            // PaddleOcrAllのコンストラクタを調査
+            var constructors = typeof(PaddleOcrAll).GetConstructors();
+            Console.WriteLine("\nPaddleOcrAll constructors:");
+            foreach (var ctor in constructors)
+            {
+                var parameters = string.Join(", ", ctor.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"));
+                Console.WriteLine($"  PaddleOcrAll({parameters})");
+            }
+            
+            // Runメソッドの戻り値型を調査
+            var runMethods = typeof(PaddleOcrAll).GetMethods()
+                .Where(m => m.Name == "Run")
+                .ToArray();
+                
+            Console.WriteLine("\nRun methods:");
+            foreach (var method in runMethods)
+            {
+                var parameters = string.Join(", ", method.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"));
+                Console.WriteLine($"  {method.ReturnType.Name} Run({parameters})");
+            }
+            
+            Console.WriteLine("\n=== API Test Completed ===");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"API Test Error: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+        }
+    }
+}
