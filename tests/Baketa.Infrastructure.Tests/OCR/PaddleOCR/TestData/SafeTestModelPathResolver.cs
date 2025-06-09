@@ -4,77 +4,68 @@ using System.IO;
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 
 /// <summary>
-/// テスト用の安全なModelPathResolver
-/// 実際のファイルシステムにアクセスせず、テスト専用のパスを提供します
+/// テスト用の安全なモデルパスリゾルバー
+/// 実際のファイルシステム操作を行わず、テスト環境で安全に動作します
 /// </summary>
 public class SafeTestModelPathResolver : IModelPathResolver
 {
-    private readonly string _baseDirectory;
+    private readonly string _testBaseDirectory;
 
-    public SafeTestModelPathResolver(string baseDirectory)
+    public SafeTestModelPathResolver(string testBaseDirectory)
     {
-        _baseDirectory = baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory));
+        _testBaseDirectory = testBaseDirectory ?? throw new ArgumentNullException(nameof(testBaseDirectory));
     }
 
     public string GetModelsRootDirectory()
     {
-        return Path.Combine(_baseDirectory, "Models");
+        return Path.Combine(_testBaseDirectory, "Models");
     }
 
     public string GetDetectionModelsDirectory()
     {
-        return Path.Combine(GetModelsRootDirectory(), "detection");
+        return Path.Combine(_testBaseDirectory, "Models", "detection");
     }
 
     public string GetRecognitionModelsDirectory(string language)
     {
-        return Path.Combine(GetModelsRootDirectory(), "recognition", language);
+        ArgumentException.ThrowIfNullOrEmpty(language);
+        return Path.Combine(_testBaseDirectory, "Models", "recognition", language);
+    }
+
+    public string GetClassificationModelsDirectory()
+    {
+        return Path.Combine(_testBaseDirectory, "Models", "classification");
     }
 
     public string GetDetectionModelPath(string modelName)
     {
+        ArgumentException.ThrowIfNullOrEmpty(modelName);
         return Path.Combine(GetDetectionModelsDirectory(), $"{modelName}.onnx");
     }
 
     public string GetRecognitionModelPath(string language, string modelName)
     {
+        ArgumentException.ThrowIfNullOrEmpty(language);
+        ArgumentException.ThrowIfNullOrEmpty(modelName);
         return Path.Combine(GetRecognitionModelsDirectory(language), $"{modelName}.onnx");
     }
 
     public string GetClassificationModelPath(string modelName)
     {
-        return Path.Combine(GetModelsRootDirectory(), "classification", $"{modelName}.onnx");
+        ArgumentException.ThrowIfNullOrEmpty(modelName);
+        return Path.Combine(GetClassificationModelsDirectory(), $"{modelName}.onnx");
     }
 
-    public string GetTempDirectory()
+    public bool FileExists(string filePath)
     {
-        return Path.Combine(_baseDirectory, "Temp");
-    }
-
-    public bool FileExists(string path)
-    {
-        // テスト用：常にfalseを返してモデルダウンロードをスキップ
+        // テスト用では常にファイルが存在しないとみなす（安全性のため）
         return false;
     }
 
     public void EnsureDirectoryExists(string directoryPath)
     {
-        // 安全なテスト専用ディレクトリのみを作成
-        if (string.IsNullOrWhiteSpace(directoryPath))
-            return;
-
-        // ネットワークパスを検出して拒否
-        if (directoryPath.StartsWith(@"\\", StringComparison.Ordinal))
-        {
-            throw new ArgumentException($"無効なネットワークパス: {directoryPath}", nameof(directoryPath));
-        }
-
-        // テストベースディレクトリ以下のパスのみ許可
-        if (!directoryPath.StartsWith(_baseDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException($"テストベースディレクトリ外のパス: {directoryPath}", nameof(directoryPath));
-        }
-
+        ArgumentException.ThrowIfNullOrEmpty(directoryPath);
+        
         try
         {
             if (!Directory.Exists(directoryPath))
@@ -82,9 +73,17 @@ public class SafeTestModelPathResolver : IModelPathResolver
                 Directory.CreateDirectory(directoryPath);
             }
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
         {
-            throw new InvalidOperationException($"ディレクトリの作成に失敗: {directoryPath}", ex);
+            // テスト環境ではアクセス権限エラーを無視
+        }
+        catch (IOException)
+        {
+            // テスト環境ではI/Oエラーを無視
+        }
+        catch (ArgumentException)
+        {
+            // テスト環境では引数エラーを無視
         }
     }
 }

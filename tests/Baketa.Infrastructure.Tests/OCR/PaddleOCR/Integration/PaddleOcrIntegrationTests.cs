@@ -7,6 +7,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.DI;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
 using Moq;
 using System.IO;
@@ -55,6 +56,7 @@ public class PaddleOcrIntegrationTests : IDisposable
             modelPathResolver.GetDetectionModelsDirectory(),
             modelPathResolver.GetRecognitionModelsDirectory("eng"),
             modelPathResolver.GetRecognitionModelsDirectory("jpn"),
+            Path.Combine(_testBaseDirectory, "Models", "classification"), // 分類モデルディレクトリを追加
             Path.Combine(_testBaseDirectory, "Temp")
         };
 
@@ -76,7 +78,8 @@ public class PaddleOcrIntegrationTests : IDisposable
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
         // Act & Assert - OCRエンジン初期化のみをテスト（実際のPaddleOcrInitializerは使用しない）
-        var engineInitResult = await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = false, WorkerCount = 2 };
+        var engineInitResult = await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         Assert.True(engineInitResult, "SafeTestPaddleOcrEngine should initialize successfully");
         
         Assert.True(safeOcrEngine.IsInitialized, "OCR engine should be initialized");
@@ -93,15 +96,16 @@ public class PaddleOcrIntegrationTests : IDisposable
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
         // Act & Assert - 初期化（安全なエンジンのみ）
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var engSettings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(engSettings, CancellationToken.None).ConfigureAwait(false);
 
         // 言語切り替えテスト
-        var switchResult = await safeOcrEngine.SwitchLanguageAsync("jpn").ConfigureAwait(false);
+        var switchResult = await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
         Assert.True(switchResult, "Language switch should succeed");
         Assert.Equal("jpn", safeOcrEngine.CurrentLanguage);
 
         // 元の言語に戻す
-        var switchBackResult = await safeOcrEngine.SwitchLanguageAsync("eng").ConfigureAwait(false);
+        var switchBackResult = await safeOcrEngine.SwitchLanguageAsync("eng", CancellationToken.None).ConfigureAwait(false);
         Assert.True(switchBackResult, "Language switch back should succeed");
         Assert.Equal("eng", safeOcrEngine.CurrentLanguage);
     }
@@ -119,17 +123,18 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var mockImage = CreateMockImage();
 
         // Act
-        var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+        var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.NotNull(results);
         // テスト用エンジンでは空の結果が期待される
-        Assert.Empty(results);
+        Assert.Empty(results.TextRegions);
     }
 
     [Fact]
@@ -141,17 +146,19 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var mockImage = CreateMockImage();
         var roi = new Rectangle(10, 10, 100, 50);
 
         // Act
-        var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, roi, CancellationToken.None).ConfigureAwait(false);
+        var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, roi, null, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.NotNull(results);
-        Assert.Empty(results);
+        Assert.Empty(results.TextRegions);
+        Assert.Equal(roi, results.RegionOfInterest);
     }
 
     #endregion
@@ -170,7 +177,8 @@ public class PaddleOcrIntegrationTests : IDisposable
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act - 安全なエンジンのみを初期化
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         stopwatch.Stop();
 
@@ -189,12 +197,13 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act
-        await safeOcrEngine.SwitchLanguageAsync("jpn").ConfigureAwait(false);
+        await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
         
         stopwatch.Stop();
 
@@ -213,14 +222,15 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 4).ConfigureAwait(false); // マルチスレッド有効
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false); // マルチスレッド有効
 
         var mockImage = CreateMockImage();
         const int concurrentCallsCount = 10;
 
         // Act
         var tasks = Enumerable.Range(0, concurrentCallsCount)
-            .Select(async _ => await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false))
+            .Select(async _ => await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false))
             .ToArray();
 
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -267,11 +277,12 @@ public class PaddleOcrIntegrationTests : IDisposable
         // テスト用の安全なエンジンで初期化失敗をシミュレート
         using var failingEngine = new SafeTestPaddleOcrEngine(mockModelPathResolver.Object, logger, true);
 
-        // Act - エラーを発生させるためにnullを使用
+        // Act - エラーを発生させるための無効な設定
         bool result;
         try
         {
-            result = await failingEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+            var invalidSettings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+            result = await failingEngine.InitializeAsync(invalidSettings, CancellationToken.None).ConfigureAwait(false);
         }
         catch (ArgumentException)
         {
@@ -294,7 +305,7 @@ public class PaddleOcrIntegrationTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => uninitializedEngine.RecognizeAsync(mockImage.Object, CancellationToken.None)).ConfigureAwait(false);
+            () => uninitializedEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     #endregion
@@ -310,7 +321,8 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act
         safeOcrEngine.Dispose();
@@ -320,7 +332,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         
         // 再利用しようとすると例外が発生することを確認
         await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => safeOcrEngine.RecognizeAsync(CreateMockImage().Object, CancellationToken.None)).ConfigureAwait(false);
+            () => safeOcrEngine.RecognizeAsync(CreateMockImage().Object, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     #endregion
@@ -339,7 +351,8 @@ public class PaddleOcrIntegrationTests : IDisposable
             modelPathResolver.GetModelsRootDirectory(),
             modelPathResolver.GetDetectionModelsDirectory(),
             modelPathResolver.GetRecognitionModelsDirectory("eng"),
-            modelPathResolver.GetRecognitionModelsDirectory("jpn")
+            modelPathResolver.GetRecognitionModelsDirectory("jpn"),
+            Path.Combine(_testBaseDirectory, "Models", "classification") // 分類モデルディレクトリを追加
         };
 
         // Assert - ディレクトリパスが正しく作成されることを確認（テスト環境では事前作成済み）
@@ -359,15 +372,18 @@ public class PaddleOcrIntegrationTests : IDisposable
         var detectionModelPath = modelPathResolver.GetDetectionModelPath("det_db_standard");
         var englishModelPath = modelPathResolver.GetRecognitionModelPath("eng", "rec_english_standard");
         var japaneseModelPath = modelPathResolver.GetRecognitionModelPath("jpn", "rec_japan_standard");
+        var classificationModelPath = modelPathResolver.GetClassificationModelPath("cls_mobile_standard"); // 分類モデルパスを追加
 
         // Assert
         Assert.Contains("det_db_standard.onnx", detectionModelPath, StringComparison.Ordinal);
         Assert.Contains("rec_english_standard.onnx", englishModelPath, StringComparison.Ordinal);
         Assert.Contains("rec_japan_standard.onnx", japaneseModelPath, StringComparison.Ordinal);
+        Assert.Contains("cls_mobile_standard.onnx", classificationModelPath, StringComparison.Ordinal); // 分類モデルパスの検証
         
         Assert.Contains("detection", detectionModelPath, StringComparison.Ordinal);
         Assert.Contains(Path.Combine("recognition", "eng"), englishModelPath, StringComparison.Ordinal);
         Assert.Contains(Path.Combine("recognition", "jpn"), japaneseModelPath, StringComparison.Ordinal);
+        Assert.Contains("classification", classificationModelPath, StringComparison.Ordinal); // 分類モデルディレクトリの検証
     }
 
     #endregion

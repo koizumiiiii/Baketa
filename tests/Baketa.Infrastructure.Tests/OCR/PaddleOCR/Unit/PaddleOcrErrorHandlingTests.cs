@@ -7,14 +7,15 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.PaddleOCR;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
 using System.IO;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
 /// <summary>
-/// PaddleOCRエラーケースの包括的テスト
-/// Phase 4: テストと検証 - エラー処理テスト
+/// PaddleOCRエラーケースの包括的テスト（安全版）
+/// すべて SafeTestPaddleOcrEngine を使用してネットワークアクセスを回避
 /// </summary>
 public class PaddleOcrErrorHandlingTests : IDisposable
 {
@@ -50,6 +51,16 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory(It.IsAny<string>()))
             .Returns<string>(lang => Path.Combine(_testBaseDirectory, "Models", "recognition", lang));
+
+        // CS1061修正: GetClassificationModelsDirectory()は存在しないため削除
+        // 代わりにGetClassificationModelPathメソッドをモック
+        _mockModelPathResolver.Setup(x => x.GetClassificationModelPath(It.IsAny<string>()))
+            .Returns(Path.Combine(_testBaseDirectory, "Models", "classification", "model.onnx"));
+
+        _mockModelPathResolver.Setup(x => x.FileExists(It.IsAny<string>()))
+            .Returns(false);
+        
+        _mockModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()));
     }
 
     #region 初期化エラーテスト
@@ -61,18 +72,26 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
 
         // Act & Assert - 無効な言語
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            ocrEngine.InitializeAsync("", false, true, 2)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ArgumentException>(() => {
+            var settings = new OcrEngineSettings { Language = "", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+            return ocrEngine.InitializeAsync(settings, CancellationToken.None);
+        }).ConfigureAwait(false);
         
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            ocrEngine.InitializeAsync("invalid", false, true, 2)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ArgumentException>(() => {
+            var settings = new OcrEngineSettings { Language = "invalid", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+            return ocrEngine.InitializeAsync(settings, CancellationToken.None);
+        }).ConfigureAwait(false);
 
         // Act & Assert - 無効なコンシューマ数
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => 
-            ocrEngine.InitializeAsync("eng", false, true, 0)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => {
+            var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 0 };
+            return ocrEngine.InitializeAsync(settings, CancellationToken.None);
+        }).ConfigureAwait(false);
         
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => 
-            ocrEngine.InitializeAsync("eng", false, true, 11)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => {
+            var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 11 };
+            return ocrEngine.InitializeAsync(settings, CancellationToken.None);
+        }).ConfigureAwait(false);
     }
 
     [Fact]
@@ -167,10 +186,10 @@ public class PaddleOcrErrorHandlingTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => 
-            ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None)).ConfigureAwait(false);
+            ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
         
         await Assert.ThrowsAsync<InvalidOperationException>(() => 
-            ocrEngine.RecognizeAsync(mockImage.Object, new Rectangle(0, 0, 100, 100), CancellationToken.None)).ConfigureAwait(false);
+            ocrEngine.RecognizeAsync(mockImage.Object, new Rectangle(0, 0, 100, 100), null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -178,14 +197,15 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            ocrEngine.RecognizeAsync(null!, CancellationToken.None)).ConfigureAwait(false);
+            ocrEngine.RecognizeAsync(null!, null, CancellationToken.None)).ConfigureAwait(false);
         
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            ocrEngine.RecognizeAsync(null!, new Rectangle(0, 0, 100, 100), CancellationToken.None)).ConfigureAwait(false);
+            ocrEngine.RecognizeAsync(null!, new Rectangle(0, 0, 100, 100), null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -193,14 +213,15 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage();
         
         ocrEngine.Dispose();
 
         // Act & Assert
         await Assert.ThrowsAsync<ObjectDisposedException>(() => 
-            ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None)).ConfigureAwait(false);
+            ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -211,7 +232,7 @@ public class PaddleOcrErrorHandlingTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => 
-            ocrEngine.SwitchLanguageAsync("jpn")).ConfigureAwait(false);
+            ocrEngine.SwitchLanguageAsync("jpn", CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -219,14 +240,15 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            ocrEngine.SwitchLanguageAsync("")).ConfigureAwait(false);
+            ocrEngine.SwitchLanguageAsync("", CancellationToken.None)).ConfigureAwait(false);
         
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            ocrEngine.SwitchLanguageAsync("invalid")).ConfigureAwait(false);
+            ocrEngine.SwitchLanguageAsync("invalid", CancellationToken.None)).ConfigureAwait(false);
     }
 
     #endregion
@@ -238,7 +260,8 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         ocrEngine.Dispose();
 
@@ -247,7 +270,8 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         // 動作することを確認するテストに変更
         try 
         {
-            await ocrEngine.InitializeAsync("jpn", false, true, 1).ConfigureAwait(false);
+            var newSettings = new OcrEngineSettings { Language = "jpn", UseGpu = false, EnableMultiThread = true, WorkerCount = 1 };
+            await ocrEngine.InitializeAsync(newSettings, CancellationToken.None).ConfigureAwait(false);
             // Dispose後でも例外が投げられない場合があるため、テストを緩和
         }
         catch (ObjectDisposedException)
@@ -313,15 +337,11 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         using var ocrEngine = new SafeTestPaddleOcrEngine(failingModelPathResolver.Object, _mockEngineLogger.Object, true);
 
         // Act & Assert - 無効な引数で初期化に失敗
-        try
-        {
-            await ocrEngine.InitializeAsync("invalid", false, true, 2).ConfigureAwait(false);
-            Assert.Fail("Should have thrown an exception");
-        }
-        catch (ArgumentException)
-        {
-            // 例外は期待される
-        }
+        var invalidSettings = new OcrEngineSettings { Language = "invalid", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        
+        // 例外が投げられることを確認
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            ocrEngine.InitializeAsync(invalidSettings, CancellationToken.None)).ConfigureAwait(false);
         
         // エンジンは初期化されていない状態であるべき
         Assert.False(ocrEngine.IsInitialized);
@@ -333,7 +353,8 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         // 破損したモックイメージを作成
         var corruptedMockImage = new Mock<IImage>();
@@ -345,7 +366,7 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         // Act & Assert - SafeTestPaddleOcrEngineでは例外処理が実装されている場合のテスト
         try
         {
-            await ocrEngine.RecognizeAsync(corruptedMockImage.Object, CancellationToken.None).ConfigureAwait(false);
+            await ocrEngine.RecognizeAsync(corruptedMockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
             // SafeTestPaddleOcrEngineでは例外が投げられない場合もある
         }
         catch (InvalidOperationException)
@@ -359,7 +380,7 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         
         // 正常な画像での処理は引き続き可能であるべき
         var normalMockImage = CreateMockImage();
-        var results = await ocrEngine.RecognizeAsync(normalMockImage.Object, CancellationToken.None).ConfigureAwait(false);
+        var results = await ocrEngine.RecognizeAsync(normalMockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
         Assert.NotNull(results);
     }
 
@@ -375,7 +396,10 @@ public class PaddleOcrErrorHandlingTests : IDisposable
 
         // Act - 同時に複数の初期化を試行
         var initTasks = Enumerable.Range(0, 5)
-            .Select(async _ => await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false))
+            .Select(async _ => {
+                var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+                return await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
+            })
             .ToArray();
 
         var results = await Task.WhenAll(initTasks).ConfigureAwait(false);
@@ -391,11 +415,12 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act - 同時に複数の言語切り替えを試行
         var switchTasks = ConcurrentLanguages
-            .Select(async lang => await ocrEngine.SwitchLanguageAsync(lang).ConfigureAwait(false))
+            .Select(async lang => await ocrEngine.SwitchLanguageAsync(lang, CancellationToken.None).ConfigureAwait(false))
             .ToArray();
 
         var results = await Task.WhenAll(switchTasks).ConfigureAwait(false);
@@ -415,22 +440,23 @@ public class PaddleOcrErrorHandlingTests : IDisposable
     {
         // Arrange - テスト用の安全なエンジンを使用
         using var ocrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, _mockEngineLogger.Object, true);
-        await ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage(640, 480);
 
         // Act & Assert - 画像外のROI
         var outsideROI = new Rectangle(700, 500, 100, 100);
-        var results1 = await ocrEngine.RecognizeAsync(mockImage.Object, outsideROI, CancellationToken.None).ConfigureAwait(false);
+        var results1 = await ocrEngine.RecognizeAsync(mockImage.Object, outsideROI, null, CancellationToken.None).ConfigureAwait(false);
         Assert.NotNull(results1);
 
         // Act & Assert - 負のROI
         var negativeROI = new Rectangle(-10, -10, 50, 50);
-        var results2 = await ocrEngine.RecognizeAsync(mockImage.Object, negativeROI, CancellationToken.None).ConfigureAwait(false);
+        var results2 = await ocrEngine.RecognizeAsync(mockImage.Object, negativeROI, null, CancellationToken.None).ConfigureAwait(false);
         Assert.NotNull(results2);
 
         // Act & Assert - ゼロサイズのROI
         var zeroROI = new Rectangle(100, 100, 0, 0);
-        var results3 = await ocrEngine.RecognizeAsync(mockImage.Object, zeroROI, CancellationToken.None).ConfigureAwait(false);
+        var results3 = await ocrEngine.RecognizeAsync(mockImage.Object, zeroROI, null, CancellationToken.None).ConfigureAwait(false);
         Assert.NotNull(results3);
     }
 
@@ -448,7 +474,7 @@ public class PaddleOcrErrorHandlingTests : IDisposable
         var mockImage = CreateMockImage();
         try
         {
-            await ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+            await ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
         }
         catch (InvalidOperationException)
         {
