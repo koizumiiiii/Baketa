@@ -5,6 +5,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 using Baketa.Infrastructure.OCR.PaddleOCR.Results;
 using Baketa.Infrastructure.DI;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
 using System.Diagnostics.CodeAnalysis;
 
@@ -58,11 +59,16 @@ public static class PaddleOcrUsageExample
             var ocrEngine = serviceProvider.GetRequiredService<PaddleOcrEngine>();
             
             // 英語モデルで初期化
+            var settings = new OcrEngineSettings
+            {
+                Language = "eng",
+                UseGpu = false,
+                EnableMultiThread = true,
+                WorkerCount = 2
+            };
+            
             var engineInitSuccess = await ocrEngine.InitializeAsync(
-                language: "eng",
-                useGpu: false,
-                enableMultiThread: true,
-                consumerCount: 2
+                settings
             ).ConfigureAwait(false);
             
             if (!engineInitSuccess)
@@ -122,11 +128,13 @@ public static class PaddleOcrUsageExample
             var ocrEngine = serviceProvider.GetRequiredService<PaddleOcrEngine>();
             
             // 英語で初期化
-            await ocrEngine.InitializeAsync("eng").ConfigureAwait(false);
+            var engSettings = new OcrEngineSettings { Language = "eng" };
+            await ocrEngine.InitializeAsync(engSettings).ConfigureAwait(false);
             Console.WriteLine($"現在の言語: {ocrEngine.CurrentLanguage}");
             
             // 日本語に切り替え
-            await ocrEngine.SwitchLanguageAsync("jpn").ConfigureAwait(false);
+            var jpnSettings = new OcrEngineSettings { Language = "jpn" };
+            await ocrEngine.ApplySettingsAsync(jpnSettings).ConfigureAwait(false);
             Console.WriteLine($"切り替え後の言語: {ocrEngine.CurrentLanguage}");
             
             return true;
@@ -169,7 +177,8 @@ public static class PaddleOcrUsageExample
             await initializer.InitializeAsync().ConfigureAwait(false);
             
             var ocrEngine = serviceProvider.GetRequiredService<PaddleOcrEngine>();
-            await ocrEngine.InitializeAsync("eng").ConfigureAwait(false);
+            var roiSettings = new OcrEngineSettings { Language = "eng" };
+            await ocrEngine.InitializeAsync(roiSettings).ConfigureAwait(false);
             
             // ROI指定でのOCR実行例
             // var image = LoadSampleImage(); // 実装は省略
@@ -219,15 +228,16 @@ public static class PaddleOcrUsageExample
             Console.WriteLine("---");
         }
         
-        var collection = new OcrResultCollection(
-            results, 
-            processingTime: TimeSpan.FromMilliseconds(0), // 実際の処理時間は測定が必要
-            language: "eng", 
-            imageSize: new Size(800, 600)
-        );
+        // var collection = new Baketa.Core.Abstractions.OCR.OcrResultCollection(
+        //     results.Select(r => r.ToTextRegion()).ToList(),
+        //     サンプル画像パラメータ（実際の実装では適切な値を設定）
+        //     testImage, // IImageの実装が必要
+        //     TimeSpan.FromMilliseconds(0), // 実際の処理時間は測定が必要
+        //     "eng"
+        // );
         
-        Console.WriteLine($"統計情報: {collection}");
-        Console.WriteLine($"結合テキスト: '{collection.CombinedText}'");
+        // Console.WriteLine($"統計情報: {collection}");
+        // Console.WriteLine($"結合テキスト: '{collection.Text}'");
     }
     
     /// <summary>

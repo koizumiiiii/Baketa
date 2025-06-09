@@ -5,13 +5,14 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
 /// <summary>
-/// PaddleOcrEngineの単体テスト
-/// Phase 4: テストと検証 - 単体テスト実装
+/// PaddleOcrEngineの単体テスト（安全版）
+/// すべて SafeTestPaddleOcrEngine を使用してネットワークアクセスを回避
 /// </summary>
 public class PaddleOcrEngineTests : IDisposable
 {
@@ -28,7 +29,7 @@ public class PaddleOcrEngineTests : IDisposable
         // モックセットアップ
         SetupModelPathResolverMock();
         
-        // テスト用の安全なエンジンを使用
+        // 安全なテスト用エンジンのみを使用
         _ocrEngine = new SafeTestPaddleOcrEngine(
             _mockModelPathResolver.Object, 
             _mockLogger.Object, 
@@ -48,6 +49,11 @@ public class PaddleOcrEngineTests : IDisposable
         
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory("jpn"))
             .Returns(@"E:\dev\Baketa\tests\TestModels\recognition\jpn");
+
+        // CS1061修正: GetClassificationModelsDirectory()は存在しないため削除
+        // 代わりにGetClassificationModelPathメソッドをモック
+        _mockModelPathResolver.Setup(x => x.GetClassificationModelPath(It.IsAny<string>()))
+            .Returns(@"E:\dev\Baketa\tests\TestModels\classification\model.onnx");
             
         // ファイル存在チェックのモック設定（テスト用）
         _mockModelPathResolver.Setup(x => x.FileExists(It.IsAny<string>()))
@@ -66,8 +72,8 @@ public class PaddleOcrEngineTests : IDisposable
         const int consumerCount = 2;
 
         // Act
-        var result = await _ocrEngine.InitializeAsync(
-            language, useGpu, enableMultiThread, consumerCount).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = language, UseGpu = useGpu, EnableMultiThread = enableMultiThread, WorkerCount = consumerCount };
+        var result = await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.True(result);
@@ -83,7 +89,10 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _ocrEngine.InitializeAsync(language!, false, true, 1)).ConfigureAwait(false);
+            () => {
+                var settings = new OcrEngineSettings { Language = language!, UseGpu = false, EnableMultiThread = true, WorkerCount = 1 };
+                return _ocrEngine.InitializeAsync(settings, CancellationToken.None);
+            }).ConfigureAwait(false);
     }
 
     [Theory]
@@ -94,18 +103,23 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => _ocrEngine.InitializeAsync("eng", false, true, consumerCount)).ConfigureAwait(false);
+            () => {
+                var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = consumerCount };
+                return _ocrEngine.InitializeAsync(settings, CancellationToken.None);
+            }).ConfigureAwait(false);
     }
 
     [Fact]
     public async Task InitializeAsync_AlreadyInitialized_ReturnsTrue()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         Assert.True(_ocrEngine.IsInitialized);
 
         // Act
-        var result = await _ocrEngine.InitializeAsync("jpn", false, true, 1).ConfigureAwait(false);
+        var newSettings = new OcrEngineSettings { Language = "jpn", UseGpu = false, EnableMultiThread = true, WorkerCount = 1 };
+        var result = await _ocrEngine.InitializeAsync(newSettings, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.True(result);
@@ -122,10 +136,11 @@ public class PaddleOcrEngineTests : IDisposable
     public async Task SwitchLanguageAsync_ToValidLanguage_ReturnsTrue()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         // Act
-        var result = await _ocrEngine.SwitchLanguageAsync("jpn").ConfigureAwait(false);
+        var result = await _ocrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.True(result);
@@ -139,11 +154,12 @@ public class PaddleOcrEngineTests : IDisposable
     public async Task SwitchLanguageAsync_InvalidLanguage_ThrowsArgumentException(string? language)
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _ocrEngine.SwitchLanguageAsync(language!)).ConfigureAwait(false);
+            () => _ocrEngine.SwitchLanguageAsync(language!, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -151,17 +167,18 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ocrEngine.SwitchLanguageAsync("jpn")).ConfigureAwait(false);
+            () => _ocrEngine.SwitchLanguageAsync("jpn", CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
     public async Task SwitchLanguageAsync_SameLanguage_ReturnsTrue()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         // Act
-        var result = await _ocrEngine.SwitchLanguageAsync("eng").ConfigureAwait(false);
+        var result = await _ocrEngine.SwitchLanguageAsync("eng", CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.True(result);
@@ -176,11 +193,12 @@ public class PaddleOcrEngineTests : IDisposable
     public async Task RecognizeAsync_NullImage_ThrowsArgumentNullException()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => _ocrEngine.RecognizeAsync(null!, CancellationToken.None)).ConfigureAwait(false);
+            () => _ocrEngine.RecognizeAsync(null!, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -191,54 +209,57 @@ public class PaddleOcrEngineTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None)).ConfigureAwait(false);
+            () => _ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     [Fact]
     public async Task RecognizeAsync_ValidImage_ReturnsResults()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage();
 
         // Act
-        var results = await _ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+        var results = await _ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.NotNull(results);
         // テスト用エンジンではダミー結果として空配列が返される
-        Assert.Empty(results);
+        Assert.Empty(results.TextRegions);
     }
 
     [Fact]
     public async Task RecognizeAsync_WithROI_ReturnsResults()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage();
         var roi = new Rectangle(10, 10, 100, 50);
 
         // Act
-        var results = await _ocrEngine.RecognizeAsync(mockImage.Object, roi, CancellationToken.None).ConfigureAwait(false);
+        var results = await _ocrEngine.RecognizeAsync(mockImage.Object, roi, null, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.NotNull(results);
         // テスト用エンジンではダミー結果として空配列が返される
-        Assert.Empty(results);
+        Assert.Empty(results.TextRegions);
     }
 
     [Fact]
     public async Task RecognizeAsync_Disposed_ThrowsObjectDisposedException()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage();
         
         _ocrEngine.Dispose();
 
         // Act & Assert
         await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => _ocrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None)).ConfigureAwait(false);
+            () => _ocrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
     }
 
     #endregion
@@ -259,7 +280,8 @@ public class PaddleOcrEngineTests : IDisposable
         const string expectedLanguage = "eng";
         
         // Act
-        await _ocrEngine.InitializeAsync(expectedLanguage, false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = expectedLanguage, UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.Equal(expectedLanguage, _ocrEngine.CurrentLanguage);
@@ -276,7 +298,8 @@ public class PaddleOcrEngineTests : IDisposable
     public async Task IsInitialized_Initialized_ReturnsTrue()
     {
         // Act
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Assert
         Assert.True(_ocrEngine.IsInitialized);
@@ -301,7 +324,8 @@ public class PaddleOcrEngineTests : IDisposable
     public async Task Dispose_InitializedEngine_DisposesCorrectly()
     {
         // Arrange
-        await _ocrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
+        await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         Assert.True(_ocrEngine.IsInitialized);
 
         // Act
