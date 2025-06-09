@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
@@ -9,18 +10,23 @@ namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 /// <summary>
 /// テスト用の安全なPaddleOcrEngineラッパー
 /// 実際のPaddleOCRライブラリを使用せずに、引数検証と基本的な動作をテストします
+/// IOcrEngineインターフェースに完全準拠
 /// </summary>
-public class SafeTestPaddleOcrEngine : IDisposable
+public class SafeTestPaddleOcrEngine : IOcrEngine
 {
     private readonly IModelPathResolver _modelPathResolver;
     private readonly ILogger<PaddleOcrEngine>? _logger;
     private readonly bool _skipRealInitialization;
     private bool _disposed;
     
-    // テスト用の状態管理
-    public bool IsInitialized { get; private set; }
-    public string? CurrentLanguage { get; private set; }
-    public bool IsMultiThreadEnabled { get; private set; }
+    // 設定管理
+    private OcrEngineSettings _settings = new();
+    
+    // パフォーマンス統計
+    private int _totalProcessedImages;
+    private readonly List<double> _processingTimes = [];
+    private int _errorCount;
+    private DateTime _startTime = DateTime.UtcNow;
 
     public SafeTestPaddleOcrEngine(
         IModelPathResolver modelPathResolver,
@@ -32,19 +38,49 @@ public class SafeTestPaddleOcrEngine : IDisposable
         _skipRealInitialization = skipRealInitialization;
     }
 
+    #region IOcrEngine実装
+
     /// <summary>
-    /// OCRエンジンを初期化（テスト用）
+    /// OCRエンジンの名前
     /// </summary>
-    public async Task<bool> InitializeAsync(
-        string language = "eng",
-        bool useGpu = false,
-        bool enableMultiThread = false,
-        int consumerCount = 2)
+    public string EngineName => "PaddleOCR (Test)";
+
+    /// <summary>
+    /// OCRエンジンのバージョン
+    /// </summary>
+    public string EngineVersion => "2.7.0.3";
+
+    /// <summary>
+    /// エンジンが初期化済みかどうか
+    /// </summary>
+    public bool IsInitialized { get; private set; }
+
+    /// <summary>
+    /// 現在の言語設定
+    /// </summary>
+    public string? CurrentLanguage { get; private set; }
+
+    /// <summary>
+    /// OCRエンジンを初期化します
+    /// </summary>
+    public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        
         if (_skipRealInitialization)
         {
-            // テスト用のモック初期化
-            return await SimulateInitializationAsync(language, useGpu, enableMultiThread, consumerCount).ConfigureAwait(false);
+            settings ??= new OcrEngineSettings();
+            
+            // 厳密なパラメータ検証を実装（例外を投げる）
+            ValidateInitializationSettings(settings);
+            
+            if (!settings.IsValid())
+            {
+                _logger?.LogError("無効な設定でOCRエンジンの初期化が失敗しました");
+                return false;
+            }
+            
+            return await SimulateInitializationAsync(settings, cancellationToken).ConfigureAwait(false);
         }
 
         // 実際のPaddleOcrEngineは使用しない（テスト環境では危険）
@@ -52,70 +88,295 @@ public class SafeTestPaddleOcrEngine : IDisposable
     }
 
     /// <summary>
-    /// 言語の切り替え（テスト用）
+    /// 画像からテキストを認識します
     /// </summary>
-    public async Task<bool> SwitchLanguageAsync(
-        string language,
-        bool useGpu = false,
-        bool enableMultiThread = false,
-        int consumerCount = 2)
+    public async Task<OcrResultCollection> RecognizeAsync(
+        IImage image,
+        IProgress<OcrProgress>? progressCallback = null,
+        CancellationToken cancellationToken = default)
     {
-        if (_skipRealInitialization)
-        {
-            return await SimulateSwitchLanguageAsync(language, useGpu, enableMultiThread, consumerCount).ConfigureAwait(false);
-        }
-
-        throw new NotSupportedException("実際のPaddleOCRエンジンの言語切り替えはテスト環境では無効化されています");
+        return await RecognizeAsync(image, null, progressCallback, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// OCR実行（テスト用）
+    /// 画像の指定領域からテキストを認識します
     /// </summary>
-    public async Task<object[]> RecognizeAsync(
-    IImage image, 
-    CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        return await RecognizeAsync(image, null, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// ROI指定でOCR実行（テスト用）
-    /// </summary>
-    public async Task<object[]> RecognizeAsync(
-    IImage image,
-    Rectangle? regionOfInterest = null,
-    CancellationToken cancellationToken = default)
+    public async Task<OcrResultCollection> RecognizeAsync(
+        IImage image,
+        Rectangle? regionOfInterest,
+        IProgress<OcrProgress>? progressCallback = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
         ThrowIfNotInitialized();
 
-        // テスト用のダミー結果を返す
-        await Task.Delay(1, cancellationToken).ConfigureAwait(false); // テスト用の最短遅延
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-        _logger?.LogDebug("テスト用OCR実行 - ダミー結果を返却");
-        return [];
+        try
+        {
+            // 進捗通知
+            progressCallback?.Report(new OcrProgress(0.0, "OCR処理を開始（テスト用）"));
+            
+            // テスト用の最短遅延
+            await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+            
+            progressCallback?.Report(new OcrProgress(0.5, "テキスト検出中（テスト用）"));
+            await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+            
+            progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了（テスト用）"));
+            
+            stopwatch.Stop();
+            
+            // 統計を更新
+            _totalProcessedImages++;
+            _processingTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
+            
+            _logger?.LogDebug("テスト用OCR実行完了 - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            // 空の結果を返す（テスト用）
+            return new OcrResultCollection(
+                [],
+                image,
+                stopwatch.Elapsed,
+                CurrentLanguage ?? _settings.Language,
+                regionOfInterest
+            );
+        }
+        catch (OperationCanceledException)
+        {
+            stopwatch.Stop();
+            _logger?.LogInformation("OCR処理がキャンセルされました（テスト用）");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _errorCount++;
+            _logger?.LogError(ex, "OCR処理中にエラーが発生（テスト用）");
+            throw new OcrException("OCR処理に失敗しました（テスト用）", ex);
+        }
     }
+
+    /// <summary>
+    /// OCRエンジンの設定を取得します
+    /// </summary>
+    public OcrEngineSettings GetSettings()
+    {
+        return _settings.Clone();
+    }
+
+    /// <summary>
+    /// OCRエンジンの設定を適用します
+    /// </summary>
+    public async Task ApplySettingsAsync(OcrEngineSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ThrowIfDisposed();
+        
+        if (!settings.IsValid())
+        {
+            throw new ArgumentException("無効な設定です", nameof(settings));
+        }
+
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("OCRエンジンが初期化されていません。InitializeAsync()を先に呼び出してください。");
+        }
+
+        await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+        
+        // 言語変更を検出
+        bool languageChanged = _settings.Language != settings.Language;
+        
+        // 設定をコピー
+        _settings = settings.Clone();
+        
+        // 言語が変更された場合は更新
+        if (languageChanged)
+        {
+            CurrentLanguage = _settings.Language;
+            _logger?.LogInformation("言語を変更しました: {Language}（テスト用）", _settings.Language);
+        }
+        
+        _logger?.LogInformation("OCRエンジン設定を更新: 言語={Language}, モデル={Model}（テスト用）",
+            _settings.Language, _settings.ModelName);
+    }
+
+    /// <summary>
+    /// 使用可能な言語のリストを取得します
+    /// </summary>
+    public IReadOnlyList<string> GetAvailableLanguages()
+    {
+        return ["eng", "jpn"];
+    }
+
+    /// <summary>
+    /// 使用可能なモデルのリストを取得します
+    /// </summary>
+    public IReadOnlyList<string> GetAvailableModels()
+    {
+        return ["standard"];
+    }
+
+    /// <summary>
+    /// 指定言語のモデルが利用可能かを確認します
+    /// </summary>
+    public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(languageCode))
+            return false;
+            
+        var availableLanguages = GetAvailableLanguages();
+        if (!availableLanguages.Contains(languageCode))
+            return false;
+            
+        await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+            
+        // テスト環境ではモデルファイルの存在確認は行わない
+        return true; // テスト用では常に利用可能とする
+    }
+
+    /// <summary>
+    /// エンジンのパフォーマンス統計を取得
+    /// </summary>
+    public OcrPerformanceStats GetPerformanceStats()
+    {
+        double averageTime = _processingTimes.Count > 0 ? _processingTimes.Average() : 0.0;
+        double minTime = _processingTimes.Count > 0 ? _processingTimes.Min() : 0.0;
+        double maxTime = _processingTimes.Count > 0 ? _processingTimes.Max() : 0.0;
+        double successRate = _totalProcessedImages > 0 ? 
+            (double)(_totalProcessedImages - _errorCount) / _totalProcessedImages : 1.0;
+
+        return new OcrPerformanceStats
+        {
+            TotalProcessedImages = _totalProcessedImages,
+            AverageProcessingTimeMs = averageTime,
+            MinProcessingTimeMs = minTime,
+            MaxProcessingTimeMs = maxTime,
+            ErrorCount = _errorCount,
+            SuccessRate = successRate,
+            StartTime = _startTime,
+            LastUpdateTime = DateTime.UtcNow
+        };
+    }
+
+    #endregion
+
+    #region 言語切り替え支援メソッド（テスト用）
+
+    /// <summary>
+    /// 言語を切り替えます（テスト用の簡易メソッド）
+    /// </summary>
+    public async Task<bool> SwitchLanguageAsync(string language, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ThrowIfNotInitialized();
+        
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            throw new ArgumentException("言語コードが無効です", nameof(language));
+        }
+        
+        if (language == "invalid")
+        {
+            throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
+        }
+        
+        if (!GetAvailableLanguages().Contains(language))
+        {
+            throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
+        }
+
+        if (CurrentLanguage == language)
+        {
+            _logger?.LogDebug("既に指定された言語で初期化されています: {Language}（テスト用）", language);
+            return true;
+        }
+
+        // 設定を更新
+        var newSettings = _settings.Clone();
+        newSettings.Language = language;
+        
+        await ApplySettingsAsync(newSettings, cancellationToken).ConfigureAwait(false);
+        
+        _logger?.LogInformation("言語切り替え完了: {Language}（テスト用）", language);
+        return true;
+    }
+
+    #endregion
+
+    #region バリデーションメソッド
+
+    /// <summary>
+    /// 初期化設定の厳密な検証
+    /// </summary>
+    private static void ValidateInitializationSettings(OcrEngineSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        
+        // 言語の検証
+        if (string.IsNullOrWhiteSpace(settings.Language))
+        {
+            throw new ArgumentException("言語コードが無効です", nameof(settings));
+        }
+        
+        if (settings.Language == "invalid")
+        {
+            throw new ArgumentException($"サポートされていない言語: {settings.Language}", nameof(settings));
+        }
+        
+        // ワーカー数の検証
+        if (settings.WorkerCount <= 0 || settings.WorkerCount > 10)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.WorkerCount, 
+                "ワーカー数は1から10の間で指定してください");
+        }
+        
+        // 閾値の検証
+        if (settings.DetectionThreshold < 0.0 || settings.DetectionThreshold > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.DetectionThreshold,
+                "検出閾値は0.0から1.0の間で指定してください");
+        }
+        
+        if (settings.RecognitionThreshold < 0.0 || settings.RecognitionThreshold > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.RecognitionThreshold,
+                "認識閾値は0.0から1.0の間で指定してください");
+        }
+        
+        // 最大検出数の検証
+        if (settings.MaxDetections <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.MaxDetections,
+                "最大検出数は正の値で指定してください");
+        }
+        
+        // GPUデバイスIDの検証
+        if (settings.GpuDeviceId < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.GpuDeviceId,
+                "GPUデバイスIDは0以上で指定してください");
+        }
+        
+        // モデル名の検証
+        if (string.IsNullOrWhiteSpace(settings.ModelName))
+        {
+            throw new ArgumentException("モデル名が無効です", nameof(settings));
+        }
+    }
+
+    #endregion
+
+    #region プライベートメソッド
 
     /// <summary>
     /// テスト用の初期化シミュレーション
     /// </summary>
-    private async Task<bool> SimulateInitializationAsync(string language, bool useGpu, bool enableMultiThread, int consumerCount)
+    private async Task<bool> SimulateInitializationAsync(OcrEngineSettings settings, CancellationToken cancellationToken)
     {
-        ThrowIfDisposed();
-        
-        await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドのダミー待機
-
-        // 引数検証のみ実行（実際のPaddleOcrEngineと同じ検証）
-        if (string.IsNullOrWhiteSpace(language))
-            throw new ArgumentException("言語コードが無効です", nameof(language));
-        
-        if (!IsValidLanguage(language))
-            throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
-        
-        if (consumerCount < 1 || consumerCount > 10)
-            throw new ArgumentOutOfRangeException(nameof(consumerCount), "コンシューマー数は1-10の範囲で指定してください");
+        await Task.Delay(1, cancellationToken).ConfigureAwait(false);
 
         // 無効なパス設定を検出
         if (IsInvalidPathConfiguration())
@@ -135,73 +396,37 @@ public class SafeTestPaddleOcrEngine : IDisposable
             // テスト用のディレクトリ作成シミュレーション
             CreateTestDirectories();
             
+            // 設定を適用
+            _settings = settings.Clone();
+            
             // 成功をシミュレート
             IsInitialized = true;
-            CurrentLanguage = language;
-            IsMultiThreadEnabled = enableMultiThread;
+            CurrentLanguage = settings.Language;
+            _startTime = DateTime.UtcNow;
             
             _logger?.LogInformation("PaddleOCRエンジンの初期化完了（テスト用）");
             return true;
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "PaddleOCRエンジンの初期化に失敗（テスト用） - 引数エラー");
+            _logger?.LogError(ex, "無効な引数でPaddleOCRエンジンの初期化に失敗（テスト用）");
             return false;
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "PaddleOCRエンジンの初期化に失敗（テスト用） - 操作エラー");
+            _logger?.LogError(ex, "無効な操作でPaddleOCRエンジンの初期化に失敗（テスト用）");
             return false;
         }
         catch (UnauthorizedAccessException ex)
         {
-            _logger?.LogError(ex, "PaddleOCRエンジンの初期化に失敗（テスト用） - アクセス権限エラー");
+            _logger?.LogError(ex, "アクセス権限不足でPaddleOCRエンジンの初期化に失敗（テスト用）");
             return false;
         }
-        catch (System.IO.IOException ex)
+        catch (IOException ex)
         {
-            _logger?.LogError(ex, "PaddleOCRエンジンの初期化に失敗（テスト用） - I/Oエラー");
+            _logger?.LogError(ex, "I/Oエラーでディレクトリ作成に失敗（テスト用）");
             return false;
         }
-    }
-
-    /// <summary>
-    /// テスト用の言語切り替えシミュレーション
-    /// </summary>
-    private async Task<bool> SimulateSwitchLanguageAsync(string language, bool useGpu, bool enableMultiThread, int consumerCount)
-    {
-        ThrowIfDisposed();
-        
-        // パフォーマンステスト用の遅延を最短に
-        await Task.Delay(1).ConfigureAwait(false); // テスト用の最短待機時間
-
-        // 引数検証
-        if (string.IsNullOrWhiteSpace(language))
-            throw new ArgumentException("言語コードが無効です", nameof(language));
-        
-        if (!IsValidLanguage(language))
-            throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
-        
-        if (consumerCount < 1 || consumerCount > 10)
-            throw new ArgumentOutOfRangeException(nameof(consumerCount), "コンシューマー数は1-10の範囲で指定してください");
-
-        if (!IsInitialized)
-        {
-            throw new InvalidOperationException("OCRエンジンが初期化されていません。InitializeAsync()を先に呼び出してください。");
-        }
-
-        if (CurrentLanguage == language)
-        {
-            _logger?.LogDebug("既に指定された言語で初期化されています: {Language}（テスト用）", language);
-            return true;
-        }
-
-        // 言語切り替えをシミュレート
-        CurrentLanguage = language;
-        IsMultiThreadEnabled = enableMultiThread;
-        
-        _logger?.LogInformation("言語切り替え完了: {Language}（テスト用）", language);
-        return true;
     }
 
     /// <summary>
@@ -233,44 +458,20 @@ public class SafeTestPaddleOcrEngine : IDisposable
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogWarning(ex, "パス設定の確認中に引数エラーが発生");
+            _logger?.LogWarning(ex, "パス設定の引数が無効です");
             return true; // エラーが発生した場合は無効とみなす
-        }
-        catch (NullReferenceException ex)
-        {
-            _logger?.LogWarning(ex, "パス設定の確認中にnull参照エラーが発生");
-            return true;
-        }
-        catch (NotSupportedException ex)
-        {
-            _logger?.LogWarning(ex, "パス設定の確認中にサポートされていない操作エラーが発生");
-            return true;
         }
         catch (UnauthorizedAccessException ex)
         {
             _logger?.LogWarning(ex, "パス設定の確認中にアクセス権限エラーが発生");
-            return true;
+            return true; // エラーが発生した場合は無効とみなす
         }
-        catch (System.Security.SecurityException ex)
-        {
-            _logger?.LogWarning(ex, "パス設定の確認中にセキュリティエラーが発生");
-            return true;
-        }
-        catch (System.IO.IOException ex)
+        catch (IOException ex)
         {
             _logger?.LogWarning(ex, "パス設定の確認中にI/Oエラーが発生");
-            return true;
+            return true; // エラーが発生した場合は無効とみなす
         }
     }
-
-    /// <summary>
-    /// 言語コードの妥当性確認
-    /// </summary>
-    private static bool IsValidLanguage(string language) => language switch
-    {
-        "eng" or "jpn" => true,
-        _ => false
-    };
 
     /// <summary>
     /// 初期化状態のチェック
@@ -299,12 +500,12 @@ public class SafeTestPaddleOcrEngine : IDisposable
         try
         {
             // テスト環境でのディレクトリ作成をシミュレート
-            var testDirectories = new[]
-            {
+            string[] testDirectories =
+            [
                 _modelPathResolver.GetDetectionModelsDirectory(),
                 _modelPathResolver.GetRecognitionModelsDirectory("eng"),
                 _modelPathResolver.GetRecognitionModelsDirectory("jpn")
-            };
+            ];
             
             foreach (var directory in testDirectories)
             {
@@ -313,49 +514,38 @@ public class SafeTestPaddleOcrEngine : IDisposable
                     _modelPathResolver.EnsureDirectoryExists(directory);
                     _logger?.LogDebug("テスト用ディレクトリ作成: {Directory}", directory);
                 }
-                catch (ArgumentException ex)
-                {
-                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成に失敗 - 引数エラー: {Directory}", directory);
-                    // テスト環境では継続
-                }
                 catch (UnauthorizedAccessException ex)
                 {
-                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成に失敗 - アクセス権限エラー: {Directory}", directory);
+                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成でアクセス権限エラー: {Directory}", directory);
                     // テスト環境では継続
                 }
-                catch (System.IO.IOException ex)
+                catch (IOException ex)
                 {
-                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成に失敗 - I/Oエラー: {Directory}", directory);
+                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成でI/Oエラー: {Directory}", directory);
                     // テスト環境では継続
                 }
-                catch (System.Security.SecurityException ex)
+                catch (ArgumentException ex)
                 {
-                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成に失敗 - セキュリティエラー: {Directory}", directory);
+                    _logger?.LogWarning(ex, "テスト用ディレクトリ作成で引数エラー: {Directory}", directory);
                     // テスト環境では継続
                 }
             }
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化に失敗 - 引数エラー");
+            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化で引数エラー");
             // テスト環境ではエラーを再スローしない
         }
-        catch (UnauthorizedAccessException ex)
+        catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化に失敗 - アクセス権限エラー");
-            // テスト環境ではエラーを再スローしない
-        }
-        catch (System.IO.IOException ex)
-        {
-            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化に失敗 - I/Oエラー");
-            // テスト環境ではエラーを再スローしない
-        }
-        catch (System.Security.SecurityException ex)
-        {
-            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化に失敗 - セキュリティエラー");
+            _logger?.LogError(ex, "テスト用ディレクトリ作成の初期化で操作エラー");
             // テスト環境ではエラーを再スローしない
         }
     }
+
+    #endregion
+
+    #region IDisposable実装
 
     /// <summary>
     /// リソースの解放
@@ -381,9 +571,11 @@ public class SafeTestPaddleOcrEngine : IDisposable
             
             IsInitialized = false;
             CurrentLanguage = null;
-            IsMultiThreadEnabled = false;
+            _processingTimes.Clear();
         }
 
         _disposed = true;
     }
+
+    #endregion
 }

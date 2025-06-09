@@ -7,6 +7,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.DI;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 using System.Drawing;
 using System.Diagnostics;
@@ -56,12 +57,14 @@ public class PaddleOcrPerformanceTests : IDisposable
         {
             var modelsDirectory = Path.Combine(_testBaseDirectory, "Models");
             var detectionDirectory = Path.Combine(modelsDirectory, "detection");
+            var classificationDirectory = Path.Combine(modelsDirectory, "classification"); // 分類モデル用を追加
             var recognitionEngDirectory = Path.Combine(modelsDirectory, "recognition", "eng");
             var recognitionJpnDirectory = Path.Combine(modelsDirectory, "recognition", "jpn");
             var tempDirectory = Path.Combine(_testBaseDirectory, "Temp");
 
             Directory.CreateDirectory(modelsDirectory);
             Directory.CreateDirectory(detectionDirectory);
+            Directory.CreateDirectory(classificationDirectory); // 分類モデルディレクトリを作成
             Directory.CreateDirectory(recognitionEngDirectory);
             Directory.CreateDirectory(recognitionJpnDirectory);
             Directory.CreateDirectory(tempDirectory);
@@ -100,7 +103,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         var stopwatch = Stopwatch.StartNew();
 
         // Act - 安全なエンジンのみを初期化
-        var engineInitResult = await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        var engineInitResult = await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         
         stopwatch.Stop();
         var elapsedMs = stopwatch.ElapsedMilliseconds;
@@ -124,14 +128,16 @@ public class PaddleOcrPerformanceTests : IDisposable
         var coldStartTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
             using var coldEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-            await coldEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+            var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+            await coldEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         }).ConfigureAwait(false);
 
         // Act & Measure - ウォームスタート（２回目の初期化）
         var warmStartTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
             using var warmEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-            await warmEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+            var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+            await warmEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         }).ConfigureAwait(false);
 
         // Assert - テスト用エンジンでは基本的に同じ性能
@@ -155,12 +161,13 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // Act & Measure
         var switchTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            await safeOcrEngine.SwitchLanguageAsync("jpn").ConfigureAwait(false);
+            await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
         }).ConfigureAwait(false);
 
         // Assert
@@ -180,7 +187,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var languages = new[] { "jpn", "eng", "jpn", "eng", "jpn" };
         var switchTimes = new List<long>();
@@ -190,7 +198,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         {
             var switchTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
             {
-                await safeOcrEngine.SwitchLanguageAsync(language).ConfigureAwait(false);
+                await safeOcrEngine.SwitchLanguageAsync(language, CancellationToken.None).ConfigureAwait(false);
             }).ConfigureAwait(false);
             switchTimes.Add(switchTime);
         }
@@ -221,14 +229,15 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var mockImage = PaddleOcrTestHelper.CreateEnglishTextMockImage();
 
         // Act & Measure
         var ocrTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
             Assert.NotNull(results);
         }).ConfigureAwait(false);
 
@@ -248,7 +257,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var imageSizes = new[]
         {
@@ -267,7 +277,7 @@ public class PaddleOcrPerformanceTests : IDisposable
             
             var ocrTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
             {
-                var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+                var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
                 Assert.NotNull(results);
             }).ConfigureAwait(false);
 
@@ -298,7 +308,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         var mockImage = PaddleOcrTestHelper.CreateMockImage(1280, 720);
         var roi = PaddleOcrTestHelper.CreateCenterROI(1280, 720);
@@ -306,14 +317,14 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Act & Measure - 全画像
         var fullImageTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
             Assert.NotNull(results);
         }).ConfigureAwait(false);
 
         // Act & Measure - ROI指定
         var roiTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, roi, CancellationToken.None).ConfigureAwait(false);
+            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, roi, null, CancellationToken.None).ConfigureAwait(false);
             Assert.NotNull(results);
         }).ConfigureAwait(false);
 
@@ -342,7 +353,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 4).ConfigureAwait(false); // マルチスレッド有効
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false); // マルチスレッド有効
 
         const int concurrentRequests = 10;
         var mockImages = Enumerable.Range(0, concurrentRequests)
@@ -353,7 +365,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         var concurrentTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
             var tasks = mockImages.Select(async mockImage => 
-                await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false))
+                await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false))
                 .ToArray();
 
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -382,8 +394,10 @@ public class PaddleOcrPerformanceTests : IDisposable
         // マルチスレッドエンジン
         using var multiThreadEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
-        await singleThreadEngine.InitializeAsync("eng", false, false, 1).ConfigureAwait(false); // シングルスレッド
-        await multiThreadEngine.InitializeAsync("eng", false, true, 4).ConfigureAwait(false);   // マルチスレッド
+        var singleThreadSettings = new OcrEngineSettings { Language = "eng", EnableMultiThread = false, WorkerCount = 1 };
+        var multiThreadSettings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
+        await singleThreadEngine.InitializeAsync(singleThreadSettings, CancellationToken.None).ConfigureAwait(false); // シングルスレッド
+        await multiThreadEngine.InitializeAsync(multiThreadSettings, CancellationToken.None).ConfigureAwait(false);   // マルチスレッド
 
         const int operationCount = 5;
         var mockImages = Enumerable.Range(0, operationCount)
@@ -395,7 +409,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         {
             foreach (var mockImage in mockImages)
             {
-                var results = await singleThreadEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+                var results = await singleThreadEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
                 Assert.NotNull(results);
             }
         }).ConfigureAwait(false);
@@ -404,7 +418,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         var multiThreadTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
             var tasks = mockImages.Select(async mockImage => 
-                await multiThreadEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false))
+                await multiThreadEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false))
                 .ToArray();
 
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -433,7 +447,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         // 初期メモリ使用量
         GC.Collect();
@@ -446,7 +461,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         for (int i = 0; i < iterations; i++)
         {
             var mockImage = PaddleOcrTestHelper.CreateMockImage(640, 480);
-            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+            var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
             Assert.NotNull(results);
         }
 
@@ -482,7 +497,8 @@ public class PaddleOcrPerformanceTests : IDisposable
         
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
         
-        await safeOcrEngine.InitializeAsync("eng", false, true, 2).ConfigureAwait(false);
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
         const int longRunIterations = 50;
         var executionTimes = new List<long>();
@@ -494,7 +510,7 @@ public class PaddleOcrPerformanceTests : IDisposable
             
             var executionTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
             {
-                var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, CancellationToken.None).ConfigureAwait(false);
+                var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
                 Assert.NotNull(results);
             }).ConfigureAwait(false);
 
@@ -505,7 +521,7 @@ public class PaddleOcrPerformanceTests : IDisposable
             {
                 var currentLang = safeOcrEngine.CurrentLanguage;
                 var newLang = currentLang == "eng" ? "jpn" : "eng";
-                await safeOcrEngine.SwitchLanguageAsync(newLang).ConfigureAwait(false);
+                await safeOcrEngine.SwitchLanguageAsync(newLang, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
