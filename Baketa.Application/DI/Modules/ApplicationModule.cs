@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Application.Services.Capture;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -77,20 +79,15 @@ namespace Baketa.Application.DI.Modules;
         /// <summary>
         /// その他のアプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
+        /// <param name="services">サービスコレクション</param>
         /// <param name="environment">アプリケーション実行環境</param>
-        private static void RegisterOtherApplicationServices(IServiceCollection _, Core.DI.BaketaEnvironment environment)
+        private static void RegisterOtherApplicationServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
         {
-            // キャプチャサービスなど他のアプリケーションサービス
-            // 例: services.AddSingleton<ICaptureService, CaptureService>();
-            // 例: services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
-            // 例: services.AddSingleton<IWindowCaptureService, WindowCaptureService>();
+            // キャプチャサービスの登録
+            RegisterCaptureServices(services);
             
             // 統合サービス
             // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
-            
-            // プロファイル管理
-            // 例: services.AddSingleton<IGameProfileService, GameProfileService>();
             
             // テキスト処理
             // 例: services.AddSingleton<ITextAnalysisService, TextAnalysisService>();
@@ -101,6 +98,26 @@ namespace Baketa.Application.DI.Modules;
                 // 例: services.AddSingleton<IDevelopmentService, DevelopmentService>();
                 // 例: services.AddSingleton<IDebugConsoleService, DebugConsoleService>();
             }
+        }
+        
+        /// <summary>
+        /// キャプチャサービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterCaptureServices(IServiceCollection services)
+        {
+            // キャプチャサービスの実装を登録
+            services.AddSingleton<AdvancedCaptureService>();
+            
+            // 両方のインターフェースが同じインスタンスを参照するように設定
+            services.AddSingleton<ICaptureService>(provider => provider.GetRequiredService<AdvancedCaptureService>());
+            services.AddSingleton<IAdvancedCaptureService>(provider => provider.GetRequiredService<AdvancedCaptureService>());
+            
+            // ゲームプロファイル管理サービスの登録
+            services.AddSingleton<IGameProfileManager, GameProfileManager>();
+            
+            // ゲーム自動検出サービスの登録
+            services.AddSingleton<IGameDetectionService, GameDetectionService>();
         }
         
         /// <summary>

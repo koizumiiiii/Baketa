@@ -178,6 +178,39 @@ public sealed class OcrSettings
     [SettingMetadata(SettingLevel.Debug, "OCR", "処理済み画像保存", 
         Description = "前処理後の画像を保存します（開発者向け）")]
     public bool SaveProcessedImages { get; set; } = false;
+    
+    /// <summary>
+    /// 設定のクローンを作成します
+    /// </summary>
+    /// <returns>クローンされた設定</returns>
+    public OcrSettings Clone()
+    {
+        return new OcrSettings
+        {
+            IsEnabled = IsEnabled,
+            AutoOptimizationEnabled = AutoOptimizationEnabled,
+            Engine = Engine,
+            RecognitionLanguage = RecognitionLanguage,
+            ConfidenceThreshold = ConfidenceThreshold,
+            EnableImagePreprocessing = EnableImagePreprocessing,
+            ConvertToGrayscale = ConvertToGrayscale,
+            EnableBinarization = EnableBinarization,
+            BinarizationThreshold = BinarizationThreshold,
+            EnableNoiseReduction = EnableNoiseReduction,
+            EnhanceContrast = EnhanceContrast,
+            EnhanceEdges = EnhanceEdges,
+            ImageScaleFactor = ImageScaleFactor,
+            EnableParallelProcessing = EnableParallelProcessing,
+            MaxParallelThreads = MaxParallelThreads,
+            EnableTextAreaDetection = EnableTextAreaDetection,
+            MinTextLineHeight = MinTextLineHeight,
+            MaxTextLineHeight = MaxTextLineHeight,
+            TimeoutSeconds = TimeoutSeconds,
+            EnableVerboseLogging = EnableVerboseLogging,
+            SaveOcrResults = SaveOcrResults,
+            SaveProcessedImages = SaveProcessedImages
+        };
+    }
 }
 
 /// <summary>
