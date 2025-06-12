@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Events.Implementation;
 
