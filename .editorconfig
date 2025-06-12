@@ -37,6 +37,9 @@ dotnet_diagnostic.IDE0090.severity = silent
 # IDE0305: コレクション初期化の簡素化
 dotnet_diagnostic.IDE0305.severity = warning
 
+# C# 12 コレクション式の設定
+dotnet_style_prefer_collection_expression = when_types_clearly_match:warning
+
 # CA1305: IFormatProviderの指定
 dotnet_diagnostic.CA1305.severity = warning
 
