@@ -1,4 +1,4 @@
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 using System;
 
 namespace Baketa.Core.Events.EventTypes;

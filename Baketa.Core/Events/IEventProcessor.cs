@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Events;
 

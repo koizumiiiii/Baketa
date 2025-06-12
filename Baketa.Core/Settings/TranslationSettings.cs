@@ -241,6 +241,47 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Debug, "Translation", "API統計記録", 
         Description = "翻訳API使用統計を記録します（開発者向け）")]
     public bool RecordApiUsageStatistics { get; set; } = false;
+    
+    /// <summary>
+    /// 設定のクローンを作成します
+    /// </summary>
+    /// <returns>クローンされた設定</returns>
+    public TranslationSettings Clone()
+    {
+        return new TranslationSettings
+        {
+            IsEnabled = IsEnabled,
+            DefaultEngine = DefaultEngine,
+            AutoDetectSourceLanguage = AutoDetectSourceLanguage,
+            DefaultSourceLanguage = DefaultSourceLanguage,
+            DefaultTargetLanguage = DefaultTargetLanguage,
+            TranslationDelayMs = TranslationDelayMs,
+            EnableTranslationCache = EnableTranslationCache,
+            Style = Style,
+            FallbackEngine = FallbackEngine,
+            TimeoutSeconds = TimeoutSeconds,
+            MaxCharactersPerRequest = MaxCharactersPerRequest,
+            MinCharactersToTranslate = MinCharactersToTranslate,
+            PreventDuplicateTranslations = PreventDuplicateTranslations,
+            DuplicateSimilarityThreshold = DuplicateSimilarityThreshold,
+            EnableParallelTranslation = EnableParallelTranslation,
+            MaxParallelTranslations = MaxParallelTranslations,
+            CacheRetentionHours = CacheRetentionHours,
+            MaxCacheEntries = MaxCacheEntries,
+            EncryptApiKeys = EncryptApiKeys,
+            GoogleTranslateApiKey = GoogleTranslateApiKey,
+            DeepLApiKey = DeepLApiKey,
+            OpenAiApiKey = OpenAiApiKey,
+            CustomTranslationPrompt = CustomTranslationPrompt,
+            LocalModelPath = LocalModelPath,
+            AutoUpdateLocalModel = AutoUpdateLocalModel,
+            EnableQualityEstimation = EnableQualityEstimation,
+            QualityThreshold = QualityThreshold,
+            EnableVerboseLogging = EnableVerboseLogging,
+            SaveTranslationResults = SaveTranslationResults,
+            RecordApiUsageStatistics = RecordApiUsageStatistics
+        };
+    }
 }
 
 /// <summary>

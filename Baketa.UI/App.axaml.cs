@@ -8,7 +8,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using CoreEvents = Baketa.Core.Events;
+using Baketa.Core.Events;
 using UIEvents = Baketa.UI.Framework.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
@@ -170,7 +170,7 @@ namespace Baketa.UI;
     }
     
     // イベント定義
-    internal sealed class ApplicationStartupEvent : CoreEvents.EventBase
+    internal sealed class ApplicationStartupEvent : EventBase
     {
         /// <summary>
         /// イベント名
@@ -183,7 +183,7 @@ namespace Baketa.UI;
         public override string Category => "Application";
     }
 
-    internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
+    internal sealed class ApplicationShutdownEvent : EventBase
     {
         /// <summary>
         /// イベント名

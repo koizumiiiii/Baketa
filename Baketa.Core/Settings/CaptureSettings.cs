@@ -163,4 +163,34 @@ public sealed class CaptureSettings
     [SettingMetadata(SettingLevel.Debug, "Capture", "デバッグ保存パス", 
         Description = "デバッグ用キャプチャの保存先パス（開発者向け）")]
     public string DebugCaptureSavePath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// 設定のクローンを作成します
+    /// </summary>
+    /// <returns>クローンされた設定</returns>
+    public CaptureSettings Clone()
+    {
+        return new CaptureSettings
+        {
+            IsEnabled = IsEnabled,
+            CaptureIntervalMs = CaptureIntervalMs,
+            CaptureQuality = CaptureQuality,
+            AutoDetectCaptureArea = AutoDetectCaptureArea,
+            FixedCaptureAreaX = FixedCaptureAreaX,
+            FixedCaptureAreaY = FixedCaptureAreaY,
+            FixedCaptureAreaWidth = FixedCaptureAreaWidth,
+            FixedCaptureAreaHeight = FixedCaptureAreaHeight,
+            TargetMonitor = TargetMonitor,
+            ConsiderDpiScaling = ConsiderDpiScaling,
+            UseHardwareAcceleration = UseHardwareAcceleration,
+            DifferenceDetectionSensitivity = DifferenceDetectionSensitivity,
+            DifferenceDetectionGridSize = DifferenceDetectionGridSize,
+            SaveCaptureHistory = SaveCaptureHistory,
+            MaxCaptureHistoryCount = MaxCaptureHistoryCount,
+            FullscreenOptimization = FullscreenOptimization,
+            AutoOptimizeForGames = AutoOptimizeForGames,
+            SaveDebugCaptures = SaveDebugCaptures,
+            DebugCaptureSavePath = DebugCaptureSavePath
+        };
+    }
 }
