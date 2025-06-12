@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Baketa.Core.Services;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -343,7 +344,7 @@ public sealed class JsonSettingsService : ISettingsService
     /// <summary>
     /// 設定ファイルのバックアップを作成します
     /// </summary>
-    private async Task CreateBackupAsync()
+    private Task CreateBackupAsync()
     {
         try
         {
@@ -367,13 +368,13 @@ public sealed class JsonSettingsService : ISettingsService
             _logger.LogWarning(ex, "バックアップファイルの入出力エラーが発生しました");
         }
         
-        await Task.CompletedTask.ConfigureAwait(false);
+        return Task.CompletedTask;
     }
     
     /// <summary>
     /// 破損した設定ファイルのバックアップを作成します
     /// </summary>
-    private async Task CreateCorruptBackupAsync()
+    private Task CreateCorruptBackupAsync()
     {
         try
         {
@@ -398,6 +399,205 @@ public sealed class JsonSettingsService : ISettingsService
             _logger.LogWarning(ex, "破損ファイルのバックアップ作成中に入出力エラーが発生しました");
         }
         
-        await Task.CompletedTask.ConfigureAwait(false);
+        return Task.CompletedTask;
     }
+
+    #region ISettingsServiceの不足メソッド実装
+
+    /// <inheritdoc />
+    public AppSettings GetSettings()
+    {
+        // TODO: 実際の実装
+        return new AppSettings();
+    }
+
+    /// <inheritdoc />
+    public Task SetSettingsAsync(AppSettings settings)
+    {
+        // TODO: 実際の実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public T GetCategorySettings<T>() where T : class, new()
+    {
+        // TODO: 実際の実装
+        return new T();
+    }
+
+    /// <inheritdoc />
+    public Task SetCategorySettingsAsync<T>(T settings) where T : class, new()
+    {
+        // TODO: 実際の実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public GameProfileSettings? GetGameProfile(string profileId)
+    {
+        // TODO: 実際の実装
+        return null;
+    }
+
+    /// <inheritdoc />
+    public Task SaveGameProfileAsync(string profileId, GameProfileSettings profile)
+    {
+        // TODO: 実際の実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task DeleteGameProfileAsync(string profileId)
+    {
+        // TODO: 実際の実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, GameProfileSettings> GetAllGameProfiles()
+    {
+        // TODO: 実際の実装
+        return new Dictionary<string, GameProfileSettings>();
+    }
+
+    /// <inheritdoc />
+    public Task SetActiveGameProfileAsync(string? profileId)
+    {
+        // TODO: 実際の実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public GameProfileSettings? GetActiveGameProfile()
+    {
+        // TODO: 実際の実装
+        return null;
+    }
+
+    /// <inheritdoc />
+    public async Task ResetToDefaultsAsync()
+    {
+        lock (_lockObject)
+        {
+            _settings.Clear();
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+        _logger.LogInformation("設定をデフォルト値にリセットしました");
+    }
+
+    /// <inheritdoc />
+    public Task CreateBackupAsync(string? backupFilePath = null)
+    {
+        backupFilePath ??= $"{_settingsFilePath}.backup_{DateTime.Now:yyyyMMdd_HHmmss}";
+        
+        try
+        {
+            if (File.Exists(_settingsFilePath))
+            {
+                File.Copy(_settingsFilePath, backupFilePath, true);
+                _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", backupFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "設定のバックアップ作成に失敗しました");
+            throw;
+        }
+        
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task RestoreFromBackupAsync(string backupFilePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(backupFilePath);
+        
+        if (!File.Exists(backupFilePath))
+        {
+            throw new FileNotFoundException($"バックアップファイルが見つかりません: {backupFilePath}");
+        }
+        
+        try
+        {
+            File.Copy(backupFilePath, _settingsFilePath, true);
+            await ReloadAsync().ConfigureAwait(false);
+            
+            _logger.LogInformation("バックアップから設定を復元しました: {BackupPath}", backupFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "バックアップからの復元に失敗しました");
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public SettingsValidationResult ValidateSettings()
+    {
+        // TODO: 実際の検証ロジックを実装
+        return SettingsValidationResult.CreateSuccess();
+    }
+
+    /// <inheritdoc />
+    public bool RequiresMigration()
+    {
+        // TODO: 実際のマイグレーション判定ロジックを実装
+        return false;
+    }
+
+    /// <inheritdoc />
+    public Task MigrateSettingsAsync()
+    {
+        // TODO: 実際のマイグレーションロジックを実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+#pragma warning disable CS0067 // インターフェース実装のためにイベントを定義しているが、将来的な機能拡張のため未使用
+    public event EventHandler<SettingChangedEventArgs>? SettingChanged;
+
+    /// <inheritdoc />
+    public event EventHandler<GameProfileChangedEventArgs>? GameProfileChanged;
+
+    /// <inheritdoc />
+    public event EventHandler<SettingsSavedEventArgs>? SettingsSaved;
+#pragma warning restore CS0067
+
+    /// <inheritdoc />
+    public SettingsStatistics GetStatistics()
+    {
+        // TODO: 実際の統計情報を実装
+        return SettingsStatistics.CreateEmpty();
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<SettingChangeRecord> GetChangeHistory(int maxEntries = 100)
+    {
+        // TODO: 実際の変更履歴を実装
+        return ((List<SettingChangeRecord>)[]).AsReadOnly();
+    }
+
+    /// <inheritdoc />
+    public Task AddToFavoritesAsync(string settingKey)
+    {
+        // TODO: 実際のお気に入り機能を実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RemoveFromFavoritesAsync(string settingKey)
+    {
+        // TODO: 実際のお気に入り機能を実装
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> GetFavoriteSettings()
+    {
+        // TODO: 実際のお気に入り機能を実装
+        return ((List<string>)[]).AsReadOnly();
+    }
+
+    #endregion
 }
