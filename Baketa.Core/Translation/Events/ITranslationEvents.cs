@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Events;
