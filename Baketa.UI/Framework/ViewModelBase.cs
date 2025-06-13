@@ -28,6 +28,11 @@ namespace Baketa.UI.Framework;
         protected readonly ILogger? _logger;
         
         /// <summary>
+        /// ロガーへのパブリックアクセス
+        /// </summary>
+        public ILogger? Logger => _logger;
+        
+        /// <summary>
         /// エラーメッセージ
         /// </summary>
         private string? _errorMessage;

@@ -15,6 +15,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Baketa.Application\Baketa.Application.csproj" />
 		<ProjectReference Include="..\Baketa.Core\Baketa.Core.csproj" />
+		<ProjectReference Include="..\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj" />
 	</ItemGroup>
 
   <ItemGroup>

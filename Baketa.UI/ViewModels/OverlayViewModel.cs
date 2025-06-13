@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Reactive;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Baketa.Core.UI.Geometry;
+using Baketa.Core.UI.Overlay;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.ReactiveUI;
+using Baketa.UI.Overlay;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -16,6 +20,8 @@ namespace Baketa.UI.ViewModels;
     /// </summary>
     internal sealed class OverlayViewModel : Framework.ViewModelBase
     {
+        private readonly AvaloniaOverlayWindowAdapter? _overlayAdapter;
+        private IOverlayWindow? _previewOverlay;
         // オーバーレイの表示位置
         private string _position = "上";
         public string Position
@@ -172,10 +178,16 @@ namespace Baketa.UI.ViewModels;
         /// 新しいOverlayViewModelを初期化します
         /// </summary>
         /// <param name="eventAggregator">イベント集約器</param>
+        /// <param name="overlayAdapter">オーバーレイアダプター</param>
         /// <param name="logger">ロガー</param>
-        public OverlayViewModel(UIEvents.IEventAggregator eventAggregator, ILogger? logger = null)
+        public OverlayViewModel(
+            UIEvents.IEventAggregator eventAggregator,
+            AvaloniaOverlayWindowAdapter? overlayAdapter = null,
+            ILogger? logger = null)
             : base(eventAggregator, logger)
         {
+            _overlayAdapter = overlayAdapter;
+            
             // コマンドの初期化
             SaveSettingsCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteSaveSettingsAsync);
             PreviewOverlayCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecutePreviewOverlayAsync);
@@ -192,18 +204,66 @@ namespace Baketa.UI.ViewModels;
                 FontSize, 
                 FontColor, 
                 BackgroundColor, 
-                BackgroundOpacity / 100.0)).ConfigureAwait(true);
+                BackgroundOpacity / 100.0)).ConfigureAwait(false);
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // プレビューコマンド実行
         private async Task ExecutePreviewOverlayAsync()
         {
-            // 実際のプレビュー表示処理
-            // オーバーレイウィンドウを一時的に表示する処理
-            
-            await Task.CompletedTask.ConfigureAwait(true);
+            try
+            {
+                if (_overlayAdapter == null)
+                {
+                    Logger?.LogWarning("オーバーレイアダプターが利用できません。プレビューをスキップします。");
+                    return;
+                }
+                
+                // 既存のプレビューを閉じる
+                if (_previewOverlay != null)
+                {
+                    _previewOverlay.Dispose();
+                    _previewOverlay = null;
+                }
+                
+                // プレビューオーバーレイを作成
+                var overlaySize = new Size(Width, Height);
+                var overlayPosition = new Point(OffsetX + 100, OffsetY + 100); // オフセットを適用
+                
+                _previewOverlay = await _overlayAdapter.CreateOverlayWindowAsync(
+                    nint.Zero, // プレビュー用はターゲット無し
+                    overlaySize,
+                    overlayPosition).ConfigureAwait(false);
+                
+                // クリックスルー設定
+                _previewOverlay.IsClickThrough = false; // プレビューではクリック可能に
+                
+                // プレビュー表示
+                _previewOverlay.Show();
+                
+                Logger?.LogInformation("オーバーレイプレビューを表示しました。サイズ: {Size}, 位置: {Position}", overlaySize, overlayPosition);
+                
+                // 一定時間後に自動で閉じる
+                _ = Task.Delay(TimeSpan.FromSeconds(DisplayDuration))
+                    .ContinueWith(_ =>
+                    {
+                        if (_previewOverlay != null)
+                        {
+                            _previewOverlay.Dispose();
+                            _previewOverlay = null;
+                            Logger?.LogDebug("プレビューオーバーレイを自動で閉じました。");
+                        }
+                    }, TaskScheduler.Default);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogError(ex, "プレビューオーバーレイの表示中に無効な操作エラーが発生しました。");
+            }
+            catch (ExternalException ex)
+            {
+                Logger?.LogError(ex, "プレビューオーバーレイの表示中に外部エラーが発生しました。");
+            }
         }
         
         // デフォルト設定リセットコマンド実行
@@ -219,7 +279,7 @@ namespace Baketa.UI.ViewModels;
             Height = 100;
             DisplayDuration = 5;
             
-            await Task.CompletedTask.ConfigureAwait(true);
+            await Task.CompletedTask.ConfigureAwait(false);
         }
     }
     
