@@ -3,6 +3,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.Platform.DI.Modules;
+using Baketa.Application.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -85,6 +86,9 @@ namespace Baketa.Application.DI.Modules;
         {
             // キャプチャサービスの登録
             RegisterCaptureServices(services);
+            
+            // フルスクリーン管理サービス
+            services.AddFullscreenManagement();
             
             // 統合サービス
             // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
