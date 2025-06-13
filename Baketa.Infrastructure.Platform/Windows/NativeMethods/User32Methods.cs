@@ -64,6 +64,39 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
         
         [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
         internal static extern int GetWindowTextLength(IntPtr hWnd);
+        
+        // フルスクリーン検出のための追加API
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        internal static extern IntPtr GetDesktopWindow();
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        internal static extern long GetWindowLong(IntPtr hWnd, GetWindowLongIndex nIndex);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        internal static extern IntPtr MonitorFromWindow(IntPtr hwnd, MonitorFlags dwFlags);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, EnumMonitorsDelegate lpfnEnum, IntPtr dwData);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool IsWindow(IntPtr hWnd);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool IsWindowVisible(IntPtr hWnd);
+        
+        [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool IsZoomed(IntPtr hWnd);
     }
     
     [Flags]

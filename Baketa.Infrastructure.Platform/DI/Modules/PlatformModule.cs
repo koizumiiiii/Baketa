@@ -4,6 +4,7 @@ using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.Platform.Resources;
 using Baketa.Infrastructure.Platform.Windows.OpenCv;
+using Baketa.Infrastructure.Platform.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -30,6 +31,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             {
                 // キャプチャサービス
                 RegisterCaptureServices(services);
+                
+                // フルスクリーンサービス
+                services.AddFullscreenServices();
                 
                 // 画像処理サービス
                 RegisterImageServices(services);
