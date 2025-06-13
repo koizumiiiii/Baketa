@@ -90,11 +90,13 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
         /// <summary>
         /// Windows UI関連サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterWindowsUIServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterWindowsUIServices(IServiceCollection services)
         {
             // オーバーレイ関連
-            // 例: services.AddSingleton<IWindowsOverlayService, Win32OverlayService>();
+            services.RegisterOverlayServices();
+            
+            // その他のUI関連サービス
             // 例: services.AddSingleton<IWindowsNotificationService, WindowsNotificationService>();
             
             // システムトレイ
