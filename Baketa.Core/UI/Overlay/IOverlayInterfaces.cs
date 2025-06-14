@@ -94,6 +94,11 @@ public interface IOverlayWindow : IDisposable
     /// オーバーレイをターゲットウィンドウに合わせて調整します
     /// </summary>
     void AdjustToTargetWindow();
+    
+    /// <summary>
+    /// オーバーレイウィンドウを閉じます
+    /// </summary>
+    void Close();
 }
 
 /// <summary>

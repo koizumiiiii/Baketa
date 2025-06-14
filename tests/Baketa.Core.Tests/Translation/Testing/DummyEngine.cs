@@ -3,16 +3,17 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Testing;
+namespace Baketa.Core.Tests.Translation.Testing;
 
     /// <summary>
-    /// 極めて単純な実装テスト用
+    /// 抽象基底クラスの最小実装用テストクラス
     /// </summary>
-    public class SimpleEngine : TranslationEngineBase
+    public class DummyEngine : TranslationEngineBase
     {
         private static readonly List<LanguagePair> _supportedLanguagePairs =
         [
@@ -31,12 +32,12 @@ namespace Baketa.Core.Translation.Testing;
         /// <summary>
         /// 翻訳エンジン名
         /// </summary>
-        public override string Name => "SimpleEngine";
+        public override string Name => "DummyEngine";
 
         /// <summary>
         /// 翻訳エンジンの説明
         /// </summary>
-        public override string Description => "単純なテスト実装";
+        public override string Description => "ダミー実装";
 
         /// <summary>
         /// ネットワーク接続が必要か
@@ -46,17 +47,9 @@ namespace Baketa.Core.Translation.Testing;
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        public SimpleEngine() 
-            : base(NullLogger<TranslationEngineBase>.Instance)
+        public DummyEngine() 
+            : base(NullLogger<DummyEngine>.Instance)
         {
-        }
-
-        /// <summary>
-        /// サポートされている言語ペアを取得
-        /// </summary>
-        public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
-        {
-            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs);
         }
 
         /// <summary>
@@ -70,9 +63,9 @@ namespace Baketa.Core.Translation.Testing;
             // 非常に単純なダミー実装
             string translated = request.SourceLanguage.Code switch
             {
-                "ja" => $"[JA→EN Simple] {request.SourceText}",
-                "en" => $"[EN→JA Simple] {request.SourceText}",
-                _ => $"[UNK Simple] {request.SourceText}"
+                "ja" => $"[JA→EN] {request.SourceText}",
+                "en" => $"[EN→JA] {request.SourceText}",
+                _ => $"[UNK] {request.SourceText}"
             };
 
             var response = new TranslationResponse
@@ -90,11 +83,19 @@ namespace Baketa.Core.Translation.Testing;
         }
 
         /// <summary>
+        /// サポートされている言語ペアを取得
+        /// </summary>
+        public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
+        {
+            return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs);
+        }
+
+        /// <summary>
         /// エンジン固有の初期化処理
         /// </summary>
         protected override Task<bool> InitializeInternalAsync()
         {
-            // 常に初期化成功
+            // ダミー実装なので常に成功
             return Task.FromResult(true);
         }
     }

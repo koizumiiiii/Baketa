@@ -96,6 +96,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             // オーバーレイ関連
             services.RegisterOverlayServices();
             
+            // マルチモニターサポート
+            services.AddMultiMonitorSupport();
+            
             // その他のUI関連サービス
             // 例: services.AddSingleton<IWindowsNotificationService, WindowsNotificationService>();
             

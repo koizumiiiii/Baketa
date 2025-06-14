@@ -8,8 +8,11 @@
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<Platforms>x64</Platforms>
-		<UseWPF>true</UseWPF>
-		<UseWindowsForms>true</UseWindowsForms>
+		<!-- WPFとWinFormsを無効化してAvaloniaとの競合を回避 -->
+		<!-- <UseWPF>true</UseWPF> -->
+		<!-- <UseWindowsForms>true</UseWindowsForms> -->
+		<LangVersion>12</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
 	<ItemGroup>
