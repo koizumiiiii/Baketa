@@ -72,6 +72,9 @@ namespace Baketa.UI.DI.Modules;
             // オーバーレイ関連サービス
             services.AddTransient<Baketa.UI.Overlay.AvaloniaOverlayWindowAdapter>();
             
+            // マルチモニターUIサポート
+            services.AddUIMultiMonitorSupport();
+            
             // 将来的に実装される予定の内容：
             
             // ダイアログサービスやナビゲーションサービス

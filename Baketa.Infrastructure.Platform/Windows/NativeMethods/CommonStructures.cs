@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
 
@@ -166,6 +167,40 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
     }
     
     /// <summary>
+    /// MONITORINFOEX構造体（モニター名を含む拡張版）
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct MONITORINFOEX
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+        
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szDevice;
+        
+        public static MONITORINFOEX Create()
+        {
+            return new MONITORINFOEX
+            {
+                cbSize = (uint)Marshal.SizeOf<MONITORINFOEX>(),
+                szDevice = string.Empty
+            };
+        }
+    }
+    
+    /// <summary>
+    /// DPI取得タイプ
+    /// </summary>
+    internal enum DpiType : uint
+    {
+        Effective = 0,
+        Angular = 1,
+        Raw = 2
+    }
+    
+    /// <summary>
     /// EnumDisplayMonitors用のデリゲート
     /// </summary>
     /// <param name="hMonitor">モニターハンドル</param>
@@ -174,3 +209,34 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
     /// <param name="dwData">ユーザーデータ</param>
     /// <returns>継続するかどうか</returns>
     internal delegate bool EnumMonitorsDelegate(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+    
+    /// <summary>
+    /// ウィンドウイベントプロシージャデリゲート
+    /// </summary>
+    internal delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, 
+        int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+    
+    /// <summary>
+    /// ウィンドウプロシージャデリゲート
+    /// </summary>
+    internal delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+    
+    /// <summary>
+    /// WNDCLASS構造体
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct WNDCLASS
+    {
+        public uint style;
+        public WndProcDelegate lpfnWndProc;
+        public int cbClsExtra;
+        public int cbWndExtra;
+        public IntPtr hInstance;
+        public IntPtr hIcon;
+        public IntPtr hCursor;
+        public IntPtr hbrBackground;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? lpszMenuName;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string lpszClassName;
+    }
