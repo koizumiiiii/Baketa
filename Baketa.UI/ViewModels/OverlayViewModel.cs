@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Reactive;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Baketa.Core.UI.Geometry;
 using Baketa.Core.UI.Overlay;
 using Baketa.UI.Framework;
@@ -10,7 +7,6 @@ using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Overlay;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
-
 using UIEvents = Baketa.UI.Framework.Events;
 
 namespace Baketa.UI.ViewModels;
@@ -228,8 +224,8 @@ namespace Baketa.UI.ViewModels;
                 }
                 
                 // プレビューオーバーレイを作成
-                var overlaySize = new Size(Width, Height);
-                var overlayPosition = new Point(OffsetX + 100, OffsetY + 100); // オフセットを適用
+                var overlaySize = new CoreSize(Width, Height);
+                var overlayPosition = new CorePoint(OffsetX + 100, OffsetY + 100); // オフセットを適用
                 
                 _previewOverlay = await _overlayAdapter.CreateOverlayWindowAsync(
                     nint.Zero, // プレビュー用はターゲット無し

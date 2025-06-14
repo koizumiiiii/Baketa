@@ -1,11 +1,13 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Baketa.Core.UI.Overlay;
 using Baketa.Core.UI.Geometry;
 using Microsoft.Extensions.Logging;
+using Point = Baketa.Core.UI.Geometry.Point;
+using Size = Baketa.Core.UI.Geometry.Size;
+using Rect = Baketa.Core.UI.Geometry.Rect;
+using Xunit;
 
-namespace Baketa.UI.Overlay.Tests;
+namespace Baketa.UI.Tests.Overlay;
 
 /// <summary>
 /// オーバーレイ機能の基本テストクラス
@@ -22,12 +24,15 @@ public static class OverlayBasicTests
         IOverlayWindowManager manager, 
         ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(manager);
+        
         try
         {
             logger?.LogInformation("オーバーレイ作成テストを開始します。");
             
             // デフォルト設定でオーバーレイを作成
-            var overlay = await OverlayWindowFactory.CreateDefaultOverlayAsync(manager, nint.Zero).ConfigureAwait(false);
+            // TODO: OverlayWindowFactoryの実装を待つ
+            var overlay = await manager.CreateOverlayWindowAsync(nint.Zero, new Size(400, 120), new Point(200, 200)).ConfigureAwait(false);
             
             // 基本プロパティの確認
             if (overlay.Handle == nint.Zero)
@@ -88,11 +93,14 @@ public static class OverlayBasicTests
         IOverlayWindowManager manager,
         ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(manager);
+        
         try
         {
             logger?.LogInformation("クリックスルーテストを開始します。");
             
-            var overlay = await OverlayWindowFactory.CreateDefaultOverlayAsync(manager, nint.Zero).ConfigureAwait(false);
+            // TODO: OverlayWindowFactoryの実装を待つ
+            var overlay = await manager.CreateOverlayWindowAsync(nint.Zero, new Size(400, 120), new Point(200, 200)).ConfigureAwait(false);
             
             // 初期状態（クリックスルー有効）
             if (!overlay.IsClickThrough)
@@ -146,11 +154,14 @@ public static class OverlayBasicTests
         IOverlayWindowManager manager,
         ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(manager);
+        
         try
         {
             logger?.LogInformation("ヒットテスト領域テストを開始します。");
             
-            var overlay = await OverlayWindowFactory.CreateDefaultOverlayAsync(manager, nint.Zero).ConfigureAwait(false);
+            // TODO: OverlayWindowFactoryの実装を待つ
+            var overlay = await manager.CreateOverlayWindowAsync(nint.Zero, new Size(400, 120), new Point(200, 200)).ConfigureAwait(false);
             
             // 初期状態（領域なし）
             if (overlay.HitTestAreas.Count != 0)
@@ -231,6 +242,8 @@ public static class OverlayBasicTests
         IOverlayWindowManager manager,
         ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(manager);
+        
         logger?.LogInformation("オーバーレイ基本テストスイートを開始します。");
         
         var tests = new (string Name, Func<Task<bool>> Test)[]

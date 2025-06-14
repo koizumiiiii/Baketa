@@ -1,5 +1,3 @@
-// 大元の実装は別プロジェクトにあるため、ここでは参照しない
-// using Baketa.Application.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Factories;
 
@@ -14,7 +12,6 @@ using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Factories;
 using Baketa.Core.Translation.Repositories;
 using Baketa.Core.Translation.Services;
-using Baketa.Core.Translation.Testing;
 using Baketa.Core.Translation.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
@@ -70,9 +67,12 @@ namespace Baketa.Core.Translation.DI;
             // HttpClientを登録
             services.AddHttpClient();
             
-            // 翻訳エンジン登録
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, DummyEngine>();
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, SimpleEngine>();
+            // TODO: 実際のプロダクション用翻訳エンジンをここに登録
+            // 例: services.AddSingleton<ITranslationEngine, GoogleTranslationEngine>();
+            // 例: services.AddSingleton<ITranslationEngine, DeepLTranslationEngine>();
+            
+            // 注意: DummyEngineとSimpleEngineはテスト用のため、プロダクションコードでは使用しない
+            // テスト時は Baketa.Core.Tests.Translation.Testing 名前空間から利用可能
             
             // 翻訳エンジンファクトリーの登録
             services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
