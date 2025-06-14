@@ -281,6 +281,40 @@ internal sealed class WindowsOverlayWindow : IOverlayWindow
         }
     }
     
+    public void Close()
+    {
+        ThrowIfDisposed(_disposed, this);
+        
+        try
+        {
+            Hide();
+            
+            if (WindowHandle != nint.Zero)
+            {
+                if (OverlayInterop.DestroyWindow(WindowHandle))
+                {
+                    WindowHandle = nint.Zero;
+                    _logger?.LogDebug("Overlay window closed successfully");
+                }
+                else
+                {
+                    var error = OverlayInterop.GetLastError();
+                    _logger?.LogError("Failed to destroy window. Error: {Error}", error);
+                }
+            }
+        }
+        catch (ExternalException ex)
+        {
+            _logger?.LogError(ex, "External exception while closing overlay window");
+            throw;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger?.LogError(ex, "Invalid operation while closing overlay window");
+            throw;
+        }
+    }
+    
     // === プライベートメソッド ===
     
     private void InitializeWindow()

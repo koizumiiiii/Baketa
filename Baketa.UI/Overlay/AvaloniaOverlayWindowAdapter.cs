@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Baketa.Core.UI.Overlay;
 using Baketa.Core.UI.Geometry;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Overlay;
 
@@ -34,8 +30,8 @@ public sealed class AvaloniaOverlayWindowAdapter
     /// </summary>
     public async Task<IOverlayWindow> CreateOverlayWindowAsync(
         nint targetWindowHandle, 
-        Size initialSize, 
-        Point initialPosition)
+        CoreSize initialSize, 
+        CorePoint initialPosition)
     {
         try
         {
@@ -120,8 +116,8 @@ public static class OverlayWindowFactory
         ArgumentNullException.ThrowIfNull(manager);
         
         // デフォルト設定
-        var defaultSize = new Size(600, 100);
-        var defaultPosition = new Point(100, 100);
+        var defaultSize = new CoreSize(600, 100);
+        var defaultPosition = new CorePoint(100, 100);
         
         return await manager.CreateOverlayWindowAsync(targetWindowHandle, defaultSize, defaultPosition).ConfigureAwait(false);
     }
@@ -136,23 +132,23 @@ public static class OverlayWindowFactory
     public static async Task<IOverlayWindow> CreateTranslationOverlayAsync(
         IOverlayWindowManager manager,
         nint targetWindowHandle,
-        Rect textBounds)
+        CoreRect textBounds)
     {
         ArgumentNullException.ThrowIfNull(manager);
         
         // テキスト境界に基づいてサイズと位置を計算
-        var overlaySize = new Size(
+        var overlaySize = new CoreSize(
             Math.Max(textBounds.Width, 200), 
             Math.Max(textBounds.Height + 20, 60));
         
-        var overlayPosition = new Point(
+        var overlayPosition = new CorePoint(
             textBounds.X, 
             textBounds.Y + textBounds.Height + 5);
         
         var overlay = await manager.CreateOverlayWindowAsync(targetWindowHandle, overlaySize, overlayPosition).ConfigureAwait(false);
         
         // 翻訳テキスト用のヒットテスト領域を追加
-        var hitTestArea = new Rect(0, 0, overlaySize.Width, overlaySize.Height);
+        var hitTestArea = new CoreRect(0, 0, overlaySize.Width, overlaySize.Height);
         overlay.AddHitTestArea(hitTestArea);
         
         return overlay;
