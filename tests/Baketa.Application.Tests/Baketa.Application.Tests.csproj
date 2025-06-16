@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <Platforms>x64</Platforms>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    
+    <!-- テストプロジェクトでのCA2007警告抑制 -->
+    <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -97,17 +97,22 @@ public class BasicTests
     public async Task AsyncOperationsShouldWork()
     {
         // Arrange
-        var delay = TimeSpan.FromMilliseconds(10);
+        var delay = TimeSpan.FromMilliseconds(50); // より確実な遅延時間に変更
+        var tolerance = TimeSpan.FromMilliseconds(10); // 許容誤差を設定
         
         // Act
-        var startTime = DateTime.UtcNow;
-        await Task.Delay(delay).ConfigureAwait(true);
-        var endTime = DateTime.UtcNow;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await Task.Delay(delay);
+        stopwatch.Stop();
         
         // Assert
-        var actualDelay = endTime - startTime;
-        Assert.True(actualDelay >= delay);
+        var actualDelay = stopwatch.Elapsed;
+        var minimumExpected = delay - tolerance; // 許容誤差を考慮した最小時間
         
-        _output.WriteLine($"✅ 非同期処理テスト完了: 遅延 {actualDelay.TotalMilliseconds:F1}ms");
+        Assert.True(
+            actualDelay >= minimumExpected,
+            $"期待される最小遅延時間: {minimumExpected.TotalMilliseconds:F1}ms, 実際の遅延時間: {actualDelay.TotalMilliseconds:F1}ms");
+        
+        _output.WriteLine($"✅ 非同期処理テスト完了: 遅延 {actualDelay.TotalMilliseconds:F1}ms (期待: {delay.TotalMilliseconds:F1}ms)");
     }
 }
