@@ -10,35 +10,8 @@ namespace Baketa.UI.Framework;
     /// </summary>
     internal static class ReactiveObjectExtensions
     {
-        /// <summary>
-        /// プロパティを設定し、変更があった場合のみ通知します
-        /// </summary>
-        /// <typeparam name="TObj">ReactiveObjectの型</typeparam>
-        /// <typeparam name="TProperty">プロパティの型</typeparam>
-        /// <param name="This">ReactiveObjectインスタンス</param>
-        /// <param name="backingField">バッキングフィールドの参照</param>
-        /// <param name="newValue">新しい値</param>
-        /// <param name="propertyName">プロパティ名</param>
-        /// <returns>値が変更されたかどうか</returns>
-        public static bool RaiseAndSetIfChanged<TObj, TProperty>(
-            this TObj This,
-            ref TProperty backingField,
-            TProperty newValue,
-            [CallerMemberName] string? propertyName = null)
-            where TObj : ReactiveObject
-        {
-            ArgumentNullException.ThrowIfNull(This);
-            if (EqualityComparer<TProperty>.Default.Equals(backingField, newValue))
-                return false;
-                
-            // nullの場合は空文字列を使用
-            var safeName = propertyName ?? string.Empty;
-            
-            This.RaisePropertyChanging(safeName);
-            backingField = newValue;
-            This.RaisePropertyChanged(safeName);
-            return true;
-        }
+        // 競合を回避するため、ReactiveUIの標準メソッドを使用します
+        // カスタムのRaiseAndSetIfChangedメソッドは削除しました
         
         /// <summary>
         /// 複数のプロパティ変更を一度に通知します
