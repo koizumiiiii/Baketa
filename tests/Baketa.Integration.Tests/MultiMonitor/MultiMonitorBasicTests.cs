@@ -79,12 +79,12 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         var monitorManager = _serviceProvider.GetRequiredService<IMonitorManager>();
         
         // Act & Assert - 開始
-        await monitorManager.StartMonitoringAsync().ConfigureAwait(true);
+        await monitorManager.StartMonitoringAsync();
         Assert.True(monitorManager.IsMonitoring);
         _output.WriteLine("✅ モニター監視開始");
         
         // Act & Assert - 停止
-        await monitorManager.StopMonitoringAsync().ConfigureAwait(true);
+        await monitorManager.StopMonitoringAsync();
         Assert.False(monitorManager.IsMonitoring);
         _output.WriteLine("✅ モニター監視停止");
     }
@@ -100,11 +100,11 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         var mockGameWindow = GetMockGameWindowHandle();
         
         // Act & Assert - 開始
-        await fullscreenService.StartMonitoringAsync(mockGameWindow).ConfigureAwait(true);
+        await fullscreenService.StartMonitoringAsync(mockGameWindow);
         _output.WriteLine("✅ フルスクリーン監視開始");
         
         // Act & Assert - 停止
-        await fullscreenService.StopMonitoringAsync().ConfigureAwait(true);
+        await fullscreenService.StopMonitoringAsync();
         _output.WriteLine("✅ フルスクリーン監視停止");
         
         // 例外が発生しなければ成功
@@ -158,15 +158,15 @@ public class MultiMonitorBasicTests : IAsyncDisposable
             var fullscreenService = provider.GetRequiredService<IFullscreenModeService>();
             
             // Act - サービス開始
-            await monitorManager.StartMonitoringAsync().ConfigureAwait(true);
-            await fullscreenService.StartMonitoringAsync(GetMockGameWindowHandle()).ConfigureAwait(true);
+            await monitorManager.StartMonitoringAsync();
+            await fullscreenService.StartMonitoringAsync(GetMockGameWindowHandle());
             
-            // 短時間実行
-            await Task.Delay(100).ConfigureAwait(true);
+            // 短時間実行（安定した遅延時間を使用）
+            await Task.Delay(200);
             
             // サービス停止
-            await monitorManager.StopMonitoringAsync().ConfigureAwait(true);
-            await fullscreenService.StopMonitoringAsync().ConfigureAwait(true);
+            await monitorManager.StopMonitoringAsync();
+            await fullscreenService.StopMonitoringAsync();
             
             _output.WriteLine("✅ サービスの開始・停止が正常に完了しました");
         }
@@ -175,11 +175,11 @@ public class MultiMonitorBasicTests : IAsyncDisposable
             // Act - リソース解放
             if (provider is IAsyncDisposable asyncProvider)
             {
-                await asyncProvider.DisposeAsync().ConfigureAwait(true);
+                await asyncProvider.DisposeAsync();
             }
             else if (provider is IDisposable disposableProvider)
             {
-                await Task.Run(disposableProvider.Dispose).ConfigureAwait(true);
+                await Task.Run(disposableProvider.Dispose);
             }
         }
         
@@ -202,7 +202,7 @@ public class MultiMonitorBasicTests : IAsyncDisposable
     {
         if (_serviceProvider is IAsyncDisposable asyncDisposable)
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(true);
+            await asyncDisposable.DisposeAsync();
         }
         else if (_serviceProvider is IDisposable disposable)
         {

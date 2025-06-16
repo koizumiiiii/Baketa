@@ -188,3 +188,22 @@ dotnet_diagnostic.CA1721.severity = none
 [*TranslationContext.cs]
 dotnet_diagnostic.IDE0251.severity = none
 dotnet_diagnostic.CA1051.severity = none
+
+# === テストプロジェクト固有の設定 ===
+
+# テストプロジェクトではConfigureAwait(false)を使用すべきではないため、CA2007を抑制
+[**/tests/**/*.cs]
+dotnet_diagnostic.CA2007.severity = none
+
+# テストメソッドでのasync/await関連の警告抑制
+[**/*Tests.cs]
+dotnet_diagnostic.CA2007.severity = none
+
+# 具体的なテストプロジェクトパス
+[**/Baketa.*Tests/**/*.cs]
+dotnet_diagnostic.CA2007.severity = none
+
+# テスト用モッククラスでの警告抑制
+[**/*Mock*.cs]
+dotnet_diagnostic.CA1812.severity = none
+dotnet_diagnostic.CA1822.severity = none
