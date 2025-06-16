@@ -1134,7 +1134,6 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
 internal sealed class TestDisplayChangeListener : IDisposable
 {
     private readonly ILogger _logger;
-    private volatile bool _isListening;
     private volatile bool _disposed;
     
     public TestDisplayChangeListener(ILogger logger)
@@ -1144,13 +1143,11 @@ internal sealed class TestDisplayChangeListener : IDisposable
     
     public void StartListening()
     {
-        _isListening = true;
         _logger.LogDebug("Test display change listener started (no-op)");
     }
     
     public void StopListening()
     {
-        _isListening = false;
         _logger.LogDebug("Test display change listener stopped (no-op)");
     }
     

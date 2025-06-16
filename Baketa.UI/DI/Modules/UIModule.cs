@@ -4,6 +4,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Services;
+using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -71,6 +72,9 @@ namespace Baketa.UI.DI.Modules;
             
             // オーバーレイ関連サービス
             services.AddTransient<Baketa.UI.Overlay.AvaloniaOverlayWindowAdapter>();
+            
+            // オーバーレイ位置管理システム
+            OverlayPositioningModule.RegisterServices(services);
             
             // マルチモニターUIサポート
             services.AddUIMultiMonitorSupport();
