@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Events;
 using Baketa.Application.Models;
+using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
 using Baketa.UI.Framework;
@@ -21,13 +22,11 @@ namespace Baketa.UI.ViewModels.Controls;
 /// </summary>
 internal sealed class OperationalControlViewModel : Framework.ViewModelBase
 {
-    private readonly ICaptureService _captureService;
+    private readonly ITranslationOrchestrationService _translationOrchestrationService;
     private readonly ISettingsService _settingsService;
     
-    // 割り込み処理用
-    private CancellationTokenSource? _automaticModeCts;
-    private Task? _automaticTranslationTask;
-    private volatile bool _isSingleTranslationActive;
+    // 割り込み処理用（統合サービス内で管理されるため簡素化）
+    private volatile bool _isSubscribedToTranslationEvents;
 
     #region Properties
 
@@ -80,18 +79,18 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     /// <summary>
     /// コンストラクタ
     /// </summary>
-    /// <param name="captureService">キャプチャサービス</param>
+    /// <param name="translationOrchestrationService">翻訳統合サービス</param>
     /// <param name="settingsService">設定サービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public OperationalControlViewModel(
-        ICaptureService captureService,
+        ITranslationOrchestrationService translationOrchestrationService,
         ISettingsService settingsService,
-        IEventAggregator eventAggregator,
+        Baketa.UI.Framework.Events.IEventAggregator eventAggregator,
         ILogger<OperationalControlViewModel>? logger = null)
         : base(eventAggregator, logger)
     {
-        _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
+        _translationOrchestrationService = translationOrchestrationService ?? throw new ArgumentNullException(nameof(translationOrchestrationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
         // コマンドの作成（実行可否条件付き）
@@ -107,6 +106,9 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
 
         // プロパティ変更の監視
         SetupPropertyObservations();
+        
+        // 翻訳統合サービスのイベント購読
+        SubscribeToTranslationEvents();
     }
 
     /// <summary>
@@ -125,10 +127,58 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
             .Subscribe(isTranslating =>
             {
                 CanToggleMode = !isTranslating;
-                CanTriggerSingleTranslation = !isTranslating || !_isSingleTranslationActive;
+                CanTriggerSingleTranslation = !isTranslating;
                 UpdateCurrentStatus();
             });
         _disposables.Add(subscription2);
+    }
+
+    /// <summary>
+    /// 翻訳統合サービスのイベント購読
+    /// </summary>
+    private void SubscribeToTranslationEvents()
+    {
+        if (_isSubscribedToTranslationEvents) return;
+
+        // 翻訳結果の監視
+        var translationResultsSubscription = _translationOrchestrationService.TranslationResults
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(result =>
+            {
+                _logger?.LogDebug("翻訳結果を受信: ID={Id}, モード={Mode}, テキスト長={Length}",
+                    result.Id, result.Mode, result.TranslatedText.Length);
+                    
+                // UI更新処理（必要に応じて）
+                UpdateCurrentStatus();
+            });
+        _disposables.Add(translationResultsSubscription);
+
+        // 翻訳状態変更の監視
+        var statusChangesSubscription = _translationOrchestrationService.StatusChanges
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(status =>
+            {
+                // 翻訳サービスの状態をViewModelの状態に反映
+                IsTranslating = _translationOrchestrationService.IsAnyTranslationActive;
+                UpdateCurrentStatus();
+            });
+        _disposables.Add(statusChangesSubscription);
+
+        // 進行状況の監視
+        var progressSubscription = _translationOrchestrationService.ProgressUpdates
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(progress =>
+            {
+                // 必要に応じて詳細な進行状況をUIに反映
+                if (!string.IsNullOrEmpty(progress.Message))
+                {
+                    CurrentStatus = progress.Message;
+                }
+            });
+        _disposables.Add(progressSubscription);
+
+        _isSubscribedToTranslationEvents = true;
+        _logger?.LogDebug("翻訳統合サービスのイベント購読を開始しました");
     }
 
     /// <summary>
@@ -178,67 +228,37 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     /// </summary>
     private async Task ExecuteTriggerSingleTranslationAsync()
     {
-        if (_isSingleTranslationActive)
-        {
-            _logger?.LogWarning("単発翻訳が既に実行中です");
-            return;
-        }
-
-        _isSingleTranslationActive = true;
-        IsTranslating = true;
-
         try
         {
-            CurrentStatus = "単発翻訳実行中...";
+            _logger?.LogInformation("単発翻訳を実行します");
 
-            // 翻訳実行イベントを発行
-            await PublishEventAsync(new TranslationTriggeredEvent(TranslationMode.Manual)).ConfigureAwait(true);
+            // 翻訳統合サービス経由で単発翻訳を実行
+            await _translationOrchestrationService.TriggerSingleTranslationAsync().ConfigureAwait(true);
 
-            // TODO: 実際のキャプチャサービスが実装されたら置き換える
-            // 現在のICaptureServiceにはCaptureOnceAsyncがないため、一時的に代替実装
-            await SimulateCaptureOnceAsync().ConfigureAwait(true);
-
-            _logger?.LogInformation("単発翻訳が完了しました");
-            CurrentStatus = "翻訳完了";
-
-            // 一定時間後にステータスをリセット
-            using var delayCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await Task.Delay(2000, delayCts.Token).ConfigureAwait(true);
-            if (!IsTranslating) // まだ他の翻訳が実行中でなければリセット
-            {
-                CurrentStatus = IsAutomaticMode ? "自動翻訳中" : "準備完了";
-            }
+            _logger?.LogInformation("単発翻訳コマンドを送信しました");
         }
         catch (OperationCanceledException ex)
         {
             _logger?.LogInformation(ex, "単発翻訳がキャンセルされました");
-            CurrentStatus = "キャンセル";
+            ErrorMessage = "翻訳がキャンセルされました";
         }
         catch (InvalidOperationException ex)
         {
             _logger?.LogError(ex, "単発翻訳実行中に無効な操作が発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
-            CurrentStatus = "エラー";
         }
         catch (TimeoutException ex)
         {
             _logger?.LogError(ex, "単発翻訳がタイムアウトしました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
-            CurrentStatus = "エラー";
         }
 #pragma warning disable CA1031 // ViewModel層でのユーザー体験保護のため一般例外をキャッチ
         catch (Exception ex)
         {
             _logger?.LogError(ex, "単発翻訳実行中に予期しないエラーが発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
-            CurrentStatus = "エラー";
         }
 #pragma warning restore CA1031
-        finally
-        {
-            _isSingleTranslationActive = false;
-            IsTranslating = _automaticTranslationTask?.Status == TaskStatus.Running;
-        }
     }
 
     /// <summary>
@@ -250,11 +270,13 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
         {
             if (isAutomatic)
             {
-                await StartAutomaticTranslationAsync().ConfigureAwait(true);
+                _logger?.LogInformation("自動翻訳モードを開始します");
+                await _translationOrchestrationService.StartAutomaticTranslationAsync().ConfigureAwait(true);
             }
             else
             {
-                await StopAutomaticTranslationAsync().ConfigureAwait(true);
+                _logger?.LogInformation("自動翻訳モードを停止します");
+                await _translationOrchestrationService.StopAutomaticTranslationAsync().ConfigureAwait(true);
             }
         }
         catch (InvalidOperationException ex)
@@ -276,188 +298,19 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
 #pragma warning restore CA1031
     }
 
-    /// <summary>
-    /// 自動翻訳開始
-    /// </summary>
-    private async Task StartAutomaticTranslationAsync()
-    {
-        if (_automaticTranslationTask?.Status == TaskStatus.Running)
-        {
-            _logger?.LogWarning("自動翻訳が既に実行中です");
-            return;
-        }
 
-        _automaticModeCts = new CancellationTokenSource();
-        IsTranslating = true;
-        CurrentStatus = "自動翻訳開始中...";
-
-        _automaticTranslationTask = Task.Run(async () =>
-        {
-            try
-            {
-                CurrentStatus = "自動翻訳中";
-                
-                // TODO: 実際のキャプチャサービスが実装されたら置き換える
-                // 現在のICaptureServiceにはStartContinuousCaptureAsyncがないため、一時的に代替実装
-                await SimulateStartContinuousCaptureAsync(_automaticModeCts.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger?.LogInformation("自動翻訳がキャンセルされました");
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger?.LogError(ex, "自動翻訳中に無効な操作が発生しました");
-                ErrorMessage = $"自動翻訳エラー: {ex.Message}";
-            }
-#pragma warning disable CA1031 // バックグラウンドタスクでのアプリケーション安定性のため一般例外をキャッチ
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "自動翻訳中に予期しないエラーが発生しました");
-                ErrorMessage = $"自動翻訳エラー: {ex.Message}";
-            }
-#pragma warning restore CA1031
-        }, _automaticModeCts.Token);
-
-        _logger?.LogInformation("自動翻訳を開始しました");
-        await Task.CompletedTask.ConfigureAwait(true);
-    }
-
-    /// <summary>
-    /// 自動翻訳停止
-    /// </summary>
-    private async Task StopAutomaticTranslationAsync()
-    {
-        if (_automaticModeCts == null || _automaticTranslationTask?.Status != TaskStatus.Running)
-        {
-            _logger?.LogWarning("停止する自動翻訳がありません");
-            IsTranslating = false;
-            CurrentStatus = "準備完了";
-            return;
-        }
-
-        CurrentStatus = "自動翻訳停止中...";
-
-        try
-        {
-#pragma warning disable CA1849 // CancellationTokenSource.Cancel()には非同期バージョンが存在しない
-            _automaticModeCts.Cancel();
-#pragma warning restore CA1849
-            
-            // タスクの完了を待機（タイムアウト付き）
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await _automaticTranslationTask.WaitAsync(timeoutCts.Token).ConfigureAwait(true);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogWarning("自動翻訳の停止がタイムアウトしました");
-        }
-        finally
-        {
-            _automaticModeCts?.Dispose();
-            _automaticModeCts = null;
-            _automaticTranslationTask = null;
-            IsTranslating = _isSingleTranslationActive;
-            CurrentStatus = "準備完了";
-        }
-
-        _logger?.LogInformation("自動翻訳を停止しました");
-    }
 
     /// <summary>
     /// 現在の状態表示を更新
     /// </summary>
     private void UpdateCurrentStatus()
     {
-        if (IsTranslating)
-        {
-            if (_isSingleTranslationActive)
-            {
-                CurrentStatus = "単発翻訳実行中...";
-            }
-            else if (IsAutomaticMode)
-            {
-                CurrentStatus = "自動翻訳中";
-            }
-        }
-        else
-        {
-            CurrentStatus = IsAutomaticMode ? "自動翻訳待機中" : "準備完了";
-        }
+        CurrentStatus = _translationOrchestrationService.IsSingleTranslationActive ? "単発翻訳実行中..." :
+                        _translationOrchestrationService.IsAutomaticTranslationActive ? "自動翻訳中" :
+                        IsAutomaticMode ? "自動翻訳待機中" : "準備完了";
     }
 
-    #region 一時的な代替実装（TODO: 実際のサービス実装後に削除）
 
-    /// <summary>
-    /// CaptureOnceAsyncの代替実装
-    /// </summary>
-    private async Task SimulateCaptureOnceAsync()
-    {
-        // 画面全体をキャプチャ（既存のメソッドを使用）
-        var image = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
-        
-        // 実際の翻訳処理はここで行われるが、現在は模擬実装
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await Task.Delay(1000, cts.Token).ConfigureAwait(false); // 翻訳処理時間をシミュレート
-        
-        // 画像リソースを解放
-        image?.Dispose();
-    }
-
-    /// <summary>
-    /// StartContinuousCaptureAsyncの代替実装
-    /// </summary>
-    private async Task SimulateStartContinuousCaptureAsync(CancellationToken cancellationToken)
-    {
-        var options = _captureService.GetCaptureOptions();
-        var interval = TimeSpan.FromMilliseconds(options.CaptureInterval);
-
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            try
-            {
-                // 単発翻訳が実行中の場合は待機
-                while (_isSingleTranslationActive && !cancellationToken.IsCancellationRequested)
-                {
-                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-                }
-
-                if (cancellationToken.IsCancellationRequested)
-                    break;
-
-                // 連続キャプチャと翻訳を実行
-                var image = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
-                
-                // 翻訳実行イベントを発行
-                await PublishEventAsync(new TranslationTriggeredEvent(TranslationMode.Automatic)).ConfigureAwait(false);
-                
-                // 実際の翻訳処理はここで行われるが、現在は模擬実装
-                await Task.Delay(500, cancellationToken).ConfigureAwait(false); // 翻訳処理時間をシミュレート
-                
-                image?.Dispose();
-
-                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger?.LogError(ex, "連続キャプチャ中に無効な操作が発生しました");
-                await Task.Delay(1000, cancellationToken).ConfigureAwait(false); // エラー時は少し待機
-            }
-#pragma warning disable CA1031 // バックグラウンドループでのアプリケーション安定性のため一般例外をキャッチ
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "連続キャプチャ中に予期しないエラーが発生しました");
-                await Task.Delay(1000, cancellationToken).ConfigureAwait(false); // エラー時は少し待機
-            }
-#pragma warning restore CA1031
-        }
-    }
-
-    #endregion
 
     /// <summary>
     /// アクティベーション時の処理
@@ -467,6 +320,22 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
         // 初期状態の設定
         UpdateCurrentStatus();
         
+        // 翻訳統合サービスを開始
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _translationOrchestrationService.StartAsync().ConfigureAwait(false);
+                _logger?.LogDebug("TranslationOrchestrationServiceが開始されました");
+            }
+#pragma warning disable CA1031 // UIアクティベーション時のアプリケーション安定性のため一般例外をキャッチ
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "TranslationOrchestrationServiceの開始中にエラーが発生しました");
+            }
+#pragma warning restore CA1031
+        });
+        
         _logger?.LogDebug("OperationalControlViewModelがアクティベートされました");
     }
 
@@ -475,23 +344,21 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     /// </summary>
     protected override void HandleDeactivation()
     {
-        // 自動翻訳を停止
-        if (IsAutomaticMode)
+        // 翻訳統合サービスを停止
+        _ = Task.Run(async () =>
         {
-#pragma warning disable CA1031 // UI非同期処理でのアプリケーション安定性のため一般例外をキャッチ
-            _ = Task.Run(async () =>
+            try
             {
-                try
-                {
-                    await StopAutomaticTranslationAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "非アクティベーション時の自動翻訳停止でエラーが発生しました");
-                }
-            });
+                await _translationOrchestrationService.StopAsync().ConfigureAwait(false);
+                _logger?.LogDebug("TranslationOrchestrationServiceが停止されました");
+            }
+#pragma warning disable CA1031 // UI非アクティベーション時のアプリケーション安定性のため一般例外をキャッチ
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "非アクティベーション時のTranslationOrchestrationService停止でエラーが発生しました");
+            }
 #pragma warning restore CA1031
-        }
+        });
 
         _logger?.LogDebug("OperationalControlViewModelが非アクティベートされました");
     }
@@ -503,11 +370,11 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     {
         if (disposing)
         {
-            // 自動翻訳の停止
-#pragma warning disable CA1849 // CancellationTokenSource.Cancel()には非同期バージョンが存在しない
-            _automaticModeCts?.Cancel();
-#pragma warning restore CA1849
-            _automaticModeCts?.Dispose();
+            // 翻訳統合サービスのリソース解放
+            if (_translationOrchestrationService is IDisposable disposableService)
+            {
+                disposableService.Dispose();
+            }
         }
 
         base.Dispose(disposing);
