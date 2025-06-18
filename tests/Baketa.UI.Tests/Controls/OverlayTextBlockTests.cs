@@ -48,6 +48,7 @@ public sealed class OverlayTextBlockTests : IDisposable
         Assert.True(control.ToggleVisibilityEnabled);
         Assert.Equal(1.4, control.LineHeight);
         Assert.Equal(TextWrapping.Wrap, control.TextWrapping);
+        Assert.Equal(8.0, control.ParagraphSpacing);
 
         _output.WriteLine("✅ コンストラクター初期値テスト完了");
     }
@@ -154,6 +155,45 @@ public sealed class OverlayTextBlockTests : IDisposable
         Assert.Equal(wrapping, control.TextWrapping);
 
         _output.WriteLine($"✅ テキスト折り返しプロパティテスト完了: {wrapping}");
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(8.0)]
+    [InlineData(16.0)]
+    public void ParagraphSpacingPropertyShouldSetAndGetCorrectly(double spacing)
+    {
+        // Arrange
+        var control = new OverlayTextBlock();
+
+        // Act
+        control.ParagraphSpacing = spacing;
+
+        // Assert
+        Assert.Equal(spacing, control.ParagraphSpacing);
+
+        _output.WriteLine($"✅ 段落間スペーシングプロパティテスト完了: {spacing}");
+    }
+
+    [Fact]
+    public void ParagraphSpacingWithEdgeValuesShouldHandleCorrectly()
+    {
+        // Arrange
+        var control = new OverlayTextBlock();
+
+        // Act & Assert - 最小値付近
+        control.ParagraphSpacing = 0.0;
+        Assert.Equal(0.0, control.ParagraphSpacing);
+
+        // Act & Assert - 大きな値
+        control.ParagraphSpacing = 50.0;
+        Assert.Equal(50.0, control.ParagraphSpacing);
+
+        // Act & Assert - デフォルト値
+        control.ParagraphSpacing = 8.0;
+        Assert.Equal(8.0, control.ParagraphSpacing);
+
+        _output.WriteLine("✅ 段落間スペーシングエッジケーステスト完了");
     }
 
     #endregion
@@ -308,6 +348,7 @@ public sealed class OverlayTextBlockTests : IDisposable
             control.Theme = (OverlayTheme)(i % 4);
             control.AnimationEnabled = i % 2 == 0;
             control.LineHeight = 1.0 + (i % 10) * 0.1;
+            control.ParagraphSpacing = 4.0 + (i % 5) * 2.0;
         }
 
         stopwatch.Stop();
@@ -382,6 +423,7 @@ public sealed class OverlayTextBlockTests : IDisposable
         control.ToggleVisibilityEnabled = false;
         control.LineHeight = 2.0;
         control.TextWrapping = TextWrapping.NoWrap;
+        control.ParagraphSpacing = 16.0;
 
         // Assert
         Assert.Equal("統合テストテキスト", control.Text);
@@ -390,6 +432,7 @@ public sealed class OverlayTextBlockTests : IDisposable
         Assert.False(control.ToggleVisibilityEnabled);
         Assert.Equal(2.0, control.LineHeight);
         Assert.Equal(TextWrapping.NoWrap, control.TextWrapping);
+        Assert.Equal(16.0, control.ParagraphSpacing);
 
         _output.WriteLine("✅ 複数プロパティ変更統合テスト完了");
     }

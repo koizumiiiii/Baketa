@@ -12,6 +12,8 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="MaxWidth" Value="500"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineHeight" Value="1.4"/>
+        <Setter Property="ParagraphSpacing" Value="8"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="VerticalAlignment" Value="Top"/>
         <Setter Property="Template">
@@ -22,6 +24,7 @@
                         BorderThickness="{TemplateBinding BorderThickness}"
                         CornerRadius="{TemplateBinding CornerRadius}"
                         BoxShadow="{TemplateBinding BoxShadow}">
+                    <!-- 注意: ParagraphSpacingプロパティは将来の複数段落サポートで使用予定 -->
                     <TextBlock Name="PART_TextBlock"
                                Text="{TemplateBinding Text}"
                                Foreground="{TemplateBinding Foreground}"
@@ -29,7 +32,7 @@
                                FontSize="{TemplateBinding FontSize}"
                                FontWeight="{TemplateBinding FontWeight}"
                                TextWrapping="{TemplateBinding TextWrapping}"
-                               LineHeight="1.4"
+                               LineHeight="{TemplateBinding LineHeight}"
                                Margin="{TemplateBinding Padding}"/>
                 </Border>
             </ControlTemplate>

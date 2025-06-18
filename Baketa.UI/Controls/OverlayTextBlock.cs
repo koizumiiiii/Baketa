@@ -80,6 +80,12 @@ public class OverlayTextBlock : ContentControl
         AvaloniaProperty.Register<OverlayTextBlock, BoxShadows>(
             nameof(BoxShadow),
             defaultValue: default);
+            
+    /// <summary>段落間スペーシングプロパティ</summary>
+    public static readonly StyledProperty<double> ParagraphSpacingProperty =
+        AvaloniaProperty.Register<OverlayTextBlock, double>(
+            nameof(ParagraphSpacing),
+            defaultValue: 8.0);
 
     /// <summary>アニメーション有効/無効</summary>
     public bool AnimationEnabled
@@ -114,6 +120,13 @@ public class OverlayTextBlock : ContentControl
     {
         get => GetValue(BoxShadowProperty);
         set => SetValue(BoxShadowProperty, value);
+    }
+    
+    /// <summary>段落間スペーシング</summary>
+    public double ParagraphSpacing
+    {
+        get => GetValue(ParagraphSpacingProperty);
+        set => SetValue(ParagraphSpacingProperty, value);
     }
 
     // アニメーション制御用フィールド
