@@ -29,7 +29,7 @@ public class OverlayTextBlock : ContentControl
     public string Text
     {
         get => GetValue(TextProperty);
-        set => SetValue(TextProperty, value);
+        set => SetValue(TextProperty, value ?? string.Empty);
     }
 
     /// <summary>テーマプリセット</summary>

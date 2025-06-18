@@ -29,7 +29,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             AdapterTestHelper.EnsureTestDataExists();
         }
         
-        [Fact(Skip = "GDI+ エラーのため一時スキップ - Issue #70とは無関係")]
+        [Fact]
         public void ToImage_NullArgument_ThrowsArgumentNullException()
         {
             // Arrange & Act & Assert
