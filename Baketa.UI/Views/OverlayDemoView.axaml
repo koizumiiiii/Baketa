@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Baketa.UI.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Baketa.UI.Views.OverlayDemoView">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- タイトル -->
+        <TextBlock Grid.Row="0" 
+                   Text="Overlay Text Block Demo"
+                   FontSize="24" 
+                   FontWeight="Bold" 
+                   Margin="0,0,0,20"/>
+        
+        <!-- コントロールパネル -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,20">
+            <Button Name="ToggleButton" Content="Toggle Visibility" Padding="8,4"/>
+            <ComboBox Name="ThemeComboBox" MinWidth="120">
+                <ComboBoxItem>Auto</ComboBoxItem>
+                <ComboBoxItem>Light</ComboBoxItem>
+                <ComboBoxItem>Dark</ComboBoxItem>
+                <ComboBoxItem>HighContrast</ComboBoxItem>
+            </ComboBox>
+            <CheckBox Name="AnimationCheckBox" Content="Animation Enabled" IsChecked="True"/>
+        </StackPanel>
+        
+        <!-- デモ表示エリア -->
+        <Border Grid.Row="2" 
+                Background="#F0F0F0" 
+                CornerRadius="8"
+                Padding="20">
+            
+            <StackPanel Spacing="20">
+                <!-- サンプルテキスト1 -->
+                <controls:OverlayTextBlock Name="SampleOverlay1"
+                                         Text="これはオーバーレイテキストブロックのサンプルです。ゲーム翻訳テキストの表示をシミュレートしています。"
+                                         Theme="Dark"
+                                         AnimationEnabled="True"
+                                         ToggleVisibilityEnabled="True"/>
+                
+                <!-- サンプルテキスト2 -->
+                <controls:OverlayTextBlock Name="SampleOverlay2"
+                                         Text="Sample English text for overlay demonstration. This shows how different themes look."
+                                         Theme="Light"
+                                         AnimationEnabled="True"
+                                         ToggleVisibilityEnabled="True"/>
+                
+                <!-- サンプルテキスト3 -->
+                <controls:OverlayTextBlock Name="SampleOverlay3"
+                                         Text="高コントラストテーマのサンプル。アクセシビリティを重視した表示です。"
+                                         Theme="HighContrast"
+                                         AnimationEnabled="True"
+                                         ToggleVisibilityEnabled="True"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
