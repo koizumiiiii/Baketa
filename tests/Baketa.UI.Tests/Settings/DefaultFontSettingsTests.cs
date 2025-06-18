@@ -135,7 +135,7 @@ public sealed class DefaultFontSettingsTests
         var weight = DefaultFontSettings.Weight;
 
         // Assert - 有効なFontWeight値である
-        Assert.True(weight >= FontWeight.Thin && weight <= FontWeight.UltraBlack);
+        Assert.InRange(weight, FontWeight.Thin, FontWeight.UltraBlack);
         
         // Assert - Normal値である
         Assert.Equal(FontWeight.Normal, weight);
@@ -151,10 +151,12 @@ public sealed class DefaultFontSettingsTests
         var lineHeight = DefaultFontSettings.LineHeight;
 
         // Assert - 正の値である
-        Assert.True(size > 0 && lineHeight > 0);
+        Assert.True(size > 0);
+        Assert.True(lineHeight > 0);
         
         // Assert - 実用的な範囲内である
-        Assert.True(size >= 8.0 && size <= 72.0 && lineHeight >= 1.0 && lineHeight <= 3.0);
+        Assert.InRange(size, 8.0, 72.0);
+        Assert.InRange(lineHeight, 1.0, 3.0);
 
         _output.WriteLine($"✅ 数値妥当性テスト完了:");
         _output.WriteLine($"  サイズ: {size} (8-72の範囲内)");
@@ -185,7 +187,7 @@ public sealed class DefaultFontSettingsTests
         stopwatch.Stop();
 
         // Assert - 10000回のアクセスが50ms以内に完了することを確認
-        Assert.True(stopwatch.ElapsedMilliseconds < 50);
+        Assert.InRange(stopwatch.ElapsedMilliseconds, 0, 50);
 
         _output.WriteLine($"✅ パフォーマンステスト完了: {iterations}回のプロパティアクセスを{stopwatch.ElapsedMilliseconds}msで実行");
     }
@@ -237,7 +239,8 @@ public sealed class DefaultFontSettingsTests
         var type = typeof(DefaultFontSettings);
 
         // Assert - staticクラスである
-        Assert.True(type.IsAbstract && type.IsSealed);
+        Assert.True(type.IsAbstract);
+        Assert.True(type.IsSealed);
 
         // Assert - パブリックコンストラクターが存在しない
         var constructors = type.GetConstructors();
@@ -258,7 +261,8 @@ public sealed class DefaultFontSettingsTests
         // Assert - すべてのプロパティがstaticでread-only
         foreach (var property in properties)
         {
-            Assert.True(property.GetMethod?.IsStatic == true, $"プロパティ {property.Name} はstaticである必要があります");
+            Assert.NotNull(property.GetMethod);
+            Assert.True(property.GetMethod.IsStatic, $"プロパティ {property.Name} はstaticである必要があります");
             Assert.Null(property.SetMethod); // set accessorが存在しない = read-only
         }
 
