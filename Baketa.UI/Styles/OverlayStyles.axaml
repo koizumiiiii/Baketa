@@ -1,0 +1,68 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Baketa.UI.Controls">
+
+    <!-- 基本オーバーレイテキストブロックスタイル -->
+    <Style Selector="controls|OverlayTextBlock">
+        <Setter Property="FontFamily" Value="Yu Gothic UI"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="MaxWidth" Value="500"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineHeight" Value="1.4"/>
+        <Setter Property="ParagraphSpacing" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Background"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        BoxShadow="{TemplateBinding BoxShadow}">
+                    <!-- 注意: ParagraphSpacingプロパティは将来の複数段落サポートで使用予定 -->
+                    <TextBlock Name="PART_TextBlock"
+                               Text="{TemplateBinding Text}"
+                               Foreground="{TemplateBinding Foreground}"
+                               FontFamily="{TemplateBinding FontFamily}"
+                               FontSize="{TemplateBinding FontSize}"
+                               FontWeight="{TemplateBinding FontWeight}"
+                               TextWrapping="{TemplateBinding TextWrapping}"
+                               LineHeight="{TemplateBinding LineHeight}"
+                               Margin="{TemplateBinding Padding}"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    
+    <!-- ダークテーマ -->
+    <Style Selector="controls|OverlayTextBlock.Dark">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="#E6000000"/>  <!-- 不透明度0.9相当 -->
+        <Setter Property="BorderBrush" Value="#40FFFFFF"/>
+        <Setter Property="BoxShadow" Value="0 2 8 4 #60000000"/>
+    </Style>
+    
+    <!-- ライトテーマ -->
+    <Style Selector="controls|OverlayTextBlock.Light">
+        <Setter Property="Foreground" Value="Black"/>
+        <Setter Property="Background" Value="#E6FFFFFF"/>  <!-- 不透明度0.9相当 -->
+        <Setter Property="BorderBrush" Value="#40000000"/>
+        <Setter Property="BoxShadow" Value="0 2 8 4 #40000000"/>
+    </Style>
+    
+    <!-- 高コントラストテーマ -->
+    <Style Selector="controls|OverlayTextBlock.HighContrast">
+        <Setter Property="Foreground" Value="Yellow"/>
+        <Setter Property="Background" Value="Black"/>
+        <Setter Property="BorderBrush" Value="White"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="BoxShadow" Value="0 0 0 0 Transparent"/>
+    </Style>
+
+</Styles>
