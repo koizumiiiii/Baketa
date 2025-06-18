@@ -1,0 +1,140 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Controls"
+             x:Class="Baketa.UI.Views.Controls.OperationalControl"
+             x:DataType="vm:OperationalControlViewModel"
+             Classes="operational-control">
+
+    <!-- 設計時データコンテキスト -->
+    <Design.DataContext>
+        <vm:OperationalControlViewModel />
+    </Design.DataContext>
+
+
+
+    <!-- スタイル適用 -->
+    <UserControl.Styles>
+        <StyleInclude Source="/Styles/OperationalControlStyles.axaml" />
+    </UserControl.Styles>
+
+    <!-- メインコンテナ -->
+    <Border Classes="operational-container">
+        <StackPanel Classes="operational-layout">
+            
+            <!-- タイトル表示 -->
+            <TextBlock Text="翻訳制御"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,8"
+                       Foreground="{DynamicResource SystemBaseHighColor}" />
+
+            <!-- 自動翻訳トグルセクション -->
+            <StackPanel Classes="operational-horizontal">
+                <TextBlock Text="モード:"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource SystemBaseMediumHighColor}" />
+                
+                <ToggleSwitch x:Name="AutomaticModeToggle"
+                              Classes="operational-toggle"
+                              IsChecked="{Binding IsAutomaticMode}"
+                              IsEnabled="{Binding CanToggleMode}"
+                              ToolTip.Tip="自動翻訳モードのON/OFF切り替え"
+                              HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- 単発翻訳ボタンセクション -->
+            <Button x:Name="SingleTranslationButton"
+                    Classes="operational-primary"
+                    Content="今すぐ翻訳"
+                    Command="{Binding TriggerSingleTranslationCommand}"
+                    IsEnabled="{Binding CanTriggerSingleTranslation}"
+                    ToolTip.Tip="現在の画面を一度だけ翻訳します"
+                    HorizontalAlignment="Center" />
+
+            <!-- ステータス表示セクション -->
+            <Border Background="{DynamicResource SystemAltLowColor}"
+                    BorderBrush="{DynamicResource SystemBaseLowColor}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12,6"
+                    Margin="0,8,0,0">
+                
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ステータスアイコン -->
+                    <Ellipse Grid.Column="0"
+                             Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0">
+                        <Ellipse.Fill>
+                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" />
+                        </Ellipse.Fill>
+                        <!-- 翻訳中の場合のみ表示 -->
+                        <Ellipse.IsVisible>
+                            <Binding Path="IsTranslating" />
+                        </Ellipse.IsVisible>
+                    </Ellipse>
+
+                    <!-- ステータステキスト -->
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding CurrentStatus}"
+                               FontSize="12"
+                               FontWeight="Medium"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SystemBaseMediumHighColor}" />
+
+                    <!-- 翻訳中インジケーター -->
+                    <ProgressBar Grid.Column="2"
+                                 Width="20"
+                                 Height="4"
+                                 IsIndeterminate="{Binding IsTranslating}"
+                                 IsVisible="{Binding IsTranslating}"
+                                 Foreground="{DynamicResource SystemAccentColor}"
+                                 Background="{DynamicResource SystemBaseLowColor}"
+                                 VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- エラーメッセージ表示（エラー時のみ表示） -->
+            <Border Background="{DynamicResource SystemErrorTextColor}"
+                    BorderBrush="{DynamicResource SystemErrorTextColor}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12,8"
+                    Margin="0,4,0,0"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- エラーアイコン -->
+                    <Path Width="16"
+                          Height="16"
+                          Fill="White"
+                          VerticalAlignment="Center"
+                          Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M10.5,12H13.5V17H10.5V12Z" />
+                    
+                    <!-- エラーメッセージテキスト -->
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               FontSize="12"
+                               FontWeight="Medium"
+                               Foreground="White"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxWidth="200" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Border>
+
+</UserControl>

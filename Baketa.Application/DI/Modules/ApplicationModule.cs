@@ -64,15 +64,20 @@ namespace Baketa.Application.DI.Modules;
         /// <summary>
         /// 翻訳アプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterTranslationApplicationServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterTranslationApplicationServices(IServiceCollection services)
         {
-            // 翻訳関連のアプリケーションサービス
+            // 翻訳統合サービス（IEventAggregatorの依存を削除）
+            services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
+            services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
+                provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
+            
+            // 翻訳関連のアプリケーションサービス（将来拡張）
             // 例: services.AddSingleton<ITranslationService, TranslationService>();
             // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
             // 例: services.AddSingleton<ILanguageService, LanguageService>();
             
-            // 翻訳カスタマイズ
+            // 翻訳カスタマイズ（将来拡張）
             // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
             // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
         }
