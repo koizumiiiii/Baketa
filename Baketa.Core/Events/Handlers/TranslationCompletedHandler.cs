@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using System;
 using System.Drawing;
@@ -8,9 +9,16 @@ namespace Baketa.Core.Events.Handlers;
     /// <summary>
     /// 翻訳完了イベントハンドラー
     /// </summary>
+    /// <inheritdoc />
     public class TranslationCompletedHandler : IEventProcessor<TranslationCompletedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
+        
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
         
         /// <summary>
         /// コンストラクタ

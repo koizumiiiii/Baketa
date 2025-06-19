@@ -7,10 +7,9 @@ using System.Threading.Tasks;
 using Baketa.Application.Events;
 using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
-using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
 using Baketa.UI.Framework;
-using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
@@ -86,7 +85,7 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     public OperationalControlViewModel(
         ITranslationOrchestrationService translationOrchestrationService,
         ISettingsService settingsService,
-        Baketa.UI.Framework.Events.IEventAggregator eventAggregator,
+        Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator,
         ILogger<OperationalControlViewModel>? logger = null)
         : base(eventAggregator, logger)
     {

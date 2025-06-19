@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
 using Baketa.UI.Framework.ReactiveUI;
 
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 namespace Baketa.UI.ViewModels;
 
@@ -37,7 +37,7 @@ namespace Baketa.UI.ViewModels;
         /// <param name="settingsService">設定サービス</param>
         /// <param name="logger">ロガー</param>
         public AccessibilitySettingsViewModel(
-            UIEvents.IEventAggregator eventAggregator,
+            Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator,
             ISettingsService settingsService,
             ILogger? logger = null)
             : base(eventAggregator, logger)
@@ -125,15 +125,15 @@ namespace Baketa.UI.ViewModels;
                 // 設定を確定
                 await _settingsService.SaveAsync().ConfigureAwait(false);
                 
-                // 設定変更イベントを発行
-                await _eventAggregator.PublishAsync(new AccessibilitySettingsChangedEvent
-                {
-                    DisableAnimations = DisableAnimations,
-                    HighContrastMode = HighContrastMode,
-                    FontScaleFactor = FontScaleFactor,
-                    AlwaysShowKeyboardFocus = AlwaysShowKeyboardFocus,
-                    KeyboardNavigationSpeed = KeyboardNavigationSpeed
-                }).ConfigureAwait(false);
+                // 設定変更イベントを発行（AccessibilitySettingsChangedEventは後で定義）
+                // await _eventAggregator.PublishAsync(new AccessibilitySettingsChangedEvent
+                // {
+                //     DisableAnimations = DisableAnimations,
+                //     HighContrastMode = HighContrastMode,
+                //     FontScaleFactor = FontScaleFactor,
+                //     AlwaysShowKeyboardFocus = AlwaysShowKeyboardFocus,
+                //     KeyboardNavigationSpeed = KeyboardNavigationSpeed
+                // }).ConfigureAwait(false);
                 
                 _logger?.LogInformation("アクセシビリティ設定を保存しました");
             }

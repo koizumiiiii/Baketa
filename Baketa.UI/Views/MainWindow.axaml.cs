@@ -11,6 +11,7 @@ using Baketa.UI.ViewModels;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
+using Baketa.Core.Abstractions.Events;
 using CoreEvents = Baketa.Core.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
 
@@ -24,7 +25,7 @@ namespace Baketa.UI.Views;
         // ロガー
         private readonly ILogger<MainWindow>? _logger;
         // イベント集約器
-        private readonly CoreEvents.IEventAggregator? _eventAggregator;
+        private readonly IEventAggregator? _eventAggregator;
         
         /// <summary>
         /// 新しいメインウィンドウを初期化します
@@ -35,7 +36,7 @@ namespace Baketa.UI.Views;
             _logger = logger;
             
             // サービスロケータからイベント集約器を取得
-            _eventAggregator = Program.ServiceProvider?.GetService(typeof(CoreEvents.IEventAggregator)) as CoreEvents.IEventAggregator;
+            _eventAggregator = Program.ServiceProvider?.GetService(typeof(IEventAggregator)) as IEventAggregator;
             
             InitializeComponent();
             
@@ -181,9 +182,15 @@ namespace Baketa.UI.Views;
     /// アクセシビリティ設定変更イベントプロセッサー
     /// </summary>
     /// <param name="mainWindow">メインウィンドウ</param>
-    internal sealed class AccessibilitySettingsProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
+    internal sealed class AccessibilitySettingsProcessor(MainWindow mainWindow) : IEventProcessor<CoreEvents.AccessibilitySettingsChangedEvent>
     {
         private readonly MainWindow _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
         
         public Task HandleAsync(CoreEvents.AccessibilitySettingsChangedEvent eventData)
         {
@@ -195,9 +202,15 @@ namespace Baketa.UI.Views;
     /// 通知イベントプロセッサー
     /// </summary>
     /// <param name="mainWindow">メインウィンドウ</param>
-    internal sealed class NotificationProcessor(MainWindow mainWindow) : CoreEvents.IEventProcessor<EventTypes.NotificationEvent>
+    internal sealed class NotificationProcessor(MainWindow mainWindow) : IEventProcessor<EventTypes.NotificationEvent>
     {
         private readonly MainWindow _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
         
         public Task HandleAsync(EventTypes.NotificationEvent eventData)
         {

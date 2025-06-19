@@ -1,7 +1,7 @@
 using System;
 using System.Reactive.Disposables;
 using System.Threading.Tasks;
-using Baketa.UI.Framework.Events;
+using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -129,24 +129,64 @@ namespace Baketa.UI.Framework;
         /// <typeparam name="TEvent">イベント型</typeparam>
         /// <param name="eventData">イベントインスタンス</param>
         /// <returns>発行タスク</returns>
-        protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : Baketa.Core.Abstractions.Events.IEvent
+        protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             return _eventAggregator.PublishAsync(eventData);
         }
         
         /// <summary>
-        /// イベントをサブスクライブします
+        /// イベントをサブスクライブします（プロセッサー版）
         /// </summary>
         /// <typeparam name="TEvent">イベント型</typeparam>
-        /// <param name="handler">ハンドラ</param>
+        /// <param name="processor">イベントプロセッサー</param>
         /// <returns>購読解除可能なDisposable</returns>
-        protected IDisposable SubscribeToEvent<TEvent>(Func<TEvent, Task> handler) where TEvent : Baketa.Core.Abstractions.Events.IEvent
+        protected void SubscribeToEvent<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        {
+            ArgumentNullException.ThrowIfNull(processor);
+            _eventAggregator.Subscribe<TEvent>(processor);
+        }
+        
+        /// <summary>
+        /// イベントをサブスクライブします（ハンドラ版）
+        /// </summary>
+        /// <typeparam name="TEvent">イベント型</typeparam>
+        /// <param name="handler">イベントハンドラ</param>
+        /// <returns>購読解除可能なDisposable</returns>
+        protected IDisposable SubscribeToEvent<TEvent>(Func<TEvent, Task> handler) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(handler);
             
-            var subscription = _eventAggregator.Subscribe<TEvent>(handler);
+            // インラインプロセッサーを作成
+            var processor = new InlineEventProcessor<TEvent>(handler);
+            _eventAggregator.Subscribe<TEvent>(processor);
+            
+            // 購読解除用のDisposableを返す
+            var subscription = Disposable.Create(() => _eventAggregator.Unsubscribe<TEvent>(processor));
             _disposables.Add(subscription);
             return subscription;
+        }
+        
+        /// <summary>
+        /// インラインイベントプロセッサー
+        /// </summary>
+        /// <typeparam name="TEvent">イベント型</typeparam>
+        private sealed class InlineEventProcessor<TEvent> : IEventProcessor<TEvent>
+            where TEvent : IEvent
+        {
+            private readonly Func<TEvent, Task> _handler;
+            
+            public InlineEventProcessor(Func<TEvent, Task> handler)
+            {
+                _handler = handler;
+            }
+            
+            public int Priority => 100;
+            public bool SynchronousExecution => false;
+            
+            public Task HandleAsync(TEvent eventData)
+            {
+                return _handler(eventData);
+            }
         }
     }

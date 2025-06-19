@@ -12,7 +12,7 @@ namespace Baketa.Core.Events.Implementation;
     /// イベント集約機構の実装
     /// </summary>
     // プライマリコンストラクターの使用を拒否（IDE0290）
-    public class EventAggregator : IEventAggregator
+    public class EventAggregator : Baketa.Core.Abstractions.Events.IEventAggregator
     {
         private readonly ILogger<EventAggregator>? _logger;
         // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）
@@ -76,12 +76,14 @@ namespace Baketa.Core.Events.Implementation;
                     _logger?.LogError(ex, "プロセッサ {ProcessorType} で引数エラーが発生しました", 
                         processor.GetType().Name);
                 }
-                // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
-                // このcatchブロックは意図的に一般的な例外を捕捉します
-                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name))
+                // イベント処理は継続する必要があるため、一般的な例外を意図的にキャッチします
+                // CA1031: 致命的でない例外はイベント処理の継続のために適切に処理されます
+#pragma warning disable CA1031
+                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name, eventData, processor))
                 {
-                    // ロギングはShouldCatchExceptionメソッド内で行われます
+                // ロギングとイベント発行はShouldCatchExceptionメソッド内で行われます
                 }
+#pragma warning restore CA1031
             }
             
             await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -151,13 +153,15 @@ namespace Baketa.Core.Events.Implementation;
                     _logger?.LogError(ex, "プロセッサ {ProcessorType} で引数エラーが発生しました", 
                         processor.GetType().Name);
                 }
-                // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
-                // このcatchブロックは意図的に一般的な例外を捕捉します
-                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name) && 
-                                          ex is not OperationCanceledException)
+                // イベント処理は継続する必要があるため、一般的な例外を意図的にキャッチします
+                // CA1031: 致命的でない例外はイベント処理の継続のために適切に処理されます
+#pragma warning disable CA1031
+                catch (Exception ex) when (ShouldCatchException(ex, processor.GetType().Name, eventData, processor) && 
+                ex is not OperationCanceledException)
                 {
-                    // ロギングはShouldCatchExceptionメソッド内で行われます
+                // ロギングとイベント発行はShouldCatchExceptionメソッド内で行われます
                 }
+#pragma warning restore CA1031
             }
             
             await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -224,6 +228,59 @@ namespace Baketa.Core.Events.Implementation;
             }
         }
         
+        /// <inheritdoc />
+        public void UnsubscribeAll()
+        {
+            lock (_syncRoot)
+            {
+                _processors.Clear();
+                _logger?.LogDebug("すべてのイベントプロセッサの登録を解除しました");
+            }
+        }
+        
+        /// <inheritdoc />
+        public void UnsubscribeAllForEvent<TEvent>() where TEvent : IEvent
+        {
+            var eventType = typeof(TEvent);
+            lock (_syncRoot)
+            {
+                if (_processors.Remove(eventType))
+                {
+                    _logger?.LogDebug("イベント {EventType} のすべてのプロセッサ登録を解除しました", eventType.Name);
+                }
+            }
+        }
+        
+        /// <inheritdoc />
+        public void UnsubscribeAllForSubscriber(object subscriber)
+        {
+            ArgumentNullException.ThrowIfNull(subscriber);
+            
+            lock (_syncRoot)
+            {
+                foreach (var kvp in _processors.ToList())
+                {
+                    var eventType = kvp.Key;
+                    var handlers = kvp.Value;
+                    
+                    var toRemove = handlers.Where(h => ReferenceEquals(h, subscriber)).ToList();
+                    foreach (var handler in toRemove)
+                    {
+                        handlers.Remove(handler);
+                    }
+                    
+                    if (toRemove.Count > 0)
+                    {
+                        _logger?.LogDebug("購読者 {SubscriberType} のイベント {EventType} 登録を {Count} 件解除しました",
+                            subscriber.GetType().Name, eventType.Name, toRemove.Count);
+                    }
+                }
+            }
+        }
+        
+        /// <inheritdoc />
+        public event EventHandler<EventProcessorErrorEventArgs>? EventProcessorError;
+        
         /// <summary>
         /// 登録されたプロセッサを実行し、エラーハンドリングを行う
         /// </summary>
@@ -276,12 +333,14 @@ namespace Baketa.Core.Events.Implementation;
                 _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に引数エラーが発生しました",
                     processorType, typeof(TEvent).Name);
             }
-            // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
-            // このcatchブロックは意図的に一般的な例外を捕捉します
-            catch (Exception ex) when (ShouldCatchException(ex, processorType))
+            // イベント処理は継続する必要があるため、一般的な例外を意図的にキャッチします
+            // CA1031: 致命的でない例外はイベント処理の継続のために適切に処理されます
+#pragma warning disable CA1031
+            catch (Exception ex) when (ShouldCatchException(ex, processorType, eventData, processor))
             {
-                // ロギングはShouldCatchExceptionメソッド内で行われます
+                // ロギングとイベント発行はShouldCatchExceptionメソッド内で行われます
             }
+#pragma warning restore CA1031
         }
         
         /// <summary>
@@ -354,20 +413,24 @@ namespace Baketa.Core.Events.Implementation;
                 _logger?.LogError(ex, "プロセッサ {ProcessorType} でイベント {EventType} の処理中に引数エラーが発生しました",
                     processorType, typeof(TEvent).Name);
             }
-            // 他の例外は回復不可能なものとして扱い、イベント処理は継続する必要があるため
-            // このcatchブロックは意図的に一般的な例外を捕捉します
-            catch (Exception ex) when (ShouldCatchException(ex, processorType))
+            // イベント処理は継続する必要があるため、一般的な例外を意図的にキャッチします
+            // CA1031: 致命的でない例外はイベント処理の継続のために適切に処理されます
+#pragma warning disable CA1031
+            catch (Exception ex) when (ShouldCatchException(ex, processorType, eventData, processor))
             {
-                // ロギングはShouldCatchExceptionメソッド内で行われます
+                // ロギングとイベント発行はShouldCatchExceptionメソッド内で行われます
             }
+#pragma warning restore CA1031
         }
         /// <summary>
-        /// 例外を捕捉すべきかを判断し、ログ出力も行います
+        /// 例外を捕捉すべきかを判断し、ログ出力とイベント発行も行います
         /// </summary>
         /// <param name="exception">発生した例外</param>
         /// <param name="processorType">プロセッサタイプ名</param>
+        /// <param name="eventData">処理中のイベントデータ</param>
+        /// <param name="processor">プロセッサインスタンス</param>
         /// <returns>例外を捕捉すべき場合はtrue</returns>
-        private bool ShouldCatchException(Exception exception, string processorType)
+        private bool ShouldCatchException(Exception exception, string processorType, IEvent eventData, object processor)
         {
             // 既知の例外型をチェック
             if (exception is OutOfMemoryException or StackOverflowException or ThreadAbortException)
@@ -376,9 +439,25 @@ namespace Baketa.Core.Events.Implementation;
                 return false;
             }
             
-            // それ以外の例外はログに記録して処理を継続
+            // ログ記録
             _logger?.LogError(exception, "プロセッサ {ProcessorType} で予期しない例外が発生しました: {ExceptionType}", 
                 processorType, exception.GetType().Name);
+            
+            // EventProcessorErrorイベントの発行
+            try
+            {
+                var errorArgs = new EventProcessorErrorEventArgs(exception, eventData, processor);
+                EventProcessorError?.Invoke(this, errorArgs);
+            }
+            // イベント発行中の例外はログのみで処理し、イベント処理を継続します
+            // CA1031: イベント発行中の例外はメインのイベント処理を阻害しないように適切に処理されます
+#pragma warning disable CA1031
+            catch (Exception eventEx)
+            {
+                // イベント発行中の例外はログのみで処理
+                _logger?.LogError(eventEx, "イベントプロセッサエラーイベントの発行中に例外が発生しました");
+            }
+#pragma warning restore CA1031
             
             return true;
         }

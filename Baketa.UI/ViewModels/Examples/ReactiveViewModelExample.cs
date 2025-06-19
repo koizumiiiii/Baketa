@@ -9,6 +9,7 @@ using ReactiveUI.Fody.Helpers;
 using ReactiveUI.Validation.Extensions;
 using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework.Events;
 
 namespace Baketa.UI.ViewModels.Examples;

@@ -2,6 +2,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Application.DI.Extensions;
+using Baketa.UI.DI.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

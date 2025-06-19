@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events;
 
 namespace Baketa.Core.Tests.Events;

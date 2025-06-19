@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using System;
 using System.Threading.Tasks;
@@ -11,7 +12,11 @@ namespace Baketa.Core.Events.Handlers;
     {
         private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         
-
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
         
         /// <inheritdoc />
         public async Task HandleAsync(OcrFailedEvent eventData)

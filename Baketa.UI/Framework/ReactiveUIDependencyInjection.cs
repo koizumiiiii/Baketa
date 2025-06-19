@@ -1,6 +1,6 @@
 using System;
 using Baketa.UI.Framework.Debugging;
-using Baketa.UI.Framework.Events;
+// using Baketa.UI.Framework.Events; // 古いEventAggregatorを削除
 using Baketa.UI.Framework.Navigation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -31,8 +31,7 @@ namespace Baketa.UI.Framework;
             // ReactiveUIサービスを登録
             Splat.Locator.CurrentMutable.InitializeReactiveUI();
 
-            // イベント集約機構を登録
-            services.AddSingleton<IEventAggregator, EventAggregator>();
+            // イベント集約機構はアプリケーションモジュールで登録されます
             
             // ナビゲーション機構を登録
             services.AddSingleton<INavigationHost, NavigationManager>();
