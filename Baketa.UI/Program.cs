@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Avalonia;
 using Avalonia.ReactiveUI;
+using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
-using Baketa.UI.DI;
+using Baketa.Core.DI.Modules;
+using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
@@ -86,8 +88,19 @@ namespace Baketa.UI;
             });
             
             // Baketaの標準モジュールを登録
-            // UIモジュールを含む全モジュールを登録
-            services.AddUIModule(environment, configuration);
+            // Coreモジュールの登録
+            var coreModule = new CoreModule();
+            var registeredModules = new HashSet<Type>();
+            var moduleStack = new Stack<Type>();
+            coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            
+            // ApplicationModuleの明示的登録
+            var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
+            applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            
+            // UIモジュールの登録
+            var uiModule = new UIModule();
+            uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
             // サービスプロバイダーの構築
             ServiceProvider = services.BuildServiceProvider();

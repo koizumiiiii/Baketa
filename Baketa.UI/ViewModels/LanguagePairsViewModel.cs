@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ReactiveUI;
 
 // 名前空間エイリアスを使用して衝突を解決
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 namespace Baketa.UI.ViewModels;
 
@@ -86,7 +86,7 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
     /// 新しいLanguagePairsViewModelを初期化します
     /// </summary>
     public LanguagePairsViewModel(
-        UIEvents.IEventAggregator eventAggregator,
+    Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator,
         ILogger? logger = null)
         : base(eventAggregator, logger)
     {

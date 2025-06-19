@@ -1,11 +1,12 @@
 using System;
 using System.Reactive;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 namespace Baketa.UI.ViewModels;
 
@@ -71,7 +72,7 @@ namespace Baketa.UI.ViewModels;
         /// </summary>
         /// <param name="eventAggregator">イベント集約器</param>
         /// <param name="logger">ロガー</param>
-        public CaptureViewModel(UIEvents.IEventAggregator eventAggregator, ILogger? logger = null)
+        public CaptureViewModel(IEventAggregator eventAggregator, ILogger? logger = null)
             : base(eventAggregator, logger)
         {
             // コマンドの実行可否条件
@@ -95,24 +96,26 @@ namespace Baketa.UI.ViewModels;
         /// </summary>
         protected override void HandleActivation()
         {
-            // イベント購読
-            SubscribeToEvent<UIEvents.CaptureStatusChangedEvent>(OnCaptureStatusChanged);
+            // イベント購読（実装予定）
+            // SubscribeToEvent<CaptureStatusChangedEvent>(OnCaptureStatusChanged);
         }
         
         // キャプチャ開始コマンド実行
         private async Task ExecuteStartCaptureAsync()
         {
             //_logger?.LogInformation("キャプチャ開始コマンドが実行されました");
-            await PublishEventAsync(new UIEvents.StartCaptureRequestedEvent()).ConfigureAwait(false);
+            // await PublishEventAsync(new StartCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = true;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // キャプチャ停止コマンド実行
         private async Task ExecuteStopCaptureAsync()
         {
             //_logger?.LogInformation("キャプチャ停止コマンドが実行されました");
-            await PublishEventAsync(new UIEvents.StopCaptureRequestedEvent()).ConfigureAwait(false);
+            // await PublishEventAsync(new StopCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = false;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         
         // 領域選択コマンド実行
@@ -136,10 +139,10 @@ namespace Baketa.UI.ViewModels;
             await Task.CompletedTask.ConfigureAwait(false);
         }
         
-        // キャプチャステータス変更イベントハンドラ
-        private async Task OnCaptureStatusChanged(UIEvents.CaptureStatusChangedEvent eventData)
-        {
-            IsCapturing = eventData.IsActive;
-            await Task.CompletedTask.ConfigureAwait(false);
-        }
+        // キャプチャステータス変更イベントハンドラ（実装予定）
+        // private async Task OnCaptureStatusChanged(CaptureStatusChangedEvent eventData)
+        // {
+        //     IsCapturing = eventData.IsActive;
+        //     await Task.CompletedTask.ConfigureAwait(false);
+        // }
     }

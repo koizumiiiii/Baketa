@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Events.Implementation;
 
@@ -14,8 +15,8 @@ namespace Baketa.Core.Events.Implementation;
         /// <returns>設定済みのサービスコレクション</returns>
         public static IServiceCollection AddEventAggregator(this IServiceCollection services)
         {
-            // イベント集約機構をシングルトンとして登録
-            services.AddSingleton<IEventAggregator, EventAggregator>();
+            // イベント集約機構をシングルトンとして登録（完全修飾名使用）
+            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, EventAggregator>();
             
             return services;
         }

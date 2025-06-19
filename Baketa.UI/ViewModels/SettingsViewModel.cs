@@ -14,7 +14,7 @@ using DynamicData;
 
 // 名前空間エイリアスを使用して衝突を解決
 using CoreEvents = Baketa.Core.Events;
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 // IDE0028の警告を抑制
 #pragma warning disable IDE0028 // コレクション初期化を簡細化できます
@@ -446,7 +446,7 @@ namespace Baketa.UI.ViewModels
         /// <param name="statusService">翻訳エンジン状態監視サービス</param>
         /// <param name="logger">ロガー</param>
         public SettingsViewModel(
-            UIEvents.IEventAggregator eventAggregator, 
+            Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator, 
             AccessibilitySettingsViewModel accessibilityViewModel,
             LanguagePairsViewModel languagePairsViewModel,
             ITranslationEngineStatusService? statusService = null,

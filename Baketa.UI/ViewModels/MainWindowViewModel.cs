@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
+using Baketa.Core.Abstractions.Events;
 using CoreEvents = Baketa.Core.Events;
 using UIEvents = Baketa.UI.Framework.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
@@ -131,7 +132,7 @@ namespace Baketa.UI.ViewModels;
         /// <param name="accessibilityViewModel">アクセシビリティ設定ビューモデル</param>
         /// <param name="logger">ロガー</param>
         public MainWindowViewModel(
-            UIEvents.IEventAggregator eventAggregator,
+            IEventAggregator eventAggregator,
             HomeViewModel homeViewModel,
             CaptureViewModel captureViewModel,
             TranslationViewModel translationViewModel,

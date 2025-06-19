@@ -1,5 +1,6 @@
 using Baketa.Application.DI.Modules;
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
@@ -7,6 +8,7 @@ using Baketa.UI.Services;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 
@@ -44,11 +46,23 @@ namespace Baketa.UI.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterViewModels(IServiceCollection services)
         {
-            // メインViewModelとオーバーレイViewModel
-            services.AddSingleton<MainViewModel>();
-            services.AddSingleton<MainWindowViewModel>(); // デザイナー用
-            // 例: services.AddSingleton<OverlayViewModel>();
-            // 例: services.AddSingleton<SystemTrayViewModel>();
+            // 基本ビューモデル（依存関係なし）
+            services.AddSingleton<HomeViewModel>();
+            services.AddSingleton<CaptureViewModel>();
+            services.AddSingleton<TranslationViewModel>();
+            services.AddSingleton<OverlayViewModel>();
+            services.AddSingleton<HistoryViewModel>();
+            
+            // 操作UI ViewModel（依存関係あり）
+            services.AddSingleton<Baketa.UI.ViewModels.Controls.OperationalControlViewModel>();
+            
+            // 設定ビューモデル
+            services.AddSingleton<AccessibilitySettingsViewModel>();
+            services.AddSingleton<LanguagePairsViewModel>();
+            services.AddSingleton<SettingsViewModel>();
+            
+            // メインウィンドウビューモデル（全依存関係解決後に登録）
+            services.AddSingleton<MainWindowViewModel>();
             
             // 翻訳仕様を同期するサービス
             // 例: services.AddSingleton<IViewModelSynchronizationService, ViewModelSynchronizationService>();

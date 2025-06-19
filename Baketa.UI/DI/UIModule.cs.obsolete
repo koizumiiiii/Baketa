@@ -1,5 +1,5 @@
 using Baketa.UI.Framework;
-using Baketa.UI.Framework.Events;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Settings;
 using Baketa.UI.Services;
@@ -22,8 +22,7 @@ namespace Baketa.UI.DI;
         /// <param name="configuration">設定</param>
         public static void RegisterUIServices(this IServiceCollection services, IConfiguration? configuration = null)
         {
-            // イベント集約器
-            services.AddSingleton<IEventAggregator, EventAggregator>();
+            // イベント集約器はアプリケーションモジュールで登録されます
             
             // 基本ビューモデル（依存関係なし）
             services.AddSingleton<HomeViewModel>();
@@ -31,6 +30,9 @@ namespace Baketa.UI.DI;
             services.AddSingleton<TranslationViewModel>();
             services.AddSingleton<OverlayViewModel>();
             services.AddSingleton<HistoryViewModel>();
+            
+            // 操作UI ViewModel（依存関係あり）
+            services.AddSingleton<Baketa.UI.ViewModels.Controls.OperationalControlViewModel>();
             
             // 依存関係付きビューモデル
             services.AddSingleton<LanguagePairsViewModel>(provider => 

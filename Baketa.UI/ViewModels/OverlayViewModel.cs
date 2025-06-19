@@ -9,6 +9,7 @@ using Baketa.UI.Overlay;
 using Baketa.UI.Overlay.Positioning;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using Baketa.Core.Abstractions.Events;
 using UIEvents = Baketa.UI.Framework.Events;
 
 namespace Baketa.UI.ViewModels;
@@ -223,7 +224,7 @@ namespace Baketa.UI.ViewModels;
         /// <param name="positionManagerFactory">位置管理システムファクトリー</param>
         /// <param name="logger">ロガー</param>
         public OverlayViewModel(
-            UIEvents.IEventAggregator eventAggregator,
+            IEventAggregator eventAggregator,
             AvaloniaOverlayWindowAdapter? overlayAdapter = null,
             IOverlayPositionManager? positionManager = null,
             IOverlayPositionManagerFactory? positionManagerFactory = null,
