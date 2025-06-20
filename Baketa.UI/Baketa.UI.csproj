@@ -15,6 +15,11 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
+	<!-- テストアセンブリからのアクセスを許可 -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Baketa.UI.Tests" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\Baketa.Application\Baketa.Application.csproj" />
 		<ProjectReference Include="..\Baketa.Core\Baketa.Core.csproj" />

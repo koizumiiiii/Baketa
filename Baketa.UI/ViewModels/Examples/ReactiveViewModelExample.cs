@@ -90,13 +90,13 @@ namespace Baketa.UI.ViewModels.Examples;
                 viewModel => viewModel.Name,
                 name => !string.IsNullOrWhiteSpace(name),
                 "名前は必須項目です");
-            _disposables.Add(nameRule);
+            Disposables.Add(nameRule);
                 
             var descRule = this.ValidationRule(
                 viewModel => viewModel.Description,
                 description => description?.Length <= 100,
                 "説明は100文字以内で入力してください");
-            _disposables.Add(descRule);
+            Disposables.Add(descRule);
                 
             // 派生プロパティの設定（Name, Descriptionの両方が有効な場合のみ保存可能）
             _canSave = this.WhenAnyValue(
@@ -106,7 +106,7 @@ namespace Baketa.UI.ViewModels.Examples;
                     !string.IsNullOrWhiteSpace(name) &&
                     !(desc?.Length > 100))
                 .ToProperty(this, x => x.CanSave);
-            _disposables.Add(_canSave);
+            Disposables.Add(_canSave);
                 
             // コマンドの作成
             SaveCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
@@ -116,18 +116,18 @@ namespace Baketa.UI.ViewModels.Examples;
             // コマンドにログ機能を追加
             SaveCommand.Subscribe(
                 _ => {
-                    if (_logger != null)
-                        _logCommandExecuted(_logger, "Save", null);
+                    if (Logger != null)
+                        _logCommandExecuted(Logger, "Save", null);
                     MessageBus.Current.SendMessage(new global::Baketa.UI.Framework.ExecuteCommandMessage("Save"));
                 });
 
             SaveCommand.ThrownExceptions.Subscribe(
                 ex => {
-                    if (_logger != null)
-                        _logCommandError(_logger, "Save", ex);
+                    if (Logger != null)
+                        _logCommandError(Logger, "Save", ex);
                 });
             
-            _disposables.Add(SaveCommand);
+            Disposables.Add(SaveCommand);
                 
             ResetCommand = global::Baketa.UI.Framework.ReactiveUI.ReactiveCommandFactory.Create(
                     ExecuteResetAsync);
@@ -135,18 +135,18 @@ namespace Baketa.UI.ViewModels.Examples;
             // コマンドにログ機能を追加
             ResetCommand.Subscribe(
                 _ => {
-                    if (_logger != null)
-                        _logCommandExecuted(_logger, "Reset", null);
+                    if (Logger != null)
+                        _logCommandExecuted(Logger, "Reset", null);
                     MessageBus.Current.SendMessage(new global::Baketa.UI.Framework.ExecuteCommandMessage("Reset"));
                 });
 
             ResetCommand.ThrownExceptions.Subscribe(
                 ex => {
-                    if (_logger != null)
-                        _logCommandError(_logger, "Reset", ex);
+                    if (Logger != null)
+                        _logCommandError(Logger, "Reset", ex);
                 });
                 
-            _disposables.Add(ResetCommand);
+            Disposables.Add(ResetCommand);
         }
         
         /// <summary>
@@ -174,8 +174,8 @@ namespace Baketa.UI.ViewModels.Examples;
                 IsLoading = true;
                 ErrorMessage = null;
                 
-                if (_logger != null)
-                    _logDataSave(_logger, Name, null);
+                if (Logger != null)
+                    _logDataSave(Logger, Name, null);
                 
                 // 保存処理の模擬
                 await Task.Delay(1000).ConfigureAwait(false);
@@ -183,25 +183,25 @@ namespace Baketa.UI.ViewModels.Examples;
                 // イベントの発行
                 await PublishEventAsync(new DataSavedEvent(this.Name)).ConfigureAwait(false);
                 
-                if (_logger != null)
-                    _logDataSaveComplete(_logger, null);
+                if (Logger != null)
+                    _logDataSaveComplete(Logger, null);
             }
             catch (InvalidOperationException ex)
             {
-                if (_logger != null)
-                    _logDataSaveError(_logger, ex);
+                if (Logger != null)
+                    _logDataSaveError(Logger, ex);
                 ErrorMessage = "保存に失敗しました: " + ex.Message;
             }
             catch (TaskCanceledException ex)
             {
-                if (_logger != null)
-                    _logDataSaveError(_logger, ex);
+                if (Logger != null)
+                    _logDataSaveError(Logger, ex);
                 ErrorMessage = "保存処理がキャンセルされました: " + ex.Message;
             }
             catch (TimeoutException ex)
             {
-                if (_logger != null)
-                    _logDataSaveError(_logger, ex);
+                if (Logger != null)
+                    _logDataSaveError(Logger, ex);
                 ErrorMessage = "保存処理がタイムアウトしました: " + ex.Message;
             }
             finally
@@ -215,8 +215,8 @@ namespace Baketa.UI.ViewModels.Examples;
         /// </summary>
         private async Task ExecuteResetAsync()
         {
-            if (_logger != null)
-                _logDataReset(_logger, null);
+            if (Logger != null)
+                _logDataReset(Logger, null);
             
             // リアクティブプログラミングのメリットを示すため、変更通知を遅延
             using (DelayChangeNotifications())
@@ -241,8 +241,8 @@ namespace Baketa.UI.ViewModels.Examples;
             // イベント購読の例
             SubscribeToEvent<DataRequestEvent>(async _ => 
             {
-                if (_logger != null)
-                    _logDataRequestReceived(_logger, null);
+                if (Logger != null)
+                    _logDataRequestReceived(Logger, null);
                 await ExecuteSaveAsync().ConfigureAwait(false);
             });
         }

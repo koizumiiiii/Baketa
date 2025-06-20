@@ -19,7 +19,7 @@ namespace Baketa.UI.ViewModels.Controls;
 /// <summary>
 /// 操作UI（自動/単発翻訳ボタン）のビューモデル
 /// </summary>
-internal sealed class OperationalControlViewModel : Framework.ViewModelBase
+public sealed class OperationalControlViewModel : Framework.ViewModelBase
 {
     private readonly ITranslationOrchestrationService _translationOrchestrationService;
     private readonly ISettingsService _settingsService;
@@ -89,8 +89,11 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
         ILogger<OperationalControlViewModel>? logger = null)
         : base(eventAggregator, logger)
     {
-        _translationOrchestrationService = translationOrchestrationService ?? throw new ArgumentNullException(nameof(translationOrchestrationService));
-        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        ArgumentNullException.ThrowIfNull(translationOrchestrationService);
+        ArgumentNullException.ThrowIfNull(settingsService);
+        
+        _translationOrchestrationService = translationOrchestrationService;
+        _settingsService = settingsService;
 
         // コマンドの作成（実行可否条件付き）
         var canToggleMode = this.WhenAnyValue(x => x.CanToggleMode);
@@ -119,7 +122,7 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
         var subscription1 = this.WhenAnyValue(x => x.IsAutomaticMode)
             .Skip(1) // 初期値をスキップ
             .Subscribe(async isAutomatic => await OnAutomaticModeChangedAsync(isAutomatic).ConfigureAwait(true));
-        _disposables.Add(subscription1);
+        Disposables.Add(subscription1);
 
         // 翻訳中状態の変更時にコマンド実行可否を更新
         var subscription2 = this.WhenAnyValue(x => x.IsTranslating)
@@ -129,7 +132,7 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
                 CanTriggerSingleTranslation = !isTranslating;
                 UpdateCurrentStatus();
             });
-        _disposables.Add(subscription2);
+        Disposables.Add(subscription2);
     }
 
     /// <summary>
@@ -144,13 +147,13 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(result =>
             {
-                _logger?.LogDebug("翻訳結果を受信: ID={Id}, モード={Mode}, テキスト長={Length}",
+            Logger?.LogDebug("翻訳結果を受信: ID={Id}, モード={Mode}, テキスト長={Length}",
                     result.Id, result.Mode, result.TranslatedText.Length);
                     
                 // UI更新処理（必要に応じて）
                 UpdateCurrentStatus();
             });
-        _disposables.Add(translationResultsSubscription);
+        Disposables.Add(translationResultsSubscription);
 
         // 翻訳状態変更の監視
         var statusChangesSubscription = _translationOrchestrationService.StatusChanges
@@ -161,7 +164,7 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
                 IsTranslating = _translationOrchestrationService.IsAnyTranslationActive;
                 UpdateCurrentStatus();
             });
-        _disposables.Add(statusChangesSubscription);
+        Disposables.Add(statusChangesSubscription);
 
         // 進行状況の監視
         var progressSubscription = _translationOrchestrationService.ProgressUpdates
@@ -174,10 +177,10 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
                     CurrentStatus = progress.Message;
                 }
             });
-        _disposables.Add(progressSubscription);
+        Disposables.Add(progressSubscription);
 
         _isSubscribedToTranslationEvents = true;
-        _logger?.LogDebug("翻訳統合サービスのイベント購読を開始しました");
+        Logger?.LogDebug("翻訳統合サービスのイベント購読を開始しました");
     }
 
     /// <summary>
@@ -194,29 +197,29 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
             // モード変更イベントを発行
             await PublishEventAsync(new TranslationModeChangedEvent(newMode, previousMode)).ConfigureAwait(true);
 
-            _logger?.LogInformation(
+            Logger?.LogInformation(
                 "翻訳モードが変更されました: {PreviousMode} → {NewMode}",
                 previousMode, newMode);
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "翻訳モード切り替え中に無効な操作が発生しました");
+            Logger?.LogError(ex, "翻訳モード切り替え中に無効な操作が発生しました");
             ErrorMessage = $"モード切り替えエラー: {ex.Message}";
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "翻訳モード切り替え中に引数エラーが発生しました");
+            Logger?.LogError(ex, "翻訳モード切り替え中に引数エラーが発生しました");
             ErrorMessage = $"モード切り替えエラー: {ex.Message}";
         }
         catch (TimeoutException ex)
         {
-            _logger?.LogError(ex, "翻訳モード切り替えがタイムアウトしました");
+            Logger?.LogError(ex, "翻訳モード切り替えがタイムアウトしました");
             ErrorMessage = $"モード切り替えエラー: {ex.Message}";
         }
 #pragma warning disable CA1031 // ViewModel層でのユーザー体験保護のため一般例外をキャッチ
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "翻訳モード切り替え中に予期しないエラーが発生しました");
+            Logger?.LogError(ex, "翻訳モード切り替え中に予期しないエラーが発生しました");
             ErrorMessage = $"モード切り替えエラー: {ex.Message}";
         }
 #pragma warning restore CA1031
@@ -229,32 +232,32 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
     {
         try
         {
-            _logger?.LogInformation("単発翻訳を実行します");
+            Logger?.LogInformation("単発翻訳を実行します");
 
             // 翻訳統合サービス経由で単発翻訳を実行
             await _translationOrchestrationService.TriggerSingleTranslationAsync().ConfigureAwait(true);
 
-            _logger?.LogInformation("単発翻訳コマンドを送信しました");
+            Logger?.LogInformation("単発翻訳コマンドを送信しました");
         }
         catch (OperationCanceledException ex)
         {
-            _logger?.LogInformation(ex, "単発翻訳がキャンセルされました");
+            Logger?.LogInformation(ex, "単発翻訳がキャンセルされました");
             ErrorMessage = "翻訳がキャンセルされました";
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "単発翻訳実行中に無効な操作が発生しました");
+            Logger?.LogError(ex, "単発翻訳実行中に無効な操作が発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
         }
         catch (TimeoutException ex)
         {
-            _logger?.LogError(ex, "単発翻訳がタイムアウトしました");
+            Logger?.LogError(ex, "単発翻訳がタイムアウトしました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
         }
 #pragma warning disable CA1031 // ViewModel層でのユーザー体験保護のため一般例外をキャッチ
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "単発翻訳実行中に予期しないエラーが発生しました");
+            Logger?.LogError(ex, "単発翻訳実行中に予期しないエラーが発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
         }
 #pragma warning restore CA1031
@@ -269,29 +272,29 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
         {
             if (isAutomatic)
             {
-                _logger?.LogInformation("自動翻訳モードを開始します");
+                Logger?.LogInformation("自動翻訳モードを開始します");
                 await _translationOrchestrationService.StartAutomaticTranslationAsync().ConfigureAwait(true);
             }
             else
             {
-                _logger?.LogInformation("自動翻訳モードを停止します");
+                Logger?.LogInformation("自動翻訳モードを停止します");
                 await _translationOrchestrationService.StopAutomaticTranslationAsync().ConfigureAwait(true);
             }
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "自動翻訳モード変更処理中に無効な操作が発生しました");
+            Logger?.LogError(ex, "自動翻訳モード変更処理中に無効な操作が発生しました");
             ErrorMessage = $"モード変更エラー: {ex.Message}";
         }
         catch (TimeoutException ex)
         {
-            _logger?.LogError(ex, "自動翻訳モード変更がタイムアウトしました");
+            Logger?.LogError(ex, "自動翻訳モード変更がタイムアウトしました");
             ErrorMessage = $"モード変更エラー: {ex.Message}";
         }
 #pragma warning disable CA1031 // ViewModel層でのユーザー体験保護のため一般例外をキャッチ
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "自動翻訳モード変更処理中に予期しないエラーが発生しました");
+            Logger?.LogError(ex, "自動翻訳モード変更処理中に予期しないエラーが発生しました");
             ErrorMessage = $"モード変更エラー: {ex.Message}";
         }
 #pragma warning restore CA1031
@@ -325,17 +328,17 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
             try
             {
                 await _translationOrchestrationService.StartAsync().ConfigureAwait(false);
-                _logger?.LogDebug("TranslationOrchestrationServiceが開始されました");
+                Logger?.LogDebug("TranslationOrchestrationServiceが開始されました");
             }
 #pragma warning disable CA1031 // UIアクティベーション時のアプリケーション安定性のため一般例外をキャッチ
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "TranslationOrchestrationServiceの開始中にエラーが発生しました");
+                Logger?.LogError(ex, "TranslationOrchestrationServiceの開始中にエラーが発生しました");
             }
 #pragma warning restore CA1031
         });
         
-        _logger?.LogDebug("OperationalControlViewModelがアクティベートされました");
+        Logger?.LogDebug("OperationalControlViewModelがアクティベートされました");
     }
 
     /// <summary>
@@ -349,17 +352,17 @@ internal sealed class OperationalControlViewModel : Framework.ViewModelBase
             try
             {
                 await _translationOrchestrationService.StopAsync().ConfigureAwait(false);
-                _logger?.LogDebug("TranslationOrchestrationServiceが停止されました");
+                Logger?.LogDebug("TranslationOrchestrationServiceが停止されました");
             }
 #pragma warning disable CA1031 // UI非アクティベーション時のアプリケーション安定性のため一般例外をキャッチ
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "非アクティベーション時のTranslationOrchestrationService停止でエラーが発生しました");
+                Logger?.LogError(ex, "非アクティベーション時のTranslationOrchestrationService停止でエラーが発生しました");
             }
 #pragma warning restore CA1031
         });
 
-        _logger?.LogDebug("OperationalControlViewModelが非アクティベートされました");
+        Logger?.LogDebug("OperationalControlViewModelが非アクティベートされました");
     }
 
     /// <summary>

@@ -281,14 +281,14 @@ namespace Baketa.UI.ViewModels;
         /// </summary>
         public void OnWindowClosing()
         {
-            _logger?.LogInformation("メインウィンドウのクローズが要求されました");
+            Logger?.LogInformation("メインウィンドウのクローズが要求されました");
             // 必要に応じてクローズ前の処理を実行
         }
         
         // 設定画面を開くコマンド実行
         private async Task ExecuteOpenSettingsAsync()
         {
-            _logger?.LogInformation("設定画面を開くコマンドが実行されました");
+            Logger?.LogInformation("設定画面を開くコマンドが実行されました");
             
             // 設定タブに切り替え
             SelectedTabIndex = 5; // SettingsViewModelタブ
@@ -299,7 +299,7 @@ namespace Baketa.UI.ViewModels;
         // アプリケーション終了コマンド実行
         private async Task ExecuteExitAsync()
         {
-            _logger?.LogInformation("アプリケーション終了コマンドが実行されました");
+            Logger?.LogInformation("アプリケーション終了コマンドが実行されました");
             
             // 終了前の確認（実際にはダイアログ表示）
             await PublishEventAsync(new UIEvents.ApplicationExitRequestedEvent()).ConfigureAwait(false);
@@ -310,7 +310,7 @@ namespace Baketa.UI.ViewModels;
         // キャプチャ開始コマンド実行
         private async Task ExecuteStartCaptureAsync()
         {
-            _logger?.LogInformation("キャプチャ開始コマンドが実行されました");
+            Logger?.LogInformation("キャプチャ開始コマンドが実行されました");
             
             await PublishEventAsync(new UIEvents.StartCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = true;
@@ -326,7 +326,7 @@ namespace Baketa.UI.ViewModels;
         // キャプチャ停止コマンド実行
         private async Task ExecuteStopCaptureAsync()
         {
-            _logger?.LogInformation("キャプチャ停止コマンドが実行されました");
+            Logger?.LogInformation("キャプチャ停止コマンドが実行されました");
             
             await PublishEventAsync(new UIEvents.StopCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = false;
@@ -342,7 +342,7 @@ namespace Baketa.UI.ViewModels;
         // 領域選択コマンド実行
         private async Task ExecuteSelectRegionAsync()
         {
-            _logger?.LogInformation("領域選択コマンドが実行されました");
+            Logger?.LogInformation("領域選択コマンドが実行されました");
             
             // CaptureViewModelタブに切り替え
             SelectedTabIndex = 1;
@@ -357,7 +357,7 @@ namespace Baketa.UI.ViewModels;
         // ログビューワーを開くコマンド実行
         private async Task ExecuteOpenLogViewerAsync()
         {
-            _logger?.LogInformation("ログビューワーを開くコマンドが実行されました");
+            Logger?.LogInformation("ログビューワーを開くコマンドが実行されました");
             
             // ログビューワーを開くロジック
             // (まだ実装されていません)
@@ -371,7 +371,7 @@ namespace Baketa.UI.ViewModels;
         // 翻訳履歴を開くコマンド実行
         private async Task ExecuteOpenTranslationHistoryAsync()
         {
-            _logger?.LogInformation("翻訳履歴を開くコマンドが実行されました");
+            Logger?.LogInformation("翻訳履歴を開くコマンドが実行されました");
             
             // 履歴タブに切り替え
             SelectedTabIndex = 4; // HistoryViewModelタブ
@@ -382,7 +382,7 @@ namespace Baketa.UI.ViewModels;
         // ヘルプを開くコマンド実行
         private async Task ExecuteOpenHelpAsync()
         {
-            _logger?.LogInformation("ヘルプを開くコマンドが実行されました");
+            Logger?.LogInformation("ヘルプを開くコマンドが実行されました");
             
             // ヘルプ画面を開くロジック
             // (まだ実装されていません)
@@ -396,7 +396,7 @@ namespace Baketa.UI.ViewModels;
         // バージョン情報を開くコマンド実行
         private async Task ExecuteOpenAboutAsync()
         {
-            _logger?.LogInformation("バージョン情報を開くコマンドが実行されました");
+            Logger?.LogInformation("バージョン情報を開くコマンドが実行されました");
             
             // バージョン情報ダイアログを表示するロジック
             // (まだ実装されていません)
@@ -410,7 +410,7 @@ namespace Baketa.UI.ViewModels;
         // トレイに最小化するコマンド実行
         private async Task ExecuteMinimizeToTrayAsync()
         {
-            _logger?.LogInformation("トレイに最小化コマンドが実行されました");
+            Logger?.LogInformation("トレイに最小化コマンドが実行されました");
             
             // トレイに最小化するロジック
             await PublishEventAsync(new UIEvents.MinimizeToTrayRequestedEvent()).ConfigureAwait(false);

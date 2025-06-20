@@ -59,7 +59,7 @@ namespace Baketa.UI.ViewModels;
         {
             try
             {
-                _logger?.LogInformation("アクセシビリティ設定を読み込み中");
+                Logger?.LogInformation("アクセシビリティ設定を読み込み中");
                 
                 // 設定サービスから値を読み込む
                 DisableAnimations = _settingsService.GetValue("Accessibility:DisableAnimations", false);
@@ -68,26 +68,26 @@ namespace Baketa.UI.ViewModels;
                 AlwaysShowKeyboardFocus = _settingsService.GetValue("Accessibility:AlwaysShowKeyboardFocus", false);
                 KeyboardNavigationSpeed = _settingsService.GetValue("Accessibility:KeyboardNavigationSpeed", 1.0);
                 
-                _logger?.LogInformation("アクセシビリティ設定を読み込みました");
+                Logger?.LogInformation("アクセシビリティ設定を読み込みました");
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に操作エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に操作エラーが発生しました");
                 ResetToDefaults();
             }
             catch (ArgumentException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に引数エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に引数エラーが発生しました");
                 ResetToDefaults();
             }
             catch (FormatException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に形式エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に形式エラーが発生しました");
                 ResetToDefaults();
             }
             catch (NullReferenceException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に参照エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に参照エラーが発生しました");
                 ResetToDefaults();
             }
         }
@@ -97,7 +97,7 @@ namespace Baketa.UI.ViewModels;
         /// </summary>
         private void ResetToDefaults()
         {
-            _logger?.LogInformation("アクセシビリティ設定をデフォルト値にリセットします");
+            Logger?.LogInformation("アクセシビリティ設定をデフォルト値にリセットします");
             
             DisableAnimations = false;
             HighContrastMode = false;
@@ -113,7 +113,7 @@ namespace Baketa.UI.ViewModels;
         {
             try
             {
-                _logger?.LogInformation("アクセシビリティ設定を保存中");
+                Logger?.LogInformation("アクセシビリティ設定を保存中");
                 
                 // 設定サービスに値を保存
                 _settingsService.SetValue("Accessibility:DisableAnimations", DisableAnimations);
@@ -135,26 +135,26 @@ namespace Baketa.UI.ViewModels;
                 //     KeyboardNavigationSpeed = KeyboardNavigationSpeed
                 // }).ConfigureAwait(false);
                 
-                _logger?.LogInformation("アクセシビリティ設定を保存しました");
+                Logger?.LogInformation("アクセシビリティ設定を保存しました");
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に操作エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に操作エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (ArgumentException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に引数エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に引数エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (NullReferenceException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に参照エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に参照エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (TaskCanceledException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中にタスクがキャンセルされました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中にタスクがキャンセルされました");
                 ErrorMessage = "設定の保存がキャンセルされました。";
             }
         }
