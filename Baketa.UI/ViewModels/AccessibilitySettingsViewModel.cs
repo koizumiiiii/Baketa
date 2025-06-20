@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
 using Baketa.UI.Framework.ReactiveUI;
 
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 namespace Baketa.UI.ViewModels;
 
@@ -37,7 +37,7 @@ namespace Baketa.UI.ViewModels;
         /// <param name="settingsService">設定サービス</param>
         /// <param name="logger">ロガー</param>
         public AccessibilitySettingsViewModel(
-            UIEvents.IEventAggregator eventAggregator,
+            Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator,
             ISettingsService settingsService,
             ILogger? logger = null)
             : base(eventAggregator, logger)
@@ -59,7 +59,7 @@ namespace Baketa.UI.ViewModels;
         {
             try
             {
-                _logger?.LogInformation("アクセシビリティ設定を読み込み中");
+                Logger?.LogInformation("アクセシビリティ設定を読み込み中");
                 
                 // 設定サービスから値を読み込む
                 DisableAnimations = _settingsService.GetValue("Accessibility:DisableAnimations", false);
@@ -68,26 +68,26 @@ namespace Baketa.UI.ViewModels;
                 AlwaysShowKeyboardFocus = _settingsService.GetValue("Accessibility:AlwaysShowKeyboardFocus", false);
                 KeyboardNavigationSpeed = _settingsService.GetValue("Accessibility:KeyboardNavigationSpeed", 1.0);
                 
-                _logger?.LogInformation("アクセシビリティ設定を読み込みました");
+                Logger?.LogInformation("アクセシビリティ設定を読み込みました");
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に操作エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に操作エラーが発生しました");
                 ResetToDefaults();
             }
             catch (ArgumentException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に引数エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に引数エラーが発生しました");
                 ResetToDefaults();
             }
             catch (FormatException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に形式エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に形式エラーが発生しました");
                 ResetToDefaults();
             }
             catch (NullReferenceException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の読み込み中に参照エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の読み込み中に参照エラーが発生しました");
                 ResetToDefaults();
             }
         }
@@ -97,7 +97,7 @@ namespace Baketa.UI.ViewModels;
         /// </summary>
         private void ResetToDefaults()
         {
-            _logger?.LogInformation("アクセシビリティ設定をデフォルト値にリセットします");
+            Logger?.LogInformation("アクセシビリティ設定をデフォルト値にリセットします");
             
             DisableAnimations = false;
             HighContrastMode = false;
@@ -113,7 +113,7 @@ namespace Baketa.UI.ViewModels;
         {
             try
             {
-                _logger?.LogInformation("アクセシビリティ設定を保存中");
+                Logger?.LogInformation("アクセシビリティ設定を保存中");
                 
                 // 設定サービスに値を保存
                 _settingsService.SetValue("Accessibility:DisableAnimations", DisableAnimations);
@@ -125,36 +125,36 @@ namespace Baketa.UI.ViewModels;
                 // 設定を確定
                 await _settingsService.SaveAsync().ConfigureAwait(false);
                 
-                // 設定変更イベントを発行
-                await _eventAggregator.PublishAsync(new AccessibilitySettingsChangedEvent
-                {
-                    DisableAnimations = DisableAnimations,
-                    HighContrastMode = HighContrastMode,
-                    FontScaleFactor = FontScaleFactor,
-                    AlwaysShowKeyboardFocus = AlwaysShowKeyboardFocus,
-                    KeyboardNavigationSpeed = KeyboardNavigationSpeed
-                }).ConfigureAwait(false);
+                // 設定変更イベントを発行（AccessibilitySettingsChangedEventは後で定義）
+                // await _eventAggregator.PublishAsync(new AccessibilitySettingsChangedEvent
+                // {
+                //     DisableAnimations = DisableAnimations,
+                //     HighContrastMode = HighContrastMode,
+                //     FontScaleFactor = FontScaleFactor,
+                //     AlwaysShowKeyboardFocus = AlwaysShowKeyboardFocus,
+                //     KeyboardNavigationSpeed = KeyboardNavigationSpeed
+                // }).ConfigureAwait(false);
                 
-                _logger?.LogInformation("アクセシビリティ設定を保存しました");
+                Logger?.LogInformation("アクセシビリティ設定を保存しました");
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に操作エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に操作エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (ArgumentException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に引数エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に引数エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (NullReferenceException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中に参照エラーが発生しました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中に参照エラーが発生しました");
                 ErrorMessage = "設定の保存中にエラーが発生しました。";
             }
             catch (TaskCanceledException ex)
             {
-                _logger?.LogError(ex, "アクセシビリティ設定の保存中にタスクがキャンセルされました");
+                Logger?.LogError(ex, "アクセシビリティ設定の保存中にタスクがキャンセルされました");
                 ErrorMessage = "設定の保存がキャンセルされました。";
             }
         }

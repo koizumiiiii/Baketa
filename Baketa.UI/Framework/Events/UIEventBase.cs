@@ -8,7 +8,7 @@ namespace Baketa.UI.Framework.Events;
     internal abstract class UIEventBase : Baketa.Core.Events.EventBase, IEvent
     {
         /// <summary>
-        /// イベントの一意な識別子 (コンパチビリティ用)
+        /// イベントの一意な識別子 (Coreインターフェース互換用)
         /// </summary>
         public Guid EventId => Id;
     }

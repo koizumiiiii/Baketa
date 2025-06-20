@@ -170,9 +170,13 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
         MultiMonitorOverlayManager multiMonitorManager,
         ITextMeasurementService textMeasurementService)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _multiMonitorManager = multiMonitorManager ?? throw new ArgumentNullException(nameof(multiMonitorManager));
-        _textMeasurementService = textMeasurementService ?? throw new ArgumentNullException(nameof(textMeasurementService));
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(multiMonitorManager);
+        ArgumentNullException.ThrowIfNull(textMeasurementService);
+        
+        _logger = logger;
+        _multiMonitorManager = multiMonitorManager;
+        _textMeasurementService = textMeasurementService;
         
         _logger.LogDebug("OverlayPositionManager初期化完了");
     }
@@ -185,7 +189,15 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
         
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken);
         
-        await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        try
+        {
+            await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            // オブジェクトが破棄済みの場合は正常終了
+            return;
+        }
         try
         {
             _currentTextRegions = textRegions;
@@ -207,7 +219,15 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
         
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken);
         
-        await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        try
+        {
+            await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            // オブジェクトが破棄済みの場合は正常終了
+            return;
+        }
         try
         {
             _currentTranslation = translationInfo;
@@ -231,7 +251,15 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
         
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken);
         
-        await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        try
+        {
+            await _updateSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            // オブジェクトが破棄済みの場合は正常終了
+            return;
+        }
         try
         {
             var wasSignificantChange = _currentGameWindow == null ||

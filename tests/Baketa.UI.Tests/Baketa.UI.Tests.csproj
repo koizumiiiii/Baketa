@@ -11,7 +11,8 @@
     
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <!-- テスト固有のCA警告を抑制 -->
+    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +29,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     
+    <!-- FluentAssertions for better test assertions -->
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    
+    <!-- ReactiveUI Testing -->
+    <PackageReference Include="ReactiveUI.Testing" Version="20.1.1" />
+    
     <!-- Avalonia UI Testing -->
     <PackageReference Include="Avalonia" Version="11.2.7" />
     <PackageReference Include="Avalonia.Headless" Version="11.2.7" />
@@ -35,8 +42,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Baketa.Core\Baketa.Core.csproj" />
-    <ProjectReference Include="..\..\Baketa.UI\Baketa.UI.csproj" />
+    <ProjectReference Include="..\..\Baketa.Infrastructure\Baketa.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\..\Baketa.Application\Baketa.Application.csproj" />
+    <ProjectReference Include="..\..\Baketa.UI\Baketa.UI.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.UI.Framework;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Models;
