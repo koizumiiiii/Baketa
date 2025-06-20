@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using System;
 using System.Threading.Tasks;
@@ -10,6 +11,12 @@ namespace Baketa.Core.Events.Handlers;
     public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     {
         private readonly IEventAggregator _eventAggregator;
+        
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
         
         /// <summary>
         /// コンストラクタ

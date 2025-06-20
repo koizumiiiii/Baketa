@@ -1,4 +1,4 @@
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Tests.Events;
 
@@ -18,6 +18,12 @@ namespace Baketa.Core.Tests.Events;
         /// イベント処理が呼ばれた回数
         /// </summary>
         public int CallCount { get; private set; }
+
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
 
         /// <inheritdoc />
         public async Task HandleAsync(TestEvent eventData)
@@ -63,6 +69,12 @@ namespace Baketa.Core.Tests.Events;
         public int ErrorCount { get; private set; }
 
         /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
+
+        /// <inheritdoc />
         public async Task HandleAsync(ErrorTestEvent eventData)
         {
             if (eventData == null)
@@ -106,6 +118,12 @@ namespace Baketa.Core.Tests.Events;
         /// 完了した回数
         /// </summary>
         public int CompletionCount { get; private set; }
+
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
 
         /// <inheritdoc />
         public async Task HandleAsync(TestEvent eventData)

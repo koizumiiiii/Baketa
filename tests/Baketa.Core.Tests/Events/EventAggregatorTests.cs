@@ -1,4 +1,4 @@
-using Baketa.Core.Events;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Implementation;
 using Microsoft.Extensions.Logging;
 using System.Threading;

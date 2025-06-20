@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ReactiveUI;
 
 // 名前空間エイリアスを使用して衝突を解決
-using UIEvents = Baketa.UI.Framework.Events;
+// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
 
 namespace Baketa.UI.ViewModels;
 
@@ -86,7 +86,7 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
     /// 新しいLanguagePairsViewModelを初期化します
     /// </summary>
     public LanguagePairsViewModel(
-        UIEvents.IEventAggregator eventAggregator,
+    Baketa.Core.Abstractions.Events.IEventAggregator eventAggregator,
         ILogger? logger = null)
         : base(eventAggregator, logger)
     {
@@ -152,19 +152,19 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
                 LanguagePairs.Add(pair);
             }
             
-            _logger?.LogInformation("デフォルトの言語ペア {Count} 個を読み込みました", defaultPairs.Length);
+            Logger?.LogInformation("デフォルトの言語ペア {Count} 個を読み込みました", defaultPairs.Length);
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "言語ペア設定の引数が無効です");
+            Logger?.LogError(ex, "言語ペア設定の引数が無効です");
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "言語ペアコレクションの操作に失敗しました");
+            Logger?.LogError(ex, "言語ペアコレクションの操作に失敗しました");
         }
         catch (OutOfMemoryException ex)
         {
-            _logger?.LogError(ex, "メモリ不足により言語ペアの読み込みに失敗しました");
+            Logger?.LogError(ex, "メモリ不足により言語ペアの読み込みに失敗しました");
         }
     }
     
@@ -211,7 +211,7 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
     private void LoadLanguagePairSettings()
     {
         // TODO: 永続化された設定を読み込む処理を実装する
-        _logger?.LogDebug("言語ペア設定を読み込みました");
+        Logger?.LogDebug("言語ペア設定を読み込みました");
     }
     
     /// <summary>
@@ -239,24 +239,24 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
             LanguagePairs.Add(newPair);
             SelectedLanguagePair = newPair;
             
-            _logger?.LogDebug("新しい言語ペアを追加しました: {LanguagePair}", newPair.LanguagePairKey);
+            Logger?.LogDebug("新しい言語ペアを追加しました: {LanguagePair}", newPair.LanguagePairKey);
             
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ArgumentException ex)
         {
             ErrorMessage = $"言語ペアの追加パラメータが無効です: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (InvalidOperationException ex)
         {
             ErrorMessage = $"言語ペアの追加操作が無効です: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (OutOfMemoryException ex)
         {
             ErrorMessage = $"メモリ不足により言語ペアの追加に失敗しました: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
     
@@ -279,17 +279,17 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
                 SelectedLanguagePair = LanguagePairs.FirstOrDefault();
             }
             
-            _logger?.LogDebug("言語ペアを削除しました: {LanguagePair}", languagePair.LanguagePairKey);
+            Logger?.LogDebug("言語ペアを削除しました: {LanguagePair}", languagePair.LanguagePairKey);
         }
         catch (ArgumentNullException ex)
         {
             ErrorMessage = $"削除対象の言語ペアが指定されていません: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (InvalidOperationException ex)
         {
             ErrorMessage = $"言語ペアの削除操作が無効です: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
     
@@ -307,12 +307,12 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
             
             SelectedLanguagePair = languagePair;
             
-            _logger?.LogDebug("言語ペアを編集モードにしました: {LanguagePair}", languagePair.LanguagePairKey);
+            Logger?.LogDebug("言語ペアを編集モードにしました: {LanguagePair}", languagePair.LanguagePairKey);
         }
         catch (ArgumentNullException ex)
         {
             ErrorMessage = $"編集対象の言語ペアが指定されていません: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
     
@@ -327,19 +327,19 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
             LoadDefaultLanguagePairs();
             SelectedLanguagePair = LanguagePairs.FirstOrDefault();
             
-            _logger?.LogInformation("言語ペア設定をデフォルトにリセットしました");
+            Logger?.LogInformation("言語ペア設定をデフォルトにリセットしました");
             
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
             ErrorMessage = $"デフォルトリセット操作が無効です: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (OutOfMemoryException ex)
         {
             ErrorMessage = $"メモリ不足によりリセットに失敗しました: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
     
@@ -362,24 +362,24 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
             };
             await PublishEventAsync(languagePairEvent).ConfigureAwait(false);
             
-            _logger?.LogInformation("言語ペア設定を保存しました: {Count} ペア", LanguagePairs.Count);
+            Logger?.LogInformation("言語ペア設定を保存しました: {Count} ペア", LanguagePairs.Count);
             
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
             ErrorMessage = $"言語ペア設定の保存操作が無効です: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (UnauthorizedAccessException ex)
         {
             ErrorMessage = $"設定ファイルへのアクセスが拒否されました: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (IOException ex)
         {
             ErrorMessage = $"設定ファイルの入出力エラーが発生しました: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         finally
         {
@@ -395,19 +395,19 @@ internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
         try
         {
             // TODO: プリセット選択ダイアログの実装
-            _logger?.LogDebug("プリセット読み込み機能は今後実装予定です");
+            Logger?.LogDebug("プリセット読み込み機能は今後実装予定です");
             
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (NotImplementedException ex)
         {
             ErrorMessage = $"プリセット機能はまだ実装されていません: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
         catch (UnauthorizedAccessException ex)
         {
             ErrorMessage = $"プリセットファイルへのアクセスが拒否されました: {ex.Message}";
-            _logLanguagePairOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+            _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
     

@@ -8,8 +8,8 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Baketa.Core.Events;
-using UIEvents = Baketa.UI.Framework.Events;
+using Baketa.Core.Abstractions.Events;
+using CoreEvents = Baketa.Core.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 
@@ -18,7 +18,7 @@ namespace Baketa.UI;
     internal sealed partial class App : Avalonia.Application
     {
         private ILogger<App>? _logger;
-        private UIEvents.IEventAggregator? _eventAggregator;
+        private IEventAggregator? _eventAggregator;
         
         // LoggerMessageデリゲートの定義
         private static readonly Action<ILogger, Exception?> _logInitializing =
@@ -51,7 +51,7 @@ namespace Baketa.UI;
             }
             
             // イベント集約器を取得
-            _eventAggregator = Program.ServiceProvider?.GetService<UIEvents.IEventAggregator>();
+            _eventAggregator = Program.ServiceProvider?.GetService<IEventAggregator>();
         }
 
         public override void OnFrameworkInitializationCompleted()
@@ -64,7 +64,7 @@ namespace Baketa.UI;
                     var serviceProvider = Program.ServiceProvider 
                         ?? throw new InvalidOperationException("サービスプロバイダーが初期化されていません");
                     
-                    _eventAggregator = serviceProvider.GetRequiredService<UIEvents.IEventAggregator>();
+                    _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                     
                     // MainWindowViewModelを取得
                     var mainWindowViewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
@@ -76,7 +76,7 @@ namespace Baketa.UI;
                     };
                     
                     // アプリケーション起動完了イベントをパブリッシュ
-                    _eventAggregator.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
+                    _eventAggregator?.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
                     
                     if (_logger != null)
                     {
@@ -170,7 +170,10 @@ namespace Baketa.UI;
     }
     
     // イベント定義
-    internal sealed class ApplicationStartupEvent : EventBase
+    /// <summary>
+    /// アプリケーション開始イベント
+    /// </summary>
+    internal sealed class ApplicationStartupEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名
@@ -183,7 +186,10 @@ namespace Baketa.UI;
         public override string Category => "Application";
     }
 
-    internal sealed class ApplicationShutdownEvent : EventBase
+    /// <summary>
+    /// アプリケーション終了イベント
+    /// </summary>
+    internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
     {
         /// <summary>
         /// イベント名

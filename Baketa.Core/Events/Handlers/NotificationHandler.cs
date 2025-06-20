@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using System;
 using System.Threading.Tasks;
@@ -13,6 +14,12 @@ namespace Baketa.Core.Events.Handlers;
     /// </remarks>
     public class NotificationHandler : IEventProcessor<NotificationEvent>
     {
+        /// <inheritdoc />
+        public int Priority => 0;
+        
+        /// <inheritdoc />
+        public bool SynchronousExecution => false;
+        
         /// <inheritdoc />
         public Task HandleAsync(NotificationEvent eventData)
         {

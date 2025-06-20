@@ -1,0 +1,46 @@
+using System;
+using System.Threading.Tasks;
+
+namespace Baketa.Core.Services;
+
+/// <summary>
+/// イベント集約器インターフェース
+/// アプリケーション全体でのイベント配信と購読を管理
+/// </summary>
+public interface IEventAggregator
+{
+    /// <summary>
+    /// イベントを非同期で発行します
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="eventData">発行するイベントデータ</param>
+    /// <returns>発行処理のタスク</returns>
+    Task PublishAsync<TEvent>(TEvent eventData) where TEvent : class;
+    
+    /// <summary>
+    /// イベントハンドラーを購読します
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="handler">イベントハンドラー</param>
+    /// <returns>購読解除用のDisposable</returns>
+    IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler) where TEvent : class;
+    
+    /// <summary>
+    /// 同期的なイベントハンドラーを購読します
+    /// </summary>
+    /// <typeparam name="TEvent">イベント型</typeparam>
+    /// <param name="handler">同期イベントハンドラー</param>
+    /// <returns>購読解除用のDisposable</returns>
+    IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class;
+    
+    /// <summary>
+    /// 指定されたオブジェクトの全購読を解除します
+    /// </summary>
+    /// <param name="subscriber">購読者オブジェクト</param>
+    void UnsubscribeAll(object subscriber);
+    
+    /// <summary>
+    /// 全ての購読を解除します
+    /// </summary>
+    void Clear();
+}

@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
@@ -10,6 +11,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Application.Services.Capture;
+using Baketa.Core.Events.Implementation;
+using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -64,15 +67,20 @@ namespace Baketa.Application.DI.Modules;
         /// <summary>
         /// 翻訳アプリケーションサービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterTranslationApplicationServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterTranslationApplicationServices(IServiceCollection services)
         {
-            // 翻訳関連のアプリケーションサービス
+            // 翻訳統合サービス（IEventAggregatorの依存を削除）
+            services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
+            services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
+                provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
+            
+            // 翻訳関連のアプリケーションサービス（将来拡張）
             // 例: services.AddSingleton<ITranslationService, TranslationService>();
             // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
             // 例: services.AddSingleton<ILanguageService, LanguageService>();
             
-            // 翻訳カスタマイズ
+            // 翻訳カスタマイズ（将来拡張）
             // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
             // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
         }
@@ -84,6 +92,9 @@ namespace Baketa.Application.DI.Modules;
         /// <param name="environment">アプリケーション実行環境</param>
         private static void RegisterOtherApplicationServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
         {
+            // イベント集約機構の登録
+            RegisterEventAggregator(services);
+            
             // キャプチャサービスの登録
             RegisterCaptureServices(services);
             
@@ -102,6 +113,20 @@ namespace Baketa.Application.DI.Modules;
                 // 例: services.AddSingleton<IDevelopmentService, DevelopmentService>();
                 // 例: services.AddSingleton<IDebugConsoleService, DebugConsoleService>();
             }
+        }
+        
+        /// <summary>
+        /// イベント集約機構を登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterEventAggregator(IServiceCollection services)
+        {
+            // メインのイベント集約機構を登録
+            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, EventAggregatorImpl>();
+                
+            // イベントプロセッサー自動登録サービス
+            services.AddSingleton<Baketa.Application.Services.Events.EventProcessorRegistrationService>();
+            services.AddHostedService<Baketa.Application.Services.Events.EventProcessorRegistrationService>();
         }
         
         /// <summary>
@@ -127,13 +152,14 @@ namespace Baketa.Application.DI.Modules;
         /// <summary>
         /// イベントハンドラーを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterEventHandlers(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterEventHandlers(IServiceCollection services)
         {
-            // 各種イベントハンドラーの登録
+            // 翻訳モード変更イベントプロセッサー
+            services.AddSingleton<Baketa.Application.Events.Processors.TranslationModeChangedEventProcessor>();
+            
+            // 他のイベントハンドラーの登録
             // 例: services.AddSingleton<CaptureCompletedEventHandler>();
-            // 例: services.AddSingleton<IEventHandler<CaptureCompletedEvent>>(sp => 
-            //     sp.GetRequiredService<CaptureCompletedEventHandler>());
             
             // 自動登録が必要な場合は必要に応じて実装
             // RegisterEventHandlersAutomatically(services);
