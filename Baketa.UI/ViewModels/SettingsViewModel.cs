@@ -592,15 +592,15 @@ namespace Baketa.UI.ViewModels
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _logger?.LogError(ex, "状態監視サービスが既に実行中です");
+                    Logger?.LogError(ex, "状態監視サービスが既に実行中です");
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    _logger?.LogError(ex, "状態監視の開始権限がありません");
+                    Logger?.LogError(ex, "状態監視の開始権限がありません");
                 }
                 catch (TimeoutException ex)
                 {
-                    _logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
+                    Logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
                 }
             });
         }
@@ -638,7 +638,7 @@ namespace Baketa.UI.ViewModels
                 // フォールバック発生時の特別処理
                 if (update.UpdateType == StatusUpdateType.FallbackTriggered)
                 {
-                    _logger?.LogInformation(
+                    Logger?.LogInformation(
                         "フォールバックが発生しました: {EngineName} at {UpdatedAt}",
                         update.EngineName, update.UpdatedAt);
                         
@@ -651,11 +651,11 @@ namespace Baketa.UI.ViewModels
             }
             catch (ArgumentNullException ex)
             {
-                _logger?.LogError(ex, "状態更新イベントのパラメータが無効です");
+                Logger?.LogError(ex, "状態更新イベントのパラメータが無効です");
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "状態更新イベントの処理中に無効な操作が発生しました");
+                Logger?.LogError(ex, "状態更新イベントの処理中に無効な操作が発生しました");
             }
         }
 
@@ -746,17 +746,17 @@ namespace Baketa.UI.ViewModels
             catch (InvalidOperationException ex)
             {
                 ErrorMessage = $"設定の保存中に操作エラーが発生しました: {ex.Message}";
-                _logSettingsOperationError(_logger ?? NullLogger.Instance, ex.Message, ex);
+                _logSettingsOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
             }
             catch (ArgumentException ex)
             {
                 ErrorMessage = $"設定の保存中に引数エラーが発生しました: {ex.Message}";
-                _logSettingsArgumentError(_logger ?? NullLogger.Instance, ex.Message, ex);
+                _logSettingsArgumentError(Logger ?? NullLogger.Instance, ex.Message, ex);
             }
             catch (IOException ex)
             {
                 ErrorMessage = $"設定ファイルの操作中にエラーが発生しました: {ex.Message}";
-                _logSettingsFileError(_logger ?? NullLogger.Instance, ex.Message, ex);
+                _logSettingsFileError(Logger ?? NullLogger.Instance, ex.Message, ex);
             }
             finally
             {
@@ -831,22 +831,22 @@ namespace Baketa.UI.ViewModels
                 IsStatusMonitoringEnabled = true;
                 ErrorMessage = string.Empty;
                 
-                _logger?.LogInformation("状態監視を手動で開始しました");
+                Logger?.LogInformation("状態監視を手動で開始しました");
             }
             catch (InvalidOperationException ex)
             {
                 ErrorMessage = $"状態監視が既に実行中です: {ex.Message}";
-                _logger?.LogError(ex, "状態監視が既に実行中です");
+                Logger?.LogError(ex, "状態監視が既に実行中です");
             }
             catch (UnauthorizedAccessException ex)
             {
                 ErrorMessage = $"状態監視の開始権限がありません: {ex.Message}";
-                _logger?.LogError(ex, "状態監視の開始権限がありません");
+                Logger?.LogError(ex, "状態監視の開始権限がありません");
             }
             catch (TimeoutException ex)
             {
                 ErrorMessage = $"状態監視の開始がタイムアウトしました: {ex.Message}";
-                _logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
+                Logger?.LogError(ex, "状態監視の開始がタイムアウトしました");
             }
             finally
             {
@@ -871,17 +871,17 @@ namespace Baketa.UI.ViewModels
                 IsStatusMonitoringEnabled = false;
                 ErrorMessage = string.Empty;
                 
-                _logger?.LogInformation("状態監視を手動で停止しました");
+                Logger?.LogInformation("状態監視を手動で停止しました");
             }
             catch (InvalidOperationException ex)
             {
                 ErrorMessage = $"状態監視が実行中ではありません: {ex.Message}";
-                _logger?.LogError(ex, "状態監視が実行中ではありません");
+                Logger?.LogError(ex, "状態監視が実行中ではありません");
             }
             catch (TimeoutException ex)
             {
                 ErrorMessage = $"状態監視の停止がタイムアウトしました: {ex.Message}";
-                _logger?.LogError(ex, "状態監視の停止がタイムアウトしました");
+                Logger?.LogError(ex, "状態監視の停止がタイムアウトしました");
             }
             finally
             {
@@ -906,17 +906,17 @@ namespace Baketa.UI.ViewModels
                 await _statusService.RefreshStatusAsync().ConfigureAwait(false);
                 ErrorMessage = string.Empty;
                 
-                _logger?.LogDebug("状態を手動でリフレッシュしました");
+                Logger?.LogDebug("状態を手動でリフレッシュしました");
             }
             catch (InvalidOperationException ex)
             {
                 ErrorMessage = $"状態リフレッシュが無効な状態です: {ex.Message}";
-                _logger?.LogError(ex, "状態リフレッシュが無効な状態です");
+                Logger?.LogError(ex, "状態リフレッシュが無効な状態です");
             }
             catch (TimeoutException ex)
             {
                 ErrorMessage = $"状態リフレッシュがタイムアウトしました: {ex.Message}";
-                _logger?.LogError(ex, "状態リフレッシュがタイムアウトしました");
+                Logger?.LogError(ex, "状態リフレッシュがタイムアウトしました");
             }
             finally
             {
@@ -945,11 +945,11 @@ namespace Baketa.UI.ViewModels
                         }
                         catch (InvalidOperationException ex)
                         {
-                            _logger?.LogWarning(ex, "ViewModel破棄時に状態監視が既に停止していました");
+                            Logger?.LogWarning(ex, "ViewModel破棄時に状態監視が既に停止していました");
                         }
                         catch (TimeoutException ex)
                         {
-                            _logger?.LogWarning(ex, "ViewModel破棄時の状態監視停止がタイムアウトしました");
+                            Logger?.LogWarning(ex, "ViewModel破棄時の状態監視停止がタイムアウトしました");
                         }
                     });
                 }

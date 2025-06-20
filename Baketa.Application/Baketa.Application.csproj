@@ -19,6 +19,11 @@
 		<PackageReference Include="System.Reactive" Version="6.0.0" />
 	</ItemGroup>
 
+	<!-- テストアセンブリからのアクセスを許可 -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Baketa.Application.Tests" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\Baketa.Core\Baketa.Core.csproj" />
 		<ProjectReference Include="..\Baketa.Infrastructure\Baketa.Infrastructure.csproj" />

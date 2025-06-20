@@ -10,7 +10,8 @@
     
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <!-- テスト固有のCA警告を抑制 -->
+    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +24,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    
+    <!-- FluentAssertions for better test assertions -->
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
   </ItemGroup>
 
   <!-- プロジェクト参照の順序を適切に設定 -->

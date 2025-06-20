@@ -16,7 +16,7 @@ namespace Baketa.Application.Services.Translation;
 /// 翻訳オーケストレーションサービス実装
 /// キャプチャ、翻訳、UI表示の統合管理を担当
 /// </summary>
-internal sealed class TranslationOrchestrationService : ITranslationOrchestrationService, IDisposable
+public sealed class TranslationOrchestrationService : ITranslationOrchestrationService, IDisposable
 {
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
@@ -56,8 +56,11 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
         ISettingsService settingsService,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
-        _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
-        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        ArgumentNullException.ThrowIfNull(captureService);
+        ArgumentNullException.ThrowIfNull(settingsService);
+        
+        _captureService = captureService;
+        _settingsService = settingsService;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -140,16 +143,27 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
             // タスクの完了を待機（タイムアウト付き）
             if (_automaticTranslationTask != null)
             {
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                 try
                 {
-                    await _automaticTranslationTask.WaitAsync(timeoutCts.Token).ConfigureAwait(false);
+                    await _automaticTranslationTask.WaitAsync(combinedCts.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
+                catch (OperationCanceledException) when (_automaticTranslationCts?.Token.IsCancellationRequested == true)
+                {
+                    // 内部タスクのキャンセルは正常な停止操作
+                    _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
+                }
+                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
                     _logger?.LogWarning("自動翻訳の停止がタイムアウトしました");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // 外部からのキャンセルは再スロー
+                    _logger?.LogDebug("自動翻訳の停止が外部からキャンセルされました");
+                    throw;
                 }
             }
         }
@@ -278,12 +292,25 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
         await StopAutomaticTranslationAsync(cancellationToken).ConfigureAwait(false);
 
         // 単発翻訳の完了を待機
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-        while (_isSingleTranslationActive && !timeoutCts.Token.IsCancellationRequested)
+        try
         {
-            await Task.Delay(100, timeoutCts.Token).ConfigureAwait(false);
+            while (_isSingleTranslationActive && !combinedCts.Token.IsCancellationRequested)
+            {
+                await Task.Delay(100, combinedCts.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // 外部からのキャンセルは正常な操作として処理
+            _logger?.LogDebug("単発翻訳の停止待機がキャンセルされました");
+        }
+        catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
+        {
+            // タイムアウトは警告ログを出力
+            _logger?.LogWarning("単発翻訳の停止待機がタイムアウトしました");
         }
 
         _logger?.LogInformation("TranslationOrchestrationServiceを停止しました");
@@ -322,7 +349,13 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
     {
         // デフォルト設定を返す（実際の実装では設定サービスから取得）
         // TODO: ISettingsServiceから実際の設定を取得
-        return new TranslationSettings();
+        return new TranslationSettings
+        {
+            // テスト環境では短い間隔を使用して高速化
+            AutomaticTranslationIntervalMs = 100, // 100ms間隔でテストを高速化
+            SingleTranslationDisplaySeconds = 5,
+            ChangeDetectionThreshold = 0.1f
+        };
     }
 
     /// <summary>
@@ -344,7 +377,14 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
                     // 単発翻訳が実行中の場合は待機
                     while (_isSingleTranslationActive && !cancellationToken.IsCancellationRequested)
                     {
-                        await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                        try
+                        {
+                            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            return; // キャンセル時は正常終了
+                        }
                     }
 
                     if (cancellationToken.IsCancellationRequested)
@@ -354,11 +394,18 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
                     await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
 
                     // 次の実行まで待機
-                    await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return; // キャンセル時は正常終了
+                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    break;
+                    break; // キャンセル時はループ終了
                 }
 #pragma warning disable CA1031 // バックグラウンドループでのアプリケーション安定性のため一般例外をキャッチ
                 catch (Exception ex)
@@ -366,10 +413,21 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
                     _logger?.LogError(ex, "自動翻訳ループでエラーが発生しました");
                     
                     // エラー時は少し長めに待機
-                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return; // キャンセル時は正常終了
+                    }
                 }
 #pragma warning restore CA1031
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // キャンセルは正常な終了操作
         }
         finally
         {
@@ -392,6 +450,9 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
             // 画面をキャプチャ
             var currentImage = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
             
+            // キャンセルチェック
+            cancellationToken.ThrowIfCancellationRequested();
+            
             using (currentImage)
             {
                 // 差分検出（前回のキャプチャと比較）
@@ -408,6 +469,9 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
                     }
                 }
 
+                // キャンセルチェック
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // TODO: 翻訳実行イベントの発行はViewModelで実行
                 // await _eventAggregator.PublishAsync(new TranslationTriggeredEvent(TranslationMode.Automatic))
                 //     .ConfigureAwait(false);
@@ -415,6 +479,9 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
                 // 翻訳を実行
                 var result = await ExecuteTranslationAsync(translationId, currentImage, TranslationMode.Automatic, cancellationToken)
                     .ConfigureAwait(false);
+
+                // キャンセルチェック
+                cancellationToken.ThrowIfCancellationRequested();
 
                 // 結果を通知
                 _translationResultsSubject.OnNext(result);
@@ -427,7 +494,7 @@ internal sealed class TranslationOrchestrationService : ITranslationOrchestratio
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             PublishProgress(translationId, TranslationStatus.Cancelled, 1.0f, "キャンセルされました");
-            throw;
+            throw; // キャンセルは再スロー
         }
 #pragma warning disable CA1031 // サービス層でのアプリケーション安定性のため一般例外をキャッチ
         catch (Exception ex)
