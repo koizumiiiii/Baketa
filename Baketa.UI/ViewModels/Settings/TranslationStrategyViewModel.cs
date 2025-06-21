@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
+using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
 
@@ -17,7 +19,7 @@ namespace Baketa.UI.ViewModels.Settings;
 /// <summary>
 /// 翻訳戦略選択ViewModel
 /// </summary>
-public sealed class TranslationStrategyViewModel : ViewModelBase, IActivatableViewModel, IDisposable
+public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IActivatableViewModel
 {
     private readonly ITranslationEngineStatusService _statusService;
     private readonly INotificationService _notificationService;
@@ -37,7 +39,8 @@ public sealed class TranslationStrategyViewModel : ViewModelBase, IActivatableVi
     /// <summary>
     /// ViewModel活性化管理
     /// </summary>
-    public ViewModelActivator Activator { get; } = new();
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CS0109:Member does not hide an accessible member", Justification = "Intentional shadowing for independent activation management")]
+    public new ViewModelActivator Activator { get; } = new();
 
     /// <summary>
     /// 現在選択されている翻訳戦略
@@ -69,7 +72,8 @@ public sealed class TranslationStrategyViewModel : ViewModelBase, IActivatableVi
     /// <summary>
     /// ローディング中かどうか
     /// </summary>
-    public bool IsLoading
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CS0109:Member does not hide an accessible member", Justification = "Intentional shadowing for independent loading state management")]
+    public new bool IsLoading
     {
         get => _isLoading;
         private set => this.RaiseAndSetIfChanged(ref _isLoading, value);
@@ -153,7 +157,8 @@ public sealed class TranslationStrategyViewModel : ViewModelBase, IActivatableVi
         ITranslationEngineStatusService statusService,
         INotificationService notificationService,
         IOptions<TranslationUIOptions> options,
-        ILogger<TranslationStrategyViewModel> logger)
+        ILogger<TranslationStrategyViewModel> logger,
+        IEventAggregator eventAggregator) : base(eventAggregator)
     {
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(notificationService);
@@ -577,10 +582,16 @@ public sealed class TranslationStrategyViewModel : ViewModelBase, IActivatableVi
         };
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    protected override void Dispose(bool disposing)
     {
-        _disposables?.Dispose();
+        if (disposing)
+        {
+            _disposables?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 

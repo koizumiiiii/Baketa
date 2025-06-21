@@ -37,13 +37,22 @@ public sealed class MainUiSettings
     public int PanelPositionY { get; set; } = 50;
     
     /// <summary>
+    /// 翻訳パネルの透明度（バッキングフィールド）
+    /// </summary>
+    private double _panelOpacity = 0.8;
+    
+    /// <summary>
     /// 翻訳パネルの透明度（0.0-1.0）
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "MainUi", "透明度", 
         Description = "翻訳パネルの透明度（0.0=完全透明、1.0=完全不透明）", 
         MinValue = 0.1, 
         MaxValue = 1.0)]
-    public double PanelOpacity { get; set; } = 0.8;
+    public double PanelOpacity 
+    { 
+        get => _panelOpacity; 
+        set => _panelOpacity = Math.Clamp(value, 0.1, 1.0); 
+    }
     
     /// <summary>
     /// 未使用時の自動非表示機能を使用するか
@@ -53,6 +62,11 @@ public sealed class MainUiSettings
     public bool AutoHideWhenIdle { get; set; } = true;
     
     /// <summary>
+    /// 自動非表示までの時間（バッキングフィールド）
+    /// </summary>
+    private int _autoHideDelaySeconds = 10;
+    
+    /// <summary>
     /// 自動非表示までの時間（秒）
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "MainUi", "自動非表示時間", 
@@ -60,7 +74,11 @@ public sealed class MainUiSettings
         Unit = "秒", 
         MinValue = 3, 
         MaxValue = 300)]
-    public int AutoHideDelaySeconds { get; set; } = 10;
+    public int AutoHideDelaySeconds 
+    { 
+        get => _autoHideDelaySeconds; 
+        set => _autoHideDelaySeconds = Math.Clamp(value, 3, 300); 
+    }
     
     /// <summary>
     /// マウスホバー時の表示強調を行うか
@@ -110,6 +128,11 @@ public sealed class MainUiSettings
     public bool EnableBoundarySnap { get; set; } = true;
     
     /// <summary>
+    /// 境界スナップの距離（バッキングフィールド）
+    /// </summary>
+    private int _boundarySnapDistance = 20;
+    
+    /// <summary>
     /// 境界スナップの距離（ピクセル）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "MainUi", "スナップ距離", 
@@ -117,7 +140,11 @@ public sealed class MainUiSettings
         Unit = "px", 
         MinValue = 5, 
         MaxValue = 100)]
-    public int BoundarySnapDistance { get; set; } = 20;
+    public int BoundarySnapDistance 
+    { 
+        get => _boundarySnapDistance; 
+        set => _boundarySnapDistance = Math.Clamp(value, 5, 100); 
+    }
     
     /// <summary>
     /// パネルアニメーション効果を有効にするか
@@ -127,6 +154,11 @@ public sealed class MainUiSettings
     public bool EnableAnimations { get; set; } = true;
     
     /// <summary>
+    /// アニメーション持続時間（バッキングフィールド）
+    /// </summary>
+    private int _animationDurationMs = 300;
+    
+    /// <summary>
     /// アニメーション持続時間（ミリ秒）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "MainUi", "アニメーション時間", 
@@ -134,7 +166,11 @@ public sealed class MainUiSettings
         Unit = "ms", 
         MinValue = 100, 
         MaxValue = 2000)]
-    public int AnimationDurationMs { get; set; } = 300;
+    public int AnimationDurationMs 
+    { 
+        get => _animationDurationMs; 
+        set => _animationDurationMs = Math.Clamp(value, 100, 2000); 
+    }
     
     /// <summary>
     /// パネルのテーマスタイル
@@ -178,4 +214,29 @@ public enum UiSize
     /// 大サイズ（見やすさ重視）
     /// </summary>
     Large
+}
+
+/// <summary>
+/// UI要素のテーマ定義
+/// ライト/ダーク/自動切り替えテーマをサポート
+/// </summary>
+public enum UiTheme
+{
+    /// <summary>
+    /// ライトテーマ（明るい背景）
+    /// 明るい環境での使用に適している
+    /// </summary>
+    Light,
+    
+    /// <summary>
+    /// ダークテーマ（暗い背景）
+    /// 暗い環境での使用や目の疲労軽減に適している
+    /// </summary>
+    Dark,
+    
+    /// <summary>
+    /// 自動テーマ（システム設定に従う）
+    /// Windowsのテーマ設定に合わせて自動的に切り替える
+    /// </summary>
+    Auto
 }
