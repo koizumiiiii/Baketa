@@ -1,0 +1,209 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:settings="using:Baketa.Core.Settings"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.MainUiSettingsView"
+             x:DataType="vm:MainUiSettingsViewModel">
+    
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer Classes="settings-content">
+        <StackPanel Spacing="24">
+            <!-- タイトル -->
+            <TextBlock Text="操作パネル設定" 
+                       Classes="settings-category-header"
+                       Margin="0,0,0,16"/>
+
+            <!-- 基本設定セクション -->
+            <StackPanel Classes="settings-section">
+                <TextBlock Text="表示設定" 
+                           FontSize="16" FontWeight="SemiBold" 
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           Margin="0,0,0,12"/>
+
+                <!-- 常に最前面に表示 -->
+                <controls:SettingsItem Title="常に最前面に表示"
+                                      Description="翻訳パネルを常に他のウィンドウの前面に表示します"
+                                      WarningMessage="無効にするとゲーム画面の下に隠れる可能性があります">
+                    <ToggleSwitch IsChecked="{Binding AlwaysOnTop}"/>
+                </controls:SettingsItem>
+
+                <!-- パネルサイズ -->
+                <controls:SettingsItem Title="パネルサイズ"
+                                      Description="翻訳パネルの表示サイズ">
+                    <ComboBox ItemsSource="{Binding PanelSizes}"
+                              SelectedItem="{Binding PanelSize}"
+                              Width="150">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="settings:UiSize">
+                                <TextBlock Text="{Binding Converter={x:Static converters:UiSizeToStringConverter.Instance}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:SettingsItem>
+
+                <!-- 透明度 -->
+                <controls:SettingsItem Title="透明度"
+                                      Description="翻訳パネルの透明度（10%-100%）">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Slider Value="{Binding PanelOpacity}" 
+                                Minimum="0.1" Maximum="1.0" 
+                                TickFrequency="0.1" Width="200"/>
+                        <TextBlock Text="{Binding PanelOpacityPercentage}" 
+                                   VerticalAlignment="Center" Width="50"/>
+                    </StackPanel>
+                </controls:SettingsItem>
+
+                <!-- ホバー強調 -->
+                <controls:SettingsItem Title="ホバー強調"
+                                      Description="マウスをパネル上に移動した時に表示を強調します">
+                    <ToggleSwitch IsChecked="{Binding HighlightOnHover}"/>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 操作設定セクション -->
+            <StackPanel Classes="settings-section">
+                <TextBlock Text="操作設定" 
+                           FontSize="16" FontWeight="SemiBold" 
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           Margin="0,0,0,12"/>
+
+                <!-- ドラッグ移動 -->
+                <controls:SettingsItem Title="ドラッグ移動を有効化"
+                                      Description="翻訳パネルをマウスドラッグで移動できるようにします">
+                    <ToggleSwitch IsChecked="{Binding EnableDragging}"/>
+                </controls:SettingsItem>
+
+                <!-- 自動非表示 -->
+                <controls:SettingsItem Title="自動非表示"
+                                      Description="操作がない場合に自動的にパネルを非表示にします">
+                    <ToggleSwitch IsChecked="{Binding AutoHideWhenIdle}"/>
+                </controls:SettingsItem>
+
+                <!-- 自動非表示時間 -->
+                <controls:SettingsItem Title="自動非表示時間"
+                                      Description="自動非表示が実行されるまでの待機時間（3-300秒）"
+                                      IsVisible="{Binding AutoHideWhenIdle}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Slider Value="{Binding AutoHideDelaySeconds}" 
+                                Minimum="3" Maximum="300" 
+                                TickFrequency="1" Width="200"/>
+                        <TextBlock Text="{Binding AutoHideDelaySeconds, StringFormat={}{0}秒}" 
+                                   VerticalAlignment="Center" Width="60"/>
+                    </StackPanel>
+                </controls:SettingsItem>
+
+                <!-- 単発翻訳表示時間 -->
+                <controls:SettingsItem Title="単発翻訳表示時間"
+                                      Description="単発翻訳結果が自動的に消えるまでの時間（3-60秒）">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Slider Value="{Binding SingleShotDisplayTime}" 
+                                Minimum="3" Maximum="60" 
+                                TickFrequency="1" Width="200"/>
+                        <TextBlock Text="{Binding SingleShotDisplayTime, StringFormat={}{0}秒}" 
+                                   VerticalAlignment="Center" Width="60"/>
+                    </StackPanel>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定セクション（条件表示） -->
+            <StackPanel Classes="settings-section" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="詳細設定" 
+                           FontSize="16" FontWeight="SemiBold" 
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           Margin="0,0,0,12"/>
+
+                <!-- 境界スナップ -->
+                <controls:SettingsItem Title="境界スナップ"
+                                      Description="パネルが画面端に近づいた時に自動的に端に吸着させます">
+                    <ToggleSwitch IsChecked="{Binding EnableBoundarySnap}"/>
+                </controls:SettingsItem>
+
+                <!-- スナップ距離 -->
+                <controls:SettingsItem Title="スナップ距離"
+                                      Description="境界スナップが発動する画面端からの距離（5-100px）"
+                                      IsVisible="{Binding EnableBoundarySnap}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Slider Value="{Binding BoundarySnapDistance}" 
+                                Minimum="5" Maximum="100" 
+                                TickFrequency="1" Width="200"/>
+                        <TextBlock Text="{Binding BoundarySnapDistance, StringFormat={}{0}px}" 
+                                   VerticalAlignment="Center" Width="60"/>
+                    </StackPanel>
+                </controls:SettingsItem>
+
+                <!-- アニメーション効果 -->
+                <controls:SettingsItem Title="アニメーション効果"
+                                      Description="パネルの表示・非表示時にアニメーション効果を適用します">
+                    <ToggleSwitch IsChecked="{Binding EnableAnimations}"/>
+                </controls:SettingsItem>
+
+                <!-- アニメーション時間 -->
+                <controls:SettingsItem Title="アニメーション時間"
+                                      Description="アニメーション効果の持続時間（100-2000ms）"
+                                      IsVisible="{Binding EnableAnimations}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Slider Value="{Binding AnimationDurationMs}" 
+                                Minimum="100" Maximum="2000" 
+                                TickFrequency="50" Width="200"/>
+                        <TextBlock Text="{Binding AnimationDurationMs, StringFormat={}{0}ms}" 
+                                   VerticalAlignment="Center" Width="60"/>
+                    </StackPanel>
+                </controls:SettingsItem>
+
+                <!-- テーマスタイル -->
+                <controls:SettingsItem Title="テーマスタイル"
+                                      Description="翻訳パネルの外観テーマ">
+                    <ComboBox ItemsSource="{Binding ThemeOptions}"
+                              SelectedItem="{Binding ThemeStyle}"
+                              Width="150">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="settings:UiTheme">
+                                <TextBlock Text="{Binding Converter={x:Static converters:UiThemeToStringConverter.Instance}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- デバッグ設定セクション（条件表示） -->
+            <StackPanel Classes="settings-section" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="デバッグ設定" 
+                           FontSize="16" FontWeight="SemiBold" 
+                           Foreground="{DynamicResource WarningBrush}"
+                           Margin="0,0,0,12"/>
+
+                <!-- デバッグ情報表示 -->
+                <controls:SettingsItem Title="デバッグ情報表示"
+                                      Description="パネルにデバッグ情報を表示します（開発者向け）">
+                    <ToggleSwitch IsChecked="{Binding ShowDebugInfo}"/>
+                </controls:SettingsItem>
+
+                <!-- FPS表示 -->
+                <controls:SettingsItem Title="FPS表示"
+                                      Description="フレームレート情報を表示します（開発者向け）">
+                    <ToggleSwitch IsChecked="{Binding ShowFrameRate}"/>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクションボタン -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,24,0,0">
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Classes="secondary"
+                        Width="140"/>
+                        
+                <Button Content="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}" 
+                        Command="{Binding ToggleAdvancedSettingsCommand}"
+                        Classes="accent"
+                        Width="140"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

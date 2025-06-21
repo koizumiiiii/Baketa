@@ -105,26 +105,7 @@ public sealed class ThemeSettings
     public string CustomCssFilePath { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// UIテーマ定義
-/// </summary>
-public enum UiTheme
-{
-    /// <summary>
-    /// ライトテーマ
-    /// </summary>
-    Light,
-    
-    /// <summary>
-    /// ダークテーマ
-    /// </summary>
-    Dark,
-    
-    /// <summary>
-    /// 自動切り替え（システム設定に従う）
-    /// </summary>
-    Auto
-}
+
 
 /// <summary>
 /// アニメーション速度定義

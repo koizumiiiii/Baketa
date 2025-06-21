@@ -1,0 +1,143 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        xmlns:converters="using:Baketa.UI.Converters"
+        xmlns:models="using:Baketa.UI.Models.Settings"
+        x:Class="Baketa.UI.Views.SettingsWindow"
+        x:DataType="vm:SettingsWindowViewModel"
+        Title="設定"
+        Width="1000" Height="700"
+        MinWidth="800" MinHeight="600"
+        Icon="/Assets/Icons/settings.ico"
+        WindowStartupLocation="CenterOwner">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="800" Height="600">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <Window.Styles>
+        <!-- ウィンドウ固有のスタイル -->
+        <Style Selector="ListBoxItem.settings-nav-item">
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="4,2" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        
+        <Style Selector="ListBoxItem.settings-nav-item:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="TextBlock.Foreground" Value="White" />
+        </Style>
+        
+        <Style Selector="ListBoxItem.settings-nav-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+            <Setter Property="TextBlock.Foreground" Value="White" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- ヘッダー -->
+        <Border Grid.Row="0" Classes="navigationHeader">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <PathIcon Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"
+                              Width="20" Height="20"
+                              Foreground="{DynamicResource PrimaryBrush}"/>
+                    <TextBlock Text="設定" 
+                               FontSize="18" FontWeight="SemiBold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                </StackPanel>
+                
+                <!-- 詳細設定表示切り替えボタン -->
+                <Button Grid.Column="1" 
+                        Command="{Binding ToggleAdvancedSettingsCommand}" 
+                        Classes="accent"
+                        Margin="0,5">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                                  Width="16" Height="16"/>
+                        <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+        
+        <!-- メインコンテンツ -->
+        <Grid Grid.Row="1" ColumnDefinitions="280,*">
+            <!-- ナビゲーションサイドバー -->
+            <Border Grid.Column="0" Classes="settings-navigation">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <ListBox ItemsSource="{Binding VisibleCategories}"
+                             SelectedItem="{Binding SelectedCategory}"
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:SettingCategory">
+                                <Border Classes="settings-nav-item">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <PathIcon Data="{Binding IconData}" 
+                                                  Width="20" Height="20" 
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding Description}" 
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </ScrollViewer>
+            </Border>
+            
+            <!-- 設定コンテンツエリア -->
+            <Border Grid.Column="1" Background="{DynamicResource BackgroundBrush}">
+                <ScrollViewer Classes="settings-content" 
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ContentControl Content="{Binding SelectedCategory.Content}"
+                                    Margin="0,0,0,20"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        
+        <!-- フッター / ステータスバー -->
+        <Border Grid.Row="2" Classes="statusBar">
+            <Grid ColumnDefinitions="*,Auto">
+                <!-- ステータスメッセージ -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" 
+                             Fill="{Binding HasChanges, Converter={x:Static converters:BoolToStatusColorConverter.Instance}}"
+                             VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- アクションボタン -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                    <Button Content="リセット" 
+                            Command="{Binding ResetCommand}"
+                            ToolTip.Tip="すべての設定をデフォルトに戻します"
+                            Width="100"/>
+                    <Button Content="キャンセル" 
+                            Command="{Binding CancelCommand}"
+                            ToolTip.Tip="変更を破棄して閉じます"
+                            Width="100"/>
+                    <Button Content="保存" 
+                            Command="{Binding SaveCommand}" 
+                            IsEnabled="{Binding HasChanges}" 
+                            Classes="accent"
+                            ToolTip.Tip="変更を保存します"
+                            Width="100"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

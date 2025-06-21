@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Baketa.UI.Controls.SettingsItem"
+             x:Name="Root">
+    
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <StackPanel Spacing="10">
+                <!-- Basic toggle example -->
+                <Border Classes="settings-item">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="設定項目のタイトル" FontWeight="SemiBold"/>
+                            <TextBlock Text="設定項目の説明文です。" 
+                                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                     FontSize="12"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                
+                <!-- Slider example -->
+                <Border Classes="settings-item">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="スライダー設定" FontWeight="SemiBold"/>
+                            <TextBlock Text="0から100までの値を設定します。" 
+                                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                     FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Slider Value="50" Minimum="0" Maximum="100" Width="150"/>
+                            <TextBlock Text="50" VerticalAlignment="Center" Width="30"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+    </Design.PreviewWith>
+    
+    <Border Classes="settings-item">
+        <Grid ColumnDefinitions="*,Auto">
+            <!-- Left side: Title and Description -->
+            <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="{Binding #Root.Title}" 
+                           FontWeight="SemiBold"/>
+                
+                <TextBlock Text="{Binding #Root.Description}" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding #Root.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                
+                <!-- Warning message if present -->
+                <TextBlock Text="{Binding #Root.WarningMessage}" 
+                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding #Root.WarningMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
+            
+            <!-- Right side: Control content -->
+            <ContentPresenter Grid.Column="1" 
+                              Content="{Binding #Root.SettingContent}"
+                              VerticalAlignment="Center"/>
+        </Grid>
+    </Border>
+</UserControl>

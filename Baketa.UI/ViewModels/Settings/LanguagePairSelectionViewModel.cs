@@ -10,7 +10,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
 using DynamicData;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
+using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
 
@@ -19,7 +21,7 @@ namespace Baketa.UI.ViewModels.Settings;
 /// <summary>
 /// 言語ペア選択ViewModel
 /// </summary>
-public sealed class LanguagePairSelectionViewModel : ViewModelBase, IActivatableViewModel, IDisposable
+public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IActivatableViewModel
 {
     private readonly ITranslationEngineStatusService _statusService;
     private readonly ILocalizationService _localizationService;
@@ -40,7 +42,8 @@ public sealed class LanguagePairSelectionViewModel : ViewModelBase, IActivatable
     /// <summary>
     /// ViewModel活性化管理
     /// </summary>
-    public ViewModelActivator Activator { get; } = new();
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CS0109:Member does not hide an accessible member", Justification = "Intentional shadowing for independent activation management")]
+    public new ViewModelActivator Activator { get; } = new();
 
     /// <summary>
     /// 利用可能な言語ペア一覧
@@ -77,7 +80,8 @@ public sealed class LanguagePairSelectionViewModel : ViewModelBase, IActivatable
     /// <summary>
     /// ローディング中かどうか
     /// </summary>
-    public bool IsLoading
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CS0109:Member does not hide an accessible member", Justification = "Intentional shadowing for independent loading state management")]
+    public new bool IsLoading
     {
         get => _isLoading;
         private set => this.RaiseAndSetIfChanged(ref _isLoading, value);
@@ -135,7 +139,8 @@ public sealed class LanguagePairSelectionViewModel : ViewModelBase, IActivatable
         ILocalizationService localizationService,
         INotificationService notificationService,
         IOptions<TranslationUIOptions> options,
-        ILogger<LanguagePairSelectionViewModel> logger)
+        ILogger<LanguagePairSelectionViewModel> logger,
+        IEventAggregator eventAggregator) : base(eventAggregator)
     {
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(localizationService);
@@ -667,11 +672,17 @@ public sealed class LanguagePairSelectionViewModel : ViewModelBase, IActivatable
         };
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    protected override void Dispose(bool disposing)
     {
-        _disposables.Dispose();
-        _languagePairsSource.Dispose();
+        if (disposing)
+        {
+            _disposables.Dispose();
+            _languagePairsSource.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 

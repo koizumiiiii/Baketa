@@ -5,7 +5,9 @@ using System.Reactive.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
+using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
+using Baketa.UI.Framework;
 using Baketa.UI.Services;
 
 namespace Baketa.UI.ViewModels.Settings;
@@ -13,7 +15,7 @@ namespace Baketa.UI.ViewModels.Settings;
 /// <summary>
 /// エンジン状態表示ViewModel
 /// </summary>
-public sealed class EngineStatusViewModel : ViewModelBase, IActivatableViewModel, IDisposable
+public sealed class EngineStatusViewModel : Framework.ViewModelBase, IActivatableViewModel
 {
     private readonly ITranslationEngineStatusService _statusService;
     private readonly ILogger<EngineStatusViewModel> _logger;
@@ -29,7 +31,8 @@ public sealed class EngineStatusViewModel : ViewModelBase, IActivatableViewModel
     /// <summary>
     /// ViewModel活性化管理
     /// </summary>
-    public ViewModelActivator Activator { get; } = new();
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CS0109:Member does not hide an accessible member", Justification = "Intentional shadowing for independent activation management")]
+    public new ViewModelActivator Activator { get; } = new();
 
     /// <summary>
     /// LocalOnlyエンジンの状態テキスト
@@ -87,7 +90,8 @@ public sealed class EngineStatusViewModel : ViewModelBase, IActivatableViewModel
     public EngineStatusViewModel(
         ITranslationEngineStatusService statusService,
         IOptions<TranslationUIOptions> options,
-        ILogger<EngineStatusViewModel> logger)
+        ILogger<EngineStatusViewModel> logger,
+        IEventAggregator eventAggregator) : base(eventAggregator)
     {
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(logger);
@@ -150,9 +154,15 @@ public sealed class EngineStatusViewModel : ViewModelBase, IActivatableViewModel
             IsLocalEngineHealthy, IsCloudEngineHealthy);
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    protected override void Dispose(bool disposing)
     {
-        _disposables?.Dispose();
+        if (disposing)
+        {
+            _disposables?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

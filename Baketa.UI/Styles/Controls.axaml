@@ -347,4 +347,83 @@
         <Setter Property="Background" Value="{DynamicResource StatusBarBackground}" />
         <Setter Property="Padding" Value="16,4" />
     </Style>
+    
+    <!-- ==== 設定項目用スタイル ==== -->
+    
+    <!-- 設定項目コンテナ -->
+    <Style Selector="Border.settings-item">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+    
+    <Style Selector="Border.settings-item:pointerover">
+        <Setter Property="Background" Value="{DynamicResource BackgroundVeryLightBrush}" />
+    </Style>
+    
+    <!-- 設定カテゴリヘッダー -->
+    <Style Selector="TextBlock.settings-category-header">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Margin" Value="0,20,0,10" />
+    </Style>
+    
+    <!-- 設定項目タイトル -->
+    <Style Selector="TextBlock.settings-title">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    
+    <!-- 設定項目説明 -->
+    <Style Selector="TextBlock.settings-description">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    
+    <!-- 設定項目警告 -->
+    <Style Selector="TextBlock.settings-warning">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="FontStyle" Value="Italic" />
+    </Style>
+    
+    <!-- ナビゲーションサイドバー -->
+    <Style Selector="Border.settings-navigation">
+        <Setter Property="Background" Value="{DynamicResource BackgroundLightBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BackgroundDarkBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,1,0" />
+    </Style>
+    
+    <!-- ナビゲーションアイテム -->
+    <Style Selector="ListBoxItem.settings-nav-item">
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Margin" Value="4,2" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    
+    <Style Selector="ListBoxItem.settings-nav-item:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <Style Selector="ListBoxItem.settings-nav-item:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextOnPrimaryBrush}" />
+    </Style>
+    
+    <!-- 設定コンテンツエリア -->
+    <Style Selector="ScrollViewer.settings-content">
+        <Setter Property="Padding" Value="20" />
+    </Style>
+    
+    <!-- 設定セクション -->
+    <Style Selector="StackPanel.settings-section">
+        <Setter Property="Spacing" Value="8" />
+        <Setter Property="Margin" Value="0,0,0,24" />
+    </Style>
 </Styles>

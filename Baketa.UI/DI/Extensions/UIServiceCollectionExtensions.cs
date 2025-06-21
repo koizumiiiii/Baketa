@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Controls;
 using Baketa.UI.Services;
+using Baketa.UI.DI.Modules;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
 using System;
@@ -44,6 +45,9 @@ internal static class UIServiceCollectionExtensions
     /// </summary>
     private static void RegisterUISpecificServices(IServiceCollection services, IConfiguration? configuration)
     {
+        // 設定関連サービスの登録
+        services.AddSettingsServices();
+        
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
         
