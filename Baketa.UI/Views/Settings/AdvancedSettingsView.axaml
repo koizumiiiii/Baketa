@@ -1,0 +1,332 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.AdvancedSettingsView"
+             x:DataType="vm:AdvancedSettingsViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- ヘッダー -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="拡張設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="高度な機能とシステム最適化の詳細設定" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <Border Background="{DynamicResource SystemFillColorAttentionBrush}" 
+                        CornerRadius="5" Padding="10" Margin="0,10,0,0">
+                    <TextBlock Text="⚠️ 警告: これらの設定は上級ユーザー向けです。変更すると予期しない動作が発生する可能性があります。" 
+                               FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}"/>
+                </Border>
+            </StackPanel>
+
+            <!-- 基本最適化設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="基本最適化設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="高度な設定を有効化"
+                                        Description="高度な設定とオプションを有効にします"
+                                        WarningMessage="高度な設定を変更すると予期しない動作が発生する可能性があります">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableAdvancedFeatures}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="メモリ最適化"
+                                        Description="メモリ使用量を最適化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding OptimizeMemoryUsage}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ガベージコレクション最適化"
+                                        Description="ガベージコレクションを最適化してパフォーマンスを向上させます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding OptimizeGarbageCollection}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定表示切り替え -->
+            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                </StackPanel>
+            </Button>
+
+            <!-- CPU/プロセス設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="CPU・プロセス設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="CPU親和性マスク"
+                                        Description="特定のCPUコアにプロセスを割り当てます（0=自動）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <NumericUpDown Value="{Binding CpuAffinityMask}" 
+                                           Minimum="0" Maximum="64" 
+                                           Width="100"/>
+                            <TextBlock Text="{Binding CpuAffinityMaskText}" 
+                                       VerticalAlignment="Center" Width="80"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="プロセス優先度"
+                                        Description="アプリケーションのプロセス優先度">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding ProcessPriorityOptions}"
+                                  SelectedItem="{Binding ProcessPriority}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ワーカースレッド数"
+                                        Description="バックグラウンド処理に使用するスレッド数（0=自動）">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding ThreadCountOptions}"
+                                  SelectedItem="{Binding WorkerThreadCount}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="I/Oスレッド数"
+                                        Description="ファイル入出力に使用するスレッド数（0=自動）">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding ThreadCountOptions}"
+                                  SelectedItem="{Binding IoThreadCount}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- メモリ・バッファリング設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="メモリ・バッファリング設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="バッファリング戦略"
+                                        Description="メモリバッファリングの戦略">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding BufferingStrategyOptions}"
+                                  SelectedItem="{Binding BufferingStrategy}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="キューサイズ制限"
+                                        Description="内部処理キューの最大サイズ">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding QueueSizeOptions}"
+                                  SelectedItem="{Binding MaxQueueSize}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- ネットワーク設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="ネットワーク設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="ネットワークタイムアウト"
+                                        Description="ネットワーク通信のタイムアウト時間">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding NetworkTimeoutSeconds}" 
+                                    Minimum="5" Maximum="300" 
+                                    TickFrequency="5" Width="200"/>
+                            <TextBlock Text="{Binding NetworkTimeoutSeconds, StringFormat={}{0}秒}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="HTTP接続プール最大サイズ"
+                                        Description="HTTP接続プールの最大サイズ">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MaxHttpConnections}" 
+                                    Minimum="1" Maximum="100" 
+                                    TickFrequency="5" Width="200"/>
+                            <TextBlock Text="{Binding MaxHttpConnections}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- リトライ設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="リトライ設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="リトライ戦略"
+                                        Description="失敗時の再試行戦略">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding RetryStrategyOptions}"
+                                  SelectedItem="{Binding RetryStrategy}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最大リトライ回数"
+                                        Description="失敗時の最大再試行回数"
+                                        IsVisible="{Binding IsRetryConfigEnabled}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MaxRetryCount}" 
+                                    Minimum="0" Maximum="10" 
+                                    TickFrequency="1" Width="200"/>
+                            <TextBlock Text="{Binding MaxRetryCount, StringFormat={}{0}回}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="リトライ間隔"
+                                        Description="再試行間の待機時間"
+                                        IsVisible="{Binding IsRetryConfigEnabled}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding RetryDelayMs}" 
+                                    Minimum="100" Maximum="30000" 
+                                    TickFrequency="500" Width="200"/>
+                            <TextBlock Text="{Binding RetryDelayText}" 
+                                       VerticalAlignment="Center" Width="100"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 統計・監視設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="統計・監視設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="統計情報収集"
+                                        Description="パフォーマンス統計情報を収集します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableStatisticsCollection}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="統計保持期間"
+                                        Description="統計データを保持する期間"
+                                        IsVisible="{Binding EnableStatisticsCollection}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding StatisticsRetentionDays}" 
+                                    Minimum="1" Maximum="365" 
+                                    TickFrequency="7" Width="200"/>
+                            <TextBlock Text="{Binding StatisticsRetentionDays, StringFormat={}{0}日}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="プロファイリング"
+                                        Description="詳細なパフォーマンスプロファイリングを有効にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableProfiling}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="異常検出"
+                                        Description="システムの異常状態を自動検出します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableAnomalyDetection}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="自動修復"
+                                        Description="検出された問題を自動的に修復します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableAutoRecovery}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 実験的設定表示切り替え -->
+            <Button Command="{Binding ToggleExperimentalSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink"
+                    IsVisible="{Binding ShowAdvancedSettings}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowExperimentalSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="実験的機能とデバッグ設定"/>
+                </StackPanel>
+            </Button>
+
+            <!-- 実験的・デバッグ設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowExperimentalSettings}">
+                <TextBlock Text="実験的機能・デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                <Border Background="{DynamicResource SystemFillColorCriticalBrush}" 
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <TextBlock Text="🚨 危険: これらの設定は開発者向けです。本番環境では使用しないでください。" 
+                               FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorOnCriticalBrush}"/>
+                </Border>
+                
+                <controls:SettingsItem Title="実験的機能"
+                                        Description="実験的な機能を有効にします（開発者向け）"
+                                        WarningMessage="実験的機能は不安定である可能性があります">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableExperimentalFeatures}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="内部API露出"
+                                        Description="内部APIへのアクセスを許可します（開発者向け）">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding ExposeInternalApis}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="デバッグブレークポイント"
+                                        Description="特定の条件でデバッガーブレークを発生させます（開発者向け）">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableDebugBreaks}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="メモリダンプ生成"
+                                        Description="クラッシュ時にメモリダンプを生成します（開発者向け）">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding GenerateMemoryDumps}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="カスタム設定ファイルパス"
+                                        Description="カスタム設定ファイルのパス（開発者向け）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBox Text="{Binding CustomConfigPath}" 
+                                     Width="300" IsReadOnly="True"/>
+                            <Button Content="参照..." 
+                                    Command="{Binding BrowseConfigPathCommand}"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクション -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="システム診断" 
+                        Command="{Binding RunSystemDiagnosticsCommand}"
+                        Width="120"/>
+                <Button Content="システム最適化" 
+                        Command="{Binding OptimizeSystemCommand}"
+                        Classes="accent" Width="120"/>
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

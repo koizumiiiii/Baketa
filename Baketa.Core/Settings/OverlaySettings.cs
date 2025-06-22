@@ -14,6 +14,15 @@ public sealed class OverlaySettings
     public bool IsEnabled { get; set; } = true;
     
     /// <summary>
+    /// オーバーレイ表示の有効化（別名）
+    /// </summary>
+    public bool EnableOverlay
+    {
+        get => IsEnabled;
+        set => IsEnabled = value;
+    }
+    
+    /// <summary>
     /// オーバーレイの透明度（0.0-1.0）
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Overlay", "透明度", 
@@ -81,6 +90,15 @@ public sealed class OverlaySettings
     public int AutoHideDelayForSingleShot { get; set; } = 10;
     
     /// <summary>
+    /// 表示時間（秒）（別名）
+    /// </summary>
+    public int DisplayDurationSeconds
+    {
+        get => AutoHideDelayForSingleShot;
+        set => AutoHideDelayForSingleShot = value;
+    }
+    
+    /// <summary>
     /// オーバーレイの最大幅（ピクセル、0で制限なし）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "最大幅", 
@@ -113,6 +131,13 @@ public sealed class OverlaySettings
     [SettingMetadata(SettingLevel.Basic, "Overlay", "クリックで閉じる", 
         Description = "オーバーレイをクリックして手動で非表示にできます")]
     public bool AllowManualClose { get; set; } = true;
+    
+    /// <summary>
+    /// クリックスルー機能の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Overlay", "クリックスルー", 
+        Description = "オーバーレイをクリックしても底のアプリにクリックが通るようにします")]
+    public bool EnableClickThrough { get; set; } = false;
     
     /// <summary>
     /// 翻訳結果のフェードアウトアニメーション時間（ミリ秒）

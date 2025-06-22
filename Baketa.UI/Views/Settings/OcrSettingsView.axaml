@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.OcrSettingsView"
+             x:DataType="vm:OcrSettingsViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- ヘッダー -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="OCR設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="光学文字認識の詳細設定" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 基本設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="OCRを有効化"
+                                        Description="画面上のテキストを自動的に認識します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableOcr}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="認識言語"
+                                        Description="OCRで認識する主要言語">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                  SelectedItem="{Binding OcrLanguage}"
+                                  IsEnabled="{Binding EnableOcr}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="信頼度閾値"
+                                        Description="テキスト認識の最小信頼度（0.0-1.0）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding ConfidenceThreshold}" 
+                                    Minimum="0.0" Maximum="1.0" 
+                                    TickFrequency="0.1" 
+                                    IsEnabled="{Binding EnableOcr}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding ConfidenceThreshold, StringFormat={}{0:F1}}" 
+                                       VerticalAlignment="Center" Width="40"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="テキストフィルタリング"
+                                        Description="認識されたテキストの後処理を有効にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableTextFiltering}"
+                                      IsEnabled="{Binding EnableOcr}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定表示切り替え -->
+            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink"
+                    IsEnabled="{Binding EnableOcr}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                </StackPanel>
+            </Button>
+
+            <!-- 詳細設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="画像前処理設定"
+                                        Description="OCR精度向上のための画像処理オプション（未実装）">
+                    <controls:SettingsItem.SettingContent>
+                        <TextBlock Text="開発中..." 
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="パフォーマンス設定"
+                                        Description="OCR処理の最適化設定（未実装）">
+                    <controls:SettingsItem.SettingContent>
+                        <TextBlock Text="開発中..." 
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクション -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="OCRテスト" 
+                        Command="{Binding TestOcrCommand}"
+                        IsEnabled="{Binding EnableOcr}"
+                        Classes="accent"
+                        Width="100"/>
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

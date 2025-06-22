@@ -14,6 +14,15 @@ public sealed class OcrSettings
     public bool IsEnabled { get; set; } = true;
     
     /// <summary>
+    /// OCR機能の有効化（別名）
+    /// </summary>
+    public bool EnableOcr
+    {
+        get => IsEnabled;
+        set => IsEnabled = value;
+    }
+    
+    /// <summary>
     /// 自動最適化の有効化
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "OCR", "自動最適化", 
@@ -35,6 +44,15 @@ public sealed class OcrSettings
         Description = "OCRで認識する言語", 
         ValidValues = new object[] { "ja", "en", "zh", "ko", "multi" })]
     public string RecognitionLanguage { get; set; } = "ja";
+    
+    /// <summary>
+    /// 認識言語（別名）
+    /// </summary>
+    public string Language
+    {
+        get => RecognitionLanguage;
+        set => RecognitionLanguage = value;
+    }
     
     /// <summary>
     /// 認識信頼度の閾値（0.0-1.0）
@@ -129,6 +147,13 @@ public sealed class OcrSettings
     public bool EnableTextAreaDetection { get; set; } = true;
     
     /// <summary>
+    /// テキストフィルタリングの有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "テキストフィルタリング", 
+        Description = "不要な文字やノイズをフィルタリングします")]
+    public bool EnableTextFiltering { get; set; } = true;
+    
+    /// <summary>
     /// 最小テキスト行高さ
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "最小行高さ", 
@@ -203,6 +228,7 @@ public sealed class OcrSettings
             EnableParallelProcessing = EnableParallelProcessing,
             MaxParallelThreads = MaxParallelThreads,
             EnableTextAreaDetection = EnableTextAreaDetection,
+            EnableTextFiltering = EnableTextFiltering,
             MinTextLineHeight = MinTextLineHeight,
             MaxTextLineHeight = MaxTextLineHeight,
             TimeoutSeconds = TimeoutSeconds,

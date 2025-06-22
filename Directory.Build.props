@@ -31,4 +31,16 @@
   <ItemGroup>
     <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
   </ItemGroup>
+  
+  <!-- バックアップファイルの自動除外設定 -->
+  <ItemGroup>
+    <Compile Remove="**/*.backup*" />
+    <Compile Remove="**/*.old*" />
+    <Compile Remove="**/*removed*" />
+    <Compile Remove="**/*.deleted" />
+    <None Remove="**/*.backup*" />
+    <None Remove="**/*.old*" />
+    <None Remove="**/*removed*" />
+    <None Remove="**/*.deleted" />
+  </ItemGroup>
 </Project>

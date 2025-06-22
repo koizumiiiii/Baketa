@@ -218,6 +218,19 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         await SaveAsync().ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<T?> GetAsync<T>() where T : class, new()
+    {
+        return await Task.FromResult(GetCategorySettings<T>()).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync<T>(T settings) where T : class, new()
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        await SetCategorySettingsAsync(settings).ConfigureAwait(false);
+    }
+
     #endregion
 
     #region プロファイル管理

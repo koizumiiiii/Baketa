@@ -1,6 +1,7 @@
 using ReactiveUI;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -14,6 +15,7 @@ using Baketa.UI.Framework;
 using Baketa.UI.Views.Settings;
 using Baketa.UI.ViewModels.Settings;
 using Microsoft.Extensions.Logging;
+using UiFramework = Baketa.UI.Framework;
 
 namespace Baketa.UI.ViewModels;
 
@@ -21,7 +23,7 @@ namespace Baketa.UI.ViewModels;
 /// 設定ウィンドウのViewModel
 /// プログレッシブディスクロージャーによる基本/詳細設定の階層表示をサポート
 /// </summary>
-public sealed class SettingsWindowViewModel : Framework.ViewModelBase
+public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 {
     private readonly ISettingsChangeTracker _changeTracker;
     private readonly IEventAggregator _eventAggregator;
@@ -49,7 +51,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
         InitializeCategories();
 
         // 変更追跡の設定
-        _changeTracker.HasChangesChanged += (_, e) =>
+        this._changeTracker.HasChangesChanged += (_, e) =>
         {
             this.RaisePropertyChanged(nameof(HasChanges));
             StatusMessage = e.HasChanges ? "設定に変更があります" : "変更なし";
@@ -110,7 +112,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     /// <summary>
     /// 設定に変更があるかどうか
     /// </summary>
-    public bool HasChanges => _changeTracker.HasChanges;
+    public bool HasChanges => this._changeTracker.HasChanges;
 
     /// <summary>
     /// ステータスメッセージ
@@ -253,19 +255,21 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     /// <summary>
     /// 一般設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateGeneralSettingsView()
+    private GeneralSettingsView CreateGeneralSettingsView()
     {
-        // TODO: 実装 - 一般設定View
-        return new TextBlock { Text = "一般設定（未実装）" };
+        GeneralSettings settings = new(); // TODO: 実際の設定データを注入
+        GeneralSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<GeneralSettingsViewModel>);
+        return new GeneralSettingsView { DataContext = viewModel };
     }
 
     /// <summary>
     /// 外観設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateAppearanceSettingsView()
+    private ThemeSettingsView CreateAppearanceSettingsView()
     {
-        // TODO: 実装 - 外観設定View
-        return new TextBlock { Text = "外観設定（未実装）" };
+        ThemeSettings settings = new(); // TODO: 実際の設定データを注入
+        ThemeSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<ThemeSettingsViewModel>);
+        return new ThemeSettingsView { DataContext = viewModel };
     }
 
     /// <summary>
@@ -275,8 +279,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     {
         MainUiSettings settings = new(); // TODO: 実際の設定データを注入
         MainUiSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<MainUiSettingsViewModel>);
-        MainUiSettingsView view = new() { DataContext = viewModel };
-        return view;
+        return new MainUiSettingsView { DataContext = viewModel };
     }
 
     /// <summary>
@@ -291,37 +294,58 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     /// <summary>
     /// オーバーレイ設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateOverlaySettingsView()
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope", 
+        Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
+    private UserControl CreateOverlaySettingsView()
     {
-        // TODO: 実装 - オーバーレイ設定View
-        return new TextBlock { Text = "オーバーレイ設定（未実装）" };
+        _ = new OverlaySettings(); // TODO: 実際の設定データを注入
+        _ = new OverlaySettingsViewModel(new OverlaySettings(), _eventAggregator, _logger as ILogger<OverlaySettingsViewModel>);
+        // 簡単なスタブ実装としてUserControlを返す
+        var textBlock = new Avalonia.Controls.TextBlock { Text = "オーバーレイ設定（開発中）" };
+        return new UserControl
+        {
+            Content = textBlock
+        };
     }
 
     /// <summary>
     /// キャプチャ設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateCaptureSettingsView()
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope", 
+        Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
+    private UserControl CreateCaptureSettingsView()
     {
-        // TODO: 実装 - キャプチャ設定View
-        return new TextBlock { Text = "キャプチャ設定（未実装）" };
+        _ = new CaptureSettings(); // TODO: 実際の設定データを注入
+        _ = new CaptureSettingsViewModel(new CaptureSettings(), _eventAggregator, _logger as ILogger<CaptureSettingsViewModel>);
+        // 簡単なスタブ実装としてUserControlを返す
+        var textBlock = new Avalonia.Controls.TextBlock { Text = "キャプチャ設定（開発中）" };
+        return new UserControl
+        {
+            Content = textBlock
+        };
     }
 
     /// <summary>
     /// OCR設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateOcrSettingsView()
+    private OcrSettingsView CreateOcrSettingsView()
     {
-        // TODO: 実装 - OCR設定View
-        return new TextBlock { Text = "OCR設定（未実装）" };
+        OcrSettings settings = new(); // TODO: 実際の設定データを注入
+        OcrSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<OcrSettingsViewModel>);
+        return new OcrSettingsView { DataContext = viewModel };
     }
 
     /// <summary>
     /// 拡張設定Viewを作成します
     /// </summary>
-    private static TextBlock CreateAdvancedSettingsView()
+    private UserControl CreateAdvancedSettingsView()
     {
-        // TODO: 実装 - 拡張設定View
-        return new TextBlock { Text = "拡張設定（未実装）" };
+        // 簡単なスタブ実装としてUserControlを返す
+        var textBlock = new Avalonia.Controls.TextBlock { Text = "拡張設定（開発中）" };
+        return new UserControl
+        {
+            Content = textBlock
+        };
     }
 
     /// <summary>
@@ -344,7 +368,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
             // TODO: 実際の設定保存処理を実装
             await Task.Delay(500).ConfigureAwait(false); // シミュレーション
 
-            _changeTracker.ClearChanges();
+            this._changeTracker.ClearChanges();
             StatusMessage = "設定を保存しました";
         }
         catch (InvalidOperationException ex)
@@ -369,7 +393,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     /// </summary>
     private async Task CancelAsync()
     {
-        if (await _changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
+        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
         {
             // TODO: ウィンドウを閉じる処理
             StatusMessage = "変更をキャンセルしました";
@@ -381,7 +405,7 @@ public sealed class SettingsWindowViewModel : Framework.ViewModelBase
     /// </summary>
     private async Task ResetAsync()
     {
-        if (await _changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
+        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
         {
             // TODO: 設定のリセット処理を実装
             StatusMessage = "設定をリセットしました";

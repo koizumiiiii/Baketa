@@ -1,0 +1,286 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.OverlaySettingsView"
+             x:DataType="vm:OverlaySettingsViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- ヘッダー -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="オーバーレイ設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="翻訳結果をゲーム画面上に表示するオーバーレイの設定" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 基本設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="オーバーレイ表示"
+                                        Description="翻訳結果をゲーム画面上にオーバーレイ表示します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding IsEnabled}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="透明度"
+                                        Description="オーバーレイの透明度（高いほど不透明）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding Opacity}" 
+                                    Minimum="0.1" Maximum="1.0" 
+                                    TickFrequency="0.1" Width="200"/>
+                            <TextBlock Text="{Binding OpacityPercentage}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="フォントサイズ"
+                                        Description="オーバーレイに表示されるテキストのフォントサイズ">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding FontSizeOptions}"
+                                  SelectedItem="{Binding FontSize}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="背景色"
+                                        Description="オーバーレイの背景色">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Background="{Binding BackgroundColorHex}" 
+                                    Width="40" Height="25" CornerRadius="3"/>
+                            <Button Content="色を選択..." 
+                                    Command="{Binding ChooseBackgroundColorCommand}"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="テキスト色"
+                                        Description="オーバーレイのテキスト色">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Background="{Binding TextColorHex}" 
+                                    Width="40" Height="25" CornerRadius="3"/>
+                            <Button Content="色を選択..." 
+                                    Command="{Binding ChooseTextColorCommand}"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 自動非表示設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="自動非表示設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="自動翻訳の自動非表示"
+                                        Description="自動翻訳の結果を指定時間後に自動的に非表示にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableAutoHideForAutoTranslation}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="自動翻訳の非表示時間"
+                                        Description="自動翻訳結果が自動的に消えるまでの時間"
+                                        IsVisible="{Binding EnableAutoHideForAutoTranslation}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding AutoHideDelayForAutoTranslation}" 
+                                    Minimum="2" Maximum="30" 
+                                    TickFrequency="1" Width="200"/>
+                            <TextBlock Text="{Binding AutoHideDelayForAutoTranslation, StringFormat={}{0}秒}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="単発翻訳の自動非表示時間"
+                                        Description="単発翻訳結果が自動的に消えるまでの時間">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding AutoHideDelayForSingleShot}" 
+                                    Minimum="3" Maximum="60" 
+                                    TickFrequency="1" Width="200"/>
+                            <TextBlock Text="{Binding AutoHideDelayForSingleShot, StringFormat={}{0}秒}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="クリックで閉じる"
+                                        Description="オーバーレイをクリックして手動で非表示にできます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding AllowManualClose}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定表示切り替え -->
+            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                </StackPanel>
+            </Button>
+
+            <!-- 詳細設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="表示位置設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="表示位置モード"
+                                        Description="オーバーレイの表示位置の決定方法">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding PositionModeOptions}"
+                                  SelectedItem="{Binding PositionMode}"
+                                  Width="200"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="固定位置"
+                                        Description="固定位置モード時の表示座標"
+                                        IsVisible="{Binding IsFixedPositionEnabled}">
+                    <controls:SettingsItem.SettingContent>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" Margin="0,5">
+                            <TextBlock Grid.Column="0" Text="X:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding FixedPositionX}"
+                                           Minimum="0" Maximum="3840" Width="100" Margin="0,0,20,0"/>
+                            <TextBlock Grid.Column="2" Text="Y:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="3" Value="{Binding FixedPositionY}"
+                                           Minimum="0" Maximum="2160" Width="100"/>
+                        </Grid>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- サイズとレイアウト設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="サイズとレイアウト" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="最大サイズ"
+                                        Description="オーバーレイの最大幅と高さ（0で制限なし）">
+                    <controls:SettingsItem.SettingContent>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" Margin="0,5">
+                            <TextBlock Grid.Column="0" Text="幅:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding MaxWidth}"
+                                           Minimum="0" Maximum="1920" Width="100" Margin="0,0,20,0"/>
+                            <TextBlock Grid.Column="2" Text="高さ:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="3" Value="{Binding MaxHeight}"
+                                           Minimum="0" Maximum="1080" Width="100"/>
+                        </Grid>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="テキスト省略"
+                                        Description="長いテキストを省略記号付きで表示します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableTextTruncation}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="クリックスルー"
+                                        Description="オーバーレイをクリックしても底のアプリにクリックが通るようにします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableClickThrough}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 外観設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="外観設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="境界線表示"
+                                        Description="オーバーレイの周囲に境界線を表示します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding ShowBorder}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="境界線色"
+                                        Description="オーバーレイの境界線色"
+                                        IsVisible="{Binding ShowBorder}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Background="{Binding BorderColorHex}" 
+                                    Width="40" Height="25" CornerRadius="3"/>
+                            <Button Content="色を選択..." 
+                                    Command="{Binding ChooseBorderColorCommand}"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="境界線太さ"
+                                        Description="オーバーレイの境界線の太さ"
+                                        IsVisible="{Binding ShowBorder}">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding BorderThicknessOptions}"
+                                  SelectedItem="{Binding BorderThickness}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="角丸半径"
+                                        Description="オーバーレイの角の丸み">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding CornerRadius}" 
+                                    Minimum="0" Maximum="20" 
+                                    TickFrequency="1" Width="200"/>
+                            <TextBlock Text="{Binding CornerRadius, StringFormat={}{0}px}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="フェードアウト時間"
+                                        Description="オーバーレイが消える時のアニメーション時間">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding FadeOutDurationMs}" 
+                                    Minimum="0" Maximum="2000" 
+                                    TickFrequency="100" Width="200"/>
+                            <TextBlock Text="{Binding FadeOutDurationText}" 
+                                       VerticalAlignment="Center" Width="100"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- デバッグ設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowDebugBounds}">
+                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="デバッグ境界表示"
+                                        Description="オーバーレイの境界をデバッグ用に表示します（開発者向け）"
+                                        WarningMessage="この設定は開発者向けです。通常は無効のままにしてください。">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding ShowDebugBounds}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクション -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="プレビュー表示" 
+                        Command="{Binding PreviewOverlayCommand}"
+                        Classes="accent" Width="120"/>
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

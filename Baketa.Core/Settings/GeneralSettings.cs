@@ -63,8 +63,8 @@ public sealed class GeneralSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "General", "ログレベル", 
         Description = "出力するログの詳細レベル", 
-        ValidValues = new object[] { LogLevel.Error, LogLevel.Warning, LogLevel.Information, LogLevel.Debug, LogLevel.Trace })]
-    public LogLevel LogLevel { get; set; } = LogLevel.Information;
+        ValidValues = new object[] { Microsoft.Extensions.Logging.LogLevel.Error, Microsoft.Extensions.Logging.LogLevel.Warning, Microsoft.Extensions.Logging.LogLevel.Information, Microsoft.Extensions.Logging.LogLevel.Debug, Microsoft.Extensions.Logging.LogLevel.Trace })]
+    public Microsoft.Extensions.Logging.LogLevel LogLevel { get; set; } = Microsoft.Extensions.Logging.LogLevel.Information;
     
     /// <summary>
     /// ログファイルの保持日数
@@ -91,33 +91,4 @@ public sealed class GeneralSettings
     public string? ActiveGameProfile { get; set; }
 }
 
-/// <summary>
-/// ログレベル定義
-/// </summary>
-public enum LogLevel
-{
-    /// <summary>
-    /// エラーのみ
-    /// </summary>
-    Error,
-    
-    /// <summary>
-    /// 警告以上
-    /// </summary>
-    Warning,
-    
-    /// <summary>
-    /// 情報以上
-    /// </summary>
-    Information,
-    
-    /// <summary>
-    /// デバッグ以上
-    /// </summary>
-    Debug,
-    
-    /// <summary>
-    /// すべて（最詳細）
-    /// </summary>
-    Trace
-}
+
