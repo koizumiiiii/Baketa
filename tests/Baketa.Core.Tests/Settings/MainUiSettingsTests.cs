@@ -65,7 +65,7 @@ public class MainUiSettingsTests
     }
 
     [Theory]
-    [InlineData(0.0)]
+    [InlineData(0.1)] // 最小値
     [InlineData(0.5)]
     [InlineData(1.0)]
     public void PanelOpacity_SetValidRange_ShouldUpdateProperty(double opacity)
@@ -78,6 +78,21 @@ public class MainUiSettingsTests
 
         // Assert
         Assert.Equal(opacity, settings.PanelOpacity);
+    }
+
+    [Theory]
+    [InlineData(0.0)] // 最小値未満はクランプされる
+    [InlineData(-0.1)]
+    public void PanelOpacity_SetBelowMinimum_ShouldClampToMinimum(double opacity)
+    {
+        // Arrange
+        var settings = new MainUiSettings();
+
+        // Act
+        settings.PanelOpacity = opacity;
+
+        // Assert
+        Assert.Equal(0.1, settings.PanelOpacity); // 最小値にクランプ
     }
 
     [Fact]
@@ -94,7 +109,7 @@ public class MainUiSettingsTests
     }
 
     [Theory]
-    [InlineData(1)]
+    [InlineData(3)] // 最小値
     [InlineData(5)]
     [InlineData(30)]
     [InlineData(60)]
@@ -108,6 +123,21 @@ public class MainUiSettingsTests
 
         // Assert
         Assert.Equal(delay, settings.AutoHideDelaySeconds);
+    }
+
+    [Theory]
+    [InlineData(1)] // 最小値未満はクランプされる
+    [InlineData(2)]
+    public void AutoHideDelaySeconds_SetBelowMinimum_ShouldClampToMinimum(int delay)
+    {
+        // Arrange
+        var settings = new MainUiSettings();
+
+        // Act
+        settings.AutoHideDelaySeconds = delay;
+
+        // Assert
+        Assert.Equal(3, settings.AutoHideDelaySeconds); // 最小値にクランプ
     }
 
     [Fact]

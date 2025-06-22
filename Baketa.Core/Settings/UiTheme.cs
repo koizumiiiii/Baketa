@@ -24,3 +24,28 @@ public enum UiTheme
     /// </summary>
     Auto
 }
+
+/// <summary>
+/// UIサイズ定義
+/// アプリケーションの表示スケールサイズ
+/// </summary>
+public enum UiSize
+{
+    /// <summary>
+    /// 小サイズ（コンパクト表示）
+    /// 狭い画面や効率性を重視する場合に適している
+    /// </summary>
+    Small,
+    
+    /// <summary>
+    /// 中サイズ（標準表示）
+    /// 一般的な使用に適した標準的なサイズ
+    /// </summary>
+    Medium,
+    
+    /// <summary>
+    /// 大サイズ（見やすさ重視）
+    /// 視認性を重視する場合や大画面での使用に適している
+    /// </summary>
+    Large
+}

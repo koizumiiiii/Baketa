@@ -16,4 +16,14 @@
 		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- バックアップファイル除外 -->
+		<Compile Remove="**/*.backup*" />
+		<Compile Remove="**/*.old*" />
+		<Compile Remove="**/*removed*" />
+		<None Remove="**/*.backup*" />
+		<None Remove="**/*.old*" />
+		<None Remove="**/*removed*" />
+	</ItemGroup>
+
 </Project>

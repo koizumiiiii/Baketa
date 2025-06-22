@@ -14,6 +14,15 @@ public sealed class CaptureSettings
     public bool IsEnabled { get; set; } = true;
     
     /// <summary>
+    /// キャプチャ機能の有効化（別名）
+    /// </summary>
+    public bool EnableCapture
+    {
+        get => IsEnabled;
+        set => IsEnabled = value;
+    }
+    
+    /// <summary>
     /// キャプチャ間隔（ミリ秒）
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Capture", "キャプチャ間隔", 
@@ -112,6 +121,22 @@ public sealed class CaptureSettings
     public int DifferenceDetectionSensitivity { get; set; } = 30;
     
     /// <summary>
+    /// 差分検出機能の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Capture", "差分検出有効", 
+        Description = "画面変更の差分検出機能を有効にします")]
+    public bool EnableDifferenceDetection { get; set; } = true;
+    
+    /// <summary>
+    /// 差分検出闾値（0.0～1.0）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Capture", "差分検出闾値", 
+        Description = "差分検出の闾値（小さいほど敏感）", 
+        MinValue = 0.0, 
+        MaxValue = 1.0)]
+    public double DifferenceThreshold { get; set; } = 0.1;
+    
+    /// <summary>
     /// 差分検出領域の分割数
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Capture", "差分検出分割数", 
@@ -184,6 +209,8 @@ public sealed class CaptureSettings
             ConsiderDpiScaling = ConsiderDpiScaling,
             UseHardwareAcceleration = UseHardwareAcceleration,
             DifferenceDetectionSensitivity = DifferenceDetectionSensitivity,
+            EnableDifferenceDetection = EnableDifferenceDetection,
+            DifferenceThreshold = DifferenceThreshold,
             DifferenceDetectionGridSize = DifferenceDetectionGridSize,
             SaveCaptureHistory = SaveCaptureHistory,
             MaxCaptureHistoryCount = MaxCaptureHistoryCount,

@@ -1,0 +1,144 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.GeneralSettingsView"
+             x:DataType="vm:GeneralSettingsViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- ヘッダー -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="一般設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="アプリケーションの基本的な動作設定" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 基本設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="Windows起動時に自動開始"
+                                        Description="Windowsログイン時にBaketaを自動的に開始します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding AutoStartWithWindows}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="システムトレイに最小化"
+                                        Description="ウィンドウを閉じた時にシステムトレイに最小化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding MinimizeToTray}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="終了確認ダイアログ"
+                                        Description="アプリケーション終了時に確認ダイアログを表示します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding ShowExitConfirmation}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="使用統計情報の収集"
+                                        Description="匿名の使用統計情報を収集して改善に役立てます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding AllowUsageStatistics}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="自動アップデート確認"
+                                        Description="新しいバージョンが利用可能になった時に通知します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding CheckForUpdatesAutomatically}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定表示切り替え -->
+            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                </StackPanel>
+            </Button>
+
+            <!-- 詳細設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="パフォーマンス優先モード"
+                                        Description="メモリ使用量よりも処理速度を優先します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding PerformanceMode}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最大メモリ使用量"
+                                        Description="アプリケーションが使用する最大メモリ量（128-4096MB）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MaxMemoryUsageMb}" 
+                                    Minimum="128" Maximum="4096" 
+                                    TickFrequency="128" Width="200"/>
+                            <TextBlock Text="{Binding MaxMemoryUsageMb, StringFormat={}{0} MB}" 
+                                       VerticalAlignment="Center" Width="80"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ログレベル"
+                                        Description="出力するログの詳細レベル">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding LogLevelOptions}"
+                                  SelectedItem="{Binding LogLevel}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ログ保持日数"
+                                        Description="ログファイルを保持する日数（1-365日）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <NumericUpDown Value="{Binding LogRetentionDays}"
+                                           Minimum="1" Maximum="365" 
+                                           Width="100"/>
+                            <Button Content="ログフォルダを開く" 
+                                    Command="{Binding OpenLogFolderCommand}"
+                                    Classes="accent"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- デバッグ設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding EnableDebugMode}">
+                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="デバッグモード"
+                                        Description="デバッグ機能を有効にします（開発者向け）"
+                                        WarningMessage="この設定は上級ユーザー向けです。通常は無効のままにしてください。">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableDebugMode}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクション -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

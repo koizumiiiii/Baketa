@@ -1,0 +1,272 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
+             x:Class="Baketa.UI.Views.Settings.CaptureSettingsView"
+             x:DataType="vm:CaptureSettingsViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- デザインタイム用のダミーデータ -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- ヘッダー -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="キャプチャ設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="画面キャプチャとスクリーンショット機能の詳細設定" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 基本設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="キャプチャ機能"
+                                        Description="画面キャプチャ機能を有効にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding IsEnabled}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="キャプチャ間隔"
+                                        Description="画面をキャプチャする間隔（短いほど高精度、長いほど高速）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding CaptureIntervalMs}" 
+                                    Minimum="100" Maximum="5000" 
+                                    TickFrequency="100" Width="200"/>
+                            <TextBlock Text="{Binding CaptureIntervalText}" 
+                                       VerticalAlignment="Center" Width="120"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="キャプチャ品質"
+                                        Description="キャプチャ画像の品質（高いほど精度向上、低いほど高速）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding CaptureQuality}" 
+                                    Minimum="1" Maximum="100" 
+                                    TickFrequency="5" Width="200"/>
+                            <TextBlock Text="{Binding CaptureQuality, StringFormat={}{0}%}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="領域検出モード"
+                                        Description="テキスト領域を自動的に検出するか、固定領域を使用するかを選択">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding AutoDetectCaptureArea}"
+                                      OnContent="自動検出" OffContent="固定領域"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 固定領域設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsFixedAreaEnabled}">
+                <TextBlock Text="固定キャプチャ領域" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="位置とサイズ"
+                                        Description="固定キャプチャ領域の位置とサイズを指定">
+                    <controls:SettingsItem.SettingContent>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto" Margin="0,5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding FixedCaptureAreaX}"
+                                           Minimum="0" Maximum="3840" Width="100" Margin="0,0,20,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Y:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Row="0" Grid.Column="3" Value="{Binding FixedCaptureAreaY}"
+                                           Minimum="0" Maximum="2160" Width="100"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="幅:" VerticalAlignment="Center" Margin="0,5,10,0"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding FixedCaptureAreaWidth}"
+                                           Minimum="50" Maximum="3840" Width="100" Margin="0,5,20,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="高さ:" VerticalAlignment="Center" Margin="0,5,10,0"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding FixedCaptureAreaHeight}"
+                                           Minimum="50" Maximum="2160" Width="100" Margin="0,5,0,0"/>
+                        </Grid>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 詳細設定表示切り替え -->
+            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
+                    HorizontalAlignment="Left"
+                    Classes="hyperlink">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
+                              Width="16" Height="16"/>
+                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
+                </StackPanel>
+            </Button>
+
+            <!-- 詳細設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="対象モニター"
+                                        Description="マルチモニター環境でキャプチャするモニターを選択">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding MonitorOptions}"
+                                  SelectedItem="{Binding SelectedMonitorOption}"
+                                  Width="200">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="DPIスケーリング考慮"
+                                        Description="高DPI環境でのスケーリングを考慮したキャプチャ">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding ConsiderDpiScaling}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ハードウェアアクセラレーション"
+                                        Description="GPUを使用したハードウェアアクセラレーション">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding UseHardwareAcceleration}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 差分検出設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="差分検出設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="差分検出機能"
+                                        Description="画面変更の差分検出機能を有効にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableDifferenceDetection}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="検出感度"
+                                        Description="画面変更を検出する感度（高いほど小さな変更も検出）"
+                                        IsVisible="{Binding EnableDifferenceDetection}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding DifferenceDetectionSensitivity}" 
+                                    Minimum="1" Maximum="100" 
+                                    TickFrequency="5" Width="200"/>
+                            <TextBlock Text="{Binding DifferenceDetectionSensitivity}" 
+                                       VerticalAlignment="Center" Width="40"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="検出閾値"
+                                        Description="差分検出の閾値（小さいほど敏感）"
+                                        IsVisible="{Binding EnableDifferenceDetection}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding DifferenceThreshold}" 
+                                    Minimum="0.0" Maximum="1.0" 
+                                    TickFrequency="0.05" Width="200"/>
+                            <TextBlock Text="{Binding DifferenceThresholdPercentage}" 
+                                       VerticalAlignment="Center" Width="60"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="グリッド分割数"
+                                        Description="差分検出のために画面を分割する数"
+                                        IsVisible="{Binding EnableDifferenceDetection}">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding GridSizeOptions}"
+                                  SelectedItem="{Binding DifferenceDetectionGridSize}"
+                                  Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- ゲーム対応設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="ゲーム対応設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="フルスクリーン最適化"
+                                        Description="フルスクリーンゲームからのキャプチャを最適化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding FullscreenOptimization}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ゲーム自動最適化"
+                                        Description="ゲームを検出した時にキャプチャ設定を自動最適化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding AutoOptimizeForGames}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- 履歴設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+                <TextBlock Text="履歴設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="キャプチャ履歴保存"
+                                        Description="キャプチャした画像の履歴を保存します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding SaveCaptureHistory}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最大保存数"
+                                        Description="保存するキャプチャ履歴の最大数"
+                                        IsVisible="{Binding SaveCaptureHistory}">
+                    <controls:SettingsItem.SettingContent>
+                        <NumericUpDown Value="{Binding MaxCaptureHistoryCount}"
+                                       Minimum="10" Maximum="1000" 
+                                       Width="100"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- デバッグ設定 -->
+            <StackPanel Spacing="12" IsVisible="{Binding SaveDebugCaptures}">
+                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                
+                <controls:SettingsItem Title="デバッグキャプチャ保存"
+                                        Description="デバッグ用にキャプチャ画像を保存します（開発者向け）"
+                                        WarningMessage="この設定は開発者向けです。通常は無効のままにしてください。">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding SaveDebugCaptures}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="保存パス"
+                                        Description="デバッグ用キャプチャの保存先パス"
+                                        IsVisible="{Binding SaveDebugCaptures}">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBox Text="{Binding DebugCaptureSavePath}" 
+                                     Width="300" IsReadOnly="True"/>
+                            <Button Content="参照..." 
+                                    Command="{Binding BrowseDebugPathCommand}"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+            </StackPanel>
+
+            <!-- アクション -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="テストキャプチャ" 
+                        Command="{Binding TestCaptureCommand}"
+                        Classes="accent" Width="120"/>
+                <Button Content="ゲーム最適化" 
+                        Command="{Binding OptimizeForCurrentGameCommand}"
+                        Width="120"/>
+                <Button Content="デフォルトに戻す" 
+                        Command="{Binding ResetToDefaultsCommand}"
+                        Width="120"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

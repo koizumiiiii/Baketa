@@ -74,6 +74,21 @@ public interface ISettingsService
     /// <param name="settings">設定カテゴリ</param>
     Task SetCategorySettingsAsync<T>(T settings) where T : class, new();
     
+    /// <summary>
+    /// 設定を非同期で取得します
+    /// </summary>
+    /// <typeparam name="T">設定の型</typeparam>
+    /// <returns>設定オブジェクト</returns>
+    Task<T?> GetAsync<T>() where T : class, new();
+    
+    /// <summary>
+    /// 設定を非同期で保存します
+    /// </summary>
+    /// <typeparam name="T">設定の型</typeparam>
+    /// <param name="settings">保存する設定</param>
+    /// <returns>保存タスク</returns>
+    Task SaveAsync<T>(T settings) where T : class, new();
+    
     #endregion
     
     #region プロファイル管理
