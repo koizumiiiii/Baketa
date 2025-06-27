@@ -1,0 +1,124 @@
+{
+  "name": "Baketa Real-time Game Translation",
+  "description": "Windows-specific real-time text translation overlay application for games. Uses OCR technology and AI translation to provide high-performance game translation tools.",
+  "version": "1.0.0",
+  "language": "csharp",
+  "framework": "dotnet8",
+  "platform": "windows",
+  
+  "claude_config": {
+    "model": "claude-sonnet-4-20250514",
+    "response_language": "japanese",
+    "temperature": 0.1,
+    "max_tokens": 4096,
+    "auto_approve_edits": true,
+    "confirmation_level": "minimal",
+    "command_environment": "powershell"
+  },
+  
+  "response_language": {
+    "primary": "japanese",
+    "requirement": "ALL responses must be in Japanese",
+    "code_comments": "English for technical clarity",
+    "explanations": "Japanese for user understanding",
+    "error_messages": "Original language + Japanese explanation"
+  },
+  
+  "editor_settings": {
+    "auto_approve": true,
+    "ask_before_edit": false,
+    "batch_edits": true,
+    "safe_mode": false,
+    "backup_enabled": true
+  },
+  
+  "command_execution": {
+    "preferred_shell": "powershell",
+    "dotnet_path": "C:\\Program Files\\dotnet\\dotnet.exe",
+    "fallback_to_fullpath": true,
+    "use_project_scripts": true
+  },
+  
+  "project_scripts": {
+    "build": ".\\scripts\\run_build.ps1",
+    "test": ".\\scripts\\run_tests.ps1",
+    "run": ".\\scripts\\run_app.ps1",
+    "clean": ".\\scripts\\run_build.ps1 -Clean"
+  },
+  
+  "architecture": {
+    "type": "clean-architecture",
+    "layers": [
+      "Baketa.Core - Platform-independent core functionality and abstractions",
+      "Baketa.Infrastructure - Infrastructure layer (OCR, translation)",
+      "Baketa.Infrastructure.Platform - Windows-specific implementations",
+      "Baketa.Application - Business logic and feature integration",
+      "Baketa.UI - User interface (Avalonia UI)"
+    ]
+  },
+  
+  "key_technologies": [
+    "C# 12",
+    "Avalonia UI 11.2.7",
+    "ReactiveUI",
+    "PaddleOCR",
+    "OpenCV",
+    "OPUS-MT Translation",
+    "Google Gemini API",
+    "Microsoft.Extensions.DependencyInjection",
+    "xUnit Testing"
+  ],
+  
+  "development_focus": [
+    "Windows-specific design",
+    "Real-time image processing",
+    "OCR optimization",
+    "Low resource consumption",
+    "Game performance preservation",
+    "Multi-language translation support",
+    "Root cause solution implementation"
+  ],
+  
+  "quality_standards": {
+    "code_analysis": "Microsoft Code Analysis + EditorConfig",
+    "async_programming": "ConfigureAwait(false) required in library code",
+    "null_safety": "Nullable reference types enabled",
+    "architecture_compliance": "Clean Architecture principles",
+    "test_coverage": "Unit + Integration + UI tests",
+    "solution_approach": "Root cause solutions, not surface-level fixes"
+  },
+  
+  "communication_guidelines": {
+    "primary_language": "日本語 (Japanese)",
+    "technical_documentation": "English for international compatibility, Japanese explanations",
+    "code_comments": "English preferred for technical clarity",
+    "business_logic": "Japanese domain knowledge preserved when needed",
+    "error_explanations": "Always provide Japanese explanations",
+    "response_format": "All Claude Code responses must be in Japanese"
+  },
+  
+  "development_philosophy": {
+    "core_principle": "根本原因解決 (Root Cause Solutions)",
+    "approach": "Fundamental solutions over surface-level fixes",
+    "long_term_focus": "Sustainable and maintainable code architecture",
+    "problem_solving": "Systematic analysis and architectural solutions"
+  },
+  
+  "workflow_optimization": {
+    "auto_approve_session": "Use Shift+Tab for 'Yes, and don't ask again this session'",
+    "command_templates": "Use project scripts for consistent execution",
+    "error_handling": "Collect errors, analyze root cause, implement fundamental fixes",
+    "testing_strategy": "PowerShell scripts with detailed logging",
+    "mandatory_post_implementation": {
+      "always_check_errors": true,
+      "required_steps": [
+        "Run compilation check: .\\scripts\\run_build.ps1 -Verbosity normal",
+        "Check code analysis warnings: dotnet build --verbosity normal | findstr warning",
+        "Run tests if applicable: .\\scripts\\run_tests.ps1",
+        "Provide implementation completion report"
+      ],
+      "automated_check": ".\\scripts\\check_implementation.ps1",
+      "report_format": "✅ 実装完了チェック結果: コンパイルエラー/警告/テスト結果を明記"
+    }
+  }
+}

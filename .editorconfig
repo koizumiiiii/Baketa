@@ -1,83 +1,162 @@
-# IDE0037: メンバーの名前を簡素化できます
-dotnet_diagnostic.IDE0037.severity = silent
-
-# IDE0042: 変数の宣言を分解できます
-dotnet_diagnostic.IDE0042.severity = silent
-
 # EditorConfig is awesome: https://EditorConfig.org
 
 # top-most EditorConfig file
 root = true
 
+# === C# 12 / .NET 8.0 Compliance Settings ===
+
 # .NET code style settings
 [*.{cs,vb}]
-# IDE0028: コレクション初期化の簡素化
-dotnet_style_collection_initializer = true:warning
-dotnet_diagnostic.IDE0028.severity = warning
 
-# CA1515: 内部クラスの警告拒否
-dotnet_diagnostic.CA1515.severity = none
+# === C# 12 Language Features ===
 
-# CA1812: 明らかにインスタンス化されない内部クラス
-dotnet_diagnostic.CA1812.severity = none
-
-# CA1848: LoggerMessageデリゲートの使用に関する警告抑制
-dotnet_diagnostic.CA1848.severity = none
-
-# IDE0290: プライマリコンストラクターの使用に関する警告抑制
-dotnet_diagnostic.IDE0290.severity = silent
-
-# IDE0031: Nullチェックの簡素化に関する警告抑制
-dotnet_diagnostic.IDE0031.severity = none
-
-# IDE0090: new式の簡素化
-dotnet_style_object_initializer = true:silent
-dotnet_diagnostic.IDE0090.severity = silent
-
-# IDE0305: コレクション初期化の簡素化
-dotnet_diagnostic.IDE0305.severity = warning
-
-# C# 12 コレクション式の設定
-dotnet_style_prefer_collection_expression = when_types_clearly_match:warning
-
-# CA1305: IFormatProviderの指定
-dotnet_diagnostic.CA1305.severity = warning
-
-# Null安全性関連の設定
-dotnet_style_null_propagation = true:warning
-dotnet_style_coalesce_expression = true:warning
-dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
-dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
-dotnet_style_prefer_auto_properties = true:warning
-
-# usingステートメント関連の設定
-csharp_using_directive_placement = outside_namespace:warning
-csharp_prefer_simple_using_statement = true:warning
-dotnet_diagnostic.IDE0063.severity = warning
-
-# using ステートメントの整理（名前空間関連）
-dotnet_sort_system_directives_first = true:warning
-dotnet_separate_import_directive_groups = true:warning
-
-# リソース管理関連の設定
-dotnet_diagnostic.CA2000.severity = warning
-dotnet_diagnostic.CA1816.severity = warning
-
-# 未使用変数/パラメータ関連
-dotnet_diagnostic.IDE0060.severity = none
-dotnet_code_quality_unused_parameters = all:suggestion
-dotnet_diagnostic.CS0219.severity = warning
-dotnet_diagnostic.xUnit1026.severity = warning
-
-# readonlyフィールド関連
-dotnet_style_readonly_field = true:warning
-dotnet_diagnostic.IDE0044.severity = warning
-
-# 名前空間宣言の設定
+# File-scoped namespaces (REQUIRED for all new files)
 csharp_style_namespace_declarations = file_scoped:warning
 dotnet_diagnostic.IDE0161.severity = warning
 
-# 名前空間命名規則
+# Primary constructors (encouraged where appropriate)
+dotnet_diagnostic.IDE0290.severity = suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+
+# Collection expressions (C# 12 feature)
+dotnet_style_prefer_collection_expression = when_types_clearly_match:warning
+dotnet_diagnostic.IDE0305.severity = warning
+
+# Pattern matching enhancements
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+dotnet_diagnostic.IDE0019.severity = warning
+csharp_style_prefer_switch_expression = true:warning
+dotnet_diagnostic.IDE0066.severity = warning
+
+# Required members (C# 11/12 feature)
+csharp_style_prefer_required_members = true:suggestion
+
+# Raw string literals preference
+csharp_style_prefer_raw_string_literals = true:suggestion
+
+# === .NET 8.0 Best Practices ===
+
+# Collection initialization modernization
+dotnet_style_collection_initializer = true:warning
+dotnet_diagnostic.IDE0028.severity = warning
+csharp_style_collection_initializer = true:warning
+
+# Modern object initialization
+dotnet_style_object_initializer = true:suggestion
+dotnet_diagnostic.IDE0090.severity = suggestion
+
+# === Null Safety & Modern Patterns ===
+
+# Nullable reference types (enforced project-wide)
+dotnet_style_null_propagation = true:warning
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+csharp_style_conditional_delegate_call = true:warning
+
+# Throw expressions
+csharp_style_throw_expression = true:suggestion
+
+# === Performance & Modern APIs ===
+
+# Prefer auto properties
+dotnet_style_prefer_auto_properties = true:warning
+
+# Readonly fields
+dotnet_style_readonly_field = true:warning
+dotnet_diagnostic.IDE0044.severity = warning
+
+# === Async/Await Best Practices ===
+
+# ConfigureAwait(false) enforcement (library code only, not tests)
+dotnet_diagnostic.CA2007.severity = warning
+
+# === Modern using Patterns ===
+
+# Using directive placement
+csharp_using_directive_placement = outside_namespace:warning
+
+# Simple using statements (C# 8+)
+csharp_prefer_simple_using_statement = true:warning
+dotnet_diagnostic.IDE0063.severity = warning
+
+# Using statement organization
+dotnet_sort_system_directives_first = true:warning
+dotnet_separate_import_directive_groups = true:warning
+
+# === Code Quality Enforcement ===
+
+# Unused value assignment (use discard)
+dotnet_diagnostic.IDE0059.severity = warning
+csharp_style_unused_value_assignment_preference = discard_variable:warning
+
+# Unused parameters
+dotnet_diagnostic.IDE0060.severity = suggestion
+dotnet_code_quality_unused_parameters = all:suggestion
+
+# === Legacy IDE Warnings (Controlled) ===
+
+# IDE0037: Simplify member name
+dotnet_diagnostic.IDE0037.severity = silent
+
+# IDE0042: Deconstruct variable declaration
+dotnet_diagnostic.IDE0042.severity = silent
+
+# IDE0031: Null check simplification (sometimes conflicts with readability)
+dotnet_diagnostic.IDE0031.severity = suggestion
+
+# IDE0270: Null check simplification (newer pattern)
+dotnet_diagnostic.IDE0270.severity = suggestion
+
+# === Resource Management ===
+
+# Disposal patterns
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA1816.severity = warning
+
+# === Platform-Specific Suppressions ===
+
+# Windows-specific APIs (expected in Windows-only application)
+dotnet_diagnostic.CA1416.severity = none
+
+# === Project-Specific Suppressions ===
+
+# Internal class warnings (acceptable for internal architecture)
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1812.severity = none
+
+# Logger message delegate warnings (performance not critical for this application)
+dotnet_diagnostic.CA1848.severity = none
+
+# IFormatProvider specification (encouraged but not critical)
+dotnet_diagnostic.CA1305.severity = suggestion
+
+# Wrapper suffix warnings (acceptable for adapter pattern)
+dotnet_diagnostic.CA1711.severity = none
+
+# Method naming patterns (legacy compatibility)
+dotnet_diagnostic.CA1721.severity = none
+
+# Collection property warnings (acceptable for configuration objects)
+dotnet_diagnostic.CA2227.severity = none
+
+# Parameter name consistency warnings (legacy compatibility)
+dotnet_diagnostic.CA1725.severity = none
+
+# Dynamic log message template warnings (acceptable for diagnostic logging)
+dotnet_diagnostic.CA2254.severity = none
+
+# Static method suggestions (not always applicable)
+dotnet_diagnostic.CA1822.severity = none
+
+# Array property warnings (acceptable for configuration)
+dotnet_diagnostic.CA1819.severity = none
+
+# Generic overload warnings (legacy compatibility)
+dotnet_diagnostic.CA2263.severity = none
+
+# === Naming Conventions ===
+
+# Namespace naming
 dotnet_naming_rule.namespace_naming.symbols = namespace_symbol
 dotnet_naming_rule.namespace_naming.style = pascal_case_style
 dotnet_naming_rule.namespace_naming.severity = warning
@@ -85,94 +164,29 @@ dotnet_naming_rule.namespace_naming.severity = warning
 dotnet_naming_symbols.namespace_symbol.applicable_kinds = namespace
 dotnet_naming_style.pascal_case_style.capitalization = pascal_case
 
-# 不要な値代入回避 (ディスカードシンボル使用)
-dotnet_diagnostic.IDE0059.severity = warning
-csharp_style_unused_value_assignment_preference = discard_variable:warning
-
-# if文の簡素化
-dotnet_diagnostic.IDE0045.severity = warning
-dotnet_style_prefer_conditional_expression_over_assignment = true:warning
-
-# コレクションの初期化簡素化
-dotnet_diagnostic.IDE0300.severity = warning
-dotnet_diagnostic.IDE0301.severity = warning
-dotnet_diagnostic.IDE0306.severity = warning
-dotnet_style_collection_initializer = true:warning
-csharp_style_collection_initializer = true:warning
-
-# メンバーをreadonlyにする
-dotnet_diagnostic.IDE0251.severity = warning
-dotnet_style_readonly_field = true:warning
-
-# パターンマッチングを使用
-dotnet_diagnostic.IDE0019.severity = warning
-csharp_style_pattern_matching_over_as_with_null_check = true:warning
-
-# switch式の使用
-dotnet_diagnostic.IDE0066.severity = warning
-csharp_style_prefer_switch_expression = true:warning
-
-# 名前空間はフォルダー構造と一致
+# Namespace should match folder structure
 dotnet_diagnostic.IDE0130.severity = warning
 
-# プラットフォーム依存APIの警告 - Windows専用アプリケーションのため抑制
-dotnet_diagnostic.CA1416.severity = none
+# === File-Specific Overrides ===
 
-# 警告抑制一覧 - 全プロジェクト共通
+# Configuration services (broad exception handling required for availability)
+[**/Services/JsonSettingsService.cs]
+dotnet_diagnostic.CA1031.severity = none
 
-# CA1711: Wrapperサフィックスに関する警告抜別
-dotnet_diagnostic.CA1711.severity = none
+[**/Services/NotificationService.cs]
+dotnet_diagnostic.CA1031.severity = none
 
-# CA1721: "Get"で始まるメソッド名の警告抜別 (リファクタリング計画が必要)
-dotnet_diagnostic.CA1721.severity = none
-
-# CA2227: 書き込み可能なコレクションプロパティ
-dotnet_diagnostic.CA2227.severity = none
-
-# CA1725: オーバーライド階層でのパラメーター名の不一致
-dotnet_diagnostic.CA1725.severity = none
-
-# CA2254: ログメッセージテンプレートの動的生成
-dotnet_diagnostic.CA2254.severity = none
-
-# CA1822: インスタンスメソッドをstaticにマーク可能
-dotnet_diagnostic.CA1822.severity = none
-
-# CA1819: プロパティで返される配列は書き込み禁止でない
-dotnet_diagnostic.CA1819.severity = none
-
-# CA2263: ジェネリックオーバーロードの使用
-dotnet_diagnostic.CA2263.severity = none
-
-# IDE0270: Nullチェックの簡素化
-dotnet_diagnostic.IDE0270.severity = none
-
-# === 特定のパターンに対する警告抑制 ===
-
-# 特定の大規模リファクタリングを要するファイルは一時的に警告を抑制
+# Legacy files under refactoring
 [**/Services/OCR/OcrPreprocessingService.cs]
 dotnet_diagnostic.IDE0301.severity = none
 dotnet_diagnostic.IDE0300.severity = none
 
-# UI関連のコンポーネントも同様に
 [**/Framework/Validation/ValidationHelpers.cs]
 dotnet_diagnostic.IDE0301.severity = none
 dotnet_diagnostic.IDE0300.severity = none
 dotnet_diagnostic.IDE0306.severity = none
 
-# 現在警告が出ているファイルに対する警告抑制はリファクタリング完了のため削除
-
-# プロジェクト固有の設定
-[*.cs]
-# 基本設定（プロジェクトのコーディング規約に合わせて調整）
-indent_style = space
-indent_size = 4
-end_of_line = crlf
-charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-# 特定ファイルに対する設定
+# Platform-specific wrappers
 [*OpenCvWrapper.cs]
 dotnet_diagnostic.CA1711.severity = none
 
@@ -189,21 +203,35 @@ dotnet_diagnostic.CA1721.severity = none
 dotnet_diagnostic.IDE0251.severity = none
 dotnet_diagnostic.CA1051.severity = none
 
-# === テストプロジェクト固有の設定 ===
+# === Test Project Settings ===
 
-# テストプロジェクトではConfigureAwait(false)を使用すべきではないため、CA2007を抑制
+# Test projects exempt from ConfigureAwait(false) requirement
 [**/tests/**/*.cs]
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1707.severity = none  # Allow underscores in test method names
+dotnet_diagnostic.CA2000.severity = none  # Automatic resource management in tests
 
-# テストメソッドでのasync/await関連の警告抑制
 [**/*Tests.cs]
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2000.severity = none
 
-# 具体的なテストプロジェクトパス
 [**/Baketa.*Tests/**/*.cs]
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2000.severity = none
 
-# テスト用モッククラスでの警告抑制
+# Mock classes in tests
 [**/*Mock*.cs]
 dotnet_diagnostic.CA1812.severity = none
 dotnet_diagnostic.CA1822.severity = none
+
+# === General File Settings ===
+
+[*.cs]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true

@@ -399,4 +399,161 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# ===== BAKETA PROJECT SPECIFIC =====
+
+# Machine Learning Models (large files, downloaded separately)
+Models/
+*.onnx
+*.model
+*.vocab
+*.bin
+
+# OCR/Translation temporary files
+temp_ocr/
+temp_images/
+temp_translations/
+
+# Configuration files with sensitive data
+appsettings.Production.json
+appsettings.Local.json
+**/secrets.json
+**/*secrets*.json
+
+# User-specific settings and profiles
+UserProfiles/
+user_settings.json
+game_profiles_personal.json
+
+# Runtime logs and diagnostics
+runtime_logs/
+crash_dumps/
+performance_logs/
+*.dmp
+
+# Test output and coverage
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.opencover
+
+# Temporary and backup files
+*.backup
+*.old
+*removed*
+*.deleted
+*.temp
+*.tmp
+
+# PaddleOCR specific files
+paddle_models/
+paddleocr_cache/
+
+# OpenCV temporary files
+opencv_temp/
+cv_cache/
+
+# Translation cache files
+translation_cache/
+*.translation_cache
+
+# Screen capture temporary files
+screenshots_temp/
+capture_cache/
+
+# Performance profiling files
+*.speedscope
+*.prof
+*.perf
+
+# ===== CLAUDE CODE CONFIGURATION =====
+
+# Claude Code configuration (should be committed for team consistency)
+# .claude/ - Keep this directory tracked
+
+# Personal Claude Code settings (if any)
+.claude/personal/
+.claude/user_*
+
+# ===== DEVELOPMENT ENVIRONMENT =====
+
+# GitHub Issues offline cache
 docs/.github/
+
+# Development scripts output
+scripts/output/
+scripts/temp/
+scripts/logs/
+
+# Manual test files
+manual_test_*
+dev_test_*
+scratch_*
+
+# IDE specific temporary files
+*.sln.GhostDoc.xml
+*.sln.DotSettings
+
+# ===== OPERATING SYSTEM =====
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS (if anyone uses)
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux (if anyone uses)
+*~
+.nfs*
+
+# ===== DOCUMENTATION GENERATION =====
+
+# Generated documentation
+docs/generated/
+api_docs/
+*.docx~
+*.xlsx~
+
+# ===== SECURITY & SENSITIVE DATA =====
+
+# API Keys and secrets
+*.key
+*.pem
+api_keys.json
+credentials.json
+
+# Local development certificates
+*.pfx
+*.p12
+dev_cert.*
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# ===== MISCELLANEOUS =====
+
+# Compressed files (usually not source)
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Video/Audio test files (usually large)
+test_media/
+*.mp4
+*.avi
+*.mov
+*.wav
+*.mp3
