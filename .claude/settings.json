@@ -1,0 +1,45 @@
+{
+  "preferredNotifChannel": "terminal_bell",
+  "taskCompletionNotification": true,
+  "implementationCheckReminder": true,
+  "errorNotificationEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(rg*)",
+      "Bash(grep*)",
+      "Bash(grep -*)",
+      "Bash(*grep*)",
+      "Bash(find*)",
+      "Bash(find -*)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(wc*)",
+      "Bash(dotnet*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Edit(*)",
+      "MultiEdit(*)",
+      "Write(*)",
+      "Read(*)",
+      "Glob(*)",
+      "LS(*)",
+      "NotebookRead(*)",
+      "NotebookEdit(*)"
+    ],
+    "deny": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(rm*)",
+      "Bash(sudo*)",
+      "Bash(npm install*)",
+      "Bash(pnpm install*)",
+      "Bash(yarn install*)",
+      "Read(.env*)",
+      "Read(*.key)",
+      "Read(*.secret)"
+    ]
+  }
+}

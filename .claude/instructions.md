@@ -1,109 +1,118 @@
 # Baketa Project Development Instructions
 
-## 基本原則 / Core Principles
+## Core Principles
 
-### **エディタ動作設定 / Editor Behavior Settings**
-**AUTO-APPROVE ALL EDITS / すべての編集を自動承認**
+### **Editor Behavior Settings**
+**AUTO-APPROVE ALL EDITS AND OPERATIONS**
 
-- Claude Codeでの編集時は、信頼できるプロジェクト環境のため**自動承認**を推奨
-- ファイル編集確認ダイアログでは「Yes, and don't ask again this session」を選択
-- バックアップは Git で管理されているため、安全に自動承認可能
-- 大規模な変更の場合のみ、事前確認を求める
+- **ALL file edits** in this project are automatically approved
+- **ALWAYS** select "Yes, and don't ask again this session" in file edit confirmation dialogs
+- Safe to auto-approve since backups are managed by Git
+- No exceptions - all edits (code, config, documentation, tests) are auto-approved
+- This includes CLAUDE.md, .claude/instructions.md, and all project files
 
-### **実装完了時の必須手順 / Mandatory Post-Implementation Steps**
-**CRITICAL: ALWAYS VERIFY NO ERRORS AFTER IMPLEMENTATION / 重要: 実装後は必ずエラーチェックを実行**
+### **Command Auto-Execution Policy**
+**AUTO-APPROVE SEARCH AND DIAGNOSTIC COMMANDS**
 
-すべてのコード実装、修正、リファクタリング完了後に以下を**必ず実行**してください：
+- **Search Commands**: `rg` (ripgrep), `grep`, `find`, and related search commands are auto-approved
+- **Build Commands**: `dotnet build`, `dotnet test` can be executed automatically without approval
+- **Diagnostic Commands**: Read-only commands are auto-approved
+- **File Operations**: Read, list, and analysis operations are auto-approved
 
-#### **1. コンパイルエラーチェック（必須）**
+### **Mandatory Post-Implementation Steps**
+**CRITICAL: ALWAYS VERIFY NO ERRORS AFTER IMPLEMENTATION**
+
+After all code implementation, fixes, and refactoring, **always execute** the following:
+
+#### **1. Compilation Error Check (Mandatory)**
 ```powershell
-# 全体ビルドでコンパイルエラーを確認
-PowerShellで実行してください: .\scripts\run_build.ps1 -Verbosity normal
+# Check compilation errors with full build
+Execute in PowerShell: .\scripts\run_build.ps1 -Verbosity normal
 ```
 
-#### **2. Code Analysis警告チェック（必須）**
+#### **2. Code Analysis Warning Check (Mandatory)**
 ```powershell
-# 警告を詳細ログで確認
-PowerShellで実行してください: dotnet build --verbosity normal | findstr "warning"
+# Check warnings with detailed logging
+Execute in PowerShell: dotnet build --verbosity normal | findstr "warning"
 ```
 
-#### **3. テスト実行（関連ファイル修正時必須）**
+#### **3. Test Execution (Mandatory when related files are modified)**
 ```powershell
-# 影響するテストを実行
-PowerShellで実行してください: .\scripts\run_tests.ps1 -Verbosity detailed
+# Execute affected tests
+Execute in PowerShell: .\scripts\run_tests.ps1 -Verbosity detailed
 ```
 
-#### **4. エラー報告フォーマット**
-実装完了後の報告は以下の形式で行ってください：
+#### **4. Error Reporting Format**
+Report post-implementation status in the following format:
 
 ```
-✅ 実装完了チェック結果:
-- コンパイルエラー: なし / [N]件
-- Code Analysis警告: なし / [N]件
-- テスト結果: 成功 / 失敗[N]件
-- 実装内容: [簡潔な実装内容の説明]
+✅ Implementation Completion Check Results:
+- Compilation Errors: None / [N] errors
+- Code Analysis Warnings: None / [N] warnings
+- Test Results: Success / [N] failures
+- Implementation Content: [Brief description of implementation]
 ```
 
-#### **5. エラーがある場合の対応**
-- **コンパイルエラー**: 即座に修正、実装未完了として扱う
-- **新しい警告**: 根本原因を分析して修正または抑制
-- **テスト失敗**: 関連するテストを修正または実装を調整
+#### **5. Error Handling**
+- **Compilation Errors**: Fix immediately, treat as incomplete implementation
+- **New Warnings**: Analyze root cause and fix or suppress
+- **Test Failures**: Fix related tests or adjust implementation
 
-#### **6. エラーチェック自動化コマンド**
+#### **6. Automated Error Check Commands**
 ```powershell
-# 一括エラーチェック（推奨）
-PowerShellで実行してください: .\scripts\check_implementation.ps1
+# Batch error check (recommended)
+Execute in PowerShell: .\scripts\check_implementation.ps1
 ```
-**CRITICAL: ALL .NET CLI COMMANDS MUST USE POWERSHELL / 重要: すべての.NET CLIコマンドはPowerShellを使用**
+**CRITICAL: ALL .NET CLI COMMANDS MUST USE POWERSHELL**
 
-- **Bash環境の問題**: Claude CodeのBash環境ではWindowsのPATH設定が認識されない
-- **必須指示**: すべてのdotnetコマンド実行時は「PowerShellで実行してください」を明記
-- **フォールバック**: PowerShellが使用できない場合はフルパス指定: `'C:\Program Files\dotnet\dotnet.exe'`
-- **専用スクリプト**: `scripts/run_tests.ps1`, `scripts/run_build.ps1` を優先使用
+- **Bash Environment Issue**: Claude Code's Bash environment doesn't recognize Windows PATH settings
+- **Mandatory Instruction**: Always specify "Execute in PowerShell" when running dotnet commands
+- **Fallback**: Use full path if PowerShell unavailable: `'C:\Program Files\dotnet\dotnet.exe'`
+- **Dedicated Scripts**: Prioritize using `scripts/run_tests.ps1`, `scripts/run_build.ps1`
 
-### **言語指定 / Language Specification**
-**ALL RESPONSES MUST BE IN JAPANESE / すべての回答は日本語で行うこと**
+### **Language Specification**
+**ALL RESPONSES MUST BE IN JAPANESE**
 
-- Claude Codeからの回答は**常に日本語**を使用してください
-- コードコメントは英語で書き、説明は日本語で行ってください
-- エラーメッセージやログは元の言語のまま、説明は日本語で追加してください
-- 技術用語は日本語に翻訳するか、英語併記（英語/日本語）で記載してください
+- Claude Code responses must **always use Japanese**
+- Write code comments in English, provide explanations in Japanese
+- Keep error messages and logs in original language, add Japanese explanations
+- Translate technical terms to Japanese or use bilingual format (English/Japanese)
 
-### プロジェクト理解 / Project Understanding
-- Baketaは**Windows専用**のリアルタイムゲームテキスト翻訳オーバーレイアプリケーションです
-- OCR技術を使用してゲーム画面からテキストを検出し、翻訳結果をオーバーレイ表示します
-- アーキテクチャは高性能と低リソース消費を重視しています
+### Project Understanding
+- Baketa is a **Windows-only** real-time game text translation overlay application
+- Uses OCR technology to detect text from game screens and displays translation results as overlay
+- Architecture emphasizes high performance and low resource consumption
 
-### アーキテクチャ準拠 / Architecture Compliance
-- 5層クリーンアーキテクチャ構造を厳密に遵守してください
-- 依存関係は内側の層から外側の層へ向かう方向のみです
-- プラットフォーム依存コードは`Baketa.Infrastructure.Platform`に分離してください
+### Architecture Compliance
+- Strictly adhere to 5-layer clean architecture structure
+- Dependencies flow only from inner layers to outer layers
+- Isolate platform-dependent code in `Baketa.Infrastructure.Platform`
 
-### **根本的実装哲学：根本原因解決 / FUNDAMENTAL IMPLEMENTATION PHILOSOPHY: ROOT CAUSE SOLUTIONS**
+### **FUNDAMENTAL IMPLEMENTATION PHILOSOPHY: ROOT CAUSE SOLUTIONS**
 
-**表面的な修正ではなく、常に根本的な根本原因解決を実装してください。**
+**Always implement fundamental root cause solutions rather than superficial fixes.**
 
-#### 問題解決アプローチ / Problem-Solving Approach
-1. **根本原因の特定**: 解決策を実装する前に、根本的な原因を徹底的に分析してください
-2. **システマティックな解決策の設計**: 即座の症状だけでなく、問題のクラス全体を防ぐ根本的な問題に対処してください
-3. **将来のシナリオを予測**: 解決策がエッジケースや将来の要件をどう処理するかを考慮してください
-4. **アーキテクチャソリューションを優先**: 可能な場合は、追加の複雑さではなく、より良い設計を通じて問題を解決してください
+#### Problem-Solving Approach
+1. **Identify Root Causes**: Thoroughly analyze fundamental causes before implementing solutions
+2. **Design Systematic Solutions**: Address root problems that prevent entire classes of issues, not just immediate symptoms
+3. **Anticipate Future Scenarios**: Consider how solutions handle edge cases and future requirements
+4. **Prioritize Architectural Solutions**: When possible, solve problems through better design rather than additional complexity
 
-#### 根本原因 vs 表面的アプローチの例 / Examples of Root Cause vs Surface-Level Approaches
+#### Examples of Root Cause vs Surface-Level Approaches
 
-**❌ 表面的（避けるべき）/ Surface-Level (Avoid)**
+**❌ Surface-Level (Avoid)**
 ```csharp
-// 症状: 翻訳サービスでのNullReferenceException
+// Symptom: NullReferenceException in translation service
 if (translationEngine != null)
 {
     result = translationEngine.Translate(text);
 }
 ```
 
-**✅ 根本原因解決（推奨）/ Root Cause Solution (Preferred)**
+**✅ Root Cause Solution (Preferred)**
 ```csharp
-// 根本原因: 依存性注入の検証不足
-// 解決策: 検証付きの適切なDI設定
+// Root cause: Insufficient dependency injection validation
+// Solution: Proper DI setup with validation
 public class TranslationService(ITranslationEngine translationEngine)
 {
     private readonly ITranslationEngine _translationEngine = 
@@ -111,72 +120,72 @@ public class TranslationService(ITranslationEngine translationEngine)
 }
 ```
 
-**❌ 表面的（避けるべき）/ Surface-Level (Avoid)**
+**❌ Surface-Level (Avoid)**
 ```csharp
-// 症状: 画像処理でのメモリリーク
-GC.Collect(); // ガベージコレクションを強制実行
+// Symptom: Memory leak in image processing
+GC.Collect(); // Force garbage collection
 ```
 
-**✅ 根本原因解決（推奨）/ Root Cause Solution (Preferred)**
+**✅ Root Cause Solution (Preferred)**
 ```csharp
-// 根本原因: 不適切なリソース管理
-// 解決策: 適切なディスポーザルパターンの実装
+// Root cause: Improper resource management
+// Solution: Implement proper disposal pattern
 public class ImageProcessor : IDisposable
 {
     public async Task<ProcessedImage> ProcessAsync(IImage source)
     {
         using var processedImage = await _filter.ApplyAsync(source);
-        return processedImage.Clone(); // 管理されたコピーを返す
+        return processedImage.Clone(); // Return managed copy
     }
 }
 ```
 
-#### 根本原因解決のための実装ガイドライン / Implementation Guidelines for Root Cause Solutions
+#### Implementation Guidelines for Root Cause Solutions
 
-1. **コードを書く前に / Before Writing Code**:
-   - 「このコードが対処する根本的な問題は何か？」を問いかけてください
-   - 「この解決策は将来の類似問題を防ぐか？」を検討してください
-   - 「症状を治療しているのか、原因を治療しているのか？」を評価してください
+1. **Before Writing Code**:
+   - Ask "What fundamental problem does this code address?"
+   - Consider "Will this solution prevent future similar problems?"
+   - Evaluate "Am I treating symptoms or treating causes?"
 
-2. **設計レベルの解決策 / Design-Level Solutions**:
-   - エラーのクラス全体を防ぐために型安全性を使用してください
-   - アーキテクチャ境界で検証を実装してください
-   - 誤用を困難または不可能にするインターフェースを設計してください
+2. **Design-Level Solutions**:
+   - Use type safety to prevent entire classes of errors
+   - Implement validation at architectural boundaries
+   - Design interfaces that make misuse difficult or impossible
 
-3. **長期的な持続可能性 / Long-term Sustainability**:
-   - 将来の開発者の認知負荷を減らす解決策を優先してください
-   - 正しい使用を自然に導くパターンを実装してください
-   - 制御を犠牲にすることなく複雑さを隠す抽象化を作成してください
+3. **Long-term Sustainability**:
+   - Prioritize solutions that reduce cognitive load for future developers
+   - Implement patterns that naturally guide correct usage
+   - Create abstractions that hide complexity without sacrificing control
 
-#### 根本原因分析フレームワーク / Root Cause Analysis Framework
+#### Root Cause Analysis Framework
 
-**実装タスクごとに / For Every Implementation Task:**
+**For Every Implementation Task:**
 
-1. **問題分析 / Problem Analysis**:
+1. **Problem Analysis**:
    ```
-   - 即座の問題は何か？
-   - この問題を導いたシステム設計は何か？
-   - どの前提が破られたか？
-   - この種の問題をどう防ぐことができるか？
-   ```
-
-2. **解決策設計 / Solution Design**:
-   ```
-   - これをより良い型設計で解決できるか？
-   - これをアーキテクチャレベルで対処すべきか？
-   - この解決策は将来の要件にスケールするか？
-   - この解決策は全体的なシステム複雑性を減らすか？
+   - What is the immediate problem?
+   - What system design led to this problem?
+   - Which assumptions were violated?
+   - How can we prevent this class of problems?
    ```
 
-3. **実装検証 / Implementation Validation**:
+2. **Solution Design**:
    ```
-   - 解決策は根本原因に対処しているか？
-   - 複雑性を追加しているか、減らしているか？
-   - この解決策は時間とともに良く機能するか？
-   - このパターンを類似の問題に適用できるか？
+   - Can this be solved with better type design?
+   - Should this be addressed at the architecture level?
+   - Does this solution scale to future requirements?
+   - Does this solution reduce overall system complexity?
    ```
 
-## 作業前の必須確認事項 / Pre-Work Mandatory Checks
+3. **Implementation Validation**:
+   ```
+   - Does the solution address the root cause?
+   - Is it adding or reducing complexity?
+   - Will this solution age well over time?
+   - Can this pattern be applied to similar problems?
+   ```
+
+## Pre-Work Mandatory Checks
 
 ### 1. プロジェクト概要の理解 / Project Overview Understanding
 ```bash
@@ -434,19 +443,31 @@ mockService.Setup(x => x.GetDataAsync()).ReturnsAsync(testData);
 
 **重要: コマンド実行はPowerShellを使用してください（BashのPATH問題回避）**
 
+**Windows専用プロジェクトのWSL/Linux環境対応**: EnableWindowsTargetingプロパティが必要
+
 ```powershell
-# 全体的なビルド検証（PowerShell）
-dotnet build --configuration Debug --arch x64
+# 全体的なビルド検証（PowerShell）- WSL対応版
+dotnet build --configuration Debug -p:EnableWindowsTargeting=true
 
-# テスト実行（PowerShell）
-dotnet test --logger "console;verbosity=detailed"
+# 特定プロジェクトビルド（PowerShell）- WSL対応版
+dotnet build Baketa.UI --configuration Debug -p:EnableWindowsTargeting=true
 
-# 特定プロジェクトビルド（PowerShell）
-dotnet build Baketa.UI --configuration Debug
+# 推奨: プロジェクト専用スクリプト使用（PowerShell）
+.\scripts\run_build.ps1 -Verbosity normal
+.\scripts\run_tests.ps1 -Verbosity detailed
+.\scripts\check_implementation.ps1
 
-# UIテスト実行（PowerShell）
-dotnet test tests/Baketa.UI.Tests/ --logger "console;verbosity=detailed"
+# テスト実行（PowerShell）- 注意: WSL環境ではWindowsDesktop.App制限あり
+dotnet test --logger "console;verbosity=detailed" -p:EnableWindowsTargeting=true
+
+# UIテスト実行（PowerShell）- 注意: WSL環境制限
+dotnet test tests/Baketa.UI.Tests/ --logger "console;verbosity=detailed" -p:EnableWindowsTargeting=true
 ```
+
+**WSL/Linux環境での制限事項**:
+- `net8.0-windows`ターゲットのテスト実行には`Microsoft.WindowsDesktop.App`が必要
+- UI関連テストは実際のWindows環境での実行を推奨
+- ビルド検証は`EnableWindowsTargeting=true`で実行可能
 
 **Claude Codeでのコマンド実行指示例:**
 ```
