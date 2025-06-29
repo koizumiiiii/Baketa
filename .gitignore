@@ -474,6 +474,8 @@ capture_cache/
 # Personal Claude Code settings (if any)
 .claude/personal/
 .claude/user_*
+.claude/settings.local.json
+.claude/*.local.json
 
 # ===== DEVELOPMENT ENVIRONMENT =====
 

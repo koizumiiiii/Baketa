@@ -31,6 +31,57 @@
     "safe_mode": false,
     "backup_enabled": true
   },
+
+  "command_execution_permissions": {
+    "auto_approve_commands": true,
+    "allowed_commands_without_permission": [
+      "dotnet build",
+      "dotnet build --configuration Debug",
+      "dotnet build --configuration Release", 
+      "dotnet build --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet build --configuration Release -p:EnableWindowsTargeting=true",
+      "dotnet build --verbosity minimal",
+      "dotnet build --verbosity normal",
+      "dotnet build --verbosity detailed",
+      "dotnet build --configuration Debug --arch x64 -p:EnableWindowsTargeting=true",
+      "dotnet build Baketa.UI --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet build Baketa.Core --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet build Baketa.Application --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet build Baketa.Infrastructure --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet build Baketa.Infrastructure.Platform --configuration Debug -p:EnableWindowsTargeting=true",
+      "dotnet test",
+      "dotnet test --verbosity minimal",
+      "dotnet test --verbosity normal",
+      "dotnet test --verbosity detailed",
+      "dotnet test --logger \"console;verbosity=detailed\"",
+      "dotnet test --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet test --logger \"console;verbosity=detailed\" --no-build",
+      "dotnet test tests/Baketa.UI.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet test tests/Baketa.Core.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet test tests/Baketa.Application.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet test tests/Baketa.Infrastructure.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet test tests/Baketa.Infrastructure.Platform.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
+      "dotnet clean",
+      "dotnet clean -p:EnableWindowsTargeting=true",
+      "dotnet restore",
+      ".\\scripts\\run_build.ps1",
+      ".\\scripts\\run_build.ps1 -Verbosity normal",
+      ".\\scripts\\run_build.ps1 -Verbosity detailed",
+      ".\\scripts\\run_tests.ps1",
+      ".\\scripts\\run_tests.ps1 -Verbosity detailed",
+      ".\\scripts\\check_implementation.ps1",
+      "grep",
+      "find",
+      "ls",
+      "cat",
+      "head", 
+      "tail",
+      "wc"
+    ],
+    "build_commands_auto_approved": true,
+    "test_commands_auto_approved": true,
+    "read_only_commands_auto_approved": true
+  },
   
   "command_execution": {
     "preferred_shell": "powershell",
@@ -103,12 +154,62 @@
     "long_term_focus": "Sustainable and maintainable code architecture",
     "problem_solving": "Systematic analysis and architectural solutions"
   },
+
+  "implementation_methodology": {
+    "thinking_mode": "Always use Think Mode for implementation reasoning",
+    "mandatory_pre_implementation_steps": {
+      "step_1_root_cause_analysis": {
+        "description": "根本原因分析 - Identify true causes, not symptoms",
+        "requirements": [
+          "問題の本質特定 - Identify the essence of the problem",
+          "アーキテクチャ影響確認 - Verify architectural consistency",
+          "設計パターン適合性検証 - Validate design pattern compliance",
+          "技術的負債評価 - Assess technical debt impact"
+        ]
+      },
+      "step_2_impact_analysis": {
+        "description": "影響範囲分析 - Analyze modification impact scope",
+        "requirements": [
+          "依存関係確認 - Identify dependent files and modules",
+          "インターフェース変更影響評価 - Assess API/interface changes",
+          "テスト影響範囲特定 - Identify affected tests",
+          "ビルド・コンパイル影響予測 - Predict build/compile impact",
+          "パフォーマンス影響評価 - Evaluate performance implications"
+        ]
+      },
+      "step_3_implementation_strategy": {
+        "description": "実装戦略策定 - Develop implementation strategy",
+        "requirements": [
+          "段階的実装計画 - Plan incremental implementation",
+          "リスク軽減策準備 - Prepare risk mitigation strategies",
+          "検証方法事前定義 - Pre-define verification methods"
+        ]
+      }
+    },
+    "implementation_template": {
+      "format": "## Think Mode Analysis\n\n### 1. Root Cause Analysis\n- 問題の本質: \n- アーキテクチャへの影響: \n- 技術的負債評価: \n\n### 2. Impact Analysis\n- 依存関係: \n- インターフェース変更: \n- テスト影響: \n- ビルド影響: \n\n### 3. Implementation Strategy\n- 実装手順: \n- リスク軽減: \n- 検証方法: "
+    }
+  },
   
   "workflow_optimization": {
     "auto_approve_session": "Use Shift+Tab for 'Yes, and don't ask again this session'",
     "command_templates": "Use project scripts for consistent execution",
     "error_handling": "Collect errors, analyze root cause, implement fundamental fixes",
     "testing_strategy": "PowerShell scripts with detailed logging",
+    "auto_execution_policy": {
+      "build_verification": "Always run build checks after code changes without asking",
+      "diagnostic_commands": "Auto-approve all diagnostic and read-only commands",
+      "compilation_checks": "Automatically verify compilation after modifications"
+    },
+    "mandatory_pre_implementation": {
+      "always_use_think_mode": true,
+      "required_analysis_steps": [
+        "Root Cause Analysis (根本原因分析)",
+        "Impact Analysis (影響範囲分析)",
+        "Implementation Strategy (実装戦略策定)"
+      ],
+      "template_usage": "Apply implementation_methodology.implementation_template for all code changes"
+    },
     "mandatory_post_implementation": {
       "always_check_errors": true,
       "required_steps": [
