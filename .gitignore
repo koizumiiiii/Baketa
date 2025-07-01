@@ -400,3 +400,24 @@ FodyWeavers.xsd
 *.sln.iml
 
 docs/.github/
+
+# Claude-Gemini自動化システム（実行時生成ファイル）
+claude-gemini/logs/*
+claude-gemini/temp/*
+claude-gemini/bridge/*
+claude-gemini/triggers/*
+
+# ただし、.gitkeepとディレクトリ構造は保持
+!claude-gemini/logs/.gitkeep
+!claude-gemini/logs/**/.gitkeep
+!claude-gemini/temp/.gitkeep
+!claude-gemini/temp/**/.gitkeep
+!claude-gemini/bridge/.gitkeep
+!claude-gemini/bridge/**/.gitkeep
+!claude-gemini/triggers/.gitkeep
+
+# スクリプトと設定は管理対象
+!claude-gemini/scripts/
+!claude-gemini/config.json
+!claude-gemini/*.md
+.DS_Store
