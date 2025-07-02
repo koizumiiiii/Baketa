@@ -6,31 +6,26 @@ using System.Threading.Tasks;
 
 namespace Baketa.Core.Events.Handlers;
 
-    /// <summary>
-    /// 翻訳完了イベントハンドラー
-    /// </summary>
-    /// <inheritdoc />
-    public class TranslationCompletedHandler : IEventProcessor<TranslationCompletedEvent>
+/// <summary>
+/// 翻訳完了イベントハンドラー
+/// </summary>
+/// <inheritdoc />
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="eventAggregator">イベント集約インスタンス</param>
+public class TranslationCompletedHandler(IEventAggregator eventAggregator) : IEventProcessor<TranslationCompletedEvent>
     {
-        private readonly IEventAggregator _eventAggregator;
+        private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         
         /// <inheritdoc />
         public int Priority => 0;
         
         /// <inheritdoc />
         public bool SynchronousExecution => false;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="eventAggregator">イベント集約インスタンス</param>
-        public TranslationCompletedHandler(IEventAggregator eventAggregator)
-        {
-            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        }
-        
-        /// <inheritdoc />
-        public async Task HandleAsync(TranslationCompletedEvent eventData)
+
+    /// <inheritdoc />
+    public async Task HandleAsync(TranslationCompletedEvent eventData)
         {
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);

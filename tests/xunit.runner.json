@@ -1,0 +1,15 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "methodDisplay": "method",
+  "methodDisplayOptions": "replaceUnderscoreWithSpace",
+  "preEnumerateTheories": false,
+  "diagnosticMessages": false,
+  "internalDiagnosticMessages": false,
+  "reporterSwitch": "console",
+  "transform": {
+    "xml": {
+      "enabled": true,
+      "outputPath": "TestResults"
+    }
+  }
+}

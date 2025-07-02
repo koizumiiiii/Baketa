@@ -7,24 +7,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理のためのエッジ検出フィルター
-    /// </summary>
-    public class OcrEdgeDetectionFilter : ImageFilterBase
+/// <summary>
+/// OCR処理のためのエッジ検出フィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrEdgeDetectionFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrEdgeDetectionFilter(ILogger<OcrEdgeDetectionFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrEdgeDetectionFilter> _logger;
+        private readonly ILogger<OcrEdgeDetectionFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrEdgeDetectionFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrEdgeDetectionFilter(ILogger<OcrEdgeDetectionFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCRエッジ検出";
+    /// <inheritdoc/>
+    public override string Name => "OCRエッジ検出";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理のためのテキスト輪郭を強調するエッジ検出フィルター";
@@ -76,8 +71,8 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                 {
                     case "Sobel":
                         // Sobelエッジ検出 - X方向とY方向の勾配を計算
-                        var sobelX = await inputImage.SobelAsync(dx: 1, dy: 0, ksize: apertureSize).ConfigureAwait(false);
-                        var sobelY = await inputImage.SobelAsync(dx: 0, dy: 1, ksize: apertureSize).ConfigureAwait(false);
+                        var sobelX = await inputImage.SobelAsync(1, 0, apertureSize).ConfigureAwait(false);
+                        var sobelY = await inputImage.SobelAsync(0, 1, apertureSize).ConfigureAwait(false);
                         
                         // X方向とY方向の勾配を結合
                         edgeImage = await sobelX.CombineGradientsAsync(sobelY).ConfigureAwait(false);
@@ -88,10 +83,10 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                     case "Canny":
                         // Cannyエッジ検出 - 最も一般的で効果的なエッジ検出
                         edgeImage = await inputImage.CannyAsync(
-                            threshold1: lowThreshold,
-                            threshold2: highThreshold,
-                            apertureSize: apertureSize,
-                            L2gradient: l2Gradient).ConfigureAwait(false);
+                            lowThreshold,
+                            highThreshold,
+                            apertureSize,
+                            l2Gradient).ConfigureAwait(false);
                             
                         _logger.LogDebug("Cannyエッジ検出を適用しました (低閾値:{LowThreshold}, 高閾値:{HighThreshold}, アパーチャサイズ:{ApertureSize}, L2勾配:{L2Gradient})",
                             lowThreshold, highThreshold, apertureSize, l2Gradient);
@@ -99,15 +94,15 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
                     case "Laplacian":
                         // Laplacianエッジ検出 - 2次微分を使用
-                        edgeImage = await inputImage.LaplacianAsync(ksize: apertureSize).ConfigureAwait(false);
+                        edgeImage = await inputImage.LaplacianAsync(apertureSize).ConfigureAwait(false);
                         
                         _logger.LogDebug("Laplacianエッジ検出を適用しました (アパーチャサイズ:{ApertureSize})", apertureSize);
                         break;
 
                     case "Scharr":
                         // Scharrエッジ検出 - Sobelの改良版
-                        var scharrX = await inputImage.ScharrAsync(dx: 1, dy: 0).ConfigureAwait(false);
-                        var scharrY = await inputImage.ScharrAsync(dx: 0, dy: 1).ConfigureAwait(false);
+                        var scharrX = await inputImage.ScharrAsync(1, 0).ConfigureAwait(false);
+                        var scharrY = await inputImage.ScharrAsync(0, 1).ConfigureAwait(false);
                         
                         // X方向とY方向の勾配を結合
                         edgeImage = await scharrX.CombineGradientsAsync(scharrY).ConfigureAwait(false);
@@ -155,7 +150,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
             var textEdgesMask = await edgeImage.DetectTextLikeEdgesAsync().ConfigureAwait(false);
             
             // マスクを使用してテキストエッジのみを強調
-            var enhancedEdges = await edgeImage.EnhanceMaskedRegionsAsync(textEdgesMask, enhancementFactor: 1.5).ConfigureAwait(false);
+            var enhancedEdges = await edgeImage.EnhanceMaskedRegionsAsync(textEdgesMask, 1.5).ConfigureAwait(false);
             
             return enhancedEdges;
         }
@@ -166,7 +161,7 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
         private static async Task<IAdvancedImage> EnhanceAllEdgesAsync(IAdvancedImage edgeImage)
         {
             // シンプルなコントラスト強調でエッジを強調
-            var enhancedEdges = await edgeImage.AdjustContrastAsync(alpha: 1.5, beta: 0).ConfigureAwait(false);
+            var enhancedEdges = await edgeImage.AdjustContrastAsync(1.5, 0).ConfigureAwait(false);
             
             return enhancedEdges;
         }

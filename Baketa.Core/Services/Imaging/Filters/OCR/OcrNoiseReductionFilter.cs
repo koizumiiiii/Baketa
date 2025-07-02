@@ -147,9 +147,9 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                 case "Bilateral":
                     // バイラテラルフィルタ - エッジを保持しながらノイズ除去
                     resultImage = await image.BilateralFilterAsync(
-                        d: kernelSize,
-                        sigmaColor: sigmaColor * strengthFactor,
-                        sigmaSpace: sigmaSpace * strengthFactor).ConfigureAwait(false);
+                        kernelSize,
+                        sigmaColor * strengthFactor,
+                        sigmaSpace * strengthFactor).ConfigureAwait(false);
                     _logger.LogDebug("バイラテラルフィルタを適用しました (D:{D}, SigmaColor:{SigmaColor}, SigmaSpace:{SigmaSpace})",
                         kernelSize, sigmaColor * strengthFactor, sigmaSpace * strengthFactor);
                     break;
@@ -157,9 +157,9 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                 case "NonLocalMeans":
                     // Non-Local Meansフィルタ - 高品質なノイズ除去
                     resultImage = await image.NonLocalMeansFilterAsync(
-                        h: 10 * strengthFactor,
-                        templateWindowSize: kernelSize,
-                        searchWindowSize: kernelSize * 2 + 1).ConfigureAwait(false);
+                        10 * strengthFactor,
+                        kernelSize,
+                        kernelSize * 2 + 1).ConfigureAwait(false);
                     _logger.LogDebug("Non-Local Meansフィルタを適用しました (H:{H}, TemplateSize:{TemplateSize}, SearchSize:{SearchSize})",
                         10 * strengthFactor, kernelSize, kernelSize * 2 + 1);
                     break;
@@ -171,16 +171,16 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                     {
                         // エッジ保持＋テキスト特化のノイズ除去
                         resultImage = await image.CustomOcrNoiseReductionAsync(
-                            strength: strengthFactor,
-                            preserveEdges: true).ConfigureAwait(false);
+                            strengthFactor,
+                            true).ConfigureAwait(false);
                         _logger.LogDebug("エッジ保持型カスタムOCRノイズ除去を適用しました (強度:{Strength})", strengthFactor);
                     }
                     else
                     {
                         // テキスト特化のノイズ除去（エッジ保持なし）
                         resultImage = await image.CustomOcrNoiseReductionAsync(
-                            strength: strengthFactor,
-                            preserveEdges: false).ConfigureAwait(false);
+                            strengthFactor,
+                            false).ConfigureAwait(false);
                         _logger.LogDebug("標準カスタムOCRノイズ除去を適用しました (強度:{Strength})", strengthFactor);
                     }
                     break;

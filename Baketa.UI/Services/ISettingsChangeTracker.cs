@@ -5,21 +5,13 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// 設定変更状態のイベントデータ
 /// </summary>
-public sealed class HasChangesChangedEventArgs : EventArgs
+/// <param name="hasChanges">変更状態</param>
+public sealed class HasChangesChangedEventArgs(bool hasChanges) : EventArgs
 {
     /// <summary>
     /// 変更状態
     /// </summary>
-    public bool HasChanges { get; }
-
-    /// <summary>
-    /// HasChangesChangedEventArgsを初期化します
-    /// </summary>
-    /// <param name="hasChanges">変更状態</param>
-    public HasChangesChangedEventArgs(bool hasChanges)
-    {
-        HasChanges = hasChanges;
-    }
+    public bool HasChanges { get; } = hasChanges;
 }
 
 /// <summary>

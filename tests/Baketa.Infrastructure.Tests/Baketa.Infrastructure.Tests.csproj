@@ -9,7 +9,8 @@
     <IsTestProject>true</IsTestProject>
     <!-- xUnit1030警告を抑制: テストプロジェクトでのConfigureAwait(false)使用のため -->
     <!-- CA2007警告を抑制: ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);xUnit1030;CA2007</NoWarn>
+    <!-- テスト用の存在しないリソースアクセス警告を抑制 -->
+    <NoWarn>$(NoWarn);xUnit1030;CA2007;NETSDK1206;SYSLIB0014</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

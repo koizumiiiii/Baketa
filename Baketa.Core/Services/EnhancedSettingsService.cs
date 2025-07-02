@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Settings;
@@ -24,6 +25,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     private readonly Dictionary<string, SettingChangeRecord> _changeHistory;
     private readonly HashSet<string> _favoriteSettings;
     private readonly object _lockObject = new();
+    private readonly SemaphoreSlim _fileSemaphore = new(1, 1);
     private readonly string _settingsFilePath;
     private bool _disposed;
     
@@ -101,6 +103,9 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     /// <inheritdoc />
     public void SetValue<T>(string key, T value)
     {
+        if (string.IsNullOrEmpty(key))
+            throw new ArgumentException("Setting key cannot be null or empty.", nameof(key));
+            
         lock (_lockObject)
         {
             try
@@ -225,10 +230,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task SaveAsync<T>(T settings) where T : class, new()
+    public async Task SaveAsync<T>(T _) where T : class, new()
     {
-        ArgumentNullException.ThrowIfNull(settings);
-        await SetCategorySettingsAsync(settings).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(_);
+        await SetCategorySettingsAsync(_).ConfigureAwait(false);
     }
 
     #endregion
@@ -327,6 +332,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         var startTime = DateTime.Now;
         var settingCount = 0;
         
+        await _fileSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             string json;
@@ -337,7 +343,26 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             }
             
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
-            await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
+            
+            // Root cause solution: Implement retry logic for file access conflicts
+            const int maxRetries = 3;
+            const int retryDelayMs = 100;
+            
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
+                    break; // Success, exit retry loop
+                }
+                catch (IOException ex) when (attempt < maxRetries - 1 && 
+                    (ex.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("access", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning("File access conflict on attempt {Attempt}, retrying in {DelayMs}ms: {Message}", 
+                        attempt + 1, retryDelayMs, ex.Message);
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
             
             var saveTime = (long)(DateTime.Now - startTime).TotalMilliseconds;
             
@@ -351,6 +376,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             _logger.LogError(ex, "設定の保存に失敗しました: {FilePath}", _settingsFilePath);
             OnSettingsSaved(_settingsFilePath, ex.Message);
             throw;
+        }
+        finally
+        {
+            _fileSemaphore.Release();
         }
     }
 
@@ -405,21 +434,21 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task CreateBackupAsync(string? backupFilePath = null)
+    public Task CreateBackupAsync(string? _ = null)
     {
-        backupFilePath ??= GenerateBackupFilePath();
+        _ ??= GenerateBackupFilePath();
         
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(backupFilePath)!);
-            File.Copy(_settingsFilePath, backupFilePath, true);
+            Directory.CreateDirectory(Path.GetDirectoryName(_)!);
+            File.Copy(_settingsFilePath, _, true);
             
-            _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", backupFilePath);
+            _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", _);
             return Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "設定のバックアップ作成に失敗しました: {BackupPath}", backupFilePath);
+            _logger.LogError(ex, "設定のバックアップ作成に失敗しました: {BackupPath}", _);
             throw;
         }
     }
@@ -712,11 +741,11 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         }
     }
 
-    private void OnSettingsSaved(string filePath, string errorMessage)
+    private void OnSettingsSaved(string _, string _1)
     {
         try
         {
-            SettingsSaved?.Invoke(this, new SettingsSavedEventArgs(filePath, errorMessage));
+            SettingsSaved?.Invoke(this, new SettingsSavedEventArgs(_, _1));
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
         {
@@ -745,6 +774,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 _logger.LogError(ex, "設定サービス解放時の保存でエラーが発生しました");
             }
             
+            _fileSemaphore?.Dispose();
             _disposed = true;
         }
     }

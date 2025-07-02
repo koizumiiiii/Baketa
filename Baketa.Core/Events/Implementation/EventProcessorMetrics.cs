@@ -7,34 +7,28 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Events.Implementation;
 
-    /// <summary>
-    /// イベントプロセッサのパフォーマンスメトリクス
-    /// </summary>
-    // プライマリコンストラクターの使用を拒否（IDE0290）
-    public class EventProcessorMetrics
-    {
-        private readonly ILogger<EventProcessorMetrics>? _logger;
-        // コレクション初期化の簡素化を拒否（IDE0090）
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<double>> _processingTimes = new ConcurrentDictionary<string, ConcurrentQueue<double>>();
+/// <summary>
+/// イベントプロセッサのパフォーマンスメトリクス
+/// </summary>
+/// <remarks>
+/// イベントプロセッサのパフォーマンスメトリクスを初期化します
+/// </remarks>
+/// <param name="logger">ロガー（オプション）</param>
+// プライマリコンストラクターの使用を拒否（IDE0290）
+public class EventProcessorMetrics(ILogger<EventProcessorMetrics>? logger = null)
+{
+    // コレクション初期化の簡素化を拒否（IDE0090）
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<double>> _processingTimes = new ConcurrentDictionary<string, ConcurrentQueue<double>>();
         private readonly ConcurrentDictionary<string, long> _invocationCounts = new ConcurrentDictionary<string, long>();
         private readonly ConcurrentDictionary<string, long> _errorCounts = new ConcurrentDictionary<string, long>();
 
-        /// <summary>
-        /// イベントプロセッサのパフォーマンスメトリクスを初期化します
-        /// </summary>
-        /// <param name="logger">ロガー（オプション）</param>
-        public EventProcessorMetrics(ILogger<EventProcessorMetrics>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// プロセッサのパフォーマンス測定を開始
-        /// </summary>
-        /// <param name="processorType">プロセッサタイプ</param>
-        /// <param name="eventType">イベントタイプ</param>
-        /// <returns>測定用ストップウォッチ</returns>
-        public Stopwatch StartMeasurement(Type processorType, Type eventType)
+    /// <summary>
+    /// プロセッサのパフォーマンス測定を開始
+    /// </summary>
+    /// <param name="processorType">プロセッサタイプ</param>
+    /// <param name="eventType">イベントタイプ</param>
+    /// <returns>測定用ストップウォッチ</returns>
+    public Stopwatch StartMeasurement(Type processorType, Type eventType)
         {
             ArgumentNullException.ThrowIfNull(processorType);
             ArgumentNullException.ThrowIfNull(eventType);
@@ -87,7 +81,7 @@ namespace Baketa.Core.Events.Implementation;
             // 処理時間が長い場合は警告ログを出力
             if (elapsed > 100)
             {
-                _logger?.LogWarning("プロセッサ {ProcessorType} のイベント {EventType} 処理に {ProcessingTime}ms かかりました",
+                logger?.LogWarning("プロセッサ {ProcessorType} のイベント {EventType} 処理に {ProcessingTime}ms かかりました",
                     processorType.Name, eventType.Name, elapsed.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
         }

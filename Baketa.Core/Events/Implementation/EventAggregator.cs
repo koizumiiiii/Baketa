@@ -8,28 +8,23 @@ using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Events.Implementation;
 
-    /// <summary>
-    /// イベント集約機構の実装
-    /// </summary>
-    // プライマリコンストラクターの使用を拒否（IDE0290）
-    public class EventAggregator : Baketa.Core.Abstractions.Events.IEventAggregator
+/// <summary>
+/// イベント集約機構の実装
+/// </summary>
+/// <remarks>
+/// イベント集約機構を初期化します
+/// </remarks>
+/// <param name="logger">ロガー（オプション）</param>
+// プライマリコンストラクターの使用を拒否（IDE0290）
+public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.Core.Abstractions.Events.IEventAggregator
     {
-        private readonly ILogger<EventAggregator>? _logger;
+        private readonly ILogger<EventAggregator>? _logger = logger;
         // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）
         private readonly Dictionary<Type, List<object>> _processors = [];
-        private readonly object _syncRoot = new object();
+        private readonly object _syncRoot = new();
 
-        /// <summary>
-        /// イベント集約機構を初期化します
-        /// </summary>
-        /// <param name="logger">ロガー（オプション）</param>
-        public EventAggregator(ILogger<EventAggregator>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <inheritdoc />
-        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    /// <inheritdoc />
+    public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             

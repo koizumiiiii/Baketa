@@ -21,6 +21,11 @@
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3026</MSBuildWarningsAsMessages>
   </PropertyGroup>
   
+  <!-- WSL環境でWindows専用プロジェクトをビルド可能にする設定 -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+  
   <!-- テストプロジェクト用の最適化設定 -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Baketa.Application.Tests'">
     <!-- ビルド並行度を制限してリソース競合を減らす -->

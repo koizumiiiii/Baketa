@@ -124,58 +124,47 @@ public class OcrPerformanceInfo
 /// <summary>
 /// OCR結果の統計情報
 /// </summary>
-public class OcrResultStatistics
+public class OcrResultStatistics(
+    int totalCharacters,
+    double averageConfidence,
+    double maxConfidence,
+    double minConfidence,
+    int validRegions,
+    Size imageSize,
+    bool usedRegionOfInterest = false)
 {
     /// <summary>
     /// 総テキスト文字数
     /// </summary>
-    public int TotalCharacters { get; init; }
-    
+    public int TotalCharacters { get; init; } = Math.Max(0, totalCharacters);
+
     /// <summary>
     /// 平均信頼度
     /// </summary>
-    public double AverageConfidence { get; init; }
-    
+    public double AverageConfidence { get; init; } = Math.Clamp(averageConfidence, 0.0, 1.0);
+
     /// <summary>
     /// 最高信頼度
     /// </summary>
-    public double MaxConfidence { get; init; }
-    
+    public double MaxConfidence { get; init; } = Math.Clamp(maxConfidence, 0.0, 1.0);
+
     /// <summary>
     /// 最低信頼度
     /// </summary>
-    public double MinConfidence { get; init; }
-    
+    public double MinConfidence { get; init; } = Math.Clamp(minConfidence, 0.0, 1.0);
+
     /// <summary>
     /// 有効なテキスト領域数
     /// </summary>
-    public int ValidRegions { get; init; }
-    
+    public int ValidRegions { get; init; } = Math.Max(0, validRegions);
+
     /// <summary>
     /// 処理対象画像のサイズ
     /// </summary>
-    public Size ImageSize { get; init; }
-    
+    public Size ImageSize { get; init; } = imageSize;
+
     /// <summary>
     /// ROIが使用されたかどうか
     /// </summary>
-    public bool UsedRegionOfInterest { get; init; }
-    
-    public OcrResultStatistics(
-        int totalCharacters,
-        double averageConfidence,
-        double maxConfidence,
-        double minConfidence,
-        int validRegions,
-        Size imageSize,
-        bool usedRegionOfInterest = false)
-    {
-        TotalCharacters = Math.Max(0, totalCharacters);
-        AverageConfidence = Math.Clamp(averageConfidence, 0.0, 1.0);
-        MaxConfidence = Math.Clamp(maxConfidence, 0.0, 1.0);
-        MinConfidence = Math.Clamp(minConfidence, 0.0, 1.0);
-        ValidRegions = Math.Max(0, validRegions);
-        ImageSize = imageSize;
-        UsedRegionOfInterest = usedRegionOfInterest;
-    }
+    public bool UsedRegionOfInterest { get; init; } = usedRegionOfInterest;
 }

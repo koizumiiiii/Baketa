@@ -5,30 +5,25 @@ using System.Threading.Tasks;
 
 namespace Baketa.Core.Events.Handlers;
 
-    /// <summary>
-    /// キャプチャ完了イベントハンドラー
-    /// </summary>
-    public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
+/// <summary>
+/// キャプチャ完了イベントハンドラー
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="eventAggregator">イベント集約インスタンス</param>
+public class CaptureCompletedHandler(IEventAggregator eventAggregator) : IEventProcessor<CaptureCompletedEvent>
     {
-        private readonly IEventAggregator _eventAggregator;
+        private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         
         /// <inheritdoc />
         public int Priority => 0;
         
         /// <inheritdoc />
         public bool SynchronousExecution => false;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="eventAggregator">イベント集約インスタンス</param>
-        public CaptureCompletedHandler(IEventAggregator eventAggregator)
-        {
-            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        }
-        
-        /// <inheritdoc />
-        public async Task HandleAsync(CaptureCompletedEvent eventData)
+
+    /// <inheritdoc />
+    public async Task HandleAsync(CaptureCompletedEvent eventData)
         {
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);

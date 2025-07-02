@@ -98,11 +98,11 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                     case "AdaptiveGaussian":
                         // ガウシアン適応的二値化
                         binaryImage = await inputImage.AdaptiveThresholdAsync(
-                            maxValue: maxValue,
-                            adaptiveMethod: "Gaussian",
-                            blockSize: blockSize,
-                            c: c,
-                            invert: invert).ConfigureAwait(false);
+                            maxValue,
+                            "Gaussian",
+                            blockSize,
+                            c,
+                            invert).ConfigureAwait(false);
                         _logger.LogDebug("ガウシアン適応的二値化を適用しました (ブロックサイズ:{BlockSize}, C:{C}, 反転:{Invert})",
                             blockSize, c, invert);
                         break;
@@ -110,11 +110,11 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                     case "AdaptiveMean":
                         // 平均適応的二値化
                         binaryImage = await inputImage.AdaptiveThresholdAsync(
-                            maxValue: maxValue,
-                            adaptiveMethod: "Mean",
-                            blockSize: blockSize,
-                            c: c,
-                            invert: invert).ConfigureAwait(false);
+                            maxValue,
+                            "Mean",
+                            blockSize,
+                            c,
+                            invert).ConfigureAwait(false);
                         _logger.LogDebug("平均適応的二値化を適用しました (ブロックサイズ:{BlockSize}, C:{C}, 反転:{Invert})",
                             blockSize, c, invert);
                         break;

@@ -8,24 +8,18 @@ namespace Baketa.Core.Events.EventTypes;
 /// <summary>
 /// フルスクリーン状態変更イベント
 /// </summary>
-public class FullscreenStateChangedEvent : EventBase
+public class FullscreenStateChangedEvent(FullscreenInfo fullscreenInfo, bool? previousFullscreenState = null) : EventBase
 {
     /// <summary>
     /// フルスクリーン情報
     /// </summary>
-    public FullscreenInfo FullscreenInfo { get; }
-    
+    public FullscreenInfo FullscreenInfo { get; } = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
+
     /// <summary>
     /// 前回のフルスクリーン状態
     /// </summary>
-    public bool? PreviousFullscreenState { get; }
-    
-    public FullscreenStateChangedEvent(FullscreenInfo fullscreenInfo, bool? previousFullscreenState = null)
-    {
-        FullscreenInfo = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
-        PreviousFullscreenState = previousFullscreenState;
-    }
-    
+    public bool? PreviousFullscreenState { get; } = previousFullscreenState;
+
     public override string Name => "FullscreenStateChanged";
     public override string Category => "Capture";
     
@@ -39,33 +33,26 @@ public class FullscreenStateChangedEvent : EventBase
 /// <summary>
 /// フルスクリーン最適化適用イベント
 /// </summary>
-public class FullscreenOptimizationAppliedEvent : EventBase
+public class FullscreenOptimizationAppliedEvent(
+    FullscreenInfo fullscreenInfo,
+    CaptureSettings optimizedSettings,
+    CaptureSettings? originalSettings = null) : EventBase
 {
     /// <summary>
     /// フルスクリーン情報
     /// </summary>
-    public FullscreenInfo FullscreenInfo { get; }
-    
+    public FullscreenInfo FullscreenInfo { get; } = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
+
     /// <summary>
     /// 最適化されたキャプチャ設定
     /// </summary>
-    public CaptureSettings OptimizedSettings { get; }
-    
+    public CaptureSettings OptimizedSettings { get; } = optimizedSettings ?? throw new ArgumentNullException(nameof(optimizedSettings));
+
     /// <summary>
     /// 元のキャプチャ設定
     /// </summary>
-    public CaptureSettings? OriginalSettings { get; }
-    
-    public FullscreenOptimizationAppliedEvent(
-        FullscreenInfo fullscreenInfo, 
-        CaptureSettings optimizedSettings, 
-        CaptureSettings? originalSettings = null)
-    {
-        FullscreenInfo = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
-        OptimizedSettings = optimizedSettings ?? throw new ArgumentNullException(nameof(optimizedSettings));
-        OriginalSettings = originalSettings;
-    }
-    
+    public CaptureSettings? OriginalSettings { get; } = originalSettings;
+
     public override string Name => "FullscreenOptimizationApplied";
     public override string Category => "Capture";
     
@@ -79,33 +66,26 @@ public class FullscreenOptimizationAppliedEvent : EventBase
 /// <summary>
 /// フルスクリーン最適化解除イベント
 /// </summary>
-public class FullscreenOptimizationRemovedEvent : EventBase
+public class FullscreenOptimizationRemovedEvent(
+    CaptureSettings? restoredSettings = null,
+    string reason = "",
+    string? windowInfo = null) : EventBase
 {
     /// <summary>
     /// 復元されたキャプチャ設定
     /// </summary>
-    public CaptureSettings? RestoredSettings { get; }
-    
+    public CaptureSettings? RestoredSettings { get; } = restoredSettings;
+
     /// <summary>
     /// 解除理由
     /// </summary>
-    public string Reason { get; }
-    
+    public string Reason { get; } = reason;
+
     /// <summary>
     /// 対象ウィンドウ情報
     /// </summary>
-    public string? WindowInfo { get; }
-    
-    public FullscreenOptimizationRemovedEvent(
-        CaptureSettings? restoredSettings = null, 
-        string reason = "", 
-        string? windowInfo = null)
-    {
-        RestoredSettings = restoredSettings;
-        Reason = reason;
-        WindowInfo = windowInfo;
-    }
-    
+    public string? WindowInfo { get; } = windowInfo;
+
     public override string Name => "FullscreenOptimizationRemoved";
     public override string Category => "Capture";
     
@@ -121,30 +101,23 @@ public class FullscreenOptimizationRemovedEvent : EventBase
 /// <summary>
 /// フルスクリーン最適化エラーイベント
 /// </summary>
-public class FullscreenOptimizationErrorEvent : EventBase
+public class FullscreenOptimizationErrorEvent(Exception exception, string context = "", string? errorMessage = null) : EventBase
 {
     /// <summary>
     /// 発生した例外
     /// </summary>
-    public Exception Exception { get; }
-    
+    public Exception Exception { get; } = exception ?? throw new ArgumentNullException(nameof(exception));
+
     /// <summary>
     /// エラーメッセージ
     /// </summary>
-    public string ErrorMessage { get; }
-    
+    public string ErrorMessage { get; } = errorMessage ?? exception.Message;
+
     /// <summary>
     /// エラーコンテキスト
     /// </summary>
-    public string Context { get; }
-    
-    public FullscreenOptimizationErrorEvent(Exception exception, string context = "", string? errorMessage = null)
-    {
-        Exception = exception ?? throw new ArgumentNullException(nameof(exception));
-        Context = context;
-        ErrorMessage = errorMessage ?? exception.Message;
-    }
-    
+    public string Context { get; } = context;
+
     public override string Name => "FullscreenOptimizationError";
     public override string Category => "Capture";
     
@@ -157,18 +130,13 @@ public class FullscreenOptimizationErrorEvent : EventBase
 /// <summary>
 /// フルスクリーン検出開始イベント
 /// </summary>
-public class FullscreenDetectionStartedEvent : EventBase
+public class FullscreenDetectionStartedEvent(FullscreenDetectionSettings settings) : EventBase
 {
     /// <summary>
     /// 検出設定
     /// </summary>
-    public FullscreenDetectionSettings Settings { get; }
-    
-    public FullscreenDetectionStartedEvent(FullscreenDetectionSettings settings)
-    {
-        Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-    }
-    
+    public FullscreenDetectionSettings Settings { get; } = settings ?? throw new ArgumentNullException(nameof(settings));
+
     public override string Name => "FullscreenDetectionStarted";
     public override string Category => "Capture";
     
@@ -182,24 +150,18 @@ public class FullscreenDetectionStartedEvent : EventBase
 /// <summary>
 /// フルスクリーン検出停止イベント
 /// </summary>
-public class FullscreenDetectionStoppedEvent : EventBase
+public class FullscreenDetectionStoppedEvent(string reason = "", TimeSpan? runDuration = null) : EventBase
 {
     /// <summary>
     /// 停止理由
     /// </summary>
-    public string Reason { get; }
-    
+    public string Reason { get; } = reason;
+
     /// <summary>
     /// 実行時間
     /// </summary>
-    public TimeSpan? RunDuration { get; }
-    
-    public FullscreenDetectionStoppedEvent(string reason = "", TimeSpan? runDuration = null)
-    {
-        Reason = reason;
-        RunDuration = runDuration;
-    }
-    
+    public TimeSpan? RunDuration { get; } = runDuration;
+
     public override string Name => "FullscreenDetectionStopped";
     public override string Category => "Capture";
     

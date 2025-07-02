@@ -13,6 +13,8 @@ using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
+using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -123,12 +125,12 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
     /// <summary>
     /// LocalOnlyエンジンの状態
     /// </summary>
-    public TranslationEngineStatus LocalEngineStatus => _statusService.LocalEngineStatus;
+    public EngineStatus LocalEngineStatus => _statusService.LocalEngineStatus;
 
     /// <summary>
     /// CloudOnlyエンジンの状態
     /// </summary>
-    public TranslationEngineStatus CloudEngineStatus => _statusService.CloudEngineStatus;
+    public EngineStatus CloudEngineStatus => _statusService.CloudEngineStatus;
 
     /// <summary>
     /// 戦略選択コマンド
@@ -403,7 +405,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
     /// <summary>
     /// エンジン状態更新時の処理
     /// </summary>
-    private void OnEngineStatusUpdate(TranslationEngineStatusUpdate update)
+    private void OnEngineStatusUpdate(StatusUpdate update)
     {
         // 現在の戦略を再検証
         var warning = ValidateStrategyAsync(SelectedStrategy).ConfigureAwait(false).GetAwaiter().GetResult();

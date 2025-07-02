@@ -89,7 +89,7 @@ namespace Baketa.Core.Services.Imaging.Filters;
         /// <summary>
         /// 膨張処理を適用します
         /// </summary>
-        private static async Task<IAdvancedImage> ApplyDilateAsync(IAdvancedImage image, int kernelSize)
+        private static async Task<IAdvancedImage> ApplyDilateAsync(IAdvancedImage image, int _)
         {
             // 膨張処理の実装（明るい領域を拡大）
             var enhancementOptions = new ImageEnhancementOptions
@@ -105,7 +105,7 @@ namespace Baketa.Core.Services.Imaging.Filters;
         /// <summary>
         /// 収縮処理を適用します
         /// </summary>
-        private static async Task<IAdvancedImage> ApplyErodeAsync(IAdvancedImage image, int kernelSize)
+        private static async Task<IAdvancedImage> ApplyErodeAsync(IAdvancedImage image, int _)
         {
             // 収縮処理の実装（暗い領域を拡大）
             var enhancementOptions = new ImageEnhancementOptions

@@ -13,6 +13,8 @@ using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
+using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -104,12 +106,12 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     /// <summary>
     /// LocalOnlyエンジンの状態
     /// </summary>
-    public TranslationEngineStatus LocalEngineStatus => _statusService.LocalEngineStatus;
+    public EngineStatus LocalEngineStatus => _statusService.LocalEngineStatus;
 
     /// <summary>
     /// CloudOnlyエンジンの状態
     /// </summary>
-    public TranslationEngineStatus CloudEngineStatus => _statusService.CloudEngineStatus;
+    public EngineStatus CloudEngineStatus => _statusService.CloudEngineStatus;
 
     /// <summary>
     /// エンジン選択変更コマンド
@@ -354,7 +356,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     /// <summary>
     /// 状態更新イベントの処理
     /// </summary>
-    private void OnStatusUpdate(TranslationEngineStatusUpdate update)
+    private void OnStatusUpdate(StatusUpdate update)
     {
         _logger.LogDebug("Status update received: {Engine} - {Type}", update.EngineName, update.UpdateType);
 

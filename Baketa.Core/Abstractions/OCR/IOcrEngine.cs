@@ -6,68 +6,53 @@ namespace Baketa.Core.Abstractions.OCR;
 /// <summary>
 /// OCR処理の進捗状況を表すクラス
 /// </summary>
-public class OcrProgress
+public class OcrProgress(double progress, string status)
 {
     /// <summary>
     /// 進捗率（0.0～1.0）
     /// </summary>
-    public double Progress { get; }
-    
+    public double Progress { get; } = Math.Clamp(progress, 0.0, 1.0);
+
     /// <summary>
     /// 現在の処理ステータス
     /// </summary>
-    public string Status { get; }
-    
-    public OcrProgress(double progress, string status)
-    {
-        Progress = Math.Clamp(progress, 0.0, 1.0);
-        Status = status ?? string.Empty;
-    }
+    public string Status { get; } = status ?? string.Empty;
 }
 
 /// <summary>
 /// OCR結果のテキスト領域情報
 /// </summary>
-public class OcrTextRegion
+public class OcrTextRegion(
+    string text,
+    Rectangle bounds,
+    double confidence,
+    Point[]? contour = null,
+    TextDirection direction = TextDirection.Horizontal)
 {
     /// <summary>
     /// 認識されたテキスト
     /// </summary>
-    public string Text { get; }
-    
+    public string Text { get; } = text ?? string.Empty;
+
     /// <summary>
     /// テキスト領域の境界矩形（元画像座標系）
     /// </summary>
-    public Rectangle Bounds { get; }
-    
+    public Rectangle Bounds { get; } = bounds;
+
     /// <summary>
     /// 認識信頼度（0.0～1.0）
     /// </summary>
-    public double Confidence { get; }
-    
+    public double Confidence { get; } = Math.Clamp(confidence, 0.0, 1.0);
+
     /// <summary>
     /// テキスト領域の詳細な輪郭点（オプション）
     /// </summary>
-    public Point[]? Contour { get; }
-    
+    public Point[]? Contour { get; } = contour;
+
     /// <summary>
     /// テキストの推定方向（将来の方向分類モデル用）
     /// </summary>
-    public TextDirection Direction { get; }
-    
-    public OcrTextRegion(
-        string text, 
-        Rectangle bounds, 
-        double confidence, 
-        Point[]? contour = null,
-        TextDirection direction = TextDirection.Horizontal)
-    {
-        Text = text ?? string.Empty;
-        Bounds = bounds;
-        Confidence = Math.Clamp(confidence, 0.0, 1.0);
-        Contour = contour;
-        Direction = direction;
-    }
+    public TextDirection Direction { get; } = direction;
 }
 
 /// <summary>
@@ -99,33 +84,38 @@ public enum TextDirection
 /// <summary>
 /// OCR結果を表すクラス
 /// </summary>
-public class OcrResultCollection
+public class OcrResultCollection(
+    IReadOnlyList<OcrTextRegion> textRegions,
+    IImage sourceImage,
+    TimeSpan processingTime,
+    string languageCode,
+    Rectangle? regionOfInterest = null)
 {
     /// <summary>
     /// 認識されたテキスト領域のリスト
     /// </summary>
-    public IReadOnlyList<OcrTextRegion> TextRegions { get; }
-    
+    public IReadOnlyList<OcrTextRegion> TextRegions { get; } = textRegions ?? throw new ArgumentNullException(nameof(textRegions));
+
     /// <summary>
     /// 処理対象の画像（または指定されたROI）
     /// </summary>
-    public IImage SourceImage { get; }
-    
+    public IImage SourceImage { get; } = sourceImage ?? throw new ArgumentNullException(nameof(sourceImage));
+
     /// <summary>
     /// 指定されたROI（画像全体の場合はnull）
     /// </summary>
-    public Rectangle? RegionOfInterest { get; }
-    
+    public Rectangle? RegionOfInterest { get; } = regionOfInterest;
+
     /// <summary>
     /// OCR処理時間
     /// </summary>
-    public TimeSpan ProcessingTime { get; }
-    
+    public TimeSpan ProcessingTime { get; } = processingTime;
+
     /// <summary>
     /// 使用された言語コード
     /// </summary>
-    public string LanguageCode { get; }
-    
+    public string LanguageCode { get; } = languageCode ?? throw new ArgumentNullException(nameof(languageCode));
+
     /// <summary>
     /// 画像内のすべてのテキストを結合（改行区切り）
     /// </summary>
@@ -135,20 +125,6 @@ public class OcrResultCollection
     /// 有効なテキストが検出されているかどうか
     /// </summary>
     public bool HasText => TextRegions.Count > 0 && TextRegions.Any(r => !string.IsNullOrWhiteSpace(r.Text));
-    
-    public OcrResultCollection(
-        IReadOnlyList<OcrTextRegion> textRegions, 
-        IImage sourceImage, 
-        TimeSpan processingTime,
-        string languageCode,
-        Rectangle? regionOfInterest = null)
-    {
-        TextRegions = textRegions ?? throw new ArgumentNullException(nameof(textRegions));
-        SourceImage = sourceImage ?? throw new ArgumentNullException(nameof(sourceImage));
-        ProcessingTime = processingTime;
-        LanguageCode = languageCode ?? throw new ArgumentNullException(nameof(languageCode));
-        RegionOfInterest = regionOfInterest;
-    }
 }
 
 /// <summary>

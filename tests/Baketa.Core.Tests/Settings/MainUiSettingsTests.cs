@@ -173,10 +173,11 @@ public class MainUiSettingsTests
     public void AlwaysOnTop_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.AlwaysOnTop = false;
+        var settings = new MainUiSettings
+        {
+            // Act
+            AlwaysOnTop = false
+        };
 
         // Assert
         Assert.False(settings.AlwaysOnTop);
@@ -203,10 +204,11 @@ public class MainUiSettingsTests
     public void EnableDragging_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.EnableDragging = false;
+        MainUiSettings settings = new MainUiSettings
+        {
+            // Act
+            EnableDragging = false
+        };
 
         // Assert
         Assert.False(settings.EnableDragging);

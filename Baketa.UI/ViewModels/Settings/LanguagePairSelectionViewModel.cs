@@ -15,6 +15,7 @@ using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -477,7 +478,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     /// <summary>
     /// エンジン状態更新時の処理
     /// </summary>
-    private void OnEngineStatusUpdate(TranslationEngineStatusUpdate update)
+    private void OnEngineStatusUpdate(StatusUpdate update)
     {
         // エンジン状態に応じて言語ペアの利用可否を更新
         foreach (var languagePair in _languagePairsSource.Items)
@@ -489,7 +490,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     /// <summary>
     /// 言語ペアの利用可否を更新
     /// </summary>
-    private void UpdateLanguagePairAvailability(LanguagePairConfiguration languagePair, TranslationEngineStatusUpdate update)
+    private void UpdateLanguagePairAvailability(LanguagePairConfiguration languagePair, StatusUpdate update)
     {
         // CloudOnlyエンジン使用の言語ペアの場合
         if (languagePair.SelectedEngine == "CloudOnly" && update.EngineName == "CloudOnly")

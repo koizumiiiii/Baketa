@@ -12,7 +12,8 @@
     
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <!-- 統合テスト固有の警告を抑制 -->
+    <NoWarn>$(NoWarn);CA2007;AVLN2000;AVLN2001;NETSDK1206</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

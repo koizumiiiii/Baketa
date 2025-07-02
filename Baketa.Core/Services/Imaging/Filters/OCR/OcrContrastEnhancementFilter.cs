@@ -72,8 +72,8 @@ namespace Baketa.Core.Services.Imaging.Filters.OCR;
                         case "CLAHE":
                             // CLAHE (Contrast Limited Adaptive Histogram Equalization)
                             enhancedImage = await enhancedImage.ApplyAdaptiveContrastAsync(
-                                clipLimit: clipLimit,
-                                tileGridSize: tileGridSize).ConfigureAwait(false);
+                                clipLimit,
+                                tileGridSize).ConfigureAwait(false);
                             _logger.LogDebug("CLAHE適応的コントラスト強調を適用しました (ClipLimit:{ClipLimit}, TileSize:{TileSize})",
                                 clipLimit, tileGridSize);
                             break;

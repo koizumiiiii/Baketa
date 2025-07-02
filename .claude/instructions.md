@@ -24,51 +24,62 @@
 
 After all code implementation, fixes, and refactoring, **always execute** the following:
 
-#### **1. Compilation Error Check (Mandatory)**
-```powershell
-# Check compilation errors with full build
-Execute in PowerShell: .\scripts\run_build.ps1 -Verbosity normal
+#### **1. WSL Environment Limitations**
+**IMPORTANT: WSL環境では`net8.0-windows`ターゲットフレームワークの制約により、dotnetコマンドによるビルド・テスト実行はサポートされていません。**
+
+#### **2. Code Analysis Alternative Methods**
+```bash
+# コードの静的解析（ripgrep使用）
+rg "TODO|FIXME|HACK" --type cs
+rg "throw new.*Exception" --type cs
+rg "null!" --type cs
+
+# 潜在的な問題パターンの検索
+rg "ConfigureAwait\(true\)" --type cs
+rg "\.Result\b" --type cs
+rg "\.Wait\(\)" --type cs
 ```
 
-#### **2. Code Analysis Warning Check (Mandatory)**
-```powershell
-# Check warnings with detailed logging
-Execute in PowerShell: dotnet build --verbosity normal | findstr "warning"
+#### **3. Manual Verification Methods**
+```bash
+# コンパイルエラーの可能性がある箇所を確認
+rg "class.*:" --type cs | head -20
+rg "interface.*:" --type cs | head -20
+rg "using.*;" --type cs | head -20
 ```
 
-#### **3. Test Execution (Mandatory when related files are modified)**
-```powershell
-# Execute affected tests
-Execute in PowerShell: .\scripts\run_tests.ps1 -Verbosity detailed
-```
-
-#### **4. Error Reporting Format**
-Report post-implementation status in the following format:
+#### **4. Error Reporting Format (WSL Adapted)**
+WSL環境での実装完了確認フォーマット:
 
 ```
-✅ Implementation Completion Check Results:
-- Compilation Errors: None / [N] errors
-- Code Analysis Warnings: None / [N] warnings
-- Test Results: Success / [N] failures
+✅ WSL Environment Implementation Check Results:
+- Static Analysis: [Issues found/None]
+- Code Pattern Verification: [Potential issues/None]  
+- Architecture Compliance: [Confirmed/Issues found]
 - Implementation Content: [Brief description of implementation]
 ```
 
-#### **5. Error Handling**
-- **Compilation Errors**: Fix immediately, treat as incomplete implementation
-- **New Warnings**: Analyze root cause and fix or suppress
-- **Test Failures**: Fix related tests or adjust implementation
+#### **5. Error Handling (WSL Environment)**
+- **Static Analysis Issues**: コードパターン検索で発見された問題を修正
+- **Architecture Violations**: クリーンアーキテクチャ違反の修正
+- **Code Pattern Issues**: 非同期プログラミングパターンの修正
 
-#### **6. Automated Error Check Commands**
-```powershell
-# Batch error check (recommended)
-Execute in PowerShell: .\scripts\check_implementation.ps1
+#### **6. WSL Alternative Verification**
+```bash
+# WSL環境での包括的チェック
+echo "Checking for common C# issues..."
+rg "ConfigureAwait\(true\)|\.Result\b|\.Wait\(\)" --type cs
+echo "Checking for potential null reference issues..."
+rg "null!" --type cs
+echo "Checking architecture compliance..."
+find . -name "*.cs" -path "*/Baketa.Core/*" | head -10
 ```
-**CRITICAL: ALL .NET CLI COMMANDS MUST USE POWERSHELL**
+**WSL ENVIRONMENT LIMITATIONS**
 
-- **Bash Environment Issue**: Claude Code's Bash environment doesn't recognize Windows PATH settings
-- **Mandatory Instruction**: Always specify "Execute in PowerShell" when running dotnet commands
-- **Fallback**: Use full path if PowerShell unavailable: `'C:\Program Files\dotnet\dotnet.exe'`
-- **Dedicated Scripts**: Prioritize using `scripts/run_tests.ps1`, `scripts/run_build.ps1`
+- **Current Environment**: WSL (Windows Subsystem for Linux)
+- **Limitation**: `net8.0-windows` target framework not supported in WSL
+- **Alternative**: Use static analysis and code pattern verification
+- **Future Consideration**: Actual compilation testing requires Windows environment or cross-platform target
 
 ### **Language Specification**
 **ALL RESPONSES MUST BE IN JAPANESE**

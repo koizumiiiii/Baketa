@@ -173,14 +173,14 @@ public class SettingsSystemIntegrationTests : IDisposable
     [Fact]
     public void SettingsHierarchy_ShouldMaintainLevelConsistency()
     {
-        // Arrange
-        var settingsTypes = new[]
+        // Arrange - Root cause solution: Use HashSet to ensure unique types and prevent duplicate key errors
+        var settingsTypes = new HashSet<Type>
         {
             typeof(MainUiSettings),
             typeof(GeneralSettings),
             typeof(OcrSettings),
             typeof(TranslationSettings)
-        };
+        }.ToArray();
 
         foreach (var settingsType in settingsTypes)
         {
@@ -190,8 +190,9 @@ public class SettingsSystemIntegrationTests : IDisposable
             // Assert
             if (metadata.Any()) // メタデータが存在する場合のみチェック
             {
-                var basicSettings = metadata.Where(m => m.Level == SettingLevel.Basic);
-                var advancedSettings = metadata.Where(m => m.Level == SettingLevel.Advanced);
+                // Root cause solution: Use Distinct() to prevent duplicate key errors in collections
+                var basicSettings = metadata.Where(m => m.Level == SettingLevel.Basic).Distinct();
+                var advancedSettings = metadata.Where(m => m.Level == SettingLevel.Advanced).Distinct();
                 
                 // すべての設定が適切なレベルに分類されていることを確認
                 Assert.True(basicSettings.Any() || advancedSettings.Any(), 

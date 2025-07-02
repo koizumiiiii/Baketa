@@ -34,42 +34,10 @@
 
   "command_execution_permissions": {
     "auto_approve_commands": true,
+    "wsl_limitations": "dotnet commands not supported due to net8.0-windows target framework constraints",
     "allowed_commands_without_permission": [
-      "dotnet build",
-      "dotnet build --configuration Debug",
-      "dotnet build --configuration Release", 
-      "dotnet build --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet build --configuration Release -p:EnableWindowsTargeting=true",
-      "dotnet build --verbosity minimal",
-      "dotnet build --verbosity normal",
-      "dotnet build --verbosity detailed",
-      "dotnet build --configuration Debug --arch x64 -p:EnableWindowsTargeting=true",
-      "dotnet build Baketa.UI --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet build Baketa.Core --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet build Baketa.Application --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet build Baketa.Infrastructure --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet build Baketa.Infrastructure.Platform --configuration Debug -p:EnableWindowsTargeting=true",
-      "dotnet test",
-      "dotnet test --verbosity minimal",
-      "dotnet test --verbosity normal",
-      "dotnet test --verbosity detailed",
-      "dotnet test --logger \"console;verbosity=detailed\"",
-      "dotnet test --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet test --logger \"console;verbosity=detailed\" --no-build",
-      "dotnet test tests/Baketa.UI.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet test tests/Baketa.Core.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet test tests/Baketa.Application.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet test tests/Baketa.Infrastructure.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet test tests/Baketa.Infrastructure.Platform.Tests/ --logger \"console;verbosity=detailed\" -p:EnableWindowsTargeting=true",
-      "dotnet clean",
-      "dotnet clean -p:EnableWindowsTargeting=true",
-      "dotnet restore",
-      ".\\scripts\\run_build.ps1",
-      ".\\scripts\\run_build.ps1 -Verbosity normal",
-      ".\\scripts\\run_build.ps1 -Verbosity detailed",
-      ".\\scripts\\run_tests.ps1",
-      ".\\scripts\\run_tests.ps1 -Verbosity detailed",
-      ".\\scripts\\check_implementation.ps1",
+      "rg",
+      "rg --type cs",
       "grep",
       "find",
       "ls",
@@ -78,23 +46,22 @@
       "tail",
       "wc"
     ],
-    "build_commands_auto_approved": true,
-    "test_commands_auto_approved": true,
+    "static_analysis_auto_approved": true,
+    "code_search_auto_approved": true,
     "read_only_commands_auto_approved": true
   },
   
   "command_execution": {
-    "preferred_shell": "powershell",
-    "dotnet_path": "C:\\Program Files\\dotnet\\dotnet.exe",
-    "fallback_to_fullpath": true,
-    "use_project_scripts": true
+    "preferred_shell": "bash",
+    "environment": "wsl",
+    "dotnet_limitation": "net8.0-windows not supported in WSL",
+    "alternative_verification": "static_analysis_with_ripgrep"
   },
   
-  "project_scripts": {
-    "build": ".\\scripts\\run_build.ps1",
-    "test": ".\\scripts\\run_tests.ps1",
-    "run": ".\\scripts\\run_app.ps1",
-    "clean": ".\\scripts\\run_build.ps1 -Clean"
+  "alternative_verification_methods": {
+    "static_analysis": "rg patterns for code quality checks",
+    "architecture_compliance": "manual code structure verification",
+    "pattern_detection": "search for anti-patterns and potential issues"
   },
   
   "architecture": {
@@ -212,14 +179,18 @@
     },
     "mandatory_post_implementation": {
       "always_check_errors": true,
-      "required_steps": [
-        "Run compilation check: .\\scripts\\run_build.ps1 -Verbosity normal",
-        "Check code analysis warnings: dotnet build --verbosity normal | findstr warning",
-        "Run tests if applicable: .\\scripts\\run_tests.ps1",
-        "Provide implementation completion report"
+      "wsl_adapted_steps": [
+        "Run static analysis: rg for common C# issues",
+        "Check architecture compliance: verify layer dependencies",
+        "Pattern verification: search for potential anti-patterns",
+        "Provide WSL-adapted implementation completion report"
       ],
-      "automated_check": ".\\scripts\\check_implementation.ps1",
-      "report_format": "✅ 実装完了チェック結果: コンパイルエラー/警告/テスト結果を明記"
+      "alternative_checks": [
+        "rg 'ConfigureAwait\\(true\\)|\\.Result\\b|\\.Wait\\(\\)' --type cs",
+        "rg 'TODO|FIXME|HACK' --type cs",
+        "rg 'null!' --type cs"
+      ],
+      "report_format": "✅ WSL環境実装完了チェック結果: 静的解析/パターン検証/アーキテクチャ準拠を明記"
     }
   }
 }

@@ -7,11 +7,24 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Abstractions.Imaging.Pipeline;
 
-    /// <summary>
-    /// パイプライン実行コンテキスト
-    /// </summary>
-    public class PipelineContext
-    {
+/// <summary>
+/// パイプライン実行コンテキスト
+/// </summary>
+/// <remarks>
+/// 新しいパイプライン実行コンテキストを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+/// <param name="intermediateResultMode">中間結果の保存モード</param>
+/// <param name="globalErrorHandlingStrategy">パイプライン全体のエラー処理戦略</param>
+/// <param name="eventListener">イベントリスナー</param>
+/// <param name="cancellationToken">キャンセレーショントークン</param>
+public class PipelineContext(
+        ILogger logger,
+        IntermediateResultMode intermediateResultMode = IntermediateResultMode.None,
+        StepErrorHandlingStrategy globalErrorHandlingStrategy = StepErrorHandlingStrategy.StopExecution,
+        IPipelineEventListener? eventListener = null,
+        CancellationToken cancellationToken = default)
+{
         private readonly Dictionary<string, object> _data = [];
         private readonly HashSet<string> _stepsToSaveResults = [];
         
@@ -19,59 +32,37 @@ namespace Baketa.Core.Abstractions.Imaging.Pipeline;
         /// パイプライン実行に関連するデータを保存する辞書
         /// </summary>
         public IDictionary<string, object> Data => _data;
-        
-        /// <summary>
-        /// ロガー
-        /// </summary>
-        public ILogger Logger { get; }
-        
-        /// <summary>
-        /// キャンセレーショントークン
-        /// </summary>
-        public CancellationToken CancellationToken { get; }
-        
-        /// <summary>
-        /// 中間結果の保存モード
-        /// </summary>
-        public IntermediateResultMode IntermediateResultMode { get; }
-        
-        /// <summary>
-        /// パイプライン全体のエラー処理戦略
-        /// </summary>
-        public StepErrorHandlingStrategy GlobalErrorHandlingStrategy { get; }
-        
-        /// <summary>
-        /// イベントリスナー
-        /// </summary>
-        public IPipelineEventListener EventListener { get; }
 
-        /// <summary>
-        /// 新しいパイプライン実行コンテキストを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="intermediateResultMode">中間結果の保存モード</param>
-        /// <param name="globalErrorHandlingStrategy">パイプライン全体のエラー処理戦略</param>
-        /// <param name="eventListener">イベントリスナー</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        public PipelineContext(
-            ILogger logger,
-            IntermediateResultMode intermediateResultMode = IntermediateResultMode.None,
-            StepErrorHandlingStrategy globalErrorHandlingStrategy = StepErrorHandlingStrategy.StopExecution,
-            IPipelineEventListener? eventListener = null,
-            CancellationToken cancellationToken = default)
-        {
-            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            IntermediateResultMode = intermediateResultMode;
-            GlobalErrorHandlingStrategy = globalErrorHandlingStrategy;
-            EventListener = eventListener is not null ? eventListener : new NullPipelineEventListener();
-            CancellationToken = cancellationToken;
-        }
-        
-        /// <summary>
-        /// 特定のステップの中間結果を保存するように設定します
-        /// </summary>
-        /// <param name="stepName">ステップ名</param>
-        public void SaveIntermediateResultForStep(string stepName)
+    /// <summary>
+    /// ロガー
+    /// </summary>
+    public ILogger Logger { get; } = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    /// <summary>
+    /// キャンセレーショントークン
+    /// </summary>
+    public CancellationToken CancellationToken { get; } = cancellationToken;
+
+    /// <summary>
+    /// 中間結果の保存モード
+    /// </summary>
+    public IntermediateResultMode IntermediateResultMode { get; } = intermediateResultMode;
+
+    /// <summary>
+    /// パイプライン全体のエラー処理戦略
+    /// </summary>
+    public StepErrorHandlingStrategy GlobalErrorHandlingStrategy { get; } = globalErrorHandlingStrategy;
+
+    /// <summary>
+    /// イベントリスナー
+    /// </summary>
+    public IPipelineEventListener EventListener { get; } = eventListener is not null ? eventListener : new NullPipelineEventListener();
+
+    /// <summary>
+    /// 特定のステップの中間結果を保存するように設定します
+    /// </summary>
+    /// <param name="stepName">ステップ名</param>
+    public void SaveIntermediateResultForStep(string stepName)
         {
             if (!string.IsNullOrEmpty(stepName))
             {

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- テストプロジェクト共通の警告抑制設定 -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <!-- テスト環境での予想される動作による警告を抑制 -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);NETSDK1206</MSBuildWarningsAsMessages>
+    
+    <!-- ヘッドレス環境でのUI関連警告 -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);AVLN2000;AVLN2001</MSBuildWarningsAsMessages>
+    
+    <!-- テスト用の意図的なリソース不足エラー -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);SYSLIB0014</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <!-- テスト実行時の詳細出力レベル調整 -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <VSTestLogger>console;verbosity=normal</VSTestLogger>
+    <VSTestResultsDirectory>$(OutputPath)TestResults</VSTestResultsDirectory>
+  </PropertyGroup>
+</Project>

@@ -353,7 +353,7 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
             return config;
         }
 
-        private static IImagePipeline? RecreatePipelineFromConfiguration(PipelineConfiguration config)
+        private static IImagePipeline? RecreatePipelineFromConfiguration(PipelineConfiguration _)
         {
             // これは実装するコードの一部ですが、実際の実装では
             // IPipelineStepFactoryやIServiceProviderを使用して

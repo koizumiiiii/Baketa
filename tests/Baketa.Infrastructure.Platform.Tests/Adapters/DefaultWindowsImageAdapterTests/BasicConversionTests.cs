@@ -40,12 +40,13 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
         [InlineData(320, 240)]
         [InlineData(1024, 768)]
         [InlineData(1920, 1080)]
-        public void ToImage_ValidImage_ReturnsCorrectDimensions(int width, int height)
+        public async Task ToImage_ValidImage_ReturnsCorrectDimensions(int width, int height)
         {
             // Arrange
             try
             {
-                AdapterTestHelper.EnsureTestDataExists(); // 必要な場合のみ実行
+                // Root cause solution: Properly await async test data preparation
+                await AdapterTestHelper.EnsureTestDataExists().ConfigureAwait(false);
                 using var windowsImage = AdapterTestHelper.CreateMockWindowsImage(width, height);
                 
                 // Act
@@ -74,12 +75,13 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
         [Theory]
         [InlineData(320, 240)]
         [InlineData(1024, 768)]
-        public void ToAdvancedImage_ValidImage_ReturnsCorrectDimensions(int width, int height)
+        public async Task ToAdvancedImage_ValidImage_ReturnsCorrectDimensions(int width, int height)
         {
             // Arrange
             try
             {
-                AdapterTestHelper.EnsureTestDataExists(); // 必要な場合のみ実行
+                // Root cause solution: Properly await async test data preparation
+                await AdapterTestHelper.EnsureTestDataExists().ConfigureAwait(false);
                 using var windowsImage = AdapterTestHelper.CreateMockWindowsImage(width, height);
                 
                 // Act
@@ -115,7 +117,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             try
             {
                 // Arrange
-                AdapterTestHelper.EnsureTestDataExists(); // 必要な場合のみ実行
+                // Root cause solution: Properly await async test data preparation
+                await AdapterTestHelper.EnsureTestDataExists().ConfigureAwait(false);
                 // まずIImageオブジェクトを作成
                 using var windowsImage = AdapterTestHelper.CreateMockWindowsImage(width, height);
                 using var image = _adapter.ToImage(windowsImage);
@@ -152,7 +155,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             try
             {
                 // Arrange
-                AdapterTestHelper.EnsureTestDataExists(); // 必要な場合のみ実行
+                // Root cause solution: Properly await async test data preparation
+                await AdapterTestHelper.EnsureTestDataExists().ConfigureAwait(false);
                 // まずIAdvancedImageオブジェクトを作成
                 using var windowsImage = AdapterTestHelper.CreateMockWindowsImage(width, height);
                 using var image = _adapter.ToAdvancedImage(windowsImage);
