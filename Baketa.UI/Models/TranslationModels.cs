@@ -143,6 +143,14 @@ namespace Baketa.UI.Models;
             get => _description;
             set => this.RaiseAndSetIfChanged(ref _description, value);
         }
+
+        /// <summary>
+        /// サポートされているかどうか
+        /// </summary>
+        public bool IsSupported
+        {
+            get => IsEnabled && !RequiresDownload;
+        }
         
         /// <summary>
         /// 言語ペアキー（例: "ja-en"）
@@ -158,8 +166,8 @@ namespace Baketa.UI.Models;
         /// 中国語関連の言語ペアかどうか
         /// </summary>
         public bool IsChineseRelated => 
-            SourceLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase) || 
-            TargetLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+            (!string.IsNullOrEmpty(SourceLanguage) && SourceLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) || 
+            (!string.IsNullOrEmpty(TargetLanguage) && TargetLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase));
         
         /// <summary>
         /// 2段階翻訳が利用可能かどうか
@@ -182,7 +190,9 @@ namespace Baketa.UI.Models;
         /// <summary>直接翻訳</summary>
         Direct,
         /// <summary>2段階翻訳</summary>
-        TwoStage
+        TwoStage,
+        /// <summary>ハイブリッド翻訳</summary>
+        Hybrid
     }
 
     /// <summary>
@@ -193,7 +203,9 @@ namespace Baketa.UI.Models;
         /// <summary>ローカルエンジンのみ（OPUS-MT）</summary>
         LocalOnly,
         /// <summary>クラウドエンジンのみ（Gemini API等）</summary>
-        CloudOnly
+        CloudOnly,
+        /// <summary>ハイブリッドエンジン（ローカル＋クラウド）</summary>
+        Hybrid
     }
 
     /// <summary>
@@ -251,6 +263,24 @@ namespace Baketa.UI.Models;
             "ja-zh-Hans"  // 日本語 → 簡体字中国語
         ];
     }
+
+    /// <summary>
+    /// 翻訳エンジンアイテム
+    /// </summary>
+    public sealed record TranslationEngineItem(
+        TranslationEngine Engine,
+        string Id,
+        string DisplayName,
+        string Description);
+
+    /// <summary>
+    /// 翻訳戦略アイテム
+    /// </summary>
+    public sealed record TranslationStrategyItem(
+        TranslationStrategy Strategy,
+        string DisplayName,
+        string Description,
+        bool IsAvailable);
 
     /// <summary>
     /// 言語情報

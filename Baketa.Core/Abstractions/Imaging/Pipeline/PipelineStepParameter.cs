@@ -2,91 +2,79 @@ using System;
 
 namespace Baketa.Core.Abstractions.Imaging.Pipeline;
 
+/// <summary>
+/// パイプラインステップのパラメータ定義を表すクラス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="name">パラメータ名</param>
+/// <param name="description">パラメータの説明</param>
+/// <param name="parameterType">パラメータの型</param>
+/// <param name="defaultValue">デフォルト値</param>
+/// <param name="minValue">最小値（数値型パラメータのみ）</param>
+/// <param name="maxValue">最大値（数値型パラメータのみ）</param>
+/// <param name="allowedValues">許容される値のリスト（列挙型や選択肢がある場合）</param>
+public class PipelineStepParameter(
+        string name,
+        string description,
+        Type parameterType,
+        object? defaultValue = null,
+        object? minValue = null,
+        object? maxValue = null,
+        IReadOnlyCollection<object>? allowedValues = null)
+{
     /// <summary>
-    /// パイプラインステップのパラメータ定義を表すクラス
+    /// パラメータ名
     /// </summary>
-    public class PipelineStepParameter
-    {
-        /// <summary>
-        /// パラメータ名
-        /// </summary>
-        public string Name { get; }
-        
-        /// <summary>
-        /// パラメータの説明
-        /// </summary>
-        public string Description { get; }
-        
-        /// <summary>
-        /// パラメータの型
-        /// </summary>
-        public Type ParameterType { get; }
-        
-        /// <summary>
-        /// デフォルト値
-        /// </summary>
-        public object? DefaultValue { get; }
-        
-        /// <summary>
-        /// パラメータが必須かどうか
-        /// </summary>
-        public bool IsRequired { get; }
-        
-        /// <summary>
-        /// パラメータの最小値（数値型パラメータのみ）
-        /// </summary>
-        public object? MinValue { get; }
-        
-        /// <summary>
-        /// パラメータの最大値（数値型パラメータのみ）
-        /// </summary>
-        public object? MaxValue { get; }
-        
-        /// <summary>
-        /// パラメータのステップサイズ（数値型パラメータのみ）
-        /// </summary>
-        public object? StepSize { get; }
-        
-        /// <summary>
-        /// 許容される値のリスト（列挙型や選択肢がある場合）
-        /// </summary>
-        public IReadOnlyCollection<object>? AllowedValues { get; }
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="name">パラメータ名</param>
-        /// <param name="description">パラメータの説明</param>
-        /// <param name="parameterType">パラメータの型</param>
-        /// <param name="defaultValue">デフォルト値</param>
-        /// <param name="minValue">最小値（数値型パラメータのみ）</param>
-        /// <param name="maxValue">最大値（数値型パラメータのみ）</param>
-        /// <param name="allowedValues">許容される値のリスト（列挙型や選択肢がある場合）</param>
-        public PipelineStepParameter(
-            string name, 
-            string description, 
-            Type parameterType, 
-            object? defaultValue = null, 
-            object? minValue = null,
-            object? maxValue = null,
-            IReadOnlyCollection<object>? allowedValues = null)
-        {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            Description = description ?? throw new ArgumentNullException(nameof(description));
-            ParameterType = parameterType ?? throw new ArgumentNullException(nameof(parameterType));
-            DefaultValue = defaultValue;
-            IsRequired = defaultValue == null; // デフォルト値がない場合は必須
-            MinValue = minValue;
-            MaxValue = maxValue;
-            AllowedValues = allowedValues;
-        }
-        
-        /// <summary>
-        /// 値がこのパラメータに対して有効かどうかを検証します
-        /// </summary>
-        /// <param name="value">検証する値</param>
-        /// <returns>有効な場合はtrue、そうでない場合はfalse</returns>
-        public bool ValidateValue(object? value)
+    public string Name { get; } = name ?? throw new ArgumentNullException(nameof(name));
+
+    /// <summary>
+    /// パラメータの説明
+    /// </summary>
+    public string Description { get; } = description ?? throw new ArgumentNullException(nameof(description));
+
+    /// <summary>
+    /// パラメータの型
+    /// </summary>
+    public Type ParameterType { get; } = parameterType ?? throw new ArgumentNullException(nameof(parameterType));
+
+    /// <summary>
+    /// デフォルト値
+    /// </summary>
+    public object? DefaultValue { get; } = defaultValue;
+
+    /// <summary>
+    /// パラメータが必須かどうか
+    /// </summary>
+    public bool IsRequired { get; } = defaultValue == null; // デフォルト値がない場合は必須
+
+    /// <summary>
+    /// パラメータの最小値（数値型パラメータのみ）
+    /// </summary>
+    public object? MinValue { get; } = minValue;
+
+    /// <summary>
+    /// パラメータの最大値（数値型パラメータのみ）
+    /// </summary>
+    public object? MaxValue { get; } = maxValue;
+
+    /// <summary>
+    /// パラメータのステップサイズ（数値型パラメータのみ）
+    /// </summary>
+    public object? StepSize { get; }
+
+    /// <summary>
+    /// 許容される値のリスト（列挙型や選択肢がある場合）
+    /// </summary>
+    public IReadOnlyCollection<object>? AllowedValues { get; } = allowedValues;
+
+    /// <summary>
+    /// 値がこのパラメータに対して有効かどうかを検証します
+    /// </summary>
+    /// <param name="value">検証する値</param>
+    /// <returns>有効な場合はtrue、そうでない場合はfalse</returns>
+    public bool ValidateValue(object? value)
         {
             // 必須パラメータのnullチェック
             if (IsRequired && value == null)

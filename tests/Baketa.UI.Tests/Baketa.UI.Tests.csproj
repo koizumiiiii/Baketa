@@ -12,7 +12,12 @@
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
     <!-- テスト固有のCA警告を抑制 -->
-    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201</NoWarn>
+    <!-- UI/ネットワーク関連テスト警告を抑制 -->
+    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201;CA1016;AVLN2000;AVLN2001;NETSDK1206</NoWarn>
+    
+    <!-- テスト実行時の情報レベル警告を抑制 -->
+    <OutputType>Library</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
   <ItemGroup>

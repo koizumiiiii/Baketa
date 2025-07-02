@@ -219,16 +219,11 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
         /// <summary>
         /// GetOutputImageInfo用の仮想画像クラス
         /// </summary>
-        private sealed class VirtualImage : IAdvancedImage
+        private sealed class VirtualImage(ImageInfo imageInfo) : IAdvancedImage
         {
-            private readonly ImageInfo _imageInfo;
-            
-            public VirtualImage(ImageInfo imageInfo)
-            {
-                _imageInfo = imageInfo;
-            }
-            
-            public int Width => _imageInfo.Width;
+            private readonly ImageInfo _imageInfo = imageInfo;
+
+        public int Width => _imageInfo.Width;
             public int Height => _imageInfo.Height;
             public ImageFormat Format => _imageInfo.Format;
             

@@ -291,7 +291,7 @@ public sealed class OverlayPositionManagerTests : IDisposable
     
     public void Dispose()
     {
-        _positionManager?.DisposeAsync().AsTask().Wait();
+        _positionManager?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         // _multiMonitorManagerはnullのため呼び出しをスキップ
         GC.SuppressFinalize(this);
     }

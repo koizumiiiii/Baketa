@@ -51,37 +51,30 @@ namespace Baketa.Core.Abstractions.Events;
         /// </summary>
         event EventHandler<EventProcessorErrorEventArgs> EventProcessorError;
     }
-    
-    /// <summary>
-    /// イベントプロセッサのエラーイベント引数
-    /// </summary>
-    public class EventProcessorErrorEventArgs : EventArgs
+
+/// <summary>
+/// イベントプロセッサのエラーイベント引数
+/// </summary>
+/// <remarks>
+/// コンストラクター
+/// </remarks>
+/// <param name="exception">発生した例外</param>
+/// <param name="eventData">処理しようとしていたイベント</param>
+/// <param name="processor">例外を発生させたイベントプロセッサ</param>
+public class EventProcessorErrorEventArgs(Exception exception, IEvent eventData, object processor) : EventArgs
     {
-        /// <summary>
-        /// 発生した例外
-        /// </summary>
-        public Exception Exception { get; }
-        
-        /// <summary>
-        /// 処理しようとしていたイベント
-        /// </summary>
-        public IEvent EventData { get; }
-        
-        /// <summary>
-        /// 例外を発生させたイベントプロセッサ
-        /// </summary>
-        public object Processor { get; }
-        
-        /// <summary>
-        /// コンストラクター
-        /// </summary>
-        /// <param name="exception">発生した例外</param>
-        /// <param name="eventData">処理しようとしていたイベント</param>
-        /// <param name="processor">例外を発生させたイベントプロセッサ</param>
-        public EventProcessorErrorEventArgs(Exception exception, IEvent eventData, object processor)
-        {
-            Exception = exception;
-            EventData = eventData;
-            Processor = processor;
-        }
-    }
+    /// <summary>
+    /// 発生した例外
+    /// </summary>
+    public Exception Exception { get; } = exception;
+
+    /// <summary>
+    /// 処理しようとしていたイベント
+    /// </summary>
+    public IEvent EventData { get; } = eventData;
+
+    /// <summary>
+    /// 例外を発生させたイベントプロセッサ
+    /// </summary>
+    public object Processor { get; } = processor;
+}

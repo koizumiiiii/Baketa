@@ -7,53 +7,44 @@ namespace Baketa.Core.Events.CaptureEvents;
 /// <summary>
 /// 拡張キャプチャサービスのステータス変更イベント
 /// </summary>
-public class AdvancedCaptureServiceStatusChangedEvent : EventBase
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="previousStatus">変更前のステータス</param>
+/// <param name="currentStatus">変更後のステータス</param>
+/// <param name="reason">ステータス変更の理由</param>
+/// <param name="currentSettings">現在のキャプチャ設定</param>
+public class AdvancedCaptureServiceStatusChangedEvent(
+    CaptureServiceStatus previousStatus,
+    CaptureServiceStatus currentStatus,
+    string? reason = null,
+    CaptureSettings? currentSettings = null) : EventBase
 {
     /// <summary>
     /// 変更前のステータス
     /// </summary>
-    public CaptureServiceStatus PreviousStatus { get; }
-    
+    public CaptureServiceStatus PreviousStatus { get; } = previousStatus;
+
     /// <summary>
     /// 変更後のステータス
     /// </summary>
-    public CaptureServiceStatus CurrentStatus { get; }
-    
+    public CaptureServiceStatus CurrentStatus { get; } = currentStatus;
+
     /// <summary>
     /// ステータス変更の理由（オプション）
     /// </summary>
-    public string? Reason { get; }
-    
+    public string? Reason { get; } = reason;
+
     /// <summary>
     /// ステータス変更が発生した時刻
     /// </summary>
-    public DateTime StatusChangedAt { get; }
-    
+    public DateTime StatusChangedAt { get; } = DateTime.Now;
+
     /// <summary>
     /// 現在のキャプチャ設定
     /// </summary>
-    public CaptureSettings? CurrentSettings { get; }
-    
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="previousStatus">変更前のステータス</param>
-    /// <param name="currentStatus">変更後のステータス</param>
-    /// <param name="reason">ステータス変更の理由</param>
-    /// <param name="currentSettings">現在のキャプチャ設定</param>
-    public AdvancedCaptureServiceStatusChangedEvent(
-        CaptureServiceStatus previousStatus,
-        CaptureServiceStatus currentStatus,
-        string? reason = null,
-        CaptureSettings? currentSettings = null)
-    {
-        PreviousStatus = previousStatus;
-        CurrentStatus = currentStatus;
-        Reason = reason;
-        StatusChangedAt = DateTime.Now;
-        CurrentSettings = currentSettings;
-    }
-    
+    public CaptureSettings? CurrentSettings { get; } = currentSettings;
+
     /// <inheritdoc />
     public override string Name => "AdvancedCaptureServiceStatusChanged";
     

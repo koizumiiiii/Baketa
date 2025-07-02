@@ -22,8 +22,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
             _output = output;
             _adapter = new DefaultWindowsImageAdapter();
             
-            // テストデータの準備
-            AdapterTestHelper.EnsureTestDataExists();
+            // Root cause solution: Proper async test data preparation
+            Task.Run(async () => await AdapterTestHelper.EnsureTestDataExists().ConfigureAwait(false)).GetAwaiter().GetResult();
         }
         
         /// <summary>

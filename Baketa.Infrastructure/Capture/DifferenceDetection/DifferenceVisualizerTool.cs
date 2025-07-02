@@ -198,10 +198,10 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// </summary>
         private async Task DrawRectangleAsync(
             IAdvancedImage image, 
-            Rectangle rect, 
-            Color color, 
-            int thickness = 1, 
-            float opacity = 1.0f)
+            Rectangle _, 
+            Color _1, 
+            int _2 = 1, 
+            float _3 = 1.0f)
         {
             ArgumentNullException.ThrowIfNull(image, nameof(image));
             
@@ -218,10 +218,10 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         private async Task DrawTextAsync(
             IAdvancedImage image, 
             string text, 
-            int x, 
-            int y, 
-            Color textColor, 
-            Color backgroundColor)
+            int _, 
+            int _1, 
+            Color _2, 
+            Color _3)
         {
             ArgumentNullException.ThrowIfNull(image, nameof(image));
             ArgumentNullException.ThrowIfNull(text, nameof(text));

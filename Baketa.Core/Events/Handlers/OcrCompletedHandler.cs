@@ -6,30 +6,25 @@ using System.Threading.Tasks;
 
 namespace Baketa.Core.Events.Handlers;
 
-    /// <summary>
-    /// OCR完了イベントハンドラー
-    /// </summary>
-    public class OcrCompletedHandler : IEventProcessor<OcrCompletedEvent>
+/// <summary>
+/// OCR完了イベントハンドラー
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="eventAggregator">イベント集約インスタンス</param>
+public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProcessor<OcrCompletedEvent>
     {
-        private readonly IEventAggregator _eventAggregator;
+        private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         
         /// <inheritdoc />
         public int Priority => 0;
         
         /// <inheritdoc />
         public bool SynchronousExecution => false;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="eventAggregator">イベント集約インスタンス</param>
-        public OcrCompletedHandler(IEventAggregator eventAggregator)
-        {
-            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        }
-        
-        /// <inheritdoc />
-        public async Task HandleAsync(OcrCompletedEvent eventData)
+
+    /// <inheritdoc />
+    public async Task HandleAsync(OcrCompletedEvent eventData)
         {
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);

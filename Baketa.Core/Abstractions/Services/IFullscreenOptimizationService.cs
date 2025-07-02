@@ -188,92 +188,70 @@ public interface IFullscreenOptimizationService
 /// <summary>
 /// フルスクリーン最適化適用イベント引数
 /// </summary>
-public class FullscreenOptimizationAppliedEventArgs : EventArgs
+public class FullscreenOptimizationAppliedEventArgs(
+    FullscreenInfo fullscreenInfo,
+    CaptureSettings optimizedSettings,
+    CaptureSettings? originalSettings = null) : EventArgs
 {
     /// <summary>
     /// フルスクリーン情報
     /// </summary>
-    public FullscreenInfo FullscreenInfo { get; }
-    
+    public FullscreenInfo FullscreenInfo { get; } = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
+
     /// <summary>
     /// 最適化後のキャプチャ設定
     /// </summary>
-    public CaptureSettings OptimizedSettings { get; }
-    
+    public CaptureSettings OptimizedSettings { get; } = optimizedSettings ?? throw new ArgumentNullException(nameof(optimizedSettings));
+
     /// <summary>
     /// 最適化前の元の設定
     /// </summary>
-    public CaptureSettings? OriginalSettings { get; }
-    
+    public CaptureSettings? OriginalSettings { get; } = originalSettings;
+
     /// <summary>
     /// 最適化が適用された時刻
     /// </summary>
-    public DateTime AppliedTime { get; }
-    
-    public FullscreenOptimizationAppliedEventArgs(
-        FullscreenInfo fullscreenInfo, 
-        CaptureSettings optimizedSettings, 
-        CaptureSettings? originalSettings = null)
-    {
-        FullscreenInfo = fullscreenInfo ?? throw new ArgumentNullException(nameof(fullscreenInfo));
-        OptimizedSettings = optimizedSettings ?? throw new ArgumentNullException(nameof(optimizedSettings));
-        OriginalSettings = originalSettings;
-        AppliedTime = DateTime.Now;
-    }
+    public DateTime AppliedTime { get; } = DateTime.Now;
 }
 
 /// <summary>
 /// フルスクリーン最適化解除イベント引数
 /// </summary>
-public class FullscreenOptimizationRemovedEventArgs : EventArgs
+public class FullscreenOptimizationRemovedEventArgs(CaptureSettings? restoredSettings = null, string reason = "") : EventArgs
 {
     /// <summary>
     /// 復元されたキャプチャ設定
     /// </summary>
-    public CaptureSettings? RestoredSettings { get; }
-    
+    public CaptureSettings? RestoredSettings { get; } = restoredSettings;
+
     /// <summary>
     /// 最適化が解除された時刻
     /// </summary>
-    public DateTime RemovedTime { get; }
-    
+    public DateTime RemovedTime { get; } = DateTime.Now;
+
     /// <summary>
     /// 解除理由
     /// </summary>
-    public string Reason { get; }
-    
-    public FullscreenOptimizationRemovedEventArgs(CaptureSettings? restoredSettings = null, string reason = "")
-    {
-        RestoredSettings = restoredSettings;
-        RemovedTime = DateTime.Now;
-        Reason = reason;
-    }
+    public string Reason { get; } = reason;
 }
 
 /// <summary>
 /// フルスクリーン最適化エラーイベント引数
 /// </summary>
-public class FullscreenOptimizationErrorEventArgs : EventArgs
+public class FullscreenOptimizationErrorEventArgs(Exception exception, string? message = null) : EventArgs
 {
     /// <summary>
     /// 発生した例外
     /// </summary>
-    public Exception Exception { get; }
-    
+    public Exception Exception { get; } = exception ?? throw new ArgumentNullException(nameof(exception));
+
     /// <summary>
     /// エラーが発生した時刻
     /// </summary>
-    public DateTime ErrorTime { get; }
-    
+    public DateTime ErrorTime { get; } = DateTime.Now;
+
     /// <summary>
     /// エラーメッセージ
     /// </summary>
-    public string Message { get; }
-    
-    public FullscreenOptimizationErrorEventArgs(Exception exception, string? message = null)
-    {
-        Exception = exception ?? throw new ArgumentNullException(nameof(exception));
-        ErrorTime = DateTime.Now;
-        Message = message ?? exception.Message;
-    }
+    public string Message { get; } = message ?? exception.Message;
 }

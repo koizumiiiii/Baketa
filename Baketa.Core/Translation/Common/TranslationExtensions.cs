@@ -180,7 +180,7 @@ namespace Baketa.Core.Translation.Common;
         /// </summary>
         /// <param name="event">翻訳開始イベント</param>
         /// <returns>エンジン名</returns>
-        public static string EngineName(this TranslationStartedEvent @event)
+        public static string EngineName(this TranslationStartedEvent _)
         {
             return "Unknown"; // TODO: 翻訳開始時はエンジン名が不明な場合があるためデフォルト値を返す
         }
@@ -210,9 +210,9 @@ namespace Baketa.Core.Translation.Common;
         /// </summary>
         /// <param name="language">言語文字列</param>
         /// <returns>言語コード</returns>
-        public static string Code(this string language)
+        public static string Code(this string _)
         {
-            return language; // 実際には言語文字列が取得されているのでそのまま返す
+            return _; // 実際には言語文字列が取得されているのでそのまま返す
         }
         
         /// <summary>

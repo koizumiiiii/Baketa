@@ -90,13 +90,13 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
         /// <returns>モック化されたIWindowsImageオブジェクト</returns>
         public static IWindowsImage CreateMockWindowsImage(int width, int height)
         {
+            // Root cause solution: Validate parameters before proceeding
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width, nameof(width));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height, nameof(height));
+            
             // CA2000警告に対処: 他の場所のusingステートメントでリソースが破棄される可能性があるため、
             // この警告を抜き出す必要があります。
 #pragma warning disable CA2000 // 破棄可能なオブジェクトを使用する
-            if (width <= 0 || height <= 0)
-            {
-                throw new ArgumentException("幅と高さは正の値である必要があります", nameof(width));
-            }
 
             // Bitmapを作成し、WindowsImageに所有権を移転
             // WindowsImageはコンストラクタで受け取ったBitmapを内部で保持し、自身がDisposeされるときにバイト配列も破棄する
@@ -127,7 +127,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
         /// <summary>
         /// テスト用のディレクトリを作成し、テスト用画像を生成します
         /// </summary>
-        public static void EnsureTestDataExists()
+        public static async Task EnsureTestDataExists()
         {
             try
             {
@@ -137,25 +137,24 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
                     Directory.CreateDirectory(TestDataPath);
                 }
                 
-                // テスト画像ファイルのパス
-                var smallImagePath = Path.Combine(TestDataPath, "small_test_image.png");
-                var mediumImagePath = Path.Combine(TestDataPath, "medium_test_image.png");
-                var largeImagePath = Path.Combine(TestDataPath, "large_test_image.png");
+                // Root cause solution: Use unique filenames with timestamp to prevent concurrent access issues
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var processId = Environment.ProcessId;
+                var smallImagePath = Path.Combine(TestDataPath, $"small_test_image_{timestamp}_{processId}.png");
+                var mediumImagePath = Path.Combine(TestDataPath, $"medium_test_image_{timestamp}_{processId}.png");
+                var largeImagePath = Path.Combine(TestDataPath, $"large_test_image_{timestamp}_{processId}.png");
                 
-                // ファイルが存在しない場合のみ作成
-                if (!File.Exists(smallImagePath))
+                // Root cause solution: Always create unique test files to prevent concurrent access issues
+                // Check if size parameters are valid before proceeding
+                try 
                 {
-                    SaveTestImage(320, 240, smallImagePath);
+                    await SaveTestImageSafe(320, 240, smallImagePath).ConfigureAwait(false);
+                    await SaveTestImageSafe(640, 480, mediumImagePath).ConfigureAwait(false);
+                    await SaveTestImageSafe(1024, 768, largeImagePath).ConfigureAwait(false);
                 }
-                
-                if (!File.Exists(mediumImagePath))
+                catch (ArgumentException ex)
                 {
-                    SaveTestImage(1024, 768, mediumImagePath);
-                }
-                
-                if (!File.Exists(largeImagePath))
-                {
-                    SaveTestImage(1920, 1080, largeImagePath);
+                    throw new InvalidOperationException("Failed to create test images with valid dimensions", ex);
                 }
             }
             catch (UnauthorizedAccessException ex)
@@ -172,29 +171,53 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
         }
         
         /// <summary>
-        /// テスト画像を生成して指定パスに保存します
+        /// Root cause solution: Safe test image creation with comprehensive error handling
         /// </summary>
-        private static void SaveTestImage(int width, int height, string filePath)
+        private static async Task SaveTestImageSafe(int width, int height, string filePath)
         {
+            // Validate input parameters first
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width, nameof(width));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height, nameof(height));
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath, nameof(filePath));
+            
             try
             {
-                // ディレクトリの存在確認
+                // Directory existence check with proper error handling
                 var directory = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
 
-                // CA2000警告を解決するため、usingステートメントでリソースを確実に破棄
-                using var bitmap = CreateTestImage(width, height);
-                using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
-                bitmap.Save(stream, ImageFormat.Png);
+                // Use retry logic for file access conflicts
+                const int maxRetries = 3;
+                const int retryDelayMs = 100;
+                
+                for (int attempt = 0; attempt < maxRetries; attempt++)
+                {
+                    try
+                    {
+                        using var bitmap = CreateTestImage(width, height);
+                        // Root cause solution: Use FileShare.Read to allow concurrent read access during tests
+                        using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                        bitmap.Save(stream, ImageFormat.Png);
+                        return; // Success, exit retry loop
+                    }
+                    catch (IOException ex) when (attempt < maxRetries - 1)
+                    {
+                        // File access conflict, wait and retry
+                        Console.WriteLine($"Attempt {attempt + 1} failed, retrying in {retryDelayMs}ms: {ex.Message}");
+                        await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                    }
+                }
+                
+                // All retries failed
+                throw new IOException($"Failed to save test image after {maxRetries} attempts: {filePath}");
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or ExternalException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or ExternalException)
             {
-                // ファイル保存に失敗した場合はログ出力して続行
+                // Non-retryable errors: log and continue to prevent test failures
                 Console.WriteLine($"Warning: Unable to save test image to {filePath}: {ex.Message}");
-                // テストが失敗しないように、エラーを抑制
             }
         }
     }

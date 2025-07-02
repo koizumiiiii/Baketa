@@ -3,53 +3,44 @@ using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Core.Abstractions.Imaging.Pipeline;
 
+/// <summary>
+/// パイプライン処理における画像情報を表すクラス
+/// 名前空間の衝突を避けるため、ImageInfo から PipelineImageInfo にリネーム
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+public class PipelineImageInfo(int width, int height, int channels, ImageFormat format, PipelineStage stage)
+{
     /// <summary>
-    /// パイプライン処理における画像情報を表すクラス
-    /// 名前空間の衝突を避けるため、ImageInfo から PipelineImageInfo にリネーム
+    /// 画像の幅
     /// </summary>
-    public class PipelineImageInfo
-    {
-        /// <summary>
-        /// 画像の幅
-        /// </summary>
-        public int Width { get; }
+    public int Width { get; } = width;
 
-        /// <summary>
-        /// 画像の高さ
-        /// </summary>
-        public int Height { get; }
+    /// <summary>
+    /// 画像の高さ
+    /// </summary>
+    public int Height { get; } = height;
 
-        /// <summary>
-        /// 画像のチャンネル数
-        /// </summary>
-        public int Channels { get; }
+    /// <summary>
+    /// 画像のチャンネル数
+    /// </summary>
+    public int Channels { get; } = channels;
 
-        /// <summary>
-        /// 画像のフォーマット
-        /// </summary>
-        public ImageFormat Format { get; }
+    /// <summary>
+    /// 画像のフォーマット
+    /// </summary>
+    public ImageFormat Format { get; } = format;
 
-        /// <summary>
-        /// パイプラインの処理段階
-        /// </summary>
-        public PipelineStage Stage { get; }
+    /// <summary>
+    /// パイプラインの処理段階
+    /// </summary>
+    public PipelineStage Stage { get; } = stage;
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        public PipelineImageInfo(int width, int height, int channels, ImageFormat format, PipelineStage stage)
-        {
-            Width = width;
-            Height = height;
-            Channels = channels;
-            Format = format;
-            Stage = stage;
-        }
-
-        /// <summary>
-        /// 標準的な画像情報からパイプライン画像情報を作成
-        /// </summary>
-        public static PipelineImageInfo FromImageInfo(ImageInfo imageInfo, PipelineStage stage)
+    /// <summary>
+    /// 標準的な画像情報からパイプライン画像情報を作成
+    /// </summary>
+    public static PipelineImageInfo FromImageInfo(ImageInfo imageInfo, PipelineStage stage)
         {
             ArgumentNullException.ThrowIfNull(imageInfo);
 

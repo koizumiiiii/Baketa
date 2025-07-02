@@ -4,68 +4,59 @@ using System.Collections.ObjectModel;
 
 namespace Baketa.Core.Abstractions.Imaging.Pipeline;
 
-    /// <summary>
-    /// パイプライン実行結果を表すクラス
-    /// </summary>
-    public class PipelineResult : IDisposable
+/// <summary>
+/// パイプライン実行結果を表すクラス
+/// </summary>
+/// <remarks>
+/// パイプライン実行結果を作成します
+/// </remarks>
+/// <param name="result">パイプライン処理の最終結果</param>
+/// <param name="intermediateResults">各ステップの中間結果</param>
+/// <param name="processingTimeMs">パイプライン実行の処理時間（ミリ秒）</param>
+/// <param name="intermediateResultMode">中間結果の保存モード</param>
+/// <param name="executedStepCount">実行されたステップ数</param>
+public class PipelineResult(
+        IAdvancedImage result,
+        Dictionary<string, IAdvancedImage> intermediateResults,
+        long processingTimeMs,
+        IntermediateResultMode intermediateResultMode,
+        int executedStepCount) : IDisposable
     {
-        private readonly Dictionary<string, IAdvancedImage> _intermediateResults;
+        private readonly Dictionary<string, IAdvancedImage> _intermediateResults = intermediateResults ?? [];
         private bool _disposed;
-        
-        /// <summary>
-        /// パイプライン処理の最終結果
-        /// </summary>
-        public IAdvancedImage Result { get; }
-        
-        /// <summary>
-        /// 各ステップの中間結果
-        /// </summary>
-        public IReadOnlyDictionary<string, IAdvancedImage> IntermediateResults => 
+
+    /// <summary>
+    /// パイプライン処理の最終結果
+    /// </summary>
+    public IAdvancedImage Result { get; } = result ?? throw new ArgumentNullException(nameof(result));
+
+    /// <summary>
+    /// 各ステップの中間結果
+    /// </summary>
+    public IReadOnlyDictionary<string, IAdvancedImage> IntermediateResults => 
             new ReadOnlyDictionary<string, IAdvancedImage>(_intermediateResults);
-        
-        /// <summary>
-        /// パイプライン実行の処理時間（ミリ秒）
-        /// </summary>
-        public long ProcessingTimeMs { get; }
-        
-        /// <summary>
-        /// 中間結果の保存モード
-        /// </summary>
-        public IntermediateResultMode IntermediateResultMode { get; }
 
-        /// <summary>
-        /// 実行されたステップ数
-        /// </summary>
-        public int ExecutedStepCount { get; }
+    /// <summary>
+    /// パイプライン実行の処理時間（ミリ秒）
+    /// </summary>
+    public long ProcessingTimeMs { get; } = processingTimeMs;
 
-        /// <summary>
-        /// パイプライン実行結果を作成します
-        /// </summary>
-        /// <param name="result">パイプライン処理の最終結果</param>
-        /// <param name="intermediateResults">各ステップの中間結果</param>
-        /// <param name="processingTimeMs">パイプライン実行の処理時間（ミリ秒）</param>
-        /// <param name="intermediateResultMode">中間結果の保存モード</param>
-        /// <param name="executedStepCount">実行されたステップ数</param>
-        public PipelineResult(
-            IAdvancedImage result,
-            Dictionary<string, IAdvancedImage> intermediateResults,
-            long processingTimeMs,
-            IntermediateResultMode intermediateResultMode,
-            int executedStepCount)
-        {
-            Result = result ?? throw new ArgumentNullException(nameof(result));
-            _intermediateResults = intermediateResults ?? [];
-            ProcessingTimeMs = processingTimeMs;
-            IntermediateResultMode = intermediateResultMode;
-            ExecutedStepCount = executedStepCount;
-        }
+    /// <summary>
+    /// 中間結果の保存モード
+    /// </summary>
+    public IntermediateResultMode IntermediateResultMode { get; } = intermediateResultMode;
 
-        /// <summary>
-        /// 指定されたステップの中間結果を取得します
-        /// </summary>
-        /// <param name="stepName">ステップ名</param>
-        /// <returns>中間結果、存在しない場合はnull</returns>
-        public IAdvancedImage? GetIntermediateResult(string stepName)
+    /// <summary>
+    /// 実行されたステップ数
+    /// </summary>
+    public int ExecutedStepCount { get; } = executedStepCount;
+
+    /// <summary>
+    /// 指定されたステップの中間結果を取得します
+    /// </summary>
+    /// <param name="stepName">ステップ名</param>
+    /// <returns>中間結果、存在しない場合はnull</returns>
+    public IAdvancedImage? GetIntermediateResult(string stepName)
         {
             return _intermediateResults.TryGetValue(stepName, out var result) ? result : null;
         }
