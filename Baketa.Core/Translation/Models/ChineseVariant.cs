@@ -146,6 +146,6 @@ public static class ChineseVariantExtensions
     /// <returns>有効な場合はtrue</returns>
     public static bool IsValid(this ChineseVariant variant)
     {
-        return Enum.IsDefined(typeof(ChineseVariant), variant);
+        return Enum.IsDefined<ChineseVariant>(variant);
     }
 }

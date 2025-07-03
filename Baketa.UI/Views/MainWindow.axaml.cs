@@ -36,7 +36,7 @@ namespace Baketa.UI.Views;
             _logger = logger;
             
             // サービスロケータからイベント集約器を取得
-            _eventAggregator = Program.ServiceProvider?.GetService(typeof(IEventAggregator)) as IEventAggregator;
+            _eventAggregator = Program.ServiceProvider?.GetService<IEventAggregator>();
             
             InitializeComponent();
             

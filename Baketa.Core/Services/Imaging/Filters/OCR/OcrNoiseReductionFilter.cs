@@ -8,24 +8,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理のためのノイズ除去フィルター
-    /// </summary>
-    public class OcrNoiseReductionFilter : ImageFilterBase
+/// <summary>
+/// OCR処理のためのノイズ除去フィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrNoiseReductionFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrNoiseReductionFilter(ILogger<OcrNoiseReductionFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrNoiseReductionFilter> _logger;
+        private readonly ILogger<OcrNoiseReductionFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrNoiseReductionFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrNoiseReductionFilter(ILogger<OcrNoiseReductionFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCRノイズ除去";
+    /// <inheritdoc/>
+    public override string Name => "OCRノイズ除去";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理のためのテキスト認識精度を向上させるノイズ除去フィルター";

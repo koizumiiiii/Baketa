@@ -334,16 +334,16 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
     }
     
     /// <inheritdoc/>
-    public override async Task<bool> SupportsLanguagePairAsync(LanguagePair pair)
+    public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
     {
-        ArgumentNullException.ThrowIfNull(pair, nameof(pair));
+        ArgumentNullException.ThrowIfNull(languagePair, nameof(languagePair));
             
         var supportedPairs = await GetSupportedLanguagePairsAsync().ConfigureAwait(false);
         
         foreach (var supportedPair in supportedPairs)
         {
-            if (string.Equals(supportedPair.SourceLanguage.Code, pair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(supportedPair.TargetLanguage.Code, pair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(supportedPair.SourceLanguage.Code, languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(supportedPair.TargetLanguage.Code, languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -402,13 +402,8 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
             response.EnsureSuccessStatusCode();
             
             var apiResponseTemp = await response.Content.ReadFromJsonAsync<GeminiApiResponse>(
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-                
-            if (apiResponseTemp == null)
-            {
-                throw new TranslationException(TranslationErrorType.InvalidResponse, "APIから空の応答が返されました");
-            }
-            
+                cancellationToken: cancellationToken).ConfigureAwait(false) ?? throw new TranslationException(TranslationErrorType.InvalidResponse, "APIから空の応答が返されました");
+
             // 不変条件を満たす値を代入
             var apiResponse = apiResponseTemp;
                 
@@ -596,13 +591,7 @@ public partial class GeminiTranslationEngine : TranslationEngineBase, ICloudTran
             try
             {
                 GeminiApiResponse? apiResponseTemp = await response.Content.ReadFromJsonAsync<GeminiApiResponse>(
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
-                    
-                if (apiResponseTemp == null)
-                {
-                    throw new TranslationFormatException("APIから空の応答が返されました");
-                }
-                
+                    cancellationToken: cancellationToken).ConfigureAwait(false) ?? throw new TranslationFormatException("APIから空の応答が返されました");
                 apiResponse = apiResponseTemp;
                     
                 if (apiResponse.Candidates == null || apiResponse.Candidates.Count == 0)

@@ -123,7 +123,7 @@ internal sealed class BoolToBackgroundConverter : IValueConverter
         return new SolidColorBrush(Colors.Transparent);
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -184,7 +184,7 @@ internal sealed class CollectionCountConverter : IValueConverter
         return 0;
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -230,7 +230,7 @@ internal sealed class CollectionAverageConverter : IValueConverter
         return 0.0;
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }

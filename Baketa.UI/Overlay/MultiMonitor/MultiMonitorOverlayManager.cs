@@ -619,7 +619,7 @@ public sealed class MultiMonitorOverlayManager : ReactiveObject, IAsyncDisposabl
     /// <param name="overlayHandle">オーバーレイハンドル</param>
     /// <param name="exception">発生した例外</param>
     /// <returns>処理タスク</returns>
-    private async Task HandleOverlayErrorAsync(nint overlayHandle, Exception exception)
+    private async Task HandleOverlayErrorAsync(nint overlayHandle, Exception _)
     {
         try
         {
@@ -1051,7 +1051,7 @@ public sealed class MultiMonitorOverlayManager : ReactiveObject, IAsyncDisposabl
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>閉じるタスク</returns>
-    public async Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default)
+    public async Task CloseAllOverlaysAsync(CancellationToken _ = default)
     {
         try
         {

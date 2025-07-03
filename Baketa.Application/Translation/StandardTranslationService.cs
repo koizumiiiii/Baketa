@@ -11,44 +11,37 @@ using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Application.Translation;
 
-    /// <summary>
-    /// 標準翻訳サービス
-    /// 翻訳パイプラインを使用してITranslationServiceを実装します
-    /// </summary>
-    public class StandardTranslationService : ITranslationService
+/// <summary>
+/// 標準翻訳サービス
+/// 翻訳パイプラインを使用してITranslationServiceを実装します
+/// </summary>
+/// <remarks>
+/// 標準翻訳サービスのコンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+/// <param name="pipeline">翻訳パイプライン</param>
+/// <param name="engineDiscovery">翻訳エンジン検出サービス</param>
+public class StandardTranslationService(
+        ILogger<StandardTranslationService> logger,
+        ITranslationPipeline pipeline,
+        ITranslationEngineDiscovery engineDiscovery) : ITranslationService
     {
-        private readonly ILogger<StandardTranslationService> _logger;
-        private readonly ITranslationPipeline _pipeline;
-        private readonly ITranslationEngineDiscovery _engineDiscovery;
+        private readonly ILogger<StandardTranslationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly ITranslationPipeline _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
+        private readonly ITranslationEngineDiscovery _engineDiscovery = engineDiscovery ?? throw new ArgumentNullException(nameof(engineDiscovery));
 
-        /// <summary>
-        /// 標準翻訳サービスのコンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="pipeline">翻訳パイプライン</param>
-        /// <param name="engineDiscovery">翻訳エンジン検出サービス</param>
-        public StandardTranslationService(
-            ILogger<StandardTranslationService> logger,
-            ITranslationPipeline pipeline,
-            ITranslationEngineDiscovery engineDiscovery)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
-            _engineDiscovery = engineDiscovery ?? throw new ArgumentNullException(nameof(engineDiscovery));
-        }
-
-        /// <summary>
-        /// テキストを翻訳します
-        /// </summary>
-        /// <param name="sourceText">翻訳元テキスト</param>
-        /// <param name="sourceLanguage">元言語</param>
-        /// <param name="targetLanguage">対象言語</param>
-        /// <param name="context">翻訳コンテキスト（オプション）</param>
-        /// <param name="preferredEngine">優先エンジン名（オプション）</param>
-        /// <param name="options">翻訳オプション（オプション）</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>翻訳レスポンス</returns>
-        public async Task<TranslationResponse> TranslateAsync(
+    /// <summary>
+    /// テキストを翻訳します
+    /// </summary>
+    /// <param name="sourceText">翻訳元テキスト</param>
+    /// <param name="sourceLanguage">元言語</param>
+    /// <param name="targetLanguage">対象言語</param>
+    /// <param name="context">翻訳コンテキスト（オプション）</param>
+    /// <param name="preferredEngine">優先エンジン名（オプション）</param>
+    /// <param name="options">翻訳オプション（オプション）</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>翻訳レスポンス</returns>
+    public async Task<TranslationResponse> TranslateAsync(
             string sourceText,
             Language sourceLanguage,
             Language targetLanguage,

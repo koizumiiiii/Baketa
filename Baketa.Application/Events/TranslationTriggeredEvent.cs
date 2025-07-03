@@ -7,28 +7,22 @@ namespace Baketa.Application.Events;
 /// <summary>
 /// 翻訳実行トリガーイベント
 /// </summary>
-public sealed class TranslationTriggeredEvent : EventBase
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="mode">翻訳モード</param>
+/// <param name="triggeredAt">トリガーされた時刻</param>
+public sealed class TranslationTriggeredEvent(TranslationMode mode, DateTime triggeredAt) : EventBase
 {
     /// <summary>
     /// 翻訳モード
     /// </summary>
-    public TranslationMode Mode { get; }
+    public TranslationMode Mode { get; } = mode;
 
     /// <summary>
     /// トリガーされた時刻
     /// </summary>
-    public DateTime TriggeredAt { get; }
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="mode">翻訳モード</param>
-    /// <param name="triggeredAt">トリガーされた時刻</param>
-    public TranslationTriggeredEvent(TranslationMode mode, DateTime triggeredAt)
-    {
-        Mode = mode;
-        TriggeredAt = triggeredAt;
-    }
+    public DateTime TriggeredAt { get; } = triggeredAt;
 
     /// <summary>
     /// コンストラクタ - TriggeredAtを現在時刻で初期化

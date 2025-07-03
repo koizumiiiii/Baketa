@@ -6,41 +6,33 @@ using Baketa.Core.Extensions;
 
 namespace Baketa.Core.Services.Imaging;
 
-    /// <summary>
-    /// IImageの基本実装
-    /// </summary>
-    public class CoreImage : DisposableBase, IImage
+/// <summary>
+/// IImageの基本実装
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="pixelData">ピクセルデータ</param>
+/// <param name="width">幅</param>
+/// <param name="height">高さ</param>
+/// <param name="format">画像フォーマット</param>
+public class CoreImage(byte[] pixelData, int width, int height, ImageFormat format) : DisposableBase, IImage
     {
-        private byte[] _pixelData;
-        
-        /// <inheritdoc/>
-        public int Width { get; }
-        
-        /// <inheritdoc/>
-        public int Height { get; }
-        
-        /// <summary>
-        /// 画像フォーマット
-        /// </summary>
-        public ImageFormat Format { get; }
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="pixelData">ピクセルデータ</param>
-        /// <param name="width">幅</param>
-        /// <param name="height">高さ</param>
-        /// <param name="format">画像フォーマット</param>
-        public CoreImage(byte[] pixelData, int width, int height, ImageFormat format)
-        {
-            _pixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
-            Width = width;
-            Height = height;
-            Format = format;
-        }
-        
-        /// <inheritdoc/>
-        public Task<byte[]> ToByteArrayAsync()
+        private byte[] _pixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
+
+    /// <inheritdoc/>
+    public int Width { get; } = width;
+
+    /// <inheritdoc/>
+    public int Height { get; } = height;
+
+    /// <summary>
+    /// 画像フォーマット
+    /// </summary>
+    public ImageFormat Format { get; } = format;
+
+    /// <inheritdoc/>
+    public Task<byte[]> ToByteArrayAsync()
         {
             ThrowIfDisposed();
             return Task.FromResult<byte[]>([.. _pixelData]);

@@ -134,8 +134,9 @@ public sealed class SettingsMigrationManager : ISettingsMigrationManager
                 
                 if (!migration.CanMigrate(workingSettings))
                 {
+                    const string errorTemplate = "マイグレーション {FromVersion}→{ToVersion} を実行できません";
                     var errorMsg = $"マイグレーション {migration.FromVersion}→{migration.ToVersion} を実行できません";
-                    _logger.LogError(errorMsg);
+                    _logger.LogError(errorTemplate, migration.FromVersion, migration.ToVersion);
                     return new MigrationPlanResult(
                         false, workingSettings, fromVersion, toVersion ?? LatestSchemaVersion, 
                         stepResults, errorMsg, warnings, stopwatch.ElapsedMilliseconds);
@@ -200,8 +201,9 @@ public sealed class SettingsMigrationManager : ISettingsMigrationManager
                 
                 if (!migration.CanMigrate(workingSettings))
                 {
+                    const string errorTemplate = "マイグレーション {FromVersion}→{ToVersion} を実行できません";
                     var errorMsg = $"マイグレーション {migration.FromVersion}→{migration.ToVersion} を実行できません";
-                    _logger.LogError(errorMsg);
+                    _logger.LogError(errorTemplate, migration.FromVersion, migration.ToVersion);
                     return new MigrationPlanResult(
                         false, workingSettings, fromVersion, toVersion ?? LatestSchemaVersion, 
                         stepResults, errorMsg, warnings, stopwatch.ElapsedMilliseconds);

@@ -11,9 +11,13 @@ namespace Baketa.Core.Settings.Migration;
 /// UX改善によりホットキー機能が完全に削除されたため、
 /// 既存設定からホットキー関連項目を削除し、新しいMainUI設定を追加
 /// </summary>
-public sealed class V0ToV1Migration : ISettingsMigration
+/// <remarks>
+/// V0ToV1Migrationを初期化します
+/// </remarks>
+/// <param name="logger">ロガー（任意）</param>
+public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : ISettingsMigration
 {
-    private readonly ILogger<V0ToV1Migration>? _logger;
+    private readonly ILogger<V0ToV1Migration>? _logger = logger;
 
     /// <inheritdoc />
     public int FromVersion => 0;
@@ -23,15 +27,6 @@ public sealed class V0ToV1Migration : ISettingsMigration
 
     /// <inheritdoc />
     public string Description => "ホットキー機能削除とMainUI設定追加（UX改善対応）";
-
-    /// <summary>
-    /// V0ToV1Migrationを初期化します
-    /// </summary>
-    /// <param name="logger">ロガー（任意）</param>
-    public V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// マイグレーションが適用可能かどうかをチェックします（CanMigrateのエイリアス）
@@ -202,6 +197,7 @@ public sealed class V0ToV1Migration : ISettingsMigration
     {
         // AppSettings内のHotkey系プロパティを削除
         var keysToProcess = settings.Keys.ToList();
+        var totalRemovedCount = 0;
         
         foreach (var key in keysToProcess)
         {
@@ -220,8 +216,22 @@ public sealed class V0ToV1Migration : ISettingsMigration
                     nestedDict.Remove(nestedKey);
                     changes.Add(new MigrationSettingChange(fullKey, oldValue, null, "ネストされたホットキー設定の削除"));
                     deletedSettings.Add(fullKey);
+                    totalRemovedCount++;
+                }
+                
+                // 空のネストオブジェクトになった場合の警告
+                if (nestedDict.Count == 0 && nestedKeysToRemove.Count > 0)
+                {
+                    warnings.Add($"設定グループ '{key}' が空になりました。ホットキー設定削除によるものです。");
                 }
             }
+        }
+        
+        // ネストした設定の削除に関する総合警告
+        if (totalRemovedCount > 0)
+        {
+            warnings.Add($"ネストされたホットキー設定 {totalRemovedCount} 項目が削除されました。");
+            _logger?.LogDebug("ネストされたホットキー設定を {Count} 項目削除しました", totalRemovedCount);
         }
 
         await Task.CompletedTask.ConfigureAwait(false);

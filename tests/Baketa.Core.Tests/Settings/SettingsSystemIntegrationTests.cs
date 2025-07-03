@@ -201,7 +201,7 @@ public class SettingsSystemIntegrationTests : IDisposable
                 // レベル設定の一貫性を確認
                 foreach (var meta in metadata)
                 {
-                    Assert.True(Enum.IsDefined(typeof(SettingLevel), meta.Level),
+                    Assert.True(Enum.IsDefined<SettingLevel>(meta.Level),
                         $"Setting {meta.Property.Name} has invalid level");
                 }
             }

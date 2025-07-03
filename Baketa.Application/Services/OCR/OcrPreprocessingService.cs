@@ -15,52 +15,42 @@ using Baketa.Infrastructure.Imaging.Extensions;
 
 namespace Baketa.Application.Services.OCR;
 
-    /// <summary>
-    /// OCR前処理サービス
-    /// </summary>
-    public class OcrPreprocessingService : IOcrPreprocessingService
+/// <summary>
+/// OCR前処理サービス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="pipelineBuilder">パイプラインビルダー</param>
+/// <param name="filterFactory">フィルターファクトリー</param>
+/// <param name="regionAggregator">テキスト領域集約器</param>
+/// <param name="detectorFactory">テキスト検出器ファクトリー</param>
+/// <param name="logger">ロガー</param>
+public class OcrPreprocessingService(
+        IImagePipelineBuilder pipelineBuilder,
+        IFilterFactory filterFactory,
+        ITextRegionAggregator regionAggregator,
+        Func<string, ITextRegionDetector> detectorFactory,
+        ILogger<OcrPreprocessingService> logger,
+        IServiceProvider serviceProvider) : IOcrPreprocessingService
     {
-        private readonly IImagePipelineBuilder _pipelineBuilder;
-        private readonly IFilterFactory _filterFactory;
-        private readonly ITextRegionAggregator _regionAggregator;
-        private readonly Func<string, ITextRegionDetector> _detectorFactory;
-        private readonly ILogger<OcrPreprocessingService> _logger;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IImagePipelineBuilder _pipelineBuilder = pipelineBuilder ?? throw new ArgumentNullException(nameof(pipelineBuilder));
+        private readonly IFilterFactory _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
+        private readonly ITextRegionAggregator _regionAggregator = regionAggregator ?? throw new ArgumentNullException(nameof(regionAggregator));
+        private readonly Func<string, ITextRegionDetector> _detectorFactory = detectorFactory ?? throw new ArgumentNullException(nameof(detectorFactory));
+        private readonly ILogger<OcrPreprocessingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         
         private readonly Dictionary<string, IImagePipeline> _pipelineCache = [];
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="pipelineBuilder">パイプラインビルダー</param>
-        /// <param name="filterFactory">フィルターファクトリー</param>
-        /// <param name="regionAggregator">テキスト領域集約器</param>
-        /// <param name="detectorFactory">テキスト検出器ファクトリー</param>
-        /// <param name="logger">ロガー</param>
-        public OcrPreprocessingService(
-            IImagePipelineBuilder pipelineBuilder,
-            IFilterFactory filterFactory,
-            ITextRegionAggregator regionAggregator,
-            Func<string, ITextRegionDetector> detectorFactory,
-            ILogger<OcrPreprocessingService> logger,
-            IServiceProvider serviceProvider)
-        {
-            _pipelineBuilder = pipelineBuilder ?? throw new ArgumentNullException(nameof(pipelineBuilder));
-            _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
-            _regionAggregator = regionAggregator ?? throw new ArgumentNullException(nameof(regionAggregator));
-            _detectorFactory = detectorFactory ?? throw new ArgumentNullException(nameof(detectorFactory));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        }
-        
-        /// <summary>
-        /// 画像を処理し、OCRのためのテキスト領域を検出します
-        /// </summary>
-        /// <param name="image">入力画像</param>
-        /// <param name="profileName">使用するプロファイル名（null=デフォルト）</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>前処理結果（検出されたテキスト領域を含む）</returns>
-        public async Task<OcrPreprocessingResult> ProcessImageAsync(
+
+    /// <summary>
+    /// 画像を処理し、OCRのためのテキスト領域を検出します
+    /// </summary>
+    /// <param name="image">入力画像</param>
+    /// <param name="profileName">使用するプロファイル名（null=デフォルト）</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>前処理結果（検出されたテキスト領域を含む）</returns>
+    public async Task<OcrPreprocessingResult> ProcessImageAsync(
             IAdvancedImage image, 
             string? profileName = null, 
             CancellationToken cancellationToken = default)
@@ -402,48 +392,40 @@ if (metadataObj is IReadOnlyList<OCRTextRegion> regions)
             IEnumerable<string> detectorTypes,
             CancellationToken cancellationToken = default);
     }
-    
+
+/// <summary>
+/// OCR前処理結果
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="isCancelled">処理がキャンセルされたかどうか</param>
+/// <param name="error">エラーが発生した場合の例外</param>
+/// <param name="processedImage">前処理後の画像</param>
+/// <param name="detectedRegions">検出されたテキスト領域</param>
+public class OcrPreprocessingResult(
+        bool isCancelled,
+        Exception? error,
+        IAdvancedImage processedImage,
+        IReadOnlyList<OCRTextRegion> detectedRegions)
+{
     /// <summary>
-    /// OCR前処理結果
+    /// 処理がキャンセルされたかどうか
     /// </summary>
-    public class OcrPreprocessingResult
-    {
-        /// <summary>
-        /// 処理がキャンセルされたかどうか
-        /// </summary>
-        public bool IsCancelled { get; }
-        
-        /// <summary>
-        /// エラーが発生した場合の例外
-        /// </summary>
-        public Exception? Error { get; }
-        
-        /// <summary>
-        /// 前処理後の画像
-        /// </summary>
-        public IAdvancedImage ProcessedImage { get; }
-        
-        /// <summary>
-        /// 検出されたテキスト領域
-        /// </summary>
-        public IReadOnlyList<OCRTextRegion> DetectedRegions { get; }
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="isCancelled">処理がキャンセルされたかどうか</param>
-        /// <param name="error">エラーが発生した場合の例外</param>
-        /// <param name="processedImage">前処理後の画像</param>
-        /// <param name="detectedRegions">検出されたテキスト領域</param>
-        public OcrPreprocessingResult(
-            bool isCancelled,
-            Exception? error,
-            IAdvancedImage processedImage,
-            IReadOnlyList<OCRTextRegion> detectedRegions)
-        {
-            IsCancelled = isCancelled;
-            Error = error;
-            ProcessedImage = processedImage ?? throw new ArgumentNullException(nameof(processedImage));
-            DetectedRegions = detectedRegions ?? Array.Empty<OCRTextRegion>();
-        }
-    }
+    public bool IsCancelled { get; } = isCancelled;
+
+    /// <summary>
+    /// エラーが発生した場合の例外
+    /// </summary>
+    public Exception? Error { get; } = error;
+
+    /// <summary>
+    /// 前処理後の画像
+    /// </summary>
+    public IAdvancedImage ProcessedImage { get; } = processedImage ?? throw new ArgumentNullException(nameof(processedImage));
+
+    /// <summary>
+    /// 検出されたテキスト領域
+    /// </summary>
+    public IReadOnlyList<OCRTextRegion> DetectedRegions { get; } = detectedRegions ?? Array.Empty<OCRTextRegion>();
+}

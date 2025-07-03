@@ -230,10 +230,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task SaveAsync<T>(T _) where T : class, new()
+    public async Task SaveAsync<T>(T settings) where T : class, new()
     {
-        ArgumentNullException.ThrowIfNull(_);
-        await SetCategorySettingsAsync(_).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(settings);
+        await SetCategorySettingsAsync(settings).ConfigureAwait(false);
     }
 
     #endregion
@@ -434,21 +434,21 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task CreateBackupAsync(string? _ = null)
+    public Task CreateBackupAsync(string? backupFilePath = null)
     {
-        _ ??= GenerateBackupFilePath();
+        backupFilePath ??= GenerateBackupFilePath();
         
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_)!);
-            File.Copy(_settingsFilePath, _, true);
+            Directory.CreateDirectory(Path.GetDirectoryName(backupFilePath)!);
+            File.Copy(_settingsFilePath, backupFilePath, true);
             
-            _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", _);
+            _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", backupFilePath);
             return Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "設定のバックアップ作成に失敗しました: {BackupPath}", _);
+            _logger.LogError(ex, "設定のバックアップ作成に失敗しました: {BackupPath}", backupFilePath);
             throw;
         }
     }
@@ -594,20 +594,20 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         }
     }
 
-    private bool TryGetSettingValue(string key, out object? value)
+    private bool TryGetSettingValue(string _, out object? value)
     {
         // TODO: 実際の設定値取得ロジックを実装
         value = null;
         return false;
     }
 
-    private bool SetSettingValue(string key, object? value)
+    private bool SetSettingValue(string _, object? _1)
     {
         // TODO: 実際の設定値設定ロジックを実装
         return true;
     }
 
-    private bool RemoveSettingValue(string key)
+    private bool RemoveSettingValue(string _)
     {
         // TODO: 実際の設定値削除ロジックを実装
         return true;
@@ -660,7 +660,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         }
     }
 
-    private string GetCategoryFromKey(string key)
+    private string GetCategoryFromKey(string _)
     {
         // TODO: キーからカテゴリを推測するロジックを実装
         return "General";

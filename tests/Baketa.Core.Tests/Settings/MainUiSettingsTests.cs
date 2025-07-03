@@ -55,10 +55,11 @@ public class MainUiSettingsTests
     public void PanelOpacity_SetValidValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.PanelOpacity = 0.5;
+        var settings = new MainUiSettings
+        {
+            // Act
+            PanelOpacity = 0.5
+        };
 
         // Assert
         Assert.Equal(0.5, settings.PanelOpacity);
@@ -71,10 +72,11 @@ public class MainUiSettingsTests
     public void PanelOpacity_SetValidRange_ShouldUpdateProperty(double opacity)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.PanelOpacity = opacity;
+        var settings = new MainUiSettings
+        {
+            // Act
+            PanelOpacity = opacity
+        };
 
         // Assert
         Assert.Equal(opacity, settings.PanelOpacity);
@@ -86,10 +88,11 @@ public class MainUiSettingsTests
     public void PanelOpacity_SetBelowMinimum_ShouldClampToMinimum(double opacity)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.PanelOpacity = opacity;
+        var settings = new MainUiSettings
+        {
+            // Act
+            PanelOpacity = opacity
+        };
 
         // Assert
         Assert.Equal(0.1, settings.PanelOpacity); // 最小値にクランプ
@@ -99,10 +102,11 @@ public class MainUiSettingsTests
     public void AutoHideWhenIdle_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.AutoHideWhenIdle = false;
+        var settings = new MainUiSettings
+        {
+            // Act
+            AutoHideWhenIdle = false
+        };
 
         // Assert
         Assert.False(settings.AutoHideWhenIdle);
@@ -116,10 +120,11 @@ public class MainUiSettingsTests
     public void AutoHideDelaySeconds_SetValidValue_ShouldUpdateProperty(int delay)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.AutoHideDelaySeconds = delay;
+        var settings = new MainUiSettings
+        {
+            // Act
+            AutoHideDelaySeconds = delay
+        };
 
         // Assert
         Assert.Equal(delay, settings.AutoHideDelaySeconds);
@@ -131,10 +136,11 @@ public class MainUiSettingsTests
     public void AutoHideDelaySeconds_SetBelowMinimum_ShouldClampToMinimum(int delay)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.AutoHideDelaySeconds = delay;
+        var settings = new MainUiSettings
+        {
+            // Act
+            AutoHideDelaySeconds = delay
+        };
 
         // Assert
         Assert.Equal(3, settings.AutoHideDelaySeconds); // 最小値にクランプ
@@ -144,10 +150,11 @@ public class MainUiSettingsTests
     public void HighlightOnHover_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.HighlightOnHover = false;
+        var settings = new MainUiSettings
+        {
+            // Act
+            HighlightOnHover = false
+        };
 
         // Assert
         Assert.False(settings.HighlightOnHover);
@@ -160,10 +167,11 @@ public class MainUiSettingsTests
     public void PanelSize_SetValidValue_ShouldUpdateProperty(UiSize size)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.PanelSize = size;
+        var settings = new MainUiSettings
+        {
+            // Act
+            PanelSize = size
+        };
 
         // Assert
         Assert.Equal(size, settings.PanelSize);
@@ -191,10 +199,11 @@ public class MainUiSettingsTests
     public void SingleShotDisplayTime_SetValidValue_ShouldUpdateProperty(int displayTime)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.SingleShotDisplayTime = displayTime;
+        var settings = new MainUiSettings
+        {
+            // Act
+            SingleShotDisplayTime = displayTime
+        };
 
         // Assert
         Assert.Equal(displayTime, settings.SingleShotDisplayTime);
@@ -204,7 +213,7 @@ public class MainUiSettingsTests
     public void EnableDragging_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        MainUiSettings settings = new MainUiSettings
+        MainUiSettings settings = new()
         {
             // Act
             EnableDragging = false
@@ -218,10 +227,11 @@ public class MainUiSettingsTests
     public void EnableBoundarySnap_SetValue_ShouldUpdateProperty()
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.EnableBoundarySnap = false;
+        var settings = new MainUiSettings
+        {
+            // Act
+            EnableBoundarySnap = false
+        };
 
         // Assert
         Assert.False(settings.EnableBoundarySnap);
@@ -235,10 +245,11 @@ public class MainUiSettingsTests
     public void BoundarySnapDistance_SetValidValue_ShouldUpdateProperty(int distance)
     {
         // Arrange
-        var settings = new MainUiSettings();
-
-        // Act
-        settings.BoundarySnapDistance = distance;
+        var settings = new MainUiSettings
+        {
+            // Act
+            BoundarySnapDistance = distance
+        };
 
         // Assert
         Assert.Equal(distance, settings.BoundarySnapDistance);
@@ -425,9 +436,9 @@ public class UiSizeTests
     public void UiSize_ShouldHaveExpectedValues()
     {
         // Assert
-        Assert.True(Enum.IsDefined(typeof(UiSize), UiSize.Small));
-        Assert.True(Enum.IsDefined(typeof(UiSize), UiSize.Medium));
-        Assert.True(Enum.IsDefined(typeof(UiSize), UiSize.Large));
+        Assert.True(Enum.IsDefined<UiSize>(UiSize.Small));
+        Assert.True(Enum.IsDefined<UiSize>(UiSize.Medium));
+        Assert.True(Enum.IsDefined<UiSize>(UiSize.Large));
     }
 
     [Fact]

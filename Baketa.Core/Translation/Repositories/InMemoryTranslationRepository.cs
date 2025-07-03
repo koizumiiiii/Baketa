@@ -10,30 +10,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.Repositories;
 
-    /// <summary>
-    /// インメモリ翻訳リポジトリ
-    /// </summary>
-    public class InMemoryTranslationRepository : ITranslationRepository
+/// <summary>
+/// インメモリ翻訳リポジトリ
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class InMemoryTranslationRepository(ILogger<InMemoryTranslationRepository> logger) : ITranslationRepository
     {
         private readonly Dictionary<Guid, TranslationRecord> _records = [];
-        private readonly ILogger<InMemoryTranslationRepository> _logger;
+        private readonly ILogger<InMemoryTranslationRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public InMemoryTranslationRepository(ILogger<InMemoryTranslationRepository> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <summary>
-        /// 翻訳レコードを保存します
-        /// </summary>
-        /// <param name="record">翻訳レコード</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>完了タスク</returns>
-        public Task SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 翻訳レコードを保存します
+    /// </summary>
+    /// <param name="record">翻訳レコード</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>完了タスク</returns>
+    public Task SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default)
         {
             return SaveRecordWithStrategyAsync(record, MergeStrategy.Overwrite, cancellationToken);
         }
@@ -48,6 +43,9 @@ namespace Baketa.Core.Translation.Repositories;
         public Task SaveRecordWithStrategyAsync(TranslationRecord record, MergeStrategy strategy, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(record);
+            
+            // キャンセルトークンのチェック
+            cancellationToken.ThrowIfCancellationRequested();
             
             try
             {

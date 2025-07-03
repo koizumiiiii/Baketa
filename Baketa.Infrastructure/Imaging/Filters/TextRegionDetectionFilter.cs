@@ -11,12 +11,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
-    /// <summary>
-    /// テキスト領域検出フィルター
-    /// </summary>
-    public class TextRegionDetectionFilter : BaseImageFilter
+/// <summary>
+/// テキスト領域検出フィルター
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="detector">テキスト領域検出器</param>
+/// <param name="logger">ロガー</param>
+public class TextRegionDetectionFilter(
+        ITextRegionDetector detector,
+        ILogger<TextRegionDetectionFilter>? logger = null) : BaseImageFilter(logger)
     {
-        private readonly ITextRegionDetector _detector;
+        private readonly ITextRegionDetector _detector = detector ?? throw new ArgumentNullException(nameof(detector));
         
         /// <summary>
         /// フィルターの名前
@@ -32,24 +39,11 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// フィルターのカテゴリ
         /// </summary>
         public override FilterCategory Category => FilterCategory.Effect;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="detector">テキスト領域検出器</param>
-        /// <param name="logger">ロガー</param>
-        public TextRegionDetectionFilter(
-            ITextRegionDetector detector,
-            ILogger<TextRegionDetectionFilter>? logger = null)
-            : base(logger)
-        {
-            _detector = detector ?? throw new ArgumentNullException(nameof(detector));
-        }
-        
-        /// <summary>
-        /// デフォルトパラメータを初期化します
-        /// </summary>
-        protected override void InitializeDefaultParameters()
+
+    /// <summary>
+    /// デフォルトパラメータを初期化します
+    /// </summary>
+    protected override void InitializeDefaultParameters()
         {
             base.InitializeDefaultParameters();
             
@@ -100,9 +94,9 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// </summary>
         /// <param name="image">入力画像</param>
         /// <returns>処理結果画像</returns>
-        public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage image)
+        public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
-            ArgumentNullException.ThrowIfNull(image);
+            ArgumentNullException.ThrowIfNull(inputImage);
                 
             Log(LogLevel.Debug, "テキスト領域検出フィルターを適用中...");
             
@@ -115,7 +109,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
                 int maxRegions = GetParameter<int>("MaxRegions");
                 
                 // テキスト領域検出を実行
-                var regions = await _detector.DetectRegionsAsync(image).ConfigureAwait(false);
+                var regions = await _detector.DetectRegionsAsync(inputImage).ConfigureAwait(false);
                 
                 // 結果のフィルタリング
                 var filteredRegions = FilterRegions(regions, minConfidence, maxRegions);
@@ -130,7 +124,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
                 }
                 
                 // 結果画像を作成
-                var resultImage = image.Clone() as IAdvancedImage
+                var resultImage = inputImage.Clone() as IAdvancedImage
                     ?? throw new InvalidOperationException("画像のクローンに失敗しました");
                 
                 // メタデータに検出結果を保存

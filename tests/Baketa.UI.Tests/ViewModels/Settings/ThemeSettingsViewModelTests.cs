@@ -135,8 +135,10 @@ public class ThemeSettingsViewModelTests
     public void AccentColorHex_ReturnsCorrectFormat(uint accentColor, string expectedHex)
     {
         // Arrange
-        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.AccentColor = accentColor;
+        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            AccentColor = accentColor
+        };
 
         // Act
         var hex = viewModel.AccentColorHex;
@@ -154,8 +156,10 @@ public class ThemeSettingsViewModelTests
     public void ScaleFactorPercentage_ReturnsCorrectFormat(double factor, string expected)
     {
         // Arrange
-        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.CustomScaleFactor = factor;
+        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            CustomScaleFactor = factor
+        };
 
         // Act
         var percentage = viewModel.ScaleFactorPercentage;
@@ -353,12 +357,13 @@ public class ThemeSettingsViewModelTests
     public void CurrentSettings_ReturnsCurrentValues()
     {
         // Arrange
-        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        // 一部の値を変更
-        viewModel.AppTheme = UiTheme.Dark;
-        viewModel.BaseFontSize = 16;
-        viewModel.EnableAnimations = false;
+        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // 一部の値を変更
+            AppTheme = UiTheme.Dark,
+            BaseFontSize = 16,
+            EnableAnimations = false
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;
@@ -432,10 +437,11 @@ public class ThemeSettingsViewModelTests
     public void CustomScaleFactor_ValidRanges_AcceptsValue(double scaleFactor)
     {
         // Arrange
-        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.CustomScaleFactor = scaleFactor;
+        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            CustomScaleFactor = scaleFactor
+        };
 
         // Assert
         viewModel.CustomScaleFactor.Should().Be(scaleFactor);
@@ -448,10 +454,11 @@ public class ThemeSettingsViewModelTests
     public void CustomCssFilePath_ValidPaths_AcceptsValue(string cssPath)
     {
         // Arrange
-        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.CustomCssFilePath = cssPath;
+        var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            CustomCssFilePath = cssPath
+        };
 
         // Assert
         viewModel.CustomCssFilePath.Should().Be(cssPath);

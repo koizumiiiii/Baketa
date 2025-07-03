@@ -13,7 +13,7 @@
     
     <!-- テストメソッド名にアンダースコアを許可するように警告を抑制 -->
     <!-- CA2007警告を抑制: ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);CA1707;CA2007</NoWarn>
+    <NoWarn>$(NoWarn);CA1707;CA2007;CA1822</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

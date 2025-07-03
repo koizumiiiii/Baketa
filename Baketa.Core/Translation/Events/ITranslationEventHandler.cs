@@ -17,28 +17,23 @@ namespace Baketa.Core.Translation.Events;
         /// <returns>完了タスク</returns>
         Task HandleAsync(TEvent eventData);
     }
-    
-    /// <summary>
-    /// イベントハンドラーをイベントプロセッサーに変換するアダプター
-    /// </summary>
-    /// <typeparam name="TEvent">イベントの型</typeparam>
-    public class EventHandlerAdapter<TEvent> : IEventProcessor<TEvent> where TEvent : IEvent
+
+/// <summary>
+/// イベントハンドラーをイベントプロセッサーに変換するアダプター
+/// </summary>
+/// <typeparam name="TEvent">イベントの型</typeparam>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="handler">イベントハンドラー</param>
+public class EventHandlerAdapter<TEvent>(ITranslationEventHandler<TEvent> handler) : IEventProcessor<TEvent> where TEvent : IEvent
     {
-        private readonly ITranslationEventHandler<TEvent> _handler;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="handler">イベントハンドラー</param>
-        public EventHandlerAdapter(ITranslationEventHandler<TEvent> handler)
-        {
-            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
-        }
-        
-        /// <summary>
-        /// 優先度
-        /// </summary>
-        public int Priority => 0;
+        private readonly ITranslationEventHandler<TEvent> _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+
+    /// <summary>
+    /// 優先度
+    /// </summary>
+    public int Priority => 0;
         
         /// <summary>
         /// 同期実行

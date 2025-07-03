@@ -11,34 +11,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Pipeline;
 
-    /// <summary>
-    /// OCR最適化パイプラインを構築するビルダークラス
-    /// </summary>
+/// <summary>
+/// OCR最適化パイプラインを構築するビルダークラス
+/// </summary>
+/// <remarks>
+/// 新しいOcrPipelineBuilderを作成します
+/// </remarks>
+/// <param name="pipeline">パイプラインインスタンス</param>
+/// <param name="filterFactory">OCRフィルターファクトリー</param>
+/// <param name="logger">ロガー</param>
 #pragma warning disable CA1062 // パラメータの引数チェックはメソッド内で行っているため
-    public class OcrPipelineBuilder : IOcrPipelineBuilder
+public class OcrPipelineBuilder(
+        IImagePipeline pipeline,
+        IOcrFilterFactory filterFactory,
+        ILogger<OcrPipelineBuilder> logger) : IOcrPipelineBuilder
     {
-        private readonly IImagePipeline _pipeline;
-        private readonly IOcrFilterFactory _filterFactory;
-        private readonly ILogger<OcrPipelineBuilder> _logger;
+        private readonly IImagePipeline _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
+        private readonly IOcrFilterFactory _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
+        private readonly ILogger<OcrPipelineBuilder> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrPipelineBuilderを作成します
-        /// </summary>
-        /// <param name="pipeline">パイプラインインスタンス</param>
-        /// <param name="filterFactory">OCRフィルターファクトリー</param>
-        /// <param name="logger">ロガー</param>
-        public OcrPipelineBuilder(
-            IImagePipeline pipeline,
-            IOcrFilterFactory filterFactory,
-            ILogger<OcrPipelineBuilder> logger)
-        {
-            _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
-            _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public IImagePipeline BuildStandardPipeline()
+    /// <inheritdoc/>
+    public IImagePipeline BuildStandardPipeline()
         {
             _logger.LogInformation("標準OCRパイプラインを構築しています");
             

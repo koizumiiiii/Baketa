@@ -5,119 +5,99 @@ namespace Baketa.Core.Settings;
 /// <summary>
 /// 設定変更イベント引数
 /// </summary>
-public sealed class SettingChangedEventArgs : EventArgs
+/// <remarks>
+/// SettingChangedEventArgsを初期化します
+/// </remarks>
+/// <param name="settingKey">設定キー</param>
+/// <param name="oldValue">変更前の値</param>
+/// <param name="newValue">変更後の値</param>
+/// <param name="category">設定カテゴリ</param>
+/// <param name="changeType">変更の種類</param>
+/// <param name="comment">変更理由・コメント</param>
+public sealed class SettingChangedEventArgs(
+    string settingKey,
+    object? oldValue,
+    object? newValue,
+    string category,
+    SettingChangeType changeType,
+    string? comment = null) : EventArgs
 {
     /// <summary>
     /// 変更された設定のキー
     /// </summary>
-    public string SettingKey { get; }
-    
+    public string SettingKey { get; } = settingKey ?? throw new ArgumentNullException(nameof(settingKey));
+
     /// <summary>
     /// 変更前の値
     /// </summary>
-    public object? OldValue { get; }
-    
+    public object? OldValue { get; } = oldValue;
+
     /// <summary>
     /// 変更後の値
     /// </summary>
-    public object? NewValue { get; }
-    
+    public object? NewValue { get; } = newValue;
+
     /// <summary>
     /// 設定カテゴリ
     /// </summary>
-    public string Category { get; }
-    
+    public string Category { get; } = category ?? throw new ArgumentNullException(nameof(category));
+
     /// <summary>
     /// 変更の種類
     /// </summary>
-    public SettingChangeType ChangeType { get; }
-    
+    public SettingChangeType ChangeType { get; } = changeType;
+
     /// <summary>
     /// 変更日時
     /// </summary>
-    public DateTime Timestamp { get; }
-    
+    public DateTime Timestamp { get; } = DateTime.Now;
+
     /// <summary>
     /// 変更理由・コメント
     /// </summary>
-    public string? Comment { get; }
-
-    /// <summary>
-    /// SettingChangedEventArgsを初期化します
-    /// </summary>
-    /// <param name="settingKey">設定キー</param>
-    /// <param name="oldValue">変更前の値</param>
-    /// <param name="newValue">変更後の値</param>
-    /// <param name="category">設定カテゴリ</param>
-    /// <param name="changeType">変更の種類</param>
-    /// <param name="comment">変更理由・コメント</param>
-    public SettingChangedEventArgs(
-        string settingKey, 
-        object? oldValue, 
-        object? newValue, 
-        string category, 
-        SettingChangeType changeType,
-        string? comment = null)
-    {
-        SettingKey = settingKey ?? throw new ArgumentNullException(nameof(settingKey));
-        OldValue = oldValue;
-        NewValue = newValue;
-        Category = category ?? throw new ArgumentNullException(nameof(category));
-        ChangeType = changeType;
-        Comment = comment;
-        Timestamp = DateTime.Now;
-    }
+    public string? Comment { get; } = comment;
 }
 
 /// <summary>
 /// ゲームプロファイル変更イベント引数
 /// </summary>
-public sealed class GameProfileChangedEventArgs : EventArgs
+/// <remarks>
+/// GameProfileChangedEventArgsを初期化します
+/// </remarks>
+/// <param name="profileId">プロファイルID</param>
+/// <param name="profile">変更されたプロファイル</param>
+/// <param name="changeType">変更の種類</param>
+/// <param name="comment">変更理由・コメント</param>
+public sealed class GameProfileChangedEventArgs(
+    string profileId,
+    GameProfileSettings? profile,
+    ProfileChangeType changeType,
+    string? comment = null) : EventArgs
 {
     /// <summary>
     /// プロファイルID
     /// </summary>
-    public string ProfileId { get; }
-    
+    public string ProfileId { get; } = profileId ?? throw new ArgumentNullException(nameof(profileId));
+
     /// <summary>
     /// 変更されたプロファイル
     /// </summary>
-    public GameProfileSettings? Profile { get; }
-    
+    public GameProfileSettings? Profile { get; } = profile;
+
     /// <summary>
     /// 変更の種類
     /// </summary>
-    public ProfileChangeType ChangeType { get; }
-    
+    public ProfileChangeType ChangeType { get; } = changeType;
+
     /// <summary>
     /// 変更日時
     /// </summary>
-    public DateTime Timestamp { get; }
-    
+    public DateTime Timestamp { get; } = DateTime.Now;
+
     /// <summary>
     /// 変更理由・コメント
     /// </summary>
-    public string? Comment { get; }
-
-    /// <summary>
-    /// GameProfileChangedEventArgsを初期化します
-    /// </summary>
-    /// <param name="profileId">プロファイルID</param>
-    /// <param name="profile">変更されたプロファイル</param>
-    /// <param name="changeType">変更の種類</param>
-    /// <param name="comment">変更理由・コメント</param>
-    public GameProfileChangedEventArgs(
-        string profileId, 
-        GameProfileSettings? profile, 
-        ProfileChangeType changeType,
-        string? comment = null)
-    {
-        ProfileId = profileId ?? throw new ArgumentNullException(nameof(profileId));
-        Profile = profile;
-        ChangeType = changeType;
-        Comment = comment;
-        Timestamp = DateTime.Now;
-    }
+    public string? Comment { get; } = comment;
 }
 
 /// <summary>

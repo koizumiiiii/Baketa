@@ -289,19 +289,13 @@ public interface ITranslationEngineFactory
 /// <summary>
 /// 翻訳エンジンファクトリーの実装
 /// </summary>
-public class TranslationEngineFactory : ITranslationEngineFactory
+public class TranslationEngineFactory(
+    IServiceProvider serviceProvider,
+    ILogger<TranslationEngineFactory> logger) : ITranslationEngineFactory
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<TranslationEngineFactory> _logger;
-    
-    public TranslationEngineFactory(
-        IServiceProvider serviceProvider,
-        ILogger<TranslationEngineFactory> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<TranslationEngineFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <inheritdoc/>
     public ITranslationEngine CreateEngine(string engineType)
     {
@@ -333,23 +327,16 @@ public class TranslationEngineFactory : ITranslationEngineFactory
 /// <summary>
 /// 拡張翻訳サービス
 /// </summary>
-public class EnhancedTranslationService : ITranslationService
+public class EnhancedTranslationService(
+    ITranslationEngineFactory engineFactory,
+    IConfiguration configuration,
+    ILogger<EnhancedTranslationService> logger) : ITranslationService
 {
-    private readonly ITranslationEngineFactory _engineFactory;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<EnhancedTranslationService> _logger;
+    private readonly ITranslationEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ILogger<EnhancedTranslationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly Dictionary<string, ITranslationEngine> _engineCache = new(StringComparer.Ordinal);
-    
-    public EnhancedTranslationService(
-        ITranslationEngineFactory engineFactory,
-        IConfiguration configuration,
-        ILogger<EnhancedTranslationService> logger)
-    {
-        _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+
     /// <inheritdoc/>
     public async Task<TranslationResponse> TranslateAsync(
         string sourceText,
@@ -522,11 +509,11 @@ public class EnhancedTranslationService : ITranslationService
     
     /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> GetSupportedEnginesForLanguagePairAsync(
-        Language sourceLanguage, 
-        Language targetLanguage)
+        Language sourceLang, 
+        Language targetLang)
     {
-        ArgumentNullException.ThrowIfNull(sourceLanguage);
-        ArgumentNullException.ThrowIfNull(targetLanguage);
+        ArgumentNullException.ThrowIfNull(sourceLang);
+        ArgumentNullException.ThrowIfNull(targetLang);
         var supportedEngines = new List<string>();
         var engineTypes = _engineFactory.GetAvailableEngineTypes();
         
@@ -537,8 +524,8 @@ public class EnhancedTranslationService : ITranslationService
                 var engine = GetOrCreateEngine(engineType);
                 var languagePair = new Baketa.Core.Translation.Models.LanguagePair
                 {
-                    SourceLanguage = sourceLanguage,
-                    TargetLanguage = targetLanguage
+                    SourceLanguage = sourceLang,
+                    TargetLanguage = targetLang
                 };
                 
                 if (await engine.SupportsLanguagePairAsync(languagePair).ConfigureAwait(false))

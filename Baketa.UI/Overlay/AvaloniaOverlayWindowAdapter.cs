@@ -1,5 +1,7 @@
 using Baketa.Core.UI.Overlay;
 using Baketa.Core.UI.Geometry;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Overlay;
 
@@ -7,17 +9,13 @@ namespace Baketa.UI.Overlay;
 /// Avaloniaオーバーレイウィンドウのアダプタークラス
 /// プラットフォーム固有実装とUI層の仲介を行う
 /// </summary>
-public sealed class AvaloniaOverlayWindowAdapter
+/// <param name="serviceProvider">サービスプロバイダー</param>
+/// <param name="logger">ロガー</param>
+public sealed class AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvider, ILogger<AvaloniaOverlayWindowAdapter> logger)
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<AvaloniaOverlayWindowAdapter> _logger;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly ILogger<AvaloniaOverlayWindowAdapter> _logger = logger;
     private IOverlayWindowManager? _platformManager;
-    
-    public AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvider, ILogger<AvaloniaOverlayWindowAdapter> logger)
-    {
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
     
     /// <summary>
     /// プラットフォーム固有のマネージャーを遅延初期化で取得

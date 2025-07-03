@@ -93,8 +93,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
             int iterations = 1)
         {
             // OCR用のMorphTypeをImagingのMorphTypeに変換
-            var imagingMorphType = (Baketa.Core.Abstractions.Imaging.MorphType)Enum.Parse(
-                typeof(Baketa.Core.Abstractions.Imaging.MorphType), 
+            var imagingMorphType = Enum.Parse<Baketa.Core.Abstractions.Imaging.MorphType>(
                 morphType.ToString());
                 
             return _wrapper.ApplyMorphologyAsync(source, imagingMorphType, kernelSize, iterations);

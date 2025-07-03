@@ -6,133 +6,112 @@ namespace Baketa.Core.Settings;
 /// <summary>
 /// 設定システムの統計情報
 /// </summary>
-public sealed class SettingsStatistics
+/// <remarks>
+/// SettingsStatisticsを初期化します
+/// </remarks>
+public sealed class SettingsStatistics(
+    int totalSettings,
+    IReadOnlyDictionary<string, int> settingsByCategory,
+    int gameProfileCount,
+    int modifiedSettingsCount,
+    int favoriteSettingsCount,
+    DateTime? lastSaved,
+    DateTime? lastLoaded,
+    int changeHistoryCount,
+    int backupCount,
+    long settingsFileSizeBytes,
+    DateTime? lastMigration,
+    int currentSchemaVersion,
+    double averageSaveTimeMs,
+    double averageLoadTimeMs,
+    IReadOnlyDictionary<SettingLevel, int> settingsByLevel,
+    string? activeGameProfileId)
 {
     /// <summary>
     /// 総設定項目数
     /// </summary>
-    public int TotalSettings { get; }
-    
+    public int TotalSettings { get; } = totalSettings;
+
     /// <summary>
     /// カテゴリ別設定数
     /// </summary>
-    public IReadOnlyDictionary<string, int> SettingsByCategory { get; }
-    
+    public IReadOnlyDictionary<string, int> SettingsByCategory { get; } = settingsByCategory ?? throw new ArgumentNullException(nameof(settingsByCategory));
+
     /// <summary>
     /// ゲームプロファイル数
     /// </summary>
-    public int GameProfileCount { get; }
-    
+    public int GameProfileCount { get; } = gameProfileCount;
+
     /// <summary>
     /// デフォルト値から変更された設定数
     /// </summary>
-    public int ModifiedSettingsCount { get; }
-    
+    public int ModifiedSettingsCount { get; } = modifiedSettingsCount;
+
     /// <summary>
     /// お気に入り設定数
     /// </summary>
-    public int FavoriteSettingsCount { get; }
-    
+    public int FavoriteSettingsCount { get; } = favoriteSettingsCount;
+
     /// <summary>
     /// 最後に保存した日時
     /// </summary>
-    public DateTime? LastSaved { get; }
-    
+    public DateTime? LastSaved { get; } = lastSaved;
+
     /// <summary>
     /// 最後に読み込んだ日時
     /// </summary>
-    public DateTime? LastLoaded { get; }
-    
+    public DateTime? LastLoaded { get; } = lastLoaded;
+
     /// <summary>
     /// 変更履歴エントリ数
     /// </summary>
-    public int ChangeHistoryCount { get; }
-    
+    public int ChangeHistoryCount { get; } = changeHistoryCount;
+
     /// <summary>
     /// バックアップファイル数
     /// </summary>
-    public int BackupCount { get; }
-    
+    public int BackupCount { get; } = backupCount;
+
     /// <summary>
     /// 設定ファイルサイズ（バイト）
     /// </summary>
-    public long SettingsFileSizeBytes { get; }
-    
+    public long SettingsFileSizeBytes { get; } = settingsFileSizeBytes;
+
     /// <summary>
     /// 最後のマイグレーション日時
     /// </summary>
-    public DateTime? LastMigration { get; }
-    
+    public DateTime? LastMigration { get; } = lastMigration;
+
     /// <summary>
     /// 現在のスキーマバージョン
     /// </summary>
-    public int CurrentSchemaVersion { get; }
-    
+    public int CurrentSchemaVersion { get; } = currentSchemaVersion;
+
     /// <summary>
     /// 平均保存時間（ミリ秒）
     /// </summary>
-    public double AverageSaveTimeMs { get; }
-    
+    public double AverageSaveTimeMs { get; } = averageSaveTimeMs;
+
     /// <summary>
     /// 平均読み込み時間（ミリ秒）
     /// </summary>
-    public double AverageLoadTimeMs { get; }
-    
+    public double AverageLoadTimeMs { get; } = averageLoadTimeMs;
+
     /// <summary>
     /// レベル別設定数（基本・詳細・デバッグ）
     /// </summary>
-    public IReadOnlyDictionary<SettingLevel, int> SettingsByLevel { get; }
-    
+    public IReadOnlyDictionary<SettingLevel, int> SettingsByLevel { get; } = settingsByLevel ?? throw new ArgumentNullException(nameof(settingsByLevel));
+
     /// <summary>
     /// アクティブなゲームプロファイルID
     /// </summary>
-    public string? ActiveGameProfileId { get; }
-    
+    public string? ActiveGameProfileId { get; } = activeGameProfileId;
+
     /// <summary>
     /// 統計生成日時
     /// </summary>
-    public DateTime GeneratedAt { get; }
+    public DateTime GeneratedAt { get; } = DateTime.Now;
 
-    /// <summary>
-    /// SettingsStatisticsを初期化します
-    /// </summary>
-    public SettingsStatistics(
-        int totalSettings,
-        IReadOnlyDictionary<string, int> settingsByCategory,
-        int gameProfileCount,
-        int modifiedSettingsCount,
-        int favoriteSettingsCount,
-        DateTime? lastSaved,
-        DateTime? lastLoaded,
-        int changeHistoryCount,
-        int backupCount,
-        long settingsFileSizeBytes,
-        DateTime? lastMigration,
-        int currentSchemaVersion,
-        double averageSaveTimeMs,
-        double averageLoadTimeMs,
-        IReadOnlyDictionary<SettingLevel, int> settingsByLevel,
-        string? activeGameProfileId)
-    {
-        TotalSettings = totalSettings;
-        SettingsByCategory = settingsByCategory ?? throw new ArgumentNullException(nameof(settingsByCategory));
-        GameProfileCount = gameProfileCount;
-        ModifiedSettingsCount = modifiedSettingsCount;
-        FavoriteSettingsCount = favoriteSettingsCount;
-        LastSaved = lastSaved;
-        LastLoaded = lastLoaded;
-        ChangeHistoryCount = changeHistoryCount;
-        BackupCount = backupCount;
-        SettingsFileSizeBytes = settingsFileSizeBytes;
-        LastMigration = lastMigration;
-        CurrentSchemaVersion = currentSchemaVersion;
-        AverageSaveTimeMs = averageSaveTimeMs;
-        AverageLoadTimeMs = averageLoadTimeMs;
-        SettingsByLevel = settingsByLevel ?? throw new ArgumentNullException(nameof(settingsByLevel));
-        ActiveGameProfileId = activeGameProfileId;
-        GeneratedAt = DateTime.Now;
-    }
-    
     /// <summary>
     /// 空の統計情報を作成します
     /// </summary>

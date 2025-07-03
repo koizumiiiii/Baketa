@@ -308,14 +308,9 @@ public sealed class ChineseTranslationFullIntegrationTests : IDisposable
 /// <summary>
 /// パフォーマンステスト用クラス
 /// </summary>
-public class ChineseTranslationPerformanceTests
+public class ChineseTranslationPerformanceTests(ITestOutputHelper testOutput)
 {
-    private readonly ITestOutputHelper _testOutput;
-
-    public ChineseTranslationPerformanceTests(ITestOutputHelper testOutput)
-    {
-        _testOutput = testOutput ?? throw new ArgumentNullException(nameof(testOutput));
-    }
+    private readonly ITestOutputHelper _testOutput = testOutput ?? throw new ArgumentNullException(nameof(testOutput));
 
     [Theory]
     [InlineData("This is a test sentence for translation performance measurement.")]

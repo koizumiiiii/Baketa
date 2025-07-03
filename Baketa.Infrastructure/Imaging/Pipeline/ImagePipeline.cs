@@ -11,28 +11,33 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Imaging.Pipeline;
 
-    /// <summary>
-    /// 画像処理パイプラインの実装
-    /// </summary>
-    public class ImagePipeline : IImagePipeline
+/// <summary>
+/// 画像処理パイプラインの実装
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="name">パイプライン名</param>
+/// <param name="description">パイプライン説明</param>
+/// <param name="logger">ロガー</param>
+public class ImagePipeline(string name, string description, ILogger<ImagePipeline>? logger = null) : IImagePipeline
     {
         private readonly List<IImagePipelineFilter> _filters = [];
-        private readonly ILogger<ImagePipeline>? _logger;
-        
-        /// <summary>
-        /// パイプラインの名前
-        /// </summary>
-        public string Name { get; private set; }
-        
-        /// <summary>
-        /// パイプラインの説明
-        /// </summary>
-        public string Description { get; private set; }
-        
-        /// <summary>
-        /// パイプラインに登録されているフィルター
-        /// </summary>
-        public IReadOnlyList<IImagePipelineFilter> Filters => _filters.AsReadOnly();
+
+    /// <summary>
+    /// パイプラインの名前
+    /// </summary>
+    public string Name { get; private set; } = name;
+
+    /// <summary>
+    /// パイプラインの説明
+    /// </summary>
+    public string Description { get; private set; } = description;
+
+    /// <summary>
+    /// パイプラインに登録されているフィルター
+    /// </summary>
+    public IReadOnlyList<IImagePipelineFilter> Filters => _filters.AsReadOnly();
         
         /// <summary>
         /// 中間結果の保存モード
@@ -59,43 +64,30 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
         /// </summary>
         public IReadOnlyList<IImagePipelineStep> Steps => 
             [.._filters.Select(f => f as IImagePipelineStep)];
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="name">パイプライン名</param>
-        /// <param name="description">パイプライン説明</param>
-        /// <param name="logger">ロガー</param>
-        public ImagePipeline(string name, string description, ILogger<ImagePipeline>? logger = null)
+
+    /// <summary>
+    /// パイプラインを実行します
+    /// </summary>
+    /// <param name="inputImage">入力画像</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>処理結果と中間結果を含むパイプライン実行結果</returns>
+    public async Task<PipelineResult> ExecuteAsync(IAdvancedImage input, CancellationToken cancellationToken = default)
         {
-            Name = name;
-            Description = description;
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// パイプラインを実行します
-        /// </summary>
-        /// <param name="inputImage">入力画像</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>処理結果と中間結果を含むパイプライン実行結果</returns>
-        public async Task<PipelineResult> ExecuteAsync(IAdvancedImage inputImage, CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(inputImage);
+            ArgumentNullException.ThrowIfNull(input);
                 
-            _logger?.LogDebug("パイプライン '{PipelineName}' の実行を開始 ({FilterCount} フィルター)", 
+            logger?.LogDebug("パイプライン '{PipelineName}' の実行を開始 ({FilterCount} フィルター)", 
                 Name, _filters.Count);
             
             var stopwatch = Stopwatch.StartNew();
             // PipelineContextを正しく初期化
             var context = new PipelineContext(
-                _logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ImagePipeline>.Instance,
+                logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ImagePipeline>.Instance,
                 IntermediateResultMode,
                 GlobalErrorHandlingStrategy,
                 EventListener,
                 cancellationToken);
                 
-            var currentImage = inputImage;
+            var currentImage = input;
             var intermediateResults = new Dictionary<string, IAdvancedImage>();
             
             try
@@ -107,11 +99,11 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        _logger?.LogInformation("パイプライン実行がキャンセルされました");
+                        logger?.LogInformation("パイプライン実行がキャンセルされました");
                         
                         // キャンセル状態の結果を作成して返す
                         return new PipelineResult(
-                            inputImage, 
+                            input, 
                             intermediateResults, 
                             stopwatch.ElapsedMilliseconds, 
                             IntermediateResultMode,
@@ -119,7 +111,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                     }
                     
                     var filter = _filters[i];
-                    _logger?.LogTrace("フィルター #{Index} '{FilterName}' を適用中...", i, filter.Name);
+                    logger?.LogTrace("フィルター #{Index} '{FilterName}' を適用中...", i, filter.Name);
                     
                     // 非同期メソッドを使用
                     await EventListener.OnStepStartAsync(filter, currentImage, context).ConfigureAwait(false);
@@ -139,7 +131,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                             intermediateResults[stepKey] = currentImage;
                         }
                         
-                        _logger?.LogTrace("フィルター '{FilterName}' を適用完了 ({ElapsedMs}ms)", 
+                        logger?.LogTrace("フィルター '{FilterName}' を適用完了 ({ElapsedMs}ms)", 
                             filter.Name, filterStopwatch.ElapsedMilliseconds);
                         
                         // 非同期メソッドを使用
@@ -149,7 +141,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                     {
                         filterStopwatch.Stop();
                         
-                        _logger?.LogError(ex, "フィルター '{FilterName}' の適用中に操作エラーが発生しました", 
+                        logger?.LogError(ex, "フィルター '{FilterName}' の適用中に操作エラーが発生しました", 
                             filter.Name);
                             
                         // 非同期メソッドを使用
@@ -177,7 +169,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                     {
                         filterStopwatch.Stop();
                         
-                        _logger?.LogError(ex, "フィルター '{FilterName}' の適用中に引数エラーが発生しました", 
+                        logger?.LogError(ex, "フィルター '{FilterName}' の適用中に引数エラーが発生しました", 
                             filter.Name);
                             
                         // 非同期メソッドを使用
@@ -204,7 +196,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 }
                 
                 stopwatch.Stop();
-                _logger?.LogDebug("パイプライン '{PipelineName}' の実行が完了 (合計: {ElapsedMs}ms)", 
+                logger?.LogDebug("パイプライン '{PipelineName}' の実行が完了 (合計: {ElapsedMs}ms)", 
                     Name, stopwatch.ElapsedMilliseconds);
                     
                 // 完了した結果を作成
@@ -223,7 +215,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
                 stopwatch.Stop();
-                _logger?.LogInformation("パイプライン '{PipelineName}' の実行がキャンセルされました",
+                logger?.LogInformation("パイプライン '{PipelineName}' の実行がキャンセルされました",
                     Name);
                     
                 // 非同期メソッドを使用
@@ -231,7 +223,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 
                 // エラー状態の結果を作成して返す
                 return new PipelineResult(
-                    inputImage, 
+                    input, 
                     intermediateResults, 
                     stopwatch.ElapsedMilliseconds, 
                     IntermediateResultMode,
@@ -240,7 +232,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             catch (InvalidOperationException ex)
             {
                 stopwatch.Stop();
-                _logger?.LogError(ex, "パイプライン '{PipelineName}' の実行中に操作エラーが発生しました", 
+                logger?.LogError(ex, "パイプライン '{PipelineName}' の実行中に操作エラーが発生しました", 
                     Name);
                     
                 // 非同期メソッドを使用
@@ -248,7 +240,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 
                 // エラー状態の結果を作成して返す
                 return new PipelineResult(
-                    inputImage, 
+                    input, 
                     intermediateResults, 
                     stopwatch.ElapsedMilliseconds, 
                     IntermediateResultMode,
@@ -257,7 +249,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             catch (ArgumentException ex)
             {
                 stopwatch.Stop();
-                _logger?.LogError(ex, "パイプライン '{PipelineName}' の実行中に引数エラーが発生しました", 
+                logger?.LogError(ex, "パイプライン '{PipelineName}' の実行中に引数エラーが発生しました", 
                     Name);
                     
                 // 非同期メソッドを使用
@@ -265,7 +257,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 
                 // エラー状態の結果を作成して返す
                 return new PipelineResult(
-                    inputImage, 
+                    input, 
                     intermediateResults, 
                     stopwatch.ElapsedMilliseconds, 
                     IntermediateResultMode,
@@ -515,13 +507,17 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             return Task.FromResult<IAdvancedImage?>(null);
         }
     }
-    
-    /// <summary>
-    /// テスト用レガシーアダプター
-    /// </summary>
-    internal sealed class MockIImagePipelineFilter : IImagePipelineFilter
+
+/// <summary>
+/// テスト用レガシーアダプター
+/// </summary>
+/// <remarks>
+/// 初期化
+/// </remarks>
+/// <param name="wrappedStep">ラップするステップ</param>
+internal sealed class MockIImagePipelineFilter(IImagePipelineStep wrappedStep) : IImagePipelineFilter
     {
-        private readonly IImagePipelineStep _wrappedStep;
+        private readonly IImagePipelineStep _wrappedStep = wrappedStep ?? throw new ArgumentNullException(nameof(wrappedStep));
         
         /// <summary>
         /// 名前
@@ -532,36 +528,26 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
         /// 説明
         /// </summary>
         public string Description => _wrappedStep.Description;
-        
-        /// <summary>
-        /// エラーハンドリングストラテジー
-        /// </summary>
-        public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; }
-        
-        /// <summary>
-        /// パラメータ一覧
-        /// </summary>
-        public IReadOnlyCollection<PipelineStepParameter> Parameters => _wrappedStep.Parameters;
+
+    /// <summary>
+    /// エラーハンドリングストラテジー
+    /// </summary>
+    public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = wrappedStep.ErrorHandlingStrategy;
+
+    /// <summary>
+    /// パラメータ一覧
+    /// </summary>
+    public IReadOnlyCollection<PipelineStepParameter> Parameters => _wrappedStep.Parameters;
         
         /// <summary>
         /// カテゴリ
         /// </summary>
         public string Category => _wrappedStep.GetType().GetProperty("Category")?.GetValue(_wrappedStep) as string ?? "Effect";
-        
-        /// <summary>
-        /// 初期化
-        /// </summary>
-        /// <param name="wrappedStep">ラップするステップ</param>
-        public MockIImagePipelineFilter(IImagePipelineStep wrappedStep)
-        {
-            _wrappedStep = wrappedStep ?? throw new ArgumentNullException(nameof(wrappedStep));
-            ErrorHandlingStrategy = wrappedStep.ErrorHandlingStrategy;
-        }
-        
-        /// <summary>
-        /// パイプラインステップとして実行
-        /// </summary>
-        public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
+
+    /// <summary>
+    /// パイプラインステップとして実行
+    /// </summary>
+    public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
         {
             return _wrappedStep.ExecuteAsync(input, context, cancellationToken);
         }

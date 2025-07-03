@@ -15,11 +15,20 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.Chinese;
 /// 中国語翻訳専用エンジン
 /// OPUS-MTプレフィックス指定による簡体字・繁体字制御機能を提供
 /// </summary>
-public class ChineseTranslationEngine : ITranslationEngine, IDisposable
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="baseEngine">基本翻訳エンジン</param>
+/// <param name="chineseProcessor">中国語処理器</param>
+/// <param name="logger">ロガー</param>
+public class ChineseTranslationEngine(
+    OpusMtOnnxEngine baseEngine,
+    ChineseLanguageProcessor chineseProcessor,
+    ILogger<ChineseTranslationEngine> logger) : ITranslationEngine, IDisposable
 {
-    private readonly OpusMtOnnxEngine _baseEngine;
-    private readonly ChineseLanguageProcessor _chineseProcessor;
-    private readonly ILogger<ChineseTranslationEngine> _logger;
+    private readonly OpusMtOnnxEngine _baseEngine = baseEngine ?? throw new ArgumentNullException(nameof(baseEngine));
+    private readonly ChineseLanguageProcessor _chineseProcessor = chineseProcessor ?? throw new ArgumentNullException(nameof(chineseProcessor));
+    private readonly ILogger<ChineseTranslationEngine> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private bool _disposed;
 
     /// <summary>
@@ -36,22 +45,6 @@ public class ChineseTranslationEngine : ITranslationEngine, IDisposable
     /// ネットワーク接続が必要かどうか
     /// </summary>
     public bool RequiresNetwork => false;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="baseEngine">基本翻訳エンジン</param>
-    /// <param name="chineseProcessor">中国語処理器</param>
-    /// <param name="logger">ロガー</param>
-    public ChineseTranslationEngine(
-        OpusMtOnnxEngine baseEngine,
-        ChineseLanguageProcessor chineseProcessor,
-        ILogger<ChineseTranslationEngine> logger)
-    {
-        _baseEngine = baseEngine ?? throw new ArgumentNullException(nameof(baseEngine));
-        _chineseProcessor = chineseProcessor ?? throw new ArgumentNullException(nameof(chineseProcessor));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 翻訳エンジンを初期化します
@@ -409,7 +402,7 @@ public class ChineseTranslationEngine : ITranslationEngine, IDisposable
     /// <returns>前処理されたリクエスト</returns>
     private async Task<TranslationRequest> PreprocessRequestAsync(
         TranslationRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
         await Task.CompletedTask.ConfigureAwait(false); // 非同期API用のダミー
 
@@ -435,8 +428,8 @@ public class ChineseTranslationEngine : ITranslationEngine, IDisposable
     /// <returns>後処理されたレスポンス</returns>
     private async Task<TranslationResponse> PostprocessResponseAsync(
         TranslationResponse response,
-        TranslationRequest originalRequest,
-        CancellationToken cancellationToken)
+        TranslationRequest _,
+        CancellationToken _1)
     {
         await Task.CompletedTask.ConfigureAwait(false); // 非同期API用のダミー
 
@@ -604,7 +597,7 @@ public class ChineseTranslationEngine : ITranslationEngine, IDisposable
         string text, 
         string sourceLang, 
         string targetLang, 
-        ChineseVariant variant = ChineseVariant.Auto)
+        ChineseVariant _ = ChineseVariant.Auto)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(sourceLang);
@@ -666,7 +659,7 @@ public class ChineseTranslationEngine : ITranslationEngine, IDisposable
             if (disposing)
             {
                 // マネージドリソースの解放
-                // 基本エンジンと中国語処理器はDIコンテナによって管理されるため、解放しない
+                _baseEngine?.Dispose();
                 _logger.LogDebug("ChineseTranslationEngine のマネージドリソースを解放しました");
             }
 

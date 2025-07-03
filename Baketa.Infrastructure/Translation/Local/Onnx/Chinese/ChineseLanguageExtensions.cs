@@ -154,14 +154,14 @@ public static class ChineseLanguageExtensions
         {
             Language.ChineseSimplified,
             Language.ChineseTraditional,
-            new Language { Code = "zh", DisplayName = "中国語（自動判別）", NativeName = "中文" },
-            new Language { Code = "zh-Hans", DisplayName = "中国語（簡体字）", NativeName = "中文（简体）" },
-            new Language { Code = "zh-Hant", DisplayName = "中国語（繁体字）", NativeName = "中文（繁體）" },
-            new Language { Code = "yue", DisplayName = "広東語", NativeName = "粵語" },
-            new Language { Code = "yue-HK", DisplayName = "広東語（香港）", NativeName = "粵語（香港）", RegionCode = "HK" },
-            new Language { Code = "cmn", DisplayName = "標準中国語", NativeName = "國語/普通話" },
-            new Language { Code = "cmn_Hans", DisplayName = "標準中国語（簡体字）", NativeName = "國語/普通話（简体）" },
-            new Language { Code = "cmn_Hant", DisplayName = "標準中国語（繁体字）", NativeName = "國語/普通話（繁體）" }
+            new() { Code = "zh", DisplayName = "中国語（自動判別）", NativeName = "中文" },
+            new() { Code = "zh-Hans", DisplayName = "中国語（簡体字）", NativeName = "中文（简体）" },
+            new() { Code = "zh-Hant", DisplayName = "中国語（繁体字）", NativeName = "中文（繁體）" },
+            new() { Code = "yue", DisplayName = "広東語", NativeName = "粵語" },
+            new() { Code = "yue-HK", DisplayName = "広東語（香港）", NativeName = "粵語（香港）", RegionCode = "HK" },
+            new() { Code = "cmn", DisplayName = "標準中国語", NativeName = "國語/普通話" },
+            new() { Code = "cmn_Hans", DisplayName = "標準中国語（簡体字）", NativeName = "國語/普通話（简体）" },
+            new() { Code = "cmn_Hant", DisplayName = "標準中国語（繁体字）", NativeName = "國語/普通話（繁體）" }
         }.AsReadOnly();
     }
 

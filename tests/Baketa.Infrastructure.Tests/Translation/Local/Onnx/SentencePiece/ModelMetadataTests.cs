@@ -401,14 +401,15 @@ public class ModelMetadataTests
     public void Properties_CanBeSetAndRetrieved(string modelName, string sourceLang, string targetLang, long size, string version)
     {
         // Arrange
-        var metadata = new ModelMetadata();
-
-        // Act
-        metadata.ModelName = modelName;
-        metadata.SourceLanguage = sourceLang;
-        metadata.TargetLanguage = targetLang;
-        metadata.Size = size;
-        metadata.Version = version;
+        var metadata = new ModelMetadata
+        {
+            // Act
+            ModelName = modelName,
+            SourceLanguage = sourceLang,
+            TargetLanguage = targetLang,
+            Size = size,
+            Version = version
+        };
 
         // Assert
         Assert.Equal(modelName, metadata.ModelName);

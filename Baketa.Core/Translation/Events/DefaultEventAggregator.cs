@@ -8,12 +8,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.Events;
 
-    /// <summary>
-    /// デフォルトイベント集約器
-    /// </summary>
-    public class DefaultEventAggregator : IEventAggregator
+/// <summary>
+/// デフォルトイベント集約器
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class DefaultEventAggregator(ILogger<DefaultEventAggregator> logger) : IEventAggregator
     {
-        private readonly ILogger<DefaultEventAggregator> _logger;
+        private readonly ILogger<DefaultEventAggregator> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly ConcurrentDictionary<Type, List<object>> _handlers = [];
 
         /// <summary>
@@ -21,22 +25,13 @@ namespace Baketa.Core.Translation.Events;
         /// </summary>
         public event EventHandler<EventProcessorErrorEventArgs>? EventProcessorError;
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public DefaultEventAggregator(ILogger<DefaultEventAggregator> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <summary>
-        /// イベントを発行します
-        /// </summary>
-        /// <typeparam name="TEvent">イベントの型</typeparam>
-        /// <param name="eventData">発行するイベント</param>
-        /// <returns>完了タスク</returns>
-        public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    /// <summary>
+    /// イベントを発行します
+    /// </summary>
+    /// <typeparam name="TEvent">イベントの型</typeparam>
+    /// <param name="eventData">発行するイベント</param>
+    /// <returns>完了タスク</returns>
+    public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             

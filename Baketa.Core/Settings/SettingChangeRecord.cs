@@ -6,131 +6,112 @@ namespace Baketa.Core.Settings;
 /// 設定変更履歴レコード
 /// 設定変更の履歴を記録・追跡するためのデータ構造
 /// </summary>
-public sealed class SettingChangeRecord
+/// <remarks>
+/// SettingChangeRecordを初期化します
+/// </remarks>
+/// <param name="settingKey">設定キー</param>
+/// <param name="category">カテゴリ</param>
+/// <param name="oldValue">変更前の値</param>
+/// <param name="newValue">変更後の値</param>
+/// <param name="changeType">変更の種類</param>
+/// <param name="source">変更元</param>
+/// <param name="comment">コメント</param>
+/// <param name="userId">ユーザーID</param>
+/// <param name="sessionId">セッションID</param>
+/// <param name="profileId">プロファイルID</param>
+/// <param name="importance">重要度</param>
+/// <param name="triggeredOtherChanges">他の変更をトリガーしたか</param>
+/// <param name="undoInformation">元に戻す情報</param>
+public sealed class SettingChangeRecord(
+    string settingKey,
+    string category,
+    object? oldValue,
+    object? newValue,
+    SettingChangeType changeType,
+    string source,
+    string? comment = null,
+    string? userId = null,
+    string? sessionId = null,
+    string? profileId = null,
+    ChangeImportance importance = ChangeImportance.Normal,
+    bool triggeredOtherChanges = false,
+    string? undoInformation = null)
 {
     /// <summary>
     /// 変更のユニークID
     /// </summary>
-    public string Id { get; }
-    
+    public string Id { get; } = Guid.NewGuid().ToString();
+
     /// <summary>
     /// 変更された設定のキー
     /// </summary>
-    public string SettingKey { get; }
-    
+    public string SettingKey { get; } = settingKey ?? throw new ArgumentNullException(nameof(settingKey));
+
     /// <summary>
     /// 設定カテゴリ
     /// </summary>
-    public string Category { get; }
-    
+    public string Category { get; } = category ?? throw new ArgumentNullException(nameof(category));
+
     /// <summary>
     /// 変更前の値
     /// </summary>
-    public object? OldValue { get; }
-    
+    public object? OldValue { get; } = oldValue;
+
     /// <summary>
     /// 変更後の値
     /// </summary>
-    public object? NewValue { get; }
-    
+    public object? NewValue { get; } = newValue;
+
     /// <summary>
     /// 変更の種類
     /// </summary>
-    public SettingChangeType ChangeType { get; }
-    
+    public SettingChangeType ChangeType { get; } = changeType;
+
     /// <summary>
     /// 変更日時
     /// </summary>
-    public DateTime Timestamp { get; }
-    
+    public DateTime Timestamp { get; } = DateTime.Now;
+
     /// <summary>
     /// 変更理由・コメント
     /// </summary>
-    public string? Comment { get; }
-    
+    public string? Comment { get; } = comment;
+
     /// <summary>
     /// 変更元（UI、API、マイグレーション等）
     /// </summary>
-    public string Source { get; }
-    
+    public string Source { get; } = source ?? throw new ArgumentNullException(nameof(source));
+
     /// <summary>
     /// ユーザーID（将来の拡張用）
     /// </summary>
-    public string? UserId { get; }
-    
+    public string? UserId { get; } = userId;
+
     /// <summary>
     /// セッションID（関連する変更をグループ化）
     /// </summary>
-    public string? SessionId { get; }
-    
+    public string? SessionId { get; } = sessionId;
+
     /// <summary>
     /// 変更が適用されたプロファイルID
     /// </summary>
-    public string? ProfileId { get; }
-    
+    public string? ProfileId { get; } = profileId;
+
     /// <summary>
     /// 変更の重要度
     /// </summary>
-    public ChangeImportance Importance { get; }
-    
+    public ChangeImportance Importance { get; } = importance;
+
     /// <summary>
     /// この変更が他の変更をトリガーしたかどうか
     /// </summary>
-    public bool TriggeredOtherChanges { get; }
-    
+    public bool TriggeredOtherChanges { get; } = triggeredOtherChanges;
+
     /// <summary>
     /// 元に戻すための情報
     /// </summary>
-    public string? UndoInformation { get; }
+    public string? UndoInformation { get; } = undoInformation;
 
-    /// <summary>
-    /// SettingChangeRecordを初期化します
-    /// </summary>
-    /// <param name="settingKey">設定キー</param>
-    /// <param name="category">カテゴリ</param>
-    /// <param name="oldValue">変更前の値</param>
-    /// <param name="newValue">変更後の値</param>
-    /// <param name="changeType">変更の種類</param>
-    /// <param name="source">変更元</param>
-    /// <param name="comment">コメント</param>
-    /// <param name="userId">ユーザーID</param>
-    /// <param name="sessionId">セッションID</param>
-    /// <param name="profileId">プロファイルID</param>
-    /// <param name="importance">重要度</param>
-    /// <param name="triggeredOtherChanges">他の変更をトリガーしたか</param>
-    /// <param name="undoInformation">元に戻す情報</param>
-    public SettingChangeRecord(
-        string settingKey,
-        string category,
-        object? oldValue,
-        object? newValue,
-        SettingChangeType changeType,
-        string source,
-        string? comment = null,
-        string? userId = null,
-        string? sessionId = null,
-        string? profileId = null,
-        ChangeImportance importance = ChangeImportance.Normal,
-        bool triggeredOtherChanges = false,
-        string? undoInformation = null)
-    {
-        Id = Guid.NewGuid().ToString();
-        SettingKey = settingKey ?? throw new ArgumentNullException(nameof(settingKey));
-        Category = category ?? throw new ArgumentNullException(nameof(category));
-        OldValue = oldValue;
-        NewValue = newValue;
-        ChangeType = changeType;
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Comment = comment;
-        UserId = userId;
-        SessionId = sessionId;
-        ProfileId = profileId;
-        Importance = importance;
-        TriggeredOtherChanges = triggeredOtherChanges;
-        UndoInformation = undoInformation;
-        Timestamp = DateTime.Now;
-    }
-    
     /// <summary>
     /// 変更の説明を取得します
     /// </summary>

@@ -11,26 +11,20 @@ namespace Baketa.UI.IntegrationTests.Monitors;
 /// マルチモニターサポートの動作確認テストクラス
 /// 開発・デバッグ時の動作検証に使用
 /// </summary>
-public sealed class MultiMonitorTestRunner : IDisposable
+/// <remarks>
+/// MultiMonitorTestRunnerを初期化
+/// </remarks>
+/// <param name="adapter">マルチモニターアダプター</param>
+/// <param name="logger">ロガー</param>
+public sealed class MultiMonitorTestRunner(
+    AvaloniaMultiMonitorAdapter adapter,
+    ILogger<MultiMonitorTestRunner> logger) : IDisposable
 {
-    private readonly AvaloniaMultiMonitorAdapter _adapter;
-    private readonly ILogger<MultiMonitorTestRunner> _logger;
+    private readonly AvaloniaMultiMonitorAdapter _adapter = adapter;
+    private readonly ILogger<MultiMonitorTestRunner> _logger = logger;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private bool _disposed;
-    
-    /// <summary>
-    /// MultiMonitorTestRunnerを初期化
-    /// </summary>
-    /// <param name="adapter">マルチモニターアダプター</param>
-    /// <param name="logger">ロガー</param>
-    public MultiMonitorTestRunner(
-        AvaloniaMultiMonitorAdapter adapter,
-        ILogger<MultiMonitorTestRunner> logger)
-    {
-        _adapter = adapter;
-        _logger = logger;
-    }
-    
+
     /// <summary>
     /// 基本的なマルチモニター機能テストを実行
     /// </summary>
@@ -301,6 +295,7 @@ public sealed class MultiMonitorTestRunner : IDisposable
         {
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
+            _adapter.Dispose();
             
             _logger.LogInformation("MultiMonitorTestRunner disposed");
         }

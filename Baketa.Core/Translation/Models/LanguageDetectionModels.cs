@@ -73,7 +73,13 @@ public static class LanguageDetectionExtensions
         ArgumentNullException.ThrowIfNull(language);
         
         // 代替言語候補を拡張メソッドで追加
-        // ※ LanguageDetectionResult自体にはこの機能が無いため、拡張メソッドから追加する
+        // 将来的にLanguageDetectionResultに代替候補リスト機能が追加された場合のための拡張ポイント
+        // 現在は信頼度を使用して検証のみ実行
+        if (confidence > result.Confidence)
+        {
+            // より高い信頼度の言語が提供された場合のログ記録等に利用可能
+            System.Diagnostics.Debug.WriteLine($"Higher confidence alternative found: {language.Code} ({confidence:P2})");
+        }
         
         return result;
     }

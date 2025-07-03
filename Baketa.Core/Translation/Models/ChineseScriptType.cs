@@ -72,7 +72,7 @@ public static class ChineseScriptTypeExtensions
     /// <returns>有効な場合はtrue</returns>
     public static bool IsValid(this ChineseScriptType scriptType)
     {
-        return Enum.IsDefined(typeof(ChineseScriptType), scriptType);
+        return Enum.IsDefined<ChineseScriptType>(scriptType);
     }
 
     /// <summary>

@@ -96,20 +96,15 @@ public enum NotificationType
 /// <summary>
 /// 通知イベント引数
 /// </summary>
-public class NotificationEventArgs : EventArgs
+/// <param name="type">通知タイプ</param>
+/// <param name="title">通知タイトル</param>
+/// <param name="message">通知メッセージ</param>
+/// <param name="duration">表示時間（ミリ秒）</param>
+public class NotificationEventArgs(NotificationType type, string title, string message, int duration) : EventArgs
 {
-    public NotificationType Type { get; }
-    public string Title { get; }
-    public string Message { get; }
-    public int Duration { get; }
-    public DateTime Timestamp { get; }
-
-    public NotificationEventArgs(NotificationType type, string title, string message, int duration)
-    {
-        Type = type;
-        Title = title;
-        Message = message;
-        Duration = duration;
-        Timestamp = DateTime.UtcNow;
-    }
+    public NotificationType Type { get; } = type;
+    public string Title { get; } = title;
+    public string Message { get; } = message;
+    public int Duration { get; } = duration;
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
 }

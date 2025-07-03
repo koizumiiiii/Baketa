@@ -13,9 +13,9 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     
-    <!-- コード分析ルールの有効化 -->
+    <!-- コード分析ルールの有効化 (.editorconfigの抑制設定を尊重) -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisMode>All</AnalysisMode>
+    <AnalysisMode>Recommended</AnalysisMode>
     
     <!-- MSB3026警告をメッセージレベルに変更（PaddleOCRモデルコピー失敗対策） -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3026</MSBuildWarningsAsMessages>

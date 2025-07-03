@@ -66,16 +66,11 @@ public record SupportedLanguage(
 /// <summary>
 /// 言語変更イベント引数
 /// </summary>
-public class LanguageChangedEventArgs : EventArgs
+/// <param name="oldCulture">変更前の文化情報</param>
+/// <param name="newCulture">変更後の文化情報</param>
+public class LanguageChangedEventArgs(CultureInfo oldCulture, CultureInfo newCulture) : EventArgs
 {
-    public CultureInfo OldCulture { get; }
-    public CultureInfo NewCulture { get; }
-    public DateTime ChangeDate { get; }
-
-    public LanguageChangedEventArgs(CultureInfo oldCulture, CultureInfo newCulture)
-    {
-        OldCulture = oldCulture;
-        NewCulture = newCulture;
-        ChangeDate = DateTime.UtcNow;
-    }
+    public CultureInfo OldCulture { get; } = oldCulture;
+    public CultureInfo NewCulture { get; } = newCulture;
+    public DateTime ChangeDate { get; } = DateTime.UtcNow;
 }

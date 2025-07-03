@@ -16,12 +16,12 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
     /// <summary>
     /// テスト用のパイプラインフィルターインターフェース実装
     /// </summary>
-    public class TestIPipelineImageFilter : IImagePipelineFilter
+    public class TestIPipelineImageFilter(string name, string description, string category) : IImagePipelineFilter
     {
-        public string Name { get; set; } = "TestFilter";
-        public string Description { get; set; } = "Test Filter Description";
-        public string Category { get; set; } = "Effect";
-        public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
+    public string Name { get; set; } = name ?? throw new ArgumentNullException(nameof(name));
+    public string Description { get; set; } = description ?? throw new ArgumentNullException(nameof(description));
+    public string Category { get; set; } = category ?? throw new ArgumentNullException(nameof(category));
+    public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
         
         private readonly Dictionary<string, object> _parameters = [];
         
@@ -29,15 +29,8 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
             [
                 new PipelineStepParameter("param1", "Parameter 1", typeof(string), "default")
             ];
-            
-        public TestIPipelineImageFilter(string name, string description, string category)
-        {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            Description = description ?? throw new ArgumentNullException(nameof(description));
-            Category = category ?? throw new ArgumentNullException(nameof(category));
-        }
-        
-        public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
+
+    public Task<IAdvancedImage> ExecuteAsync(IAdvancedImage input, PipelineContext context, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(input);
         }
@@ -90,24 +83,16 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
     /// <summary>
     /// テスト用のモックフィルター
     /// </summary>
-    public class TestIPipelineImageFilterMock : TestIPipelineImageFilter
+    public class TestIPipelineImageFilterMock(IAdvancedImage inputImage, IAdvancedImage outputImage) : TestIPipelineImageFilter("MockFilter", "Mock Filter", "Test")
     {
-        private readonly IAdvancedImage _inputImage;
-        private readonly IAdvancedImage _outputImage;
+        private readonly IAdvancedImage _inputImage = inputImage;
 
-        public TestIPipelineImageFilterMock(IAdvancedImage inputImage, IAdvancedImage outputImage) 
-            : base("MockFilter", "Mock Filter", "Test")
-        {
-            _inputImage = inputImage;
-            _outputImage = outputImage;
-        }
-
-        public override Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
+    public override Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
             // 入力画像が期待通りなら出力画像を返す
             if (inputImage == _inputImage)
             {
-                return Task.FromResult(_outputImage);
+                return Task.FromResult(outputImage);
             }
             return Task.FromResult(inputImage);
         }
@@ -294,18 +279,10 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
         }
         
         // テスト用の拡張されたフィルタークラス
-        private sealed class TestCustomFilter : IImagePipelineFilter
+        private sealed class TestCustomFilter(string name, Func<IAdvancedImage, IAdvancedImage> transform) : IImagePipelineFilter
         {
-            private readonly Func<IAdvancedImage, IAdvancedImage> _transform;
-            
-            public TestCustomFilter(string name, Func<IAdvancedImage, IAdvancedImage> transform)
-            {
-                Name = name;
-                _transform = transform;
-            }
-            
-            public string Name { get; init; }
-            public string Description => $"{Name} Description";
+        public string Name { get; init; } = name;
+        public string Description => $"{Name} Description";
             public string Category => "Test";
             public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
             
@@ -318,7 +295,7 @@ namespace Baketa.Infrastructure.Tests.Imaging.Pipeline;
             
             public Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
             {
-                return Task.FromResult(_transform(inputImage));
+                return Task.FromResult(transform(inputImage));
             }
             
             public IDictionary<string, object> GetParameters()

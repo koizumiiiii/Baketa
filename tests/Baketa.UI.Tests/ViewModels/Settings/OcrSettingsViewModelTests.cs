@@ -66,10 +66,11 @@ public class OcrSettingsViewModelTests
     public void OcrLanguage_ValidLanguages_PropertyChangeWorks(string language)
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.OcrLanguage = language;
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            OcrLanguage = language
+        };
 
         // Assert
         viewModel.OcrLanguage.Should().Be(language);
@@ -84,10 +85,11 @@ public class OcrSettingsViewModelTests
     public void ConfidenceThreshold_ValidRanges_PropertyChangeWorks(double threshold)
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.ConfidenceThreshold = threshold;
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            ConfidenceThreshold = threshold
+        };
 
         // Assert
         viewModel.ConfidenceThreshold.Should().Be(threshold);
@@ -175,12 +177,13 @@ public class OcrSettingsViewModelTests
     public void CurrentSettings_ReturnsCurrentValues()
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        // 一部の値を変更
-        viewModel.EnableOcr = true;
-        viewModel.OcrLanguage = "English";
-        viewModel.ConfidenceThreshold = 0.8;
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // 一部の値を変更
+            EnableOcr = true,
+            OcrLanguage = "English",
+            ConfidenceThreshold = 0.8
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;
@@ -200,10 +203,11 @@ public class OcrSettingsViewModelTests
     public void ConfidenceThreshold_BoundaryValues_AcceptsValue(double threshold)
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.ConfidenceThreshold = threshold;
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            ConfidenceThreshold = threshold
+        };
 
         // Assert
         viewModel.ConfidenceThreshold.Should().Be(threshold);
@@ -213,10 +217,11 @@ public class OcrSettingsViewModelTests
     public void EnableOcr_WhenFalse_ShouldDisableRelatedFeatures()
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.EnableOcr = false;
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            EnableOcr = false
+        };
 
         // Assert
         viewModel.EnableOcr.Should().BeFalse();
@@ -227,8 +232,10 @@ public class OcrSettingsViewModelTests
     public void EnableOcr_WhenTrue_ShouldEnableRelatedFeatures()
     {
         // Arrange
-        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.EnableOcr = false; // 初期状態を無効に
+        var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            EnableOcr = false // 初期状態を無効に
+        };
 
         // Act
         viewModel.EnableOcr = true;

@@ -7,32 +7,40 @@ namespace Baketa.Core.Settings;
 /// <summary>
 /// 設定値検証結果
 /// </summary>
-public sealed class SettingValidationResult
+/// <remarks>
+/// SettingValidationResultを初期化します（テスト用）
+/// </remarks>
+/// <param name="metadata">メタデータ</param>
+/// <param name="value">検証した値</param>
+/// <param name="isValid">検証成功フラグ</param>
+/// <param name="errorMessage">エラーメッセージ</param>
+/// <param name="warningMessage">警告メッセージ</param>
+public sealed class SettingValidationResult(SettingMetadata metadata, object? value, bool isValid, string? errorMessage, string? warningMessage)
 {
     /// <summary>
     /// 検証対象のメタデータ
     /// </summary>
-    public SettingMetadata Metadata { get; }
-    
+    public SettingMetadata Metadata { get; } = metadata ?? throw new ArgumentNullException(nameof(metadata));
+
     /// <summary>
     /// 検証が成功したかどうか
     /// </summary>
-    public bool IsValid { get; }
-    
+    public bool IsValid { get; } = isValid;
+
     /// <summary>
     /// エラーメッセージ（検証失敗時）
     /// </summary>
-    public string? ErrorMessage { get; }
-    
+    public string? ErrorMessage { get; } = errorMessage;
+
     /// <summary>
     /// 警告メッセージ（検証成功でも注意が必要な場合）
     /// </summary>
-    public string? WarningMessage { get; }
-    
+    public string? WarningMessage { get; } = warningMessage;
+
     /// <summary>
     /// 検証した値
     /// </summary>
-    public object? Value { get; }
+    public object? Value { get; } = value;
 
     /// <summary>
     /// 成功した検証結果を作成します
@@ -66,23 +74,6 @@ public sealed class SettingValidationResult
         return new SettingValidationResult(metadata, value, false, errorMessage, null);
     }
 
-    /// <summary>
-    /// SettingValidationResultを初期化します（テスト用）
-    /// </summary>
-    /// <param name="metadata">メタデータ</param>
-    /// <param name="value">検証した値</param>
-    /// <param name="isValid">検証成功フラグ</param>
-    /// <param name="errorMessage">エラーメッセージ</param>
-    /// <param name="warningMessage">警告メッセージ</param>
-    public SettingValidationResult(SettingMetadata metadata, object? value, bool isValid, string? errorMessage, string? warningMessage)
-    {
-        Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-        Value = value;
-        IsValid = isValid;
-        ErrorMessage = errorMessage;
-        WarningMessage = warningMessage;
-    }
-    
     /// <summary>
     /// 検証結果の文字列表現を取得します
     /// </summary>

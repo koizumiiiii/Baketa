@@ -10,24 +10,19 @@ namespace Baketa.Core.Examples;
     /// この実装例はCA1063警告に対応しており、
     /// DisposableBaseクラスを継承した正しいDisposeパターンを示しています。
     /// </remarks>
-    public class DisposableResourceExample : DisposableBase
+    public class DisposableResourceExample(IDisposable managedResource) : DisposableBase
     {
         // マネージドリソースの例 (IDisposableを実装するオブジェクト)
-        private readonly IDisposable _managedResource;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2213:Disposable fields should be disposed", Justification = "DisposeManagedResourcesでDisposeされています")]
+        private readonly IDisposable _managedResource = managedResource ?? throw new ArgumentNullException(nameof(managedResource));
         
         // アンマネージドリソースの例 (IntPtrや安全でないリソース)
-        private IntPtr _unmanagedHandle;
-        
-        public DisposableResourceExample(IDisposable managedResource)
-        {
-            _managedResource = managedResource ?? throw new ArgumentNullException(nameof(managedResource));
-            _unmanagedHandle = IntPtr.Zero; // 初期化例
-        }
-        
-        /// <summary>
-        /// マネージドリソースを解放します
-        /// </summary>
-        protected override void DisposeManagedResources()
+        private IntPtr _unmanagedHandle = IntPtr.Zero;
+
+    /// <summary>
+    /// マネージドリソースを解放します
+    /// </summary>
+    protected override void DisposeManagedResources()
         {
             // マネージドリソースの解放
             _managedResource?.Dispose();

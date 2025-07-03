@@ -32,9 +32,165 @@ Baketaは5つの主要レイヤーから構成されるクリーンアーキテ�
 - **アダプターレイヤー**: インターフェース間の互換性確保
 - **OpenCVベースの画像処理**: ゲーム特性に合わせた最適化
 
+## 🤖 Claude-Gemini自動化システム
+
+このプロジェクトには、Claude CodeとGemini CLIを連携した完全自動開発システムが組み込まれています。
+
+### 🚀 クイックスタート
+
+#### 1. 前提条件のインストール
+
+**WSL環境で:**
+```bash
+# .NET SDK インストール
+wget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+sudo apt update
+sudo apt install -y dotnet-sdk-8.0
+
+# Claude Code インストール
+# https://claude.ai/code からインストール
+
+# Gemini CLI インストール
+npm install -g @google/generative-ai-cli
+# または適切な方法でインストール
+```
+
+#### 2. 自動化システムの使用
+
+```bash
+# WSL環境でプロジェクトディレクトリに移動
+cd /mnt/e/dev/Baketa/claude-gemini
+
+# 実行権限付与
+chmod +x *.sh
+
+# 自動開発実行
+./baketa-auto-dev.sh "機能名" "機能説明"
+
+# 例: OCR最適化機能の実装
+./baketa-auto-dev.sh "OCR最適化" "OpenCVフィルタによるテキスト検出精度向上"
+```
+
+#### 3. 対話モード
+
+```bash
+# 対話形式で機能開発
+./baketa-auto-dev.sh interactive
+
+# コードレビュー実行
+./baketa-code-review.sh --interactive
+```
+
+### 🔄 自動化フロー
+
+```
+機能要求入力 → Claude Code実装 → ビルド確認 → テスト実行 → エラー時自動修正 → 完了
+                    ↓
+               Gemini分析（エラー時）→ 修正提案 → Claude Code修正
+```
+
+### 📋 利用可能なコマンド
+
+#### 自動開発スクリプト
+```bash
+# 基本実行
+./baketa-auto-dev.sh "機能名" "説明"
+
+# 対話モード
+./baketa-auto-dev.sh interactive
+
+# 前提条件確認
+./baketa-auto-dev.sh check
+
+# ログ確認
+./baketa-auto-dev.sh logs
+```
+
+#### コードレビュースクリプト
+```bash
+# ファイルレビュー
+./baketa-code-review.sh --file Baketa.Core/Services/OcrService.cs --focus performance
+
+# ディレクトリレビュー
+./baketa-code-review.sh --dir Baketa.Infrastructure --focus architecture
+
+# プロジェクト全体レビュー
+./baketa-code-review.sh --target . --focus full
+
+# 対話モード
+./baketa-code-review.sh --interactive
+```
+
+### 🎯 レビューフォーカス領域
+
+- `architecture` - クリーンアーキテクチャ・設計パターン
+- `performance` - 非同期処理・OCR最適化・メモリ効率
+- `security` - 入力検証・エラーハンドリング・セキュリティ
+- `style` - C#規約・可読性・命名規則
+- `documentation` - XMLコメント・API仕様・ドキュメント
+- `testing` - テスタビリティ・テスト網羅性・モック
+- `full` - 包括的レビュー（全領域）
+
+### 📁 自動化システム構成
+
+```
+claude-gemini/
+├── baketa-auto-dev.sh         # 自動開発メインスクリプト
+├── baketa-code-review.sh      # コードレビュー専用スクリプト
+├── config.json               # システム設定（自動生成）
+├── logs/                     # 実行ログ（gitignore）
+│   ├── auto-dev.log          # 開発ログ
+│   ├── code-review.log       # レビューログ
+│   ├── build_attempt_*.log   # ビルドログ
+│   └── test_attempt_*.log    # テストログ
+└── reviews/                  # レビュー結果（gitignore）
+    └── review_*.md           # Markdownレビューレポート
+```
+
+### 🛠️ 設定とカスタマイズ
+
+システム設定は `claude-gemini/config.json` で管理されます（初回実行時に自動生成）：
+
+```json
+{
+  "development": {
+    "maxRetries": 3,
+    "buildConfiguration": "Release",
+    "autoFix": true
+  },
+  "gemini": {
+    "dailyLimit": 1000,
+    "defaultModel": "gemini-pro"
+  },
+  "review": {
+    "defaultFocus": "full",
+    "maxFilesPerReview": 10,
+    "saveResults": true
+  }
+}
+```
+
+### 🔍 トラブルシューティング
+
+```bash
+# 前提条件確認
+./baketa-auto-dev.sh check
+
+# ログ確認
+tail -f claude-gemini/logs/auto-dev.log
+
+# 手動ビルド確認
+cd /mnt/e/dev/Baketa
+dotnet build
+
+# 手動テスト確認
+dotnet test
+```
+
 ## Claude Code 開発環境
 
-このプロジェクトは[Claude Code](https://claude.ai/code)での開発に最適化されています。
+このプロジェクトは[Claude Code](https://claude.ai/code)での開発にも最適化されています。
 
 ### 🚀 クイックセットアップ
 
@@ -79,6 +235,7 @@ bhelp        # ヘルプ表示
 - **.NET**: 8.0 Windows Target Framework
 - **開発環境**: Visual Studio 2022 推奨
 - **Claude Code**: 効率的な開発のため推奨
+- **WSL**: 自動化システム使用時に必要
 
 ### 依存関係
 - **UI Framework**: Avalonia 11.2.7 + ReactiveUI
@@ -89,6 +246,15 @@ bhelp        # ヘルプ表示
 - **テストフレームワーク**: xUnit + Moq
 
 ## 開発ワークフロー
+
+### 自動化システム使用時の推奨フロー
+
+1. **機能要求**: WSL環境で自動化スクリプト実行
+2. **自動実装**: Claude Codeによる実装
+3. **自動検証**: ビルド・テストの自動実行
+4. **自動修正**: エラー時のGemini分析・Claude修正
+5. **コードレビュー**: 完了後のGeminiレビュー実行
+6. **統合**: 手動での最終確認・コミット
 
 ### 基本的な開発フロー
 
@@ -113,7 +279,14 @@ claude "PowerShellで以下を実行してください: .\scripts\run_tests.ps1 
 
 ## ビルドとテスト
 
-### PowerShellスクリプト使用（推奨）
+### 自動化スクリプト使用（推奨）
+
+```bash
+# WSL環境での自動ビルド・テスト
+./claude-gemini/baketa-auto-dev.sh "テスト実装" "新機能のテスト追加"
+```
+
+### PowerShellスクリプト使用
 
 ```powershell
 # ビルド
@@ -163,6 +336,12 @@ Baketa/
 │   ├── project.json           # プロジェクト設定
 │   ├── instructions.md        # 開発指示
 │   └── context.md             # コンテキスト設定
+├── claude-gemini/             # 自動化システム
+│   ├── baketa-auto-dev.sh     # 自動開発スクリプト
+│   ├── baketa-code-review.sh  # コードレビュースクリプト
+│   ├── config.json            # システム設定
+│   ├── logs/                  # ログファイル（gitignore）
+│   └── reviews/               # レビュー結果（gitignore）
 ├── scripts/                   # 開発用スクリプト
 │   ├── run_build.ps1          # ビルドスクリプト
 │   ├── run_tests.ps1          # テストスクリプト
@@ -195,6 +374,7 @@ Baketa/
 - プラットフォーム依存コードの整理
 - アダプターパターンによる互換性維持
 - Claude Code開発環境の最適化
+- Claude-Gemini自動化システムの統合
 
 ## 開発設計原則
 
@@ -215,6 +395,7 @@ Baketa/
 - クロスプラットフォーム対応の予定はありません
 - OCR最適化にはOpenCVのみを使用します
 - Claude Codeでの開発時は、PowerShell環境での実行を前提としています
+- 自動化システムはWSL環境で.NET SDKとGemini CLIが必要です
 
 ## ライセンス
 
@@ -222,6 +403,6 @@ Baketa/
 
 ## 貢献
 
-プロジェクトへの貢献を歓迎します。Claude Codeを使用した効率的な開発ワークフローに従って、プルリクエストを提出してください。
+プロジェクトへの貢献を歓迎します。Claude Code自動化システムを使用した効率的な開発ワークフローに従って、プルリクエストを提出してください。
 
 詳細な開発ガイドラインについては、[docs/claude_code_complete_guide.md](docs/claude_code_complete_guide.md) を参照してください。

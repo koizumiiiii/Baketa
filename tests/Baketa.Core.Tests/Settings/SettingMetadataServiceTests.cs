@@ -49,7 +49,7 @@ public class SettingMetadataServiceTests
     public void GetMetadata_WithValidType_ShouldReturnMetadata()
     {
         // Arrange & Act
-        var metadata = _service.GetMetadata(typeof(TestSettings));
+        var metadata = _service.GetMetadata<TestSettings>();
 
         // Assert
         Assert.NotNull(metadata);
@@ -68,7 +68,7 @@ public class SettingMetadataServiceTests
     public void GetMetadata_WithTypeWithoutMetadata_ShouldReturnEmptyList()
     {
         // Arrange & Act
-        var metadata = _service.GetMetadata(typeof(SettingsWithoutMetadata));
+        var metadata = _service.GetMetadata<SettingsWithoutMetadata>();
 
         // Assert
         Assert.NotNull(metadata);
@@ -79,10 +79,10 @@ public class SettingMetadataServiceTests
     public void GetMetadata_SameTypeTwice_ShouldReturnCachedResult()
     {
         // Arrange
-        var metadata1 = _service.GetMetadata(typeof(TestSettings));
+        var metadata1 = _service.GetMetadata<TestSettings>();
 
         // Act
-        var metadata2 = _service.GetMetadata(typeof(TestSettings));
+        var metadata2 = _service.GetMetadata<TestSettings>();
 
         // Assert
         Assert.Same(metadata1, metadata2);

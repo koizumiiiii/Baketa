@@ -218,12 +218,13 @@ public sealed class SettingsIntegrationTests : IDisposable
         changeTracker.HasChanges.Should().BeFalse();
 
         // Act 2: ViewModelで設定変更
-        var mainUiViewModel = new MainUiSettingsViewModel(
+        var _1 = new MainUiSettingsViewModel(
             new MainUiSettings(),
             _mockEventAggregator.Object,
-            Mock.Of<ILogger<MainUiSettingsViewModel>>());
-
-        mainUiViewModel.PanelOpacity = 0.5;
+            Mock.Of<ILogger<MainUiSettingsViewModel>>())
+        {
+            PanelOpacity = 0.5
+        };
 
         // Note: 実際の実装では、ViewModelの変更がChangeTrackerに通知される仕組みが必要
         // ここではモックを使用してその動作をシミュレート

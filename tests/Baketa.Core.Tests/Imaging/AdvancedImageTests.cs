@@ -16,14 +16,13 @@ namespace Baketa.Core.Tests.Imaging;
         /// <summary>
         /// テスト用のモック画像クラス
         /// </summary>
-        private sealed class MockAdvancedImage : IAdvancedImage
+        private sealed class MockAdvancedImage(int width, int height) : IAdvancedImage
         {
-        private readonly byte[] _imageData;
         private readonly Dictionary<(int x, int y), Color> _pixels = [];
         private bool _isDisposed = false;
 
-        public int Width { get; }
-        public int Height { get; }
+        public int Width { get; } = width;
+        public int Height { get; } = height;
         public ImageFormat Format => ImageFormat.Rgba32; // テスト用のデフォルトフォーマット
         public bool IsGrayscale => false;
         public int BitsPerPixel => 32;
@@ -34,15 +33,7 @@ namespace Baketa.Core.Tests.Imaging;
             // グレースケール変換の同期版実装
             return new MockAdvancedImage(Width, Height);
         }
-        
-        // コンストラクタ
-        public MockAdvancedImage(int width, int height)
-        {
-            Width = width;
-            Height = height;
-            _imageData = new byte[width * height * 3]; // RGB形式
-        }
-        
+
         public IImage Clone()
         {
             // クローン作成のモック実装
@@ -171,7 +162,7 @@ namespace Baketa.Core.Tests.Imaging;
         public Task<List<Rectangle>> DetectTextRegionsAsync()
         {
             // テキスト領域検出のモック動作
-            return Task.FromResult(new List<Rectangle> { new Rectangle(10, 10, 20, 20) });
+            return Task.FromResult(new List<Rectangle> { new(10, 10, 20, 20) });
         }
     }
 

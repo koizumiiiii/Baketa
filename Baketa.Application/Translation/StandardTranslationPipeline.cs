@@ -17,59 +17,48 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Translation;
 
-    /// <summary>
-    /// 標準翻訳パイプライン
-    /// 翻訳パイプラインは、翻訳リクエストを受け取り、キャッシュ確認、翻訳実行、
-    /// 結果の保存、イベント発行などの処理を一貫して行います。
-    /// </summary>
+/// <summary>
+/// 標準翻訳パイプライン
+/// 翻訳パイプラインは、翻訳リクエストを受け取り、キャッシュ確認、翻訳実行、
+/// 結果の保存、イベント発行などの処理を一貫して行います。
+/// </summary>
+/// <remarks>
+/// 標準翻訳パイプラインのコンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+/// <param name="engineFactory">翻訳エンジンファクトリー</param>
+/// <param name="cache">翻訳キャッシュ</param>
+/// <param name="translationManager">翻訳マネージャー</param>
+/// <param name="eventAggregator">イベント集約器</param>
+/// <param name="options">翻訳オプション</param>
 #pragma warning disable CA2016 // CancellationTokenパラメーターの転送問題を一時的に拘束します
-    public class StandardTranslationPipeline : ITranslationPipeline
+public class StandardTranslationPipeline(
+        ILogger<StandardTranslationPipeline> logger,
+        ITranslationEngineFactory engineFactory,
+        ITranslationCache cache,
+        ITranslationManager translationManager,
+        IEventAggregator eventAggregator,
+        ITranslationTransactionManager transactionManager,
+        Baketa.Core.Translation.Common.TranslationOptions options) : ITranslationPipeline
     {
-        private readonly ILogger<StandardTranslationPipeline> _logger;
-        private readonly ITranslationEngineFactory _engineFactory;
-        private readonly ITranslationCache _cache;
-        private readonly ITranslationManager _translationManager;
-        private readonly IEventAggregator _eventAggregator;
-        private readonly ITranslationTransactionManager _transactionManager;
-        private readonly Baketa.Core.Translation.Common.TranslationOptions _options;
+        private readonly ILogger<StandardTranslationPipeline> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly ITranslationEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+        private readonly ITranslationCache _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        private readonly ITranslationManager _translationManager = translationManager ?? throw new ArgumentNullException(nameof(translationManager));
+        private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        private readonly ITranslationTransactionManager _transactionManager = transactionManager ?? throw new ArgumentNullException(nameof(transactionManager));
+        private readonly Baketa.Core.Translation.Common.TranslationOptions _options = options ?? throw new ArgumentNullException(nameof(options));
 
-        /// <summary>
-        /// 標準翻訳パイプラインのコンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="engineFactory">翻訳エンジンファクトリー</param>
-        /// <param name="cache">翻訳キャッシュ</param>
-        /// <param name="translationManager">翻訳マネージャー</param>
-        /// <param name="eventAggregator">イベント集約器</param>
-        /// <param name="options">翻訳オプション</param>
-        public StandardTranslationPipeline(
-            ILogger<StandardTranslationPipeline> logger,
-            ITranslationEngineFactory engineFactory,
-            ITranslationCache cache,
-            ITranslationManager translationManager,
-            IEventAggregator eventAggregator,
-            ITranslationTransactionManager transactionManager,
-            Baketa.Core.Translation.Common.TranslationOptions options)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-            _translationManager = translationManager ?? throw new ArgumentNullException(nameof(translationManager));
-            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-            _transactionManager = transactionManager ?? throw new ArgumentNullException(nameof(transactionManager));
-            _options = options ?? throw new ArgumentNullException(nameof(options));
-        }
-
-        /// <summary>
-        /// 翻訳パイプラインを実行します
-        /// </summary>
-        /// <param name="request">翻訳リクエスト</param>
-        /// <param name="preferredEngine">優先エンジン名（オプション）</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>翻訳レスポンス</returns>
-        /// <exception cref="ArgumentNullException">requestがnullの場合</exception>
-        /// <exception cref="InvalidOperationException">翻訳エンジンが見つからない場合やエンジンからの応答が無効な場合</exception>
-        public async Task<TranslationResponse> ExecuteAsync(
+    /// <summary>
+    /// 翻訳パイプラインを実行します
+    /// </summary>
+    /// <param name="request">翻訳リクエスト</param>
+    /// <param name="preferredEngine">優先エンジン名（オプション）</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>翻訳レスポンス</returns>
+    /// <exception cref="ArgumentNullException">requestがnullの場合</exception>
+    /// <exception cref="InvalidOperationException">翻訳エンジンが見つからない場合やエンジンからの応答が無効な場合</exception>
+    public async Task<TranslationResponse> ExecuteAsync(
             TranslationRequest request,
             string? preferredEngine = null,
             CancellationToken cancellationToken = default)
@@ -292,6 +281,8 @@ namespace Baketa.Application.Translation;
                     {
 #pragma warning disable CA2016 // この特定行に対するCancellationToken警告を拘束
                         // トランザクションがない場合は直接保存
+                        // 翻訳マネージャーが実装された際に使用するため、現在は参照のみ
+                        _ = _translationManager; // CA1823警告回避のため
                         // SaveTranslationAsyncメソッドが実装された際には、以下のようにCancellationTokenを渡す
                         // await _translationManager.SaveTranslationAsync(response, request.Context, cancellationToken)
                         //    .ConfigureAwait(false);
@@ -834,6 +825,8 @@ namespace Baketa.Application.Translation;
 
 #pragma warning disable CA2016 // この特定行に対するCancellationToken警告を拘束
                                 // 翻訳レコードとして保存
+                                // 翻訳マネージャーが実装された際に使用するため、現在は参照のみ
+                                _ = _translationManager; // CA1823警告回避のため
                                 // SaveTranslationAsyncメソッドが実装された際には、以下のようにCancellationTokenを渡す
                                 // await _translationManager.SaveTranslationAsync(response, originalRequest.Context, cancellationToken)
                                 //    .ConfigureAwait(false);

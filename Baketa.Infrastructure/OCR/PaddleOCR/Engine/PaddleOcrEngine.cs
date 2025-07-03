@@ -18,10 +18,12 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 /// <summary>
 /// PaddleOCRエンジンの実装クラス（IOcrEngine準拠）
 /// </summary>
-public sealed class PaddleOcrEngine : IOcrEngine
+public sealed class PaddleOcrEngine(
+    IModelPathResolver modelPathResolver,
+    ILogger<PaddleOcrEngine>? logger = null) : IOcrEngine
 {
-    private readonly IModelPathResolver _modelPathResolver;
-    private readonly ILogger<PaddleOcrEngine>? _logger;
+    private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
+    private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly object _lockObject = new();
     
     private PaddleOcrAll? _ocrEngine;
@@ -44,14 +46,6 @@ public sealed class PaddleOcrEngine : IOcrEngine
     /// マルチスレッド対応が有効かどうか
     /// </summary>
     public bool IsMultiThreadEnabled { get; private set; }
-
-    public PaddleOcrEngine(
-        IModelPathResolver modelPathResolver,
-        ILogger<PaddleOcrEngine>? logger = null)
-    {
-        _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
-        _logger = logger;
-    }
 
     /// <summary>
     /// OCRエンジンを初期化
@@ -675,7 +669,7 @@ public sealed class PaddleOcrEngine : IOcrEngine
     /// <summary>
     /// IImageからOpenCV Matに変換
     /// </summary>
-    private async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
+    private async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? regionOfInterest, CancellationToken _)
     {
         try
         {

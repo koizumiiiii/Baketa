@@ -5,10 +5,16 @@ using Baketa.Core.Abstractions.Imaging.Pipeline;
 
 namespace Baketa.Core.Services.Imaging.Pipeline.Conditions;
 
-    /// <summary>
-    /// 画像のプロパティに基づく条件
-    /// </summary>
-    public class ImagePropertyCondition : IPipelineCondition
+/// <summary>
+/// 画像のプロパティに基づく条件
+/// </summary>
+/// <remarks>
+/// 新しいImagePropertyConditionを作成します
+/// </remarks>
+/// <param name="propertyType">比較する画像プロパティの種類</param>
+/// <param name="operator">比較演算子</param>
+/// <param name="compareValue">比較する値</param>
+public class ImagePropertyCondition(ImagePropertyCondition.PropertyType propertyType, ImagePropertyCondition.ComparisonOperator @operator, object compareValue) : IPipelineCondition
     {
         /// <summary>
         /// 画像プロパティの種類
@@ -77,37 +83,22 @@ namespace Baketa.Core.Services.Imaging.Pipeline.Conditions;
             LessThanOrEqual
         }
         
-        private readonly PropertyType _propertyType;
-        private readonly ComparisonOperator _operator;
-        private readonly object _compareValue;
-        
-        /// <summary>
-        /// 条件の説明
-        /// </summary>
-        public string Description { get; }
+        private readonly PropertyType _propertyType = propertyType;
+        private readonly ComparisonOperator _operator = @operator;
+        private readonly object _compareValue = compareValue ?? throw new ArgumentNullException(nameof(compareValue));
 
-        /// <summary>
-        /// 新しいImagePropertyConditionを作成します
-        /// </summary>
-        /// <param name="propertyType">比較する画像プロパティの種類</param>
-        /// <param name="operator">比較演算子</param>
-        /// <param name="compareValue">比較する値</param>
-        public ImagePropertyCondition(PropertyType propertyType, ComparisonOperator @operator, object compareValue)
-        {
-            _propertyType = propertyType;
-            _operator = @operator;
-            _compareValue = compareValue ?? throw new ArgumentNullException(nameof(compareValue));
-            
-            Description = $"画像の{GetPropertyTypeString(propertyType)}が{GetOperatorString(@operator)}{compareValue}";
-        }
+    /// <summary>
+    /// 条件の説明
+    /// </summary>
+    public string Description { get; } = $"画像の{GetPropertyTypeString(propertyType)}が{GetOperatorString(@operator)}{compareValue}";
 
-        /// <summary>
-        /// 条件を評価します
-        /// </summary>
-        /// <param name="input">入力画像</param>
-        /// <param name="context">パイプライン実行コンテキスト</param>
-        /// <returns>条件が真の場合はtrue、偽の場合はfalse</returns>
-        public Task<bool> EvaluateAsync(IAdvancedImage input, PipelineContext context)
+    /// <summary>
+    /// 条件を評価します
+    /// </summary>
+    /// <param name="input">入力画像</param>
+    /// <param name="context">パイプライン実行コンテキスト</param>
+    /// <returns>条件が真の場合はtrue、偽の場合はfalse</returns>
+    public Task<bool> EvaluateAsync(IAdvancedImage input, PipelineContext context)
         {
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(context);

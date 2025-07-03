@@ -9,14 +9,10 @@ namespace Baketa.UI.Tests.Settings;
 /// DefaultFontSettingsの単体テスト
 /// Issue #70 オーバーレイUIデザインとアニメーション実装 - Phase 4
 /// </summary>
-public sealed class DefaultFontSettingsTests
+/// <param name="output">テスト出力ヘルパー</param>
+public sealed class DefaultFontSettingsTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public DefaultFontSettingsTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
+    private readonly ITestOutputHelper _output = output;
 
     #region 基本値テスト
 

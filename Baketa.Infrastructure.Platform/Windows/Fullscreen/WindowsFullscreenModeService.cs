@@ -658,7 +658,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
     /// <summary>
     /// モード変更イベントを通知
     /// </summary>
-    private Task NotifyModeChangedAsync(FullscreenModeChangedEventArgs eventArgs, CancellationToken cancellationToken)
+    private Task NotifyModeChangedAsync(FullscreenModeChangedEventArgs eventArgs, CancellationToken _)
     {
         try
         {

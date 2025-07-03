@@ -8,24 +8,18 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.Chinese;
 /// <summary>
 /// 中国語変種検出サービス
 /// </summary>
-public class ChineseVariantDetectionService
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="processor">中国語言語処理プロセッサ</param>
+/// <param name="logger">ロガー</param>
+/// <exception cref="ArgumentNullException">引数がnullの場合</exception>
+public class ChineseVariantDetectionService(
+    ChineseLanguageProcessor processor,
+    ILogger<ChineseVariantDetectionService> logger)
 {
-    private readonly ChineseLanguageProcessor _processor;
-    private readonly ILogger<ChineseVariantDetectionService> _logger;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="processor">中国語言語処理プロセッサ</param>
-    /// <param name="logger">ロガー</param>
-    /// <exception cref="ArgumentNullException">引数がnullの場合</exception>
-    public ChineseVariantDetectionService(
-        ChineseLanguageProcessor processor,
-        ILogger<ChineseVariantDetectionService> logger)
-    {
-        _processor = processor ?? throw new ArgumentNullException(nameof(processor));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ChineseLanguageProcessor _processor = processor ?? throw new ArgumentNullException(nameof(processor));
+    private readonly ILogger<ChineseVariantDetectionService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// テキストから中国語変種を検出

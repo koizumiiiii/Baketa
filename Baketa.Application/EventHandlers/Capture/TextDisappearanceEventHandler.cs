@@ -7,32 +7,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.EventHandlers.Capture;
 
-    /// <summary>
-    /// テキスト消失イベントのハンドラー
-    /// </summary>
-    public class TextDisappearanceEventHandler : IEventProcessor<IEvent>
+/// <summary>
+/// テキスト消失イベントのハンドラー
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class TextDisappearanceEventHandler(ILogger<TextDisappearanceEventHandler>? logger = null) : IEventProcessor<IEvent>
     {
-        private readonly ILogger<TextDisappearanceEventHandler>? _logger;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public TextDisappearanceEventHandler(ILogger<TextDisappearanceEventHandler>? logger = null)
+        private readonly ILogger<TextDisappearanceEventHandler>? _logger = logger;
+
+    /// <summary>
+    /// イベントを処理します
+    /// </summary>
+    /// <param name="event">テキスト消失イベント</param>
+    public async Task HandleAsync(IEvent eventData)
         {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// イベントを処理します
-        /// </summary>
-        /// <param name="event">テキスト消失イベント</param>
-        public async Task HandleAsync(IEvent @event)
-        {
-            ArgumentNullException.ThrowIfNull(@event, nameof(@event));
+            ArgumentNullException.ThrowIfNull(eventData, nameof(eventData));
                 
             // TextDisappearanceEvent型にキャスト
-            if (@event is TextDisappearanceEvent textDisappearanceEvent)
+            if (eventData is TextDisappearanceEvent textDisappearanceEvent)
             {
                 try
                 {
@@ -64,14 +59,14 @@ namespace Baketa.Application.EventHandlers.Capture;
             }
             else
             {
-                _logger?.LogWarning("サポートされていないイベントタイプ: {EventType}", @event.GetType().Name);
+                _logger?.LogWarning("サポートされていないイベントタイプ: {EventType}", eventData.GetType().Name);
             }
         }
         
         /// <summary>
         /// 消失したテキスト領域に対応する翻訳ウィンドウを非表示にします
         /// </summary>
-        private async Task HideTranslationWindowsAsync(TextDisappearanceEvent @event)
+        private async Task HideTranslationWindowsAsync(TextDisappearanceEvent _)
         {
             // ここでは実際の実装は省略（UI層と連携する必要あり）
             // 実際の実装では、以下の処理を行う

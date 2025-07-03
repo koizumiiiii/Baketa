@@ -18,10 +18,10 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture;
     /// </summary>
     internal sealed class WindowsImageFactoryMock : Baketa.Core.Abstractions.Factories.IWindowsImageFactory
     {
-        public Task<IWindowsImage> CreateFromFileAsync(string filePath) => throw new NotImplementedException();
-        public Task<IWindowsImage> CreateFromBytesAsync(byte[] data) => throw new NotImplementedException();
+        public Task<IWindowsImage> CreateFromFileAsync(string _) => throw new NotImplementedException();
+        public Task<IWindowsImage> CreateFromBytesAsync(byte[] _) => throw new NotImplementedException();
         public IWindowsImage CreateFromBitmap(Bitmap bitmap) => new Mock<IWindowsImage>().Object;
-        public Task<IWindowsImage> CreateEmptyAsync(int width, int height, Color? backgroundColor = null) => throw new NotImplementedException();
+        public Task<IWindowsImage> CreateEmptyAsync(int _, int _1, Color? _2 = null) => throw new NotImplementedException();
     }
     
     /// <summary>

@@ -83,14 +83,9 @@ public static class TestHttpClientHelper
 /// テスト用のHttpClientFactory実装
 /// Moqで拡張メソッドをモックできない問題を回避
 /// </summary>
-public class TestHttpClientFactory : IHttpClientFactory
+public class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
 {
-    private readonly HttpClient _client;
-
-    public TestHttpClientFactory(HttpClient client)
-    {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
-    }
+    private readonly HttpClient _client = client ?? throw new ArgumentNullException(nameof(client));
 
     public HttpClient CreateClient(string name)
     {

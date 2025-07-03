@@ -6,24 +6,30 @@ namespace Baketa.Core.Settings;
 /// 設定項目メタデータ属性
 /// 設定項目の表示情報、分類、制約などを定義
 /// </summary>
+/// <remarks>
+/// SettingMetadataAttributeを初期化します
+/// </remarks>
+/// <param name="level">設定レベル</param>
+/// <param name="category">カテゴリ名</param>
+/// <param name="displayName">表示名</param>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-public sealed class SettingMetadataAttribute : Attribute
+public sealed class SettingMetadataAttribute(SettingLevel level, string category, string displayName) : Attribute
 {
     /// <summary>
     /// 設定レベル（基本/詳細/デバッグ）
     /// </summary>
-    public SettingLevel Level { get; }
-    
+    public SettingLevel Level { get; } = level;
+
     /// <summary>
     /// カテゴリ名（設定グループ）
     /// </summary>
-    public string Category { get; }
-    
+    public string Category { get; } = category ?? throw new ArgumentNullException(nameof(category));
+
     /// <summary>
     /// 表示名（UIに表示される名前）
     /// </summary>
-    public string DisplayName { get; }
-    
+    public string DisplayName { get; } = displayName ?? throw new ArgumentNullException(nameof(displayName));
+
     /// <summary>
     /// 説明文（ヘルプテキスト）
     /// </summary>
@@ -68,17 +74,4 @@ public sealed class SettingMetadataAttribute : Attribute
     /// 設定変更時の警告メッセージ
     /// </summary>
     public string? WarningMessage { get; set; }
-
-    /// <summary>
-    /// SettingMetadataAttributeを初期化します
-    /// </summary>
-    /// <param name="level">設定レベル</param>
-    /// <param name="category">カテゴリ名</param>
-    /// <param name="displayName">表示名</param>
-    public SettingMetadataAttribute(SettingLevel level, string category, string displayName)
-    {
-        Level = level;
-        Category = category ?? throw new ArgumentNullException(nameof(category));
-        DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
-    }
 }

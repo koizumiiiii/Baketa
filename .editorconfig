@@ -89,9 +89,19 @@ dotnet_separate_import_directive_groups = true:warning
 dotnet_diagnostic.IDE0059.severity = warning
 csharp_style_unused_value_assignment_preference = discard_variable:warning
 
-# Unused parameters
+# Unused parameters (use discard symbols for required but unused parameters)
+dotnet_diagnostic.IDE0060.severity = warning
+dotnet_code_quality_unused_parameters = all:warning
+csharp_style_unused_value_assignment_preference = discard_variable:warning
+
+# === OpenCV Stub Implementation Overrides ===
+# OpenCV wrapper classes have stub implementations with parameters for future use
+[**/OpenCv/**/*.cs]
 dotnet_diagnostic.IDE0060.severity = suggestion
-dotnet_code_quality_unused_parameters = all:suggestion
+
+# Translation engine stub implementations
+[**/Translation/Local/Onnx/**/*.cs]
+dotnet_diagnostic.IDE0060.severity = suggestion
 
 # === Legacy IDE Warnings (Controlled) ===
 
@@ -210,16 +220,19 @@ dotnet_diagnostic.CA1051.severity = none
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1707.severity = none  # Allow underscores in test method names
 dotnet_diagnostic.CA2000.severity = none  # Automatic resource management in tests
+dotnet_diagnostic.CA1416.severity = none  # Platform compatibility warnings (Windows-only app)
 
 [**/*Tests.cs]
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1416.severity = none  # Platform compatibility warnings
 
 [**/Baketa.*Tests/**/*.cs]
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1416.severity = none  # Platform compatibility warnings
 
 # Mock classes in tests
 [**/*Mock*.cs]

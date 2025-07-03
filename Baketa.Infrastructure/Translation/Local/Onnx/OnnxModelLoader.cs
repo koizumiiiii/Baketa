@@ -12,23 +12,17 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx;
 /// <summary>
 /// ONNX Runtime を使用したモデルローダーの実装
 /// </summary>
-public class OnnxModelLoader : IModelLoader, IDisposable
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OnnxModelLoader(ILogger<OnnxModelLoader> logger) : IModelLoader, IDisposable
 {
-    private readonly ILogger<OnnxModelLoader> _logger;
+    private readonly ILogger<OnnxModelLoader> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private InferenceSession? _session;
     private SessionOptions? _sessionOptions;
-    private ComputeDevice _currentDevice;
+    private ComputeDevice _currentDevice = ComputeDevice.CreateCpu();
     private bool _disposed;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public OnnxModelLoader(ILogger<OnnxModelLoader> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _currentDevice = ComputeDevice.CreateCpu();
-    }
 
     /// <inheritdoc/>
     public async Task<bool> LoadModelAsync(string modelPath, ModelOptions? options = null)

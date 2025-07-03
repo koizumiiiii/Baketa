@@ -135,15 +135,10 @@ public class ChineseLanguageProcessorDebugTests : IDisposable
 /// <summary>
 /// Debug用のXunit ロガープロバイダー
 /// </summary>
-public sealed class DebugXunitLoggerProvider : ILoggerProvider
+public sealed class DebugXunitLoggerProvider(ITestOutputHelper output) : ILoggerProvider
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
     private bool _disposed;
-
-    public DebugXunitLoggerProvider(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
 
     public ILogger CreateLogger(string categoryName)
     {
@@ -164,16 +159,10 @@ public sealed class DebugXunitLoggerProvider : ILoggerProvider
 /// <summary>
 /// Debug用のXunit ロガー
 /// </summary>
-public sealed class DebugXunitLogger : ILogger
+public sealed class DebugXunitLogger(ITestOutputHelper output, string categoryName) : ILogger
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _categoryName;
-
-    public DebugXunitLogger(ITestOutputHelper output, string categoryName)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-        _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
-    }
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+    private readonly string _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 

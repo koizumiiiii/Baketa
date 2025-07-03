@@ -133,20 +133,13 @@ namespace Baketa.Core.Tests.Imaging;
         /// <summary>
         /// モックAdvancedImageクラス
         /// </summary>
-        private sealed class MockAdvancedImage : IAdvancedImage
+        private sealed class MockAdvancedImage(byte[] data, int width = 2, int height = 2) : IAdvancedImage
         {
-            private readonly byte[] _data;
-            
-            public MockAdvancedImage(byte[] data, int width = 2, int height = 2)
-            {
-                _data = data;
-                Width = width;
-                Height = height;
-            }
-            
-            public int Width { get; }
-            public int Height { get; }
-            public ImageFormat Format => ImageFormat.Rgb24;
+            private readonly byte[] _data = data;
+
+        public int Width { get; } = width;
+        public int Height { get; } = height;
+        public ImageFormat Format => ImageFormat.Rgb24;
             public bool IsGrayscale => false;
             public int BitsPerPixel => 24;
             public int ChannelCount => 3;

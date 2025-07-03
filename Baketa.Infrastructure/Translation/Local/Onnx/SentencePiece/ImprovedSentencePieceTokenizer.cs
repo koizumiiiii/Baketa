@@ -284,32 +284,12 @@ public class ImprovedSentencePieceTokenizer : Baketa.Core.Translation.Models.ITo
     private int[] EncodeWithReflection(object tokenizer, string text)
     {
         var type = tokenizer.GetType();
-        var encodeMethod = type.GetMethod("Encode", [typeof(string)]);
-        
-        if (encodeMethod == null)
-        {
-            throw new InvalidOperationException("Encodeメソッドが見つかりません");
-        }
-
-        var result = encodeMethod.Invoke(tokenizer, [text]);
-        if (result == null)
-        {
-            throw new InvalidOperationException("Encodeメソッドがnullを返しました");
-        }
+        var encodeMethod = type.GetMethod("Encode", [typeof(string)]) ?? throw new InvalidOperationException("Encodeメソッドが見つかりません");
+        var result = encodeMethod.Invoke(tokenizer, [text]) ?? throw new InvalidOperationException("Encodeメソッドがnullを返しました");
 
         // EncodeResultからIdsを取得
-        var idsProperty = result.GetType().GetProperty("Ids");
-        if (idsProperty == null)
-        {
-            throw new InvalidOperationException("EncodeResult.Idsプロパティが見つかりません");
-        }
-
-        var ids = idsProperty.GetValue(result);
-        if (ids == null)
-        {
-            throw new InvalidOperationException("EncodeResult.Idsプロパティがnullを返しました");
-        }
-        
+        var idsProperty = result.GetType().GetProperty("Ids") ?? throw new InvalidOperationException("EncodeResult.Idsプロパティが見つかりません");
+        var ids = idsProperty.GetValue(result) ?? throw new InvalidOperationException("EncodeResult.Idsプロパティがnullを返しました");
         return ids switch
         {
             System.Collections.Generic.IReadOnlyList<int> idsList => [.. idsList],
@@ -321,19 +301,7 @@ public class ImprovedSentencePieceTokenizer : Baketa.Core.Translation.Models.ITo
     private string DecodeWithReflection(object tokenizer, int[] tokens)
     {
         var type = tokenizer.GetType();
-        var decodeMethod = type.GetMethod("Decode", [typeof(int[])]);
-        
-        if (decodeMethod == null)
-        {
-            // IReadOnlyList<int>を受け取るオーバーロードを試す
-            decodeMethod = type.GetMethod("Decode", [typeof(System.Collections.Generic.IReadOnlyList<int>)]);
-        }
-        
-        if (decodeMethod == null)
-        {
-            throw new InvalidOperationException("Decodeメソッドが見つかりません");
-        }
-
+        var decodeMethod = (type.GetMethod("Decode", [typeof(int[])]) ?? type.GetMethod("Decode", [typeof(System.Collections.Generic.IReadOnlyList<int>)])) ?? throw new InvalidOperationException("Decodeメソッドが見つかりません");
         var result = decodeMethod.Invoke(tokenizer, [tokens]);
         
         if (result is string decodedString)

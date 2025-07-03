@@ -14,23 +14,27 @@ using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common;
 
-    /// <summary>
-    /// 翻訳エンジンの基本実装を提供する抽象クラス
-    /// </summary>
-    public abstract class TranslationEngineBase : ITranslationEngine, ITranslationEngineInternal
+/// <summary>
+/// 翻訳エンジンの基本実装を提供する抽象クラス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public abstract class TranslationEngineBase(ILogger? logger = null) : ITranslationEngine, ITranslationEngineInternal
     {
-        private readonly SemaphoreSlim _initializationLock = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _initializationLock = new(1, 1);
         private bool _isInitialized;
         private bool _isDisposed;
-        /// <summary>
-        /// ロガーインスタンス
-        /// </summary>
-        protected ILogger? Logger { get; }
+    /// <summary>
+    /// ロガーインスタンス
+    /// </summary>
+    protected ILogger? Logger { get; } = logger;
 
-        /// <summary>
-        /// 翻訳エンジンの名称
-        /// </summary>
-        public abstract string Name { get; }
+    /// <summary>
+    /// 翻訳エンジンの名称
+    /// </summary>
+    public abstract string Name { get; }
         
         /// <summary>
         /// 翻訳エンジンの説明
@@ -42,22 +46,13 @@ namespace Baketa.Core.Translation.Common;
         /// </summary>
         public abstract bool RequiresNetwork { get; }
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        protected TranslationEngineBase(ILogger? logger = null)
-        {
-            Logger = logger;
-        }
-        
-        /// <summary>
-        /// テキストを翻訳します
-        /// </summary>
-        /// <param name="request">翻訳リクエスト</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>翻訳レスポンス</returns>
-        Task<TranslationResponse> ITranslationEngine.TranslateAsync(
+    /// <summary>
+    /// テキストを翻訳します
+    /// </summary>
+    /// <param name="request">翻訳リクエスト</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>翻訳レスポンス</returns>
+    Task<TranslationResponse> ITranslationEngine.TranslateAsync(
             TranslationRequest request, 
             CancellationToken cancellationToken)
         {

@@ -7,24 +7,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理に最適化されたグレースケールフィルター
-    /// </summary>
-    public class OcrGrayscaleFilter : ImageFilterBase
+/// <summary>
+/// OCR処理に最適化されたグレースケールフィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrGrayscaleFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrGrayscaleFilter(ILogger<OcrGrayscaleFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrGrayscaleFilter> _logger;
+        private readonly ILogger<OcrGrayscaleFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrGrayscaleFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrGrayscaleFilter(ILogger<OcrGrayscaleFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCRグレースケール";
+    /// <inheritdoc/>
+    public override string Name => "OCRグレースケール";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理に最適化されたグレースケール変換フィルター";

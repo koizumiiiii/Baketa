@@ -11,22 +11,26 @@ using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetec
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
 
-    /// <summary>
-    /// テキスト領域検出器の基底クラス
-    /// </summary>
-    public abstract class TextRegionDetectorBase : ITextRegionDetector
+/// <summary>
+/// テキスト領域検出器の基底クラス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public abstract class TextRegionDetectorBase(ILogger? logger = null) : ITextRegionDetector
     {
         private readonly Dictionary<string, object> _parameters = [];
-        
-        /// <summary>
-        /// ロガーを取得します
-        /// </summary>
-        protected ILogger? Logger { get; }
-        
-        /// <summary>
-        /// 検出器の名前
-        /// </summary>
-        public abstract string Name { get; }
+
+    /// <summary>
+    /// ロガーを取得します
+    /// </summary>
+    protected ILogger? Logger { get; } = logger;
+
+    /// <summary>
+    /// 検出器の名前
+    /// </summary>
+    public abstract string Name { get; }
         
         /// <summary>
         /// 検出器の説明
@@ -37,24 +41,11 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
         /// 検出に使用するアルゴリズム
         /// </summary>
         public abstract DetectionMethodEnum Method { get; }
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        protected TextRegionDetectorBase(ILogger? logger = null)
-        {
-            Logger = logger;
-            
-            // コンストラクタ内で仮想メソッドを呼び出すべきではない
-            // 継承先でInitialize()を始めに呼び出すようにする
-            // InitializeDefaultParameters();
-        }
-        
-        /// <summary>
-        /// デフォルトパラメータを初期化します
-        /// </summary>
-        protected virtual void InitializeDefaultParameters()
+
+    /// <summary>
+    /// デフォルトパラメータを初期化します
+    /// </summary>
+    protected virtual void InitializeDefaultParameters()
         {
             // 名前空間が異なるため、明示的に型変換
             var methodValue = (Baketa.Core.Abstractions.OCR.TextDetectionMethod)Method;
@@ -172,8 +163,30 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
             if (Logger == null)
                 return;
                 
-            // メッセージテンプレートは変数から直接渡さず、引数のみ変数として渡す
-            Logger.Log(level, messageTemplate, args);
+            // CA2254回避のため、フォーマット済みメッセージを使用
+            var formattedMessage = args.Length > 0 ? string.Format(CultureInfo.InvariantCulture, messageTemplate, args) : messageTemplate;
+            
+            switch (level)
+            {
+                case LogLevel.Debug:
+                    Logger.LogDebug("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Information:
+                    Logger.LogInformation("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Warning:
+                    Logger.LogWarning("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Error:
+                    Logger.LogError("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Critical:
+                    Logger.LogCritical("{Message}", formattedMessage);
+                    break;
+                default:
+                    Logger.LogInformation("{Message}", formattedMessage);
+                    break;
+            }
         }
         
         /// <summary>

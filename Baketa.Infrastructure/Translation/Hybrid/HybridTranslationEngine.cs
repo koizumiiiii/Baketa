@@ -72,14 +72,31 @@ public interface ITranslationCacheService
 /// <summary>
 /// ハイブリッド翻訳エンジン（フォールバック専用）
 /// </summary>
-public class HybridTranslationEngine : TranslationEngineBase, ITranslationEngine
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="localEngine">ローカル翻訳エンジン（OPUS-MT）</param>
+/// <param name="cloudEngine">クラウド翻訳エンジン（Gemini）</param>
+/// <param name="rateLimitService">レート制限サービス</param>
+/// <param name="cacheService">キャッシュサービス</param>
+/// <param name="options">ハイブリッド翻訳オプション</param>
+/// <param name="logger">ロガー</param>
+public class HybridTranslationEngine(
+    OpusMtOnnxEngine localEngine,
+    GeminiTranslationEngine cloudEngine,
+    IRateLimitService rateLimitService,
+    ITranslationCacheService cacheService,
+    IOptions<HybridTranslationOptions> options,
+    ILogger<HybridTranslationEngine> logger) : TranslationEngineBase(logger), ITranslationEngine
 {
-    private readonly OpusMtOnnxEngine _localEngine;
-    private readonly GeminiTranslationEngine _cloudEngine;
-    private readonly IRateLimitService _rateLimitService;
-    private readonly ITranslationCacheService _cacheService;
-    private readonly HybridTranslationOptions _options;
-    private readonly ILogger<HybridTranslationEngine> _logger;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2213:Disposable fields should be disposed", Justification = "DisposeManagedResourcesでDisposeされています")]
+    private readonly OpusMtOnnxEngine _localEngine = localEngine ?? throw new ArgumentNullException(nameof(localEngine));
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2213:Disposable fields should be disposed", Justification = "DisposeManagedResourcesでDisposeされています")]
+    private readonly GeminiTranslationEngine _cloudEngine = cloudEngine ?? throw new ArgumentNullException(nameof(cloudEngine));
+    private readonly IRateLimitService _rateLimitService = rateLimitService ?? throw new ArgumentNullException(nameof(rateLimitService));
+    private readonly ITranslationCacheService _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+    private readonly HybridTranslationOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    private readonly ILogger<HybridTranslationEngine> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
     /// <inheritdoc/>
     public override string Name => "Hybrid Translation Engine";
@@ -89,32 +106,7 @@ public class HybridTranslationEngine : TranslationEngineBase, ITranslationEngine
     
     /// <inheritdoc/>
     public override bool RequiresNetwork => true;
-    
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="localEngine">ローカル翻訳エンジン（OPUS-MT）</param>
-    /// <param name="cloudEngine">クラウド翻訳エンジン（Gemini）</param>
-    /// <param name="rateLimitService">レート制限サービス</param>
-    /// <param name="cacheService">キャッシュサービス</param>
-    /// <param name="options">ハイブリッド翻訳オプション</param>
-    /// <param name="logger">ロガー</param>
-    public HybridTranslationEngine(
-        OpusMtOnnxEngine localEngine,
-        GeminiTranslationEngine cloudEngine,
-        IRateLimitService rateLimitService,
-        ITranslationCacheService cacheService,
-        IOptions<HybridTranslationOptions> options,
-        ILogger<HybridTranslationEngine> logger) : base(logger)
-    {
-        _localEngine = localEngine ?? throw new ArgumentNullException(nameof(localEngine));
-        _cloudEngine = cloudEngine ?? throw new ArgumentNullException(nameof(cloudEngine));
-        _rateLimitService = rateLimitService ?? throw new ArgumentNullException(nameof(rateLimitService));
-        _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+
     /// <inheritdoc/>
     protected override async Task<bool> InitializeInternalAsync()
     {
@@ -258,7 +250,7 @@ public class HybridTranslationEngine : TranslationEngineBase, ITranslationEngine
     /// <param name="preferredStrategy">ユーザーが選択した戦略</param>
     /// <returns>実際に使用する戦略</returns>
     private async Task<(TranslationStrategy strategy, bool isFallback, string? fallbackReason)> DetermineTranslationStrategy(
-        TranslationRequest request, 
+        TranslationRequest _, 
         TranslationStrategy preferredStrategy)
     {
         // ローカル翻訳の場合はそのまま使用
@@ -431,10 +423,10 @@ public class HybridTranslationEngine : TranslationEngineBase, ITranslationEngine
     }
     
     /// <inheritdoc/>
-    public override async Task<bool> SupportsLanguagePairAsync(LanguagePair pair)
+    public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
     {
-        var localSupports = await _localEngine.SupportsLanguagePairAsync(pair).ConfigureAwait(false);
-        var cloudSupports = await _cloudEngine.SupportsLanguagePairAsync(pair).ConfigureAwait(false);
+        var localSupports = await _localEngine.SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
+        var cloudSupports = await _cloudEngine.SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
         
         return localSupports || cloudSupports;
     }

@@ -20,7 +20,8 @@ namespace Baketa.Core.Translation;
     public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposable
     {
         private readonly ILogger _logger;
-        private SemaphoreSlim _initializationLock = new(1, 1);
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2213:Disposable fields should be disposed", Justification = "DisposeManagedResourcesとDisposeAsyncCoreでDisposeされています")]
+        private readonly SemaphoreSlim _initializationLock = new(1, 1);
         private bool _disposed;
 
         /// <summary>
@@ -638,7 +639,6 @@ namespace Baketa.Core.Translation;
         protected virtual void DisposeManagedResources()
         {
             _initializationLock?.Dispose();
-            _initializationLock = null!;
         }
 
         /// <summary>
@@ -646,11 +646,7 @@ namespace Baketa.Core.Translation;
         /// </summary>
         protected virtual async ValueTask DisposeAsyncCore()
         {
-            if (_initializationLock != null)
-            {
-                _initializationLock.Dispose();
-                _initializationLock = null!;
-            }
+            _initializationLock?.Dispose();
             
             await Task.CompletedTask.ConfigureAwait(false);
         }

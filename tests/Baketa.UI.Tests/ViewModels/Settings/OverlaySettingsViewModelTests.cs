@@ -67,8 +67,10 @@ public class OverlaySettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateOverlaySettings();
-        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.Opacity = 0.05; // 範囲外
+        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            Opacity = 0.05 // 範囲外
+        };
 
         // Act
         var result = viewModel.ValidateSettings();
@@ -82,10 +84,11 @@ public class OverlaySettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateOverlaySettings();
-        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.PositionMode = OverlayPositionMode.Fixed;
+        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            PositionMode = OverlayPositionMode.Fixed
+        };
 
         // Assert
         viewModel.IsFixedPositionEnabled.Should().BeTrue();
@@ -96,10 +99,11 @@ public class OverlaySettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateOverlaySettings();
-        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.PositionMode = OverlayPositionMode.NearText;
+        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            PositionMode = OverlayPositionMode.NearText
+        };
 
         // Assert
         viewModel.IsFixedPositionEnabled.Should().BeFalse();
@@ -136,8 +140,10 @@ public class OverlaySettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateOverlaySettings();
-        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.Opacity = 0.75;
+        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            Opacity = 0.75
+        };
 
         // Act
         var percentage = viewModel.OpacityPercentage;
@@ -151,11 +157,12 @@ public class OverlaySettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateOverlaySettings();
-        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        viewModel.Opacity = 0.8;
-        viewModel.FontSize = 18;
-        viewModel.PositionMode = OverlayPositionMode.MouseCursor;
+        var viewModel = new OverlaySettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            Opacity = 0.8,
+            FontSize = 18,
+            PositionMode = OverlayPositionMode.MouseCursor
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;

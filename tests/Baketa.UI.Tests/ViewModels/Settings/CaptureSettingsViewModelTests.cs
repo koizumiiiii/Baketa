@@ -69,8 +69,10 @@ public class CaptureSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateCaptureSettings();
-        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.CaptureIntervalMs = 50; // 範囲外
+        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            CaptureIntervalMs = 50 // 範囲外
+        };
 
         // Act
         var result = viewModel.ValidateSettings();
@@ -108,10 +110,11 @@ public class CaptureSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateCaptureSettings();
-        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.AutoDetectCaptureArea = false;
+        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            AutoDetectCaptureArea = false
+        };
 
         // Assert
         viewModel.IsFixedAreaEnabled.Should().BeTrue();
@@ -122,10 +125,11 @@ public class CaptureSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateCaptureSettings();
-        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        viewModel.CaptureIntervalMs = 750;
-        viewModel.CaptureQuality = 90;
+        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            CaptureIntervalMs = 750,
+            CaptureQuality = 90
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;
@@ -158,8 +162,10 @@ public class CaptureSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateCaptureSettings();
-        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.TargetMonitor = 0; // プライマリモニター
+        var viewModel = new CaptureSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            TargetMonitor = 0 // プライマリモニター
+        };
 
         // Act
         var selectedOption = viewModel.SelectedMonitorOption;

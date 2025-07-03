@@ -10,23 +10,16 @@ namespace Baketa.UI.Configuration;
 /// <summary>
 /// 設定エクスポート・インポートサービス
 /// </summary>
-public sealed class SettingsExportImportService
+/// <param name="logger">ロガー</param>
+public sealed class SettingsExportImportService(ILogger<SettingsExportImportService> logger)
 {
-    private readonly ILogger<SettingsExportImportService> _logger;
+    private readonly ILogger<SettingsExportImportService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    public SettingsExportImportService(ILogger<SettingsExportImportService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 設定をファイルにエクスポートします
@@ -164,7 +157,7 @@ public sealed class SettingsExportImportService
         var correctedSettings = settings;
 
         // エンジン設定の検証
-        if (!Enum.IsDefined(typeof(TranslationEngine), settings.SelectedEngine))
+        if (!Enum.IsDefined<TranslationEngine>(settings.SelectedEngine))
         {
             correctedSettings = correctedSettings with { SelectedEngine = TranslationEngine.LocalOnly };
             corrections.AppendLine("• 翻訳エンジンをLocalOnlyに修正しました");
@@ -172,7 +165,7 @@ public sealed class SettingsExportImportService
         }
 
         // 中国語変種の検証
-        if (!Enum.IsDefined(typeof(ChineseVariant), settings.SelectedChineseVariant))
+        if (!Enum.IsDefined<ChineseVariant>(settings.SelectedChineseVariant))
         {
             correctedSettings = correctedSettings with { SelectedChineseVariant = ChineseVariant.Simplified };
             corrections.AppendLine("• 中国語変種を簡体字に修正しました");
@@ -180,7 +173,7 @@ public sealed class SettingsExportImportService
         }
 
         // 翻訳戦略の検証
-        if (!Enum.IsDefined(typeof(TranslationStrategy), settings.SelectedStrategy))
+        if (!Enum.IsDefined<TranslationStrategy>(settings.SelectedStrategy))
         {
             correctedSettings = correctedSettings with { SelectedStrategy = TranslationStrategy.Direct };
             corrections.AppendLine("• 翻訳戦略をDirectに修正しました");

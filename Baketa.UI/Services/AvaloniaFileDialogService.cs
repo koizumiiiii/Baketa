@@ -13,17 +13,10 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// Avalonia専用ファイルダイアログサービス実装
 /// </summary>
-public sealed class AvaloniaFileDialogService : IFileDialogService
+/// <param name="logger">ロガー</param>
+public sealed class AvaloniaFileDialogService(ILogger<AvaloniaFileDialogService> logger) : IFileDialogService
 {
-    private readonly ILogger<AvaloniaFileDialogService> _logger;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    public AvaloniaFileDialogService(ILogger<AvaloniaFileDialogService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<AvaloniaFileDialogService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc/>
     public async Task<string?> ShowSaveFileDialogAsync(

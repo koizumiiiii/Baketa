@@ -203,7 +203,12 @@ namespace Baketa.Core.Translation.Models;
             ArgumentNullException.ThrowIfNull(exception);
             
             var error = TranslationError.FromException(errorCode, errorMessage, exception);
-            return CreateError(request, error, engineName);
+            var response = CreateError(request, error, engineName);
+            
+            // 処理時間を設定
+            response.ProcessingTimeMs = processingTimeMs;
+            
+            return response;
         }
 
         /// <summary>

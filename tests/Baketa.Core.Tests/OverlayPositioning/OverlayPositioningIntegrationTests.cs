@@ -517,13 +517,13 @@ internal sealed class MockOverlayWindowManager : IOverlayWindowManager
 /// <summary>
 /// テスト用のモックオーバーレイウィンドウ
 /// </summary>
-internal sealed class MockOverlayWindow : IOverlayWindow
+internal sealed class MockOverlayWindow(nint handle, CoreSize size, CorePoint position) : IOverlayWindow
 {
     private readonly List<Geometry.Rect> _hitTestAreas = [];
-    
-    public nint Handle { get; }
-    public CoreSize Size { get; set; }
-    public CorePoint Position { get; set; }
+
+    public nint Handle { get; } = handle;
+    public CoreSize Size { get; set; } = size;
+    public CorePoint Position { get; set; } = position;
     public bool IsVisible { get; private set; } = true;
     public double Opacity { get; } = 0.9;
     public bool IsClickThrough { get; set; } = true;
@@ -542,14 +542,7 @@ internal sealed class MockOverlayWindow : IOverlayWindow
         get => new(Size.Width, Size.Height); 
         set => Size = new CoreSize(value.Width, value.Height); 
     }
-    
-    public MockOverlayWindow(nint handle, CoreSize size, CorePoint position)
-    {
-        Handle = handle;
-        Size = size;
-        Position = position;
-    }
-    
+
     public void Show()
     {
         IsVisible = true;

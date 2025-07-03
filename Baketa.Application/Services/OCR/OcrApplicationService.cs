@@ -101,25 +101,18 @@ public interface IOcrApplicationService
 /// <summary>
 /// OCRアプリケーションサービスの実装
 /// </summary>
-public sealed class OcrApplicationService : IOcrApplicationService, IDisposable
+public sealed class OcrApplicationService(
+    IOcrEngine ocrEngine,
+    IOcrModelManager modelManager,
+    ILogger<OcrApplicationService>? logger = null) : IOcrApplicationService, IDisposable
 {
-    private readonly IOcrEngine _ocrEngine;
-    private readonly IOcrModelManager _modelManager;
-    private readonly ILogger<OcrApplicationService>? _logger;
+    private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly IOcrModelManager _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
+    private readonly ILogger<OcrApplicationService>? _logger = logger;
     private bool _disposed;
 
     public bool IsAvailable => _ocrEngine.IsInitialized;
     public string? CurrentLanguage => _ocrEngine.CurrentLanguage;
-
-    public OcrApplicationService(
-        IOcrEngine ocrEngine,
-        IOcrModelManager modelManager,
-        ILogger<OcrApplicationService>? logger = null)
-    {
-        _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
-        _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
-        _logger = logger;
-    }
 
     /// <summary>
     /// OCRサービスを初期化

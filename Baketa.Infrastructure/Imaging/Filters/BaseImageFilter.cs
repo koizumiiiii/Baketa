@@ -9,13 +9,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
-    /// <summary>
-    /// 画像フィルター実装の基底クラス
-    /// </summary>
-    public abstract class BaseImageFilter : IImageFilter, IImagePipelineStep
+/// <summary>
+/// 画像フィルター実装の基底クラス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public abstract class BaseImageFilter(ILogger? logger = null) : IImageFilter, IImagePipelineStep
     {
         private readonly Dictionary<string, object> _parameters = [];
-        private readonly ILogger? _logger;
+        private readonly ILogger? _logger = logger;
         
         /// <summary>
         /// フィルターの名前
@@ -41,22 +45,11 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// フィルターのエラー処理戦略
         /// </summary>
         public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.ContinueExecution;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        protected BaseImageFilter(ILogger? logger = null)
-        {
-            _logger = logger;
-            // 以下は仮想メソッドを呼び出しているため、直接呼び出さずに継承先で実装するように修正
-            // InitializeDefaultParameters();
-        }
-        
-        /// <summary>
-        /// パラメータをリセットします
-        /// </summary>
-        public virtual void ResetParameters()
+
+    /// <summary>
+    /// パラメータをリセットします
+    /// </summary>
+    public virtual void ResetParameters()
         {
             _parameters.Clear();
             InitializeDefaultParameters();
@@ -156,7 +149,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
         /// </summary>
         /// <param name="image">入力画像</param>
         /// <returns>処理結果画像</returns>
-        public abstract Task<IAdvancedImage> ApplyAsync(IAdvancedImage image);
+        public abstract Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage);
         
         /// <summary>
         /// ステップを実行します
@@ -231,7 +224,30 @@ namespace Baketa.Infrastructure.Imaging.Filters;
             if (_logger == null)
                 return;
                 
-            _logger.Log(logLevel, messageTemplate, args);
+            // CA2254回避のため、フォーマット済みメッセージを使用
+            var formattedMessage = args.Length > 0 ? string.Format(CultureInfo.InvariantCulture, messageTemplate, args) : messageTemplate;
+            
+            switch (logLevel)
+            {
+                case LogLevel.Debug:
+                    _logger.LogDebug("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Information:
+                    _logger.LogInformation("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Warning:
+                    _logger.LogWarning("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Error:
+                    _logger.LogError("{Message}", formattedMessage);
+                    break;
+                case LogLevel.Critical:
+                    _logger.LogCritical("{Message}", formattedMessage);
+                    break;
+                default:
+                    _logger.LogInformation("{Message}", formattedMessage);
+                    break;
+            }
         }
         
         /// <summary>
