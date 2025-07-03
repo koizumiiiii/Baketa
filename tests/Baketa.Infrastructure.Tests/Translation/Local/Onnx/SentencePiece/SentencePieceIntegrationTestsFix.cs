@@ -300,18 +300,11 @@ pieces { piece: ""World"" score: -1.1 type: NORMAL }
     /// <summary>
     /// テスト用のHttpClientFactory実装
     /// </summary>
-    private sealed class TestHttpClientFactory : IHttpClientFactory
+    private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
-        private readonly HttpClient _client;
-
-        public TestHttpClientFactory(HttpClient client)
-        {
-            _client = client;
-        }
-
         public HttpClient CreateClient(string name)
         {
-            return _client;
+            return client;
         }
     }
 }

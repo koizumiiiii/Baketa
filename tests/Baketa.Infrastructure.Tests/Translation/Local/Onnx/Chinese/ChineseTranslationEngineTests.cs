@@ -469,26 +469,19 @@ public class ChineseVariantTranslationResultTests
 /// テスト用のChineseTranslationEngineアダプター
 /// ITranslationEngineを受け取るように修正
 /// </summary>
-public class TestableChineseTranslationEngine : ITranslationEngine, IDisposable
+public class TestableChineseTranslationEngine(
+    ITranslationEngine baseEngine,
+    ChineseLanguageProcessor chineseProcessor,
+    ILogger<ChineseTranslationEngine> logger) : ITranslationEngine, IDisposable
 {
-    private readonly ITranslationEngine _baseEngine;
-    private readonly ChineseLanguageProcessor _chineseProcessor;
-    private readonly ILogger<ChineseTranslationEngine> _logger;
+    private readonly ITranslationEngine _baseEngine = baseEngine ?? throw new ArgumentNullException(nameof(baseEngine));
+    private readonly ChineseLanguageProcessor _chineseProcessor = chineseProcessor ?? throw new ArgumentNullException(nameof(chineseProcessor));
+    private readonly ILogger<ChineseTranslationEngine> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private bool _disposed;
 
     public string Name => "Chinese Translation Engine";
     public string Description => "OPUS-MTモデルを使用した中国語翻訳エンジン（簡体字・繁体字対応）";
     public bool RequiresNetwork => false;
-
-    public TestableChineseTranslationEngine(
-        ITranslationEngine baseEngine,
-        ChineseLanguageProcessor chineseProcessor,
-        ILogger<ChineseTranslationEngine> logger)
-    {
-        _baseEngine = baseEngine ?? throw new ArgumentNullException(nameof(baseEngine));
-        _chineseProcessor = chineseProcessor ?? throw new ArgumentNullException(nameof(chineseProcessor));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<bool> InitializeAsync()
     {
@@ -505,6 +498,9 @@ public class TestableChineseTranslationEngine : ITranslationEngine, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        
+        // ロガーを使用（警告回避のため）
+        _logger.LogDebug("TestableChineseTranslationEngine.TranslateAsync called with: {SourceText}", request.SourceText);
         
         if (string.IsNullOrWhiteSpace(request.SourceText))
         {
@@ -649,7 +645,8 @@ public class TestableChineseTranslationEngine : ITranslationEngine, IDisposable
         {
             if (disposing)
             {
-                // Mockオブジェクトは解放不要
+                // ITranslationEngineがIDisposableを実装している場合は解放
+                (_baseEngine as IDisposable)?.Dispose();
             }
             _disposed = true;
         }

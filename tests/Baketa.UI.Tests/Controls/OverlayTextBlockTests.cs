@@ -12,15 +12,10 @@ namespace Baketa.UI.Tests.Controls;
 /// OverlayTextBlockコントロールの単体テスト
 /// Issue #70 オーバーレイUIデザインとアニメーション実装 - Phase 4
 /// </summary>
-public sealed class OverlayTextBlockTests : IDisposable
+public sealed class OverlayTextBlockTests(ITestOutputHelper output) : IDisposable
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output;
     private bool _disposed;
-
-    public OverlayTextBlockTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     /// <summary>
     /// テスト用Avaloniaアプリケーション
@@ -77,10 +72,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ThemePropertyShouldSetAndGetCorrectly(OverlayTheme theme)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.Theme = theme;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            Theme = theme
+        };
 
         // Assert
         Assert.Equal(theme, control.Theme);
@@ -94,10 +90,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void AnimationEnabledPropertyShouldSetAndGetCorrectly(bool enabled)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.AnimationEnabled = enabled;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            AnimationEnabled = enabled
+        };
 
         // Assert
         Assert.Equal(enabled, control.AnimationEnabled);
@@ -111,10 +108,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ToggleVisibilityEnabledPropertyShouldSetAndGetCorrectly(bool enabled)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.ToggleVisibilityEnabled = enabled;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            ToggleVisibilityEnabled = enabled
+        };
 
         // Assert
         Assert.Equal(enabled, control.ToggleVisibilityEnabled);
@@ -129,10 +127,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void LineHeightPropertyShouldSetAndGetCorrectly(double lineHeight)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.LineHeight = lineHeight;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            LineHeight = lineHeight
+        };
 
         // Assert
         Assert.Equal(lineHeight, control.LineHeight);
@@ -146,10 +145,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void TextWrappingPropertyShouldSetAndGetCorrectly(TextWrapping wrapping)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.TextWrapping = wrapping;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            TextWrapping = wrapping
+        };
 
         // Assert
         Assert.Equal(wrapping, control.TextWrapping);
@@ -164,10 +164,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ParagraphSpacingPropertyShouldSetAndGetCorrectly(double spacing)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.ParagraphSpacing = spacing;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            ParagraphSpacing = spacing
+        };
 
         // Assert
         Assert.Equal(spacing, control.ParagraphSpacing);
@@ -179,10 +180,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ParagraphSpacingWithEdgeValuesShouldHandleCorrectly()
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act & Assert - 最小値付近
-        control.ParagraphSpacing = 0.0;
+        var control = new OverlayTextBlock
+        {
+            // Act & Assert - 最小値付近
+            ParagraphSpacing = 0.0
+        };
         Assert.Equal(0.0, control.ParagraphSpacing);
 
         // Act & Assert - 大きな値
@@ -204,10 +206,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ApplyThemeAutoShouldSelectTimeBasedTheme()
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.Theme = OverlayTheme.Auto;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            Theme = OverlayTheme.Auto
+        };
 
         // Assert
         var hour = DateTime.Now.Hour;
@@ -228,10 +231,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void ApplyThemeExplicitThemesShouldBeApplied(OverlayTheme theme)
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act
-        control.Theme = theme;
+        var control = new OverlayTextBlock
+        {
+            // Act
+            Theme = theme
+        };
 
         // Assert
         Assert.Equal(theme, control.Theme);
@@ -367,10 +371,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void TextWithNullOrEmptyValuesShouldHandleGracefully()
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act & Assert - null値
-        control.Text = null!;
+        var control = new OverlayTextBlock
+        {
+            // Act & Assert - null値
+            Text = null!
+        };
         Assert.Equal(string.Empty, control.Text); // StyledPropertyのデフォルト値が使用される
 
         // Act & Assert - 空文字列
@@ -389,10 +394,11 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void LineHeightWithEdgeValuesShouldHandleCorrectly()
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act & Assert - 最小値付近
-        control.LineHeight = 0.1;
+        var control = new OverlayTextBlock
+        {
+            // Act & Assert - 最小値付近
+            LineHeight = 0.1
+        };
         Assert.Equal(0.1, control.LineHeight);
 
         // Act & Assert - 大きな値
@@ -414,16 +420,17 @@ public sealed class OverlayTextBlockTests : IDisposable
     public void IntegrationMultiplePropertyChangesShouldWorkTogether()
     {
         // Arrange
-        var control = new OverlayTextBlock();
-
-        // Act - 複数プロパティの同時変更
-        control.Text = "統合テストテキスト";
-        control.Theme = OverlayTheme.HighContrast;
-        control.AnimationEnabled = false;
-        control.ToggleVisibilityEnabled = false;
-        control.LineHeight = 2.0;
-        control.TextWrapping = TextWrapping.NoWrap;
-        control.ParagraphSpacing = 16.0;
+        var control = new OverlayTextBlock
+        {
+            // Act - 複数プロパティの同時変更
+            Text = "統合テストテキスト",
+            Theme = OverlayTheme.HighContrast,
+            AnimationEnabled = false,
+            ToggleVisibilityEnabled = false,
+            LineHeight = 2.0,
+            TextWrapping = TextWrapping.NoWrap,
+            ParagraphSpacing = 16.0
+        };
 
         // Assert
         Assert.Equal("統合テストテキスト", control.Text);

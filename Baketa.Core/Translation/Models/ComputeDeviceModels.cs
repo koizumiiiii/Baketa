@@ -50,7 +50,7 @@ public class ComputeDevice
     /// <summary>
     /// デフォルトのCPUデバイスを作成
     /// </summary>
-    public static ComputeDevice DefaultCpu => new ComputeDevice
+    public static ComputeDevice DefaultCpu => new()
     {
         DeviceId = "cpu-0",
         Name = "CPU",
@@ -63,7 +63,7 @@ public class ComputeDevice
     /// CPUデバイスを作成
     /// </summary>
     /// <returns>CPUデバイス</returns>
-    public static ComputeDevice CreateCpu() => new ComputeDevice
+    public static ComputeDevice CreateCpu() => new()
     {
         DeviceId = "cpu-0",
         Name = "CPU",
@@ -79,7 +79,7 @@ public class ComputeDevice
     /// <param name="name">デバイス名</param>
     /// <param name="deviceType">デバイスタイプ</param>
     /// <returns>GPUデバイス</returns>
-    public static ComputeDevice CreateGpu(int deviceId, string name, ComputeDeviceType deviceType = ComputeDeviceType.Cuda) => new ComputeDevice
+    public static ComputeDevice CreateGpu(int deviceId, string name, ComputeDeviceType deviceType = ComputeDeviceType.Cuda) => new()
     {
         DeviceId = $"gpu-{deviceId}",
         Name = name,

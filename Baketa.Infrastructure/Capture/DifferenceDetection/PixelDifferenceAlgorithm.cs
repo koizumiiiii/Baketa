@@ -15,23 +15,15 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
     /// <summary>
     /// ピクセルベースの差分検出アルゴリズム（最も高精度だが処理負荷が高い）
     /// </summary>
-    public class PixelDifferenceAlgorithm : IDetectionAlgorithm
+    /// <param name="logger">ロガー</param>
+    public class PixelDifferenceAlgorithm(ILogger<PixelDifferenceAlgorithm>? logger = null) : IDetectionAlgorithm
     {
-        private readonly ILogger<PixelDifferenceAlgorithm>? _logger;
+        private readonly ILogger<PixelDifferenceAlgorithm>? _logger = logger;
         
         /// <summary>
         /// アルゴリズムの種類
         /// </summary>
         public DifferenceDetectionAlgorithm AlgorithmType => DifferenceDetectionAlgorithm.PixelBased;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public PixelDifferenceAlgorithm(ILogger<PixelDifferenceAlgorithm>? logger = null)
-        {
-            _logger = logger;
-        }
         
         /// <summary>
         /// 差分を検出します
@@ -224,7 +216,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             IImage previousImage, 
             IImage currentImage, 
             DifferenceDetectionSettings settings,
-            CancellationToken cancellationToken)
+            CancellationToken _)
         {
             // 縮小率
             int scale = 8;

@@ -11,27 +11,20 @@ namespace Baketa.Application.Services.Events;
 /// <summary>
 /// イベントプロセッサーの自動購読サービス
 /// </summary>
-public sealed class EventProcessorRegistrationService : IHostedService
+/// <remarks>
+/// サービスを初期化します
+/// </remarks>
+/// <param name="serviceProvider">サービスプロバイダー</param>
+/// <param name="eventAggregator">イベント集約器</param>
+/// <param name="logger">ロガー</param>
+public sealed class EventProcessorRegistrationService(
+    IServiceProvider serviceProvider,
+    IEventAggregator eventAggregator,
+    ILogger<EventProcessorRegistrationService> logger) : IHostedService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IEventAggregator _eventAggregator;
-    private readonly ILogger<EventProcessorRegistrationService> _logger;
-
-    /// <summary>
-    /// サービスを初期化します
-    /// </summary>
-    /// <param name="serviceProvider">サービスプロバイダー</param>
-    /// <param name="eventAggregator">イベント集約器</param>
-    /// <param name="logger">ロガー</param>
-    public EventProcessorRegistrationService(
-        IServiceProvider serviceProvider,
-        IEventAggregator eventAggregator,
-        ILogger<EventProcessorRegistrationService> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly ILogger<EventProcessorRegistrationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// サービス開始時にイベントプロセッサーを自動登録します

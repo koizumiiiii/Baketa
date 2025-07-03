@@ -7,24 +7,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理のための二値化フィルター
-    /// </summary>
-    public class OcrThresholdFilter : ImageFilterBase
+/// <summary>
+/// OCR処理のための二値化フィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrThresholdFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrThresholdFilter(ILogger<OcrThresholdFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrThresholdFilter> _logger;
+        private readonly ILogger<OcrThresholdFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrThresholdFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrThresholdFilter(ILogger<OcrThresholdFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCR二値化";
+    /// <inheritdoc/>
+    public override string Name => "OCR二値化";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理のためにテキストを明確に分離する二値化フィルター";

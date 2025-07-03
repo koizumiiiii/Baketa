@@ -167,7 +167,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             if (!validationResult.IsValid)
             {
                 var errorMsg = $"設定の検証に失敗しました: {string.Join(", ", validationResult.Errors)}";
-                _logger.LogError(errorMsg);
+                _logger.LogError("設定の検証に失敗しました: {Errors}", string.Join(", ", validationResult.Errors));
                 throw new InvalidOperationException(errorMsg);
             }
             
@@ -644,7 +644,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     /// <summary>
     /// AppSettingsをストレージに保存します
     /// </summary>
-    private async Task SaveAppSettingsToStorage(AppSettings settings)
+    private async Task SaveAppSettingsToStorage(AppSettings _)
     {
         // TODO: AppSettingsを個別の設定値に分解してJsonSettingsServiceに保存
         // 現在は基本実装、将来的に完全実装

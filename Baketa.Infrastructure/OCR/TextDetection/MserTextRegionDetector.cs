@@ -13,12 +13,17 @@ using DetectionMethodEnum = Baketa.Core.Abstractions.OCR.TextDetection.TextDetec
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
 
-    /// <summary>
-    /// MSER (Maximally Stable Extremal Regions) アルゴリズムによるテキスト領域検出器
-    /// </summary>
-    public class MserTextRegionDetector : TextRegionDetectorBase
+/// <summary>
+/// MSER (Maximally Stable Extremal Regions) アルゴリズムによるテキスト領域検出器
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="openCvWrapper">OpenCVラッパー</param>
+/// <param name="logger">ロガー</param>
+public class MserTextRegionDetector(ImagingOpenCvWrapper openCvWrapper, ILogger<MserTextRegionDetector>? logger = null) : TextRegionDetectorBase(logger)
     {
-        private readonly ImagingOpenCvWrapper _openCvWrapper;
+        private readonly ImagingOpenCvWrapper _openCvWrapper = openCvWrapper ?? throw new ArgumentNullException(nameof(openCvWrapper));
         
         /// <summary>
         /// 検出器の名前
@@ -34,25 +39,14 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
         /// 検出に使用するアルゴリズム
         /// </summary>
         public override TextDetectionMethod Method => TextDetectionMethod.Mser;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="openCvWrapper">OpenCVラッパー</param>
-        /// <param name="logger">ロガー</param>
-        public MserTextRegionDetector(ImagingOpenCvWrapper openCvWrapper, ILogger<MserTextRegionDetector>? logger = null)
-            : base(logger)
-        {
-            _openCvWrapper = openCvWrapper ?? throw new ArgumentNullException(nameof(openCvWrapper));
-        }
-        
-        /// <summary>
-        /// 画像からテキスト領域を検出します
-        /// </summary>
-        /// <param name="image">検出対象の画像</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>検出されたテキスト領域のリスト</returns>
-        public override async Task<IReadOnlyList<OCRTextRegion>> DetectRegionsAsync(
+
+    /// <summary>
+    /// 画像からテキスト領域を検出します
+    /// </summary>
+    /// <param name="image">検出対象の画像</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>検出されたテキスト領域のリスト</returns>
+    public override async Task<IReadOnlyList<OCRTextRegion>> DetectRegionsAsync(
             IAdvancedImage image, 
             CancellationToken cancellationToken = default)
         {
@@ -149,7 +143,7 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
         /// <param name="contour">輪郭</param>
         /// <param name="image">画像</param>
         /// <returns>信頼度スコア（0.0～1.0）</returns>
-        private static float CalculateConfidenceScore(Rectangle bounds, Point[] contour, IAdvancedImage image)
+        private static float CalculateConfidenceScore(Rectangle bounds, Point[] contour, IAdvancedImage _)
         {
             // この実装は簡易的なもので、実際にはより複雑なスコアリングが必要
             

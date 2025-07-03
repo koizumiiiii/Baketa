@@ -7,33 +7,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Imaging.Pipeline;
 
-    /// <summary>
-    /// 画像処理パイプラインビルダーの実装
-    /// </summary>
-    public class ImagePipelineBuilder : IImagePipelineBuilder
+/// <summary>
+/// 画像処理パイプラインビルダーの実装
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="filterFactory">フィルターファクトリー</param>
+/// <param name="logger">ロガー</param>
+public class ImagePipelineBuilder(IFilterFactory filterFactory, ILogger<ImagePipelineBuilder>? logger = null) : IImagePipelineBuilder
     {
-        private readonly ImagePipeline _pipeline;
-        private readonly IFilterFactory _filterFactory;
-        private readonly ILogger<ImagePipelineBuilder>? _logger;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="filterFactory">フィルターファクトリー</param>
-        /// <param name="logger">ロガー</param>
-        public ImagePipelineBuilder(IFilterFactory filterFactory, ILogger<ImagePipelineBuilder>? logger = null)
-        {
-            _pipeline = new ImagePipeline("新しいパイプライン", "");
-            _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// パイプラインに名前を設定します
-        /// </summary>
-        /// <param name="name">パイプライン名</param>
-        /// <returns>ビルダー</returns>
-        public IImagePipelineBuilder WithName(string name)
+        private readonly ImagePipeline _pipeline = new("新しいパイプライン", "");
+        private readonly IFilterFactory _filterFactory = filterFactory ?? throw new ArgumentNullException(nameof(filterFactory));
+        private readonly ILogger<ImagePipelineBuilder>? _logger = logger;
+
+    /// <summary>
+    /// パイプラインに名前を設定します
+    /// </summary>
+    /// <param name="name">パイプライン名</param>
+    /// <returns>ビルダー</returns>
+    public IImagePipelineBuilder WithName(string name)
         {
             // プロパティを内部メソッド経由で更新
             typeof(ImagePipeline).GetProperty("Name")?.SetValue(_pipeline, name);
@@ -129,17 +122,11 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
                 
             // 内部メソッド経由で名前を設定
             var nameField = typeof(ImagePipeline).GetField("<Name>k__BackingField", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (nameField != null)
-            {
-                nameField.SetValue(_pipeline, settings.Name);
-            }
+            nameField?.SetValue(_pipeline, settings.Name);
             
             // 内部メソッド経由で説明を設定
             var descField = typeof(ImagePipeline).GetField("<Description>k__BackingField", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (descField != null)
-            {
-                descField.SetValue(_pipeline, settings.Description);
-            }
+            descField?.SetValue(_pipeline, settings.Description);
             _pipeline.IntermediateResultMode = settings.IntermediateResultMode;
             _pipeline.GlobalErrorHandlingStrategy = settings.ErrorHandlingStrategy;
             _pipeline.ClearFilters();

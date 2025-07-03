@@ -16,14 +16,8 @@ namespace Baketa.Application.Tests.Integration;
 /// <summary>
 /// Issue #101 Phase 4のイベント統合テスト
 /// </summary>
-public class EventIntegrationTests
+public class EventIntegrationTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public EventIntegrationTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     /// <summary>
     /// TranslationModeChangedEventの発行と処理が正常に動作することをテストします
@@ -40,7 +34,7 @@ public class EventIntegrationTests
         // ログ設定
         services.AddLogging(builder =>
         {
-            builder.AddXUnit(_output);
+            builder.AddXUnit(output);
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
@@ -91,7 +85,7 @@ public class EventIntegrationTests
         
         services.AddLogging(builder =>
         {
-            builder.AddXUnit(_output);
+            builder.AddXUnit(output);
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
@@ -139,7 +133,7 @@ public class EventIntegrationTests
         
         services.AddLogging(builder =>
         {
-            builder.AddXUnit(_output);
+            builder.AddXUnit(output);
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
@@ -198,16 +192,10 @@ public static class XUnitLoggerExtensions
 /// XUnit用のログプロバイダー実装
 /// </summary>
 // CA1063: IDisposableパターンを正しく実装します
-public sealed class XUnitLoggerProvider : ILoggerProvider
+public sealed class XUnitLoggerProvider(ITestOutputHelper output) : ILoggerProvider
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
     private bool _disposed;
-
-    // CA1062: 引数のnullチェックを実施
-    public XUnitLoggerProvider(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
 
     public ILogger CreateLogger(string categoryName)
     {
@@ -242,17 +230,10 @@ public sealed class XUnitLoggerProvider : ILoggerProvider
 /// <summary>
 /// XUnit用のログ実装
 /// </summary>
-public sealed class XUnitLogger : ILogger
+public sealed class XUnitLogger(ITestOutputHelper output, string categoryName) : ILogger
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _categoryName;
-
-    // CA1062: 引数のnullチェックを実施
-    public XUnitLogger(ITestOutputHelper output, string categoryName)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-        _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
-    }
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+    private readonly string _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
     {

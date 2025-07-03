@@ -8,6 +8,8 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<!-- イベントハンドラークラスとstaticメソッド警告を抑制 -->
+		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

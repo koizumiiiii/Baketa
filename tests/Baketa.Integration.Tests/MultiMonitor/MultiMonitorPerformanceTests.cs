@@ -39,7 +39,7 @@ public sealed class MultiMonitorPerformanceTests : IAsyncDisposable
     
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+        services.AddLogging(_ => _.AddConsole().SetMinimumLevel(LogLevel.Debug));
         services.AddSingleton<IMonitorManager, WindowsMonitorManager>();
         services.AddSingleton<IFullscreenModeService, WindowsFullscreenModeService>();
         // メインのAvaloniaMultiMonitorAdapterは上記でテスト用で置換済み
@@ -521,10 +521,10 @@ internal sealed class TestOverlayManagerStatistics
     public int TotalOverlayRecoveries { get; set; }
     public int TotalAutoCleanups { get; set; } = 1; // テストでは1を設定
 
-    public void IncrementOperationCount(string operationName) { /* No-op for test */ }
-    public void IncrementErrorCount(string errorType) { /* No-op for test */ }
-    public int GetOperationCount(string operationName) => 0;
-    public int GetErrorCount(string errorType) => 0;
+    public void IncrementOperationCount(string _) { /* No-op for test */ }
+    public void IncrementErrorCount(string _) { /* No-op for test */ }
+    public int GetOperationCount(string _) => 0;
+    public int GetErrorCount(string _) => 0;
 
     public override string ToString() => "Test Statistics";
 }
@@ -532,46 +532,42 @@ internal sealed class TestOverlayManagerStatistics
 /// <summary>
 /// テスト用MultiMonitorOverlayManagerモック
 /// </summary>
-internal sealed class TestMultiMonitorOverlayManager
+#pragma warning disable CA1823 // 未使用のプライベートフィールド
+internal sealed class TestMultiMonitorOverlayManager(
+    TestAvaloniaMultiMonitorAdapter monitorAdapter,
+    IFullscreenModeService fullscreenService,
+    TestAvaloniaOverlayWindowAdapter overlayAdapter,
+    ILogger<TestMultiMonitorOverlayManager> logger)
 {
-    private readonly TestAvaloniaMultiMonitorAdapter _monitorAdapter;
-    private readonly IFullscreenModeService _fullscreenService;
-    private readonly TestAvaloniaOverlayWindowAdapter _overlayAdapter;
-    private readonly ILogger<TestMultiMonitorOverlayManager> _logger;
-
-    public TestMultiMonitorOverlayManager(
-        TestAvaloniaMultiMonitorAdapter monitorAdapter,
-        IFullscreenModeService fullscreenService,
-        TestAvaloniaOverlayWindowAdapter overlayAdapter,
-        ILogger<TestMultiMonitorOverlayManager> logger)
-    {
-        _monitorAdapter = monitorAdapter;
-        _fullscreenService = fullscreenService;
-        _overlayAdapter = overlayAdapter;
-        _logger = logger;
-        Statistics = new TestOverlayManagerStatistics();
-    }
+    private readonly TestAvaloniaMultiMonitorAdapter _monitorAdapter = monitorAdapter;
+    private readonly TestAvaloniaOverlayWindowAdapter _overlayAdapter = overlayAdapter;
+    
+    // 未使用パラメーターを明示的に破棄
+    private readonly IFullscreenModeService _ = fullscreenService;
+    private readonly ILogger<TestMultiMonitorOverlayManager> _1 = logger;
+#pragma warning restore CA1823
 
     public nint TargetGameWindowHandle { get; private set; }
     public MonitorInfo? CurrentActiveMonitor { get; private set; }
-    public TestOverlayManagerStatistics Statistics { get; }
+    public TestOverlayManagerStatistics Statistics { get; } = new TestOverlayManagerStatistics();
     public int ActiveOverlayCount => _overlayAdapter.ActiveOverlayCount;
     public int ValidOverlayCount => _overlayAdapter.ActiveOverlayCount;
 
     public async Task StartManagingAsync(nint gameWindowHandle, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Starting test multi-monitor overlay management for game window 0x{Handle:X}", gameWindowHandle);
+        // ロガーは使用されていないがプライマリコンストラクターから削除できないため、_1を使用
+        _1?.LogInformation("Starting test multi-monitor overlay management for game window 0x{Handle:X}", gameWindowHandle);
         TargetGameWindowHandle = gameWindowHandle;
         CurrentActiveMonitor = _monitorAdapter.DetermineOptimalMonitorForGame(gameWindowHandle);
         Statistics.ManagementStartTime = DateTime.UtcNow;
         await Task.Delay(50, cancellationToken).ConfigureAwait(false); // 短い遅延で初期化をシミュレート
-        _logger.LogInformation("Test multi-monitor overlay management started successfully");
+        _1?.LogInformation("Test multi-monitor overlay management started successfully");
     }
 
     public async Task<IOverlayWindow> CreateOverlayAsync(
         CoreSize initialSize,
         CorePoint relativePosition,
-        CancellationToken cancellationToken = default)
+        CancellationToken _ = default)
     {
         var overlay = await _overlayAdapter.CreateOverlayWindowAsync(
             TargetGameWindowHandle, initialSize, relativePosition).ConfigureAwait(false);
@@ -580,8 +576,8 @@ internal sealed class TestMultiMonitorOverlayManager
     }
 
     public async Task MoveOverlayToMonitorAsync(
-        nint overlayHandle,
-        MonitorInfo targetMonitor,
+        nint _,
+        MonitorInfo _1,
         CancellationToken cancellationToken = default)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false); // 移動処理をシミュレート
@@ -597,13 +593,13 @@ internal sealed class TestMultiMonitorOverlayManager
     }
 
     public async Task HandleFullscreenModeChangeAsync(
-        FullscreenModeChangedEventArgs fullscreenMode,
+        FullscreenModeChangedEventArgs _,
         CancellationToken cancellationToken = default)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default)
+    public async Task CloseAllOverlaysAsync(CancellationToken _ = default)
     {
         await _overlayAdapter.CloseAllOverlaysAsync().ConfigureAwait(false);
     }
@@ -611,7 +607,7 @@ internal sealed class TestMultiMonitorOverlayManager
     public async ValueTask DisposeAsync()
     {
         await CloseAllOverlaysAsync().ConfigureAwait(false);
-        _logger.LogInformation("TestMultiMonitorOverlayManager disposed asynchronously");
+        _1?.LogInformation("TestMultiMonitorOverlayManager disposed asynchronously");
     }
 }
 
@@ -619,16 +615,14 @@ internal sealed class TestMultiMonitorOverlayManager
 /// テスト用Avaloniaマルチモニターアダプター
 /// ReactiveUIの代わりにシンプルな実装を提供
 /// </summary>
-internal sealed class TestAvaloniaMultiMonitorAdapter
+#pragma warning disable CA1823 // 未使用のプライベートフィールド
+internal sealed class TestAvaloniaMultiMonitorAdapter(IMonitorManager monitorManager, ILogger<TestAvaloniaMultiMonitorAdapter> logger)
 {
-    private readonly IMonitorManager _monitorManager;
-    private readonly ILogger<TestAvaloniaMultiMonitorAdapter> _logger;
-
-    public TestAvaloniaMultiMonitorAdapter(IMonitorManager monitorManager, ILogger<TestAvaloniaMultiMonitorAdapter> logger)
-    {
-        _monitorManager = monitorManager;
-        _logger = logger;
-    }
+    private readonly IMonitorManager _monitorManager = monitorManager;
+    
+    // 未使用パラメーターを明示的に破棄
+    private readonly ILogger<TestAvaloniaMultiMonitorAdapter> _ = logger;
+#pragma warning restore CA1823
 
     public IReadOnlyList<MonitorInfo> Monitors => _monitorManager.Monitors;
     public MonitorInfo? PrimaryMonitor => _monitorManager.PrimaryMonitor;
@@ -679,16 +673,14 @@ internal sealed class TestAvaloniaMultiMonitorAdapter
 /// <summary>
 /// テスト用Avaloniaオーバーレイウィンドウアダプター
 /// </summary>
-internal sealed class TestAvaloniaOverlayWindowAdapter
+#pragma warning disable CA1823 // 未使用のプライベートフィールド
+internal sealed class TestAvaloniaOverlayWindowAdapter(IOverlayWindowManager manager, ILogger<TestAvaloniaOverlayWindowAdapter> logger)
 {
-    private readonly IOverlayWindowManager _manager;
-    private readonly ILogger<TestAvaloniaOverlayWindowAdapter> _logger;
-
-    public TestAvaloniaOverlayWindowAdapter(IOverlayWindowManager manager, ILogger<TestAvaloniaOverlayWindowAdapter> logger)
-    {
-        _manager = manager;
-        _logger = logger;
-    }
+    private readonly IOverlayWindowManager _manager = manager;
+    
+    // 未使用パラメーターを明示的に破棄
+    private readonly ILogger<TestAvaloniaOverlayWindowAdapter> _ = logger;
+#pragma warning restore CA1823
 
     public async Task<IOverlayWindow> CreateOverlayWindowAsync(nint targetWindowHandle, CoreSize initialSize, CorePoint initialPosition)
     {
@@ -745,34 +737,29 @@ internal sealed class TestOverlayWindowManagerMock : IOverlayWindowManager
 /// <summary>
 /// テスト用オーバーレイウィンドウモック
 /// </summary>
-internal sealed class TestOverlayWindowMock : IOverlayWindow
+internal sealed class TestOverlayWindowMock(nint handle, nint targetWindowHandle, CoreSize initialSize, CorePoint initialPosition) : IOverlayWindow
 {
     private readonly List<CoreRect> _hitTestAreas = [];
     private bool _disposed;
 
-    public TestOverlayWindowMock(nint handle, nint targetWindowHandle, CoreSize initialSize, CorePoint initialPosition)
-    {
-        Handle = handle;
-        TargetWindowHandle = targetWindowHandle;
-        Size = initialSize;
-        Position = initialPosition;
-    }
-
     public bool IsVisible { get; private set; }
-    public nint Handle { get; }
+    public nint Handle { get; } = handle;
     public double Opacity => 0.9;
     public bool IsClickThrough { get; set; }
     public IReadOnlyList<CoreRect> HitTestAreas => _hitTestAreas.AsReadOnly();
-    public CorePoint Position { get; set; }
-    public CoreSize Size { get; set; }
-    public nint TargetWindowHandle { get; set; }
+    public CorePoint Position { get; set; } = initialPosition;
+    public CoreSize Size { get; set; } = initialSize;
+    public nint TargetWindowHandle { get; set; } = targetWindowHandle;
 
     public void AddHitTestArea(CoreRect area) => _hitTestAreas.Add(area);
     public void RemoveHitTestArea(CoreRect area) => _hitTestAreas.Remove(area);
     public void ClearHitTestAreas() => _hitTestAreas.Clear();
     public void Show() => IsVisible = true;
     public void Hide() => IsVisible = false;
-    public void UpdateContent(object? content = null) { /* No-op for test */ }
+    public void UpdateContent(object? _ = null) 
+    { 
+        /* No-op for test */ 
+    }
     public void AdjustToTargetWindow() { /* No-op for test */ }
     public void Close() => Dispose();
 

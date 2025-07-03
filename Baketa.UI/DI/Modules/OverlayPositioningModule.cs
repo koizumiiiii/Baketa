@@ -38,27 +38,17 @@ public sealed class OverlayPositioningModule
 /// <summary>
 /// オーバーレイ位置管理システムのファクトリー実装
 /// </summary>
-public sealed class OverlayPositionManagerFactory : IOverlayPositionManagerFactory
+/// <param name="logger">ロガー</param>
+/// <param name="multiMonitorManager">マルチモニター管理システム</param>
+/// <param name="textMeasurementService">テキスト測定サービス</param>
+public sealed class OverlayPositionManagerFactory(
+    ILogger<OverlayPositionManager> logger,
+    MultiMonitorOverlayManager multiMonitorManager,
+    ITextMeasurementService textMeasurementService) : IOverlayPositionManagerFactory
 {
-    private readonly ILogger<OverlayPositionManager> _logger;
-    private readonly MultiMonitorOverlayManager _multiMonitorManager;
-    private readonly ITextMeasurementService _textMeasurementService;
-
-    /// <summary>
-    /// 新しいOverlayPositionManagerFactoryを初期化します
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    /// <param name="multiMonitorManager">マルチモニター管理システム</param>
-    /// <param name="textMeasurementService">テキスト測定サービス</param>
-    public OverlayPositionManagerFactory(
-        ILogger<OverlayPositionManager> logger,
-        MultiMonitorOverlayManager multiMonitorManager,
-        ITextMeasurementService textMeasurementService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _multiMonitorManager = multiMonitorManager ?? throw new ArgumentNullException(nameof(multiMonitorManager));
-        _textMeasurementService = textMeasurementService ?? throw new ArgumentNullException(nameof(textMeasurementService));
-    }
+    private readonly ILogger<OverlayPositionManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly MultiMonitorOverlayManager _multiMonitorManager = multiMonitorManager ?? throw new ArgumentNullException(nameof(multiMonitorManager));
+    private readonly ITextMeasurementService _textMeasurementService = textMeasurementService ?? throw new ArgumentNullException(nameof(textMeasurementService));
 
     /// <inheritdoc/>
     public async Task<IOverlayPositionManager> CreateAsync(CancellationToken cancellationToken = default)
@@ -74,21 +64,22 @@ public sealed class OverlayPositionManagerFactory : IOverlayPositionManagerFacto
         ArgumentNullException.ThrowIfNull(settings);
         
         await Task.Yield(); // 非同期メソッドのため
-        
+
         var positionManager = new OverlayPositionManager(
             _logger,
             _multiMonitorManager,
             _textMeasurementService
-        );
-
-        // 設定を適用
-        positionManager.PositionMode = settings.PositionMode;
-        positionManager.SizeMode = settings.SizeMode;
-        positionManager.FixedPosition = settings.FixedPosition;
-        positionManager.FixedSize = settings.FixedSize;
-        positionManager.PositionOffset = settings.PositionOffset;
-        positionManager.MaxSize = settings.MaxSize;
-        positionManager.MinSize = settings.MinSize;
+        )
+        {
+            // 設定を適用
+            PositionMode = settings.PositionMode,
+            SizeMode = settings.SizeMode,
+            FixedPosition = settings.FixedPosition,
+            FixedSize = settings.FixedSize,
+            PositionOffset = settings.PositionOffset,
+            MaxSize = settings.MaxSize,
+            MinSize = settings.MinSize
+        };
 
         return positionManager;
     }

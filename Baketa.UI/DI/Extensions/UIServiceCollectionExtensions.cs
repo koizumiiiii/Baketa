@@ -43,7 +43,7 @@ internal static class UIServiceCollectionExtensions
     /// <summary>
     /// UI固有のサービスを登録
     /// </summary>
-    private static void RegisterUISpecificServices(IServiceCollection services, IConfiguration? configuration)
+    private static void RegisterUISpecificServices(IServiceCollection services, IConfiguration? _)
     {
         // 設定関連サービスの登録
         services.AddSettingsServices();
@@ -60,15 +60,13 @@ internal static class UIServiceCollectionExtensions
     /// <summary>
     /// ビューモデルの登録
     /// </summary>
-    private static void RegisterViewModels(IServiceCollection services)
+    private static void RegisterViewModels(IServiceCollection _)
     {
-        // メインビューモデル
-        services.AddTransient<SettingsViewModel>();
-        services.AddTransient<AccessibilitySettingsViewModel>();
-        services.AddTransient<LanguagePairsViewModel>();
-        
-        // コントロール用ビューモデル
-        services.AddTransient<OperationalControlViewModel>();
+        // メインビューモデル（将来実装時に使用）
+        // services.AddTransient<SettingsViewModel>();
+        // services.AddTransient<AccessibilitySettingsViewModel>();
+        // services.AddTransient<LanguagePairsViewModel>();
+        // services.AddTransient<OperationalControlViewModel>();
         
         // その他のビューモデル
         // 例: services.AddTransient<MainWindowViewModel>();
@@ -78,7 +76,7 @@ internal static class UIServiceCollectionExtensions
     /// <summary>
     /// UI関連のイベントハンドラーを登録
     /// </summary>
-    private static void RegisterUIEventHandlers(IServiceCollection services)
+    private static void RegisterUIEventHandlers(IServiceCollection _)
     {
         // UIイベントプロセッサー
         // 例: services.AddSingleton<ThemeChangedEventProcessor>();
@@ -92,15 +90,11 @@ internal static class UIServiceCollectionExtensions
 /// <summary>
 /// モック翻訳エンジン状態監視サービス（一時的な実装）
 /// </summary>
+/// <param name="logger">ロガー</param>
 // CA1852: サブタイプがない場合はsealedにできます
-internal sealed class MockTranslationEngineStatusService : ITranslationEngineStatusService
+internal sealed class MockTranslationEngineStatusService(ILogger<MockTranslationEngineStatusService> logger) : ITranslationEngineStatusService
 {
-    private readonly ILogger<MockTranslationEngineStatusService> _logger;
-
-    public MockTranslationEngineStatusService(ILogger<MockTranslationEngineStatusService> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<MockTranslationEngineStatusService> _logger = logger;
 
     // CA1805: プロパティをauto-implementedで初期化し、明示的な初期化を省略
     public TranslationEngineStatus LocalEngineStatus { get; } = CreateMockLocalEngineStatus();
@@ -131,27 +125,33 @@ internal sealed class MockTranslationEngineStatusService : ITranslationEngineSta
     
     private static TranslationEngineStatus CreateMockLocalEngineStatus()
     {
-        var status = new TranslationEngineStatus();
-        status.IsOnline = true;
-        status.IsHealthy = true;
-        status.RemainingRequests = 1000;
+        var status = new TranslationEngineStatus
+        {
+            IsOnline = true,
+            IsHealthy = true,
+            RemainingRequests = 1000
+        };
         return status;
     }
     
     private static TranslationEngineStatus CreateMockCloudEngineStatus()
     {
-        var status = new TranslationEngineStatus();
-        status.IsOnline = true;
-        status.IsHealthy = true;
-        status.RemainingRequests = 100;
+        var status = new TranslationEngineStatus
+        {
+            IsOnline = true,
+            IsHealthy = true,
+            RemainingRequests = 100
+        };
         return status;
     }
     
     private static NetworkConnectionStatus CreateMockNetworkStatus()
     {
-        var status = new NetworkConnectionStatus();
-        status.IsConnected = true;
-        status.LatencyMs = 50;
+        var status = new NetworkConnectionStatus
+        {
+            IsConnected = true,
+            LatencyMs = 50
+        };
         return status;
     }
 }

@@ -13,7 +13,8 @@
     
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <!-- CA1848警告抑制: LoggerMessageパターンはテストでは不要 -->
+    <NoWarn>$(NoWarn);CA2007;CA1822;CA1848</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

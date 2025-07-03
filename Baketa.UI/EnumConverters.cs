@@ -9,7 +9,7 @@ namespace Baketa.UI;
 /// </summary>
 internal sealed class EnumToIntConverter : IValueConverter
 {
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? Convert(object? value, Type _, object? _1, CultureInfo _2)
     {
         if (value is Enum enumValue)
         {
@@ -18,7 +18,7 @@ internal sealed class EnumToIntConverter : IValueConverter
         return 0;
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         if (value is int intValue && targetType.IsEnum)
         {
@@ -33,7 +33,7 @@ internal sealed class EnumToIntConverter : IValueConverter
 /// </summary>
 internal sealed class EnumComparisonConverter : IValueConverter
 {
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? Convert(object? value, Type _, object? parameter, CultureInfo _1)
     {
         if (value == null || parameter == null)
             return false;
@@ -51,7 +51,7 @@ internal sealed class EnumComparisonConverter : IValueConverter
         return value.Equals(parameter);
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo _)
     {
         if (value is bool isSelected && isSelected && parameter != null)
         {

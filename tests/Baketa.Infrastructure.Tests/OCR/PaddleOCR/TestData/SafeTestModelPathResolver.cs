@@ -7,14 +7,10 @@ namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 /// テスト用の安全なモデルパスリゾルバー
 /// 実際のファイルシステム操作を行わず、テスト環境で安全に動作します
 /// </summary>
-public class SafeTestModelPathResolver : IModelPathResolver
+/// <param name="testBaseDirectory">テスト用ベースディレクトリパス</param>
+public class SafeTestModelPathResolver(string testBaseDirectory) : IModelPathResolver
 {
-    private readonly string _testBaseDirectory;
-
-    public SafeTestModelPathResolver(string testBaseDirectory)
-    {
-        _testBaseDirectory = testBaseDirectory ?? throw new ArgumentNullException(nameof(testBaseDirectory));
-    }
+    private readonly string _testBaseDirectory = testBaseDirectory ?? throw new ArgumentNullException(nameof(testBaseDirectory));
 
     public string GetModelsRootDirectory()
     {
@@ -26,10 +22,10 @@ public class SafeTestModelPathResolver : IModelPathResolver
         return Path.Combine(_testBaseDirectory, "Models", "detection");
     }
 
-    public string GetRecognitionModelsDirectory(string language)
+    public string GetRecognitionModelsDirectory(string languageCode)
     {
-        ArgumentException.ThrowIfNullOrEmpty(language);
-        return Path.Combine(_testBaseDirectory, "Models", "recognition", language);
+        ArgumentException.ThrowIfNullOrEmpty(languageCode);
+        return Path.Combine(_testBaseDirectory, "Models", "recognition", languageCode);
     }
 
     public string GetClassificationModelsDirectory()
@@ -43,11 +39,11 @@ public class SafeTestModelPathResolver : IModelPathResolver
         return Path.Combine(GetDetectionModelsDirectory(), $"{modelName}.onnx");
     }
 
-    public string GetRecognitionModelPath(string language, string modelName)
+    public string GetRecognitionModelPath(string languageCode, string modelName)
     {
-        ArgumentException.ThrowIfNullOrEmpty(language);
+        ArgumentException.ThrowIfNullOrEmpty(languageCode);
         ArgumentException.ThrowIfNullOrEmpty(modelName);
-        return Path.Combine(GetRecognitionModelsDirectory(language), $"{modelName}.onnx");
+        return Path.Combine(GetRecognitionModelsDirectory(languageCode), $"{modelName}.onnx");
     }
 
     public string GetClassificationModelPath(string modelName)

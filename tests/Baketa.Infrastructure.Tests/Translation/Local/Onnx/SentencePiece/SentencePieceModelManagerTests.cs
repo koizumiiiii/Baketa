@@ -464,14 +464,9 @@ public class SentencePieceModelManagerTests : IDisposable
     /// <summary>
     /// テスト用のHttpClientFactory実装（Moqの制限を回避）
     /// </summary>
-    private sealed class TestHttpClientFactory : IHttpClientFactory
+    private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
-        private readonly HttpClient _client;
-
-        public TestHttpClientFactory(HttpClient client)
-        {
-            _client = client ?? throw new ArgumentNullException(nameof(client));
-        }
+        private readonly HttpClient _client = client ?? throw new ArgumentNullException(nameof(client));
 
         public HttpClient CreateClient(string name)
         {

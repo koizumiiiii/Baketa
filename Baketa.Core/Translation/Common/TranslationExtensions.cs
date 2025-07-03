@@ -170,7 +170,7 @@ namespace Baketa.Core.Translation.Common;
         /// </summary>
         /// <param name="options">Web APIオプション</param>
         /// <returns>User-Agent文字列</returns>
-        public static string UserAgent(this WebApiTranslationOptions options)
+        public static string UserAgent(this WebApiTranslationOptions _)
         {
             return "Baketa-Translator/1.0";
         }
@@ -178,11 +178,13 @@ namespace Baketa.Core.Translation.Common;
         /// <summary>
         /// 翻訳開始イベントからエンジン名を取得する拡張メソッド
         /// </summary>
-        /// <param name="event">翻訳開始イベント</param>
+        /// <param name="startedEvent">翻訳開始イベント</param>
         /// <returns>エンジン名</returns>
         public static string EngineName(this TranslationStartedEvent _)
         {
-            return "Unknown"; // TODO: 翻訳開始時はエンジン名が不明な場合があるためデフォルト値を返す
+            // 翻訳開始時はエンジン名が未確定の場合が多いため、デフォルト値を返す
+            // 将来的にはTranslationStartedEventにEngineNameプロパティが追加される可能性がある
+            return "TranslationStartedEvent";
         }
         
         /// <summary>
@@ -208,11 +210,13 @@ namespace Baketa.Core.Translation.Common;
         /// <summary>
         /// 言語文字列から言語コードを取得する拡張メソッド
         /// </summary>
-        /// <param name="language">言語文字列</param>
+        /// <param name="languageString">言語文字列</param>
         /// <returns>言語コード</returns>
-        public static string Code(this string _)
+        public static string Code(this string languageString)
         {
-            return _; // 実際には言語文字列が取得されているのでそのまま返す
+            // 言語文字列が既にコード形式の場合はそのまま返す
+            // 将来的には言語名からコードへの変換処理が必要になる可能性がある
+            return languageString ?? "unknown";
         }
         
         /// <summary>

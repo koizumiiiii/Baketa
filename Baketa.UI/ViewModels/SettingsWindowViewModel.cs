@@ -79,7 +79,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// </summary>
     public IReadOnlyList<SettingCategory> VisibleCategories => ShowAdvancedSettings
         ? [.. AllCategories.Where(c => c.Level <= SettingLevel.Advanced).OrderBy(c => c.DisplayOrder)]
-        : [.. AllCategories.Where(c => c.Level == SettingLevel.Basic).OrderBy(c => c.DisplayOrder)];
+        : AllCategories.Where(c => c.Level == SettingLevel.Basic).OrderBy(c => c.DisplayOrder).ToList();
 
     /// <summary>
     /// 詳細設定を表示するかどうか
@@ -159,7 +159,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         var categories = new List<SettingCategory>
         {
             // 基本設定カテゴリ
-            new SettingCategory
+            new()
             {
                 Id = "general",
                 Name = "一般設定",
@@ -170,7 +170,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateGeneralSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "appearance",
                 Name = "外観設定",
@@ -181,7 +181,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateAppearanceSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "mainui",
                 Name = "操作パネル",
@@ -192,7 +192,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateMainUiSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "translation",
                 Name = "翻訳設定",
@@ -203,7 +203,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateTranslationSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "overlay",
                 Name = "オーバーレイ",
@@ -215,7 +215,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             },
 
             // 詳細設定カテゴリ
-            new SettingCategory
+            new()
             {
                 Id = "capture",
                 Name = "キャプチャ設定",
@@ -226,7 +226,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateCaptureSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "ocr",
                 Name = "OCR設定",
@@ -237,7 +237,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = CreateOcrSettingsView()
             },
 
-            new SettingCategory
+            new()
             {
                 Id = "advanced",
                 Name = "拡張設定",
@@ -259,7 +259,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     {
         GeneralSettings settings = new(); // TODO: 実際の設定データを注入
         GeneralSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<GeneralSettingsViewModel>);
-        return new GeneralSettingsView { DataContext = viewModel };
+        return new() { DataContext = viewModel };
     }
 
     /// <summary>
@@ -269,7 +269,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     {
         ThemeSettings settings = new(); // TODO: 実際の設定データを注入
         ThemeSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<ThemeSettingsViewModel>);
-        return new ThemeSettingsView { DataContext = viewModel };
+        return new() { DataContext = viewModel };
     }
 
     /// <summary>
@@ -279,7 +279,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     {
         MainUiSettings settings = new(); // TODO: 実際の設定データを注入
         MainUiSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<MainUiSettingsViewModel>);
-        return new MainUiSettingsView { DataContext = viewModel };
+        return new() { DataContext = viewModel };
     }
 
     /// <summary>
@@ -288,7 +288,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private static TranslationSettingsView CreateTranslationSettingsView()
     {
         // 既存のTranslationSettingsViewを使用
-        return new TranslationSettingsView();
+        return new();
     }
 
     /// <summary>
@@ -298,11 +298,10 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
     private UserControl CreateOverlaySettingsView()
     {
-        _ = new OverlaySettings(); // TODO: 実際の設定データを注入
-        _ = new OverlaySettingsViewModel(new OverlaySettings(), _eventAggregator, _logger as ILogger<OverlaySettingsViewModel>);
+        // TODO: 実際の設定データを注入し、ViewModelと連携する
         // 簡単なスタブ実装としてUserControlを返す
-        var textBlock = new Avalonia.Controls.TextBlock { Text = "オーバーレイ設定（開発中）" };
-        return new UserControl
+        Avalonia.Controls.TextBlock textBlock = new() { Text = "オーバーレイ設定（開発中）" };
+        return new()
         {
             Content = textBlock
         };
@@ -315,11 +314,10 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
     private UserControl CreateCaptureSettingsView()
     {
-        _ = new CaptureSettings(); // TODO: 実際の設定データを注入
-        _ = new CaptureSettingsViewModel(new CaptureSettings(), _eventAggregator, _logger as ILogger<CaptureSettingsViewModel>);
+        // TODO: 実際の設定データを注入し、ViewModelと連携する
         // 簡単なスタブ実装としてUserControlを返す
-        var textBlock = new Avalonia.Controls.TextBlock { Text = "キャプチャ設定（開発中）" };
-        return new UserControl
+        Avalonia.Controls.TextBlock textBlock = new() { Text = "キャプチャ設定（開発中）" };
+        return new()
         {
             Content = textBlock
         };
@@ -332,7 +330,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     {
         OcrSettings settings = new(); // TODO: 実際の設定データを注入
         OcrSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<OcrSettingsViewModel>);
-        return new OcrSettingsView { DataContext = viewModel };
+        return new() { DataContext = viewModel };
     }
 
     /// <summary>
@@ -341,8 +339,8 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private UserControl CreateAdvancedSettingsView()
     {
         // 簡単なスタブ実装としてUserControlを返す
-        var textBlock = new Avalonia.Controls.TextBlock { Text = "拡張設定（開発中）" };
-        return new UserControl
+        Avalonia.Controls.TextBlock textBlock = new() { Text = "拡張設定（開発中）" };
+        return new()
         {
             Content = textBlock
         };

@@ -542,9 +542,7 @@ namespace Baketa.UI.ViewModels
                 .Subscribe(OnStatusUpdate);
             
             // 状態オブジェクトのプロパティ変更を監視
-            if (_statusService.LocalEngineStatus != null)
-            {
-                _statusService.LocalEngineStatus.WhenAnyValue(
+            _statusService.LocalEngineStatus?.WhenAnyValue(
                     x => x.IsOnline,
                     x => x.IsHealthy,
                     x => x.RemainingRequests,
@@ -554,11 +552,8 @@ namespace Baketa.UI.ViewModels
                         this.RaisePropertyChanged(nameof(LocalEngineStatusText));
                         this.RaisePropertyChanged(nameof(LocalEngineStatus));
                     });
-            }
             
-            if (_statusService.CloudEngineStatus != null)
-            {
-                _statusService.CloudEngineStatus.WhenAnyValue(
+            _statusService.CloudEngineStatus?.WhenAnyValue(
                     x => x.IsOnline,
                     x => x.IsHealthy,
                     x => x.RemainingRequests,
@@ -568,11 +563,8 @@ namespace Baketa.UI.ViewModels
                         this.RaisePropertyChanged(nameof(CloudEngineStatusText));
                         this.RaisePropertyChanged(nameof(CloudEngineStatus));
                     });
-            }
             
-            if (_statusService.NetworkStatus != null)
-            {
-                _statusService.NetworkStatus.WhenAnyValue(
+            _statusService.NetworkStatus?.WhenAnyValue(
                     x => x.IsConnected,
                     x => x.LatencyMs)
                     .Subscribe(_ => 
@@ -580,7 +572,6 @@ namespace Baketa.UI.ViewModels
                         this.RaisePropertyChanged(nameof(NetworkStatusText));
                         this.RaisePropertyChanged(nameof(NetworkStatus));
                     });
-            }
             
             // 状態監視を自動開始
             _ = Task.Run(async () =>

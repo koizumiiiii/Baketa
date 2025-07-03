@@ -99,28 +99,35 @@ public class TranslationContext
 /// <summary>
 /// 矩形領域を表す構造体
 /// </summary>
-public struct Rectangle : IEquatable<Rectangle>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="x">X座標</param>
+/// <param name="y">Y座標</param>
+/// <param name="width">幅</param>
+/// <param name="height">高さ</param>
+public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectangle>
 {
     /// <summary>
     /// X座標
     /// </summary>
-    public int X { get; set; }
-    
+    public int X { get; set; } = x;
+
     /// <summary>
     /// Y座標
     /// </summary>
-    public int Y { get; set; }
-    
+    public int Y { get; set; } = y;
+
     /// <summary>
     /// 幅
     /// </summary>
-    public int Width { get; set; }
-    
+    public int Width { get; set; } = width;
+
     /// <summary>
     /// 高さ
     /// </summary>
-    public int Height { get; set; }
-    
+    public int Height { get; set; } = height;
+
     /// <summary>
     /// 左端のX座標
     /// </summary>
@@ -140,22 +147,7 @@ public struct Rectangle : IEquatable<Rectangle>
     /// 下端のY座標
     /// </summary>
     public int Bottom => Y + Height;
-    
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="x">X座標</param>
-    /// <param name="y">Y座標</param>
-    /// <param name="width">幅</param>
-    /// <param name="height">高さ</param>
-    public Rectangle(int x, int y, int width, int height)
-    {
-        X = x;
-        Y = y;
-        Width = width;
-        Height = height;
-    }
-    
+
     /// <summary>
     /// 文字列表現を取得します
     /// </summary>

@@ -11,15 +11,10 @@ namespace Baketa.Application.EventHandlers.Capture;
 /// フルスクリーン状態変更イベントハンドラー
 /// フルスクリーン状態の変更を処理し、ログ記録やシステム通知を行う
 /// </summary>
-public class FullscreenStateChangedEventHandler : IEventProcessor<FullscreenStateChangedEvent>
+public class FullscreenStateChangedEventHandler(ILogger<FullscreenStateChangedEventHandler>? logger = null) : IEventProcessor<FullscreenStateChangedEvent>
 {
-    private readonly ILogger<FullscreenStateChangedEventHandler>? _logger;
-    
-    public FullscreenStateChangedEventHandler(ILogger<FullscreenStateChangedEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenStateChangedEventHandler>? _logger = logger;
+
     /// <summary>
     /// フルスクリーン状態変更イベントを処理します
     /// </summary>
@@ -64,15 +59,10 @@ public class FullscreenStateChangedEventHandler : IEventProcessor<FullscreenStat
 /// フルスクリーン最適化適用イベントハンドラー
 /// 最適化が適用されたときの処理を行う
 /// </summary>
-public class FullscreenOptimizationAppliedEventHandler : IEventProcessor<FullscreenOptimizationAppliedEvent>
+public class FullscreenOptimizationAppliedEventHandler(ILogger<FullscreenOptimizationAppliedEventHandler>? logger = null) : IEventProcessor<FullscreenOptimizationAppliedEvent>
 {
-    private readonly ILogger<FullscreenOptimizationAppliedEventHandler>? _logger;
-    
-    public FullscreenOptimizationAppliedEventHandler(ILogger<FullscreenOptimizationAppliedEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenOptimizationAppliedEventHandler>? _logger = logger;
+
     /// <summary>
     /// フルスクリーン最適化適用イベントを処理します
     /// </summary>
@@ -114,15 +104,10 @@ public class FullscreenOptimizationAppliedEventHandler : IEventProcessor<Fullscr
 /// フルスクリーン最適化解除イベントハンドラー
 /// 最適化が解除されたときの処理を行う
 /// </summary>
-public class FullscreenOptimizationRemovedEventHandler : IEventProcessor<FullscreenOptimizationRemovedEvent>
+public class FullscreenOptimizationRemovedEventHandler(ILogger<FullscreenOptimizationRemovedEventHandler>? logger = null) : IEventProcessor<FullscreenOptimizationRemovedEvent>
 {
-    private readonly ILogger<FullscreenOptimizationRemovedEventHandler>? _logger;
-    
-    public FullscreenOptimizationRemovedEventHandler(ILogger<FullscreenOptimizationRemovedEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenOptimizationRemovedEventHandler>? _logger = logger;
+
     /// <summary>
     /// フルスクリーン最適化解除イベントを処理します
     /// </summary>
@@ -155,15 +140,10 @@ public class FullscreenOptimizationRemovedEventHandler : IEventProcessor<Fullscr
 /// フルスクリーン最適化エラーイベントハンドラー
 /// 最適化でエラーが発生したときの処理を行う
 /// </summary>
-public class FullscreenOptimizationErrorEventHandler : IEventProcessor<FullscreenOptimizationErrorEvent>
+public class FullscreenOptimizationErrorEventHandler(ILogger<FullscreenOptimizationErrorEventHandler>? logger = null) : IEventProcessor<FullscreenOptimizationErrorEvent>
 {
-    private readonly ILogger<FullscreenOptimizationErrorEventHandler>? _logger;
-    
-    public FullscreenOptimizationErrorEventHandler(ILogger<FullscreenOptimizationErrorEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenOptimizationErrorEventHandler>? _logger = logger;
+
     /// <summary>
     /// フルスクリーン最適化エラーイベントを処理します
     /// </summary>
@@ -193,15 +173,10 @@ public class FullscreenOptimizationErrorEventHandler : IEventProcessor<Fullscree
 /// <summary>
 /// フルスクリーン検出開始イベントハンドラー
 /// </summary>
-public class FullscreenDetectionStartedEventHandler : IEventProcessor<FullscreenDetectionStartedEvent>
+public class FullscreenDetectionStartedEventHandler(ILogger<FullscreenDetectionStartedEventHandler>? logger = null) : IEventProcessor<FullscreenDetectionStartedEvent>
 {
-    private readonly ILogger<FullscreenDetectionStartedEventHandler>? _logger;
-    
-    public FullscreenDetectionStartedEventHandler(ILogger<FullscreenDetectionStartedEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenDetectionStartedEventHandler>? _logger = logger;
+
     public async Task HandleAsync(FullscreenDetectionStartedEvent eventData)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
@@ -224,15 +199,10 @@ public class FullscreenDetectionStartedEventHandler : IEventProcessor<Fullscreen
 /// <summary>
 /// フルスクリーン検出停止イベントハンドラー
 /// </summary>
-public class FullscreenDetectionStoppedEventHandler : IEventProcessor<FullscreenDetectionStoppedEvent>
+public class FullscreenDetectionStoppedEventHandler(ILogger<FullscreenDetectionStoppedEventHandler>? logger = null) : IEventProcessor<FullscreenDetectionStoppedEvent>
 {
-    private readonly ILogger<FullscreenDetectionStoppedEventHandler>? _logger;
-    
-    public FullscreenDetectionStoppedEventHandler(ILogger<FullscreenDetectionStoppedEventHandler>? logger = null)
-    {
-        _logger = logger;
-    }
-    
+    private readonly ILogger<FullscreenDetectionStoppedEventHandler>? _logger = logger;
+
     public async Task HandleAsync(FullscreenDetectionStoppedEvent eventData)
     {
         await HandleInternal(eventData).ConfigureAwait(false);

@@ -13,32 +13,23 @@ using TranslationEngineInterface = Baketa.Core.Translation.Abstractions.ITransla
 
 namespace Baketa.Core.Translation.Services;
 
-    /// <summary>
-    /// 翻訳エンジン検出サービスの実装
-    /// </summary>
-    public class DefaultTranslationEngineDiscovery : Baketa.Core.Translation.Abstractions.ITranslationEngineDiscovery
+/// <summary>
+/// 翻訳エンジン検出サービスの実装
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="engineFactory">翻訳エンジンファクトリー</param>
+public class DefaultTranslationEngineDiscovery(
+        ITranslationEngineFactory engineFactory) : Baketa.Core.Translation.Abstractions.ITranslationEngineDiscovery
     {
-        private readonly ILogger<DefaultTranslationEngineDiscovery> _logger;
-        private readonly ITranslationEngineFactory _engineFactory;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="engineFactory">翻訳エンジンファクトリー</param>
-        public DefaultTranslationEngineDiscovery(
-            ILogger<DefaultTranslationEngineDiscovery> logger,
-            ITranslationEngineFactory engineFactory)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
-        }
-        
-        /// <summary>
-        /// 利用可能な翻訳エンジン名の一覧を取得します
-        /// </summary>
-        /// <returns>翻訳エンジン名のリスト</returns>
-        public async Task<IReadOnlyList<string>> GetAvailableEngineNamesAsync()
+        private readonly ITranslationEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+
+    /// <summary>
+    /// 利用可能な翻訳エンジン名の一覧を取得します
+    /// </summary>
+    /// <returns>翻訳エンジン名のリスト</returns>
+    public async Task<IReadOnlyList<string>> GetAvailableEngineNamesAsync()
         {
             var engines = await _engineFactory.GetAvailableEnginesAsync().ConfigureAwait(false);
             return [.. engines.Select(e => e.Name)];

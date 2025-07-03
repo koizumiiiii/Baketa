@@ -75,16 +75,11 @@ public record UserPlanDetails(
 /// <summary>
 /// プラン変更イベント引数
 /// </summary>
-public class UserPlanChangedEventArgs : EventArgs
+/// <param name="oldPlan">変更前のプラン</param>
+/// <param name="newPlan">変更後のプラン</param>
+public class UserPlanChangedEventArgs(UserPlanType oldPlan, UserPlanType newPlan) : EventArgs
 {
-    public UserPlanType OldPlan { get; }
-    public UserPlanType NewPlan { get; }
-    public DateTime ChangeDate { get; }
-
-    public UserPlanChangedEventArgs(UserPlanType oldPlan, UserPlanType newPlan)
-    {
-        OldPlan = oldPlan;
-        NewPlan = newPlan;
-        ChangeDate = DateTime.UtcNow;
-    }
+    public UserPlanType OldPlan { get; } = oldPlan;
+    public UserPlanType NewPlan { get; } = newPlan;
+    public DateTime ChangeDate { get; } = DateTime.UtcNow;
 }

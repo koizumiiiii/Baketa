@@ -11,31 +11,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Capture.DifferenceDetection;
 
-    /// <summary>
-    /// ヒストグラムベースの差分検出アルゴリズム
-    /// </summary>
-    public class HistogramDifferenceAlgorithm : IDetectionAlgorithm
+/// <summary>
+/// ヒストグラムベースの差分検出アルゴリズム
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class HistogramDifferenceAlgorithm(ILogger<HistogramDifferenceAlgorithm>? logger = null) : IDetectionAlgorithm
     {
-        private readonly ILogger<HistogramDifferenceAlgorithm>? _logger;
+        private readonly ILogger<HistogramDifferenceAlgorithm>? _logger = logger;
         
         /// <summary>
         /// アルゴリズムの種類
         /// </summary>
         public DifferenceDetectionAlgorithm AlgorithmType => DifferenceDetectionAlgorithm.HistogramBased;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public HistogramDifferenceAlgorithm(ILogger<HistogramDifferenceAlgorithm>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// 差分を検出します
-        /// </summary>
-        public async Task<DetectionResult> DetectAsync(
+
+    /// <summary>
+    /// 差分を検出します
+    /// </summary>
+    public async Task<DetectionResult> DetectAsync(
             IImage previousImage, 
             IImage currentImage, 
             DifferenceDetectionSettings settings, 
@@ -234,7 +229,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// モック実装：ヒストグラム比較プロキシ
         /// 実際の実装ではOpenCVのヒストグラム比較関数を使用
         /// </summary>
-        private double CalculateHistogramComparisonProxy(IAdvancedImage image1, IAdvancedImage image2)
+        private double CalculateHistogramComparisonProxy(IAdvancedImage _, IAdvancedImage _1)
         {
             // モック実装 - 実際にはOpenCVの実装を使用
             // 暗号学的に安全な乱数生成器を使用して差分をシミュレート
@@ -249,9 +244,9 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// 変化領域を検出します
         /// </summary>
         private async Task<List<Rectangle>> DetectChangedRegionsAsync(
-            IAdvancedImage previousImage, 
-            IAdvancedImage currentImage, 
-            DifferenceDetectionSettings settings)
+            IAdvancedImage _, 
+            IAdvancedImage _1, 
+            DifferenceDetectionSettings _2)
         {
             // 実際の実装ではOpenCVの差分検出を使用
             // ここではモック実装で領域を返す
@@ -267,9 +262,9 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         /// テキスト消失を検出します
         /// </summary>
         private async Task<List<Rectangle>> DetectTextDisappearanceAsync(
-            IAdvancedImage previousImage, 
-            IAdvancedImage currentImage, 
-            DifferenceDetectionSettings settings)
+            IAdvancedImage _, 
+            IAdvancedImage _1, 
+            DifferenceDetectionSettings _2)
         {
             // テキスト消失検出（実装例）
             List<Rectangle> disappearedRegions = [new Rectangle(100, 100, 200, 50)];

@@ -11,16 +11,9 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.Onnx.SentencePiece;
 /// <summary>
 /// Microsoft.ML.Tokenizers v0.21.0 APIの利用可能性テスト
 /// </summary>
-public class MicrosoftMLTokenizersApiTests
+public class MicrosoftMLTokenizersApiTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-    private readonly ILogger _logger;
-
-    public MicrosoftMLTokenizersApiTests(ITestOutputHelper output)
-    {
-        _output = output;
-        _logger = NullLogger.Instance;
-    }
+    private readonly ITestOutputHelper _output = output;
 
     [Fact]
     public void SentencePieceTokenizer_TypeExists()

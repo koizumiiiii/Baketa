@@ -76,7 +76,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 自動検出言語用の静的インスタンス
         /// </summary>
-        public static Language Auto => new Language
+        public static Language Auto => new()
         {
             Code = "auto",
             Name = "Auto Detect",
@@ -92,7 +92,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 英語(English)
         /// </summary>
-        public static Language English => new Language
+        public static Language English => new()
         {
             Code = "en",
             Name = "English",
@@ -104,7 +104,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 日本語(Japanese)
         /// </summary>
-        public static Language Japanese => new Language
+        public static Language Japanese => new()
         {
             Code = "ja",
             Name = "Japanese",
@@ -116,7 +116,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 中国語(Chinese, Simplified)
         /// </summary>
-        public static Language ChineseSimplified => new Language
+        public static Language ChineseSimplified => new()
         {
             Code = "zh-CN",
             Name = "Chinese (Simplified)",
@@ -128,7 +128,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 中国語(Chinese, Traditional)
         /// </summary>
-        public static Language ChineseTraditional => new Language
+        public static Language ChineseTraditional => new()
         {
             Code = "zh-TW",
             Name = "Chinese (Traditional)",
@@ -140,32 +140,32 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 韓国語(Korean)
         /// </summary>
-        public static Language Korean => new Language { Code = "ko", DisplayName = "한국어" };
+        public static Language Korean => new() { Code = "ko", DisplayName = "한국어" };
 
         /// <summary>
         /// スペイン語(Spanish)
         /// </summary>
-        public static Language Spanish => new Language { Code = "es", DisplayName = "Español" };
+        public static Language Spanish => new() { Code = "es", DisplayName = "Español" };
 
         /// <summary>
         /// フランス語(French)
         /// </summary>
-        public static Language French => new Language { Code = "fr", DisplayName = "Français" };
+        public static Language French => new() { Code = "fr", DisplayName = "Français" };
 
         /// <summary>
         /// ドイツ語(German)
         /// </summary>
-        public static Language German => new Language { Code = "de", DisplayName = "Deutsch" };
+        public static Language German => new() { Code = "de", DisplayName = "Deutsch" };
 
         /// <summary>
         /// ロシア語(Russian)
         /// </summary>
-        public static Language Russian => new Language { Code = "ru", DisplayName = "Русский" };
+        public static Language Russian => new() { Code = "ru", DisplayName = "Русский" };
 
         /// <summary>
         /// アラビア語(Arabic)
         /// </summary>
-        public static Language Arabic => new Language { Code = "ar", DisplayName = "العربية", IsRightToLeft = true };
+        public static Language Arabic => new() { Code = "ar", DisplayName = "العربية", IsRightToLeft = true };
 
         /// <summary>
         /// 等価比較をオーバーライド

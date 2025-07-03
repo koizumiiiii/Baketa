@@ -463,7 +463,7 @@ internal sealed class WindowsOverlayWindow : IOverlayWindow
         }
     }
     
-    private void UpdateLayeredWindowFromContent(object? content)
+    private void UpdateLayeredWindowFromContent(object? _)
     {
         // MVP実装: 基本的なテストコンテンツを Win32 レイヤードウィンドウに描画
         try

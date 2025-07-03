@@ -148,9 +148,11 @@ public class LanguagePairSelectionViewModelTests
     {
         // Arrange
         var viewModel = CreateViewModel();
-        var chinesePair = new LanguagePairConfiguration();
-        chinesePair.SourceLanguage = "zh-cn";
-        chinesePair.TargetLanguage = "en";
+        var chinesePair = new LanguagePairConfiguration
+        {
+            SourceLanguage = "zh-cn",
+            TargetLanguage = "en"
+        };
 
         // Act
         using (viewModel.Activator.Activate())
@@ -173,9 +175,11 @@ public class LanguagePairSelectionViewModelTests
     {
         // Arrange
         var viewModel = CreateViewModel();
-        var nonChinesePair = new LanguagePairConfiguration();
-        nonChinesePair.SourceLanguage = "ja";
-        nonChinesePair.TargetLanguage = "en";
+        var nonChinesePair = new LanguagePairConfiguration
+        {
+            SourceLanguage = "ja",
+            TargetLanguage = "en"
+        };
 
         // Act
         using (viewModel.Activator.Activate())

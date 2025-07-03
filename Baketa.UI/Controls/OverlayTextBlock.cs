@@ -131,7 +131,7 @@ public class OverlayTextBlock : ContentControl
 
     // アニメーション制御用フィールド
     private bool _isVisible = true;
-    private readonly object _animationLock = new object();
+    private readonly object _animationLock = new();
     
     /// <summary>
     /// コンストラクター

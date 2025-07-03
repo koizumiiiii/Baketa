@@ -18,9 +18,9 @@ namespace Baketa.Core.Events.Implementation;
 public class EventProcessorMetrics(ILogger<EventProcessorMetrics>? logger = null)
 {
     // コレクション初期化の簡素化を拒否（IDE0090）
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<double>> _processingTimes = new ConcurrentDictionary<string, ConcurrentQueue<double>>();
-        private readonly ConcurrentDictionary<string, long> _invocationCounts = new ConcurrentDictionary<string, long>();
-        private readonly ConcurrentDictionary<string, long> _errorCounts = new ConcurrentDictionary<string, long>();
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<double>> _processingTimes = new();
+        private readonly ConcurrentDictionary<string, long> _invocationCounts = new();
+        private readonly ConcurrentDictionary<string, long> _errorCounts = new();
 
     /// <summary>
     /// プロセッサのパフォーマンス測定を開始

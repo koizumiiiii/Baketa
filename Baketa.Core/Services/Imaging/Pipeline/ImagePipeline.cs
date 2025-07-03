@@ -11,13 +11,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Pipeline;
 
-    /// <summary>
-    /// 画像処理パイプラインの実装
-    /// </summary>
-    public class ImagePipeline : IImagePipeline
+/// <summary>
+/// 画像処理パイプラインの実装
+/// </summary>
+/// <remarks>
+/// 新しいImagePipelineを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+/// <param name="eventListener">イベントリスナー (省略可能)</param>
+public class ImagePipeline(ILogger<ImagePipeline> logger, IPipelineEventListener? eventListener = null) : IImagePipeline
     {
         private readonly List<IImagePipelineStep> _steps = [];
-        private readonly ILogger<ImagePipeline> _logger;
+        private readonly ILogger<ImagePipeline> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
         /// <summary>
         /// 中間結果の保存モード
@@ -28,39 +33,28 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
         /// パイプライン全体のエラーハンドリング戦略
         /// </summary>
         public StepErrorHandlingStrategy GlobalErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.StopExecution;
-        
-        /// <summary>
-        /// パイプラインイベントのリスナー
-        /// </summary>
-        public IPipelineEventListener EventListener { get; set; }
-        
-        /// <summary>
-        /// すべてのステップを取得します
-        /// </summary>
-        public IReadOnlyList<IImagePipelineStep> Steps => _steps;
+
+    /// <summary>
+    /// パイプラインイベントのリスナー
+    /// </summary>
+    public IPipelineEventListener EventListener { get; set; } = eventListener ?? new DefaultPipelineEventListener(logger);
+
+    /// <summary>
+    /// すべてのステップを取得します
+    /// </summary>
+    public IReadOnlyList<IImagePipelineStep> Steps => _steps;
         
         /// <summary>
         /// パイプライン内のステップの数を取得します
         /// </summary>
         public int StepCount => _steps.Count;
 
-        /// <summary>
-        /// 新しいImagePipelineを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="eventListener">イベントリスナー (省略可能)</param>
-        public ImagePipeline(ILogger<ImagePipeline> logger, IPipelineEventListener? eventListener = null)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            EventListener = eventListener ?? new DefaultPipelineEventListener(logger);
-        }
-
-        /// <summary>
-        /// パイプラインに処理ステップを追加します
-        /// </summary>
-        /// <param name="pipelineStep">追加するパイプラインステップ</param>
-        /// <returns>自身のインスタンス（メソッドチェーン用）</returns>
-        public IImagePipeline AddStep(IImagePipelineStep pipelineStep)
+    /// <summary>
+    /// パイプラインに処理ステップを追加します
+    /// </summary>
+    /// <param name="pipelineStep">追加するパイプラインステップ</param>
+    /// <returns>自身のインスタンス（メソッドチェーン用）</returns>
+    public IImagePipeline AddStep(IImagePipelineStep pipelineStep)
         {
             ArgumentNullException.ThrowIfNull(pipelineStep);
             
@@ -388,28 +382,23 @@ namespace Baketa.Core.Services.Imaging.Pipeline;
             return context.ShouldSaveIntermediateResult(stepName);
         }
 
-        /// <summary>
-        /// デフォルトのパイプラインイベントリスナー
-        /// </summary>
-        private sealed class DefaultPipelineEventListener : IPipelineEventListener
+    /// <summary>
+    /// デフォルトのパイプラインイベントリスナー
+    /// </summary>
+    /// <remarks>
+    /// 新しいDefaultPipelineEventListenerを作成します
+    /// </remarks>
+    /// <param name="logger">ロガー</param>
+    private sealed class DefaultPipelineEventListener(ILogger logger) : IPipelineEventListener
         {
-            private readonly ILogger _logger;
-            
-            /// <summary>
-            /// 新しいDefaultPipelineEventListenerを作成します
-            /// </summary>
-            /// <param name="logger">ロガー</param>
-            public DefaultPipelineEventListener(ILogger logger)
-            {
-                _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            }
-            
-            /// <summary>
-            /// パイプライン実行開始時に呼び出されます
-            /// </summary>
-            /// <param name="pipeline">実行されるパイプライン</param>
-            /// <param name="input">入力画像</param>
-            public Task OnPipelineStartAsync(IImagePipeline pipeline, IAdvancedImage input)
+            private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        /// <summary>
+        /// パイプライン実行開始時に呼び出されます
+        /// </summary>
+        /// <param name="pipeline">実行されるパイプライン</param>
+        /// <param name="input">入力画像</param>
+        public Task OnPipelineStartAsync(IImagePipeline pipeline, IAdvancedImage input)
             {
                 _logger.LogDebug("パイプラインの実行を開始します（{StepCount}ステップ）", pipeline.StepCount);
                 return Task.CompletedTask;

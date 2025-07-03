@@ -543,8 +543,8 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
     {
         var monitors = new List<MonitorOption>
         {
-            new MonitorOption { Index = -1, Name = "自動選択" },
-            new MonitorOption { Index = 0, Name = "プライマリモニター" }
+            new() { Index = -1, Name = "自動選択" },
+            new() { Index = 0, Name = "プライマリモニター" }
         };
         
         // TODO: 実際のモニター検出ロジックを実装

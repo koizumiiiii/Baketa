@@ -683,7 +683,7 @@ public class AdvancedCaptureService : IAdvancedCaptureService, IDisposable
         _differenceDetector.ApplySettings(detectionSettings);
     }
     
-    private async Task PerformCaptureOptimizationAsync(CancellationToken cancellationToken)
+    private async Task PerformCaptureOptimizationAsync(CancellationToken _)
     {
         _logger?.LogDebug("キャプチャ最適化を実行");
         

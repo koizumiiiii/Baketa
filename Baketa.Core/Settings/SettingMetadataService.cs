@@ -11,19 +11,14 @@ namespace Baketa.Core.Settings;
 /// 設定メタデータ管理サービス実装
 /// リフレクションを使用して設定クラスからメタデータを抽出・管理
 /// </summary>
-public sealed class SettingMetadataService : ISettingMetadataService
+/// <remarks>
+/// SettingMetadataServiceを初期化します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public sealed class SettingMetadataService(ILogger<SettingMetadataService> logger) : ISettingMetadataService
 {
-    private readonly ILogger<SettingMetadataService> _logger;
+    private readonly ILogger<SettingMetadataService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ConcurrentDictionary<Type, IReadOnlyList<SettingMetadata>> _metadataCache = new();
-
-    /// <summary>
-    /// SettingMetadataServiceを初期化します
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public SettingMetadataService(ILogger<SettingMetadataService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <inheritdoc />
     public IReadOnlyList<SettingMetadata> GetMetadata<T>() where T : class

@@ -13,7 +13,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
     public class WindowsCapturerStub : IWindowsCapturer
     {
         private readonly IWindowsImageFactoryInterface _imageFactory;
-        private WindowsCaptureOptions _options = new WindowsCaptureOptions();
+        private WindowsCaptureOptions _options = new();
 
         /// <summary>
         /// WindowsCapturerStubのコンストラクタ

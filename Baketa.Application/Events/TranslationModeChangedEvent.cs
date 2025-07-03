@@ -6,28 +6,22 @@ namespace Baketa.Application.Events;
 /// <summary>
 /// 翻訳モード変更イベント
 /// </summary>
-public sealed class TranslationModeChangedEvent : EventBase
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="newMode">新しいモード</param>
+/// <param name="previousMode">前のモード</param>
+public sealed class TranslationModeChangedEvent(TranslationMode newMode, TranslationMode previousMode) : EventBase
 {
     /// <summary>
     /// 新しいモード
     /// </summary>
-    public TranslationMode NewMode { get; }
+    public TranslationMode NewMode { get; } = newMode;
 
     /// <summary>
     /// 前のモード
     /// </summary>
-    public TranslationMode PreviousMode { get; }
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="newMode">新しいモード</param>
-    /// <param name="previousMode">前のモード</param>
-    public TranslationModeChangedEvent(TranslationMode newMode, TranslationMode previousMode)
-    {
-        NewMode = newMode;
-        PreviousMode = previousMode;
-    }
+    public TranslationMode PreviousMode { get; } = previousMode;
 
     /// <inheritdoc />
     public override string Name => "TranslationModeChanged";

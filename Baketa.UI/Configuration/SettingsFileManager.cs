@@ -253,12 +253,7 @@ public sealed class SettingsFileManager
             }
 
             var json = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
-            var importedSettings = JsonSerializer.Deserialize<TranslationSettingsData>(json, _jsonOptions);
-            
-            if (importedSettings == null)
-            {
-                throw new InvalidOperationException("インポートされた設定が無効です");
-            }
+            var importedSettings = JsonSerializer.Deserialize<TranslationSettingsData>(json, _jsonOptions) ?? throw new InvalidOperationException("インポートされた設定が無効です");
 
             // 設定の妥当性検証
             ValidateSettings(importedSettings);
@@ -375,17 +370,17 @@ public sealed class SettingsFileManager
             throw new InvalidOperationException("言語ペアが指定されていません");
         }
         
-        if (!Enum.IsDefined(typeof(TranslationEngine), settings.SelectedEngine))
+        if (!Enum.IsDefined<TranslationEngine>(settings.SelectedEngine))
         {
             throw new InvalidOperationException($"無効なエンジンが指定されています: {settings.SelectedEngine}");
         }
         
-        if (!Enum.IsDefined(typeof(TranslationStrategy), settings.SelectedStrategy))
+        if (!Enum.IsDefined<TranslationStrategy>(settings.SelectedStrategy))
         {
             throw new InvalidOperationException($"無効な翻訳戦略が指定されています: {settings.SelectedStrategy}");
         }
         
-        if (!Enum.IsDefined(typeof(ChineseVariant), settings.SelectedChineseVariant))
+        if (!Enum.IsDefined<ChineseVariant>(settings.SelectedChineseVariant))
         {
             throw new InvalidOperationException($"無効な中国語変種が指定されています: {settings.SelectedChineseVariant}");
         }
@@ -408,7 +403,7 @@ public sealed class SettingsFileManager
         }
         
         // エンジンの修正
-        if (!Enum.IsDefined(typeof(TranslationEngine), settings.SelectedEngine))
+        if (!Enum.IsDefined<TranslationEngine>(settings.SelectedEngine))
         {
             settings.SelectedEngine = TranslationEngine.LocalOnly;
             hasChanges = true;
@@ -416,7 +411,7 @@ public sealed class SettingsFileManager
         }
         
         // 翻訳戦略の修正
-        if (!Enum.IsDefined(typeof(TranslationStrategy), settings.SelectedStrategy))
+        if (!Enum.IsDefined<TranslationStrategy>(settings.SelectedStrategy))
         {
             settings.SelectedStrategy = TranslationStrategy.Direct;
             hasChanges = true;
@@ -424,7 +419,7 @@ public sealed class SettingsFileManager
         }
         
         // 中国語変種の修正
-        if (!Enum.IsDefined(typeof(ChineseVariant), settings.SelectedChineseVariant))
+        if (!Enum.IsDefined<ChineseVariant>(settings.SelectedChineseVariant))
         {
             settings.SelectedChineseVariant = ChineseVariant.Simplified;
             hasChanges = true;

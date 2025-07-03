@@ -7,24 +7,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理のためのモルフォロジー（形態学的）処理フィルター
-    /// </summary>
-    public class OcrMorphologyFilter : ImageFilterBase
+/// <summary>
+/// OCR処理のためのモルフォロジー（形態学的）処理フィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrMorphologyFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrMorphologyFilter(ILogger<OcrMorphologyFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrMorphologyFilter> _logger;
+        private readonly ILogger<OcrMorphologyFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrMorphologyFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrMorphologyFilter(ILogger<OcrMorphologyFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCRモルフォロジー処理";
+    /// <inheritdoc/>
+    public override string Name => "OCRモルフォロジー処理";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理のためのテキスト形状を調整するモルフォロジー処理フィルター";

@@ -37,12 +37,16 @@ public interface IGameDetectionService
 /// <summary>
 /// ゲーム自動検出・プロファイル適用サービスの実装
 /// </summary>
-public partial class GameDetectionService : IGameDetectionService, IDisposable
+public partial class GameDetectionService(
+    IGameProfileManager profileManager,
+    IAdvancedCaptureService captureService,
+    CoreEventAggregator eventAggregator,
+    ILogger<GameDetectionService>? logger = null) : IGameDetectionService, IDisposable
 {
-    private readonly IGameProfileManager _profileManager;
-    private readonly IAdvancedCaptureService _captureService;
-    private readonly CoreEventAggregator _eventAggregator;
-    private readonly ILogger<GameDetectionService>? _logger;
+    private readonly IGameProfileManager _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+    private readonly IAdvancedCaptureService _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
+    private readonly CoreEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly ILogger<GameDetectionService>? _logger = logger;
     
     private System.Threading.Timer? _detectionTimer;
     private string? _lastDetectedGame;
@@ -50,19 +54,7 @@ public partial class GameDetectionService : IGameDetectionService, IDisposable
     private readonly object _syncLock = new();
     
     public bool IsDetectionRunning { get; private set; }
-    
-    public GameDetectionService(
-        IGameProfileManager profileManager,
-        IAdvancedCaptureService captureService,
-        CoreEventAggregator eventAggregator,
-        ILogger<GameDetectionService>? logger = null)
-    {
-        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
-        _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
-        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _logger = logger;
-    }
-    
+
     public Task StartDetectionAsync(CancellationToken cancellationToken = default)
     {
         lock (_syncLock)
@@ -294,35 +286,30 @@ public partial class GameDetectionService : IGameDetectionService, IDisposable
 /// <summary>
 /// ゲーム検出イベント
 /// </summary>
-public class GameDetectedEvent : EventBase
+/// <param name="processName">検出されたゲームのプロセス名</param>
+/// <param name="windowTitle">検出されたゲームのウィンドウタイトル</param>
+/// <param name="appliedProfile">適用されたプロファイル</param>
+public class GameDetectedEvent(string processName, string? windowTitle, SettingsGameCaptureProfile appliedProfile) : EventBase
 {
     /// <summary>
     /// 検出されたゲームのプロセス名
     /// </summary>
-    public string ProcessName { get; }
+    public string ProcessName { get; } = processName ?? throw new ArgumentNullException(nameof(processName));
     
     /// <summary>
     /// 検出されたゲームのウィンドウタイトル
     /// </summary>
-    public string? WindowTitle { get; }
+    public string? WindowTitle { get; } = windowTitle;
     
     /// <summary>
     /// 適用されたプロファイル
     /// </summary>
-    public SettingsGameCaptureProfile AppliedProfile { get; }
+    public SettingsGameCaptureProfile AppliedProfile { get; } = appliedProfile ?? throw new ArgumentNullException(nameof(appliedProfile));
     
     /// <summary>
     /// 検出された時刻
     /// </summary>
-    public DateTime DetectedAt { get; }
-    
-    public GameDetectedEvent(string processName, string? windowTitle, SettingsGameCaptureProfile appliedProfile)
-    {
-        ProcessName = processName ?? throw new ArgumentNullException(nameof(processName));
-        WindowTitle = windowTitle;
-        AppliedProfile = appliedProfile ?? throw new ArgumentNullException(nameof(appliedProfile));
-        DetectedAt = DateTime.Now;
-    }
+    public DateTime DetectedAt { get; } = DateTime.Now;
     
     public override string Name => "GameDetected";
     public override string Category => "GameDetection";
@@ -331,23 +318,18 @@ public class GameDetectedEvent : EventBase
 /// <summary>
 /// ゲーム終了イベント
 /// </summary>
-public class GameExitedEvent : EventBase
+/// <param name="processName">終了したゲームのプロセス名</param>
+public class GameExitedEvent(string processName) : EventBase
 {
     /// <summary>
     /// 終了したゲームのプロセス名
     /// </summary>
-    public string ProcessName { get; }
+    public string ProcessName { get; } = processName ?? throw new ArgumentNullException(nameof(processName));
     
     /// <summary>
     /// 終了が検出された時刻
     /// </summary>
-    public DateTime ExitedAt { get; }
-    
-    public GameExitedEvent(string processName)
-    {
-        ProcessName = processName ?? throw new ArgumentNullException(nameof(processName));
-        ExitedAt = DateTime.Now;
-    }
+    public DateTime ExitedAt { get; } = DateTime.Now;
     
     public override string Name => "GameExited";
     public override string Category => "GameDetection";

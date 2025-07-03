@@ -13,18 +13,12 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.Onnx.Chinese;
 /// <summary>
 /// 中国語翻訳機能の統合テスト
 /// </summary>
-public class ChineseTranslationIntegrationTests : IDisposable
+public class ChineseTranslationIntegrationTests(ITestOutputHelper output) : IDisposable
 {
-    private readonly ITestOutputHelper _output;
-    private readonly ILoggerFactory _loggerFactory;
-    private bool _disposed;
-
-    public ChineseTranslationIntegrationTests(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-        _loggerFactory = LoggerFactory.Create(builder =>
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+    private readonly ILoggerFactory _loggerFactory = LoggerFactory.Create(builder =>
             builder.AddProvider(new XunitLoggerProvider(output)));
-    }
+    private bool _disposed;
 
     [Fact]
     public void ChineseLanguageProcessor_BasicFunctionality_WorksCorrectly()
@@ -252,15 +246,10 @@ public class ChineseTranslationIntegrationTests : IDisposable
 /// <summary>
 /// Xunit用のロガープロバイダー
 /// </summary>
-public sealed class XunitLoggerProvider : ILoggerProvider
+public sealed class XunitLoggerProvider(ITestOutputHelper output) : ILoggerProvider
 {
-    private readonly ITestOutputHelper _output;
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
     private bool _disposed;
-
-    public XunitLoggerProvider(ITestOutputHelper output)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
 
     public ILogger CreateLogger(string categoryName)
     {
@@ -281,16 +270,10 @@ public sealed class XunitLoggerProvider : ILoggerProvider
 /// <summary>
 /// Xunit用のロガー
 /// </summary>
-public sealed class XunitLogger : ILogger
+public sealed class XunitLogger(ITestOutputHelper output, string categoryName) : ILogger
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _categoryName;
-
-    public XunitLogger(ITestOutputHelper output, string categoryName)
-    {
-        _output = output ?? throw new ArgumentNullException(nameof(output));
-        _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
-    }
+    private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+    private readonly string _categoryName = categoryName ?? throw new ArgumentNullException(nameof(categoryName));
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 

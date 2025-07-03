@@ -26,7 +26,7 @@ internal sealed class BoolToIconConverter : IValueConverter
         return "❓";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -54,7 +54,7 @@ internal sealed class CloudEngineStatusConverter : IMultiValueConverter
         return "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -88,7 +88,7 @@ internal sealed class EnabledCountConverter : IValueConverter
         return 0;
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -116,7 +116,7 @@ internal sealed class StatusToIconConverter : IMultiValueConverter
         return "ℹ️";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -143,7 +143,7 @@ internal sealed class EngineToDisplayConverter : IValueConverter
         return "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -164,7 +164,7 @@ internal sealed class EnumToBoolConverter : IValueConverter
         return value.ToString() == parameter.ToString();
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo _)
     {
         if (value is bool isChecked && isChecked && parameter != null)
         {
@@ -186,7 +186,7 @@ internal sealed class StringToBoolConverter : IValueConverter
         return !string.IsNullOrWhiteSpace(value?.ToString());
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -204,7 +204,7 @@ internal sealed class ObjectToBoolConverter : IValueConverter
         return value != null;
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -222,7 +222,7 @@ internal sealed class ObjectEqualsConverter : IValueConverter
         return Equals(value, parameter);
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo _)
     {
         if (value is bool isEqual && isEqual)
             return parameter;
@@ -246,7 +246,7 @@ internal sealed class BoolToStatusTextConverter : IValueConverter
         return "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -273,7 +273,7 @@ internal sealed class StrategyToDisplayConverter : IValueConverter
         return value?.ToString() ?? "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -302,7 +302,7 @@ internal sealed class ChineseVariantToDisplayConverter : IValueConverter
         return value?.ToString() ?? "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -326,7 +326,7 @@ internal sealed class LanguageToFlagConverter : IValueConverter
         return "🌐";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -348,7 +348,7 @@ internal sealed class BoolToEnabledConverter : IValueConverter
         return "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }
@@ -370,7 +370,7 @@ internal sealed class BoolToChangesConverter : IValueConverter
         return "不明";
     }
 
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
     {
         throw new NotImplementedException();
     }

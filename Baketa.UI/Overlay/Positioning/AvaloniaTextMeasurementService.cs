@@ -10,20 +10,12 @@ namespace Baketa.UI.Overlay.Positioning;
 /// <summary>
 /// Avalonia UIベースのテキスト測定サービス実装
 /// </summary>
-public sealed class AvaloniaTextMeasurementService : ITextMeasurementService, IDisposable
+/// <param name="logger">ロガー</param>
+public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasurementService> logger) : ITextMeasurementService, IDisposable
 {
-    private readonly ILogger<AvaloniaTextMeasurementService> _logger;
+    private readonly ILogger<AvaloniaTextMeasurementService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly SemaphoreSlim _measurementSemaphore = new(1, 1);
     private bool _disposed;
-    
-    /// <summary>
-    /// 新しいAvaloniaTextMeasurementServiceを初期化します
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasurementService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
     
     /// <inheritdoc/>
     public async Task<TextMeasurementResult> MeasureTextAsync(string text, TextMeasurementOptions options, CancellationToken cancellationToken = default)
@@ -153,7 +145,7 @@ public sealed class AvaloniaTextMeasurementService : ITextMeasurementService, ID
     /// <summary>
     /// 行数をカウントします
     /// </summary>
-    private int CountLines(string text, double maxWidth, double fontSize, FontFamily fontFamily)
+    private int CountLines(string text, double maxWidth, double fontSize, FontFamily _)
     {
         try
         {

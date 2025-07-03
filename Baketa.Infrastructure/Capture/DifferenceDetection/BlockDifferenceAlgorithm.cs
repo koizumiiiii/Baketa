@@ -12,31 +12,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Capture.DifferenceDetection;
 
-    /// <summary>
-    /// ブロックベースの差分検出アルゴリズム
-    /// </summary>
-    public class BlockDifferenceAlgorithm : IDetectionAlgorithm
+/// <summary>
+/// ブロックベースの差分検出アルゴリズム
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class BlockDifferenceAlgorithm(ILogger<BlockDifferenceAlgorithm>? logger = null) : IDetectionAlgorithm
     {
-        private readonly ILogger<BlockDifferenceAlgorithm>? _logger;
+        private readonly ILogger<BlockDifferenceAlgorithm>? _logger = logger;
         
         /// <summary>
         /// アルゴリズムの種類
         /// </summary>
         public DifferenceDetectionAlgorithm AlgorithmType => DifferenceDetectionAlgorithm.BlockBased;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public BlockDifferenceAlgorithm(ILogger<BlockDifferenceAlgorithm>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// 差分を検出します
-        /// </summary>
-        public async Task<DetectionResult> DetectAsync(
+
+    /// <summary>
+    /// 差分を検出します
+    /// </summary>
+    public async Task<DetectionResult> DetectAsync(
             IImage previousImage, 
             IImage currentImage, 
             DifferenceDetectionSettings settings, 
@@ -263,7 +258,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
         private bool AreRegionsAdjacent(Rectangle r1, Rectangle r2)
         {
             // 領域が重なっているか、隣接している（5ピクセル以内の距離）場合はtrue
-            Rectangle expandedR1 = new Rectangle(
+            Rectangle expandedR1 = new(
                 r1.X - 5,
                 r1.Y - 5,
                 r1.Width + 10,

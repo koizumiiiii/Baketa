@@ -158,7 +158,7 @@ internal static class User32Methods
     internal const uint MONITORINFOF_PRIMARY = 0x00000001;
     
     // 特殊ウィンドウハンドル
-    internal static readonly IntPtr HWND_MESSAGE = new IntPtr(-3);
+    internal static readonly IntPtr HWND_MESSAGE = new(-3);
 }
 
 [Flags]

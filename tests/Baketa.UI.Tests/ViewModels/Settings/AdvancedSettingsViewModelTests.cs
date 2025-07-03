@@ -67,8 +67,10 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.WorkerThreadCount = 50; // 範囲外
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            WorkerThreadCount = 50 // 範囲外
+        };
 
         // Act
         var result = viewModel.ValidateSettings();
@@ -82,10 +84,11 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.RetryStrategy = RetryStrategy.None;
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            RetryStrategy = RetryStrategy.None
+        };
 
         // Assert
         viewModel.IsRetryConfigEnabled.Should().BeFalse();
@@ -96,10 +99,11 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.RetryStrategy = RetryStrategy.Linear;
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            RetryStrategy = RetryStrategy.Linear
+        };
 
         // Assert
         viewModel.IsRetryConfigEnabled.Should().BeTrue();
@@ -136,8 +140,10 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.CpuAffinityMask = 0;
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            CpuAffinityMask = 0
+        };
 
         // Act
         var text = viewModel.CpuAffinityMaskText;
@@ -151,8 +157,10 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        viewModel.CpuAffinityMask = 15; // 0xF
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            CpuAffinityMask = 15 // 0xF
+        };
 
         // Act
         var text = viewModel.CpuAffinityMaskText;
@@ -166,11 +174,12 @@ public class AdvancedSettingsViewModelTests
     {
         // Arrange
         var settings = TestDataFactory.CreateAdvancedSettings();
-        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        viewModel.EnableAdvancedFeatures = true;
-        viewModel.CpuAffinityMask = 7;
-        viewModel.MaxRetryCount = 5;
+        var viewModel = new AdvancedSettingsViewModel(settings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            EnableAdvancedFeatures = true,
+            CpuAffinityMask = 7,
+            MaxRetryCount = 5
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;

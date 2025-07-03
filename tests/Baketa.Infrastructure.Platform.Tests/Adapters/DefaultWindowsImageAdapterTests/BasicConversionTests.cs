@@ -14,22 +14,13 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
     /// <summary>
     /// DefaultWindowsImageAdapterの基本変換機能のテスト
     /// </summary>
-    public class BasicConversionTests : IDisposable
+    public class BasicConversionTests(ITestOutputHelper output) : IDisposable
     {
-        private readonly ITestOutputHelper _output;
-        private readonly DefaultWindowsImageAdapter _adapter;
+        private readonly ITestOutputHelper _output = output ?? throw new ArgumentNullException(nameof(output));
+        private readonly DefaultWindowsImageAdapter _adapter = new();
         private bool _disposed;
-        
-        public BasicConversionTests(ITestOutputHelper output)
-        {
-            _output = output ?? throw new ArgumentNullException(nameof(output));
-            _adapter = new DefaultWindowsImageAdapter();
-            
-            // テストデータの生成を遅延実行に変更（必要な場合のみ実行）
-            // AdapterTestHelper.EnsureTestDataExists();
-        }
-        
-        [Fact]
+
+    [Fact]
         public void ToImage_NullArgument_ThrowsArgumentNullException()
         {
             // Arrange & Act & Assert

@@ -6,15 +6,10 @@ namespace Baketa.Integration.Tests;
 /// <summary>
 /// Test Explorerでの認識確認用の基本テスト
 /// </summary>
-public class BasicTests
+public class BasicTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-    
-    public BasicTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-    
+    private readonly ITestOutputHelper _output = output;
+
     /// <summary>
     /// 最も基本的なテスト - Test Explorerでの認識確認
     /// </summary>

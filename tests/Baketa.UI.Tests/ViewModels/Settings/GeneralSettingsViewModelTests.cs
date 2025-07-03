@@ -198,12 +198,13 @@ public class GeneralSettingsViewModelTests
     public void CurrentSettings_ReturnsCurrentValues()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
-        // 一部の値を変更
-        viewModel.AutoStartWithWindows = true;
-        viewModel.MaxMemoryUsageMb = 1024;
-        viewModel.LogLevel = LogLevel.Debug;
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // 一部の値を変更
+            AutoStartWithWindows = true,
+            MaxMemoryUsageMb = 1024,
+            LogLevel = LogLevel.Debug
+        };
 
         // Act
         var currentSettings = viewModel.CurrentSettings;
@@ -263,10 +264,11 @@ public class GeneralSettingsViewModelTests
     public void MaxMemoryUsageMb_ValidRanges_AcceptsValue(int memoryMb)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.MaxMemoryUsageMb = memoryMb;
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            MaxMemoryUsageMb = memoryMb
+        };
 
         // Assert
         viewModel.MaxMemoryUsageMb.Should().Be(memoryMb);
@@ -280,10 +282,11 @@ public class GeneralSettingsViewModelTests
     public void LogRetentionDays_ValidRanges_AcceptsValue(int days)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-
-        // Act
-        viewModel.LogRetentionDays = days;
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        {
+            // Act
+            LogRetentionDays = days
+        };
 
         // Assert
         viewModel.LogRetentionDays.Should().Be(days);

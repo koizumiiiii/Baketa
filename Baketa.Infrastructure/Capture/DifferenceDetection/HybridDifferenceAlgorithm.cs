@@ -127,7 +127,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
                 _logger?.LogError(ex, "ハイブリッド差分検出中に引数エラーが発生しました");
                 
                 // エラー時は変化ありとして画面全体を返す
-                var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+                var regions = new List<Rectangle> { new(0, 0, currentImage.Width, currentImage.Height) };
                 return new DetectionResult
                 {
                     HasSignificantChange = true,
@@ -139,7 +139,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             {
                 _logger?.LogError(ex, "ハイブリッド差分検出中に操作エラーが発生しました");
                 
-                var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+                var regions = new List<Rectangle> { new(0, 0, currentImage.Width, currentImage.Height) };
                 return new DetectionResult
                 {
                     HasSignificantChange = true,
@@ -151,7 +151,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             {
                 _logger?.LogError(ex, "ハイブリッド差分検出中にIOエラーが発生しました");
                 
-                var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+                var regions = new List<Rectangle> { new(0, 0, currentImage.Width, currentImage.Height) };
                 return new DetectionResult
                 {
                     HasSignificantChange = true,
@@ -163,7 +163,7 @@ namespace Baketa.Infrastructure.Capture.DifferenceDetection;
             {
                 _logger?.LogError(ex, "ハイブリッド差分検出中にメモリ不足が発生しました");
                 
-                var regions = new List<Rectangle> { new Rectangle(0, 0, currentImage.Width, currentImage.Height) };
+                var regions = new List<Rectangle> { new(0, 0, currentImage.Width, currentImage.Height) };
                 return new DetectionResult
                 {
                     HasSignificantChange = true,

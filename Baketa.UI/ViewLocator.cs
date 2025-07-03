@@ -16,7 +16,7 @@ namespace Baketa.UI;
         Justification = "Instantiated by Avalonia XAML processor")]
     internal sealed class ViewLocator : IDataTemplate
     {
-        private static readonly ILogger? _logger = Program.ServiceProvider?.GetService(typeof(ILogger<ViewLocator>)) as ILogger<ViewLocator>;
+        private static readonly ILogger? _logger = Program.ServiceProvider?.GetService<ILogger<ViewLocator>>();
 
         // LoggerMessageデリゲートの定義
         private static readonly Action<ILogger, string, Exception?> LogViewNotFound =

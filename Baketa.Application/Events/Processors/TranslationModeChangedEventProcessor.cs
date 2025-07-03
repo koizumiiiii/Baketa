@@ -8,18 +8,13 @@ namespace Baketa.Application.Events.Processors;
 /// <summary>
 /// 翻訳モード変更イベントを処理するプロセッサー
 /// </summary>
-public sealed class TranslationModeChangedEventProcessor : IEventProcessor<TranslationModeChangedEvent>
+/// <remarks>
+/// プロセッサーを初期化します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public sealed class TranslationModeChangedEventProcessor(ILogger<TranslationModeChangedEventProcessor> logger) : IEventProcessor<TranslationModeChangedEvent>
 {
-    private readonly ILogger<TranslationModeChangedEventProcessor> _logger;
-
-    /// <summary>
-    /// プロセッサーを初期化します
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public TranslationModeChangedEventProcessor(ILogger<TranslationModeChangedEventProcessor> logger)
-    {
-        _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<TranslationModeChangedEventProcessor> _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
 
     /// <inheritdoc />
     public int Priority => 100; // 標準優先度

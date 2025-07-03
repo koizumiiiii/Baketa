@@ -61,9 +61,9 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
         /// <summary>
         /// フィルター適用
         /// </summary>
-        public Task<IAdvancedImage> ApplyAsync(IAdvancedImage image)
+        public Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
         {
-            return _originalFilter.ApplyAsync(image);
+            return _originalFilter.ApplyAsync(inputImage);
         }
         
         /// <summary>
@@ -149,10 +149,7 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             // 存在しない場合は元のフィルターから取得を試みる
             try
             {
-                var getMethod = _originalFilter.GetType().GetMethod("GetParameter");
-                if (getMethod == null)
-                    throw new InvalidOperationException($"メソッド'GetParameter'が{_originalFilter.GetType().Name}に見つかりません");
-                    
+                var getMethod = _originalFilter.GetType().GetMethod("GetParameter") ?? throw new InvalidOperationException($"メソッド'GetParameter'が{_originalFilter.GetType().Name}に見つかりません");
                 var originalParam = getMethod.Invoke(_originalFilter, [parameterName]);
                 return originalParam ?? throw new KeyNotFoundException($"パラメータ'{parameterName}'が見つかりません");
             }

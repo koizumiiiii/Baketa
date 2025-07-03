@@ -175,40 +175,32 @@ public sealed class MigrationResult
 /// <summary>
 /// マイグレーション設定変更情報
 /// </summary>
-public sealed class MigrationSettingChange
+/// <remarks>
+/// MigrationSettingChangeを初期化します
+/// </remarks>
+/// <param name="key">設定キー</param>
+/// <param name="oldValue">変更前の値</param>
+/// <param name="newValue">変更後の値</param>
+/// <param name="reason">変更理由</param>
+public sealed class MigrationSettingChange(string key, object? oldValue, object? newValue, string reason)
 {
     /// <summary>
     /// 設定キー
     /// </summary>
-    public string Key { get; }
-    
+    public string Key { get; } = key ?? throw new ArgumentNullException(nameof(key));
+
     /// <summary>
     /// 変更前の値
     /// </summary>
-    public object? OldValue { get; }
-    
+    public object? OldValue { get; } = oldValue;
+
     /// <summary>
     /// 変更後の値
     /// </summary>
-    public object? NewValue { get; }
-    
+    public object? NewValue { get; } = newValue;
+
     /// <summary>
     /// 変更理由
     /// </summary>
-    public string Reason { get; }
-
-    /// <summary>
-    /// MigrationSettingChangeを初期化します
-    /// </summary>
-    /// <param name="key">設定キー</param>
-    /// <param name="oldValue">変更前の値</param>
-    /// <param name="newValue">変更後の値</param>
-    /// <param name="reason">変更理由</param>
-    public MigrationSettingChange(string key, object? oldValue, object? newValue, string reason)
-    {
-        Key = key ?? throw new ArgumentNullException(nameof(key));
-        OldValue = oldValue;
-        NewValue = newValue;
-        Reason = reason ?? throw new ArgumentNullException(nameof(reason));
-    }
+    public string Reason { get; } = reason ?? throw new ArgumentNullException(nameof(reason));
 }

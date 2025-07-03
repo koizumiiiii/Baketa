@@ -9,9 +9,13 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.Chinese;
 /// <summary>
 /// 中国語の文字体系処理を行うクラス（修正版）
 /// </summary>
-public class ChineseLanguageProcessor
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class ChineseLanguageProcessor(ILogger<ChineseLanguageProcessor> logger)
 {
-    private readonly ILogger<ChineseLanguageProcessor> _logger;
+    private readonly ILogger<ChineseLanguageProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// OPUS-MT用の中国語プレフィックスマッピング
@@ -42,15 +46,6 @@ public class ChineseLanguageProcessor
         ["zho"] = ">>cmn_Hans<<",
         ["cmn"] = ">>cmn_Hans<<"
     };
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public ChineseLanguageProcessor(ILogger<ChineseLanguageProcessor> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 言語コードに対応するOPUS-MTプレフィックスを取得

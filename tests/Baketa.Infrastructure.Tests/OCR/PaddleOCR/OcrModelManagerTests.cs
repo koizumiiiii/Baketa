@@ -54,7 +54,7 @@ public class OcrModelManagerTests : IDisposable
                 var response = new HttpResponseMessage
                 {
                     StatusCode = HttpStatusCode.OK,
-                    Content = new ByteArrayContent(new byte[] { 0x50, 0x4B, 0x03, 0x04 }) // Mock ZIP header
+                    Content = new ByteArrayContent([0x50, 0x4B, 0x03, 0x04]) // Mock ZIP header
                 };
                 return response;
             });

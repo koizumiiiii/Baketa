@@ -556,7 +556,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private async Task<TranslationResult> ExecuteTranslationAsync(
         string translationId, 
-        IImage image, 
+        IImage _, 
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {

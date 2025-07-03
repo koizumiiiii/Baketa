@@ -7,10 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.Events;
 
-    /// <summary>
-    /// 翻訳イベントをログに記録するハンドラー
-    /// </summary>
-    public class LoggingTranslationEventHandler : 
+/// <summary>
+/// 翻訳イベントをログに記録するハンドラー
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class LoggingTranslationEventHandler(ILogger<LoggingTranslationEventHandler> logger) : 
         IEventProcessor<TranslationStartedEvent>,
         IEventProcessor<TranslationCompletedEvent>,
         IEventProcessor<TranslationErrorEvent>,
@@ -18,21 +22,12 @@ namespace Baketa.Core.Translation.Events;
         ITranslationEventHandler<TranslationCompletedEvent>,
         ITranslationEventHandler<TranslationErrorEvent>
     {
-        private readonly ILogger<LoggingTranslationEventHandler> _logger;
+        private readonly ILogger<LoggingTranslationEventHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public LoggingTranslationEventHandler(ILogger<LoggingTranslationEventHandler> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <summary>
-        /// ハンドラーの優先度
-        /// </summary>
-        public int Priority => 0;
+    /// <summary>
+    /// ハンドラーの優先度
+    /// </summary>
+    public int Priority => 0;
 
         /// <summary>
         /// 同期実行かどうか

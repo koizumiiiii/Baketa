@@ -9,6 +9,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Services;
 using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.Tests.Infrastructure;
 
 namespace Baketa.UI.Tests.ViewModels;
 
@@ -16,8 +17,7 @@ namespace Baketa.UI.Tests.ViewModels;
 /// EnhancedSettingsWindowViewModelの統合テスト
 /// </summary>
 [Trait("Category", "UI")]
-[Trait("Skip", "Requires Avalonia Application context")]
-public class EnhancedSettingsWindowViewModelIntegrationTests
+public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 {
     private readonly Mock<ISettingsService> _mockSettingsService;
     private readonly Mock<ISettingsChangeTracker> _mockChangeTracker;
@@ -66,50 +66,59 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
             .Returns(Task.CompletedTask);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void Constructor_WithValidDependencies_InitializesCorrectly()
     {
         // Arrange & Act
-        var viewModel = new EnhancedSettingsWindowViewModel(
-            _mockSettingsService.Object,
-            _mockChangeTracker.Object,
-            _mockEventAggregator.Object,
-            _mockLogger.Object);
+        RunOnUIThread(() =>
+        {
+            var viewModel = new EnhancedSettingsWindowViewModel(
+                _mockSettingsService.Object,
+                _mockChangeTracker.Object,
+                _mockEventAggregator.Object,
+                _mockLogger.Object);
 
-        // Assert
-        viewModel.Should().NotBeNull();
-        viewModel.AllCategories.Should().NotBeEmpty();
-        viewModel.AllCategories.Should().HaveCount(8); // 基本5 + 詳細3
-        viewModel.VisibleCategories.Should().NotBeEmpty();
-        viewModel.ShowAdvancedSettings.Should().BeFalse();
-        viewModel.SelectedCategory.Should().NotBeNull();
+            // Assert
+            viewModel.Should().NotBeNull();
+            viewModel.AllCategories.Should().NotBeEmpty();
+            viewModel.AllCategories.Should().HaveCount(8); // 基本5 + 詳細3
+            viewModel.VisibleCategories.Should().NotBeEmpty();
+            viewModel.ShowAdvancedSettings.Should().BeFalse();
+            viewModel.SelectedCategory.Should().NotBeNull();
+        });
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void Constructor_WithNullSettingsService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
-            new EnhancedSettingsWindowViewModel(
-                null!,
-                _mockChangeTracker.Object,
-                _mockEventAggregator.Object,
-                _mockLogger.Object));
+        RunOnUIThread(() =>
+        {
+            Assert.Throws<ArgumentNullException>(() => 
+                new EnhancedSettingsWindowViewModel(
+                    null!,
+                    _mockChangeTracker.Object,
+                    _mockEventAggregator.Object,
+                    _mockLogger.Object));
+        });
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void Constructor_WithNullChangeTracker_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
-            new EnhancedSettingsWindowViewModel(
-                _mockSettingsService.Object,
-                null!,
-                _mockEventAggregator.Object,
-                _mockLogger.Object));
+        RunOnUIThread(() =>
+        {
+            Assert.Throws<ArgumentNullException>(() => 
+                new EnhancedSettingsWindowViewModel(
+                    _mockSettingsService.Object,
+                    null!,
+                    _mockEventAggregator.Object,
+                    _mockLogger.Object));
+        });
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void ShowAdvancedSettings_WhenToggled_UpdatesVisibleCategories()
     {
         // Arrange
@@ -130,7 +139,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         viewModel.VisibleCategories.Should().Contain(c => c.Level == SettingLevel.Advanced);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void ShowAdvancedSettings_WhenToggledAndSelectedCategoryNotVisible_ChangesSelection()
     {
         // Arrange
@@ -138,10 +147,11 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
-
-        // 詳細設定を表示してAdvancedカテゴリを選択
-        viewModel.ShowAdvancedSettings = true;
+            _mockLogger.Object)
+        {
+            // 詳細設定を表示してAdvancedカテゴリを選択
+            ShowAdvancedSettings = true
+        };
         var advancedCategory = viewModel.VisibleCategories.FirstOrDefault(c => c.Level == SettingLevel.Advanced);
         viewModel.SelectedCategory = advancedCategory;
 
@@ -153,7 +163,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         viewModel.SelectedCategory?.Level.Should().Be(SettingLevel.Basic);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void ToggleAdvancedSettingsCommand_WhenExecuted_TogglesShowAdvancedSettings()
     {
         // Arrange
@@ -172,7 +182,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         viewModel.ShowAdvancedSettings.Should().Be(!initialValue);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public async Task SaveCommand_WhenExecuted_CallsSaveOnAllActiveViewModels()
     {
         // Arrange
@@ -200,7 +210,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         _mockChangeTracker.Verify(x => x.ClearChanges(), Times.Once);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public async Task CancelCommand_WhenExecuted_CallsConfirmDiscardChanges()
     {
         // Arrange
@@ -220,7 +230,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public async Task ResetCommand_WhenExecuted_CallsConfirmDiscardChanges()
     {
         // Arrange
@@ -240,7 +250,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public async Task ValidateAllCommand_WhenExecuted_PerformsValidationOnAllViewModels()
     {
         // Arrange
@@ -266,7 +276,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         viewModel.StatusMessage.Should().Contain("有効");
     }
 
-    [Theory(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment. Consider converting to ViewModel-only tests or implementing proper Avalonia test setup.")]
+    [Theory]
     [InlineData("general", "一般設定")]
     [InlineData("appearance", "外観設定")]
     [InlineData("mainui", "操作パネル")]
@@ -293,7 +303,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         category.Content.Should().NotBeNull();
     }
 
-    [Theory(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Theory]
     [InlineData("capture", "キャプチャ設定")]
     [InlineData("ocr", "OCR設定")]
     [InlineData("advanced", "拡張設定")]
@@ -316,7 +326,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         category.Content.Should().NotBeNull();
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public void HasChanges_DelegatesToChangeTracker()
     {
         // Arrange
@@ -336,7 +346,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests
         viewModel.HasChanges.Should().BeFalse();
     }
 
-    [Fact(Skip = "UI creation tests require Avalonia Application context which is not available in headless test environment")]
+    [Fact]
     public async Task SaveCommand_OnException_UpdatesStatusMessage()
     {
         // Arrange

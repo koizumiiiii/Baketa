@@ -201,10 +201,10 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
         /// <returns>信頼度スコア（0.0～1.0）</returns>
         private float CalculateConfidenceScore(
             Rectangle bounds, 
-            Point[] contour, 
+            Point[] _, 
             float meanStrokeWidth,
             float strokeWidthVariance,
-            IAdvancedImage image)
+            IAdvancedImage _1)
         {
             // ストローク幅の一貫性スコア
             float strokeWidthConsistencyScore = Math.Max(

@@ -764,7 +764,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         MonitorChangeType changeType,
         MonitorInfo? affectedMonitor,
         IReadOnlyList<MonitorInfo> allMonitors,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
         try
         {

@@ -155,7 +155,7 @@ namespace Baketa.Core.Translation.Models;
         /// <summary>
         /// 言語ペア
         /// </summary>
-        public LanguagePair LanguagePair => new LanguagePair { SourceLanguage = SourceLanguage, TargetLanguage = TargetLanguage };
+        public LanguagePair LanguagePair => new() { SourceLanguage = SourceLanguage, TargetLanguage = TargetLanguage };
 
         /// <summary>
         /// キャッシュキーを生成

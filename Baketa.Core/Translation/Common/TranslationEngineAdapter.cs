@@ -14,27 +14,22 @@ using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Core.Translation.Common;
 
-    /// <summary>
-    /// 翻訳エンジンアダプター
-    /// </summary>
-    public class TranslationEngineAdapter : NewTrEngine
+/// <summary>
+/// 翻訳エンジンアダプター
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="coreEngine">コア翻訳エンジン</param>
+public class TranslationEngineAdapter(CoreTrEngine coreEngine) : NewTrEngine
     {
-        private readonly CoreTrEngine _coreEngine;
+        private readonly CoreTrEngine _coreEngine = coreEngine ?? throw new ArgumentNullException(nameof(coreEngine));
         private bool _disposed;
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="coreEngine">コア翻訳エンジン</param>
-        public TranslationEngineAdapter(CoreTrEngine coreEngine)
-        {
-            _coreEngine = coreEngine ?? throw new ArgumentNullException(nameof(coreEngine));
-        }
-
-        /// <summary>
-        /// 翻訳エンジンの名称
-        /// </summary>
-        public string Name => _coreEngine.Name;
+    /// <summary>
+    /// 翻訳エンジンの名称
+    /// </summary>
+    public string Name => _coreEngine.Name;
 
         /// <summary>
         /// 翻訳エンジンの説明

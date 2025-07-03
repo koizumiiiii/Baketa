@@ -89,7 +89,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
             IAdvancedImage source,
             Baketa.Core.Abstractions.Imaging.MorphType morphType,
             Size kernelSize,
-            int iterations = 1)
+            int _ = 1)
         {
             ArgumentNullException.ThrowIfNull(source);
 
@@ -104,40 +104,49 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// 画像にガウシアンブラーを適用します
         /// </summary>
+#pragma warning disable IDE0060 // Remove unused parameter - parameters will be used in OpenCV implementation
         public static async Task<IAdvancedImage> ApplyGaussianBlurAsync(
             IAdvancedImage source, 
-            System.Drawing.Size kernelSize, 
-            double sigmaX = 0, 
-            double sigmaY = 0)
+            System.Drawing.Size _1, 
+            double _2 = 0, 
+            double _3 = 0)
         {
             ArgumentNullException.ThrowIfNull(source);
+            
+            // TODO: OpenCV実装時に_1, _2, _3を使用
             
             // 実装はスタブ化されています
             return await Task.FromResult(source).ConfigureAwait(false);
         }
+#pragma warning restore IDE0060
         
         /// <summary>
         /// 画像にメディアンブラーを適用します
         /// </summary>
+#pragma warning disable IDE0060 // Remove unused parameter - parameters will be used in OpenCV implementation
         public static async Task<IAdvancedImage> ApplyMedianBlurAsync(
             IAdvancedImage source, 
             int kernelSize)
         {
             ArgumentNullException.ThrowIfNull(source);
             
+            // TODO: OpenCV実装時にkernelSizeを使用
+            _ = kernelSize;
+            
             // 実装はスタブ化されています
             return await Task.FromResult(source).ConfigureAwait(false);
         }
+#pragma warning restore IDE0060
         
         /// <summary>
         /// 画像に対してCannyエッジ検出を適用します
         /// </summary>
         public static async Task<IAdvancedImage> ApplyCannyEdgeAsync(
             IAdvancedImage source, 
-            double threshold1, 
-            double threshold2, 
-            int apertureSize = 3, 
-            bool l2Gradient = false)
+            double _1, 
+            double _2, 
+            int _3 = 3, 
+            bool _4 = false)
         {
             ArgumentNullException.ThrowIfNull(source);
             
@@ -149,16 +158,22 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// MSER領域を検出します
         /// </summary>
         public IReadOnlyList<Point[]> DetectMSERRegions(
-            IAdvancedImage image, 
+            IAdvancedImage _, 
             Dictionary<string, object> parameters)
         {
-            ArgumentNullException.ThrowIfNull(image);
             ArgumentNullException.ThrowIfNull(parameters);
             
-            // ディスカード変数を使用してデフォルト値を取得 (迅速化などで将来利用可能性がある値を処理)
-            _ = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
-            _ = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
-            _ = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
+            // パラメーター値を取得（将来のOpenCV実装で使用予定）
+            var delta = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
+            var minArea = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
+            var maxArea = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
+            
+            // TODO: OpenCV実装時にこれらのパラメーターを使用
+            // 現在はスタブ実装でパラメーター検証のみ実行
+            if (delta < 0 || minArea < 0 || maxArea < minArea)
+            {
+                throw new ArgumentException("Invalid MSER parameters provided");
+            }
             
             return [];
         }
@@ -191,7 +206,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// Cannyエッジ検出を実行します
         /// </summary>
-        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, double threshold1, double threshold2)
+        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, double _1, double _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             
@@ -205,8 +220,8 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         public static IAdvancedImage StrokeWidthTransform(
             IAdvancedImage grayImage, 
             IAdvancedImage edgeImage, 
-            float minStrokeWidth, 
-            float maxStrokeWidth)
+            float _1, 
+            float _2)
         {
             ArgumentNullException.ThrowIfNull(grayImage);
             ArgumentNullException.ThrowIfNull(edgeImage);
@@ -218,10 +233,9 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// ストローク幅の分散を計算します
         /// </summary>
-        public static float CalculateStrokeWidthVariance(IAdvancedImage swtImage, Point[] region)
+        public static float CalculateStrokeWidthVariance(IAdvancedImage _1, Point[] _2)
         {
-            ArgumentNullException.ThrowIfNull(swtImage);
-            ArgumentNullException.ThrowIfNull(region);
+            // TODO: OpenCV実装時に_1と_2を使用
             
             // 実装はスタブ化されています
             return 1.0f;
@@ -232,8 +246,9 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// </summary>
         public static float CalculateMeanStrokeWidth(IAdvancedImage swtImage, Point[] region)
         {
-            ArgumentNullException.ThrowIfNull(swtImage);
-            ArgumentNullException.ThrowIfNull(region);
+            // TODO: OpenCV実装時にswtImageとregionを使用
+            _ = swtImage;
+            _ = region;
             
             // 実装はスタブ化されています
             return 5.0f;
@@ -242,7 +257,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// 画像に適応的二値化を適用します
         /// </summary>
-        public static IAdvancedImage AdaptiveThreshold(IAdvancedImage image, int blockSize, double c)
+        public static IAdvancedImage AdaptiveThreshold(IAdvancedImage image, int _1, double _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             
@@ -253,7 +268,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// 画像にガウシアンぼかしを適用します
         /// </summary>
-        public static IAdvancedImage GaussianBlur(IAdvancedImage image, int kernelSize, double sigma)
+        public static IAdvancedImage GaussianBlur(IAdvancedImage image, int _1, double _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             
@@ -264,7 +279,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// モルフォロジー演算を適用します
         /// </summary>
-        public static IAdvancedImage MorphologyEx(IAdvancedImage image, Baketa.Core.Abstractions.Imaging.MorphologyOperation operation, int kernelSize)
+        public static IAdvancedImage MorphologyEx(IAdvancedImage image, Baketa.Core.Abstractions.Imaging.MorphologyOperation _1, int _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             
@@ -277,8 +292,8 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// </summary>
         public static IReadOnlyList<Point[]> ExtractConnectedComponents(
             IAdvancedImage image, 
-            int minComponentSize, 
-            int maxComponentSize)
+            int _1, 
+            int _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             
@@ -358,7 +373,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// Cannyエッジ検出を実行します (OCR用)
         /// </summary>
-        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, int threshold1, int threshold2)
+        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, int _1, int _2)
         {
             ArgumentNullException.ThrowIfNull(image);
             

@@ -12,11 +12,17 @@ namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 /// 実際のPaddleOCRライブラリを使用せずに、引数検証と基本的な動作をテストします
 /// IOcrEngineインターフェースに完全準拠
 /// </summary>
-public class SafeTestPaddleOcrEngine : IOcrEngine
+/// <param name="modelPathResolver">モデルパスリゾルバー</param>
+/// <param name="logger">ロガーインスタンス</param>
+/// <param name="skipRealInitialization">実際の初期化をスキップするかどうか</param>
+public class SafeTestPaddleOcrEngine(
+    IModelPathResolver modelPathResolver,
+    ILogger<PaddleOcrEngine>? logger = null,
+    bool skipRealInitialization = true) : IOcrEngine
 {
-    private readonly IModelPathResolver _modelPathResolver;
-    private readonly ILogger<PaddleOcrEngine>? _logger;
-    private readonly bool _skipRealInitialization;
+    private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
+    private readonly ILogger<PaddleOcrEngine>? _logger = logger;
+    private readonly bool _skipRealInitialization = skipRealInitialization;
     private bool _disposed;
     
     // 設定管理
@@ -27,16 +33,6 @@ public class SafeTestPaddleOcrEngine : IOcrEngine
     private readonly List<double> _processingTimes = [];
     private int _errorCount;
     private DateTime _startTime = DateTime.UtcNow;
-
-    public SafeTestPaddleOcrEngine(
-        IModelPathResolver modelPathResolver,
-        ILogger<PaddleOcrEngine>? logger = null,
-        bool skipRealInitialization = true)
-    {
-        _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
-        _logger = logger;
-        _skipRealInitialization = skipRealInitialization;
-    }
 
     #region IOcrEngine実装
 

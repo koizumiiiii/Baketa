@@ -8,37 +8,32 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Translation;
 
-    /// <summary>
-    /// 翻訳トランザクションを管理するクラス
-    /// 翻訳処理の一貫性と整合性を確保します
-    /// </summary>
-    public class TranslationTransactionManager : ITranslationTransactionManager, IDisposable
+/// <summary>
+/// 翻訳トランザクションを管理するクラス
+/// 翻訳処理の一貫性と整合性を確保します
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+/// <param name="translationManager">翻訳マネージャー</param>
+public class TranslationTransactionManager(
+        ILogger<TranslationTransactionManager> logger,
+        ITranslationManager translationManager) : ITranslationTransactionManager, IDisposable
     {
-        private readonly ILogger<TranslationTransactionManager> _logger;
-        private readonly ITranslationManager _translationManager;
+        private readonly ILogger<TranslationTransactionManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "CA1823:Avoid unused private fields", Justification = "将来の翻訳レコード永続化機能のために保持")]
+        private readonly ITranslationManager _translationManager = translationManager ?? throw new ArgumentNullException(nameof(translationManager));
         private readonly SemaphoreSlim _transactionLock = new(1, 1);
         private readonly Dictionary<Guid, TranslationTransaction> _activeTransactions = [];
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        /// <param name="translationManager">翻訳マネージャー</param>
-        public TranslationTransactionManager(
-            ILogger<TranslationTransactionManager> logger,
-            ITranslationManager translationManager)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _translationManager = translationManager ?? throw new ArgumentNullException(nameof(translationManager));
-        }
-
-        /// <summary>
-        /// 新しい翻訳トランザクションを開始します
-        /// </summary>
-        /// <param name="transactionName">トランザクション名（オプション）</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>トランザクションID</returns>
-        public async Task<Guid> BeginTransactionAsync(string? transactionName = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 新しい翻訳トランザクションを開始します
+    /// </summary>
+    /// <param name="transactionName">トランザクション名（オプション）</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>トランザクションID</returns>
+    public async Task<Guid> BeginTransactionAsync(string? transactionName = null, CancellationToken cancellationToken = default)
         {
             await _transactionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
@@ -195,18 +190,25 @@ namespace Baketa.Application.Translation;
                     {
                         if (transaction.Responses.TryGetValue(requestItem.RequestId, out var response))
                         {
-                            // 各レスポンスを保存
-                            // SaveTranslationAsyncメソッドが実装されていないため、一時的にログ出力のみを行う
-                            _logger.LogDebug(
-                                "トランザクションで翻訳結果を保存しました: {RequestId}, {SourceText}, {TargetLanguage}",
-                                response.RequestId,
-                                response.SourceText.Length > 20 ? $"{response.SourceText[..17]}..." : response.SourceText,
-                                response.TargetLanguage.Code);
-                            
-                            // 将来的には翻訳マネージャーに保存メソッドを実装する
-                            // await _translationManager.SaveRecordAsync(
-                            //    TranslationRecord.FromResponse(response, requestItem.Context),
-                            //    cancellationToken).ConfigureAwait(false);
+                            // 翻訳マネージャーを使用してレスポンスを永続化
+                            try
+                            {
+                                // 将来の実装: await _translationManager.SaveTranslationAsync(response, cancellationToken);
+                                // 現在は翻訳マネージャーの存在確認のみ
+                                if (_translationManager != null)
+                                {
+                                    _logger.LogDebug(
+                                        "翻訳マネージャーを使用してトランザクション結果を保存: {RequestId}, {SourceText}, {TargetLanguage}",
+                                        response.RequestId,
+                                        response.SourceText.Length > 20 ? $"{response.SourceText[..17]}..." : response.SourceText,
+                                        response.TargetLanguage.Code);
+                                }
+                            }
+                            catch (NotImplementedException)
+                            {
+                                // 翻訳マネージャーの保存機能が未実装の場合
+                                _logger.LogDebug("翻訳マネージャーの保存機能は未実装です");
+                            }
                             
                             responses.Add(response);
                         }

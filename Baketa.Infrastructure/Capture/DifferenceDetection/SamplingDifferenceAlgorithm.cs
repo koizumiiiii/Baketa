@@ -12,31 +12,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Capture.DifferenceDetection;
 
-    /// <summary>
-    /// サンプリングベースの差分検出アルゴリズム（最も高速）
-    /// </summary>
-    public class SamplingDifferenceAlgorithm : IDetectionAlgorithm
+/// <summary>
+/// サンプリングベースの差分検出アルゴリズム（最も高速）
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class SamplingDifferenceAlgorithm(ILogger<SamplingDifferenceAlgorithm>? logger = null) : IDetectionAlgorithm
     {
-        private readonly ILogger<SamplingDifferenceAlgorithm>? _logger;
+        private readonly ILogger<SamplingDifferenceAlgorithm>? _logger = logger;
         
         /// <summary>
         /// アルゴリズムの種類
         /// </summary>
         public DifferenceDetectionAlgorithm AlgorithmType => DifferenceDetectionAlgorithm.SamplingBased;
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public SamplingDifferenceAlgorithm(ILogger<SamplingDifferenceAlgorithm>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// 差分を検出します
-        /// </summary>
-        public async Task<DetectionResult> DetectAsync(
+
+    /// <summary>
+    /// 差分を検出します
+    /// </summary>
+    public async Task<DetectionResult> DetectAsync(
             IImage previousImage, 
             IImage currentImage, 
             DifferenceDetectionSettings settings, 

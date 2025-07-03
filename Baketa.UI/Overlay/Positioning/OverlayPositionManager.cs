@@ -482,7 +482,8 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
     /// <summary>
     /// OCR領域ベースの位置計算
     /// </summary>
-    private async Task<(Baketa.Core.UI.Geometry.CorePoint Position, PositionCalculationMethod Method, TextRegion? SourceRegion)> CalculateOcrBasedPositionAsync(Baketa.Core.UI.Geometry.CoreSize size, CancellationToken cancellationToken)
+    private async Task<(Baketa.Core.UI.Geometry.CorePoint Position, PositionCalculationMethod Method, TextRegion? SourceRegion)> 
+        CalculateOcrBasedPositionAsync(Baketa.Core.UI.Geometry.CoreSize size, CancellationToken _)
     {
         await Task.Yield(); // 非同期メソッドのための処理
         

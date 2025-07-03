@@ -192,7 +192,7 @@ namespace Baketa.Infrastructure.Tests.Capture;
             var mockAlgo = new Mock<IDetectionAlgorithm>();
             mockAlgo.Setup(a => a.AlgorithmType).Returns(DifferenceDetectionAlgorithm.EdgeBased);
             
-            var disappearedRegions = new List<Rectangle> { new Rectangle(10, 10, 100, 20) };
+            var disappearedRegions = new List<Rectangle> { new(10, 10, 100, 20) };
             var mockResult = new DetectionResult
             {
                 HasSignificantChange = true,
@@ -212,7 +212,7 @@ namespace Baketa.Infrastructure.Tests.Capture;
                 _mockLogger.Object);
             
             // テキスト領域設定
-            var textRegions = new List<Rectangle> { new Rectangle(10, 10, 100, 20) };
+            var textRegions = new List<Rectangle> { new(10, 10, 100, 20) };
             detector.SetPreviousTextRegions(textRegions);
             
             // Act
@@ -229,8 +229,8 @@ namespace Baketa.Infrastructure.Tests.Capture;
             var detector = new EnhancedDifferenceDetector(_mockAlgorithms, _mockEventAggregator.Object, _mockLogger.Object);
             var textRegions = new List<Rectangle>
             {
-                new Rectangle(10, 10, 100, 20),
-                new Rectangle(10, 40, 100, 20)
+                new(10, 10, 100, 20),
+                new(10, 40, 100, 20)
             };
             
             // Act

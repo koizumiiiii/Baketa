@@ -13,19 +13,13 @@ namespace Baketa.Application.Services.Capture;
 /// <summary>
 /// AdvancedCaptureServiceのデモンストレーションプログラム
 /// </summary>
-public class CaptureServiceDemo
+public class CaptureServiceDemo(
+    IAdvancedCaptureService captureService,
+    ILogger<CaptureServiceDemo> logger)
 {
-    private readonly IAdvancedCaptureService _captureService;
-    private readonly ILogger<CaptureServiceDemo> _logger;
-    
-    public CaptureServiceDemo(
-        IAdvancedCaptureService captureService,
-        ILogger<CaptureServiceDemo> logger)
-    {
-        _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly IAdvancedCaptureService _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
+    private readonly ILogger<CaptureServiceDemo> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
     /// デモプログラムを実行します
     /// </summary>

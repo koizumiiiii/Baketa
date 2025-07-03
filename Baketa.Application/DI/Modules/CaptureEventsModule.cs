@@ -37,16 +37,11 @@ namespace Baketa.Application.DI.Modules;
     /// <summary>
     /// イベント登録ヘルパークラス
     /// </summary>
-    internal sealed class EventRegistrar : IEventRegistrar
+    internal sealed class EventRegistrar(IEventAggregator eventAggregator) : IEventRegistrar
     {
-        private readonly IEventAggregator _eventAggregator;
-        
-        public EventRegistrar(IEventAggregator eventAggregator)
-        {
-            _eventAggregator = eventAggregator;
-        }
-        
-        public void Register<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
+        private readonly IEventAggregator _eventAggregator = eventAggregator;
+
+    public void Register<TEvent>(IEventProcessor<TEvent> processor) where TEvent : IEvent
         {
             _eventAggregator.Subscribe(processor);
         }

@@ -6,29 +6,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR最適化フィルターのファクトリークラス
-    /// </summary>
-    public class OcrFilterFactory : IOcrFilterFactory
+/// <summary>
+/// OCR最適化フィルターのファクトリークラス
+/// </summary>
+/// <remarks>
+/// 新しいOcrFilterFactoryを作成します
+/// </remarks>
+/// <param name="serviceProvider">サービスプロバイダー</param>
+/// <param name="logger">ロガー</param>
+public class OcrFilterFactory(
+        IServiceProvider serviceProvider,
+        ILogger<OcrFilterFactory> logger) : IOcrFilterFactory
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<OcrFilterFactory> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly ILogger<OcrFilterFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrFilterFactoryを作成します
-        /// </summary>
-        /// <param name="serviceProvider">サービスプロバイダー</param>
-        /// <param name="logger">ロガー</param>
-        public OcrFilterFactory(
-            IServiceProvider serviceProvider,
-            ILogger<OcrFilterFactory> logger)
-        {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public Baketa.Core.Abstractions.Imaging.IImageFilter CreateFilter(OcrFilterType filterType)
+    /// <inheritdoc/>
+    public Baketa.Core.Abstractions.Imaging.IImageFilter CreateFilter(OcrFilterType filterType)
         {
             try
             {

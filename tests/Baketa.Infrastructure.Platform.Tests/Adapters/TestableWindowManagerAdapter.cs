@@ -8,32 +8,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Tests.Adapters;
 
-    /// <summary>
-    /// テスト用のWindowManagerAdapter拡張クラス
-    /// モックの代わりにこのテスト用サブクラスを使用します
-    /// </summary>
-    public class TestableWindowManagerAdapter : WindowManagerAdapter
+/// <summary>
+/// テスト用のWindowManagerAdapter拡張クラス
+/// モックの代わりにこのテスト用サブクラスを使用します
+/// </summary>
+/// <remarks>
+/// テスト用のWindowManagerAdapterコンストラクタ
+/// </remarks>
+/// <param name="windowsManager">Windows固有のウィンドウマネージャー</param>
+/// <param name="logger">ロガー</param>
+public class TestableWindowManagerAdapter(
+        Core.Abstractions.Platform.Windows.IWindowManager windowsManager,
+        ILogger<WindowManagerAdapter>? logger = null) : WindowManagerAdapter(windowsManager, logger)
     {
         private readonly Dictionary<IntPtr, WindowType> _windowTypes = [];
-        
-        /// <summary>
-        /// テスト用のWindowManagerAdapterコンストラクタ
-        /// </summary>
-        /// <param name="windowsManager">Windows固有のウィンドウマネージャー</param>
-        /// <param name="logger">ロガー</param>
-        public TestableWindowManagerAdapter(
-            Core.Abstractions.Platform.Windows.IWindowManager windowsManager,
-            ILogger<WindowManagerAdapter>? logger = null)
-            : base(windowsManager, logger)
-        {
-        }
-        
-        /// <summary>
-        /// ウィンドウタイプをテスト用に設定
-        /// </summary>
-        /// <param name="handle">ウィンドウハンドル</param>
-        /// <param name="type">設定するウィンドウタイプ</param>
-        public void SetWindowType(IntPtr handle, WindowType type)
+
+    /// <summary>
+    /// ウィンドウタイプをテスト用に設定
+    /// </summary>
+    /// <param name="handle">ウィンドウハンドル</param>
+    /// <param name="type">設定するウィンドウタイプ</param>
+    public void SetWindowType(IntPtr handle, WindowType type)
         {
             _windowTypes[handle] = type;
         }

@@ -10,34 +10,28 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation.Services;
 
-    /// <summary>
-    /// インメモリ翻訳マネージャー
-    /// </summary>
-    public class InMemoryTranslationManager : ITranslationManager
+/// <summary>
+/// インメモリ翻訳マネージャー
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="repository">翻訳リポジトリ</param>
+/// <param name="logger">ロガー</param>
+public class InMemoryTranslationManager(
+        ITranslationRepository repository,
+        ILogger<InMemoryTranslationManager> logger) : ITranslationManager
     {
-        private readonly ITranslationRepository _repository;
-        private readonly ILogger<InMemoryTranslationManager> _logger;
+        private readonly ITranslationRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        private readonly ILogger<InMemoryTranslationManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="repository">翻訳リポジトリ</param>
-        /// <param name="logger">ロガー</param>
-        public InMemoryTranslationManager(
-            ITranslationRepository repository,
-            ILogger<InMemoryTranslationManager> logger)
-        {
-            _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <summary>
-        /// 翻訳レコードを保存します
-        /// </summary>
-        /// <param name="record">翻訳レコード</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>保存に成功した場合はtrue</returns>
-        public async Task<bool> SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 翻訳レコードを保存します
+    /// </summary>
+    /// <param name="record">翻訳レコード</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>保存に成功した場合はtrue</returns>
+    public async Task<bool> SaveRecordAsync(TranslationRecord record, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(record);
             

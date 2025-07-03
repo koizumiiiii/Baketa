@@ -125,12 +125,7 @@ public sealed class SettingsValidationResult
     /// <returns>ダミーメタデータ</returns>
     private static SettingMetadata CreateDummyMetadata()
     {
-        var dummyProperty = typeof(DummySettings).GetProperty(nameof(DummySettings.ErrorProperty));
-        if (dummyProperty == null)
-        {
-            throw new InvalidOperationException("ダミープロパティが見つかりません");
-        }
-        
+        var dummyProperty = typeof(DummySettings).GetProperty(nameof(DummySettings.ErrorProperty)) ?? throw new InvalidOperationException("ダミープロパティが見つかりません");
         var dummyAttribute = new SettingMetadataAttribute(SettingLevel.Basic, "Error", "Error");
         return new SettingMetadata(dummyProperty, dummyAttribute);
     }

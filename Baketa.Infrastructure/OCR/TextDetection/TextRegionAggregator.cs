@@ -10,30 +10,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
 
-    /// <summary>
-    /// テキスト領域集約実装クラス
-    /// </summary>
-    public class TextRegionAggregator : ITextRegionAggregator
+/// <summary>
+/// テキスト領域集約実装クラス
+/// </summary>
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class TextRegionAggregator(ILogger<TextRegionAggregator>? logger = null) : ITextRegionAggregator
     {
-        private readonly ILogger<TextRegionAggregator>? _logger;
+        private readonly ILogger<TextRegionAggregator>? _logger = logger;
         private readonly List<OCRTextRegion> _previousRegions = [];
-        
-        /// <summary>
-        /// コンストラクタ
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public TextRegionAggregator(ILogger<TextRegionAggregator>? logger = null)
-        {
-            _logger = logger;
-        }
-        
-        /// <summary>
-        /// 複数の検出結果を統合します
-        /// </summary>
-        /// <param name="detectionResults">各検出器からの結果</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>統合された検出結果</returns>
-        public async Task<IReadOnlyList<OCRTextRegion>> AggregateResultsAsync(
+
+    /// <summary>
+    /// 複数の検出結果を統合します
+    /// </summary>
+    /// <param name="detectionResults">各検出器からの結果</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>統合された検出結果</returns>
+    public async Task<IReadOnlyList<OCRTextRegion>> AggregateResultsAsync(
             IEnumerable<IReadOnlyList<OCRTextRegion>> detectionResults,
             CancellationToken cancellationToken = default)
         {

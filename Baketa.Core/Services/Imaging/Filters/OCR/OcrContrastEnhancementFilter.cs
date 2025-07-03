@@ -7,24 +7,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 
-    /// <summary>
-    /// OCR処理のためのコントラスト強調フィルター
-    /// </summary>
-    public class OcrContrastEnhancementFilter : ImageFilterBase
+/// <summary>
+/// OCR処理のためのコントラスト強調フィルター
+/// </summary>
+/// <remarks>
+/// 新しいOcrContrastEnhancementFilterを作成します
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class OcrContrastEnhancementFilter(ILogger<OcrContrastEnhancementFilter> logger) : ImageFilterBase
     {
-        private readonly ILogger<OcrContrastEnhancementFilter> _logger;
+        private readonly ILogger<OcrContrastEnhancementFilter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// 新しいOcrContrastEnhancementFilterを作成します
-        /// </summary>
-        /// <param name="logger">ロガー</param>
-        public OcrContrastEnhancementFilter(ILogger<OcrContrastEnhancementFilter> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <inheritdoc/>
-        public override string Name => "OCRコントラスト強調";
+    /// <inheritdoc/>
+    public override string Name => "OCRコントラスト強調";
 
         /// <inheritdoc/>
         public override string Description => "OCR処理のためにテキストとバックグラウンドのコントラストを強調します";
