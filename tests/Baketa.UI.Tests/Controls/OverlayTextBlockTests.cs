@@ -58,8 +58,10 @@ public sealed class OverlayTextBlockTests(ITestOutputHelper output) : AvaloniaTe
         
         RunOnUIThread(() =>
         {
-            var control = new OverlayTextBlock();
-            control.Text = testText;
+            var control = new OverlayTextBlock
+            {
+                Text = testText
+            };
             Assert.Equal(testText, control.Text);
         });
 
