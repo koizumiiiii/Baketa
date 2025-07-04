@@ -139,7 +139,7 @@ public sealed class PaddleOcrEngine(
     /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    public async Task<OcrResultCollection> RecognizeAsync(
+    public async Task<OcrResults> RecognizeAsync(
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
@@ -155,7 +155,7 @@ public sealed class PaddleOcrEngine(
     /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    public async Task<OcrResultCollection> RecognizeAsync(
+    public async Task<OcrResults> RecognizeAsync(
         IImage image,
         Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
@@ -178,7 +178,7 @@ public sealed class PaddleOcrEngine(
                 new("テストテキスト", new Rectangle(10, 10, 100, 30), 0.95)
             };
             
-            return new OcrResultCollection(
+            return new OcrResults(
                 dummyTextRegions,
                 image,
                 stopwatch.Elapsed,
@@ -218,7 +218,7 @@ public sealed class PaddleOcrEngine(
             
             progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了"));
             
-            var result = new OcrResultCollection(
+            var result = new OcrResults(
                 textRegions,
                 image,
                 stopwatch.Elapsed,
@@ -852,9 +852,9 @@ public sealed class PaddleOcrEngine(
     /// <summary>
     /// 空の結果を作成
     /// </summary>
-    private OcrResultCollection CreateEmptyResult(IImage image, Rectangle? regionOfInterest, TimeSpan processingTime)
+    private OcrResults CreateEmptyResult(IImage image, Rectangle? regionOfInterest, TimeSpan processingTime)
     {
-        return new OcrResultCollection(
+        return new OcrResults(
             [],
             image,
             processingTime,

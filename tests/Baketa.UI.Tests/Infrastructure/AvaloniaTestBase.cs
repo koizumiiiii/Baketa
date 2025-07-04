@@ -2,7 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using ReactiveUI;
 using System;
+using System.Reactive.Concurrency;
 using System.Threading;
 using Xunit;
 
@@ -16,36 +18,71 @@ public abstract class AvaloniaTestBase : IDisposable
 {
     private static readonly object _initLock = new();
     private static bool _initialized;
+    private readonly object _instanceLock = new();
+    private bool _instanceInitialized;
 
     protected AvaloniaTestBase()
     {
         InitializeAvalonia();
+        InitializeReactiveUI();
     }
 
     /// <summary>
     /// Avalonia UIフレームワークを初期化
     /// </summary>
-    private static void InitializeAvalonia()
+    private void InitializeAvalonia()
     {
-        lock (_initLock)
+        lock (_instanceLock)
         {
-            if (_initialized)
+            if (_instanceInitialized)
                 return;
 
-            try
+            lock (_initLock)
             {
-                // Headlessモードでアプリケーションを初期化
-                AppBuilder.Configure<TestApplication>()
-                    .UseHeadless(new AvaloniaHeadlessPlatformOptions())
-                    .SetupWithoutStarting();
+                if (!_initialized)
+                {
+                    try
+                    {
+                        // Headlessモードでアプリケーションを初期化
+                        var headlessOptions = new AvaloniaHeadlessPlatformOptions
+                        {
+                            UseHeadlessDrawing = false, // 描画処理を無効化してパフォーマンス向上
+                        };
+                        
+                        AppBuilder.Configure<TestApplication>()
+                            .UseHeadless(headlessOptions)
+                            .SetupWithoutStarting();
 
-                _initialized = true;
+                        _initialized = true;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // 既に初期化済みの場合は無視
+                        _initialized = true;
+                    }
+                }
             }
-            catch (InvalidOperationException)
-            {
-                // 既に初期化済みの場合は無視
-                _initialized = true;
-            }
+            
+            _instanceInitialized = true;
+        }
+    }
+
+    /// <summary>
+    /// ReactiveUIのスケジューラーを初期化
+    /// </summary>
+    private static void InitializeReactiveUI()
+    {
+        try
+        {
+            // テスト環境でのReactiveUIスケジューラー設定
+            // CurrentThreadSchedulerを使用することで同期的にテストを実行
+            RxApp.MainThreadScheduler = CurrentThreadScheduler.Instance;
+            RxApp.TaskpoolScheduler = ImmediateScheduler.Instance;
+        }
+        catch (Exception ex)
+        {
+            // ReactiveUI初期化エラーをデバッグ出力（テスト実行には影響しない）
+            System.Diagnostics.Debug.WriteLine($"ReactiveUI initialization warning: {ex.Message}");
         }
     }
 
@@ -89,7 +126,15 @@ public abstract class AvaloniaTestBase : IDisposable
 
     public virtual void Dispose()
     {
-        // 基底クラスでは何もしない
+        // インスタンス固有のクリーンアップ
+        lock (_instanceLock)
+        {
+            _instanceInitialized = false;
+        }
+        
+        // ガベージコレクションの実行を促す
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
         GC.SuppressFinalize(this);
     }
 }

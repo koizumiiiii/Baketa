@@ -101,10 +101,10 @@ public class OcrResultTests
 
     #endregion
 
-    #region OcrResultCollection単体テスト
+    #region PaddleOcrResultSet単体テスト
 
     [Fact]
-    public void OcrResultCollection_EmptyResults_ReturnsCorrectProperties()
+    public void PaddleOcrResultSet_EmptyResults_ReturnsCorrectProperties()
     {
         // Arrange
         var emptyResults = Array.Empty<OcrResult>();
@@ -113,7 +113,7 @@ public class OcrResultTests
         var imageSize = new Size(640, 480);
 
         // Act
-        var collection = new OcrResultCollection(emptyResults, processingTime, language, imageSize);
+        var collection = new PaddleOcrResultSet(emptyResults, processingTime, language, imageSize);
 
         // Assert
         Assert.Empty(collection.Results);
@@ -126,7 +126,7 @@ public class OcrResultTests
     }
 
     [Fact]
-    public void OcrResultCollection_MultipleResults_CalculatesCorrectStatistics()
+    public void PaddleOcrResultSet_MultipleResults_CalculatesCorrectStatistics()
     {
         // Arrange
         var results = new[]
@@ -140,7 +140,7 @@ public class OcrResultTests
         var imageSize = new Size(640, 480);
 
         // Act
-        var collection = new OcrResultCollection(results, processingTime, language, imageSize);
+        var collection = new PaddleOcrResultSet(results, processingTime, language, imageSize);
 
         // Assert
         Assert.Equal(3, collection.ResultCount);
@@ -159,7 +159,7 @@ public class OcrResultTests
             new OcrResult("High2", 0.85f, new Rectangle(0, 30, 40, 20)),
             new OcrResult("VeryLow", 0.3f, new Rectangle(120, 0, 30, 20))
         };
-        var collection = new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
+        var collection = new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
 
         // Act
         var highConfidenceResults = collection.GetHighConfidenceResults(0.8f);
@@ -177,7 +177,7 @@ public class OcrResultTests
     {
         // Arrange
         var results = new[] { new OcrResult("Test", 0.8f, new Rectangle(0, 0, 50, 20)) };
-        var collection = new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
+        var collection = new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
 
         // Act & Assert
         Assert.Throws<ArgumentOutOfRangeException>(
@@ -195,7 +195,7 @@ public class OcrResultTests
             new OcrResult("Inside2", 0.85f, new Rectangle(40, 30, 25, 15)),
             new OcrResult("PartialOverlap", 0.7f, new Rectangle(80, 40, 50, 20))
         };
-        var collection = new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
+        var collection = new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
         var searchRegion = new Rectangle(10, 10, 60, 50); // covers Inside1 and Inside2
 
         // Act
@@ -216,7 +216,7 @@ public class OcrResultTests
             new OcrResult("Test1", 0.9f, new Rectangle(10, 10, 30, 20)),
             new OcrResult("Test2", 0.8f, new Rectangle(50, 50, 40, 25))
         };
-        var collection = new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
+        var collection = new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480));
         var emptyRegion = new Rectangle(100, 100, 0, 0);
 
         // Act
@@ -260,28 +260,28 @@ public class OcrResultTests
     #region エッジケーステスト
 
     [Fact]
-    public void OcrResultCollection_NullResults_ThrowsArgumentNullException()
+    public void PaddleOcrResultSet_NullResults_ThrowsArgumentNullException()
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(
-            () => new OcrResultCollection(null!, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480)));
+            () => new PaddleOcrResultSet(null!, TimeSpan.FromMilliseconds(100), "eng", new Size(640, 480)));
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(null)]
-    public void OcrResultCollection_InvalidLanguage_ThrowsArgumentException(string? language)
+    public void PaddleOcrResultSet_InvalidLanguage_ThrowsArgumentException(string? language)
     {
         // Arrange
         var results = Array.Empty<OcrResult>();
 
         // Act & Assert
         Assert.Throws<ArgumentException>(
-            () => new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), language!, new Size(640, 480)));
+            () => new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), language!, new Size(640, 480)));
     }
 
     [Fact]
-    public void OcrResultCollection_NegativeProcessingTime_ThrowsArgumentOutOfRangeException()
+    public void PaddleOcrResultSet_NegativeProcessingTime_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
         var results = Array.Empty<OcrResult>();
@@ -289,11 +289,11 @@ public class OcrResultTests
 
         // Act & Assert
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new OcrResultCollection(results, negativeTime, "eng", new Size(640, 480)));
+            () => new PaddleOcrResultSet(results, negativeTime, "eng", new Size(640, 480)));
     }
 
     [Fact]
-    public void OcrResultCollection_ZeroImageSize_ThrowsArgumentException()
+    public void PaddleOcrResultSet_ZeroImageSize_ThrowsArgumentException()
     {
         // Arrange
         var results = Array.Empty<OcrResult>();
@@ -301,7 +301,7 @@ public class OcrResultTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(
-            () => new OcrResultCollection(results, TimeSpan.FromMilliseconds(100), "eng", zeroSize));
+            () => new PaddleOcrResultSet(results, TimeSpan.FromMilliseconds(100), "eng", zeroSize));
     }
 
     #endregion

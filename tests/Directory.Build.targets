@@ -10,11 +10,16 @@
     
     <!-- テスト用の意図的なリソース不足エラー -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);SYSLIB0014</MSBuildWarningsAsMessages>
+    
+    <!-- xUnit Skip属性による警告抑制 -->
+    <NoWarn>$(NoWarn);xUnit1004</NoWarn>
+    
+    <!-- テスト一時無効化による分析警告抑制 -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1998;IDE0052;IDE0051</WarningsNotAsErrors>
   </PropertyGroup>
 
-  <!-- テスト実行時の詳細出力レベル調整 -->
+  <!-- テスト結果ディレクトリのみ設定 -->
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
-    <VSTestLogger>console;verbosity=normal</VSTestLogger>
     <VSTestResultsDirectory>$(OutputPath)TestResults</VSTestResultsDirectory>
   </PropertyGroup>
 </Project>

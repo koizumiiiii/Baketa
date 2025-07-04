@@ -84,7 +84,7 @@ public enum TextDirection
 /// <summary>
 /// OCR結果を表すクラス
 /// </summary>
-public class OcrResultCollection(
+public class OcrResults(
     IReadOnlyList<OcrTextRegion> textRegions,
     IImage sourceImage,
     TimeSpan processingTime,
@@ -286,7 +286,7 @@ public interface IOcrEngine : IDisposable
     /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    Task<OcrResultCollection> RecognizeAsync(
+    Task<OcrResults> RecognizeAsync(
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
@@ -299,7 +299,7 @@ public interface IOcrEngine : IDisposable
     /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    Task<OcrResultCollection> RecognizeAsync(
+    Task<OcrResults> RecognizeAsync(
         IImage image,
         Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
