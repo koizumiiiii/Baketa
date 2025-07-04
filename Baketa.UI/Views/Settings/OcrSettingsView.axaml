@@ -36,6 +36,16 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
+                <controls:SettingsItem Title="翻訳先言語"
+                                        Description="翻訳結果の出力言語">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding TargetLanguageOptions}"
+                                  SelectedItem="{Binding TargetLanguage}"
+                                  IsEnabled="{Binding EnableOcr}"
+                                  Width="150"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
                 <controls:SettingsItem Title="信頼度閾値"
                                         Description="テキスト認識の最小信頼度（0.0-1.0）">
                     <controls:SettingsItem.SettingContent>
@@ -76,19 +86,163 @@
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
                 <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
                 
-                <controls:SettingsItem Title="画像前処理設定"
-                                        Description="OCR精度向上のための画像処理オプション（未実装）">
+                <!-- 画像前処理設定 -->
+                <TextBlock Text="画像前処理" FontSize="14" FontWeight="Medium" Margin="0,10,0,5"/>
+                
+                <controls:SettingsItem Title="画像前処理を有効化"
+                                        Description="OCR精度向上のための画像前処理を実行します">
                     <controls:SettingsItem.SettingContent>
-                        <TextBlock Text="開発中..." 
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                        <ToggleSwitch IsChecked="{Binding EnableImagePreprocessing}"
+                                      IsEnabled="{Binding EnableOcr}"/>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
-                <controls:SettingsItem Title="パフォーマンス設定"
-                                        Description="OCR処理の最適化設定（未実装）">
+                <controls:SettingsItem Title="グレースケール変換"
+                                        Description="画像をグレースケールに変換して処理速度を向上させます">
                     <controls:SettingsItem.SettingContent>
-                        <TextBlock Text="開発中..." 
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                        <ToggleSwitch IsChecked="{Binding ConvertToGrayscale}"
+                                      IsEnabled="{Binding EnableImagePreprocessing}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="二値化処理"
+                                        Description="画像を白黒に二値化してテキスト認識を向上させます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableBinarization}"
+                                      IsEnabled="{Binding EnableImagePreprocessing}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="二値化閾値"
+                                        Description="二値化処理の閾値（0=自動）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding BinarizationThreshold}" 
+                                    Minimum="0" Maximum="255" 
+                                    TickFrequency="25" 
+                                    IsEnabled="{Binding EnableBinarization}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding BinarizationThreshold}" 
+                                       VerticalAlignment="Center" Width="40"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="ノイズ除去"
+                                        Description="画像のノイズを除去してOCR精度を向上させます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableNoiseReduction}"
+                                      IsEnabled="{Binding EnableImagePreprocessing}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="コントラスト強調"
+                                        Description="画像のコントラストを強調してテキストを鮮明にします">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnhanceContrast}"
+                                      IsEnabled="{Binding EnableImagePreprocessing}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="エッジ強調"
+                                        Description="文字の輪郭を強調してOCR精度を向上させます">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnhanceEdges}"
+                                      IsEnabled="{Binding EnableImagePreprocessing}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="画像拡大率"
+                                        Description="OCR処理前の画像拡大倍率">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding ImageScaleFactor}" 
+                                    Minimum="1.0" Maximum="4.0" 
+                                    TickFrequency="0.5" 
+                                    IsEnabled="{Binding EnableImagePreprocessing}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding ImageScaleFactor, StringFormat={}{0:F1}x}" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <!-- パフォーマンス設定 -->
+                <TextBlock Text="パフォーマンス" FontSize="14" FontWeight="Medium" Margin="0,20,0,5"/>
+                
+                <controls:SettingsItem Title="並列処理を有効化"
+                                        Description="複数の画像を同時に処理して高速化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableParallelProcessing}"
+                                      IsEnabled="{Binding EnableOcr}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最大並列処理数"
+                                        Description="同時に処理する最大スレッド数">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MaxParallelThreads}" 
+                                    Minimum="1" Maximum="16" 
+                                    TickFrequency="1" 
+                                    IsEnabled="{Binding EnableParallelProcessing}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding MaxParallelThreads}" 
+                                       VerticalAlignment="Center" Width="40"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="テキスト領域検出"
+                                        Description="テキストがある領域のみを検出してOCR処理を最適化します">
+                    <controls:SettingsItem.SettingContent>
+                        <ToggleSwitch IsChecked="{Binding EnableTextAreaDetection}"
+                                      IsEnabled="{Binding EnableOcr}"/>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最小テキスト行高さ"
+                                        Description="認識する最小のテキスト行高さ（px）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MinTextLineHeight}" 
+                                    Minimum="5" Maximum="100" 
+                                    TickFrequency="5" 
+                                    IsEnabled="{Binding EnableTextAreaDetection}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding MinTextLineHeight}px" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="最大テキスト行高さ"
+                                        Description="認識する最大のテキスト行高さ（px）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding MaxTextLineHeight}" 
+                                    Minimum="10" Maximum="500" 
+                                    TickFrequency="25" 
+                                    IsEnabled="{Binding EnableTextAreaDetection}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding MaxTextLineHeight}px" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="OCRタイムアウト時間"
+                                        Description="OCR処理のタイムアウト時間（秒）">
+                    <controls:SettingsItem.SettingContent>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Slider Value="{Binding TimeoutSeconds}" 
+                                    Minimum="1" Maximum="60" 
+                                    TickFrequency="5" 
+                                    IsEnabled="{Binding EnableOcr}"
+                                    Width="200"/>
+                            <TextBlock Text="{Binding TimeoutSeconds}秒" 
+                                       VerticalAlignment="Center" Width="50"/>
+                        </StackPanel>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
             </StackPanel>

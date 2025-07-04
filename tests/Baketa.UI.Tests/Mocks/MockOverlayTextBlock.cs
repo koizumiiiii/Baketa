@@ -11,11 +11,6 @@ public sealed class MockOverlayTextBlock
 {
     // プロパティのバッキングフィールド
     private string _text = string.Empty;
-    private OverlayTheme _theme = OverlayTheme.Auto;
-    private bool _toggleVisibilityEnabled = true;
-    private double _lineHeight = 1.4;
-    private TextWrapping _textWrapping = TextWrapping.Wrap;
-    private double _paragraphSpacing = 8.0;
 
     /// <summary>
     /// テキスト
@@ -29,47 +24,27 @@ public sealed class MockOverlayTextBlock
     /// <summary>
     /// テーマ
     /// </summary>
-    public OverlayTheme Theme
-    {
-        get => _theme;
-        set => _theme = value;
-    }
+    public OverlayTheme Theme { get; set; } = OverlayTheme.Auto;
 
     /// <summary>
     /// 表示切り替え有効フラグ
     /// </summary>
-    public bool ToggleVisibilityEnabled
-    {
-        get => _toggleVisibilityEnabled;
-        set => _toggleVisibilityEnabled = value;
-    }
+    public bool ToggleVisibilityEnabled { get; set; } = true;
 
     /// <summary>
     /// 行間
     /// </summary>
-    public double LineHeight
-    {
-        get => _lineHeight;
-        set => _lineHeight = value;
-    }
+    public double LineHeight { get; set; } = 1.4;
 
     /// <summary>
     /// テキスト折り返し
     /// </summary>
-    public TextWrapping TextWrapping
-    {
-        get => _textWrapping;
-        set => _textWrapping = value;
-    }
+    public TextWrapping TextWrapping { get; set; } = TextWrapping.Wrap;
 
     /// <summary>
     /// 段落間スペーシング
     /// </summary>
-    public double ParagraphSpacing
-    {
-        get => _paragraphSpacing;
-        set => _paragraphSpacing = value;
-    }
+    public double ParagraphSpacing { get; set; } = 8.0;
 
     /// <summary>
     /// 表示切り替えメソッド（Mock実装）
