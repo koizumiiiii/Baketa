@@ -38,10 +38,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     {
         // Arrange
         const string testText = "テストテキスト";
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.Text = testText;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            Text = testText
+        };
 
         // Assert
         Assert.Equal(testText, control.Text);
@@ -57,10 +58,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockThemePropertyShouldSetAndGetCorrectly(OverlayTheme theme)
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.Theme = theme;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            Theme = theme
+        };
 
         // Assert
         Assert.Equal(theme, control.Theme);
@@ -74,10 +76,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockToggleVisibilityEnabledPropertyShouldSetAndGetCorrectly(bool enabled)
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.ToggleVisibilityEnabled = enabled;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            ToggleVisibilityEnabled = enabled
+        };
 
         // Assert
         Assert.Equal(enabled, control.ToggleVisibilityEnabled);
@@ -92,10 +95,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockLineHeightPropertyShouldSetAndGetCorrectly(double lineHeight)
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.LineHeight = lineHeight;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            LineHeight = lineHeight
+        };
 
         // Assert
         Assert.Equal(lineHeight, control.LineHeight);
@@ -109,10 +113,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockTextWrappingPropertyShouldSetAndGetCorrectly(TextWrapping wrapping)
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.TextWrapping = wrapping;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            TextWrapping = wrapping
+        };
 
         // Assert
         Assert.Equal(wrapping, control.TextWrapping);
@@ -127,10 +132,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockParagraphSpacingPropertyShouldSetAndGetCorrectly(double spacing)
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.ParagraphSpacing = spacing;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            ParagraphSpacing = spacing
+        };
 
         // Assert
         Assert.Equal(spacing, control.ParagraphSpacing);
@@ -182,10 +188,11 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockTextWithNullValueShouldHandleGracefully()
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.Text = null!;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            Text = null!
+        };
 
         // Assert
         Assert.Equal(string.Empty, control.Text); // null値は空文字列に変換される
@@ -197,15 +204,16 @@ public sealed class OverlayTextBlockMockTests(ITestOutputHelper output)
     public void MockMultiplePropertyChangesShouldWorkTogether()
     {
         // Arrange
-        var control = new MockOverlayTextBlock();
-
-        // Act
-        control.Text = "統合テストテキスト";
-        control.Theme = OverlayTheme.HighContrast;
-        control.ToggleVisibilityEnabled = false;
-        control.LineHeight = 2.0;
-        control.TextWrapping = TextWrapping.NoWrap;
-        control.ParagraphSpacing = 16.0;
+        var control = new MockOverlayTextBlock
+        {
+            // Act
+            Text = "統合テストテキスト",
+            Theme = OverlayTheme.HighContrast,
+            ToggleVisibilityEnabled = false,
+            LineHeight = 2.0,
+            TextWrapping = TextWrapping.NoWrap,
+            ParagraphSpacing = 16.0
+        };
 
         // Assert
         Assert.Equal("統合テストテキスト", control.Text);
