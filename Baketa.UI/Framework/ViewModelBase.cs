@@ -63,9 +63,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// <param name="eventAggregator">イベント集約器</param>
     protected ViewModelBase(IEventAggregator eventAggregator)
     {
-        ArgumentNullException.ThrowIfNull(eventAggregator);
-        
-        EventAggregator = eventAggregator;
+        EventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         Logger = null;
         
         // アクティベーション処理の設定
@@ -83,9 +81,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// <param name="logger">ロガー</param>
     protected ViewModelBase(IEventAggregator eventAggregator, ILogger? logger)
     {
-        ArgumentNullException.ThrowIfNull(eventAggregator);
-        
-        EventAggregator = eventAggregator;
+        EventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         Logger = logger;
         
         // アクティベーション処理の設定

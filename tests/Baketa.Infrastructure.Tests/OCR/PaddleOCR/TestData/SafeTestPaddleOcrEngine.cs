@@ -86,7 +86,7 @@ public class SafeTestPaddleOcrEngine(
     /// <summary>
     /// 画像からテキストを認識します
     /// </summary>
-    public async Task<OcrResultCollection> RecognizeAsync(
+    public async Task<OcrResults> RecognizeAsync(
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
@@ -97,7 +97,7 @@ public class SafeTestPaddleOcrEngine(
     /// <summary>
     /// 画像の指定領域からテキストを認識します
     /// </summary>
-    public async Task<OcrResultCollection> RecognizeAsync(
+    public async Task<OcrResults> RecognizeAsync(
         IImage image,
         Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
@@ -131,7 +131,7 @@ public class SafeTestPaddleOcrEngine(
             _logger?.LogDebug("テスト用OCR実行完了 - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
             // 空の結果を返す（テスト用）
-            return new OcrResultCollection(
+            return new OcrResults(
                 [],
                 image,
                 stopwatch.Elapsed,

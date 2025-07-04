@@ -228,7 +228,7 @@ public static class PaddleOcrUsageExample
             Console.WriteLine("---");
         }
         
-        // var collection = new Baketa.Core.Abstractions.OCR.OcrResultCollection(
+        // var collection = new Baketa.Core.Abstractions.OCR.OcrResults(
         //     results.Select(r => r.ToTextRegion()).ToList(),
         //     サンプル画像パラメータ（実際の実装では適切な値を設定）
         //     testImage, // IImageの実装が必要
