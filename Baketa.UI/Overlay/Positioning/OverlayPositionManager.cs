@@ -283,9 +283,17 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
     /// <inheritdoc/>
     public async Task<OverlayPositionInfo> CalculatePositionAndSizeAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_disposed)
+        {
+            return new OverlayPositionInfo(
+                Position: Baketa.Core.UI.Geometry.CorePoint.Zero,
+                Size: Baketa.Core.UI.Geometry.CoreSize.Empty,
+                SourceTextRegion: null,
+                Monitor: GetPrimaryMonitor(),
+                CalculationMethod: Baketa.Core.UI.Overlay.Positioning.PositionCalculationMethod.OcrBelowText);
+        }
         
-        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken);
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource?.Token ?? CancellationToken.None, cancellationToken);
         
         var monitor = _currentGameWindow?.Monitor ?? GetPrimaryMonitor();
         var positionInfo = new OverlayPositionInfo(
