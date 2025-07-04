@@ -157,9 +157,9 @@ public class OcrResult
 }
 
 /// <summary>
-/// 複数のOCR結果をまとめて管理するクラス
+/// PaddleOCRの結果をまとめて管理するクラス
 /// </summary>
-public class OcrResultCollection
+public class PaddleOcrResultSet
 {
     /// <summary>
     /// OCR結果の配列
@@ -181,7 +181,7 @@ public class OcrResultCollection
     /// </summary>
     public Size ImageSize { get; }
 
-    public OcrResultCollection(
+    public PaddleOcrResultSet(
         OcrResult[] results, 
         TimeSpan processingTime, 
         string language, 

@@ -37,7 +37,7 @@ public interface IOcrApplicationService
     /// <param name="progressCallback">進捗通知コールバック</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    Task<OcrResultCollection> RecognizeTextAsync(
+    Task<OcrResults> RecognizeTextAsync(
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
@@ -50,7 +50,7 @@ public interface IOcrApplicationService
     /// <param name="progressCallback">進捗通知コールバック</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>OCR結果</returns>
-    Task<OcrResultCollection> RecognizeTextAsync(
+    Task<OcrResults> RecognizeTextAsync(
         IImage image,
         Rectangle regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
@@ -190,7 +190,7 @@ public sealed class OcrApplicationService(
     /// <summary>
     /// 画像からテキストを認識
     /// </summary>
-    public async Task<OcrResultCollection> RecognizeTextAsync(
+    public async Task<OcrResults> RecognizeTextAsync(
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
@@ -229,7 +229,7 @@ public sealed class OcrApplicationService(
     /// <summary>
     /// 画像の指定領域からテキストを認識（ROI指定）
     /// </summary>
-    public async Task<OcrResultCollection> RecognizeTextAsync(
+    public async Task<OcrResults> RecognizeTextAsync(
         IImage image,
         Rectangle regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,

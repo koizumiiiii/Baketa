@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Baketa.UI.ViewModels.Settings;
 
 namespace Baketa.UI.Views.Settings;
 
@@ -14,5 +15,14 @@ public partial class MainUiSettingsView : UserControl
     public MainUiSettingsView()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// ViewModelを指定してMainUiSettingsViewを初期化します
+    /// </summary>
+    /// <param name="viewModel">メインUI設定ViewModel</param>
+    public MainUiSettingsView(MainUiSettingsViewModel viewModel) : this()
+    {
+        DataContext = viewModel;
     }
 }
