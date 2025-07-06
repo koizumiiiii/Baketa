@@ -950,8 +950,6 @@ namespace Baketa.UI.ViewModels
         }
     }
 
-}
-
 // 警告抑制を解除
 #pragma warning restore IDE0028
 #pragma warning restore CA1515
@@ -1099,4 +1097,5 @@ internal sealed class GeneralSettingsChangedEvent : CoreEvents.EventBase
     /// デバッグログ有効化
     /// </summary>
     public bool EnableDebugLogs { get; set; }
+}
 }

@@ -73,6 +73,11 @@ public sealed class AppSettings
     public MainUiSettings MainUi { get; set; } = new();
     
     /// <summary>
+    /// 認証設定
+    /// </summary>
+    public AuthSettings Auth { get; set; } = new();
+    
+    /// <summary>
     /// 詳細設定
     /// </summary>
     public AdvancedSettings Advanced { get; set; } = new();
@@ -144,6 +149,7 @@ public sealed class AppSettings
                 filtered.Translation = Translation;
                 filtered.Overlay = Overlay;
                 filtered.MainUi = MainUi;
+                filtered.Auth = Auth;
                 break;
                 
             case SettingLevel.Advanced:
@@ -156,6 +162,7 @@ public sealed class AppSettings
                 filtered.Translation = Translation;
                 filtered.Overlay = Overlay;
                 filtered.MainUi = MainUi;
+                filtered.Auth = Auth;
                 filtered.Advanced = Advanced;
                 filtered.GameProfiles = GameProfiles;
                 break;
@@ -231,6 +238,7 @@ public sealed class AppSettings
             ("Translation", Translation),
             ("Overlay", Overlay),
             ("MainUi", MainUi),
+            ("Auth", Auth),
             ("Advanced", Advanced),
             ("Backup", BackupSettings),
             ("Sync", SyncSettings)

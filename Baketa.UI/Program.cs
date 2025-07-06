@@ -7,6 +7,7 @@ using Avalonia.ReactiveUI;
 using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
+using Baketa.Infrastructure.DI.Modules;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,6 +94,10 @@ namespace Baketa.UI;
             var registeredModules = new HashSet<Type>();
             var moduleStack = new Stack<Type>();
             coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            
+            // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
+            var authModule = new AuthModule();
+            authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
             // ApplicationModuleの明示的登録
             var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
