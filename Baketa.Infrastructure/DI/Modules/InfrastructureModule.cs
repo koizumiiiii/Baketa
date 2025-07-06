@@ -96,8 +96,8 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="environment">アプリケーション実行環境</param>
         private static void RegisterPersistenceServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
         {
-            // 設定保存サービス
-            services.AddSingleton<ISettingsService, JsonSettingsService>();
+            // 設定保存サービス（SettingsModuleで登録されるため、ここでは削除）
+            // services.AddSingleton<ISettingsService, JsonSettingsService>();
             
             // 例: services.AddSingleton<IProfileStorage, JsonProfileStorage>();
             

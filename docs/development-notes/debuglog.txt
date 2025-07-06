@@ -1,0 +1,85 @@
+'Baketa.UI.exe' (CoreCLR: DefaultDomain): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Private.CoreLib.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Baketa.UI.dll' が読み込まれました。シンボルが読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Runtime.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'c:\program files\microsoft visual studio\2022\community\common7\ide\commonextensions\microsoft\hotreload\Microsoft.Extensions.DotNetDeltaApplier.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.IO.Pipes.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Linq.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Collections.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Console.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Threading.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Runtime.InteropServices.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Threading.Overlapped.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Security.AccessControl.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Security.Principal.Windows.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Security.Claims.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Runtime.Loader.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Collections.Concurrent.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Controls.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Base.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.ObjectModel.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Baketa.Core.dll' が読み込まれました。シンボルが読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Abstractions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Baketa.Infrastructure.dll' が読み込まれました。シンボルが読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Baketa.Application.dll' が読み込まれました。シンボルが読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Configuration.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Configuration.FileExtensions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Json.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Options.ConfigurationExtensions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Logging.Abstractions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Logging.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.ComponentModel.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Physical.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Abstractions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Primitives.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Memory.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.IO.FileSystem.Watcher.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.ComponentModel.Primitives.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.FileSystemGlobbing.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\Microsoft.Win32.Primitives.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Text.Json.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Text.Encoding.Extensions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Options.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Binder.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Logging.Console.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Logging.Configuration.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Microsoft.Extensions.Hosting.Abstractions.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Baketa.Infrastructure.Platform.dll' が読み込まれました。シンボルが読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Drawing.Primitives.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\ReactiveUI.dll' が読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Splat.dll' が読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\ReactiveUI.Validation.dll' が読み込まれました。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Diagnostics.Tracing.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Desktop.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Fonts.Inter.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.ReactiveUI.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Win32.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\MicroCom.Runtime.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Numerics.Vectors.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Skia.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Private.Uri.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\SkiaSharp.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.OpenGL.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Threading.Thread.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Vulkan.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.MicroCom.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\netstandard.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\System.Reactive.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Metal.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.ComponentModel.TypeConverter.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+LogHost: Initializing to normal mode (.cctor)
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Markup.Xaml.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Themes.Fluent.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\Avalonia.Dialogs.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\HarfBuzzSharp.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+例外がスローされました: 'System.InvalidOperationException' (Microsoft.Extensions.DependencyInjection.dll の中)
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Diagnostics.StackTrace.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Reflection.Metadata.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.Collections.Immutable.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+'Baketa.UI.exe' (CoreCLR: clrhost): 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.17\System.IO.MemoryMappedFiles.dll' が読み込まれました。含める/除外するの設定でシンボルの読み込みが無効になっています。
+例外がスローされました: 'System.InvalidOperationException' (Baketa.UI.dll の中)
+型 'System.InvalidOperationException' のハンドルされていない例外が Baketa.UI.dll で発生しました
+Unable to resolve service for type 'Baketa.Core.Services.ISettingsService' while attempting to activate 'Baketa.UI.ViewModels.AccessibilitySettingsViewModel'.
+
+プログラム '[37092] Baketa.UI.exe' はコード 4294967295 (0xffffffff) で終了しました。

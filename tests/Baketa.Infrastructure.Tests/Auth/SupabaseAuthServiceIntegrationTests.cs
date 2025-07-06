@@ -312,7 +312,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     {
         // Arrange
         var eventRaised = false;
-        EventHandler<AuthStatusChangedEventArgs> handler = (s, e) => eventRaised = true;
+        void handler(object? s, AuthStatusChangedEventArgs e) => eventRaised = true;
 
         // Act - Subscribe
         _authService.AuthStatusChanged += handler;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.ReactiveUI;
 using Baketa.Application.DI.Modules;
@@ -95,6 +96,9 @@ namespace Baketa.UI;
             var moduleStack = new Stack<Type>();
             coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // 設定システムを登録（ISettingsServiceを提供）
+            services.AddSettingsSystem();
+            
             // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
             var authModule = new AuthModule();
             authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
@@ -107,9 +111,67 @@ namespace Baketa.UI;
             var uiModule = new UIModule();
             uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // DI登録デバッグ
+            DebugServiceRegistration(services);
+            
+            // さらに詳細なDI診断
+            DebugViewModelRegistration(services);
+            
             // サービスプロバイダーの構築
             ServiceProvider = services.BuildServiceProvider();
             
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
+        }
+        
+        /// <summary>
+        /// DI登録状況をデバッグします
+        /// </summary>
+        private static void DebugServiceRegistration(IServiceCollection services)
+        {
+            System.Console.WriteLine("=== DI Service Registration Debug ===");
+            
+            // ISettingsServiceの登録確認
+            var settingsServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Services.ISettingsService));
+            System.Console.WriteLine($"ISettingsService registrations count: {settingsServices.Count()}");
+            
+            foreach (var service in settingsServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "N/A"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
+            // AccessibilitySettingsViewModelの登録確認
+            var accessibilityVM = services.Where(s => s.ServiceType == typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel));
+            System.Console.WriteLine($"AccessibilitySettingsViewModel registrations count: {accessibilityVM.Count()}");
+        }
+        
+        /// <summary>
+        /// ViewModelのDI登録詳細を確認します
+        /// </summary>
+        private static void DebugViewModelRegistration(IServiceCollection services)
+        {
+            System.Console.WriteLine("=== ViewModel Registration Debug ===");
+            
+            var viewModelTypes = new[]
+            {
+                typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
+                typeof(Baketa.UI.ViewModels.SettingsViewModel),
+                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel),
+                typeof(Baketa.UI.ViewModels.MainWindowViewModel)
+            };
+            
+            foreach (var vmType in viewModelTypes)
+            {
+                var registrations = services.Where(s => s.ServiceType == vmType);
+                System.Console.WriteLine($"{vmType.Name}: {registrations.Count()} registration(s)");
+                
+                foreach (var reg in registrations)
+                {
+                    System.Console.WriteLine($"  - Lifetime: {reg.Lifetime}");
+                    System.Console.WriteLine($"  - ImplementationType: {reg.ImplementationType?.Name ?? "Factory"}");
+                }
+            }
         }
     }
