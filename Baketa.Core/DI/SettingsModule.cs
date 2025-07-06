@@ -27,7 +27,7 @@ public static class SettingsModule
         // マイグレーション管理サービス
         services.AddSingleton<ISettingsMigrationManager, SettingsMigrationManager>();
         
-        // メイン設定サービス（既存のJsonSettingsServiceを拡張）
+        // メイン設定サービス（Coreレイヤーの実装を使用）
         services.AddSingleton<ISettingsService>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<EnhancedSettingsService>>();

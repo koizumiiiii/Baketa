@@ -131,10 +131,8 @@ namespace Baketa.UI.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterSettingsUI(IServiceCollection services)
         {
-            // 設定ViewModelと関連サービス
-            services.AddTransient<SettingsViewModel>();
-            services.AddTransient<AccessibilitySettingsViewModel>();
-            services.AddTransient<LanguagePairsViewModel>();
+            // 設定ViewModelと関連サービス（重複登録を削除し、必要最小限のみ）
+            // AccessibilitySettingsViewModel は UIServiceCollectionExtensions で登録済み
             
             // 将来的に実装される予定の内容：
             // 例: services.AddTransient<GeneralSettingsViewModel>();

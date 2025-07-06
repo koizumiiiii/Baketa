@@ -29,7 +29,10 @@ namespace Baketa.UI.DI;
             var coreModule = new CoreModule();
             coreModule.RegisterServices(services);
             
-            // InfrastructureModuleを直接登録（ISettingsServiceなどのインフラサービス）
+            // SettingsSystemを登録（ISettingsServiceを提供）
+            services.AddSettingsSystem();
+            
+            // InfrastructureModuleを直接登録（OCR、翻訳、永続化サービス）
             var infrastructureModule = new InfrastructureModule();
             infrastructureModule.RegisterServices(services);
             

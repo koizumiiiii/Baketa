@@ -1,1 +1,0 @@
-using System; using Baketa.UI.Models; var config = new LanguagePairConfiguration(); config.SourceLanguage = "zh-cn"; config.TargetLanguage = "en"; Console.WriteLine($"IsChineseRelated: {config.IsChineseRelated}");
