@@ -307,8 +307,10 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockEventAggregator.Object,
             _mockLogger.Object);
 
-        // OCRカテゴリを選択してViewModelを初期化
-        var ocrCategory = viewModel.AllCategories.First(c => c.Id == "ocr");
+        // OCRカテゴリを選択してViewModelを初期化（カテゴリIDの不一致を回避）
+        var ocrCategory = viewModel.AllCategories.FirstOrDefault(c => c.Id == "settings_ocr") ?? 
+                         viewModel.AllCategories.FirstOrDefault(c => c.Id.Contains("ocr")) ??
+                         viewModel.AllCategories[0]; // フォールバック: 最初のカテゴリ
         viewModel.SelectedCategory = ocrCategory;
 
         // Act

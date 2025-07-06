@@ -48,6 +48,11 @@ public sealed class SettingsValidationResult
     public int WarningCount => Warnings.Count;
     
     /// <summary>
+    /// 警告があるかどうか
+    /// </summary>
+    public bool HasWarnings => WarningCount > 0;
+    
+    /// <summary>
     /// 検証実行日時
     /// </summary>
     public DateTime Timestamp { get; }
@@ -89,6 +94,27 @@ public sealed class SettingsValidationResult
     {
         return new SettingsValidationResult([]);
     }
+
+    /// <summary>
+    /// 成功した検証結果を作成します（警告付き）
+    /// </summary>
+    /// <param name="warnings">警告メッセージ</param>
+    /// <returns>成功した検証結果</returns>
+    public static SettingsValidationResult CreateSuccess(IEnumerable<string> warnings)
+    {
+        if (warnings == null || !warnings.Any())
+        {
+            return CreateSuccess();
+        }
+
+        var warningResults = warnings.Select(warning =>
+        {
+            var dummyMetadata = CreateDummyMetadata();
+            return new SettingValidationResult(dummyMetadata, null, true, null, warning);
+        });
+
+        return new SettingsValidationResult(warningResults);
+    }
     
     /// <summary>
     /// 失敗した検証結果を作成します
@@ -117,6 +143,43 @@ public sealed class SettingsValidationResult
         }
         
         return new SettingsValidationResult([failureResult]);
+    }
+
+    /// <summary>
+    /// 失敗した検証結果を作成します（複数エラー）
+    /// </summary>
+    /// <param name="errors">エラーメッセージ</param>
+    /// <param name="warnings">警告メッセージ（任意）</param>
+    /// <returns>失敗した検証結果</returns>
+    public static SettingsValidationResult CreateFailure(IEnumerable<string> errors, IEnumerable<string>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        
+        var errorList = errors.ToList();
+        if (errorList.Count == 0)
+        {
+            throw new ArgumentException("At least one error is required for failure result", nameof(errors));
+        }
+
+        var results = new List<SettingValidationResult>();
+        var dummyMetadata = CreateDummyMetadata();
+
+        // Add error results
+        foreach (var error in errorList)
+        {
+            results.Add(new SettingValidationResult(dummyMetadata, null, false, error, null));
+        }
+
+        // Add warning results
+        if (warnings != null)
+        {
+            foreach (var warning in warnings)
+            {
+                results.Add(new SettingValidationResult(dummyMetadata, null, true, null, warning));
+            }
+        }
+
+        return new SettingsValidationResult(results);
     }
     
     /// <summary>
