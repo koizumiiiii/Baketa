@@ -313,7 +313,7 @@ public class SettingsValidationResultTests
     public void CreateFailure_WithNullErrorMessage_ShouldThrowArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => SettingsValidationResult.CreateFailure(null!));
+        Assert.Throws<ArgumentException>(() => SettingsValidationResult.CreateFailure((string)null!));
     }
 
     #endregion

@@ -58,7 +58,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         ResetMocks(); // 各テスト前にMockをリセット
         _currentViewModel?.Dispose(); // 前のViewModelがあれば破棄
-        _currentViewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockLogger.Object));
+        _currentViewModel = RunOnUIThread(() => new Baketa.UI.ViewModels.SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockLogger.Object));
         return _currentViewModel;
     }
     
@@ -127,30 +127,30 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             categories.Should().HaveCount(8);
             
             // 基本設定カテゴリの確認（DisplayOrder順）
-            categories[0].Id.Should().Be("general");
+            categories[0].Id.Should().Be("settings_general");
             categories[0].Level.Should().Be(SettingLevel.Basic);
             categories[0].DisplayOrder.Should().Be(1);
             
-            categories[1].Id.Should().Be("appearance");
+            categories[1].Id.Should().Be("settings_appearance");
             categories[1].Level.Should().Be(SettingLevel.Basic);
             
-            categories[2].Id.Should().Be("mainui");
+            categories[2].Id.Should().Be("settings_mainui");
             categories[2].Level.Should().Be(SettingLevel.Basic);
             
-            categories[3].Id.Should().Be("translation");
+            categories[3].Id.Should().Be("settings_translation");
             categories[3].Level.Should().Be(SettingLevel.Basic);
             
-            categories[4].Id.Should().Be("overlay");
+            categories[4].Id.Should().Be("settings_overlay");
             categories[4].Level.Should().Be(SettingLevel.Basic);
             
             // 詳細設定カテゴリの確認
-            categories[5].Id.Should().Be("capture");
+            categories[5].Id.Should().Be("settings_capture");
             categories[5].Level.Should().Be(SettingLevel.Advanced);
             
-            categories[6].Id.Should().Be("ocr");
+            categories[6].Id.Should().Be("settings_ocr");
             categories[6].Level.Should().Be(SettingLevel.Advanced);
             
-            categories[7].Id.Should().Be("advanced");
+            categories[7].Id.Should().Be("settings_advanced");
             categories[7].Level.Should().Be(SettingLevel.Advanced);
         }
         finally
@@ -175,7 +175,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         visibleCategories.Should().OnlyContain(c => c.Level == SettingLevel.Basic);
         
         var categoryIds = visibleCategories.Select(c => c.Id).ToArray();
-        categoryIds.Should().Equal("general", "appearance", "mainui", "translation", "overlay");
+        categoryIds.Should().Equal("settings_general", "settings_appearance", "settings_mainui", "settings_translation", "settings_overlay");
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Assert
         viewModel.SelectedCategory.Should().NotBe(advancedCategory);
         viewModel.SelectedCategory?.Level.Should().Be(SettingLevel.Basic);
-        viewModel.SelectedCategory?.Id.Should().Be("general"); // 最初のカテゴリ
+        viewModel.SelectedCategory?.Id.Should().Be("settings_general"); // 最初のカテゴリ
     }
 
     [Fact(Skip = "PropertyChangedイベントハング問題のため一時的に無効化")]
@@ -453,14 +453,14 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     }
 
     [Theory]
-    [InlineData("general")]
-    [InlineData("appearance")]
-    [InlineData("mainui")]
-    [InlineData("translation")]
-    [InlineData("overlay")]
-    [InlineData("capture")]
-    [InlineData("ocr")]
-    [InlineData("advanced")]
+    [InlineData("settings_general")]
+    [InlineData("settings_appearance")]
+    [InlineData("settings_mainui")]
+    [InlineData("settings_translation")]
+    [InlineData("settings_overlay")]
+    [InlineData("settings_capture")]
+    [InlineData("settings_ocr")]
+    [InlineData("settings_advanced")]
     public void CategorySelection_SpecificCategory_WorksCorrectly(string categoryId)
     {
         // Arrange

@@ -4,7 +4,9 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Services;
+using Baketa.UI.Security;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +63,10 @@ namespace Baketa.UI.DI.Modules;
             services.AddSingleton<LanguagePairsViewModel>();
             services.AddSingleton<SettingsViewModel>();
             
+            // 認証ビューモデル
+            services.AddTransient<LoginViewModel>();
+            services.AddTransient<SignupViewModel>();
+            
             // メインウィンドウビューモデル（全依存関係解決後に登録）
             services.AddSingleton<MainWindowViewModel>();
             
@@ -100,8 +106,17 @@ namespace Baketa.UI.DI.Modules;
             // 例: services.AddSingleton<INotificationService, AvaloniaNotificationService>();
             
             // ページ遷移とナビゲーション
-            // 例: services.AddSingleton<INavigationService, AvaloniaNavigationService>();
+            services.AddSingleton<INavigationService, AvaloniaNavigationService>();
             // 例: services.AddSingleton<IPageService, AvaloniaPageService>();
+            
+            // セキュリティサービス
+            services.AddSingleton<LoginAttemptTracker>();
+            services.AddSingleton<SecurityAuditLogger>();
+            services.AddSingleton<SecureSessionManager>();
+            services.AddSingleton<PasswordResetManager>();
+            services.AddSingleton<HijackingDetectionManager>();
+            services.AddSingleton<SecurityNotificationService>();
+            services.AddSingleton<RecoveryWorkflowManager>();
             
             // ウィンドウ管理
             // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
