@@ -371,17 +371,45 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             IsLoading = true;
             ErrorMessage = null;
 
-            // TODO: Implement ResetPasswordAsync method in IAuthService
-            // await _authService.ResetPasswordAsync(Email).ConfigureAwait(false);
-            await Task.Delay(1000).ConfigureAwait(false); // Placeholder
+            // セキュリティチェック
+            var sanitizedEmail = InputValidator.SanitizeInput(Email);
             
-            // 成功メッセージを表示
-            ErrorMessage = null;
-            // TODO: Show success message in UI
+            // パスワードリセットメール送信
+            var success = await _authService.SendPasswordResetEmailAsync(sanitizedEmail).ConfigureAwait(false);
+            
+            if (success)
+            {
+                // 成功メッセージを表示（ErrorMessageフィールドを情報表示にも使用）
+                ErrorMessage = "パスワードリセットメールを送信しました。メールをご確認ください。";
+                
+                // セキュリティ監査ログ
+                _auditLogger.LogSecurityEvent(
+                    SecurityAuditLogger.SecurityEventType.PasswordChange,
+                    $"パスワードリセットメール送信成功: {sanitizedEmail}",
+                    sanitizedEmail);
+            }
+            else
+            {
+                ErrorMessage = "パスワードリセットに失敗しました。メールアドレスを確認してください。";
+                
+                // 失敗ログ
+                _auditLogger.LogSecurityEvent(
+                    SecurityAuditLogger.SecurityEventType.PasswordChange,
+                    $"パスワードリセットメール送信失敗: {sanitizedEmail}",
+                    sanitizedEmail);
+            }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"パスワードリセットに失敗しました: {ex.Message}";
+            var sanitizedEmail = InputValidator.SanitizeInput(Email);
+            _logger?.LogError(ex, "パスワードリセット実行エラー: {Email}", sanitizedEmail);
+            ErrorMessage = "パスワードリセットの処理中にエラーが発生しました。";
+            
+            // エラーログ
+            _auditLogger.LogSecurityEvent(
+                SecurityAuditLogger.SecurityEventType.PasswordChange,
+                $"パスワードリセット例外: {sanitizedEmail} - {ex.Message}",
+                sanitizedEmail);
         }
         finally
         {

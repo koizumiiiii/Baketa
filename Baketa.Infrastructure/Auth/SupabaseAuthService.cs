@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.Auth;
 using Microsoft.Extensions.Logging;
+using Supabase;
 
 namespace Baketa.Infrastructure.Auth;
 
@@ -11,10 +12,8 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 {
     private readonly ILogger<SupabaseAuthService> _logger;
     private readonly SemaphoreSlim _authSemaphore = new(1, 1);
+    private readonly Client _supabaseClient;
     private bool _disposed;
-
-    // TODO: Add Supabase.Client when NuGet package is added
-    // private readonly Supabase.Client _supabaseClient;
 
     /// <summary>
     /// Event fired when authentication status changes
@@ -24,17 +23,17 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     /// <summary>
     /// Initialize Supabase authentication service with modern C# 12 primary constructor
     /// </summary>
+    /// <param name="supabaseClient">Supabase client instance</param>
     /// <param name="logger">Logger instance</param>
-    public SupabaseAuthService(ILogger<SupabaseAuthService> logger)
+    public SupabaseAuthService(Client supabaseClient, ILogger<SupabaseAuthService> logger)
     {
+        _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        // TODO: Initialize Supabase client when NuGet package is added
-        // _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
         
-        // TODO: Subscribe to auth state changes when Supabase client is available
-        // _supabaseClient.Auth.OnAuthStateChange += OnAuthStateChanged;
+        // Subscribe to auth state changes
+        _supabaseClient.Auth.AddStateChangedListener(OnAuthStateChanged);
         
-        _logger.LogInformation("SupabaseAuthService initialized");
+        _logger.LogInformation("SupabaseAuthService initialized with Supabase client");
     }
 
     /// <summary>
@@ -309,11 +308,15 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             _logger.LogInformation("Sending password reset email to: {Email}", email);
 
-            // TODO: Implement password reset when Supabase client is available
-            // await _supabaseClient.Auth.ResetPasswordForEmail(email);
-            
-            // Mock implementation for now
-            await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+            // Basic email validation
+            if (!email.Contains('@') || email.Length < 5)
+            {
+                _logger.LogWarning("Invalid email address format: {Email}", email);
+                return false;
+            }
+
+            // Supabase Auth password reset API call
+            await _supabaseClient.Auth.ResetPasswordForEmail(email).ConfigureAwait(false);
             
             _logger.LogInformation("Password reset email sent successfully to: {Email}", email);
             return true;
@@ -390,6 +393,38 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     }
 
     /// <summary>
+    /// Handle Supabase auth state changes
+    /// </summary>
+    /// <param name="sender">Event sender</param>
+    /// <param name="changedState">Changed auth state</param>
+    private void OnAuthStateChanged(object? sender, Supabase.Gotrue.Constants.AuthState changedState)
+    {
+        try
+        {
+            var session = _supabaseClient.Auth.CurrentSession;
+            var user = _supabaseClient.Auth.CurrentUser;
+
+            bool isLoggedIn = session != null && user != null;
+            
+            if (isLoggedIn && user != null)
+            {
+                var userInfo = new UserInfo(user.Id ?? string.Empty, user.Email ?? string.Empty, user.Email?.Split('@')[0] ?? "User");
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, userInfo, false));
+                _logger.LogInformation("Auth state changed: User logged in - {Email}", user.Email);
+            }
+            else
+            {
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
+                _logger.LogInformation("Auth state changed: User logged out");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling auth state change");
+        }
+    }
+
+    /// <summary>
     /// Helper method to check if object is disposed
     /// </summary>
     private void ThrowIfDisposed()
@@ -405,8 +440,8 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         if (_disposed)
             return;
 
-        // TODO: Unsubscribe from Supabase events when client is available
-        // _supabaseClient.Auth.OnAuthStateChange -= OnAuthStateChanged;
+        // Unsubscribe from Supabase events
+        _supabaseClient.Auth.RemoveStateChangedListener(OnAuthStateChanged);
 
         _authSemaphore.Dispose();
         _disposed = true;

@@ -7,6 +7,7 @@ using Baketa.Core.Settings;
 using Baketa.Infrastructure.Auth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Supabase;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -47,21 +48,21 @@ public sealed class AuthModule : ServiceModuleBase
     /// <param name="services">Service collection</param>
     private static void RegisterAuthenticationServices(IServiceCollection services)
     {
+        // Supabase client registration
+        services.AddSingleton<Supabase.Client>(provider =>
+        {
+            var authSettings = provider.GetRequiredService<IOptions<AuthSettings>>().Value;
+            var options = new Supabase.SupabaseOptions
+            {
+                AutoRefreshToken = authSettings.AutoRefreshSession,
+                AutoConnectRealtime = false // Set to false for auth-only usage
+            };
+            return new Supabase.Client(authSettings.SupabaseUrl, authSettings.SupabaseAnonKey, options);
+        });
+
         // Primary authentication service
         services.AddSingleton<SupabaseAuthService>();
         services.AddSingleton<IAuthService>(provider => provider.GetRequiredService<SupabaseAuthService>());
-
-        // TODO: Register Supabase client when NuGet package is added
-        // services.AddSingleton<Supabase.Client>(provider =>
-        // {
-        //     var authSettings = provider.GetRequiredService<IOptions<AuthSettings>>().Value;
-        //     var options = new SupabaseOptions
-        //     {
-        //         AutoRefreshToken = authSettings.AutoRefreshSession,
-        //         PersistSession = authSettings.RememberLogin
-        //     };
-        //     return new Supabase.Client(authSettings.SupabaseUrl, authSettings.SupabaseAnonKey, options);
-        // });
 
         // Authentication event handlers (future extension)
         // services.AddSingleton<IAuthEventHandler, DefaultAuthEventHandler>();

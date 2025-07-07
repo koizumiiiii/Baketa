@@ -128,8 +128,8 @@ namespace Baketa.UI.DI.Modules;
         /// <summary>
         /// 設定系UIを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private static void RegisterSettingsUI(IServiceCollection services)
+        /// <param name="_">サービスコレクション（将来の拡張のため保持）</param>
+        private static void RegisterSettingsUI(IServiceCollection _)
         {
             // 設定ViewModelと関連サービス（重複登録を削除し、必要最小限のみ）
             // AccessibilitySettingsViewModel は UIServiceCollectionExtensions で登録済み
