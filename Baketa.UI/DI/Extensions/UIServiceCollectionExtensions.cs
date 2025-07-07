@@ -60,7 +60,8 @@ internal static class UIServiceCollectionExtensions
     /// <summary>
     /// ビューモデルの登録
     /// </summary>
-    private static void RegisterViewModels(IServiceCollection services)
+    /// <param name="_">サービスコレクション（将来の拡張のため保持）</param>
+    private static void RegisterViewModels(IServiceCollection _)
     {
         // ViewModelの登録はUIModuleで一元化するため、ここでは何も登録しない
         // UIModuleとの重複を避ける

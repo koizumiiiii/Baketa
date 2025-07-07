@@ -92,31 +92,31 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// データ永続化サービスを登録します。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        /// <param name="environment">アプリケーション実行環境</param>
-        private static void RegisterPersistenceServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
+        /// <param name="_1">サービスコレクション（将来の実装で使用予定）</param>
+        /// <param name="_2">アプリケーション実行環境（将来の実装で使用予定）</param>
+        private static void RegisterPersistenceServices(IServiceCollection _1, Core.DI.BaketaEnvironment _2)
         {
             // 設定保存サービス（SettingsModuleで登録されるため、ここでは削除）
-            // services.AddSingleton<ISettingsService, JsonSettingsService>();
+            // _1.AddSingleton<ISettingsService, JsonSettingsService>();
             
-            // 例: services.AddSingleton<IProfileStorage, JsonProfileStorage>();
+            // 例: _1.AddSingleton<IProfileStorage, JsonProfileStorage>();
             
-            // 環境に応じたキャッシュ実装の選択
-            if (environment == Core.DI.BaketaEnvironment.Development || environment == Core.DI.BaketaEnvironment.Test)
-            {
-                // 開発/テスト環境ではメモリキャッシュを使用
-                // 例: services.AddSingleton<IOcrResultCache, MemoryOcrResultCache>();
-                // 例: services.AddSingleton<IDictionaryCache, MemoryDictionaryCache>();
-            }
-            else
-            {
-                // 本番環境ではSQLiteキャッシュを使用
-                // 例: services.AddSingleton<IOcrResultCache, SqliteOcrResultCache>();
-                // 例: services.AddSingleton<IDictionaryCache, SqliteDictionaryCache>();
-            }
+            // 将来実装予定のキャッシュサービス（環境別設定）
+            // if (_2 == Core.DI.BaketaEnvironment.Development || _2 == Core.DI.BaketaEnvironment.Test)
+            // {
+            //     // 開発/テスト環境ではメモリキャッシュを使用
+            //     _1.AddSingleton<IOcrResultCache, MemoryOcrResultCache>();
+            //     _1.AddSingleton<IDictionaryCache, MemoryDictionaryCache>();
+            // }
+            // else
+            // {
+            //     // 本番環境ではSQLiteキャッシュを使用
+            //     _1.AddSingleton<IOcrResultCache, SqliteOcrResultCache>();
+            //     _1.AddSingleton<IDictionaryCache, SqliteDictionaryCache>();
+            // }
             
             // バックグラウンド同期
-            // 例: services.AddSingleton<IBackgroundSyncService, BackgroundSyncService>();
+            // 例: _1.AddSingleton<IBackgroundSyncService, BackgroundSyncService>();
         }
         
         /// <summary>
