@@ -7,7 +7,7 @@
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-		<Platforms>x64</Platforms>
+		<Platforms>AnyCPU;x64</Platforms>
 		<!-- WPFとWinFormsを無効化してAvaloniaとの競合を回避 -->
 		<!-- <UseWPF>true</UseWPF> -->
 		<!-- <UseWindowsForms>true</UseWindowsForms> -->
@@ -59,6 +59,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="appsettings.Development.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <DependentUpon>appsettings.json</DependentUpon>
+    </Content>
+    <Content Include="appsettings.AlphaTest.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <DependentUpon>appsettings.json</DependentUpon>
     </Content>

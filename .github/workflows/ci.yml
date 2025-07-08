@@ -47,7 +47,7 @@ jobs:
       run: dotnet restore --verbosity minimal
     
     - name: Build solution
-      run: dotnet build --configuration Debug --no-restore --verbosity minimal --arch x64
+      run: dotnet build --configuration Debug --no-restore --verbosity minimal
     
     - name: Run tests
       run: dotnet test --configuration Debug --no-build --verbosity minimal --logger "trx" --collect:"XPlat Code Coverage"
@@ -58,15 +58,16 @@ jobs:
       with:
         name: test-results
         path: |
-          **/*.trx
-          **/coverage.cobertura.xml
+          **/TestResults/**/*.trx
+          **/TestResults/**/coverage.cobertura.xml
+        if-no-files-found: warn
     
     - name: Build artifacts summary
       if: always()
       run: |
         echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- Configuration: Debug" >> $GITHUB_STEP_SUMMARY
-        echo "- Architecture: x64" >> $GITHUB_STEP_SUMMARY
+        echo "- Architecture: Any CPU (project-specific RID)" >> $GITHUB_STEP_SUMMARY
         echo "- .NET Version: ${{ env.DOTNET_VERSION }}" >> $GITHUB_STEP_SUMMARY
         echo "- OS: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
 
@@ -89,7 +90,7 @@ jobs:
       run: dotnet restore --verbosity minimal
     
     - name: Run security analysis
-      run: dotnet build --configuration Release --verbosity minimal --arch x64
+      run: dotnet build --configuration Release --verbosity minimal
       continue-on-error: true
     
     - name: Security scan summary
