@@ -1,0 +1,255 @@
+name: Alpha Release
+
+on:
+  push:
+    tags:
+      - 'alpha-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Alpha version (e.g., alpha-0.1.0)'
+        required: true
+        type: string
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-alpha:
+    name: Build Alpha Release
+    runs-on: windows-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      package-name: ${{ steps.version.outputs.package-name }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Determine version
+      id: version
+      run: |
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $version = "${{ github.event.inputs.version }}"
+          $tag = $version
+        } else {
+          $tag = "${{ github.ref_name }}"
+          $version = $tag
+        }
+        
+        $packageName = "Baketa-$version-win-x64"
+        
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "package-name=$packageName" >> $env:GITHUB_OUTPUT
+        echo "tag=$tag" >> $env:GITHUB_OUTPUT
+        
+        echo "## Alpha Release Build" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Version: $version" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Package: $packageName.zip" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Target: Alpha Testers" >> $env:GITHUB_STEP_SUMMARY
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Restore and build
+      run: |
+        dotnet restore --verbosity minimal
+        dotnet build --configuration Release --no-restore --verbosity minimal --arch x64
+    
+    - name: Run essential tests
+      run: |
+        # Run core tests only for alpha releases
+        dotnet test tests/Baketa.Core.Tests --configuration Release --no-build --verbosity minimal
+        dotnet test tests/Baketa.Infrastructure.Tests --configuration Release --no-build --verbosity minimal
+    
+    - name: Publish application
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $outputDir = "./publish/Baketa-$version"
+        
+        dotnet publish Baketa.UI/Baketa.UI.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output $outputDir `
+          --verbosity minimal `
+          /p:PublishSingleFile=true `
+          /p:IncludeNativeLibrariesForSelfExtract=true
+    
+    - name: Create alpha package
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+        $packageName = "${{ steps.version.outputs.package-name }}"
+        
+        # Copy additional files for alpha testing
+        Copy-Item "README.md" "$publishDir/"
+        
+        # Create alpha-specific readme
+        @"
+        # Baketa Alpha Test $version
+
+        Thank you for participating in the Baketa alpha test!
+
+        ## Quick Start
+        1. Extract this package to any folder
+        2. Run Baketa.UI.exe
+        3. Follow the initial setup wizard
+        4. Start translating!
+
+        ## Alpha Test Features
+        - Local translation (Japanese ↔ English)
+        - Basic OCR with PaddleOCR
+        - Simple overlay display
+        - Essential settings
+
+        ## Known Limitations (Alpha)
+        - No cloud translation features
+        - No user accounts/login
+        - Limited language pairs
+        - Basic UI (full UI coming in beta)
+
+        ## Feedback
+        Please report issues at: https://github.com/koizumiiiii/Baketa/issues
+        Use the [Bug Report] template and mention this is an alpha version.
+
+        ## System Requirements
+        - Windows 10/11 (x64)
+        - 4GB RAM minimum
+        - 1GB disk space
+
+        Version: $version
+        Build Date: $(Get-Date -Format 'yyyy-MM-dd')
+        "@ | Out-File -FilePath "$publishDir/ALPHA_README.txt" -Encoding UTF8
+        
+        # Create package
+        Compress-Archive -Path "$publishDir/*" -DestinationPath "./publish/$packageName.zip" -Force
+        
+        # Calculate size
+        $size = [math]::Round((Get-Item "./publish/$packageName.zip").Length / 1MB, 2)
+        echo "Package size: $size MB" >> $env:GITHUB_STEP_SUMMARY
+    
+    - name: Upload alpha package
+      uses: actions/upload-artifact@v4
+      with:
+        name: alpha-package
+        path: ./publish/*.zip
+        retention-days: 90
+
+  create-alpha-release:
+    name: Create Alpha Release
+    runs-on: ubuntu-latest
+    needs: build-alpha
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Download package
+      uses: actions/download-artifact@v4
+      with:
+        name: alpha-package
+        path: ./package
+    
+    - name: Create alpha release notes
+      run: |
+        version="${{ needs.build-alpha.outputs.version }}"
+        
+        cat > alpha_release_notes.md << EOF
+        # 🧪 Baketa Alpha Test $version
+        
+        **This is an alpha test release for early feedback - not for production use!**
+        
+        ## What's New in This Alpha
+        
+        - ✅ Local Japanese ↔ English translation
+        - ✅ Basic OCR text detection
+        - ✅ Simple overlay display system
+        - ✅ Essential settings and preferences
+        
+        ## Alpha Test Focus
+        
+        This alpha focuses on **core translation functionality**:
+        - Test translation accuracy and speed
+        - Verify OCR text detection works in your games
+        - Check overlay positioning and visibility
+        - Validate basic performance and stability
+        
+        ## What's NOT in This Alpha
+        
+        - ❌ User accounts/authentication
+        - ❌ Cloud translation services
+        - ❌ Advanced UI features
+        - ❌ Extended language support
+        - ❌ Game-specific profiles
+        
+        ## Download & Installation
+        
+        1. Download \`${{ needs.build-alpha.outputs.package-name }}.zip\`
+        2. Extract to any folder (e.g., \`C:\Baketa\`)
+        3. Run \`Baketa.UI.exe\`
+        4. Follow the setup wizard
+        
+        ## System Requirements
+        
+        - Windows 10/11 (64-bit)
+        - 4GB RAM minimum
+        - 1GB free disk space
+        - No additional software required (self-contained)
+        
+        ## How to Provide Feedback
+        
+        Found a bug? Have suggestions? Please help us improve:
+        
+        1. Go to [Issues](https://github.com/koizumiiiii/Baketa/issues)
+        2. Click "New Issue" 
+        3. Choose "Bug Report" template
+        4. **Mention this alpha version: $version**
+        5. Provide as much detail as possible
+        
+        ## Privacy & Data
+        
+        This alpha version:
+        - ✅ Works completely offline
+        - ✅ No data sent to external servers
+        - ✅ No telemetry or tracking
+        - ✅ All processing happens locally
+        
+        ## Known Issues
+        
+        - OCR may require adjustment for some games
+        - Translation speed varies by text length
+        - Overlay positioning may need manual adjustment
+        - Some Windows scaling settings may affect display
+        
+        ---
+        
+        **Thank you for testing Baketa! Your feedback helps make it better for everyone.** 🚀
+        EOF
+    
+    - name: Create Alpha Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: "🧪 Alpha Test ${{ needs.build-alpha.outputs.version }}"
+        tag_name: ${{ needs.build-alpha.outputs.version }}
+        body_path: alpha_release_notes.md
+        files: ./package/*.zip
+        prerelease: true
+        make_latest: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

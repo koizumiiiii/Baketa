@@ -17,6 +17,13 @@ public sealed class AppSettings
     [SettingMetadata(SettingLevel.Debug, "System", "スキーマバージョン", 
         Description = "設定ファイルのスキーマバージョン（システム管理用）")]
     public int SchemaVersion { get; set; } = 1;
+
+    /// <summary>
+    /// フィーチャーフラグ設定
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "System", "フィーチャーフラグ",
+        Description = "機能の有効/無効を制御するフィーチャーフラグ")]
+    public FeatureFlagSettings FeatureFlags { get; set; } = new();
     
     /// <summary>
     /// 設定の最終更新日時

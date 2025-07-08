@@ -15,6 +15,28 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 -->
 		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		
+		<!-- リリース用設定 -->
+		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>
+		<AssemblyDescription>Real-time text translation overlay for games</AssemblyDescription>
+		<AssemblyCompany>Baketa Project</AssemblyCompany>
+		<AssemblyProduct>Baketa</AssemblyProduct>
+		<AssemblyCopyright>Copyright © 2025 Baketa Project</AssemblyCopyright>
+		<AssemblyVersion>0.1.0.0</AssemblyVersion>
+		<FileVersion>0.1.0.0</FileVersion>
+		<ApplicationIcon>Assets\avalonia-logo.ico</ApplicationIcon>
+	</PropertyGroup>
+
+	<!-- Release配布用設定 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DebugType>none</DebugType>
+		<DebugSymbols>false</DebugSymbols>
+		<Optimize>true</Optimize>
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<PublishTrimmed>false</PublishTrimmed>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
 
 	<!-- テストアセンブリからのアクセスを許可 -->

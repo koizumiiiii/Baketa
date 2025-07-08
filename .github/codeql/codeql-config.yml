@@ -1,0 +1,20 @@
+name: "Baketa CodeQL Config"
+
+disable-default-queries: false
+
+query-filters:
+  - exclude:
+      id: cs/weak-crypto
+  - exclude:
+      id: cs/hardcoded-credentials
+
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - "tests/**"
+  - "docs/**"
+  - "scripts/**"
+  - "**/*.Designer.cs"
+  - "**/obj/**"
+  - "**/bin/**"

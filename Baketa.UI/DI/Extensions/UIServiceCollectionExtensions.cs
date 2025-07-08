@@ -6,6 +6,7 @@ using Baketa.UI.ViewModels.Controls;
 using Baketa.UI.Services;
 using Baketa.UI.DI.Modules;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using System;
 using System.Threading;
