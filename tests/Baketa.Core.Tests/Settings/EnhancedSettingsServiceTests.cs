@@ -213,7 +213,8 @@ public class EnhancedSettingsServiceTests : IDisposable
     public async Task SaveGameProfileAsync_WithValidProfileAndId_ShouldNotThrow()
     {
         // Arrange
-        const string profileId = "test-profile";
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var profileId = $"test-profile-{uniqueId}";
         var profile = new GameProfileSettings();
 
         // Act & Assert
