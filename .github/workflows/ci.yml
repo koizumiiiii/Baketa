@@ -50,7 +50,7 @@ jobs:
       run: dotnet build --configuration Debug --no-restore --verbosity minimal
     
     - name: Run tests
-      run: dotnet test --configuration Debug --no-build --verbosity minimal --logger "trx" --collect:"XPlat Code Coverage" --parallel none -- RunConfiguration.MaxCpuCount=1
+      run: dotnet test --configuration Debug --no-build --verbosity minimal --logger "trx" --collect:"XPlat Code Coverage" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
     
     - name: Upload test results
       uses: actions/upload-artifact@v4
