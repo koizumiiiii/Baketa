@@ -174,9 +174,14 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             var targetSemver = _versionComparison.ParseVersion(versionString);
             return _versionComparison.IsNewer(targetSemver, currentSemver);
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
-            _logger.LogWarning(ex, "バージョン比較でエラーが発生しました: {Version}", versionString);
+            _logger.LogWarning(ex, "無効なバージョン形式です: {Version}", versionString);
+            return false;
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "バージョンのフォーマットが正しくありません: {Version}", versionString);
             return false;
         }
     }
@@ -230,9 +235,17 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             {
                 await CheckForUpdatesAsync(false, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (TaskCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(ex, "初回更新チェックでエラーが発生しました");
+                _logger.LogWarning(ex, "初回更新チェックがタイムアウトしました");
+            }
+            catch (OperationCanceledException)
+            {
+                // キャンセルは正常な時暴処理
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "初回更新チェックでネットワークエラーが発生しました");
             }
         }, cancellationToken);
         
@@ -289,7 +302,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             catch (Exception ex) when (retryCount < _currentSettings.RetryCount)
             {
                 retryCount++;
-                var delay = TimeSpan.FromSeconds(_currentSettings.RetryDelaySeconds * retryCount);
+                var delay = TimeSpan.FromSeconds((double)_currentSettings.RetryDelaySeconds * retryCount);
                 
                 _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）", 
                     delay.TotalSeconds, retryCount, _currentSettings.RetryCount);
@@ -384,9 +397,17 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
         {
             await CheckForUpdatesAsync(false, _periodicCheckCts.Token).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (TaskCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "定期更新チェックでエラーが発生しました");
+            _logger.LogWarning(ex, "定期更新チェックがタイムアウトしました");
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセルは正常な時暴処理
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "定期更新チェックでネットワークエラーが発生しました");
         }
     }
 
