@@ -264,9 +264,19 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
             return Task.FromResult<SystemInfo?>(systemInfo);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "システム情報へのアクセスが拒否されました");
+            return Task.FromResult<SystemInfo?>(null);
+        }
+        catch (PlatformNotSupportedException ex)
+        {
+            _logger.LogWarning(ex, "現在のプラットフォームではシステム情報の取得がサポートされていません");
+            return Task.FromResult<SystemInfo?>(null);
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "システム情報の収集でエラーが発生しました");
+            _logger.LogError(ex, "システム情報の収集で予期しないエラーが発生しました");
             return Task.FromResult<SystemInfo?>(null);
         }
     }
@@ -539,16 +549,26 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
             catch (Exception ex) when (retryCount < _currentSettings.RetryCount)
             {
                 retryCount++;
-                var delay = TimeSpan.FromSeconds(_currentSettings.RetryDelaySeconds * retryCount);
+                var delay = TimeSpan.FromSeconds((double)_currentSettings.RetryDelaySeconds * retryCount);
                 
                 _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）", 
                     delay.TotalSeconds, retryCount, _currentSettings.RetryCount);
                 
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "GitHub API呼び出しでネットワークエラーが発生しました");
+                return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, ex);
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "GitHub API呼び出しがタイムアウトまたはキャンセルされました");
+                return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, ex);
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GitHub API呼び出しが最終的に失敗しました");
+                _logger.LogError(ex, "GitHub API呼び出しで予期しないエラーが発生しました");
                 return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, ex);
             }
         }

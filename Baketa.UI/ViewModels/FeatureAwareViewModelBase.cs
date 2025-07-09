@@ -19,9 +19,7 @@ public abstract class FeatureAwareViewModelBase : ViewModelBase
         IEventAggregator eventAggregator) : base(eventAggregator)
     {
         FeatureFlagService = featureFlagService ?? throw new ArgumentNullException(nameof(featureFlagService));
-        
-        // フィーチャーフラグ変更時にUIの可視性を更新
-        FeatureFlagService.FeatureFlagChanged += OnFeatureFlagChanged;
+        InitializeFeatureHandling();
     }
 
     protected FeatureAwareViewModelBase(
@@ -30,7 +28,11 @@ public abstract class FeatureAwareViewModelBase : ViewModelBase
         ILogger? logger) : base(eventAggregator, logger)
     {
         FeatureFlagService = featureFlagService ?? throw new ArgumentNullException(nameof(featureFlagService));
-        
+        InitializeFeatureHandling();
+    }
+
+    private void InitializeFeatureHandling()
+    {
         // フィーチャーフラグ変更時にUIの可視性を更新
         FeatureFlagService.FeatureFlagChanged += OnFeatureFlagChanged;
     }
