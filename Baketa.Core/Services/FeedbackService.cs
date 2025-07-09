@@ -274,7 +274,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
             _logger.LogWarning(ex, "現在のプラットフォームではシステム情報の取得がサポートされていません");
             return Task.FromResult<SystemInfo?>(null);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
         {
             _logger.LogError(ex, "システム情報の収集で予期しないエラーが発生しました");
             return Task.FromResult<SystemInfo?>(null);
@@ -566,7 +566,12 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
                 _logger.LogError(ex, "GitHub API呼び出しがタイムアウトまたはキャンセルされました");
                 return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, ex);
             }
-            catch (Exception ex)
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "GitHub APIレスポンスのJSON解析エラーが発生しました");
+                return new SubmissionResult(FeedbackSubmissionResult.ValidationError, null, ex);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException && ex is not StackOverflowException)
             {
                 _logger.LogError(ex, "GitHub API呼び出しで予期しないエラーが発生しました");
                 return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, ex);
