@@ -1,0 +1,20 @@
+{
+  "name": "baketa-gemini-search-mcp",
+  "version": "1.0.0",
+  "description": "Google Gemini Web Search MCP Server for Baketa Project",
+  "type": "module",
+  "main": "gemini-search-server.js",
+  "scripts": {
+    "start": "node gemini-search-server.js"
+  },
+  "keywords": ["mcp", "gemini", "google", "search", "baketa"],
+  "author": "Baketa Project",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

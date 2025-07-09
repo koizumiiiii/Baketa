@@ -2,6 +2,16 @@
 
 ## Core Principles
 
+### **Project Status: v0.1.0 Alpha**
+**CURRENT IMPLEMENTATION STATUS**
+
+- **Test Coverage**: 1,300+ test cases with comprehensive coverage
+- **Security**: CodeQL-compliant implementation with security-first design
+- **CI/CD**: GitHub Actions with Windows Server 2022, sequential test execution
+- **Architecture**: Clean Architecture with modular DI and event aggregation
+- **Recent Features**: Privacy consent, feedback system, update checking
+- **AI Integration**: OpenAI o3 MCP for autonomous technical problem-solving
+
 ### **Editor Behavior Settings**
 **AUTO-APPROVE ALL EDITS AND OPERATIONS**
 
@@ -18,6 +28,70 @@
 - **Build Commands**: `dotnet build`, `dotnet test` can be executed automatically without approval
 - **Diagnostic Commands**: Read-only commands are auto-approved
 - **File Operations**: Read, list, and analysis operations are auto-approved
+- **AI Research**: Gemini MCP calls are auto-approved for technical problem-solving
+
+### **Autonomous Technical Problem-Solving**
+**PROACTIVE GEMINI EXECUTION FOR ENHANCED RESULTS**
+
+**Core Philosophy**: Traditional methods + Gemini enhancement = Superior outcomes
+
+**When to automatically use Gemini (proactive execution):**
+
+#### **1. Architecture & Design Consultation**
+- Complex design pattern selection
+- Architecture tradeoff analysis
+- Clean Architecture compliance validation
+- SOLID principle implementation guidance
+- Design pattern optimization for Baketa context
+
+#### **2. Error Analysis & Troubleshooting**
+- Complex build errors with multiple potential causes
+- Runtime exceptions requiring deeper investigation
+- Performance bottlenecks needing specialized analysis
+- Integration issues with external libraries
+- Windows-specific implementation challenges
+
+#### **3. Implementation Enhancement**
+- Code quality improvement suggestions
+- Security best practices validation
+- Performance optimization techniques
+- Modern C# 12 feature utilization
+- .NET 8.0 specific optimizations
+
+#### **4. Technical Decision Making**
+- Library/framework comparison and selection
+- Implementation approach evaluation
+- Security compliance verification (GDPR, CodeQL)
+- Performance vs. maintainability tradeoffs
+
+**Execution Patterns:**
+
+```bash
+# Pattern 1: Complement existing search
+WebSearch/WebFetch → Gemini analysis → Integrated solution
+
+# Pattern 2: Error investigation
+Error encountered → Gemini diagnosis → Root cause solution
+
+# Pattern 3: Design consultation
+Architecture decision → Gemini consultation → Best practice implementation
+
+# Pattern 4: Implementation review
+Code completion → Gemini review → Quality enhancement
+```
+
+**Gemini Usage Guidelines:**
+- Use `gemini -p "technical_question"` for direct queries
+- Focus on Baketa-specific context in prompts
+- Combine with traditional search for comprehensive coverage
+- Apply findings to improve implementation quality
+
+**Auto-execution triggers:**
+- When encountering complex technical problems
+- Before making significant architectural decisions
+- When error patterns are unclear or complex
+- When seeking optimization opportunities
+- During security implementation reviews
 
 ### **Mandatory Post-Implementation Steps**
 **CRITICAL: ALWAYS VERIFY NO ERRORS AFTER IMPLEMENTATION**
@@ -38,6 +112,11 @@ rg "null!" --type cs
 rg "ConfigureAwait\(true\)" --type cs
 rg "\.Result\b" --type cs
 rg "\.Wait\(\)" --type cs
+
+# セキュリティ実装のチェック（CodeQL対応）
+rg "catch \(Exception" --type cs
+rg "OutOfMemoryException|StackOverflowException" --type cs
+rg "JsonException" --type cs
 ```
 
 #### **3. Manual Verification Methods**

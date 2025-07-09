@@ -23,6 +23,7 @@
 - `Baketa.Infrastructure/Translation/` - Translation engine implementations
 - `Baketa.Infrastructure/Imaging/` - Image processing implementations
 - `Baketa.Application/Services/` - Application services
+- `Baketa.Core/Services/` - Core service implementations (Privacy, Feedback, Update)
 
 ### Platform Implementations
 - `Baketa.Infrastructure.Platform/Windows/` - Windows-specific implementations
@@ -40,11 +41,16 @@
 - `*/Baketa.*.csproj` - Project definitions
 - `appsettings.json` - Application configuration
 - `appsettings.SentencePiece.json` - Translation model configuration
+- `Directory.Build.props` - Global build properties
+- `.github/workflows/ci.yml` - CI/CD pipeline configuration
 
 ### Scripts
 - `scripts/download_opus_mt_models.ps1` - Model download
 - `scripts/verify_opus_mt_models.ps1` - Model verification
 - `scripts/run_sentencepiece_tests.ps1` - Test execution
+- `scripts/run_build.ps1` - Build automation
+- `scripts/run_tests.ps1` - Test execution automation
+- `scripts/run_app.ps1` - Application execution
 
 ## Excluded Files & Directories
 
@@ -96,6 +102,23 @@
 - Reference existing similar implementations when implementing new features
 - Check existing examples in corresponding test projects when implementing tests
 - Reference ViewModel patterns and ReactiveUI usage examples when implementing UI
+
+## Current Implementation Status (v0.1.0)
+
+### Recently Implemented Features
+- **Privacy Management**: GDPR-compliant consent system in `Baketa.Core/Services/PrivacyConsentService.cs`
+- **Feedback System**: GitHub Issues API integration in `Baketa.Core/Services/FeedbackService.cs`
+- **Update System**: GitHub Releases API integration in `Baketa.Core/Services/UpdateCheckService.cs`
+- **Security Enhancements**: CodeQL-compliant exception handling patterns
+- **CI/CD Pipeline**: GitHub Actions with Windows Server 2022, sequential test execution
+- **Comprehensive Testing**: 1,300+ test cases with extensive coverage
+
+### Key Implementation Patterns
+- **Exception Handling**: Specific exception types instead of generic `catch (Exception)`
+- **Security**: OutOfMemoryException and StackOverflowException protection
+- **Async Programming**: Consistent `ConfigureAwait(false)` usage
+- **Dependency Injection**: Modular service registration with `ServiceModuleBase`
+- **Event Aggregation**: Loose coupling via `IEventAggregator`
 
 ## Language-Specific Context Loading
 
