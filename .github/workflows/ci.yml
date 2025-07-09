@@ -90,7 +90,7 @@ jobs:
       run: dotnet restore --verbosity minimal
     
     - name: Run security analysis
-      run: dotnet build --configuration Release --verbosity minimal
+      run: dotnet build --configuration Release --no-restore --verbosity minimal
       continue-on-error: true
     
     - name: Security scan summary
