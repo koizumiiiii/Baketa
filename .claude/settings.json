@@ -20,6 +20,7 @@
       "Bash(git status*)",
       "Bash(git log*)",
       "Bash(git diff*)",
+      "Bash(gemini*)",
       "Edit(*)",
       "MultiEdit(*)",
       "Write(*)",
@@ -41,5 +42,49 @@
       "Read(*.key)",
       "Read(*.secret)"
     ]
-  }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Executing bash command...', 'Claude Code', 'OK', 'Information')\""
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"decision\": \"block\", \"reason\": \"Use Bash(gemini -p \\\"WebSearch: <query>\\\") instead.\"}'"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Code has a notification for you.', 'Claude Code Notification', 'OK', 'Information')\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Code has finished the task.', 'Task Complete', 'OK', 'Information')\""
+          }
+        ]
+      }
+    ]
+  },
 }

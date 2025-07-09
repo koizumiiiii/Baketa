@@ -1,7 +1,7 @@
 {
   "name": "Baketa Real-time Game Translation",
   "description": "Windows-specific real-time text translation overlay application for games. Uses OCR technology and AI translation to provide high-performance game translation tools.",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "language": "csharp",
   "framework": "dotnet8",
   "platform": "windows",
@@ -84,7 +84,9 @@
     "OPUS-MT Translation",
     "Google Gemini API",
     "Microsoft.Extensions.DependencyInjection",
-    "xUnit Testing"
+    "xUnit Testing",
+    "GitHub Actions CI/CD",
+    "CodeQL Security Analysis"
   ],
   
   "development_focus": [
@@ -94,16 +96,21 @@
     "Low resource consumption",
     "Game performance preservation",
     "Multi-language translation support",
-    "Root cause solution implementation"
+    "Root cause solution implementation",
+    "GDPR-compliant privacy management",
+    "Security-first design",
+    "Comprehensive testing (1,300+ test cases)"
   ],
   
   "quality_standards": {
-    "code_analysis": "Microsoft Code Analysis + EditorConfig",
+    "code_analysis": "Microsoft Code Analysis + EditorConfig + CodeQL",
     "async_programming": "ConfigureAwait(false) required in library code",
     "null_safety": "Nullable reference types enabled",
     "architecture_compliance": "Clean Architecture principles",
-    "test_coverage": "Unit + Integration + UI tests",
-    "solution_approach": "Root cause solutions, not surface-level fixes"
+    "test_coverage": "Unit + Integration + UI tests (1,300+ test cases)",
+    "solution_approach": "Root cause solutions, not surface-level fixes",
+    "security_analysis": "CodeQL static analysis + GitHub Security scanning",
+    "ci_cd": "GitHub Actions with Windows Server 2022, sequential test execution"
   },
   
   "communication_guidelines": {
@@ -191,6 +198,34 @@
         "rg 'null!' --type cs"
       ],
       "report_format": "✅ WSL環境実装完了チェック結果: 静的解析/パターン検証/アーキテクチャ準拠を明記"
+    }
+  },
+  
+  "implemented_features": {
+    "privacy_management": {
+      "description": "GDPR-compliant privacy consent system",
+      "key_classes": ["IPrivacyConsentService", "PrivacyConsentService"],
+      "features": ["Data collection type management", "Consent expiration (2 years)", "Consent revocation"]
+    },
+    "feedback_system": {
+      "description": "GitHub Issues API integration for user feedback",
+      "key_classes": ["IFeedbackService", "FeedbackService"],
+      "features": ["Bug reports", "Feature requests", "General feedback", "System info collection"]
+    },
+    "update_system": {
+      "description": "GitHub Releases API for secure update checking",
+      "key_classes": ["IUpdateCheckService", "UpdateCheckService", "VersionComparisonService"],
+      "features": ["Semver comparison", "Automated update checks", "Offline support"]
+    },
+    "security_features": {
+      "description": "Security-first design with comprehensive protection",
+      "implementations": ["CodeQL static analysis", "Exception handling safety", "Data protection"],
+      "standards": ["OutOfMemoryException protection", "JSON parsing safety", "HTTP timeout handling"]
+    },
+    "testing_infrastructure": {
+      "description": "Comprehensive test suite with 1,300+ test cases",
+      "coverage": "Core 85%+, Infrastructure 80%+, UI 70%+",
+      "types": ["Unit tests", "Integration tests", "Performance tests", "UI tests"]
     }
   }
 }
