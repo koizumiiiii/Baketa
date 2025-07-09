@@ -35,7 +35,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
     public void Dispose()
     {
-        _authService.Dispose();
+        _authService?.Dispose();
     }
 
     #region Constructor Tests

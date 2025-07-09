@@ -6,7 +6,7 @@
 		<Nullable>enable</Nullable>
 		<UseWPF>true</UseWPF>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<Platforms>x64</Platforms>
+		<Platforms>AnyCPU;x64</Platforms>
 		<SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
 		<!-- プラットフォーム固有実装の警告抑制 -->
 		<NoWarn>$(NoWarn);CA1822;CA1848</NoWarn>
