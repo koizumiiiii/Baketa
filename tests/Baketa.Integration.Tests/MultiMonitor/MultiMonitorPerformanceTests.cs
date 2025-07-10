@@ -701,7 +701,9 @@ internal sealed class TestMonitorManager : IMonitorManager
     public int MonitorCount => _monitors.Count;
     public bool IsMonitoring { get; private set; }
 
+#pragma warning disable CS0067 // イベントは使用されていません (テスト用スタブクラス)
     public event EventHandler<MonitorChangedEventArgs>? MonitorChanged;
+#pragma warning restore CS0067
 
     public MonitorInfo? GetMonitorFromWindow(nint windowHandle)
     {

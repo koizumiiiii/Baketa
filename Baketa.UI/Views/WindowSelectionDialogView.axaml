@@ -148,16 +148,16 @@
                             HorizontalAlignment="Center"
                             ClipToBounds="True">
                       <Grid>
-                        <!-- サムネイル画像 -->
-                        <Image Source="{Binding ThumbnailBase64, Converter={StaticResource Base64ToImageConverter}}"
+                        <!-- サムネイル画像 (一時的に無効化) -->
+                        <Image Source=""
                                Stretch="UniformToFill"
-                               IsVisible="{Binding ThumbnailBase64, Converter={StaticResource StringNotNullToBoolConverter}}"/>
+                               IsVisible="False"/>
                         
-                        <!-- フォールバックアイコン -->
+                        <!-- フォールバックアイコン (常に表示) -->
                         <PathIcon Width="24" Height="24"
                                   Data="{StaticResource WindowIcon}"
                                   Foreground="#606060"
-                                  IsVisible="{Binding ThumbnailBase64, Converter={StaticResource StringNullToBoolConverter}}"/>
+                                  IsVisible="True"/>
                       </Grid>
                     </Border>
                     

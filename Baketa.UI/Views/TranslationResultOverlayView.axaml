@@ -37,7 +37,7 @@
           CornerRadius="8"
           Padding="12"
           Margin="4"
-          BoxShadow="0 4 8 {StaticResource ShadowBrush}">
+          BoxShadow="0 4 8 0 #40000000">
     
     <!-- 翻訳結果表示 -->
     <StackPanel Spacing="8">

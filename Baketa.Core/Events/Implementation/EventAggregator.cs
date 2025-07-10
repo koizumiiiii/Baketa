@@ -28,7 +28,8 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
         {
             ArgumentNullException.ThrowIfNull(eventData);
             
-            _logger?.LogDebug("イベント発行: {EventType} (ID: {EventId})", typeof(TEvent).Name, eventData.Id);
+            Console.WriteLine($"🚀 イベント発行: {typeof(TEvent).Name} (ID: {eventData.Id})");
+            _logger?.LogDebug("🚀 イベント発行: {EventType} (ID: {EventId})", typeof(TEvent).Name, eventData.Id);
             
             var eventType = typeof(TEvent);
             List<object>? eventProcessors = null;
@@ -43,9 +44,14 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
             
             if (eventProcessors == null || eventProcessors.Count == 0)
             {
-                _logger?.LogDebug("イベント {EventType} のプロセッサが登録されていません", eventType.Name);
+                Console.WriteLine($"⚠️ イベント {eventType.Name} のプロセッサが登録されていません");
+                _logger?.LogWarning("⚠️ イベント {EventType} のプロセッサが登録されていません", eventType.Name);
                 return;
             }
+            
+            Console.WriteLine($"📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count})");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count}){Environment.NewLine}");
+            _logger?.LogDebug("📡 イベント {EventType} の処理を開始 (プロセッサ数: {ProcessorCount})", eventType.Name, eventProcessors.Count);
             
             // List<Task> そのままの実装を使用（IDE0305を拒否）
             // List<Task> そのままの実装を使用（IDE0305を拒否）
@@ -56,7 +62,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 try
                 {
                     var processorType = processor.GetType().Name;
-                    _logger?.LogTrace("プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
+                    _logger?.LogDebug("🔧 プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
                         processorType, eventType.Name);
                     
                     tasks.Add(ExecuteProcessorAsync(processor, eventData, processorType));
@@ -187,12 +193,16 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 if (!handlers.Contains(processor))
                 {
                     handlers.Add(processor);
-                    _logger?.LogDebug("プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
+                    Console.WriteLine($"✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count})");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count}){Environment.NewLine}");
+                    _logger?.LogInformation("✅ プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
                         processor.GetType().Name, eventType.Name);
                 }
                 else
                 {
-                    _logger?.LogDebug("プロセッサ {ProcessorType} は既にイベント {EventType} に登録されています", 
+                    Console.WriteLine($"⚠️ プロセッサ {processor.GetType().Name} は既にイベント {eventType.Name} に登録されています (現在の登録数: {handlers.Count})");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ プロセッサ {processor.GetType().Name} は既にイベント {eventType.Name} に登録されています (現在の登録数: {handlers.Count}){Environment.NewLine}");
+                    _logger?.LogWarning("⚠️ プロセッサ {ProcessorType} は既にイベント {EventType} に登録されています", 
                         processor.GetType().Name, eventType.Name);
                 }
             }
@@ -296,11 +306,12 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 var startTime = DateTime.UtcNow;
                 
                 // プロセッサの実行
+                _logger?.LogDebug("🚀 プロセッサ {ProcessorType}.HandleAsync() を実行中", processorType);
                 await processor.HandleAsync(eventData).ConfigureAwait(false);
                 
                 // 処理時間の計算と記録
                 var processingTime = DateTime.UtcNow - startTime;
-                _logger?.LogTrace("プロセッサ {ProcessorType} がイベント {EventType} を処理しました (処理時間: {ProcessingTime}ms)",
+                _logger?.LogDebug("✅ プロセッサ {ProcessorType} がイベント {EventType} を処理しました (処理時間: {ProcessingTime}ms)",
                     processorType, typeof(TEvent).Name, processingTime.TotalMilliseconds);
                 
                 // 処理時間が長い場合は警告を出力
