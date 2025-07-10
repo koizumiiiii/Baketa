@@ -4,11 +4,11 @@
   <!-- メインオーバーレイ：αテスト向けスタイル -->
   
   <Styles.Resources>
-    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#F5FFFFFF"/>
-    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#80606060"/>
-    <SolidColorBrush x:Key="SeparatorBrush" Color="#20000000"/>
-    <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#F0F0F0F0"/>
-    <SolidColorBrush x:Key="StatusBorderBrush" Color="#30000000"/>
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#FF404040"/>
+    <SolidColorBrush x:Key="SeparatorBrush" Color="#FFD0D0D0"/>
+    <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="StatusBorderBrush" Color="#FF404040"/>
     
     <!-- 状態別色定義 -->
     <SolidColorBrush x:Key="StatusColorBrush" Color="#605E5C"/> <!-- デフォルト: グレー -->
@@ -25,17 +25,12 @@
     <Setter Property="Background" Value="{StaticResource OverlayBackgroundBrush}"/>
     <Setter Property="BorderBrush" Value="{StaticResource OverlayBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Effect">
-      <Setter.Value>
-        <BlurEffect Radius="10"/>
-      </Setter.Value>
-    </Setter>
   </Style>
 
   <!-- オーバーレイボタンの基本スタイル -->
   <Style Selector="Button.overlay-button">
-    <Setter Property="Background" Value="#60FFFFFF"/>
-    <Setter Property="BorderBrush" Value="#80606060"/>
+    <Setter Property="Background" Value="#FFF5F5F5"/>
+    <Setter Property="BorderBrush" Value="#FF808080"/>
     <Setter Property="BorderThickness" Value="1"/>
     <Setter Property="CornerRadius" Value="8"/>
     <Setter Property="Padding" Value="8"/>
@@ -53,54 +48,55 @@
 
   <!-- オーバーレイボタンのホバー状態 -->
   <Style Selector="Button.overlay-button:pointerover">
-    <Setter Property="Background" Value="#80FFFFFF"/>
+    <Setter Property="Background" Value="#FFE5E5E5"/>
     <Setter Property="RenderTransform" Value="scale(1.05)"/>
   </Style>
 
   <!-- オーバーレイボタンの押下状態 -->
   <Style Selector="Button.overlay-button:pressed">
-    <Setter Property="Background" Value="#A0FFFFFF"/>
+    <Setter Property="Background" Value="#FFD0D0D0"/>
     <Setter Property="RenderTransform" Value="scale(0.98)"/>
   </Style>
 
   <!-- オーバーレイボタンの無効状態 -->
   <Style Selector="Button.overlay-button:disabled">
-    <Setter Property="Background" Value="#10FFFFFF"/>
-    <Setter Property="Foreground" Value="#80000000"/>
-    <Setter Property="Opacity" Value="0.5"/>
+    <Setter Property="Background" Value="#FFF0F0F0"/>
+    <Setter Property="Foreground" Value="#FF808080"/>
+    <Setter Property="Opacity" Value="0.6"/>
   </Style>
 
   <!-- セカンダリボタンスタイル -->
   <Style Selector="Button.overlay-button.secondary">
-    <Setter Property="Background" Value="#40606060"/>
-    <Setter Property="BorderBrush" Value="#60606060"/>
+    <Setter Property="Background" Value="#FF909090"/>
+    <Setter Property="BorderBrush" Value="#FF606060"/>
   </Style>
 
   <Style Selector="Button.overlay-button.secondary:pointerover">
-    <Setter Property="Background" Value="#60606060"/>
+    <Setter Property="Background" Value="#FF808080"/>
   </Style>
 
   <!-- 危険ボタンスタイル -->
   <Style Selector="Button.overlay-button.danger">
-    <Setter Property="Background" Value="#60D13438"/>
-    <Setter Property="BorderBrush" Value="#80D13438"/>
+    <Setter Property="Background" Value="#FFD13438"/>
+    <Setter Property="BorderBrush" Value="#FFA02428"/>
+    <Setter Property="Foreground" Value="#FFFFFFFF"/>
   </Style>
 
   <Style Selector="Button.overlay-button.danger:pointerover">
-    <Setter Property="Background" Value="#80D13438"/>
+    <Setter Property="Background" Value="#FFB02428"/>
   </Style>
 
   <!-- 折り畳み状態ボタン -->
   <Style Selector="Button.overlay-button.collapsed">
-    <Setter Property="Background" Value="#60FFFFFF"/>
-    <Setter Property="BorderBrush" Value="#80606060"/>
+    <Setter Property="Background" Value="#FFF5F5F5"/>
+    <Setter Property="BorderBrush" Value="#FF808080"/>
     <Setter Property="BorderThickness" Value="1"/>
     <Setter Property="CornerRadius" Value="4"/>
     <Setter Property="Padding" Value="4"/>
   </Style>
 
   <Style Selector="Button.overlay-button.collapsed:pointerover">
-    <Setter Property="Background" Value="#80FFFFFF"/>
+    <Setter Property="Background" Value="#FFE5E5E5"/>
   </Style>
 
   <!-- 状態インジケーターの色分け -->
