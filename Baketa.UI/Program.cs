@@ -9,6 +9,7 @@ using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.DI.Modules;
+using Baketa.Infrastructure.Platform.DI;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,6 +111,9 @@ namespace Baketa.UI;
             // UIモジュールの登録
             var uiModule = new UIModule();
             uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            
+            // アダプターサービスの登録
+            services.AddAdapterServices();
             
             // DI登録デバッグ
             DebugServiceRegistration(services);

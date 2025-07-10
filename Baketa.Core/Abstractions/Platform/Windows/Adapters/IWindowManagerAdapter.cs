@@ -91,4 +91,9 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
         /// 最大化状態
         /// </summary>
         public bool IsMaximized { get; set; }
+        
+        /// <summary>
+        /// ウィンドウのサムネイル画像（Base64エンコード）
+        /// </summary>
+        public string? ThumbnailBase64 { get; set; }
     }

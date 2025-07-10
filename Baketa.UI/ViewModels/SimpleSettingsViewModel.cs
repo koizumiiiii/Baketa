@@ -1,0 +1,261 @@
+using System;
+using System.Collections.ObjectModel;
+using System.Reactive;
+using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Framework;
+using Baketa.UI.Framework.Events;
+using Microsoft.Extensions.Logging;
+using ReactiveUI;
+
+namespace Baketa.UI.ViewModels;
+
+/// <summary>
+/// シンプル設定画面のViewModel
+/// αテスト向け基本設定のみ - タブなしのシンプル版
+/// </summary>
+public class SimpleSettingsViewModel : ViewModelBase
+{
+    private bool _useLocalEngine = true;
+    private string _sourceLanguage = "Japanese";
+    private string _targetLanguage = "English";
+    private int _fontSize = 14;
+    private double _overlayOpacity = 0.9;
+    private bool _hasChanges;
+
+    public SimpleSettingsViewModel(
+        IEventAggregator eventAggregator,
+        ILogger<SimpleSettingsViewModel> logger)
+        : base(eventAggregator, logger)
+    {
+        InitializeCommands();
+        InitializeCollections();
+    }
+
+    #region Properties
+
+    /// <summary>
+    /// ローカル翻訳エンジンを使用するか
+    /// </summary>
+    public bool UseLocalEngine
+    {
+        get => _useLocalEngine;
+        set => this.RaiseAndSetIfChanged(ref _useLocalEngine, value);
+    }
+
+    /// <summary>
+    /// 翻訳元言語
+    /// </summary>
+    public string SourceLanguage
+    {
+        get => _sourceLanguage;
+        set => this.RaiseAndSetIfChanged(ref _sourceLanguage, value);
+    }
+
+    /// <summary>
+    /// 翻訳先言語
+    /// </summary>
+    public string TargetLanguage
+    {
+        get => _targetLanguage;
+        set => this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+    }
+
+    /// <summary>
+    /// フォントサイズ
+    /// </summary>
+    public int FontSize
+    {
+        get => _fontSize;
+        set => this.RaiseAndSetIfChanged(ref _fontSize, value);
+    }
+
+    /// <summary>
+    /// オーバーレイ透明度
+    /// </summary>
+    public double OverlayOpacity
+    {
+        get => _overlayOpacity;
+        set => this.RaiseAndSetIfChanged(ref _overlayOpacity, value);
+    }
+
+    /// <summary>
+    /// 変更があるかどうか
+    /// </summary>
+    public bool HasChanges
+    {
+        get => _hasChanges;
+        set => this.RaiseAndSetIfChanged(ref _hasChanges, value);
+    }
+
+    /// <summary>
+    /// 利用可能な言語リスト
+    /// </summary>
+    public ObservableCollection<string> AvailableLanguages { get; } = [];
+
+    /// <summary>
+    /// フォントサイズ選択肢
+    /// </summary>
+    public ObservableCollection<int> FontSizeOptions { get; } = [];
+
+    #endregion
+
+    #region Commands
+
+    public ReactiveCommand<Unit, Unit> ApplyCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> CancelCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ResetCommand { get; private set; } = null!;
+
+    #endregion
+
+    #region Initialization
+
+    private void InitializeCommands()
+    {
+        ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync,
+            this.WhenAnyValue(x => x.HasChanges));
+        CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync);
+        ResetCommand = ReactiveCommand.CreateFromTask(ExecuteResetAsync);
+    }
+
+    private void InitializeCollections()
+    {
+        // 言語選択肢（αテスト版は限定）
+        AvailableLanguages.Add("Japanese");
+        AvailableLanguages.Add("English");
+
+        // フォントサイズ選択肢
+        FontSizeOptions.Add(10);
+        FontSizeOptions.Add(12);
+        FontSizeOptions.Add(14);
+        FontSizeOptions.Add(16);
+        FontSizeOptions.Add(18);
+        FontSizeOptions.Add(20);
+
+        // プロパティ変更監視
+        this.WhenAnyValue(
+                x => x.UseLocalEngine,
+                x => x.SourceLanguage,
+                x => x.TargetLanguage,
+                x => x.FontSize,
+                x => x.OverlayOpacity)
+            .Subscribe(_ => HasChanges = true);
+    }
+
+    #endregion
+
+    #region Command Handlers
+
+    private async Task ExecuteApplyAsync()
+    {
+        try
+        {
+            Logger?.LogInformation("Applying settings changes");
+
+            // 設定適用イベントを発行
+            var settingsEvent = new SettingsChangedEvent
+            {
+                UseLocalEngine = UseLocalEngine,
+                SourceLanguage = SourceLanguage,
+                TargetLanguage = TargetLanguage,
+                FontSize = FontSize,
+                OverlayOpacity = OverlayOpacity
+            };
+
+            await PublishEventAsync(settingsEvent).ConfigureAwait(false);
+
+            HasChanges = false;
+            Logger?.LogInformation("Settings applied successfully");
+
+            // 設定画面を閉じる
+            var closeEvent = new CloseSettingsRequestEvent();
+            await PublishEventAsync(closeEvent).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to apply settings");
+        }
+    }
+
+    private async Task ExecuteCancelAsync()
+    {
+        try
+        {
+            Logger?.LogDebug("Settings changes cancelled");
+
+            // 設定画面を閉じる
+            var closeEvent = new CloseSettingsRequestEvent();
+            await PublishEventAsync(closeEvent).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to cancel settings");
+        }
+    }
+
+    private async Task ExecuteResetAsync()
+    {
+        try
+        {
+            Logger?.LogDebug("Resetting settings to defaults");
+
+            // デフォルト値に戻す
+            UseLocalEngine = true;
+            SourceLanguage = "Japanese";
+            TargetLanguage = "English";
+            FontSize = 14;
+            OverlayOpacity = 0.9;
+
+            HasChanges = true;
+            Logger?.LogDebug("Settings reset to defaults");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to reset settings");
+        }
+
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    #endregion
+
+    #region Public Methods
+
+    /// <summary>
+    /// 設定を読み込み
+    /// </summary>
+    public async Task LoadSettingsAsync()
+    {
+        try
+        {
+            Logger?.LogDebug("Loading current settings");
+
+            // 設定読み込み要求イベントを発行
+            var loadEvent = new LoadSettingsRequestEvent();
+            await PublishEventAsync(loadEvent).ConfigureAwait(false);
+
+            // 実際の設定読み込みはイベントハンドラーで処理
+            HasChanges = false;
+            Logger?.LogDebug("Settings loaded successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to load settings");
+        }
+    }
+
+    /// <summary>
+    /// 外部から設定値を更新
+    /// </summary>
+    public void UpdateSettings(bool useLocalEngine, string sourceLanguage, string targetLanguage, int fontSize, double overlayOpacity)
+    {
+        UseLocalEngine = useLocalEngine;
+        SourceLanguage = sourceLanguage;
+        TargetLanguage = targetLanguage;
+        FontSize = fontSize;
+        OverlayOpacity = overlayOpacity;
+        HasChanges = false;
+    }
+
+    #endregion
+}

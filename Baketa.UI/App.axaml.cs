@@ -12,6 +12,7 @@ using Baketa.Core.Abstractions.Events;
 using CoreEvents = Baketa.Core.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
+using Baketa.UI.Services;
 
 namespace Baketa.UI;
 
@@ -66,14 +67,18 @@ namespace Baketa.UI;
                     
                     _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                     
-                    // MainWindowViewModelを取得
-                    var mainWindowViewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
+                    // MainOverlayViewModelを取得
+                    var mainOverlayViewModel = serviceProvider.GetRequiredService<MainOverlayViewModel>();
                     
-                    // MainWindowを設定
-                    desktop.MainWindow = new MainWindow
+                    // MainOverlayViewを設定（透明オーバーレイとして）
+                    desktop.MainWindow = new MainOverlayView
                     {
-                        DataContext = mainWindowViewModel,
+                        DataContext = mainOverlayViewModel,
                     };
+                    
+                    // 翻訳フローモジュールのイベント購読を初期化
+                    var translationFlowModule = serviceProvider.GetService<Baketa.UI.DI.Modules.TranslationFlowModule>();
+                    translationFlowModule?.ConfigureEventAggregator(_eventAggregator, serviceProvider);
                     
                     // アプリケーション起動完了イベントをパブリッシュ
                     _eventAggregator?.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
@@ -143,6 +148,11 @@ namespace Baketa.UI;
                 {
                     _logShuttingDown(_logger, null);
                 }
+                
+                // オーバーレイマネージャーの破棄
+                var overlayManager = Program.ServiceProvider?.GetService<TranslationResultOverlayManager>();
+                overlayManager?.Dispose();
+                
                 _eventAggregator?.PublishAsync(new ApplicationShutdownEvent()).GetAwaiter().GetResult();
             }
             catch (TaskCanceledException ex)
