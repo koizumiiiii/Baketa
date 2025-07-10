@@ -54,19 +54,24 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
         /// <summary>
         /// キャプチャ関連サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterCaptureServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterCaptureServices(IServiceCollection services)
         {
             // スクリーンキャプチャサービス
-            // 例: services.AddSingleton<IWindowsCaptureService, WindowsCaptureService>();
-            // 例: services.AddSingleton<IWindowEnumerator, WindowEnumerator>();
-            // 例: services.AddSingleton<IWindowFinder, WindowFinder>();
+            services.AddSingleton<Baketa.Infrastructure.Platform.Windows.Capture.IGdiScreenCapturer, 
+                Baketa.Infrastructure.Platform.Windows.Capture.GdiScreenCapturer>();
             
-            // キャプチャ設定
-            // 例: services.AddSingleton<ICaptureSettings, DefaultCaptureSettings>();
+            // ウィンドウマネージャー
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager, 
+                Baketa.Infrastructure.Platform.Windows.WindowsManagerStub>();
             
-            // 差分検出
-            // 例: services.AddSingleton<IDifferenceDetector, OpenCvDifferenceDetector>();
+            // 画像ファクトリー
+            services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, 
+                Baketa.Infrastructure.Platform.Windows.WindowsImageFactory>();
+            
+            // 差分検出器
+            services.AddSingleton<Baketa.Core.Abstractions.Capture.IDifferenceDetector, 
+                Baketa.Infrastructure.Capture.DifferenceDetection.EnhancedDifferenceDetector>();
         }
         
         /// <summary>

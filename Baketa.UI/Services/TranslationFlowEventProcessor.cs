@@ -14,22 +14,39 @@ namespace Baketa.UI.Services;
 /// 翻訳フロー統合のイベントプロセッサー
 /// UI層とApplication層の翻訳フローを統合
 /// </summary>
-public class TranslationFlowEventProcessor(
-    ILogger<TranslationFlowEventProcessor> logger,
-    IEventAggregator eventAggregator,
-    TranslationResultOverlayManager overlayManager,
-    ICaptureService captureService,
-    TranslationOrchestrationService translationService) : 
+public class TranslationFlowEventProcessor : 
     IEventProcessor<StartTranslationRequestEvent>,
     IEventProcessor<StopTranslationRequestEvent>,
     IEventProcessor<ToggleTranslationDisplayRequestEvent>,
     IEventProcessor<SettingsChangedEvent>
 {
-    private readonly ILogger<TranslationFlowEventProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-    private readonly TranslationResultOverlayManager _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
-    private readonly ICaptureService _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
-    private readonly TranslationOrchestrationService _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+    private readonly ILogger<TranslationFlowEventProcessor> _logger;
+    private readonly IEventAggregator _eventAggregator;
+    private readonly TranslationResultOverlayManager _overlayManager;
+    private readonly ICaptureService _captureService;
+    private readonly ITranslationOrchestrationService _translationService;
+    
+    // 重複処理防止用
+    private readonly HashSet<string> _processedEventIds = [];
+    private readonly HashSet<IntPtr> _processingWindows = [];
+    private readonly object _processedEventLock = new();
+    
+
+    public TranslationFlowEventProcessor(
+        ILogger<TranslationFlowEventProcessor> logger,
+        IEventAggregator eventAggregator,
+        TranslationResultOverlayManager overlayManager,
+        ICaptureService captureService,
+        ITranslationOrchestrationService translationService)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
+        _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        
+        _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
+    }
 
     public int Priority => 100;
     public bool SynchronousExecution => false;
@@ -39,33 +56,55 @@ public class TranslationFlowEventProcessor(
     /// </summary>
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
+        
+        // 重複処理防止チェック（ウィンドウハンドルベース）
+        lock (_processedEventLock)
+        {
+            if (_processingWindows.Contains(eventData.TargetWindow.Handle))
+            {
+                _logger.LogDebug("Skipping duplicate translation for window: {WindowTitle} (Handle={Handle})", 
+                    eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
+                return;
+            }
+            _processingWindows.Add(eventData.TargetWindow.Handle);
+        }
+        
         try
         {
-            _logger.LogInformation("🚀 翻訳開始要求を処理中: ウィンドウ={WindowTitle} (Handle={Handle})", 
+            _logger.LogInformation("Processing translation start request for window: {WindowTitle} (Handle={Handle})", 
                 eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
 
             // 1. 翻訳状態を「キャプチャ中」に変更
-            _logger.LogDebug("📊 翻訳状態をキャプチャ中に変更");
+            _logger.LogDebug("Changing translation status to capturing");
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Capturing);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
             // 2. オーバーレイマネージャーを初期化
-            _logger.LogDebug("🖼️ オーバーレイマネージャーを初期化");
+            _logger.LogDebug("Initializing overlay manager");
             await _overlayManager.InitializeAsync().ConfigureAwait(false);
 
             // 3. 実際の翻訳処理を開始
-            _logger.LogDebug("⚙️ 翻訳処理開始");
+            _logger.LogDebug("Starting translation process");
             await ProcessTranslationAsync(eventData.TargetWindow).ConfigureAwait(false);
 
             _logger.LogInformation("✅ 翻訳開始処理が完了しました");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ 翻訳開始処理中にエラーが発生しました: {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "Error occurred during translation start processing: {ErrorMessage}", ex.Message);
             
             // エラー状態に変更
             var errorEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+        }
+        finally
+        {
+            // 処理完了時にウィンドウハンドルを削除
+            lock (_processedEventLock)
+            {
+                _processingWindows.Remove(eventData.TargetWindow.Handle);
+                _logger.LogDebug("Translation processing completed for window handle: {Handle}", eventData.TargetWindow.Handle);
+            }
         }
     }
 
@@ -164,44 +203,45 @@ public class TranslationFlowEventProcessor(
     {
         try
         {
-            _logger.LogInformation("🔄 翻訳処理を開始: ウィンドウ={WindowTitle} (Handle={Handle})", 
+            _logger.LogInformation("Starting translation process for window: {WindowTitle} (Handle={Handle})", 
                 targetWindow.Title, targetWindow.Handle);
 
             // 1. 翻訳中状態に変更
-            _logger.LogDebug("📊 翻訳状態を翻訳中に変更");
+            _logger.LogDebug("Changing translation status to translating");
             var translatingEvent = new TranslationStatusChangedEvent(TranslationStatus.Translating);
             await _eventAggregator.PublishAsync(translatingEvent).ConfigureAwait(false);
 
             // 2. ウィンドウキャプチャ
-            _logger.LogDebug("📸 ウィンドウキャプチャを開始: Handle={Handle}", targetWindow.Handle);
+            _logger.LogDebug("Starting window capture for handle: {Handle}", targetWindow.Handle);
             var captureResult = await _captureService.CaptureWindowAsync(targetWindow.Handle).ConfigureAwait(false);
             
             if (captureResult == null)
             {
-                _logger.LogWarning("⚠️ ウィンドウキャプチャに失敗しました");
+                _logger.LogWarning("Window capture failed");
                 await DisplayFallbackTranslationAsync().ConfigureAwait(false);
                 return;
             }
             
-            _logger.LogDebug("✅ ウィンドウキャプチャ成功");
+            _logger.LogDebug("Window capture successful");
 
             // 3. 単発翻訳実行
-            _logger.LogDebug("🌐 翻訳サービスによる翻訳処理を開始");
+            _logger.LogDebug("Starting translation service processing");
             
             // TranslationResultsのObservableを購読して結果を取得
+            _logger.LogDebug("Setting up translation result subscription");
             TranslationResult? translationResult = null;
             var resultReceived = false;
             
             using var subscription = _translationService.TranslationResults
                 .Subscribe(result => 
                 {
-                    _logger.LogDebug("📥 翻訳結果を受信: {Original} -> {Translated}", 
+                    _logger.LogDebug("Translation result received: {Original} -> {Translated}", 
                         result.OriginalText, result.TranslatedText);
                     translationResult = result;
                     resultReceived = true;
                 });
             
-            _logger.LogDebug("🎯 単発翻訳をトリガー");
+            _logger.LogDebug("Triggering single translation");
             await _translationService.TriggerSingleTranslationAsync().ConfigureAwait(false);
             
             // 翻訳結果の完了まで待機（最大5秒）
@@ -213,12 +253,12 @@ public class TranslationFlowEventProcessor(
                 waited += 100;
             }
             
-            _logger.LogDebug("⏱️ 翻訳処理待機時間: {WaitTime}ms", waited);
+            _logger.LogDebug("Translation processing wait time: {WaitTime}ms", waited);
 
             // 4. 翻訳結果を表示
             if (translationResult != null)
             {
-                _logger.LogInformation("📄 翻訳結果表示: '{Original}' -> '{Translated}' (信頼度: {Confidence})", 
+                _logger.LogInformation("Translation result display: '{Original}' -> '{Translated}' (confidence: {Confidence})", 
                     translationResult.OriginalText, translationResult.TranslatedText, translationResult.Confidence);
                     
                 var displayEvent = new TranslationResultDisplayEvent
@@ -229,24 +269,24 @@ public class TranslationFlowEventProcessor(
                 };
 
                 await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
-                _logger.LogDebug("✅ 翻訳結果表示イベントを発行");
+                _logger.LogDebug("Translation result display event published");
             }
             else
             {
-                _logger.LogInformation("❓ 翻訳対象のテキストが検出されませんでした（待機時間: {WaitTime}ms）", waited);
+                _logger.LogInformation("No translatable text detected (wait time: {WaitTime}ms)", waited);
                 await DisplayNoTextFoundMessageAsync().ConfigureAwait(false);
             }
 
             // 5. 翻訳完了状態に変更
-            _logger.LogDebug("📊 翻訳状態を完了に変更");
+            _logger.LogDebug("Changing translation status to completed");
             var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
             await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
 
-            _logger.LogInformation("🏁 翻訳処理が完了しました");
+            _logger.LogInformation("Translation processing completed");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "💥 翻訳処理中にエラーが発生しました: {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "Error occurred during translation processing: {ErrorMessage}", ex.Message);
             await DisplayErrorMessageAsync(ex).ConfigureAwait(false);
         }
     }

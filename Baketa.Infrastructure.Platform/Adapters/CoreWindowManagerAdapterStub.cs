@@ -142,7 +142,7 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     IsVisible = true, // 最小化されていても選択可能とする
                     IsMinimized = _windowManager.IsMinimized(handle),
                     Bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty,
-                    ThumbnailBase64 = GetWindowThumbnail(handle)
+                    ThumbnailBase64 = string.Empty // 一時的に無効化してFormatException回避
                 };
                 
                 windowList.Add(windowInfo);
@@ -278,10 +278,10 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             finally
             {
                 // リソースを解放
-                SelectObject(memoryDC, oldBitmap);
-                DeleteObject(bitmap);
-                DeleteDC(memoryDC);
-                ReleaseDC(IntPtr.Zero, desktopDC);
+                _ = SelectObject(memoryDC, oldBitmap);
+                _ = DeleteObject(bitmap);
+                _ = DeleteDC(memoryDC);
+                _ = ReleaseDC(IntPtr.Zero, desktopDC);
             }
         }
         catch (Exception)
@@ -320,9 +320,10 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             System.Diagnostics.Debug.WriteLine($"📦 フォールバック画像生成完了: {maxWidth}x{maxHeight}px, Base64={base64.Length}文字");
             return base64;
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            System.Diagnostics.Debug.WriteLine($"💥 フォールバック画像生成エラー: {ex.Message}");
+            return string.Empty; // nullの代わりに空文字列を返す
         }
     }
     

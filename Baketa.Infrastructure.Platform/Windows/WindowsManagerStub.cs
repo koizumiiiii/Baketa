@@ -20,7 +20,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
         private static extern IntPtr GetForegroundWindow();
         
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+        private static extern int GetWindowText(IntPtr hWnd, [Out] char[] text, int count);
         
         [DllImport("user32.dll")]
         private static extern bool IsIconic(IntPtr hWnd);
@@ -123,10 +123,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 finally
                 {
                     // リソースを解放
-                    SelectObject(memoryDC, oldBitmap);
-                    DeleteObject(bitmap);
-                    DeleteDC(memoryDC);
-                    ReleaseDC(IntPtr.Zero, desktopDC);
+                    _ = SelectObject(memoryDC, oldBitmap);
+                    _ = DeleteObject(bitmap);
+                    _ = DeleteDC(memoryDC);
+                    _ = ReleaseDC(IntPtr.Zero, desktopDC);
                 }
             }
             catch (Exception)
@@ -216,9 +216,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
             try
             {
                 const int maxLength = 256;
-                var title = new System.Text.StringBuilder(maxLength);
-                GetWindowText(handle, title, maxLength);
-                return title.ToString();
+                var titleBuffer = new char[maxLength];
+                var length = GetWindowText(handle, titleBuffer, maxLength);
+                return new string(titleBuffer, 0, length);
             }
             catch
             {

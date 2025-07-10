@@ -151,29 +151,35 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// </summary>
     private async Task ExecuteSelectWindowAsync(WindowInfo selectedWindow)
     {
+        
         try
         {
             if (selectedWindow == null)
             {
-                Logger?.LogWarning("❌ ウィンドウが選択されていません");
+                Logger?.LogWarning("No window selected");
                 return;
             }
 
-            Logger?.LogInformation("🎯 ウィンドウ選択実行: '{Title}' (Handle: {Handle})", 
+            Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})", 
                 selectedWindow.Title, selectedWindow.Handle);
 
             DialogResult = selectedWindow;
             IsClosed = true;
 
             // ウィンドウ選択イベントを発行
-            Logger?.LogDebug("📢 StartTranslationRequestEventを発行");
-            await EventAggregator.PublishAsync(new StartTranslationRequestEvent(selectedWindow)).ConfigureAwait(false);
+            Logger?.LogInformation("Publishing StartTranslationRequestEvent");
+            var startEvent = new StartTranslationRequestEvent(selectedWindow);
+            Logger?.LogDebug("Event created: TargetWindow='{Title}' (Handle={Handle}), EventId={EventId}", 
+                startEvent.TargetWindow.Title, startEvent.TargetWindow.Handle, startEvent.Id);
+                
+            await EventAggregator.PublishAsync(startEvent).ConfigureAwait(false);
+            Logger?.LogInformation("StartTranslationRequestEvent published: EventId={EventId}", startEvent.Id);
             
-            Logger?.LogDebug("✅ ウィンドウ選択処理完了");
+            Logger?.LogDebug("Window selection processing completed");
         }
         catch (Exception ex)
         {
-            Logger?.LogError(ex, "💥 ウィンドウ選択処理中にエラー: {ErrorMessage}", ex.Message);
+            Logger?.LogError(ex, "Error during window selection processing: {ErrorMessage}", ex.Message);
         }
     }
 

@@ -45,9 +45,8 @@ namespace Baketa.UI.DI.Modules;
             // 設定系UIの登録
             RegisterSettingsUI(services);
             
-            // 翻訳フローモジュールの登録
-            var translationFlowModule = new TranslationFlowModule();
-            translationFlowModule.RegisterWithDependencies(services, [], new Stack<Type>());
+            // 翻訳フローモジュールをDIコンテナに登録
+            services.AddSingleton<TranslationFlowModule>();
         }
 
         /// <summary>

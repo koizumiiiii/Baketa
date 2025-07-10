@@ -21,18 +21,26 @@ public class TranslationResultOverlayManager(
     private TranslationResultOverlayViewModel? _viewModel;
     private bool _isInitialized;
     private bool _disposed;
+    private readonly object _initializeLock = new();
 
     /// <summary>
     /// オーバーレイを初期化
     /// </summary>
     public async Task InitializeAsync()
     {
-        if (_isInitialized || _disposed)
-            return;
+        lock (_initializeLock)
+        {
+            if (_isInitialized || _disposed)
+            {
+                _logger.LogDebug("Overlay manager initialization skipped (initialized: {IsInitialized}, disposed: {IsDisposed})", 
+                    _isInitialized, _disposed);
+                return;
+            }
+        }
 
         try
         {
-            _logger.LogDebug("Initializing translation result overlay");
+            _logger.LogDebug("Starting actual overlay manager initialization");
 
             // ViewModelを作成
             _viewModel = new TranslationResultOverlayViewModel(_eventAggregator, 
@@ -48,7 +56,10 @@ public class TranslationResultOverlayManager(
                 };
             });
 
-            _isInitialized = true;
+            lock (_initializeLock)
+            {
+                _isInitialized = true;
+            }
             _logger.LogInformation("Translation result overlay initialized successfully");
         }
         catch (Exception ex)
