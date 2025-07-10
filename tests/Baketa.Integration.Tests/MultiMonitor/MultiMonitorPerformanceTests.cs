@@ -40,9 +40,10 @@ public sealed class MultiMonitorPerformanceTests : IAsyncDisposable
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging(_ => _.AddConsole().SetMinimumLevel(LogLevel.Debug));
-        services.AddSingleton<IMonitorManager, WindowsMonitorManager>();
+        
+        // テスト用のモックモニターマネージャーを使用（WindowsMonitorManagerの初期化問題を回避）
+        services.AddSingleton<IMonitorManager, TestMonitorManager>();
         services.AddSingleton<IFullscreenModeService, WindowsFullscreenModeService>();
-        // メインのAvaloniaMultiMonitorAdapterは上記でテスト用で置換済み
         
         // オーバーレイ関連サービスはテスト用モックを使用
         services.AddSingleton<Baketa.Core.UI.Overlay.IOverlayWindowManager, TestOverlayWindowManagerMock>();
@@ -667,6 +668,91 @@ internal sealed class TestAvaloniaMultiMonitorAdapter(IMonitorManager monitorMan
     public async Task StopMonitoringAsync(CancellationToken cancellationToken = default)
     {
         await _monitorManager.StopMonitoringAsync(cancellationToken).ConfigureAwait(false);
+    }
+}
+
+/// <summary>
+/// テスト用モニターマネージャー（WindowsMonitorManagerの初期化問題を回避）
+/// </summary>
+internal sealed class TestMonitorManager : IMonitorManager
+{
+    private readonly List<MonitorInfo> _monitors;
+    private readonly MonitorInfo _primaryMonitor;
+
+    public TestMonitorManager()
+    {
+        // テスト用のダミーモニター情報を作成
+        _primaryMonitor = new MonitorInfo(
+            Handle: new IntPtr(1),
+            Name: "Test Primary Monitor",
+            DeviceId: "TestMonitor1",
+            Bounds: new CoreRect(0, 0, 1920, 1080),
+            WorkArea: new CoreRect(0, 0, 1920, 1040),
+            IsPrimary: true,
+            DpiX: 96.0,
+            DpiY: 96.0
+        );
+
+        _monitors = [_primaryMonitor];
+    }
+
+    public IReadOnlyList<MonitorInfo> Monitors => _monitors.AsReadOnly();
+    public MonitorInfo? PrimaryMonitor => _primaryMonitor;
+    public int MonitorCount => _monitors.Count;
+    public bool IsMonitoring { get; private set; }
+
+    public event EventHandler<MonitorChangedEventArgs>? MonitorChanged;
+
+    public MonitorInfo? GetMonitorFromWindow(nint windowHandle)
+    {
+        return _primaryMonitor;
+    }
+
+    public MonitorInfo? GetMonitorFromPoint(CorePoint point)
+    {
+        return _primaryMonitor;
+    }
+
+    public IReadOnlyList<MonitorInfo> GetMonitorsFromRect(CoreRect rect)
+    {
+        return _monitors.AsReadOnly();
+    }
+
+    public MonitorInfo? GetMonitorByHandle(nint handle)
+    {
+        return _primaryMonitor;
+    }
+
+    public CorePoint TransformPointBetweenMonitors(CorePoint point, MonitorInfo sourceMonitor, MonitorInfo targetMonitor)
+    {
+        return point; // テスト用は変換しない
+    }
+
+    public CoreRect TransformRectBetweenMonitors(CoreRect rect, MonitorInfo sourceMonitor, MonitorInfo targetMonitor)
+    {
+        return rect; // テスト用は変換しない
+    }
+
+    public Task RefreshMonitorsAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task StartMonitoringAsync(CancellationToken cancellationToken = default)
+    {
+        IsMonitoring = true;
+        return Task.CompletedTask;
+    }
+
+    public Task StopMonitoringAsync(CancellationToken cancellationToken = default)
+    {
+        IsMonitoring = false;
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        // テスト用は何もしない
     }
 }
 

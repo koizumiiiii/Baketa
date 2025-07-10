@@ -8,6 +8,8 @@ using Baketa.UI.DI.Modules;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
+using Baketa.Application.Services.Translation;
+using Baketa.Core.Abstractions.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +53,15 @@ internal static class UIServiceCollectionExtensions
         
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
+        
+        // 翻訳結果オーバーレイマネージャー
+        services.AddSingleton<TranslationResultOverlayManager>();
+        
+        // 翻訳フロー統合イベントプロセッサー
+        services.AddSingleton<TranslationFlowEventProcessor>();
+        
+        // メインオーバーレイViewModel
+        services.AddSingleton<Baketa.UI.ViewModels.MainOverlayViewModel>();
         
         // その他のUIサービス
         // 例: services.AddSingleton<INotificationService, NotificationService>();

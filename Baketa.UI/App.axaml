@@ -1,15 +1,29 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Baketa.UI.App"
-             xmlns:local="using:Baketa.UI">
+             xmlns:local="using:Baketa.UI"
+             xmlns:converters="using:Baketa.UI.Converters">
 
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="/Resources/FluentIcons.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Converters -->
+            <converters:TranslationStateToIconConverter x:Key="TranslationStateToIconConverter"/>
+            <converters:VisibilityStateToIconConverter x:Key="VisibilityStateToIconConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
   
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="/Styles/OverlayStyles.axaml"/>
         <StyleInclude Source="/Styles/OperationalControlStyles.axaml"/>
+        <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>
     </Application.Styles>
 </Application>

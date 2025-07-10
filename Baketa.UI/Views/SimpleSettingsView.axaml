@@ -1,0 +1,235 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+        x:Class="Baketa.UI.Views.SimpleSettingsView"
+        x:DataType="vm:SimpleSettingsViewModel"
+        Title="基本設定"
+        Width="500"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="True"
+        CanResize="False"
+        SystemDecorations="Full">
+
+  <Window.Resources>
+    <!-- カラーリソース -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#0078D4"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#F3F3F3"/>
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#E1E1E1"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#333333"/>
+    <SolidColorBrush x:Key="DisabledBrush" Color="#999999"/>
+  </Window.Resources>
+
+  <!-- メインコンテンツ -->
+  <Grid Background="{StaticResource BackgroundBrush}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- 設定項目エリア -->
+    <ScrollViewer Grid.Row="0" Padding="20" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="20">
+
+        <!-- タイトル -->
+        <TextBlock Text="基本設定"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Foreground="{StaticResource TextBrush}"
+                   Margin="0,0,0,10"/>
+
+        <!-- 翻訳エンジン設定 -->
+        <Border Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16">
+          <StackPanel Spacing="12">
+            <TextBlock Text="翻訳エンジン"
+                       FontWeight="SemiBold"
+                       FontSize="14"
+                       Foreground="{StaticResource TextBrush}"/>
+            
+            <RadioButton Content="ローカル翻訳（OPUS-MT）"
+                         IsChecked="{Binding UseLocalEngine}"
+                         FontSize="13"
+                         Foreground="{StaticResource TextBrush}"/>
+            
+            <RadioButton Content="クラウド翻訳（Gemini API）"
+                         IsChecked="{Binding !UseLocalEngine}"
+                         FontSize="13"
+                         Foreground="{StaticResource TextBrush}"/>
+            
+            <TextBlock Text="※ αテストではローカル翻訳のみ利用可能"
+                       FontSize="11"
+                       Foreground="{StaticResource DisabledBrush}"
+                       Margin="0,8,0,0"/>
+          </StackPanel>
+        </Border>
+
+        <!-- 言語設定 -->
+        <Border Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16">
+          <StackPanel Spacing="12">
+            <TextBlock Text="言語設定"
+                       FontWeight="SemiBold"
+                       FontSize="14"
+                       Foreground="{StaticResource TextBrush}"/>
+            
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              
+              <TextBlock Grid.Column="0"
+                         Text="翻訳元:"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         Margin="0,0,8,0"/>
+              
+              <ComboBox Grid.Column="1"
+                        ItemsSource="{Binding AvailableLanguages}"
+                        SelectedItem="{Binding SourceLanguage}"
+                        FontSize="13"
+                        Margin="0,0,16,0"/>
+              
+              <TextBlock Grid.Column="2"
+                         Text="翻訳先:"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         Margin="0,0,8,0"/>
+              
+              <ComboBox Grid.Column="3"
+                        ItemsSource="{Binding AvailableLanguages}"
+                        SelectedItem="{Binding TargetLanguage}"
+                        FontSize="13"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- 表示設定 -->
+        <Border Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16">
+          <StackPanel Spacing="12">
+            <TextBlock Text="表示設定"
+                       FontWeight="SemiBold"
+                       FontSize="14"
+                       Foreground="{StaticResource TextBrush}"/>
+            
+            <!-- フォントサイズ -->
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              
+              <TextBlock Grid.Column="0"
+                         Text="フォントサイズ:"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         Margin="0,0,12,0"/>
+              
+              <ComboBox Grid.Column="1"
+                        ItemsSource="{Binding FontSizeOptions}"
+                        SelectedItem="{Binding FontSize}"
+                        FontSize="13"
+                        HorizontalAlignment="Left"
+                        MinWidth="80"/>
+              
+              <TextBlock Grid.Column="2"
+                         Text="px"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         Margin="8,0,0,0"/>
+            </Grid>
+            
+            <!-- 透明度 -->
+            <Grid Margin="0,8,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              
+              <TextBlock Grid.Column="0"
+                         Text="透明度:"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         Margin="0,0,12,0"/>
+              
+              <Slider Grid.Column="1"
+                      Value="{Binding OverlayOpacity}"
+                      Minimum="0.1"
+                      Maximum="1.0"
+                      TickFrequency="0.1"
+                      IsSnapToTickEnabled="True"
+                      Margin="0,0,12,0"/>
+              
+              <TextBlock Grid.Column="2"
+                         Text="{Binding OverlayOpacity, StringFormat={}{0:P0}}"
+                         FontSize="13"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextBrush}"
+                         MinWidth="40"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ボタンエリア -->
+    <Border Grid.Row="1"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="20,12">
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Right"
+                  Spacing="8">
+        
+        <Button Content="リセット"
+                Command="{Binding ResetCommand}"
+                Width="80"
+                Height="32"
+                FontSize="13"
+                Foreground="{StaticResource DisabledBrush}"/>
+        
+        <Button Content="キャンセル"
+                Command="{Binding CancelCommand}"
+                Width="80"
+                Height="32"
+                FontSize="13"/>
+        
+        <Button Content="適用"
+                Command="{Binding ApplyCommand}"
+                Width="80"
+                Height="32"
+                FontSize="13"
+                Background="{StaticResource AccentBrush}"
+                Foreground="White"
+                IsEnabled="{Binding HasChanges}"/>
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</Window>
