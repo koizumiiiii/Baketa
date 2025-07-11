@@ -63,6 +63,9 @@ internal static class UIServiceCollectionExtensions
         // メインオーバーレイViewModel
         services.AddSingleton<Baketa.UI.ViewModels.MainOverlayViewModel>();
         
+        // フォント管理サービス
+        services.AddSingleton<IFontManagerService, FontManagerService>();
+        
         // その他のUIサービス
         // 例: services.AddSingleton<INotificationService, NotificationService>();
         // 例: services.AddSingleton<IDialogService, DialogService>();

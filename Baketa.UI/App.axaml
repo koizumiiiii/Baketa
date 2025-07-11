@@ -12,6 +12,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/FluentIcons.axaml"/>
+                <ResourceInclude Source="/Resources/FontResources.axaml"/>
             </ResourceDictionary.MergedDictionaries>
             
             <!-- Converters -->
@@ -22,6 +23,7 @@
   
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="/Styles/FontStyles.axaml"/>
         <StyleInclude Source="/Styles/OverlayStyles.axaml"/>
         <StyleInclude Source="/Styles/OperationalControlStyles.axaml"/>
         <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>

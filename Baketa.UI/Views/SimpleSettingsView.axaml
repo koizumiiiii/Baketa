@@ -40,7 +40,8 @@
                    FontSize="20"
                    FontWeight="Bold"
                    Foreground="{StaticResource TextBrush}"
-                   Margin="0,0,0,10"/>
+                   Margin="0,0,0,10"
+                   Classes="Bold"/>
 
         <!-- 翻訳エンジン設定 -->
         <Border Background="{StaticResource CardBackgroundBrush}"
@@ -206,13 +207,6 @@
       <StackPanel Orientation="Horizontal"
                   HorizontalAlignment="Right"
                   Spacing="8">
-        
-        <Button Content="リセット"
-                Command="{Binding ResetCommand}"
-                Width="80"
-                Height="32"
-                FontSize="13"
-                Foreground="{StaticResource DisabledBrush}"/>
         
         <Button Content="キャンセル"
                 Command="{Binding CancelCommand}"

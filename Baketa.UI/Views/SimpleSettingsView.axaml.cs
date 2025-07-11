@@ -18,6 +18,9 @@ public partial class SimpleSettingsView : Window
     {
         if (DataContext is SimpleSettingsViewModel viewModel)
         {
+            // ウィンドウ閉じる要求を処理
+            viewModel.CloseRequested += () => Close();
+            
             // ViewModelの初期化
             _ = viewModel.LoadSettingsAsync();
         }

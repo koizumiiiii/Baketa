@@ -142,7 +142,7 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     IsVisible = true, // 最小化されていても選択可能とする
                     IsMinimized = _windowManager.IsMinimized(handle),
                     Bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty,
-                    ThumbnailBase64 = string.Empty // 一時的に無効化してFormatException回避
+                    ThumbnailBase64 = GetWindowThumbnail(handle) ?? string.Empty
                 };
                 
                 windowList.Add(windowInfo);
@@ -193,23 +193,44 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     /// <param name="maxHeight">最大高さ</param>
     /// <returns>Base64エンコードされたサムネイル画像</returns>
     /// <summary>
-    /// ウィンドウのサムネイル画像を取得（実際のキャプチャ実装）
+    /// ウィンドウのサムネイル画像を取得（改良版キャプチャ実装）
     /// </summary>
     private string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
     {
         try
         {
+            // ウィンドウ可視性チェック
+            if (!IsWindow(handle) || !IsWindowVisible(handle))
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ ウィンドウが無効または非表示: Handle={handle}");
+                return GenerateFallbackThumbnail(maxWidth, maxHeight);
+            }
+
             // Win32 APIでウィンドウ情報を取得
             if (!GetWindowRect(handle, out RECT rect))
             {
+                System.Diagnostics.Debug.WriteLine($"❌ GetWindowRect失敗: Handle={handle}");
                 return GenerateFallbackThumbnail(maxWidth, maxHeight);
             }
                 
             int width = rect.Right - rect.Left;
             int height = rect.Bottom - rect.Top;
             
-            if (width <= 0 || height <= 0)
+            // ウィンドウサイズ検証
+            if (width <= 0 || height <= 0 || width > 4096 || height > 4096)
             {
+                System.Diagnostics.Debug.WriteLine($"❌ 無効なウィンドウサイズ: {width}x{height}");
+                return GenerateFallbackThumbnail(maxWidth, maxHeight);
+            }
+
+            // 画面境界チェック
+            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+            
+            // ウィンドウが完全に画面外にある場合はスキップ
+            if (rect.Right < 0 || rect.Bottom < 0 || rect.Left > screenWidth || rect.Top > screenHeight)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ ウィンドウが画面外: Rect=({rect.Left},{rect.Top},{rect.Right},{rect.Bottom})");
                 return GenerateFallbackThumbnail(maxWidth, maxHeight);
             }
 
@@ -218,75 +239,132 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             int thumbWidth = Math.Max(1, (int)(width * scale));
             int thumbHeight = Math.Max(1, (int)(height * scale));
             
-            // デスクトップDCを取得
-            IntPtr desktopDC = GetDC(IntPtr.Zero);
-            if (desktopDC == IntPtr.Zero)
+            System.Diagnostics.Debug.WriteLine($"🖼️ キャプチャ試行: Handle={handle}, Size={width}x{height}, Thumb={thumbWidth}x{thumbHeight}");
+
+            // 方法1: PrintWindow（最優先）
+            var result = TryPrintWindow(handle, width, height, thumbWidth, thumbHeight);
+            if (result != null)
             {
-                return GenerateFallbackThumbnail(maxWidth, maxHeight);
+                System.Diagnostics.Debug.WriteLine($"✅ PrintWindow成功: Handle={handle}");
+                return result;
             }
+
+            // 方法2: 一時的にウィンドウをフォアグラウンドにしてPrintWindow再試行
+            result = TryPrintWindowWithForeground(handle, width, height, thumbWidth, thumbHeight);
+            if (result != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"✅ PrintWindow+Foreground成功: Handle={handle}");
+                return result;
+            }
+
+            // 方法3: フォールバック画像
+            System.Diagnostics.Debug.WriteLine($"❌ 全ての方法が失敗: Handle={handle}");
+            return GenerateFallbackThumbnail(maxWidth, maxHeight);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ サムネイル取得例外: {ex.Message}");
+            return GenerateFallbackThumbnail(maxWidth, maxHeight);
+        }
+    }
+
+    /// <summary>
+    /// PrintWindowでキャプチャを試行
+    /// </summary>
+    private string? TryPrintWindow(IntPtr handle, int width, int height, int thumbWidth, int thumbHeight)
+    {
+        try
+        {
+            IntPtr desktopDC = GetDC(IntPtr.Zero);
+            if (desktopDC == IntPtr.Zero) return null;
             
-            // 互換DCとビットマップを作成
             IntPtr memoryDC = CreateCompatibleDC(desktopDC);
             IntPtr bitmap = CreateCompatibleBitmap(desktopDC, width, height);
             IntPtr oldBitmap = SelectObject(memoryDC, bitmap);
             
             try
             {
-                // PrintWindow を試行
-                System.Diagnostics.Debug.WriteLine($"Attempting PrintWindow for handle {handle}");
-                bool printWindowSuccess = PrintWindow(handle, memoryDC, 0);
+                // PrintWindow実行 (PW_CLIENTONLY | PW_RENDERFULLCONTENT)
+                bool success = PrintWindow(handle, memoryDC, 0x00000001 | 0x00000002);
                 
-                if (!printWindowSuccess)
+                if (success)
                 {
-                    // PrintWindow失敗時はBitBltを使用してスクリーンキャプチャ
-                    System.Diagnostics.Debug.WriteLine("PrintWindow failed, trying BitBlt");
-                    const uint SRCCOPY = 0x00CC0020;
-                    printWindowSuccess = BitBlt(memoryDC, 0, 0, width, height, desktopDC, rect.Left, rect.Top, SRCCOPY);
-                    System.Diagnostics.Debug.WriteLine($"BitBlt result: {printWindowSuccess}");
-                }
-                
-                if (printWindowSuccess)
-                {
-                    System.Diagnostics.Debug.WriteLine("Window capture succeeded");
-                    // Bitmapオブジェクトを作成
-                    using var originalBitmap = Image.FromHbitmap(bitmap);
-                    System.Diagnostics.Debug.WriteLine($"Original bitmap size: {originalBitmap.Width}x{originalBitmap.Height}");
-                    
-                    using var thumbnail = new Bitmap(thumbWidth, thumbHeight);
-                    using var graphics = Graphics.FromImage(thumbnail);
-                    
-                    graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                    graphics.DrawImage(originalBitmap, 0, 0, thumbWidth, thumbHeight);
-                    
-                    // Base64エンコード
-                    using var stream = new MemoryStream();
-                    thumbnail.Save(stream, ImageFormat.Png);
-                    var base64 = Convert.ToBase64String(stream.ToArray());
-                    
-                    System.Diagnostics.Debug.WriteLine($"✅ ウィンドウキャプチャ成功: Base64長={base64.Length}文字");
-                    System.Diagnostics.Debug.WriteLine($"🖼️ サムネイル情報: {thumbWidth}x{thumbHeight}px");
-                    return base64;
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"❌ PrintWindowとBitBlt両方が失敗: Handle={handle}");
-                    var fallback = GenerateFallbackThumbnail(maxWidth, maxHeight);
-                    System.Diagnostics.Debug.WriteLine($"🔄 フォールバック画像生成: Base64長={fallback.Length}文字");
-                    return fallback;
+                    return CreateThumbnailFromBitmap(bitmap, thumbWidth, thumbHeight);
                 }
             }
             finally
             {
-                // リソースを解放
                 _ = SelectObject(memoryDC, oldBitmap);
                 _ = DeleteObject(bitmap);
                 _ = DeleteDC(memoryDC);
                 _ = ReleaseDC(IntPtr.Zero, desktopDC);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return GenerateFallbackThumbnail(maxWidth, maxHeight);
+            System.Diagnostics.Debug.WriteLine($"TryPrintWindow例外: {ex.Message}");
+        }
+        
+        return null;
+    }
+
+    /// <summary>
+    /// 一時的にフォアグラウンドにしてPrintWindow試行
+    /// </summary>
+    private string? TryPrintWindowWithForeground(IntPtr handle, int width, int height, int thumbWidth, int thumbHeight)
+    {
+        IntPtr currentForeground = GetForegroundWindow();
+        
+        try
+        {
+            // 最小化されている場合は復元
+            if (IsIconic(handle))
+            {
+                ShowWindow(handle, SW_RESTORE);
+                System.Threading.Thread.Sleep(100); // 復元待機
+            }
+
+            // 一時的にフォアグラウンドに
+            SetForegroundWindow(handle);
+            System.Threading.Thread.Sleep(50); // レンダリング待機
+
+            var result = TryPrintWindow(handle, width, height, thumbWidth, thumbHeight);
+            
+            return result;
+        }
+        finally
+        {
+            // 元のフォアグラウンドウィンドウを復元
+            if (currentForeground != IntPtr.Zero)
+            {
+                SetForegroundWindow(currentForeground);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ビットマップからサムネイル作成
+    /// </summary>
+    private string? CreateThumbnailFromBitmap(IntPtr bitmap, int thumbWidth, int thumbHeight)
+    {
+        try
+        {
+            using var originalBitmap = Image.FromHbitmap(bitmap);
+            using var thumbnail = new Bitmap(thumbWidth, thumbHeight);
+            using var graphics = Graphics.FromImage(thumbnail);
+            
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            graphics.DrawImage(originalBitmap, 0, 0, thumbWidth, thumbHeight);
+            
+            using var stream = new MemoryStream();
+            thumbnail.Save(stream, ImageFormat.Png);
+            return Convert.ToBase64String(stream.ToArray());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"CreateThumbnailFromBitmap例外: {ex.Message}");
+            return null;
         }
     }
     
@@ -335,6 +413,27 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     [DllImport("user32.dll")]
     private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, int nFlags);
     
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
+    
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+    
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+    
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+    
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+    
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+    
     [DllImport("gdi32.dll")]
     private static extern bool BitBlt(IntPtr hdc, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hdcSrc, int nXSrc, int nYSrc, uint dwRop);
     
@@ -358,6 +457,11 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    
+    // Win32定数
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
+    private const int SW_RESTORE = 9;
     
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
