@@ -18,6 +18,8 @@
             <!-- Converters -->
             <converters:TranslationStateToIconConverter x:Key="TranslationStateToIconConverter"/>
             <converters:VisibilityStateToIconConverter x:Key="VisibilityStateToIconConverter"/>
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter"/>
+            <converters:BooleanToHeightConverter x:Key="BooleanToHeightConverter"/>
         </ResourceDictionary>
     </Application.Resources>
   

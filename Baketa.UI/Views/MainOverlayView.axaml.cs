@@ -22,7 +22,7 @@ public partial class MainOverlayView : Window
         if (screen != null)
         {
             var bounds = screen.WorkingArea;
-            var windowHeight = 280; // XAMLで設定したHeight値を使用
+            var windowHeight = 300; // 展開時の高さ値を使用
             
             // X座標: 画面左端から16px
             var x = 16;
