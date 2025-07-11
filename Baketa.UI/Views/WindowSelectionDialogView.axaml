@@ -148,16 +148,16 @@
                             HorizontalAlignment="Center"
                             ClipToBounds="True">
                       <Grid>
-                        <!-- サムネイル画像 (一時的に無効化) -->
-                        <Image Source=""
+                        <!-- サムネイル画像 -->
+                        <Image Source="{Binding ThumbnailBase64, Converter={StaticResource Base64ToImageConverter}}"
                                Stretch="UniformToFill"
-                               IsVisible="False"/>
+                               IsVisible="{Binding ThumbnailBase64, Converter={StaticResource StringNotNullToBoolConverter}}"/>
                         
-                        <!-- フォールバックアイコン (常に表示) -->
+                        <!-- フォールバックアイコン -->
                         <PathIcon Width="24" Height="24"
                                   Data="{StaticResource WindowIcon}"
                                   Foreground="#606060"
-                                  IsVisible="True"/>
+                                  IsVisible="{Binding ThumbnailBase64, Converter={StaticResource StringNullToBoolConverter}}"/>
                       </Grid>
                     </Border>
                     
@@ -188,7 +188,7 @@
                   <!-- 状態表示 -->
                   <StackPanel Grid.Row="2"
                               HorizontalAlignment="Center">
-                    <!-- 最小化状態 -->
+                    <!-- 最小化状態のみ表示 -->
                     <Border CornerRadius="10"
                             Padding="8,2"
                             Background="#F0AD00"
@@ -198,22 +198,6 @@
                                   Data="{StaticResource MinimizedIcon}"
                                   Foreground="White"/>
                         <TextBlock Text="最小化"
-                                   FontSize="10"
-                                   Foreground="White"
-                                   FontWeight="Medium"/>
-                      </StackPanel>
-                    </Border>
-                    
-                    <!-- 表示中状態 -->
-                    <Border CornerRadius="10"
-                            Padding="8,2"
-                            Background="#107C10"
-                            IsVisible="{Binding !IsMinimized}">
-                      <StackPanel Orientation="Horizontal" Spacing="4">
-                        <PathIcon Width="8" Height="8"
-                                  Data="{StaticResource VisibleIcon}"
-                                  Foreground="White"/>
-                        <TextBlock Text="表示中"
                                    FontSize="10"
                                    Foreground="White"
                                    FontWeight="Medium"/>

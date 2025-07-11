@@ -104,7 +104,6 @@ public class SimpleSettingsViewModel : ViewModelBase
 
     public ReactiveCommand<Unit, Unit> ApplyCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> ResetCommand { get; private set; } = null!;
 
     #endregion
 
@@ -115,7 +114,6 @@ public class SimpleSettingsViewModel : ViewModelBase
         ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync,
             this.WhenAnyValue(x => x.HasChanges));
         CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync);
-        ResetCommand = ReactiveCommand.CreateFromTask(ExecuteResetAsync);
     }
 
     private void InitializeCollections()
@@ -168,8 +166,7 @@ public class SimpleSettingsViewModel : ViewModelBase
             Logger?.LogInformation("Settings applied successfully");
 
             // 設定画面を閉じる
-            var closeEvent = new CloseSettingsRequestEvent();
-            await PublishEventAsync(closeEvent).ConfigureAwait(false);
+            CloseRequested?.Invoke();
         }
         catch (Exception ex)
         {
@@ -184,38 +181,25 @@ public class SimpleSettingsViewModel : ViewModelBase
             Logger?.LogDebug("Settings changes cancelled");
 
             // 設定画面を閉じる
-            var closeEvent = new CloseSettingsRequestEvent();
-            await PublishEventAsync(closeEvent).ConfigureAwait(false);
+            CloseRequested?.Invoke();
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Failed to cancel settings");
         }
-    }
-
-    private async Task ExecuteResetAsync()
-    {
-        try
-        {
-            Logger?.LogDebug("Resetting settings to defaults");
-
-            // デフォルト値に戻す
-            UseLocalEngine = true;
-            SourceLanguage = "Japanese";
-            TargetLanguage = "English";
-            FontSize = 14;
-            OverlayOpacity = 0.9;
-
-            HasChanges = true;
-            Logger?.LogDebug("Settings reset to defaults");
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "Failed to reset settings");
-        }
 
         await Task.CompletedTask.ConfigureAwait(false);
     }
+
+
+    #endregion
+
+    #region Events
+
+    /// <summary>
+    /// ウィンドウを閉じる要求イベント
+    /// </summary>
+    public event Action? CloseRequested;
 
     #endregion
 

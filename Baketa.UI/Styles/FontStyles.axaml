@@ -1,0 +1,70 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="using:Baketa.UI.Converters">
+    
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.Bold">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont-Bold}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    
+    <Style Selector="TextBlock.English">
+        <Setter Property="FontFamily" Value="{StaticResource EnglishFont}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.English.Bold">
+        <Setter Property="FontFamily" Value="{StaticResource EnglishFont-Bold}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    
+    <Style Selector="TextBlock.OtherLanguage">
+        <Setter Property="FontFamily" Value="{StaticResource OtherLanguageFont}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.OtherLanguage.Bold">
+        <Setter Property="FontFamily" Value="{StaticResource OtherLanguageFont-Bold}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    
+    <!-- Button内のTextBlockスタイル -->
+    <Style Selector="Button > ContentPresenter > TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <!-- ComboBox内のTextBlockスタイル -->
+    <Style Selector="ComboBox TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <!-- ラベル用スタイル -->
+    <Style Selector="Label">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <!-- Window Title用スタイル -->
+    <Style Selector="Window">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <!-- 翻訳結果表示用の動的フォント選択 -->
+    <Style Selector="TextBlock.TranslationText">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <!-- 言語別クラススタイル -->
+    <Style Selector="TextBlock.ja, TextBlock.Japanese">
+        <Setter Property="FontFamily" Value="{StaticResource JapaneseFont}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.en, TextBlock.English">
+        <Setter Property="FontFamily" Value="{StaticResource EnglishFont}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.zh, TextBlock.ko, TextBlock.Other">
+        <Setter Property="FontFamily" Value="{StaticResource OtherLanguageFont}"/>
+    </Style>
+
+</Styles>
