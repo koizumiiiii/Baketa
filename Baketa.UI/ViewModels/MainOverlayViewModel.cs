@@ -69,7 +69,7 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     // UI状態の計算プロパティ
-    public bool ShowHideEnabled => IsTranslationActive;
+    public bool ShowHideEnabled => true;
     public bool SettingsEnabled => !IsTranslationActive;
     public string StartStopText => IsTranslationActive ? "Stop" : "Start";
     public string StatusIndicatorClass => CurrentStatus switch

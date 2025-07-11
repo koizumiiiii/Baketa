@@ -3,12 +3,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Baketa.UI.ViewModels"
-        mc:Ignorable="d" d:DesignWidth="60" d:DesignHeight="280"
+        mc:Ignorable="d" d:DesignWidth="110" d:DesignHeight="600"
         x:Class="Baketa.UI.Views.MainOverlayView"
         x:DataType="vm:MainOverlayViewModel"
         Title="Baketa Overlay"
-        Width="60"
-        Height="280"
+        Width="70"
+        Height="{Binding IsCollapsed, Converter={StaticResource BooleanToHeightConverter}}"
         WindowStartupLocation="Manual"
         ShowInTaskbar="False"
         Topmost="True"
@@ -20,216 +20,220 @@
         ExtendClientAreaTitleBarHeightHint="0">
   
   <Window.Resources>
-    <!-- カラーリソース - 透過効果を削除して完全不透明に -->
-    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#FFFFFFFF"/>
-    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#FF404040"/>
-    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#FFF5F5F5"/>
-    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#FF808080"/>
-    <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#FFFFFFFF"/>
-    <SolidColorBrush x:Key="StatusBorderBrush" Color="#FF404040"/>
-    <SolidColorBrush x:Key="StatusInactiveBrush" Color="#FF605E5C"/>
-    <SolidColorBrush x:Key="SeparatorBrush" Color="#FFD0D0D0"/>
-    <Color x:Key="BoxShadowColor">#80000000</Color>
+    <!-- カラーリソース -->
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#F5FFFFFF"/>
+    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#A0A0A0A0"/>
+    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="Transparent"/>
+    <SolidColorBrush x:Key="ButtonHoverBrush" Color="#F0F4F8"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#E0E8F0"/>
+    <SolidColorBrush x:Key="IconBrush" Color="#202020"/>
+    <SolidColorBrush x:Key="IconDisabledBrush" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="StatusIndicatorBrush" Color="#17A2B8"/>
     
-    <!-- Fluent Icons -->
-    <StreamGeometry x:Key="PlayIcon">M8,5.14V19.14L19,12.14L8,5.14Z</StreamGeometry>
-    <StreamGeometry x:Key="StopIcon">M6,6H18V18H6V6Z</StreamGeometry>
-    <StreamGeometry x:Key="ViewIcon">M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z</StreamGeometry>
-    <StreamGeometry x:Key="SettingsIcon">M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</StreamGeometry>
-    <StreamGeometry x:Key="ChevronUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
-    <StreamGeometry x:Key="ChevronDownIcon">M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z</StreamGeometry>
-    <StreamGeometry x:Key="DismissIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
+    <!-- ステータス別カラー -->
+    <SolidColorBrush x:Key="StatusIdleBrush" Color="#6C757D"/>
+    <SolidColorBrush x:Key="StatusActiveBrush" Color="#28A745"/>
+    <SolidColorBrush x:Key="StatusProcessingBrush" Color="#FD7E14"/>
+    <SolidColorBrush x:Key="StatusErrorBrush" Color="#DC3545"/>
   </Window.Resources>
-  
+
   <Window.Styles>
-    <!-- ボタンスタイル -->
-    <Style Selector="Button.overlay-button">
+    <!-- メニュー項目スタイル -->
+    <Style Selector="Button.menu-item">
       <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
-      <Setter Property="BorderBrush" Value="{StaticResource ButtonBorderBrush}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="8"/>
-      <Setter Property="Padding" Value="0"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="8"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Margin" Value="4,2"/>
+      <Setter Property="Width" Value="50"/>
     </Style>
     
-    <Style Selector="Button.overlay-button:hover">
+    <Style Selector="Button.menu-item:hover">
+      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+    </Style>
+    
+    <Style Selector="Button.menu-item:pressed">
+      <Setter Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
+    </Style>
+    
+    <!-- ステータス表示スタイル -->
+    <Style Selector="Border.status-item">
       <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
-      <Setter Property="Opacity" Value="0.8"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="8"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Margin" Value="4,2"/>
+      <Setter Property="Width" Value="50"/>
     </Style>
     
-    <Style Selector="Button.overlay-button:pressed">
-      <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
-      <Setter Property="Opacity" Value="0.6"/>
-    </Style>
-    
-    <Style Selector="Button.overlay-button.secondary">
-      <Setter Property="Background" Value="#40606060"/>
-      <Setter Property="BorderBrush" Value="#60606060"/>
-    </Style>
-    
-    <Style Selector="Button.overlay-button.danger">
-      <Setter Property="Background" Value="#40D13438"/>
-      <Setter Property="BorderBrush" Value="#60D13438"/>
-    </Style>
-    
-    <Style Selector="Button.overlay-button.collapsed">
-      <Setter Property="Background" Value="#20FFFFFF"/>
-      <Setter Property="BorderBrush" Value="#40FFFFFF"/>
+    <!-- 最小化ボタンスタイル -->
+    <Style Selector="Button.minimize-button">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="4"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="Width" Value="50"/>
+      <Setter Property="Margin" Value="4,8,4,4"/>
+    </Style>
+    
+    <Style Selector="Button.minimize-button:hover">
+      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
     </Style>
   </Window.Styles>
 
-  <!-- メインオーバーレイ：αテスト向け基本実装 -->
+  <!-- メインコンテナ -->
   <Grid>
+  
+  <!-- メインオーバーレイ: 縦型アイコン+テキスト構成 -->
   <Border Name="MainOverlayBorder"
-          Width="60"
-          MinHeight="240"
           Background="{StaticResource OverlayBackgroundBrush}"
-          CornerRadius="8"
-          BoxShadow="0 4 8 0 #80000000"
           BorderBrush="{StaticResource OverlayBorderBrush}"
           BorderThickness="1"
+          CornerRadius="8"
+          BoxShadow="0 4 12 0 #40000000"
+          Padding="4"
           IsVisible="{Binding !IsCollapsed}">
     
-    <StackPanel Orientation="Vertical" 
-                Spacing="4" 
-                Margin="6,8">
+    <StackPanel Orientation="Vertical" Spacing="2">
       
-      <!-- 翻訳開始/停止ボタン -->
-      <Button Name="StartStopButton"
-              Width="48" Height="48"
-              Classes="overlay-button"
+      <!-- ホーム/開始ボタン -->
+      <Button Classes="menu-item"
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartStopText}">
-        <PathIcon Width="16" Height="16"
-                  Data="{StaticResource PlayIcon}"/>
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <PathIcon Width="20" Height="20"
+                    Data="{Binding IsTranslationActive, Converter={StaticResource TranslationStateToIconConverter}}"
+                    Foreground="{StaticResource IconBrush}"/>
+          <TextBlock Text="{Binding StartStopText}"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
       </Button>
       
-      <!-- 表示切り替えボタン -->
-      <Button Name="VisibilityButton"
-              Width="48" Height="48"
-              Classes="overlay-button"
+      <!-- ドライブ/表示切り替えボタン -->
+      <Button Classes="menu-item"
               Command="{Binding ShowHideCommand}"
               IsEnabled="{Binding ShowHideEnabled}"
               ToolTip.Tip="翻訳結果の表示/非表示">
-        <PathIcon Width="16" Height="16"
-                  Data="{StaticResource ViewIcon}"/>
+        <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <PathIcon Width="18" Height="18"
+                      Data="{Binding IsOverlayVisible, Converter={StaticResource VisibilityStateToIconConverter}}"
+                      Foreground="{StaticResource IconBrush}"/>
+            <Ellipse Width="8" Height="8"
+                     Fill="{StaticResource StatusActiveBrush}"
+                     Margin="2,0,0,0"
+                     IsVisible="{Binding IsTranslationActive}"/>
+          </StackPanel>
+          <TextBlock Text="非表示"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
       </Button>
       
       <!-- 設定ボタン -->
-      <Button Name="SettingsButton"
-              Width="48" Height="48"
-              Classes="overlay-button"
+      <Button Classes="menu-item"
               Command="{Binding SettingsCommand}"
               IsEnabled="{Binding SettingsEnabled}"
               ToolTip.Tip="設定">
-        <PathIcon Width="16" Height="16"
-                  Data="{StaticResource SettingsIcon}"/>
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <PathIcon Width="18" Height="18"
+                    Data="{StaticResource SettingsIcon}"
+                    Foreground="{StaticResource IconBrush}"/>
+          <TextBlock Text="設定"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
       </Button>
       
-      <!-- ステータス表示 -->
-      <Border Width="48" 
-              Background="{StaticResource StatusBackgroundBrush}"
-              BorderBrush="{StaticResource StatusBorderBrush}"
-              BorderThickness="1"
-              CornerRadius="4"
-              Padding="4"
-              Margin="0,8,0,0">
-        <StackPanel Spacing="2">
-          <TextBlock Text="状態"
-                     FontSize="8"
-                     HorizontalAlignment="Center"
-                     Foreground="{StaticResource StatusInactiveBrush}"/>
-          <TextBlock Text="{Binding CurrentStatus}"
-                     FontSize="9"
-                     FontWeight="Bold"
-                     HorizontalAlignment="Center"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource StatusInactiveBrush}"/>
-        </StackPanel>
-      </Border>
+      <!-- 区切り線 -->
+      <Rectangle Height="1" 
+                 Fill="{StaticResource OverlayBorderBrush}"
+                 Margin="8,4" 
+                 Opacity="0.5"/>
       
-      <!-- 状態表示 -->
-      <Border Name="StatusIndicator"
-              Width="48" Height="48"
-              CornerRadius="24"
-              Background="{StaticResource StatusBackgroundBrush}"
-              BorderBrush="{StaticResource StatusBorderBrush}"
-              BorderThickness="2">
-        <Ellipse Name="StatusCircle"
-                 Width="20" Height="20"
-                 Fill="{StaticResource StatusInactiveBrush}"/>
+      <!-- システム情報 -->
+      <Border Classes="status-item">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <PathIcon Width="16" Height="16"
+                      Data="{StaticResource SystemIcon}"
+                      Foreground="{StaticResource IconBrush}"/>
+            <Ellipse Width="8" Height="8"
+                     Fill="{Binding CurrentStatus, Converter={StaticResource StatusToColorConverter}}"
+                     Margin="2,0,0,0"/>
+          </StackPanel>
+          <TextBlock Text="状態"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
       </Border>
       
       <!-- 区切り線 -->
       <Rectangle Height="1" 
-                 Fill="{StaticResource SeparatorBrush}"
-                 Margin="12,8" 
-                 Opacity="0.3"/>
+                 Fill="{StaticResource OverlayBorderBrush}"
+                 Margin="8,4" 
+                 Opacity="0.5"/>
       
-      <!-- 折り畳みボタン -->
-      <Button Name="FoldButton"
-              Width="48" Height="48"
-              Classes="overlay-button secondary"
+      <!-- 最小化ボタン -->
+      <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
-              ToolTip.Tip="折り畳み">
-        <PathIcon Width="16" Height="16"
-                  Data="{StaticResource ChevronUpIcon}"/>
-      </Button>
-      
-      <!-- 終了ボタン -->
-      <Button Name="ExitButton"
-              Width="48" Height="48"
-              Classes="overlay-button danger"
-              Command="{Binding ExitCommand}"
-              ToolTip.Tip="終了">
-        <PathIcon Width="16" Height="16"
-                  Data="{StaticResource DismissIcon}"/>
+              ToolTip.Tip="最小化">
+        <StackPanel Orientation="Horizontal" Spacing="3" HorizontalAlignment="Center">
+          <PathIcon Width="10" Height="10"
+                    Data="{StaticResource ChevronUpIcon}"
+                    Foreground="{StaticResource IconBrush}"
+                    VerticalAlignment="Center"/>
+          <TextBlock Text="縮小"
+                     FontSize="8"
+                     VerticalAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
       </Button>
       
     </StackPanel>
   </Border>
 
-  <!-- 折り畳み状態 -->
+  <!-- 最小化状態 -->
   <Border Name="CollapsedOverlayBorder"
-          Width="48"
-          Height="64"
+          Width="40"
+          Height="40"
           Background="{StaticResource OverlayBackgroundBrush}"
-          CornerRadius="8"
-          BoxShadow="0 4 8 0 #80000000"
           BorderBrush="{StaticResource OverlayBorderBrush}"
           BorderThickness="1"
+          CornerRadius="20"
+          BoxShadow="0 2 8 0 #40000000"
           IsVisible="{Binding IsCollapsed}">
     
-    <StackPanel Orientation="Vertical" 
-                Spacing="4" 
-                Margin="4">
-      
-      <!-- 状態表示のみ -->
-      <Border Name="CollapsedStatusIndicator"
-              Width="40" Height="40"
-              CornerRadius="20"
-              Background="{StaticResource StatusBackgroundBrush}"
-              BorderBrush="{StaticResource StatusBorderBrush}"
-              BorderThickness="2">
-        <Ellipse Width="16" Height="16"
-                 Fill="{StaticResource StatusInactiveBrush}"/>
-      </Border>
-      
-      <!-- 展開ボタン -->
-      <Button Name="ExpandButton"
-              Width="40" Height="16"
-              Classes="overlay-button collapsed"
-              Command="{Binding FoldCommand}"
-              ToolTip.Tip="展開">
+    <Button Classes="minimize-button"
+            Command="{Binding FoldCommand}"
+            ToolTip.Tip="展開"
+            Background="Transparent"
+            BorderThickness="0"
+            Width="36"
+            Height="36">
+      <StackPanel Orientation="Vertical" Spacing="2">
         <PathIcon Width="12" Height="12"
-                  Data="{StaticResource ChevronDownIcon}"/>
-      </Button>
-      
-    </StackPanel>
+                  Data="{StaticResource ChevronDownIcon}"
+                  Foreground="{StaticResource IconBrush}"/>
+        <Ellipse Width="6" Height="6"
+                 Fill="{Binding CurrentStatus, Converter={StaticResource StatusToColorConverter}}"/>
+      </StackPanel>
+    </Button>
   </Border>
 
   </Grid>
-
 </Window>
