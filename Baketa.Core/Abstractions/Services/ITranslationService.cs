@@ -138,24 +138,9 @@ namespace Baketa.Core.Abstractions.Services;
         Local = 0,
         
         /// <summary>
-        /// Google翻訳
+        /// Google Gemini AI翻訳
         /// </summary>
-        Google = 1,
-        
-        /// <summary>
-        /// DeepL
-        /// </summary>
-        DeepL = 2,
-        
-        /// <summary>
-        /// Microsoft翻訳
-        /// </summary>
-        Microsoft = 3,
-        
-        /// <summary>
-        /// カスタムAPI
-        /// </summary>
-        Custom = 4
+        Gemini = 1
     }
     
     /// <summary>

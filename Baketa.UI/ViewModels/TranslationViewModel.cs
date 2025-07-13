@@ -24,7 +24,7 @@ namespace Baketa.UI.ViewModels;
         }
         
         // 翻訳エンジン
-        private string _translationEngine = "Google";
+        private string _translationEngine = "ローカルモデル";
         public string TranslationEngine
         {
             get => _translationEngine;
@@ -77,7 +77,7 @@ namespace Baketa.UI.ViewModels;
         }
         
         // 翻訳エンジン選択肢
-        public string[] AvailableEngines { get; } = ["Google", "DeepL", "Microsoft", "ローカルモデル"];
+        public string[] AvailableEngines { get; } = ["ローカルモデル", "Gemini"];
         
         // 言語選択肢
         public string[] AvailableLanguages { get; } = [
@@ -134,10 +134,8 @@ namespace Baketa.UI.ViewModels;
                 // 翻訳エンジンによって結果を変える（デモ用）
                 TranslatedText = TranslationEngine switch
                 {
-                    "Google" => "Translation Test",
-                    "DeepL" => "Translation Test (DeepL)",
-                    "Microsoft" => "Translation Test (Microsoft)",
                     "ローカルモデル" => "Translation Test (Local)",
+                    "Gemini" => "Translation Test (Gemini)",
                     _ => "Translation Test"
                 };
             }

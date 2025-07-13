@@ -12,7 +12,7 @@ namespace Baketa.Core.Settings.Handlers;
 /// </summary>
 public abstract class AlphaTestSettingsHandlerBase : ISettingsHandler
 {
-    protected readonly ILogger Logger;
+    protected ILogger Logger { get; }
 
     protected AlphaTestSettingsHandlerBase(ILogger logger)
     {

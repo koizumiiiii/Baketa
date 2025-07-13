@@ -67,9 +67,9 @@ namespace Baketa.Core.Translation.DI;
             // HttpClientを登録
             services.AddHttpClient();
             
-            // TODO: 実際のプロダクション用翻訳エンジンをここに登録
-            // 例: services.AddSingleton<ITranslationEngine, GoogleTranslationEngine>();
-            // 例: services.AddSingleton<ITranslationEngine, DeepLTranslationEngine>();
+            // プロダクション用翻訳エンジン
+            // Local: OPUS-MT翻訳エンジン
+            // Gemini: Google Gemini AI翻訳エンジン
             
             // 注意: DummyEngineとSimpleEngineはテスト用のため、プロダクションコードでは使用しない
             // テスト時は Baketa.Core.Tests.Translation.Testing 名前空間から利用可能
