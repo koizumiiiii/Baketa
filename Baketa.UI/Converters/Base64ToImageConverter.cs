@@ -50,7 +50,7 @@ public class Base64ToImageConverter : IValueConverter
     /// <summary>
     /// フォールバック用のプレースホルダー画像を作成
     /// </summary>
-    private static Bitmap CreateFallbackImage()
+    private static WriteableBitmap CreateFallbackImage()
     {
         // 64x64のグレープレースホルダー画像を作成
         var bitmap = new WriteableBitmap(new Avalonia.PixelSize(64, 64), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul);

@@ -15,7 +15,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// 翻訳履歴画面のビューモデル
     /// </summary>
-    internal sealed class HistoryViewModel : Framework.ViewModelBase
+    public sealed class HistoryViewModel : Framework.ViewModelBase
     {
         // 検索関連
         private string _searchText = string.Empty;

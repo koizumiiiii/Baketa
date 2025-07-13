@@ -15,7 +15,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// アクセシビリティ設定を管理するビューモデル
     /// </summary>
-    internal sealed class AccessibilitySettingsViewModel : Framework.ViewModelBase
+    public sealed class AccessibilitySettingsViewModel : Framework.ViewModelBase
     {
         private readonly ISettingsService _settingsService;
         

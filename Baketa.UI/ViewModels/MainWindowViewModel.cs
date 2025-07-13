@@ -17,7 +17,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// メインウィンドウのビューモデル
     /// </summary>
-    internal sealed class MainWindowViewModel : Framework.ViewModelBase
+    public sealed class MainWindowViewModel : Framework.ViewModelBase
     {
         // 選択中のタブインデックス
         private int _selectedTabIndex;

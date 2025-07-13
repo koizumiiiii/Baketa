@@ -33,13 +33,24 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         
         AvailableWindows = [];
         
-        // コマンドの初期化
-        SelectWindowCommand = ReactiveCommand.CreateFromTask<WindowInfo>(ExecuteSelectWindowAsync);
-        CancelCommand = ReactiveCommand.Create(ExecuteCancel);
-        RefreshCommand = ReactiveCommand.CreateFromTask(ExecuteRefreshAsync);
+        // コマンドの初期化（UIスレッドで安全に初期化）
+        try
+        {
+            SelectWindowCommand = ReactiveCommand.CreateFromTask<WindowInfo>(ExecuteSelectWindowAsync,
+                outputScheduler: RxApp.MainThreadScheduler);
+            CancelCommand = ReactiveCommand.Create(ExecuteCancel,
+                outputScheduler: RxApp.MainThreadScheduler);
+            RefreshCommand = ReactiveCommand.CreateFromTask(ExecuteRefreshAsync,
+                outputScheduler: RxApp.MainThreadScheduler);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "WindowSelectionDialogViewModelのReactiveCommand初期化エラー");
+            throw;
+        }
         
-        // 初期ロード
-        _ = Task.Run(LoadAvailableWindowsAsync);
+        // 初期ロード（非同期で安全に実行）
+        _ = LoadAvailableWindowsAsync();
     }
 
     /// <summary>
@@ -55,9 +66,23 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         get => _selectedWindow;
         set
         {
-            this.RaiseAndSetIfChanged(ref _selectedWindow, value);
-            // CanSelectプロパティの変更通知
-            this.RaisePropertyChanged(nameof(CanSelect));
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _selectedWindow, value);
+                // CanSelectプロパティの変更通知
+                this.RaisePropertyChanged(nameof(CanSelect));
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でSelectedWindow設定失敗 - 直接設定で続行");
+                _selectedWindow = value;
+                // 直接設定でもCanSelectの通知を試行
+                try
+                {
+                    this.RaisePropertyChanged(nameof(CanSelect));
+                }
+                catch { /* セカンダリ例外は無視 */ }
+            }
         }
     }
 
@@ -67,7 +92,18 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     public new bool IsLoading
     {
         get => _isLoading;
-        private set => this.RaiseAndSetIfChanged(ref _isLoading, value);
+        private set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _isLoading, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でIsLoading設定失敗 - 直接設定で続行");
+                _isLoading = value;
+            }
+        }
     }
 
     /// <summary>
@@ -102,7 +138,73 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     public bool IsClosed
     {
         get => _isClosed;
-        private set => this.RaiseAndSetIfChanged(ref _isClosed, value);
+        private set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _isClosed, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でIsClosed設定失敗 - 直接設定で続行");
+                _isClosed = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ウィンドウが翻訳対象として有効かを判定
+    /// </summary>
+    /// <param name="window">ウィンドウ情報</param>
+    /// <returns>有効な場合はtrue</returns>
+    private static bool IsValidWindow(WindowInfo window)
+    {
+        // 基本的な条件チェック
+        if (string.IsNullOrWhiteSpace(window.Title))
+            return false;
+        
+        // 表示状態のチェック
+        if (!window.IsVisible || window.IsMinimized)
+            return false;
+        
+        // ウィンドウサイズの有効性チェック
+        if (window.Bounds.Width <= 0 || window.Bounds.Height <= 0)
+            return false;
+        
+        // 極小ウィンドウの除外（翻訳には適さない）
+        if (window.Bounds.Width < 100 || window.Bounds.Height < 50)
+            return false;
+        
+        // システムウィンドウ系の除外
+        if (IsSystemWindow(window.Title))
+            return false;
+        
+        return true;
+    }
+
+    /// <summary>
+    /// システムウィンドウかどうかを判定
+    /// </summary>
+    /// <param name="title">ウィンドウタイトル</param>
+    /// <returns>システムウィンドウの場合はtrue</returns>
+    private static bool IsSystemWindow(string title)
+    {
+        var systemWindowPatterns = new[]
+        {
+            "Program Manager",
+            "Desktop Window Manager",
+            "Windows Shell Experience Host",
+            "Microsoft Text Input Application",
+            "Task Manager",
+            "Settings",
+            "Control Panel",
+            "Registry Editor",
+            "Event Viewer",
+            "Device Manager"
+        };
+
+        return systemWindowPatterns.Any(pattern => 
+            title.Contains(pattern, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -112,37 +214,49 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     {
         try
         {
-            IsLoading = true;
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsLoading = true;
+            });
             Logger?.LogDebug("Loading available windows...");
 
-            await Task.Run(async () =>
+            // バックグラウンドでウィンドウリストを取得
+            var windows = await Task.Run(() =>
             {
-                var windows = _windowManager.GetRunningApplicationWindows()
-                    .Where(w => w.IsVisible && !w.IsMinimized && !string.IsNullOrWhiteSpace(w.Title))
+                return _windowManager.GetRunningApplicationWindows()
+                    .Where(IsValidWindow)
                     .Where(w => w.Title != "WindowSelectionDialog") // 自分自身を除外
-                    .OrderBy(w => w.Title)
                     .ToList();
-
-                // UIスレッドで更新
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    AvailableWindows.Clear();
-                    foreach (var window in windows)
-                    {
-                        AvailableWindows.Add(window);
-                    }
-                });
             }).ConfigureAwait(false);
+
+            // UIスレッドで更新
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AvailableWindows.Clear();
+                foreach (var window in windows)
+                {
+                    AvailableWindows.Add(window);
+                }
+            });
 
             Logger?.LogDebug("Loaded {Count} available windows", AvailableWindows.Count);
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Failed to load available windows");
+            
+            // フォールバック：空の一覧を表示
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AvailableWindows.Clear();
+            });
         }
         finally
         {
-            IsLoading = false;
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsLoading = false;
+            });
         }
     }
 
@@ -163,8 +277,11 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})", 
                 selectedWindow.Title, selectedWindow.Handle);
 
-            DialogResult = selectedWindow;
-            IsClosed = true;
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                DialogResult = selectedWindow;
+                IsClosed = true;
+            });
 
             // ウィンドウ選択イベントを発行
             Logger?.LogInformation("Publishing StartTranslationRequestEvent");

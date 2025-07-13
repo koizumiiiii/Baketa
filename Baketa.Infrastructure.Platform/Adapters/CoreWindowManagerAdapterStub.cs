@@ -119,6 +119,7 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             // 基盤のIWindowManagerを使ってウィンドウを取得
             var windows = _windowManager.GetRunningApplicationWindows();
             var windowList = new List<Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo>();
+            var activeWindow = GetActiveWindowHandle();
             
             foreach (var window in windows)
             {
@@ -134,27 +135,51 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     title.Contains("WindowSelectionDialog", StringComparison.OrdinalIgnoreCase) ||
                     title.Contains("MainOverlay", StringComparison.OrdinalIgnoreCase))
                     continue;
+
+                // ウィンドウの状態チェック
+                bool isVisible = IsWindow(handle) && IsWindowVisible(handle);
+                bool isMinimized = IsIconic(handle);
+                var bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty;
+                
+                // 最小化ウィンドウの除外
+                if (isMinimized)
+                    continue;
+                
+                // 画面外ウィンドウの除外（座標が(-32000, -32000)のような場合）
+                if (IsWindowOffScreen(bounds))
+                    continue;
+                
+                // 無効な表示状態のウィンドウを除外
+                if (!isVisible || bounds.Width <= 0 || bounds.Height <= 0)
+                    continue;
                     
                 var windowInfo = new Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo
                 {
                     Handle = handle,
                     Title = title,
-                    IsVisible = true, // 最小化されていても選択可能とする
-                    IsMinimized = _windowManager.IsMinimized(handle),
-                    Bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty,
+                    IsVisible = isVisible,
+                    IsMinimized = isMinimized,
+                    IsMaximized = IsZoomed(handle),
+                    Bounds = bounds,
                     ThumbnailBase64 = GetWindowThumbnail(handle) ?? string.Empty
                 };
                 
                 windowList.Add(windowInfo);
             }
             
-            // 実際のウィンドウのみを表示（テストダミーウィンドウは削除）
-            
-            return windowList;
+            // アクティブウィンドウを優先表示（ソート）
+            return [.. windowList
+                .OrderByDescending(w => w.Handle == activeWindow) // アクティブウィンドウを最初に
+                .ThenByDescending(w => w.IsMaximized) // 最大化ウィンドウを次に
+                .ThenBy(w => w.Title)]; // タイトル順でソート
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // エラー時はテスト用のダミーウィンドウを返す
+            // エラーログを記録
+            System.Diagnostics.Debug.WriteLine($"❌ ウィンドウ一覧取得エラー: {ex.Message}");
+            
+            // エラー時はテスト用のダミーウィンドウを返す（開発時のみ）
+            #if DEBUG
             return
             [
                 new Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo
@@ -163,7 +188,9 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     Title = "テストウィンドウ1 - メモ帳",
                     IsVisible = true,
                     IsMinimized = false,
-                    Bounds = new Rectangle(100, 100, 800, 600)
+                    IsMaximized = false,
+                    Bounds = new Rectangle(100, 100, 800, 600),
+                    ThumbnailBase64 = GenerateFallbackThumbnail(160, 120)
                 },
                 new Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo
                 {
@@ -171,7 +198,9 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     Title = "テストウィンドウ2 - ブラウザ",
                     IsVisible = true,
                     IsMinimized = false,
-                    Bounds = new Rectangle(200, 200, 1024, 768)
+                    IsMaximized = false,
+                    Bounds = new Rectangle(200, 200, 1024, 768),
+                    ThumbnailBase64 = GenerateFallbackThumbnail(160, 120)
                 },
                 new Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo
                 {
@@ -179,9 +208,15 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
                     Title = "テストウィンドウ3 - ゲーム",
                     IsVisible = true,
                     IsMinimized = false,
-                    Bounds = new Rectangle(0, 0, 1920, 1080)
+                    IsMaximized = true,
+                    Bounds = new Rectangle(0, 0, 1920, 1080),
+                    ThumbnailBase64 = GenerateFallbackThumbnail(160, 120)
                 }
             ];
+            #else
+            // リリース時は空の一覧を返す
+            return [];
+            #endif
         }
     }
     
@@ -199,10 +234,16 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     {
         try
         {
-            // ウィンドウ可視性チェック
-            if (!IsWindow(handle) || !IsWindowVisible(handle))
+            // ウィンドウ可視性チェック（安全性を強化）
+            if (handle == IntPtr.Zero || !IsWindow(handle))
             {
-                System.Diagnostics.Debug.WriteLine($"❌ ウィンドウが無効または非表示: Handle={handle}");
+                System.Diagnostics.Debug.WriteLine($"❌ 無効なウィンドウハンドル: Handle={handle}");
+                return GenerateFallbackThumbnail(maxWidth, maxHeight);
+            }
+            
+            if (!IsWindowVisible(handle))
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ ウィンドウが非表示: Handle={handle}");
                 return GenerateFallbackThumbnail(maxWidth, maxHeight);
             }
 
@@ -404,6 +445,29 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             return string.Empty; // nullの代わりに空文字列を返す
         }
     }
+
+    /// <summary>
+    /// ウィンドウが画面外に配置されているかを判定
+    /// </summary>
+    /// <param name="bounds">ウィンドウの座標</param>
+    /// <returns>画面外の場合はtrue</returns>
+    private static bool IsWindowOffScreen(Rectangle bounds)
+    {
+        // 最小化時の典型的な座標値をチェック
+        if (bounds.X <= -30000 || bounds.Y <= -30000)
+            return true;
+        
+        // 画面領域外に完全に配置されている場合
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        
+        // ウィンドウが画面から完全に外れている場合
+        if (bounds.Right < 0 || bounds.Bottom < 0 || 
+            bounds.Left > screenWidth || bounds.Top > screenHeight)
+            return true;
+        
+        return false;
+    }
     
     #region Win32 API
     
@@ -430,6 +494,9 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(IntPtr hWnd);
     
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);

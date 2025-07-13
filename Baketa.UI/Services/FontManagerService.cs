@@ -31,16 +31,11 @@ public interface IFontManagerService
 /// <summary>
 /// フォント管理サービスの実装
 /// </summary>
-public class FontManagerService : IFontManagerService
+public class FontManagerService(ILogger<FontManagerService> logger) : IFontManagerService
 {
-    private readonly ILogger<FontManagerService> _logger;
+    private readonly ILogger<FontManagerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private string _currentSourceLanguage = "Japanese";
     private string _currentTargetLanguage = "English";
-
-    public FontManagerService(ILogger<FontManagerService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public FontFamily GetFontFamily(string language, bool isBold = false)
     {

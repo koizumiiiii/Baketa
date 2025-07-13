@@ -31,12 +31,19 @@ namespace Baketa.UI;
         [STAThread]
         public static void Main(string[] args)
         {
-            // ファイル出力で確実にログを残す
+            // ファイル出力で確実にログを残す（絶対パスで保存）
             try
             {
-                File.WriteAllText("debug_startup.txt", $"🚀 Baketa.UI.exe 起動開始 - {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n");
+                var startupLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_startup.txt");
+                File.WriteAllText(startupLogPath, $"🚀 Baketa.UI.exe 起動開始 - {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n");
+                File.AppendAllText(startupLogPath, $"📁 BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}\n");
+                File.AppendAllText(startupLogPath, $"📁 CurrentDirectory: {Environment.CurrentDirectory}\n");
+                Console.WriteLine($"📝 起動ログ作成: {startupLogPath}");
             }
-            catch { /* ファイル出力失敗は無視 */ }
+            catch (Exception fileEx) 
+            { 
+                Console.WriteLine($"❌ 起動ログ作成失敗: {fileEx.Message}");
+            }
             
             Console.WriteLine("🚀 Baketa.UI.exe 起動開始");
             System.Diagnostics.Debug.WriteLine("🚀 Baketa.UI.exe 起動開始");
@@ -54,6 +61,17 @@ namespace Baketa.UI;
                     System.Diagnostics.Debug.WriteLine($"💥 FATAL: Exception Type: {ex.GetType().Name}");
                     System.Diagnostics.Debug.WriteLine($"💥 FATAL: Message: {ex.Message}");
                     System.Diagnostics.Debug.WriteLine($"💥 FATAL: StackTrace: {ex.StackTrace}");
+                    
+                    // ファイルにも記録
+                    try
+                    {
+                        var crashLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log.txt");
+                        File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 FATAL: {ex.GetType().Name}: {ex.Message}\n");
+                        File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 StackTrace: {ex.StackTrace}\n");
+                        File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 IsTerminating: {e.IsTerminating}\n");
+                        Console.WriteLine($"📝 クラッシュログ作成: {crashLogPath}");
+                    }
+                    catch { /* ファイル出力失敗は無視 */ }
                 }
             };
             
@@ -64,6 +82,11 @@ namespace Baketa.UI;
                 
                 // DIコンテナの初期化
                 ConfigureServices();
+                
+                // OCRエンジン事前初期化（バックグラウンド）
+                Console.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
+                System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
+                _ = Task.Run(PreInitializeOcrEngineAsync);
                 
                 Console.WriteLine("🎯 Avalonia アプリケーション開始");
                 System.Diagnostics.Debug.WriteLine("🎯 Avalonia アプリケーション開始");
@@ -169,6 +192,10 @@ namespace Baketa.UI;
             var uiModule = new UIModule();
             uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // PaddleOcrModuleの登録
+            var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
+            paddleOcrModule.RegisterServices(services);
+            
             // アダプターサービスの登録
             services.AddAdapterServices();
             
@@ -237,6 +264,64 @@ namespace Baketa.UI;
                     System.Console.WriteLine($"  - Lifetime: {reg.Lifetime}");
                     System.Console.WriteLine($"  - ImplementationType: {reg.ImplementationType?.Name ?? "Factory"}");
                 }
+            }
+        }
+        
+        /// <summary>
+        /// OCRエンジンを事前初期化してメイン処理を高速化
+        /// </summary>
+        private static async Task PreInitializeOcrEngineAsync()
+        {
+            try
+            {
+                Console.WriteLine("🚀 OCRエンジン事前初期化開始");
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                
+                // ServiceProviderが利用可能になるまで待機
+                while (ServiceProvider == null)
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                    if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
+                    {
+                        Console.WriteLine("⚠️ ServiceProvider初期化タイムアウト - OCR事前初期化を中止");
+                        return;
+                    }
+                }
+                
+                // OCRエンジンサービスを取得して初期化
+                var ocrService = ServiceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+                if (ocrService != null)
+                {
+                    Console.WriteLine("🔧 OCRエンジンサービス取得成功 - 初期化開始");
+                    
+                    // OCRエンジンを事前初期化（初期化処理のみ実行）
+                    try
+                    {
+                        // OCRエンジンの初期化のみ実行（ダミー画像処理は省略してシンプルに）
+                        await ocrService.InitializeAsync().ConfigureAwait(false);
+                        timer.Stop();
+                        
+                        Console.WriteLine($"✅ OCRエンジン事前初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
+                        System.Diagnostics.Debug.WriteLine($"✅ OCRエンジン事前初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
+                    }
+                    catch (Exception ocrEx)
+                    {
+                        timer.Stop();
+                        Console.WriteLine($"⚠️ OCRエンジン初期化部分的失敗（続行）: {ocrEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
+                        System.Diagnostics.Debug.WriteLine($"⚠️ OCRエンジン初期化部分的失敗（続行）: {ocrEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
+                    }
+                }
+                else
+                {
+                    timer.Stop();
+                    Console.WriteLine($"⚠️ OCRエンジンサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                    System.Diagnostics.Debug.WriteLine($"⚠️ OCRエンジンサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"💥 OCRエンジン事前初期化エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"💥 OCRエンジン事前初期化エラー: {ex.Message}");
             }
         }
     }

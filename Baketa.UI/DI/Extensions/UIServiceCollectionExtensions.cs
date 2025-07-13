@@ -57,6 +57,9 @@ internal static class UIServiceCollectionExtensions
         // 翻訳結果オーバーレイマネージャー
         services.AddSingleton<TranslationResultOverlayManager>();
         
+        // ローディングオーバーレイマネージャー
+        services.AddSingleton<LoadingOverlayManager>();
+        
         // 翻訳フロー統合イベントプロセッサー
         services.AddSingleton<TranslationFlowEventProcessor>();
         
