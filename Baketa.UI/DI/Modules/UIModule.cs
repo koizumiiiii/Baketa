@@ -8,6 +8,7 @@ using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Services;
 using Baketa.UI.Security;
 using Baketa.UI.DI.Modules;
+using Baketa.UI.DI.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -38,8 +39,14 @@ namespace Baketa.UI.DI.Modules;
             // UI関連サービスの登録
             RegisterUIServices(services);
             
+            // UIServiceCollectionExtensionsのサービス登録
+            services.RegisterUIServices();
+            
             // 設定系UIの登録
             RegisterSettingsUI(services);
+            
+            // 翻訳フローモジュールをDIコンテナに登録
+            services.AddSingleton<TranslationFlowModule>();
         }
 
         /// <summary>

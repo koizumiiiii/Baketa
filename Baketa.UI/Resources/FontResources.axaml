@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- LINE Font リソース (日本語) -->
+    <FontFamily x:Key="LINESeedJP">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="LINESeedJP-Bold">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Bd.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="LINESeedJP-Thin">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Th.otf#LINE Seed JP</FontFamily>
+    <FontFamily x:Key="LINESeedJP-ExtraBold">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Eb.otf#LINE Seed JP</FontFamily>
+    
+    <!-- LINE Font リソース (英語) -->
+    <FontFamily x:Key="LINESeedEN">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans</FontFamily>
+    <FontFamily x:Key="LINESeedEN-Bold">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Bd.otf#LINE Seed Sans</FontFamily>
+    <FontFamily x:Key="LINESeedEN-Heavy">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_He.otf#LINE Seed Sans</FontFamily>
+    <FontFamily x:Key="LINESeedEN-Thin">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Th.otf#LINE Seed Sans</FontFamily>
+    <FontFamily x:Key="LINESeedEN-ExtraBold">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_XBd.otf#LINE Seed Sans</FontFamily>
+    
+    <!-- Noto Sans リソース (その他言語) -->
+    <FontFamily x:Key="NotoSans">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC</FontFamily>
+    
+    <!-- 言語別フォントファミリー合成 -->
+    <FontFamily x:Key="JapaneseFont">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP, Noto Sans SC</FontFamily>
+    <FontFamily x:Key="EnglishFont">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans, Noto Sans SC</FontFamily>
+    <FontFamily x:Key="OtherLanguageFont">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP</FontFamily>
+    
+    <!-- 太字バージョン -->
+    <FontFamily x:Key="JapaneseFont-Bold">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Bd.otf#LINE Seed JP, Noto Sans SC</FontFamily>
+    <FontFamily x:Key="EnglishFont-Bold">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Bd.otf#LINE Seed Sans, Noto Sans SC</FontFamily>
+    <FontFamily x:Key="OtherLanguageFont-Bold">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Bd.otf#LINE Seed JP</FontFamily>
+
+</ResourceDictionary>

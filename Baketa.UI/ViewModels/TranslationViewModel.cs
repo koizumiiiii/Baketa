@@ -13,7 +13,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// 翻訳設定画面のビューモデル
     /// </summary>
-    internal sealed class TranslationViewModel : Framework.ViewModelBase
+    public sealed class TranslationViewModel : Framework.ViewModelBase
     {
         // 翻訳先言語
         private string _targetLanguage = "英語";

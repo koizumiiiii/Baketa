@@ -31,9 +31,16 @@ namespace Baketa.Infrastructure.Platform.DI;
                 var capturer = sp.GetRequiredService<Baketa.Core.Abstractions.Platform.Windows.IWindowsCapturer>();
                 return new CaptureAdapterStub(imageAdapter, capturer);
             });
+            // Infrastructure.Platform版のWindowManagerAdapter登録
             services.AddSingleton<IWindowManagerAdapter>(sp => {
                 var windowManager = sp.GetRequiredService<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>();
                 return new WindowManagerAdapterStub(windowManager);
+            });
+            
+            // Core.Abstractions版のWindowManagerAdapter登録（独立した実装）
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>(sp => {
+                var windowManager = sp.GetRequiredService<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>();
+                return new CoreWindowManagerAdapterStub(windowManager);
             });
             
             return services;

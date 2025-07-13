@@ -1,0 +1,152 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- メインオーバーレイ：αテスト向けスタイル -->
+  
+  <Styles.Resources>
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#FF404040"/>
+    <SolidColorBrush x:Key="SeparatorBrush" Color="#FFD0D0D0"/>
+    <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="StatusBorderBrush" Color="#FF404040"/>
+    
+    <!-- 状態別色定義 -->
+    <SolidColorBrush x:Key="StatusColorBrush" Color="#605E5C"/> <!-- デフォルト: グレー -->
+    <SolidColorBrush x:Key="StatusActiveColorBrush" Color="#107C10"/> <!-- アクティブ: 緑 -->
+    <SolidColorBrush x:Key="StatusErrorColorBrush" Color="#D13438"/> <!-- エラー: 赤 -->
+    <SolidColorBrush x:Key="StatusWarningColorBrush" Color="#FF8C00"/> <!-- 警告: オレンジ -->
+    
+    <!-- BoxShadow用の色定義 -->
+    <Color x:Key="BoxShadowColor">#60000000</Color>
+  </Styles.Resources>
+
+  <!-- オーバーレイ背景スタイル -->
+  <Style Selector="Border#MainOverlayBorder, Border#CollapsedOverlayBorder">
+    <Setter Property="Background" Value="{StaticResource OverlayBackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource OverlayBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+  </Style>
+
+  <!-- オーバーレイボタンの基本スタイル -->
+  <Style Selector="Button.overlay-button">
+    <Setter Property="Background" Value="#FFF5F5F5"/>
+    <Setter Property="BorderBrush" Value="#FF808080"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="8"/>
+    <Setter Property="Margin" Value="0"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Foreground" Value="#FF000000"/>
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <!-- オーバーレイボタンのホバー状態 -->
+  <Style Selector="Button.overlay-button:pointerover">
+    <Setter Property="Background" Value="#FFE5E5E5"/>
+    <Setter Property="RenderTransform" Value="scale(1.05)"/>
+  </Style>
+
+  <!-- オーバーレイボタンの押下状態 -->
+  <Style Selector="Button.overlay-button:pressed">
+    <Setter Property="Background" Value="#FFD0D0D0"/>
+    <Setter Property="RenderTransform" Value="scale(0.98)"/>
+  </Style>
+
+  <!-- オーバーレイボタンの無効状態 -->
+  <Style Selector="Button.overlay-button:disabled">
+    <Setter Property="Background" Value="#FFF0F0F0"/>
+    <Setter Property="Foreground" Value="#FF808080"/>
+    <Setter Property="Opacity" Value="0.6"/>
+  </Style>
+
+  <!-- セカンダリボタンスタイル -->
+  <Style Selector="Button.overlay-button.secondary">
+    <Setter Property="Background" Value="#FF909090"/>
+    <Setter Property="BorderBrush" Value="#FF606060"/>
+  </Style>
+
+  <Style Selector="Button.overlay-button.secondary:pointerover">
+    <Setter Property="Background" Value="#FF808080"/>
+  </Style>
+
+  <!-- 危険ボタンスタイル -->
+  <Style Selector="Button.overlay-button.danger">
+    <Setter Property="Background" Value="#FFD13438"/>
+    <Setter Property="BorderBrush" Value="#FFA02428"/>
+    <Setter Property="Foreground" Value="#FFFFFFFF"/>
+  </Style>
+
+  <Style Selector="Button.overlay-button.danger:pointerover">
+    <Setter Property="Background" Value="#FFB02428"/>
+  </Style>
+
+  <!-- 折り畳み状態ボタン -->
+  <Style Selector="Button.overlay-button.collapsed">
+    <Setter Property="Background" Value="#FFF5F5F5"/>
+    <Setter Property="BorderBrush" Value="#FF808080"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="4"/>
+  </Style>
+
+  <Style Selector="Button.overlay-button.collapsed:pointerover">
+    <Setter Property="Background" Value="#FFE5E5E5"/>
+  </Style>
+
+  <!-- 状態インジケーターの色分け -->
+  <Style Selector="Ellipse.inactive">
+    <Setter Property="Fill" Value="{StaticResource StatusColorBrush}"/>
+  </Style>
+
+  <Style Selector="Ellipse.active">
+    <Setter Property="Fill" Value="{StaticResource StatusActiveColorBrush}"/>
+  </Style>
+
+  <Style Selector="Ellipse.error">
+    <Setter Property="Fill" Value="{StaticResource StatusErrorColorBrush}"/>
+  </Style>
+
+  <Style Selector="Ellipse.warning">
+    <Setter Property="Fill" Value="{StaticResource StatusWarningColorBrush}"/>
+  </Style>
+
+  <!-- 状態インジケーターのアニメーション -->
+  <Style Selector="Ellipse.active">
+    <Style.Animations>
+      <Animation Duration="0:0:1" IterationCount="INFINITE">
+        <KeyFrame Cue="0%">
+          <Setter Property="Opacity" Value="1"/>
+        </KeyFrame>
+        <KeyFrame Cue="50%">
+          <Setter Property="Opacity" Value="0.6"/>
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="Opacity" Value="1"/>
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- 区切り線スタイル -->
+  <Style Selector="Rectangle">
+    <Setter Property="Fill" Value="{StaticResource SeparatorBrush}"/>
+  </Style>
+
+  <!-- ツールチップスタイル -->
+  <Style Selector="ToolTip">
+    <Setter Property="Background" Value="#F0000000"/>
+    <Setter Property="Foreground" Value="#FFFFFFFF"/>
+    <Setter Property="BorderBrush" Value="#40FFFFFF"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="FontSize" Value="11"/>
+  </Style>
+
+</Styles>

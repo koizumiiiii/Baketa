@@ -13,6 +13,7 @@
 		<!-- <UseWindowsForms>true</UseWindowsForms> -->
 		<LangVersion>12</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 -->
 		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
 		

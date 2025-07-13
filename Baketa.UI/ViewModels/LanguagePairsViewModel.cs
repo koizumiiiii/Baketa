@@ -20,7 +20,7 @@ namespace Baketa.UI.ViewModels;
 /// <summary>
 /// 言語ペア設定のビューモデル
 /// </summary>
-internal sealed class LanguagePairsViewModel : Framework.ViewModelBase
+public sealed class LanguagePairsViewModel : Framework.ViewModelBase
 {
     // LoggerMessageデリゲート
     private static readonly Action<ILogger, string, Exception?> _logLanguagePairOperationError =

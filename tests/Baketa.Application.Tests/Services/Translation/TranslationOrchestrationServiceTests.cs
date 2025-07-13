@@ -7,6 +7,7 @@ using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Tests.TestUtilities;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
@@ -29,6 +30,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 {
     private readonly Mock<ICaptureService> _captureServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
+    private readonly Mock<IOcrEngine> _ocrEngineMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
     
@@ -43,6 +45,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // Mock オブジェクトの初期化
         _captureServiceMock = new Mock<ICaptureService>();
         _settingsServiceMock = new Mock<ISettingsService>();
+        _ocrEngineMock = new Mock<IOcrEngine>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
         _imageMock = new Mock<IImage>();
 
@@ -51,11 +54,15 @@ public class TranslationOrchestrationServiceTests : IDisposable
         
         // Settings Service のモック設定
         SetupSettingsServiceMocks();
+        
+        // OCR Engine のモック設定
+        SetupOcrEngineMocks();
 
         // テスト対象サービスのインスタンス作成
         _service = new TranslationOrchestrationService(
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
+            _ocrEngineMock.Object,
             _loggerMock.Object);
     }
 
@@ -524,6 +531,43 @@ public class TranslationOrchestrationServiceTests : IDisposable
     {
         // 必要に応じて設定関連のモックを追加
         // 現在は TranslationOrchestrationService が設定に直接依存していないため空
+    }
+
+    /// <summary>
+    /// OCRエンジンのモック設定
+    /// </summary>
+    private void SetupOcrEngineMocks()
+    {
+        // OCRエンジンの基本設定
+        _ocrEngineMock.Setup(x => x.IsInitialized).Returns(true);
+        _ocrEngineMock.Setup(x => x.EngineName).Returns("MockOcrEngine");
+        _ocrEngineMock.Setup(x => x.EngineVersion).Returns("1.0.0");
+        _ocrEngineMock.Setup(x => x.CurrentLanguage).Returns("jpn");
+
+        // 初期化メソッドのモック
+        _ocrEngineMock.Setup(x => x.InitializeAsync(It.IsAny<OcrEngineSettings>(), It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(true);
+
+        // OCR認識メソッドのモック - テキスト有りの結果を返す
+        var mockTextRegion = new OcrTextRegion("模擬OCRテキスト", new System.Drawing.Rectangle(0, 0, 100, 20), 0.85);
+        var mockResults = new OcrResults(
+            [mockTextRegion],
+            _imageMock.Object,
+            TimeSpan.FromMilliseconds(500),
+            "jpn");
+
+        _ocrEngineMock.Setup(x => x.RecognizeAsync(
+                It.IsAny<IImage>(),
+                It.IsAny<IProgress<OcrProgress>>(),
+                It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(mockResults);
+
+        _ocrEngineMock.Setup(x => x.RecognizeAsync(
+                It.IsAny<IImage>(),
+                It.IsAny<System.Drawing.Rectangle?>(),
+                It.IsAny<IProgress<OcrProgress>>(),
+                It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(mockResults);
     }
 
     /// <summary>

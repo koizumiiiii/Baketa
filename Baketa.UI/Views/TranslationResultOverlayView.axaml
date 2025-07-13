@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="150"
+        x:Class="Baketa.UI.Views.TranslationResultOverlayView"
+        x:DataType="vm:TranslationResultOverlayViewModel"
+        Title="Translation Result Overlay"
+        WindowStartupLocation="Manual"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        CanResize="False"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="0"
+        Width="{Binding MaxWidth}"
+        SizeToContent="Height"
+>
+
+  <Window.Resources>
+    <!-- カラーリソース -->
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#F0FFFFFF" Opacity="{Binding OverlayOpacity}"/>
+    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#40000000"/>
+    <SolidColorBrush x:Key="TranslationTextBrush" Color="#1F1F1F"/>
+    <SolidColorBrush x:Key="OriginalTextBrush" Color="#606060"/>
+    <SolidColorBrush x:Key="ShadowBrush" Color="#20000000"/>
+  </Window.Resources>
+
+  <!-- メインコンテンツ -->
+  <Border Background="{StaticResource OverlayBackgroundBrush}"
+          BorderBrush="{StaticResource OverlayBorderBrush}"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="8,6"
+          Margin="4"
+          BoxShadow="0 4 8 0 #40000000">
+    
+    <!-- 翻訳結果表示 -->
+    <StackPanel Spacing="4">
+      
+      <!-- 翻訳済みテキスト（メイン） -->
+      <TextBlock Text="{Binding TranslatedText}"
+                 FontSize="14"
+                 FontWeight="Medium"
+                 Foreground="{StaticResource TranslationTextBrush}"
+                 TextWrapping="Wrap"
+                 LineHeight="18"
+                 MaxWidth="{Binding MaxWidth}"
+                 IsVisible="True"
+                 Classes="TranslationText"/>
+      
+      <!-- 元テキスト（デバッグ用、αテストでは表示） -->
+      <TextBlock Text="{Binding OriginalText}"
+                 FontSize="11"
+                 FontWeight="Normal"
+                 Foreground="{StaticResource OriginalTextBrush}"
+                 TextWrapping="Wrap"
+                 LineHeight="14"
+                 MaxWidth="{Binding MaxWidth}"
+                 IsVisible="True"
+                 Classes="TranslationText"/>
+      
+      <!-- 区切り線（デバッグ用、αテストでは非表示） -->
+      <Rectangle Height="1" 
+                 Fill="{StaticResource OverlayBorderBrush}"
+                 IsVisible="False"/>
+      
+    </StackPanel>
+  </Border>
+</Window>

@@ -18,7 +18,7 @@ public class PaddleOcrEngineTests : IDisposable
 {
     private readonly Mock<ILogger<PaddleOcrEngine>> _mockLogger;
     private readonly Mock<IModelPathResolver> _mockModelPathResolver;
-    private readonly SafeTestPaddleOcrEngine _ocrEngine;
+    private readonly TestData.SafeTestPaddleOcrEngine _ocrEngine;
     private bool _disposed;
 
     public PaddleOcrEngineTests()
@@ -30,7 +30,7 @@ public class PaddleOcrEngineTests : IDisposable
         SetupModelPathResolverMock();
         
         // 安全なテスト用エンジンのみを使用
-        _ocrEngine = new SafeTestPaddleOcrEngine(
+        _ocrEngine = new TestData.SafeTestPaddleOcrEngine(
             _mockModelPathResolver.Object, 
             _mockLogger.Object, 
             skipRealInitialization: true);

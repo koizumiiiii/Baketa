@@ -1,10 +1,12 @@
 using System;
+using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
@@ -20,6 +22,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 {
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
+    private readonly IOcrEngine _ocrEngine;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -50,17 +53,21 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     /// <param name="captureService">キャプチャサービス</param>
     /// <param name="settingsService">設定サービス</param>
+    /// <param name="ocrEngine">OCRエンジン</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
         ISettingsService settingsService,
+        IOcrEngine ocrEngine,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
+        ArgumentNullException.ThrowIfNull(ocrEngine);
         
         _captureService = captureService;
         _settingsService = settingsService;
+        _ocrEngine = ocrEngine;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -556,29 +563,118 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private async Task<TranslationResult> ExecuteTranslationAsync(
         string translationId, 
-        IImage _, 
+        IImage image, 
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
+        string originalText = string.Empty;
+        double ocrConfidence = 0.0;
 
         try
         {
             // OCR処理
             PublishProgress(translationId, TranslationStatus.ProcessingOCR, 0.3f, "テキスト認識中...");
             
-            // TODO: 実際のOCRサービスとの統合
-            // 現在は模擬実装
-            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
-            var originalText = "模擬OCRテキスト"; // 実際のOCR結果で置き換え
+            Console.WriteLine($"🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}{Environment.NewLine}");
+            
+            // OCRエンジンが初期化されていない場合は初期化
+            if (!_ocrEngine.IsInitialized)
+            {
+                Console.WriteLine($"🛠️ OCRエンジン初期化開始");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛠️ OCRエンジン初期化開始{Environment.NewLine}");
+                
+                var settings = new OcrEngineSettings
+                {
+                    Language = "jpn", // 日本語
+                    DetectionThreshold = 0.3,
+                    RecognitionThreshold = 0.5
+                };
+                
+                try
+                {
+                    await _ocrEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
+                    Console.WriteLine($"✅ OCRエンジン初期化完了");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCRエンジン初期化完了{Environment.NewLine}");
+                }
+                catch (Exception initEx)
+                {
+                    Console.WriteLine($"❌ OCRエンジン初期化エラー: {initEx.Message}");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCRエンジン初期化エラー: {initEx.Message}{Environment.NewLine}");
+                    throw;
+                }
+            }
+            
+            // 実際のOCR処理を実行
+            Console.WriteLine($"🔍 画像オブジェクト確認:");
+            Console.WriteLine($"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}");
+            Console.WriteLine($"   📊 画像null判定: {image == null}");
+            
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 画像オブジェクト確認:{Environment.NewLine}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}{Environment.NewLine}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 画像null判定: {image == null}{Environment.NewLine}");
+            
+            try
+            {
+                Console.WriteLine($"🔍 OCR処理開始 - 画像サイズ: {image.Width}x{image.Height}");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image.Width}x{image.Height}{Environment.NewLine}");
+            }
+            catch (Exception sizeEx)
+            {
+                Console.WriteLine($"❌ 画像サイズ取得エラー: {sizeEx.Message}");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 画像サイズ取得エラー: {sizeEx.Message}{Environment.NewLine}");
+                throw;
+            }
+            
+            var ocrResults = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+            
+            Console.WriteLine($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}{Environment.NewLine}");
+            
+            if (ocrResults.HasText)
+            {
+                originalText = ocrResults.Text;
+                ocrConfidence = ocrResults.TextRegions.Count > 0 
+                    ? ocrResults.TextRegions.Average(r => r.Confidence) 
+                    : 0.0;
+                
+                Console.WriteLine($"✅ OCR認識成功:");
+                Console.WriteLine($"   📖 認識テキスト: '{originalText}'");
+                Console.WriteLine($"   📊 信頼度: {ocrConfidence:F2}");
+                Console.WriteLine($"   🔢 テキスト長: {originalText.Length}");
+                
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCR認識成功:{Environment.NewLine}");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 認識テキスト: '{originalText}'{Environment.NewLine}");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {ocrConfidence:F2}{Environment.NewLine}");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔢 テキスト長: {originalText.Length}{Environment.NewLine}");
+                    
+                _logger?.LogDebug("OCR認識成功: テキスト長={Length}, 信頼度={Confidence:F2}", 
+                    originalText.Length, ocrConfidence);
+            }
+            else
+            {
+                Console.WriteLine("❌ OCR処理でテキストが検出されませんでした");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCR処理でテキストが検出されませんでした{Environment.NewLine}");
+                _logger?.LogWarning("OCR処理でテキストが検出されませんでした");
+                originalText = string.Empty;
+            }
 
             // 翻訳処理
             PublishProgress(translationId, TranslationStatus.Translating, 0.7f, "翻訳中...");
             
-            // TODO: 実際の翻訳サービスとの統合
-            // 現在は模擬実装
-            await Task.Delay(800, cancellationToken).ConfigureAwait(false);
-            var translatedText = "模擬翻訳テキスト"; // 実際の翻訳結果で置き換え
+            string translatedText;
+            if (!string.IsNullOrWhiteSpace(originalText))
+            {
+                // TODO: 実際の翻訳サービスとの統合
+                // 現在は模擬実装
+                await Task.Delay(800, cancellationToken).ConfigureAwait(false);
+                translatedText = $"[翻訳] {originalText}"; // 実際の翻訳結果で置き換え
+            }
+            else
+            {
+                translatedText = "テキストが検出されませんでした";
+            }
 
             // 完了
             PublishProgress(translationId, TranslationStatus.Completed, 1.0f, "翻訳完了");
@@ -593,15 +689,27 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 TranslatedText = translatedText,
                 DetectedLanguage = "ja", // 実際の検出言語で置き換え
                 TargetLanguage = "en",   // 実際の設定で置き換え
-                Confidence = 0.85f,      // 実際の信頼度で置き換え
+                Confidence = (float)ocrConfidence,
                 CapturedImage = null,    // 必要に応じて画像を保持
                 ProcessingTime = processingTime
             };
         }
 #pragma warning disable CA1031 // 翻訳処理のエラーハンドリングでアプリケーション安定性のため一般例外をキャッチ
-        catch (Exception)
+        catch (Exception ex)
         {
             var processingTime = DateTime.UtcNow - startTime;
+            
+            Console.WriteLine($"❌ 翻訳処理で例外発生:");
+            Console.WriteLine($"   🔍 例外タイプ: {ex.GetType().Name}");
+            Console.WriteLine($"   📝 例外メッセージ: {ex.Message}");
+            Console.WriteLine($"   📍 スタックトレース: {ex.StackTrace}");
+            
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 翻訳処理で例外発生:{Environment.NewLine}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔍 例外タイプ: {ex.GetType().Name}{Environment.NewLine}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📝 例外メッセージ: {ex.Message}{Environment.NewLine}");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 スタックトレース: {ex.StackTrace}{Environment.NewLine}");
+            
+            _logger?.LogError(ex, "翻訳処理で例外が発生しました: TranslationId={TranslationId}", translationId);
             
             // エラーの場合もResultを返す
             return new TranslationResult
@@ -609,7 +717,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 Id = translationId,
                 Mode = mode,
                 OriginalText = string.Empty,
-                TranslatedText = "翻訳エラー",
+                TranslatedText = $"翻訳エラー: {ex.Message}",
                 TargetLanguage = "en",
                 Confidence = 0.0f,
                 ProcessingTime = processingTime

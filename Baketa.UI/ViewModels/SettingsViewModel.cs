@@ -27,7 +27,7 @@ namespace Baketa.UI.ViewModels;
 /// <summary>
 /// 設定画面のビューモデル
 /// </summary>
-internal sealed class SettingsViewModel : Framework.ViewModelBase
+public sealed class SettingsViewModel : Framework.ViewModelBase
 {
     // LoggerMessageデリゲート
     private static readonly Action<ILogger, string, Exception?> _logSettingsOperationError =
