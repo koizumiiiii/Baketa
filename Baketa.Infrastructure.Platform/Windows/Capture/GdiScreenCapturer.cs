@@ -213,8 +213,8 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
                 var bitmap = System.Drawing.Image.FromHbitmap(_hBitmap);
                 var windowsImage = _imageFactory.CreateFromBitmap((Bitmap)bitmap);
                 
-                // 元のBitmapオブジェクトは解放
-                bitmap.Dispose();
+                // WindowsImageが内部的にBitmapを参照するため、元のBitmapは破棄しない
+                // bitmap.Dispose(); // WindowsImageのDispose時に適切に処理される
                 
                 if (_logger != null)
                     Log.CaptureCompleted(_logger, width, height);

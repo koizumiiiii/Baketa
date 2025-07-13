@@ -87,6 +87,24 @@
     <Style Selector="Button.minimize-button:hover">
       <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
     </Style>
+    
+    <!-- 非アクティブボタンスタイル - 背景色なし、アイコンとテキストのみ薄いグレー -->
+    <Style Selector="Button.menu-item:disabled">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    
+    <Style Selector="Button.menu-item:disabled PathIcon">
+      <Setter Property="Foreground" Value="{StaticResource IconDisabledBrush}"/>
+    </Style>
+    
+    <Style Selector="Button.menu-item:disabled TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource IconDisabledBrush}"/>
+    </Style>
+    
+    <!-- 非アクティブ状態でホバー効果も無効化 -->
+    <Style Selector="Button.menu-item:disabled:hover">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
   </Window.Styles>
 
   <!-- メインコンテナ -->
@@ -104,10 +122,29 @@
     
     <StackPanel Orientation="Vertical" Spacing="2">
       
+      <!-- 最小化ボタン -->
+      <Button Classes="minimize-button"
+              Command="{Binding FoldCommand}"
+              ToolTip.Tip="最小化">
+        <StackPanel Orientation="Horizontal" Spacing="3" HorizontalAlignment="Center">
+          <PathIcon Width="10" Height="10"
+                    Data="{StaticResource ChevronUpIcon}"
+                    Foreground="{StaticResource IconBrush}"
+                    VerticalAlignment="Center"/>
+          <TextBlock Text="Min"
+                     FontSize="7"
+                     VerticalAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
+      </Button>
+      
       <!-- ホーム/開始ボタン -->
       <Button Classes="menu-item"
               Command="{Binding StartStopCommand}"
-              ToolTip.Tip="{Binding StartStopText}">
+              ToolTip.Tip="{Binding StartStopText}"
+              Name="StartStopButton"
+              Click="OnStartStopButtonClick"
+              IsEnabled="{Binding IsStartStopEnabled}">
         <StackPanel Orientation="Vertical" Spacing="4">
           <PathIcon Width="20" Height="20"
                     Data="{Binding IsTranslationActive, Converter={StaticResource TranslationStateToIconConverter}}"
@@ -120,6 +157,19 @@
         </StackPanel>
       </Button>
       
+      <!-- ローディングインジケーター -->
+      <Border Classes="status-item" IsVisible="{Binding IsLoading}">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <Ellipse Width="16" Height="16"
+                   Fill="{StaticResource StatusProcessingBrush}"
+                   Opacity="0.8"/>
+          <TextBlock Text="準備中"
+                     FontSize="9"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource StatusProcessingBrush}"/>
+        </StackPanel>
+      </Border>
+      
       <!-- ドライブ/表示切り替えボタン -->
       <Button Classes="menu-item"
               Command="{Binding ShowHideCommand}"
@@ -128,14 +178,14 @@
         <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <PathIcon Width="18" Height="18"
-                      Data="{Binding IsOverlayVisible, Converter={StaticResource VisibilityStateToIconConverter}}"
+                      Data="{Binding IsTranslationResultVisible, Converter={StaticResource VisibilityStateToIconConverter}}"
                       Foreground="{StaticResource IconBrush}"/>
             <Ellipse Width="8" Height="8"
                      Fill="{StaticResource StatusActiveBrush}"
                      Margin="2,0,0,0"
                      IsVisible="{Binding IsTranslationActive}"/>
           </StackPanel>
-          <TextBlock Text="非表示"
+          <TextBlock Text="{Binding ShowHideText}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"/>
@@ -151,7 +201,7 @@
           <PathIcon Width="18" Height="18"
                     Data="{StaticResource SettingsIcon}"
                     Foreground="{StaticResource IconBrush}"/>
-          <TextBlock Text="設定"
+          <TextBlock Text="Set"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"/>
@@ -175,7 +225,7 @@
                      Fill="{Binding CurrentStatus, Converter={StaticResource StatusToColorConverter}}"
                      Margin="2,0,0,0"/>
           </StackPanel>
-          <TextBlock Text="状態"
+          <TextBlock Text="Status"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"/>
@@ -188,18 +238,19 @@
                  Margin="8,4" 
                  Opacity="0.5"/>
       
-      <!-- 最小化ボタン -->
-      <Button Classes="minimize-button"
-              Command="{Binding FoldCommand}"
-              ToolTip.Tip="最小化">
-        <StackPanel Orientation="Horizontal" Spacing="3" HorizontalAlignment="Center">
-          <PathIcon Width="10" Height="10"
-                    Data="{StaticResource ChevronUpIcon}"
-                    Foreground="{StaticResource IconBrush}"
-                    VerticalAlignment="Center"/>
-          <TextBlock Text="縮小"
-                     FontSize="8"
-                     VerticalAlignment="Center"
+      <!-- 終了ボタン -->
+      <Button Classes="menu-item"
+              Command="{Binding ExitCommand}"
+              ToolTip.Tip="アプリケーション終了"
+              Click="OnExitButtonClick">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <TextBlock Text="⏻"
+                     FontSize="18"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource IconBrush}"/>
+          <TextBlock Text="Exit"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"/>
         </StackPanel>
       </Button>

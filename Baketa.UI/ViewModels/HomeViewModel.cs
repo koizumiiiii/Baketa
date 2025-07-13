@@ -15,7 +15,7 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// ホーム画面のビューモデル
     /// </summary>
-    internal sealed class HomeViewModel : Framework.ViewModelBase
+    public sealed class HomeViewModel : Framework.ViewModelBase
     {
         // 履歴確認用
         private bool _hasHistory = true; // デモ用に初期値をtrueに設定

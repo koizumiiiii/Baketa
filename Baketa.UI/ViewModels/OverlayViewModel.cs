@@ -18,7 +18,7 @@ namespace Baketa.UI.ViewModels;
     /// オーバーレイ設定画面のビューモデル
     /// オーバーレイ位置・サイズ管理システムと連携
     /// </summary>
-    internal sealed class OverlayViewModel : Framework.ViewModelBase
+    public sealed class OverlayViewModel : Framework.ViewModelBase
     {
         private readonly AvaloniaOverlayWindowAdapter? _overlayAdapter;
         private readonly IOverlayPositionManager? _positionManager;

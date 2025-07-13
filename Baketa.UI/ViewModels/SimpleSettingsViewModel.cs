@@ -40,7 +40,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public bool UseLocalEngine
     {
         get => _useLocalEngine;
-        set => this.RaiseAndSetIfChanged(ref _useLocalEngine, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _useLocalEngine, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でUseLocalEngine設定失敗 - 直接設定で続行");
+                _useLocalEngine = value;
+            }
+        }
     }
 
     /// <summary>
@@ -49,7 +60,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public string SourceLanguage
     {
         get => _sourceLanguage;
-        set => this.RaiseAndSetIfChanged(ref _sourceLanguage, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _sourceLanguage, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でSourceLanguage設定失敗 - 直接設定で続行");
+                _sourceLanguage = value;
+            }
+        }
     }
 
     /// <summary>
@@ -58,7 +80,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public string TargetLanguage
     {
         get => _targetLanguage;
-        set => this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でTargetLanguage設定失敗 - 直接設定で続行");
+                _targetLanguage = value;
+            }
+        }
     }
 
     /// <summary>
@@ -67,7 +100,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public int FontSize
     {
         get => _fontSize;
-        set => this.RaiseAndSetIfChanged(ref _fontSize, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _fontSize, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でFontSize設定失敗 - 直接設定で続行");
+                _fontSize = value;
+            }
+        }
     }
 
     /// <summary>
@@ -76,7 +120,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public double OverlayOpacity
     {
         get => _overlayOpacity;
-        set => this.RaiseAndSetIfChanged(ref _overlayOpacity, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _overlayOpacity, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でOverlayOpacity設定失敗 - 直接設定で続行");
+                _overlayOpacity = value;
+            }
+        }
     }
 
     /// <summary>
@@ -85,7 +140,18 @@ public class SimpleSettingsViewModel : ViewModelBase
     public bool HasChanges
     {
         get => _hasChanges;
-        set => this.RaiseAndSetIfChanged(ref _hasChanges, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _hasChanges, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でHasChanges設定失敗 - 直接設定で続行");
+                _hasChanges = value;
+            }
+        }
     }
 
     /// <summary>
@@ -111,9 +177,20 @@ public class SimpleSettingsViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync,
-            this.WhenAnyValue(x => x.HasChanges));
-        CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync);
+        // コマンドをUIスレッドで安全に初期化
+        try
+        {
+            ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync,
+                this.WhenAnyValue(x => x.HasChanges).ObserveOn(RxApp.MainThreadScheduler),
+                outputScheduler: RxApp.MainThreadScheduler);
+            CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync,
+                outputScheduler: RxApp.MainThreadScheduler);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "SimpleSettingsViewModelのReactiveCommand初期化エラー");
+            throw;
+        }
     }
 
     private void InitializeCollections()
@@ -130,14 +207,33 @@ public class SimpleSettingsViewModel : ViewModelBase
         FontSizeOptions.Add(18);
         FontSizeOptions.Add(20);
 
-        // プロパティ変更監視
-        this.WhenAnyValue(
-                x => x.UseLocalEngine,
-                x => x.SourceLanguage,
-                x => x.TargetLanguage,
-                x => x.FontSize,
-                x => x.OverlayOpacity)
-            .Subscribe(_ => HasChanges = true);
+        // プロパティ変更監視（UIスレッドで安全に処理）
+        try
+        {
+            this.WhenAnyValue(
+                    x => x.UseLocalEngine,
+                    x => x.SourceLanguage,
+                    x => x.TargetLanguage,
+                    x => x.FontSize,
+                    x => x.OverlayOpacity)
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(_ => 
+                {
+                    try
+                    {
+                        HasChanges = true;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Logger?.LogWarning(ex, "UIスレッド違反でHasChanges設定失敗 - 続行");
+                    }
+                });
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "SimpleSettingsViewModelのプロパティ監視初期化エラー");
+            throw;
+        }
     }
 
     #endregion

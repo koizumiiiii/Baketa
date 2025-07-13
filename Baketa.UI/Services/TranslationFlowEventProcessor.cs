@@ -31,6 +31,9 @@ public class TranslationFlowEventProcessor :
     private readonly HashSet<IntPtr> _processingWindows = [];
     private readonly object _processedEventLock = new();
     
+    // 継続的翻訳結果購読管理
+    private IDisposable? _continuousTranslationSubscription;
+    
 
     public TranslationFlowEventProcessor(
         ILogger<TranslationFlowEventProcessor> logger,
@@ -56,17 +59,25 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
+        Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
+        
+        _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
+        _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
+            eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
         
         // 重複処理防止チェック（ウィンドウハンドルベース）
         lock (_processedEventLock)
         {
+            _logger.LogInformation("🔍 重複チェック: 現在処理中のウィンドウ数={Count}", _processingWindows.Count);
             if (_processingWindows.Contains(eventData.TargetWindow.Handle))
             {
-                _logger.LogDebug("Skipping duplicate translation for window: {WindowTitle} (Handle={Handle})", 
+                _logger.LogWarning("⚠️ 重複処理をスキップ: {WindowTitle} (Handle={Handle})", 
                     eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
                 return;
             }
             _processingWindows.Add(eventData.TargetWindow.Handle);
+            _logger.LogInformation("✅ ウィンドウを処理中リストに追加: {Handle}", eventData.TargetWindow.Handle);
         }
         
         try
@@ -93,19 +104,18 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogError(ex, "Error occurred during translation start processing: {ErrorMessage}", ex.Message);
             
+            // エラー時のみ処理中リストから削除
+            lock (_processedEventLock)
+            {
+                _processingWindows.Remove(eventData.TargetWindow.Handle);
+                _logger.LogDebug("Translation processing error cleanup for window handle: {Handle}", eventData.TargetWindow.Handle);
+            }
+            
             // エラー状態に変更
             var errorEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
         }
-        finally
-        {
-            // 処理完了時にウィンドウハンドルを削除
-            lock (_processedEventLock)
-            {
-                _processingWindows.Remove(eventData.TargetWindow.Handle);
-                _logger.LogDebug("Translation processing completed for window handle: {Handle}", eventData.TargetWindow.Handle);
-            }
-        }
+        // 注意: finallyブロックを削除 - 継続的翻訳では処理中状態をStop時まで維持
     }
 
     /// <summary>
@@ -127,7 +137,29 @@ public class TranslationFlowEventProcessor :
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
 
-            _logger.LogInformation("翻訳停止処理が完了しました");
+            // 4. 継続的翻訳結果購読を停止
+            if (_continuousTranslationSubscription != null)
+            {
+                _continuousTranslationSubscription.Dispose();
+                _continuousTranslationSubscription = null;
+                _logger.LogInformation("継続的翻訳結果購読を停止");
+                Console.WriteLine("🛑 継続的翻訳結果購読を停止");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 継続的翻訳結果購読を停止{Environment.NewLine}");
+            }
+
+            // 5. 処理中ウィンドウリストをクリア
+            lock (_processedEventLock)
+            {
+                var processingCount = _processingWindows.Count;
+                _processingWindows.Clear();
+                _logger.LogInformation("処理中ウィンドウリストをクリア: {Count} 個のウィンドウ", processingCount);
+                Console.WriteLine($"🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ");
+                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ{Environment.NewLine}");
+            }
+
+            _logger.LogInformation("✅ 翻訳停止処理が完了しました");
+            Console.WriteLine("✅ 継続的翻訳停止完了");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳停止完了{Environment.NewLine}");
         }
         catch (Exception ex)
         {
@@ -203,7 +235,7 @@ public class TranslationFlowEventProcessor :
     {
         try
         {
-            _logger.LogInformation("Starting translation process for window: {WindowTitle} (Handle={Handle})", 
+            _logger.LogInformation("Starting continuous translation process for window: {WindowTitle} (Handle={Handle})", 
                 targetWindow.Title, targetWindow.Handle);
 
             // 1. 翻訳中状態に変更
@@ -211,78 +243,57 @@ public class TranslationFlowEventProcessor :
             var translatingEvent = new TranslationStatusChangedEvent(TranslationStatus.Translating);
             await _eventAggregator.PublishAsync(translatingEvent).ConfigureAwait(false);
 
-            // 2. ウィンドウキャプチャ
-            _logger.LogDebug("Starting window capture for handle: {Handle}", targetWindow.Handle);
-            var captureResult = await _captureService.CaptureWindowAsync(targetWindow.Handle).ConfigureAwait(false);
-            
-            if (captureResult == null)
-            {
-                _logger.LogWarning("Window capture failed");
-                await DisplayFallbackTranslationAsync().ConfigureAwait(false);
-                return;
-            }
-            
-            _logger.LogDebug("Window capture successful");
-
-            // 3. 単発翻訳実行
-            _logger.LogDebug("Starting translation service processing");
-            
-            // TranslationResultsのObservableを購読して結果を取得
-            _logger.LogDebug("Setting up translation result subscription");
-            TranslationResult? translationResult = null;
-            var resultReceived = false;
-            
-            using var subscription = _translationService.TranslationResults
+            // 2. 翻訳結果のObservableを購読してUIイベントに変換
+            _logger.LogDebug("Setting up translation result subscription for continuous translation");
+            _continuousTranslationSubscription = _translationService.TranslationResults
                 .Subscribe(result => 
                 {
-                    _logger.LogDebug("Translation result received: {Original} -> {Translated}", 
-                        result.OriginalText, result.TranslatedText);
-                    translationResult = result;
-                    resultReceived = true;
-                });
-            
-            _logger.LogDebug("Triggering single translation");
-            await _translationService.TriggerSingleTranslationAsync().ConfigureAwait(false);
-            
-            // 翻訳結果の完了まで待機（最大5秒）
-            var maxWaitTime = 5000;
-            var waited = 0;
-            while (!resultReceived && waited < maxWaitTime)
-            {
-                await Task.Delay(100).ConfigureAwait(false);
-                waited += 100;
-            }
-            
-            _logger.LogDebug("Translation processing wait time: {WaitTime}ms", waited);
-
-            // 4. 翻訳結果を表示
-            if (translationResult != null)
-            {
-                _logger.LogInformation("Translation result display: '{Original}' -> '{Translated}' (confidence: {Confidence})", 
-                    translationResult.OriginalText, translationResult.TranslatedText, translationResult.Confidence);
+                    Console.WriteLine($"📝 継続的翻訳結果受信:");
+                    Console.WriteLine($"   📖 オリジナル: '{result.OriginalText}'");
+                    Console.WriteLine($"   🌐 翻訳結果: '{result.TranslatedText}'");
+                    Console.WriteLine($"   📊 信頼度: {result.Confidence}");
+                    Console.WriteLine($"   📍 表示位置: (100, 200)");
                     
-                var displayEvent = new TranslationResultDisplayEvent
-                {
-                    OriginalText = translationResult.OriginalText,
-                    TranslatedText = translationResult.TranslatedText,
-                    DetectedPosition = new System.Drawing.Point(100, 200) // 固定位置
-                };
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 継続的翻訳結果受信:{Environment.NewLine}");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '{result.OriginalText}'{Environment.NewLine}");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '{result.TranslatedText}'{Environment.NewLine}");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {result.Confidence}{Environment.NewLine}");
+                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+                    
+                    _logger.LogInformation("Continuous translation result: '{Original}' -> '{Translated}' (confidence: {Confidence})", 
+                        result.OriginalText, result.TranslatedText, result.Confidence);
+                        
+                    var displayEvent = new TranslationResultDisplayEvent
+                    {
+                        OriginalText = result.OriginalText,
+                        TranslatedText = result.TranslatedText,
+                        DetectedPosition = new System.Drawing.Point(100, 200) // 固定位置
+                    };
 
-                await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
-                _logger.LogDebug("Translation result display event published");
-            }
-            else
-            {
-                _logger.LogInformation("No translatable text detected (wait time: {WaitTime}ms)", waited);
-                await DisplayNoTextFoundMessageAsync().ConfigureAwait(false);
-            }
+                    // 非同期でイベントを発行（Subscribeコールバック内なのでConfigureAwait不要）
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _eventAggregator.PublishAsync(displayEvent);
+                            Console.WriteLine("✅ 継続的翻訳結果表示イベント発行完了");
+                            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳結果表示イベント発行完了{Environment.NewLine}");
+                            _logger.LogDebug("Continuous translation result display event published");
+                        }
+                        catch (Exception eventEx)
+                        {
+                            _logger.LogError(eventEx, "Failed to publish continuous translation display event");
+                        }
+                    });
+                });
 
-            // 5. 翻訳完了状態に変更
-            _logger.LogDebug("Changing translation status to completed");
-            var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
-            await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
+            // 3. 継続的翻訳を開始
+            _logger.LogDebug("Starting continuous automatic translation");
+            await _translationService.StartAutomaticTranslationAsync().ConfigureAwait(false);
 
-            _logger.LogInformation("Translation processing completed");
+            _logger.LogInformation("✅ Continuous translation started successfully for window: {WindowTitle}", targetWindow.Title);
+            Console.WriteLine($"✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
+            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle}){Environment.NewLine}");
         }
         catch (Exception ex)
         {
@@ -296,6 +307,16 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayFallbackTranslationAsync()
     {
+        Console.WriteLine("💥 フォールバック翻訳結果を表示:");
+        Console.WriteLine("   📖 オリジナル: '(キャプチャ失敗)'");
+        Console.WriteLine("   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'");
+        Console.WriteLine("   📍 表示位置: (100, 200)");
+        
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フォールバック翻訳結果を表示:{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(キャプチャ失敗)'{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+        
         var fallbackEvent = new TranslationResultDisplayEvent
         {
             OriginalText = "(キャプチャ失敗)",
@@ -314,6 +335,16 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayNoTextFoundMessageAsync()
     {
+        Console.WriteLine("🔍 テキスト未検出メッセージを表示:");
+        Console.WriteLine("   📖 オリジナル: '(テキスト未検出)'");
+        Console.WriteLine("   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'");
+        Console.WriteLine("   📍 表示位置: (100, 200)");
+        
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 テキスト未検出メッセージを表示:{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(テキスト未検出)'{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'{Environment.NewLine}");
+        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+        
         var noTextEvent = new TranslationResultDisplayEvent
         {
             OriginalText = "(テキスト未検出)",
