@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR;
 public sealed class PaddleOcrEngineTests : IDisposable
 {
     private readonly Mock<IModelPathResolver> _mockModelPathResolver;
-    private readonly SafeTestPaddleOcrEngine _safeOcrEngine;
+    private readonly TestData.SafeTestPaddleOcrEngine _safeOcrEngine;
     private bool _disposed;
 
     public PaddleOcrEngineTests()
@@ -46,14 +46,14 @@ public sealed class PaddleOcrEngineTests : IDisposable
         _mockModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()));
         
         // 安全なテスト用エンジンのみを使用
-        _safeOcrEngine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, NullLogger<PaddleOcrEngine>.Instance, true);
+        _safeOcrEngine = new TestData.SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, NullLogger<PaddleOcrEngine>.Instance, true);
     }
 
     [Fact]
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Arrange & Act
-        using var engine = new SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, NullLogger<PaddleOcrEngine>.Instance, true);
+        using var engine = new TestData.SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, NullLogger<PaddleOcrEngine>.Instance, true);
 
         // Assert
         Assert.NotNull(engine);
@@ -68,7 +68,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
     {
         // Arrange, Act & Assert
         Assert.Throws<ArgumentNullException>(() => 
-            new SafeTestPaddleOcrEngine(null!, NullLogger<PaddleOcrEngine>.Instance, true));
+            new TestData.SafeTestPaddleOcrEngine(null!, NullLogger<PaddleOcrEngine>.Instance, true));
     }
 
     [Fact]

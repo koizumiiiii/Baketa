@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reactive.Disposables;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
@@ -34,7 +35,18 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     public string? ErrorMessage
     {
         get => _errorMessage;
-        set => this.RaiseAndSetIfChanged(ref _errorMessage, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _errorMessage, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でErrorMessage設定失敗 - 直接設定で続行");
+                _errorMessage = value;
+            }
+        }
     }
     
     /// <summary>
@@ -44,7 +56,18 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     public bool IsLoading
     {
         get => _isLoading;
-        set => this.RaiseAndSetIfChanged(ref _isLoading, value);
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _isLoading, value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でIsLoading設定失敗 - 直接設定で続行");
+                _isLoading = value;
+            }
+        }
     }
     
     /// <summary>
@@ -135,6 +158,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         _disposed = true;
     }
     
+
     /// <summary>
     /// イベントを発行します
     /// </summary>
@@ -144,7 +168,12 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        return EventAggregator.PublishAsync(eventData);
+        Console.WriteLine($"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        var task = EventAggregator.PublishAsync(eventData);
+        Console.WriteLine($"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
+        return task;
     }
     
     /// <summary>
@@ -169,14 +198,32 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         ArgumentNullException.ThrowIfNull(handler);
         
-        // インラインプロセッサーを作成
-        var processor = new InlineEventProcessor<TEvent>(handler);
-        EventAggregator.Subscribe<TEvent>(processor);
-        
-        // 購読解除用のDisposableを返す
-        var subscription = Disposable.Create(() => EventAggregator.Unsubscribe<TEvent>(processor));
-        Disposables.Add(subscription);
-        return subscription;
+        try
+        {
+            // インラインプロセッサーを作成
+            var processor = new InlineEventProcessor<TEvent>(handler);
+            EventAggregator.Subscribe<TEvent>(processor);
+            
+            // 購読解除用のDisposableを返す
+            var subscription = Disposable.Create(() => 
+            {
+                try
+                {
+                    EventAggregator.Unsubscribe<TEvent>(processor);
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogWarning(ex, "イベント購読解除中にエラーが発生: {EventType}", typeof(TEvent).Name);
+                }
+            });
+            Disposables.Add(subscription);
+            return subscription;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "イベント購読中にエラーが発生: {EventType}", typeof(TEvent).Name);
+            throw;
+        }
     }
     
     /// <summary>
@@ -199,7 +246,16 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         
         public Task HandleAsync(TEvent eventData)
         {
-            return _handler(eventData);
+            try
+            {
+                return _handler(eventData);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // UIスレッド違反が発生した場合はログ出力して続行
+                Console.WriteLine($"🚨 InlineEventProcessorでUIスレッド違反: {ex.Message}");
+                return Task.CompletedTask;
+            }
         }
     }
 }
