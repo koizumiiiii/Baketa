@@ -60,7 +60,7 @@ public class TranslationFlowEventProcessor :
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
         
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
@@ -144,7 +144,7 @@ public class TranslationFlowEventProcessor :
                 _continuousTranslationSubscription = null;
                 _logger.LogInformation("継続的翻訳結果購読を停止");
                 Console.WriteLine("🛑 継続的翻訳結果購読を停止");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 継続的翻訳結果購読を停止{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 継続的翻訳結果購読を停止{Environment.NewLine}");
             }
 
             // 5. 処理中ウィンドウリストをクリア
@@ -154,12 +154,12 @@ public class TranslationFlowEventProcessor :
                 _processingWindows.Clear();
                 _logger.LogInformation("処理中ウィンドウリストをクリア: {Count} 個のウィンドウ", processingCount);
                 Console.WriteLine($"🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ{Environment.NewLine}");
             }
 
             _logger.LogInformation("✅ 翻訳停止処理が完了しました");
             Console.WriteLine("✅ 継続的翻訳停止完了");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳停止完了{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳停止完了{Environment.NewLine}");
         }
         catch (Exception ex)
         {
@@ -254,11 +254,11 @@ public class TranslationFlowEventProcessor :
                     Console.WriteLine($"   📊 信頼度: {result.Confidence}");
                     Console.WriteLine($"   📍 表示位置: (100, 200)");
                     
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 継続的翻訳結果受信:{Environment.NewLine}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '{result.OriginalText}'{Environment.NewLine}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '{result.TranslatedText}'{Environment.NewLine}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {result.Confidence}{Environment.NewLine}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 継続的翻訳結果受信:{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '{result.OriginalText}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '{result.TranslatedText}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {result.Confidence}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
                     
                     _logger.LogInformation("Continuous translation result: '{Original}' -> '{Translated}' (confidence: {Confidence})", 
                         result.OriginalText, result.TranslatedText, result.Confidence);
@@ -275,9 +275,9 @@ public class TranslationFlowEventProcessor :
                     {
                         try
                         {
-                            await _eventAggregator.PublishAsync(displayEvent);
+                            await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
                             Console.WriteLine("✅ 継続的翻訳結果表示イベント発行完了");
-                            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳結果表示イベント発行完了{Environment.NewLine}");
+                            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳結果表示イベント発行完了{Environment.NewLine}");
                             _logger.LogDebug("Continuous translation result display event published");
                         }
                         catch (Exception eventEx)
@@ -293,7 +293,7 @@ public class TranslationFlowEventProcessor :
 
             _logger.LogInformation("✅ Continuous translation started successfully for window: {WindowTitle}", targetWindow.Title);
             Console.WriteLine($"✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle}){Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle}){Environment.NewLine}");
         }
         catch (Exception ex)
         {
@@ -312,10 +312,10 @@ public class TranslationFlowEventProcessor :
         Console.WriteLine("   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'");
         Console.WriteLine("   📍 表示位置: (100, 200)");
         
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フォールバック翻訳結果を表示:{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(キャプチャ失敗)'{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フォールバック翻訳結果を表示:{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(キャプチャ失敗)'{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
         
         var fallbackEvent = new TranslationResultDisplayEvent
         {
@@ -340,10 +340,10 @@ public class TranslationFlowEventProcessor :
         Console.WriteLine("   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'");
         Console.WriteLine("   📍 表示位置: (100, 200)");
         
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 テキスト未検出メッセージを表示:{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(テキスト未検出)'{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'{Environment.NewLine}");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 テキスト未検出メッセージを表示:{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(テキスト未検出)'{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'{Environment.NewLine}");
+        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
         
         var noTextEvent = new TranslationResultDisplayEvent
         {

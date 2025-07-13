@@ -42,14 +42,14 @@ public class AlphaTestSettingsValidatorTests
     }
 
     [Fact]
-    public void Validate_InvalidGoogleEngine_ShouldFail()
+    public void Validate_InvalidGeminiEngine_ShouldFail()
     {
         // Arrange
         var settings = new AppSettings
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.GoogleTranslate
+                DefaultEngine = TranslationEngine.Gemini
             }
         };
 
@@ -328,7 +328,7 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var translationSettings = new TranslationSettings
         {
-            DefaultEngine = TranslationEngine.DeepL // αテストでは非対応
+            DefaultEngine = TranslationEngine.Gemini // αテストでは非対応
         };
 
         // Act

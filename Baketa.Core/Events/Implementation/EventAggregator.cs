@@ -50,7 +50,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
             }
             
             Console.WriteLine($"📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count})");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count}){Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count}){Environment.NewLine}");
             _logger?.LogDebug("📡 イベント {EventType} の処理を開始 (プロセッサ数: {ProcessorCount})", eventType.Name, eventProcessors.Count);
             
             // List<Task> そのままの実装を使用（IDE0305を拒否）
@@ -59,24 +59,24 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
             
             // 詳細なデバッグ出力を追加
             Console.WriteLine($"🔍 デバッグ: eventProcessors.Count = {eventProcessors.Count}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: eventProcessors.Count = {eventProcessors.Count}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: eventProcessors.Count = {eventProcessors.Count}{Environment.NewLine}");
             
             foreach (var rawProcessor in eventProcessors)
             {
                 Console.WriteLine($"🔍 デバッグ: 登録されたプロセッサ = {rawProcessor.GetType().Name}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: 登録されたプロセッサ = {rawProcessor.GetType().Name}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: 登録されたプロセッサ = {rawProcessor.GetType().Name}{Environment.NewLine}");
                 
                 // 型チェック
                 var isCorrectType = rawProcessor is IEventProcessor<TEvent>;
                 Console.WriteLine($"🔍 デバッグ: {rawProcessor.GetType().Name} は IEventProcessor<{typeof(TEvent).Name}> か? = {isCorrectType}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: {rawProcessor.GetType().Name} は IEventProcessor<{typeof(TEvent).Name}> か? = {isCorrectType}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: {rawProcessor.GetType().Name} は IEventProcessor<{typeof(TEvent).Name}> か? = {isCorrectType}{Environment.NewLine}");
                 
                 // 実装インターフェース一覧を表示
                 var interfaces = rawProcessor.GetType().GetInterfaces();
                 foreach (var intf in interfaces)
                 {
                     Console.WriteLine($"🔍 デバッグ: {rawProcessor.GetType().Name} が実装するインターフェース: {intf.Name}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: {rawProcessor.GetType().Name} が実装するインターフェース: {intf.Name}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: {rawProcessor.GetType().Name} が実装するインターフェース: {intf.Name}{Environment.NewLine}");
                 }
             }
             
@@ -87,7 +87,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 .ToList();
                 
             Console.WriteLine($"🔍 デバッグ: 明示的型チェック後の Count = {typedProcessors.Count}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: 明示的型チェック後の Count = {typedProcessors.Count}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 デバッグ: 明示的型チェック後の Count = {typedProcessors.Count}{Environment.NewLine}");
 
             foreach (var processor in typedProcessors)
             {
@@ -95,7 +95,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 {
                     var processorType = processor.GetType().Name;
                     Console.WriteLine($"🚀 実際に処理するプロセッサ: {processorType}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 実際に処理するプロセッサ: {processorType}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 実際に処理するプロセッサ: {processorType}{Environment.NewLine}");
                     _logger?.LogDebug("🔧 プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
                         processorType, eventType.Name);
                     
@@ -177,7 +177,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 {
                     var processorType = processor.GetType().Name;
                     Console.WriteLine($"🎯 HandleAsync呼び出し準備: {processorType} -> {eventType.Name}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 HandleAsync呼び出し準備: {processorType} -> {eventType.Name}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 HandleAsync呼び出し準備: {processorType} -> {eventType.Name}{Environment.NewLine}");
                     
                     _logger?.LogTrace("プロセッサ {ProcessorType} でイベント {EventType} の処理を開始", 
                         processorType, eventType.Name);
@@ -234,14 +234,14 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 {
                     handlers.Add(processor);
                     Console.WriteLine($"✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count})");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count}){Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count}){Environment.NewLine}");
                     _logger?.LogInformation("✅ プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
                         processor.GetType().Name, eventType.Name);
                 }
                 else
                 {
                     Console.WriteLine($"⚠️ プロセッサ {processor.GetType().Name} は既にイベント {eventType.Name} に登録されています (現在の登録数: {handlers.Count})");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ プロセッサ {processor.GetType().Name} は既にイベント {eventType.Name} に登録されています (現在の登録数: {handlers.Count}){Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ プロセッサ {processor.GetType().Name} は既にイベント {eventType.Name} に登録されています (現在の登録数: {handlers.Count}){Environment.NewLine}");
                     _logger?.LogWarning("⚠️ プロセッサ {ProcessorType} は既にイベント {EventType} に登録されています", 
                         processor.GetType().Name, eventType.Name);
                 }
@@ -347,11 +347,11 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 
                 // プロセッサの実行
                 Console.WriteLine($"🚀 ExecuteProcessorAsync内でHandleAsync呼び出し: {processorType}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteProcessorAsync内でHandleAsync呼び出し: {processorType}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteProcessorAsync内でHandleAsync呼び出し: {processorType}{Environment.NewLine}");
                 _logger?.LogDebug("🚀 プロセッサ {ProcessorType}.HandleAsync() を実行中", processorType);
                 await processor.HandleAsync(eventData).ConfigureAwait(false);
                 Console.WriteLine($"✅ ExecuteProcessorAsync内でHandleAsync完了: {processorType}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ExecuteProcessorAsync内でHandleAsync完了: {processorType}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ExecuteProcessorAsync内でHandleAsync完了: {processorType}{Environment.NewLine}");
                 
                 // 処理時間の計算と記録
                 var processingTime = DateTime.UtcNow - startTime;
@@ -427,10 +427,10 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                 
                 // プロセッサの実行
                 Console.WriteLine($"🚀 ExecuteProcessorAsync(キャンセル版)内でHandleAsync呼び出し: {processorType}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteProcessorAsync(キャンセル版)内でHandleAsync呼び出し: {processorType}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteProcessorAsync(キャンセル版)内でHandleAsync呼び出し: {processorType}{Environment.NewLine}");
                 await processor.HandleAsync(eventData).ConfigureAwait(false);
                 Console.WriteLine($"✅ ExecuteProcessorAsync(キャンセル版)内でHandleAsync完了: {processorType}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ExecuteProcessorAsync(キャンセル版)内でHandleAsync完了: {processorType}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ExecuteProcessorAsync(キャンセル版)内でHandleAsync完了: {processorType}{Environment.NewLine}");
                 
                 if (cancellationToken.IsCancellationRequested)
                 {

@@ -26,7 +26,7 @@ public class MainOverlayViewModel : ViewModelBase
     private bool _isCollapsed;
     private bool _isTranslationActive;
     private TranslationStatus _currentStatus;
-    private bool _isTranslationResultVisible = false; // 初期状態は非表示
+    private bool _isTranslationResultVisible; // 初期状態は非表示
 
     public MainOverlayViewModel(
         IEventAggregator eventAggregator,
@@ -159,7 +159,7 @@ public class MainOverlayViewModel : ViewModelBase
         {
             var result = IsTranslationActive ? "Stop" : "Start";
             Console.WriteLine($"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
             return result;
         }
     }
@@ -201,7 +201,7 @@ public class MainOverlayViewModel : ViewModelBase
             startStopCmd.Subscribe(_ => 
             {
                 Console.WriteLine("🎬 StartStopCommandが実行されました");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎬 StartStopCommandが実行されました");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎬 StartStopCommandが実行されました");
             });
             
             StartStopCommand = startStopCmd;
@@ -239,7 +239,7 @@ public class MainOverlayViewModel : ViewModelBase
             .Subscribe(isLoading =>
             {
                 Console.WriteLine($"🔄 IsLoading状態変更: {isLoading}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 IsLoading状態変更: {isLoading}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 IsLoading状態変更: {isLoading}");
                 this.RaisePropertyChanged(nameof(LoadingText));
                 this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                 this.RaisePropertyChanged(nameof(SettingsEnabled));
@@ -254,23 +254,23 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task ExecuteStartStopAsync()
     {
         Console.WriteLine($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
         
         try
         {
             Console.WriteLine($"🔍 IsTranslationActive = {IsTranslationActive}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 IsTranslationActive = {IsTranslationActive}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 IsTranslationActive = {IsTranslationActive}");
             
             if (IsTranslationActive)
             {
                 Console.WriteLine("🔴 StopTranslationAsync呼び出し");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 StopTranslationAsync呼び出し");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 StopTranslationAsync呼び出し");
                 await StopTranslationAsync().ConfigureAwait(false);
             }
             else
             {
                 Console.WriteLine("🟢 StartTranslationAsync呼び出し");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🟢 StartTranslationAsync呼び出し");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🟢 StartTranslationAsync呼び出し");
                 await StartTranslationAsync().ConfigureAwait(false);
             }
         }
@@ -290,7 +290,7 @@ public class MainOverlayViewModel : ViewModelBase
     {
         var overallTimer = System.Diagnostics.Stopwatch.StartNew();
         Console.WriteLine("🚀 StartTranslationAsync開始");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
         Logger?.LogInformation("🚀 翻訳ワークフローを開始");
 
         try
@@ -298,20 +298,20 @@ public class MainOverlayViewModel : ViewModelBase
             // 1. ウィンドウ選択ダイアログを表示
             var dialogTimer = System.Diagnostics.Stopwatch.StartNew();
             Console.WriteLine("🔍 ウィンドウ選択ダイアログを表示開始");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 ウィンドウ選択ダイアログを表示開始");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 ウィンドウ選択ダイアログを表示開始");
             Logger?.LogDebug("🔍 ウィンドウ選択ダイアログを表示");
             var selectedWindow = await ShowWindowSelectionDialogAsync().ConfigureAwait(false);
             dialogTimer.Stop();
             if (selectedWindow == null)
             {
                 Console.WriteLine("❌ ウィンドウ選択がキャンセルされました");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ ウィンドウ選択がキャンセルされました");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ ウィンドウ選択がキャンセルされました");
                 Logger?.LogDebug("❌ ウィンドウ選択がキャンセルされました");
                 return; // キャンセル
             }
 
             Console.WriteLine($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle}) - 選択時間: {dialogTimer.ElapsedMilliseconds}ms");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle}) - 選択時間: {dialogTimer.ElapsedMilliseconds}ms");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle}) - 選択時間: {dialogTimer.ElapsedMilliseconds}ms");
             Logger?.LogInformation("✅ ウィンドウが選択されました: '{Title}' (Handle={Handle}) - 選択時間: {ElapsedMs}ms", 
                 selectedWindow.Title, selectedWindow.Handle, dialogTimer.ElapsedMilliseconds);
 
@@ -320,7 +320,7 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 IsLoading = true;
                 Console.WriteLine($"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
             });
             
             // 画面中央ローディングオーバーレイ表示
@@ -329,7 +329,7 @@ public class MainOverlayViewModel : ViewModelBase
             // 2. 翻訳開始
             var uiTimer = System.Diagnostics.Stopwatch.StartNew();
             Console.WriteLine("📊 翻訳状態をアクティブに設定");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📊 翻訳状態をアクティブに設定");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📊 翻訳状態をアクティブに設定");
             Logger?.LogDebug("📊 翻訳状態をキャプチャ中に設定");
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -338,48 +338,48 @@ public class MainOverlayViewModel : ViewModelBase
                 IsTranslationResultVisible = true; // 翻訳開始時は表示状態に設定
                 IsLoading = false; // ローディング状態終了
                 Console.WriteLine($"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
             });
             
             // 画面中央ローディングオーバーレイ非表示
             await _loadingManager.HideAsync().ConfigureAwait(false);
             uiTimer.Stop();
             Console.WriteLine($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
 
             // オーバーレイマネージャーを初期化
             var overlayInitTimer = System.Diagnostics.Stopwatch.StartNew();
             Console.WriteLine("🖼️ オーバーレイマネージャー初期化開始");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
             Logger?.LogDebug("🖼️ オーバーレイマネージャーを初期化");
             
             await _overlayManager.InitializeAsync().ConfigureAwait(false);
             overlayInitTimer.Stop();
             Console.WriteLine($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
             
             // オーバーレイマネージャーを表示状態に設定
             Console.WriteLine("🖼️ オーバーレイマネージャー表示状態設定開始");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー表示状態設定開始");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー表示状態設定開始");
             await _overlayManager.ShowAsync().ConfigureAwait(false);
             Console.WriteLine("✅ オーバーレイマネージャー表示状態設定完了");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー表示状態設定完了");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー表示状態設定完了");
 
             var eventTimer = System.Diagnostics.Stopwatch.StartNew();
             Console.WriteLine("📢 StartTranslationRequestEventを発行");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📢 StartTranslationRequestEventを発行");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📢 StartTranslationRequestEventを発行");
             Logger?.LogDebug("📢 StartTranslationRequestEventを発行");
             var startTranslationEvent = new StartTranslationRequestEvent(selectedWindow);
             Console.WriteLine($"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
             await PublishEventAsync(startTranslationEvent).ConfigureAwait(false);
             eventTimer.Stop();
             Console.WriteLine($"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
 
             overallTimer.Stop();
             Console.WriteLine($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (ダイアログ: {dialogTimer.ElapsedMilliseconds}ms, UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (ダイアログ: {dialogTimer.ElapsedMilliseconds}ms, UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (ダイアログ: {dialogTimer.ElapsedMilliseconds}ms, UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
 
             Logger?.LogInformation("🎉 翻訳が正常に開始されました: '{Title}' - 総処理時間: {TotalMs}ms", selectedWindow.Title, overallTimer.ElapsedMilliseconds);
         }
@@ -395,7 +395,7 @@ public class MainOverlayViewModel : ViewModelBase
             catch (Exception loadingEx)
             {
                 Console.WriteLine($"⚠️ ローディング非表示エラー: {loadingEx.Message}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ ローディング非表示エラー: {loadingEx.Message}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ ローディング非表示エラー: {loadingEx.Message}");
             }
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -404,7 +404,7 @@ public class MainOverlayViewModel : ViewModelBase
                 IsTranslationActive = false;
                 IsLoading = false; // ローディング状態終了
                 Console.WriteLine($"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
             });
         }
     }
@@ -461,19 +461,19 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task StopTranslationAsync()
     {
         Console.WriteLine("🔴 翻訳停止処理開始");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳停止処理開始");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳停止処理開始");
         Logger?.LogInformation("Stopping translation");
 
         // 翻訳停止 + ウィンドウ選択解除
         Console.WriteLine("🔴 翻訳状態をアイドルに設定");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳状態をアイドルに設定");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳状態をアイドルに設定");
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentStatus = TranslationStatus.Idle;
             IsTranslationActive = false;
             IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
             Console.WriteLine($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}");
         });
 
         // オーバーレイを非表示にしてリセット
@@ -484,20 +484,20 @@ public class MainOverlayViewModel : ViewModelBase
         await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
 
         Console.WriteLine("✅ 翻訳停止処理完了");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳停止処理完了");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳停止処理完了");
         Logger?.LogInformation("Translation stopped successfully");
     }
 
     private async void ExecuteShowHide()
     {
         Console.WriteLine($"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
         
         // 翻訳が非アクティブの場合は何もしない（安全措置）
         if (!IsTranslationActive)
         {
             Console.WriteLine("⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
             Logger?.LogWarning("非表示ボタンが翻訳非アクティブ時に押されました");
             return;
         }
@@ -506,7 +506,7 @@ public class MainOverlayViewModel : ViewModelBase
         
         var newVisibility = !IsTranslationResultVisible;
         Console.WriteLine($"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
         
         IsTranslationResultVisible = newVisibility;
         
@@ -514,13 +514,13 @@ public class MainOverlayViewModel : ViewModelBase
         if (IsTranslationResultVisible)
         {
             Console.WriteLine("👁️ オーバーレイ表示");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "👁️ オーバーレイ表示");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "👁️ オーバーレイ表示");
             await _overlayManager.ShowAsync().ConfigureAwait(false);
         }
         else
         {
             Console.WriteLine("🙈 オーバーレイ非表示");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🙈 オーバーレイ非表示");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🙈 オーバーレイ非表示");
             await _overlayManager.HideAsync().ConfigureAwait(false);
         }
         
@@ -528,7 +528,7 @@ public class MainOverlayViewModel : ViewModelBase
         await PublishEventAsync(toggleEvent).ConfigureAwait(false);
         
         Console.WriteLine($"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
         Logger?.LogDebug("Translation display visibility toggled: {IsVisible}", IsTranslationResultVisible);
     }
 

@@ -73,6 +73,7 @@ public sealed class AlphaTestTranslationEngineRule : AlphaTestValidationRuleBase
         }
 
         // αテストではLocalエンジン（OPUS-MT）のみ許可
+        // 新仕様：Geminiも追加されるが、αテストはローカルのみ
         if (engine != TranslationEngine.Local)
         {
             return CreateFailure(value, $"αテストでは翻訳エンジンは'Local (OPUS-MT)'のみ利用可能です。現在の設定: '{engine}'");
