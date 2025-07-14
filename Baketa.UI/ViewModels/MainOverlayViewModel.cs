@@ -151,7 +151,7 @@ public class MainOverlayViewModel : ViewModelBase
 
     // UI状態の計算プロパティ
     public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
-    public bool SettingsEnabled => !IsTranslationActive && !IsLoading; // 翻訳中・ローディング中は無効
+    public bool SettingsEnabled => !IsLoading; // ローディング中のみ無効（翻訳中でも設定可能）
     public bool IsStartStopEnabled => !IsLoading; // ローディング中は無効
     public string StartStopText 
     { 
@@ -209,7 +209,7 @@ public class MainOverlayViewModel : ViewModelBase
                 this.WhenAnyValue(x => x.IsTranslationActive).ObserveOn(RxApp.MainThreadScheduler), // 翻訳中のみ有効
                 outputScheduler: RxApp.MainThreadScheduler);
             SettingsCommand = ReactiveCommand.Create(ExecuteSettings,
-                this.WhenAnyValue(x => x.IsTranslationActive).Select(x => !x).ObserveOn(RxApp.MainThreadScheduler),
+                this.WhenAnyValue(x => x.IsLoading).Select(x => !x).ObserveOn(RxApp.MainThreadScheduler),
                 outputScheduler: RxApp.MainThreadScheduler);
             FoldCommand = ReactiveCommand.Create(ExecuteFold,
                 outputScheduler: RxApp.MainThreadScheduler);
@@ -532,22 +532,94 @@ public class MainOverlayViewModel : ViewModelBase
         Logger?.LogDebug("Translation display visibility toggled: {IsVisible}", IsTranslationResultVisible);
     }
 
+    private static SimpleSettingsView? _currentSettingsDialog;
+
     private async void ExecuteSettings()
     {
         try
         {
+            var currentDialogHash = _currentSettingsDialog?.GetHashCode();
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] ExecuteSettings開始 - 現在のダイアログ: {currentDialogHash}");
+            
+            // 既に設定画面が開いている場合は何もしない
+            if (_currentSettingsDialog != null)
+            {
+                DebugHelper.Log($"🔧 [MainOverlayViewModel] 設定ダイアログが既に存在 - アクティベート: {currentDialogHash}");
+                Logger?.LogDebug("Settings dialog is already open, activating");
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    _currentSettingsDialog.Activate();
+                });
+                return;
+            }
+
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] 新しい設定ダイアログを作成開始");
             Logger?.LogDebug("Opening simple settings dialog");
+            
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成開始");
 
             // SimpleSettingsViewModelを作成
             var settingsViewModel = new SimpleSettingsViewModel(EventAggregator, 
                 Microsoft.Extensions.Logging.LoggerFactoryExtensions.CreateLogger<SimpleSettingsViewModel>(
                     Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance));
+            var vmHash = settingsViewModel.GetHashCode();
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成: {vmHash}");
 
-            // 設定ダイアログを表示
-            var settingsDialog = new SimpleSettingsView
+            // ViewModelの設定を読み込み
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し前");
+            try
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await settingsViewModel.LoadSettingsAsync().ConfigureAwait(false);
+                });
+                DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し完了");
+            }
+            catch (Exception loadEx)
+            {
+                DebugHelper.Log($"💥 [MainOverlayViewModel] LoadSettingsAsync例外: {loadEx.Message}");
+            }
+
+            // 設定ダイアログを作成
+            _currentSettingsDialog = new SimpleSettingsView
             {
                 DataContext = settingsViewModel
             };
+            var dialogHash = _currentSettingsDialog.GetHashCode();
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsView作成: {dialogHash}");
+
+            // ダイアログが閉じられたときの処理
+            _currentSettingsDialog.Closed += (_, _) =>
+            {
+                Console.WriteLine($"🔧 [MainOverlayViewModel] Settings dialog Closedイベント - ダイアログ: {dialogHash}");
+                Logger?.LogDebug("Settings dialog closed event received");
+                var previousDialog = _currentSettingsDialog;
+                _currentSettingsDialog = null;
+                Console.WriteLine($"🔧 [MainOverlayViewModel] _currentSettingsDialogをnullに設定 - 前の値: {previousDialog?.GetHashCode()}");
+            };
+
+            // ViewModelのCloseRequestedイベントハンドル - 直接Close()を呼び出し
+            if (settingsViewModel != null)
+            {
+                settingsViewModel.CloseRequested += () =>
+                {
+                    Console.WriteLine($"🔧 [MainOverlayViewModel] Settings dialog close requested by ViewModel - VM: {vmHash}");
+                    Logger?.LogDebug("Settings dialog close requested by ViewModel");
+                    var dialog = _currentSettingsDialog;
+                    var currentDialogHash2 = dialog?.GetHashCode();
+                    Console.WriteLine($"🔧 [MainOverlayViewModel] 現在のダイアログ状態: {currentDialogHash2}, 作成時: {dialogHash}");
+                    if (dialog != null)
+                    {
+                        Console.WriteLine($"🔧 [MainOverlayViewModel] 直接Close()を呼び出し - 対象: {currentDialogHash2}");
+                        dialog.Close();
+                        Console.WriteLine($"🔧 [MainOverlayViewModel] Close()完了 - 対象: {currentDialogHash2}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"⚠️ [MainOverlayViewModel] _currentSettingsDialogがnull");
+                    }
+                };
+            }
 
             // UIスレッドで安全にApplication.Currentにアクセス
             var owner = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -557,20 +629,23 @@ public class MainOverlayViewModel : ViewModelBase
                     ? desktop.MainWindow : null;
             });
 
-            if (owner != null)
-            {
-                await settingsDialog.ShowDialog(owner).ConfigureAwait(false);
-            }
-            else
-            {
-                settingsDialog.Show();
-            }
-
+            // ShowDialog()ではなくShow()を使用（モーダルダイアログの問題を回避）
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] Show()呼び出し - ダイアログ: {dialogHash}");
+            _currentSettingsDialog.Show();
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] Show()完了 - ダイアログ: {dialogHash}");
+            
             Logger?.LogDebug("Settings dialog opened");
         }
         catch (Exception ex)
         {
+            DebugHelper.Log($"💥 [MainOverlayViewModel] ExecuteSettingsエラー: {ex.Message}");
+            DebugHelper.Log($"💥 [MainOverlayViewModel] スタックトレース: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                DebugHelper.Log($"💥 [MainOverlayViewModel] InnerException: {ex.InnerException.Message}");
+            }
             Logger?.LogError(ex, "Failed to open settings dialog");
+            _currentSettingsDialog = null;
         }
     }
 
