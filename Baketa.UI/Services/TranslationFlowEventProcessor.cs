@@ -205,23 +205,32 @@ public class TranslationFlowEventProcessor :
     {
         try
         {
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始");
             _logger.LogInformation("設定変更を適用中");
 
             // オーバーレイ設定を更新
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ透明度設定: {eventData.OverlayOpacity}");
             _overlayManager.SetOpacity(eventData.OverlayOpacity);
             
             // フォントサイズに基づいて最大幅を調整
             var maxWidth = eventData.FontSize * 25; // フォントサイズの25倍を最大幅とする
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ最大幅設定: {maxWidth}");
             _overlayManager.SetMaxWidth(maxWidth);
 
-            // TODO: Application層の設定サービスと統合
-            // var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-            // await settingsService.UpdateSettingsAsync(eventData);
+            // 言語設定が変更された場合は翻訳エンジンを再設定
+            if (eventData.SourceLanguage != null && eventData.TargetLanguage != null)
+            {
+                _logger.LogInformation("言語設定変更: {Source} → {Target}", eventData.SourceLanguage, eventData.TargetLanguage);
+                // TODO: 翻訳エンジンの言語ペア更新
+                // await _translationService.UpdateLanguagePairAsync(eventData.SourceLanguage, eventData.TargetLanguage);
+            }
 
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理完了");
             _logger.LogInformation("設定変更が適用されました");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"💥 [TranslationFlowEventProcessor] SettingsChangedEvent処理エラー: {ex.Message}");
             _logger.LogError(ex, "設定変更処理中にエラーが発生しました");
         }
 

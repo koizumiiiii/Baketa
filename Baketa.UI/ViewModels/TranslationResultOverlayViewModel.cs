@@ -26,6 +26,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     private double _positionX = 100;
     private double _positionY = 100;
     private double _maxWidth = 400;
+    private int _fontSize = 14;
 
     public TranslationResultOverlayViewModel(
         IEventAggregator eventAggregator,
@@ -225,6 +226,32 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// フォントサイズ
+    /// </summary>
+    public int FontSize
+    {
+        get => _fontSize;
+        set
+        {
+            try
+            {
+                this.RaiseAndSetIfChanged(ref _fontSize, value);
+                this.RaisePropertyChanged(nameof(SmallFontSize));
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger?.LogWarning(ex, "UIスレッド違反でFontSize設定失敗 - 直接設定で続行");
+                _fontSize = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 小さいフォントサイズ（元テキスト用）
+    /// </summary>
+    public int SmallFontSize => Math.Max(8, (int)(FontSize * 0.85));
+
+    /// <summary>
     /// テキストが存在するかどうか
     /// </summary>
     public bool HasText => !string.IsNullOrWhiteSpace(TranslatedText);
@@ -243,6 +270,9 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         
         // 翻訳停止イベントを購読（表示をクリア）
         SubscribeToEvent<StopTranslationRequestEvent>(OnStopTranslationRequest);
+        
+        // 設定変更イベントを購読（フォントサイズと透明度を更新）
+        SubscribeToEvent<SettingsChangedEvent>(OnSettingsChanged);
     }
 
     private async Task OnTranslationResultDisplay(TranslationResultDisplayEvent displayEvent)
@@ -471,6 +501,26 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         TranslatedText = string.Empty;
         OriginalText = string.Empty;
         Logger?.LogDebug("Translation overlay cleared");
+        return Task.CompletedTask;
+    }
+
+    private Task OnSettingsChanged(SettingsChangedEvent settingsEvent)
+    {
+        try
+        {
+            // フォントサイズを更新
+            FontSize = settingsEvent.FontSize;
+            
+            // 透明度を更新
+            OverlayOpacity = settingsEvent.OverlayOpacity;
+            
+            Logger?.LogDebug("Translation overlay settings updated - FontSize: {FontSize}, Opacity: {OverlayOpacity}", FontSize, OverlayOpacity);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "Failed to update translation overlay settings");
+        }
+        
         return Task.CompletedTask;
     }
 
