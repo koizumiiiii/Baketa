@@ -192,12 +192,17 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     /// </summary>
     private void ValidateAlphaTestCategories(AppSettings settings, List<SettingValidationResult> results, ValidationContext context)
     {
-        // αテスト対象カテゴリのみ検証
-        ValidateCategory("Translation", settings.Translation, results, context);
-        ValidateCategory("MainUi", settings.MainUi, results, context);
-        ValidateCategory("Overlay", settings.Overlay, results, context);
-        ValidateCategory("Capture", settings.Capture, results, context);
-        ValidateCategory("Ocr", settings.Ocr, results, context);
+        // αテスト対象カテゴリのみ検証（nullチェック付き）
+        if (settings.Translation != null)
+            ValidateCategory("Translation", settings.Translation, results, context);
+        if (settings.MainUi != null)
+            ValidateCategory("MainUi", settings.MainUi, results, context);
+        if (settings.Overlay != null)
+            ValidateCategory("Overlay", settings.Overlay, results, context);
+        if (settings.Capture != null)
+            ValidateCategory("Capture", settings.Capture, results, context);
+        if (settings.Ocr != null)
+            ValidateCategory("Ocr", settings.Ocr, results, context);
     }
 
     /// <summary>
@@ -205,6 +210,11 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     /// </summary>
     private void ValidateCategory<T>(string category, T settings, List<SettingValidationResult> results, ValidationContext context) where T : class
     {
+        if (settings == null)
+        {
+            return; // null設定はスキップ
+        }
+
         if (!_categoryRules.TryGetValue(category, out var categoryRules))
         {
             return; // ルールが定義されていないカテゴリはスキップ

@@ -571,7 +571,7 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    await settingsViewModel.LoadSettingsAsync().ConfigureAwait(false);
+                    await settingsViewModel.LoadSettingsAsync();
                 });
                 DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し完了");
             }

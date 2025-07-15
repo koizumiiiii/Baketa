@@ -146,21 +146,29 @@ public sealed class AlphaTestLanguagePairRule : AlphaTestValidationRuleBase
 /// </summary>
 public sealed class AlphaTestFontSizeRule : AlphaTestValidationRuleBase
 {
-    public override string PropertyPath => "PanelSize";
-    public override string Description => "パネルサイズ（αテストでは小・中・大）";
+    public override string PropertyPath => "FontSize";
+    public override string Description => "フォントサイズ（8-48px）";
     public override int Priority => 50; // 高優先度
 
     public override SettingValidationResult Validate(object? value, ValidationContext context)
     {
-        if (value is not UiSize panelSize)
+        if (value is not int fontSize)
         {
-            return CreateFailure(value, "パネルサイズが正しく設定されていません");
+            return CreateFailure(value, "フォントサイズが正しく設定されていません");
+        }
+
+        const int minFontSize = 8;
+        const int maxFontSize = 48;
+
+        if (fontSize < minFontSize || fontSize > maxFontSize)
+        {
+            return CreateFailure(value, $"フォントサイズは{minFontSize}px以上{maxFontSize}px以下で設定してください。現在の設定: {fontSize}px");
         }
 
         // αテストでは全サイズ利用可能だが、推奨サイズをチェック
-        if (panelSize == UiSize.Large)
+        if (fontSize > 36)
         {
-            return CreateSuccess(value, "大きいパネルサイズは画面を多く占有します");
+            return CreateSuccess(value, "大きなフォントサイズは画面を多く占有します");
         }
 
         return CreateSuccess(value);
@@ -173,7 +181,7 @@ public sealed class AlphaTestFontSizeRule : AlphaTestValidationRuleBase
 /// </summary>
 public sealed class AlphaTestOpacityRule : AlphaTestValidationRuleBase
 {
-    public override string PropertyPath => "PanelOpacity";
+    public override string PropertyPath => "Opacity";
     public override string Description => "オーバーレイ透明度（10-90%）";
     public override int Priority => 50; // 高優先度
 
