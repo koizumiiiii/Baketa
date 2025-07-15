@@ -107,8 +107,8 @@ public sealed class AlphaTestLanguagePairRule : AlphaTestValidationRuleBase
             return CreateFailure(value, $"αテストでは日本語↔英語の翻訳のみ利用可能です。現在の設定: '{sourceLanguage}'");
         }
 
-        // ターゲット言語も確認
-        var targetLanguage = context.Settings.Translation.DefaultTargetLanguage;
+        // ターゲット言語も確認（nullチェック付き）
+        var targetLanguage = context.Settings.Translation?.DefaultTargetLanguage;
         if (!string.IsNullOrEmpty(targetLanguage))
         {
             if (!allowedLanguages.Contains(targetLanguage, StringComparer.OrdinalIgnoreCase))
@@ -141,34 +141,26 @@ public sealed class AlphaTestLanguagePairRule : AlphaTestValidationRuleBase
 }
 
 /// <summary>
-/// αテストフォントサイズ検証ルール
-/// 8-48pxの範囲制限
+/// αテストパネルサイズ検証ルール
+/// 小・中・大サイズでの警告機能
 /// </summary>
-public sealed class AlphaTestFontSizeRule : AlphaTestValidationRuleBase
+public sealed class AlphaTestPanelSizeRule : AlphaTestValidationRuleBase
 {
-    public override string PropertyPath => "FontSize";
-    public override string Description => "フォントサイズ（8-48px）";
+    public override string PropertyPath => "PanelSize";
+    public override string Description => "パネルサイズ（小・中・大）";
     public override int Priority => 50; // 高優先度
 
     public override SettingValidationResult Validate(object? value, ValidationContext context)
     {
-        if (value is not int fontSize)
+        if (value is not UiSize panelSize)
         {
-            return CreateFailure(value, "フォントサイズが正しく設定されていません");
+            return CreateFailure(value, "パネルサイズが正しく設定されていません");
         }
 
-        const int minFontSize = 8;
-        const int maxFontSize = 48;
-
-        if (fontSize < minFontSize || fontSize > maxFontSize)
+        // 全サイズが有効だが、大サイズの場合は警告
+        if (panelSize == UiSize.Large)
         {
-            return CreateFailure(value, $"フォントサイズは{minFontSize}px以上{maxFontSize}px以下で設定してください。現在の設定: {fontSize}px");
-        }
-
-        // αテストでは全サイズ利用可能だが、推奨サイズをチェック
-        if (fontSize > 36)
-        {
-            return CreateSuccess(value, "大きなフォントサイズは画面を多く占有します");
+            return CreateSuccess(value, "大きなパネルサイズは画面を多く占有します");
         }
 
         return CreateSuccess(value);
@@ -181,7 +173,7 @@ public sealed class AlphaTestFontSizeRule : AlphaTestValidationRuleBase
 /// </summary>
 public sealed class AlphaTestOpacityRule : AlphaTestValidationRuleBase
 {
-    public override string PropertyPath => "Opacity";
+    public override string PropertyPath => "PanelOpacity";
     public override string Description => "オーバーレイ透明度（10-90%）";
     public override int Priority => 50; // 高優先度
 

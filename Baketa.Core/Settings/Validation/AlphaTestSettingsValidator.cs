@@ -153,11 +153,18 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
         AddRule("Translation", new AlphaTestLanguagePairRule());
         
         // UI設定のルール
-        AddRule("MainUi", new AlphaTestFontSizeRule());
-        AddRule("Overlay", new AlphaTestOpacityRule());
+        AddRule("MainUi", new AlphaTestPanelSizeRule());
+        // 透明度設定は削除済み（固定値0.9を使用）
         
         // キャプチャ設定のルール
         AddRule("Capture", new AlphaTestCaptureIntervalRule());
+        
+        // テスト用にグローバルルールとしても追加
+        AddRule(new AlphaTestTranslationEngineRule());
+        AddRule(new AlphaTestLanguagePairRule());
+        AddRule(new AlphaTestPanelSizeRule());
+        // AddRule(new AlphaTestOpacityRule()); // 透明度設定は削除済み
+        AddRule(new AlphaTestCaptureIntervalRule());
         
         _logger?.LogInformation("αテスト用デフォルト検証ルールを登録しました");
     }
@@ -174,8 +181,12 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
                 try
                 {
                     var value = GetValueByPath(settings, path);
-                    var result = rule.Validate(value, context);
-                    results.Add(result);
+                    // 値が存在する場合のみ検証を実行
+                    if (value != null)
+                    {
+                        var result = rule.Validate(value, context);
+                        results.Add(result);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -229,8 +240,12 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
                 try
                 {
                     var value = GetValueByPath(settings, path);
-                    var result = rule.Validate(value, categoryContext);
-                    results.Add(result);
+                    // 値が存在する場合のみ検証を実行
+                    if (value != null)
+                    {
+                        var result = rule.Validate(value, categoryContext);
+                        results.Add(result);
+                    }
                 }
                 catch (Exception ex)
                 {
