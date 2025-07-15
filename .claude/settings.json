@@ -44,13 +44,96 @@
     ]
   },
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_input.file_path | endswith(\".cs\")) | .tool_input.file_path' | xargs -r dotnet format --include"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_input.file_path | test(\"Baketa\\\\.Core/\")) | \"echo [Hook] Core layer file modified: \" + .tool_input.file_path' | sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_input.file_path | test(\"tests/.*Tests\\\\.cs$\")) | \"dotnet test --filter \\\"FullyQualifiedName~\" + (.tool_input.file_path | split(\"/\")[-1] | split(\".\")[0]) + \"\\\" --verbosity minimal\"' | sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if .tool_input.command | test(\"dotnet test\") and (.output | test(\"Failed:\")) then \"powershell.exe -Command \\\"Write-Host \\\"⚠️ テスト失敗を検出しました。エラー内容を確認してください\\\" -ForegroundColor Red\\\"\" else \"\" end' | sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_input.file_path | test(\".*\\\\.(cs|csproj)$\")) | \"echo \\\"📊 [Stats] $(find . -name \\\"*.cs\\\" -not -path \\\"*/bin/*\\\" -not -path \\\"*/obj/*\\\" | wc -l) C# files, $(git status --porcelain | wc -l) uncommitted changes\\\"\"' | sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Executing bash command...', 'Claude Code', 'OK', 'Information')\""
+            "command": "jq -r 'if .tool_input.command | test(\"^(dotnet build|dotnet test|dotnet run|dotnet format)\") then \"{\\\"decision\\\": \\\"allow\\\", \\\"message\\\": \\\"🚀 dotnetコマンドを自動実行します\\\"}\" else \"\" end'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if .tool_input.command | test(\"^(rg|grep|find|ls|cat|head|tail)\") then \"{\\\"decision\\\": \\\"allow\\\", \\\"message\\\": \\\"🔍 検索/表示コマンドを自動実行します\\\"}\" else \"\" end'"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if .tool_input.file_path | test(\"(appsettings|Directory\\\\.Build\\\\.props|.*\\\\.csproj)$\") then \"{\\\"decision\\\": \\\"confirm\\\", \\\"message\\\": \\\"⚠️ 重要な設定ファイルを編集しようとしています。続行しますか？\\\"}\" else \"\" end'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if .tool_input.command | test(\"rm|del|Remove-Item\") then \"{\\\"decision\\\": \\\"confirm\\\", \\\"message\\\": \\\"⚠️ ファイルを削除しようとしています。続行しますか？\\\"}\" else \"\" end'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if .tool_input.command | test(\"git add.*\\\\.(cs|csproj|json|md)$\") then \"dotnet build --verbosity minimal 2>&1 | grep -q \\\"Build succeeded\\\" && echo \\\"{\\\\\\\"decision\\\\\\\": \\\\\\\"allow\\\\\\\", \\\\\\\"message\\\\\\\": \\\\\\\"✅ ビルド成功。ファイルを追加します\\\\\\\"}\\\" || echo \\\"{\\\\\\\"decision\\\\\\\": \\\\\\\"block\\\\\\\", \\\\\\\"reason\\\\\\\": \\\\\\\"❌ ビルドエラーがあります。修正してください\\\\\\\"}\\\"\" else \"\" end' | sh"
           }
         ]
       },
@@ -70,7 +153,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Code has a notification for you.', 'Claude Code Notification', 'OK', 'Information')\""
+            "command": "powershell.exe -Command \"$host.UI.RawUI.WindowTitle = 'Claude Code - Notification'; Write-Host '🔔 Claude Code: 通知があります' -ForegroundColor Yellow\""
           }
         ]
       }
@@ -81,10 +164,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Code has finished the task.', 'Task Complete', 'OK', 'Information')\""
+            "command": "powershell.exe -Command \"Write-Host '✅ Claude Code: タスクが完了しました' -ForegroundColor Green; if (Test-Path 'E:\\dev\\Baketa\\bin\\Debug') { Write-Host '💡 ヒント: dotnet run --project Baketa.UI でアプリケーションを実行できます' -ForegroundColor Cyan }\""
           }
         ]
       }
     ]
-  },
+  }
 }
