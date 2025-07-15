@@ -196,10 +196,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(filters);
             
-            IAdvancedImage result = this;
+            WindowsImageAdapter result = this;
             foreach (var filter in filters)
             {
-                result = await result.ApplyFilterAsync(filter).ConfigureAwait(false);
+                result = (WindowsImageAdapter)await result.ApplyFilterAsync(filter).ConfigureAwait(false);
             }
             
             return result;
@@ -467,12 +467,12 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             
             // CPU負荷の高い処理なので、Task.Runで実行
             return await Task.Run(async () => {
-                IAdvancedImage result = this;
+                WindowsImageAdapter result = this;
                 
                 // グレースケール変換が必要な場合
                 if (options.OptimizeForTextDetection && Format != CoreImageFormat.Grayscale8)
                 {
-                    result = await ToGrayscaleAsync().ConfigureAwait(false);
+                    result = (WindowsImageAdapter)await ToGrayscaleAsync().ConfigureAwait(false);
                 }
                 
                 // 明るさ・コントラスト調整
@@ -502,7 +502,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                 // 二値化処理
                 if (options.BinarizationThreshold > 0)
                 {
-                    result = await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
+                    result = (WindowsImageAdapter)await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
                 }
                 else if (options.UseAdaptiveThreshold)
                 {
@@ -511,7 +511,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                     // サンプル実装のため、現在の画像をそのまま返す
                 }
                 
-                return result;
+                return (IAdvancedImage)result;
             }).ConfigureAwait(false);
         }
         

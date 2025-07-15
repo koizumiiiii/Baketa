@@ -18,7 +18,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = new object[] { TranslationEngine.Local, TranslationEngine.GoogleTranslate, TranslationEngine.DeepL, TranslationEngine.BingTranslator, TranslationEngine.OpenAI })]
+        ValidValues = new object[] { TranslationEngine.Local, TranslationEngine.Gemini })]
     public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = new object[] { TranslationEngine.None, TranslationEngine.Local, TranslationEngine.GoogleTranslate, TranslationEngine.BingTranslator })]
+        ValidValues = new object[] { TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini })]
     public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
@@ -164,31 +164,17 @@ public sealed class TranslationSettings
     public bool EncryptApiKeys { get; set; } = true;
     
     /// <summary>
-    /// Google Translate APIキー
+    /// Google Gemini APIキー
     /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "Google APIキー", 
-        Description = "Google Translate APIのキー（暗号化保存）")]
-    public string GoogleTranslateApiKey { get; set; } = string.Empty;
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "Gemini APIキー", 
+        Description = "Google Gemini APIのキー（暗号化保存）")]
+    public string GeminiApiKey { get; set; } = string.Empty;
     
     /// <summary>
-    /// DeepL APIキー
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "DeepL APIキー", 
-        Description = "DeepL APIのキー（暗号化保存）")]
-    public string DeepLApiKey { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// OpenAI APIキー
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "OpenAI APIキー", 
-        Description = "OpenAI APIのキー（暗号化保存）")]
-    public string OpenAiApiKey { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// カスタム翻訳プロンプト（OpenAI用）
+    /// カスタム翻訳プロンプト（Gemini用）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "カスタムプロンプト", 
-        Description = "OpenAI翻訳時のカスタムプロンプト")]
+        Description = "Gemini翻訳時のカスタムプロンプト")]
     public string CustomTranslationPrompt { get; set; } = string.Empty;
     
     /// <summary>
@@ -269,9 +255,7 @@ public sealed class TranslationSettings
             CacheRetentionHours = CacheRetentionHours,
             MaxCacheEntries = MaxCacheEntries,
             EncryptApiKeys = EncryptApiKeys,
-            GoogleTranslateApiKey = GoogleTranslateApiKey,
-            DeepLApiKey = DeepLApiKey,
-            OpenAiApiKey = OpenAiApiKey,
+            GeminiApiKey = GeminiApiKey,
             CustomTranslationPrompt = CustomTranslationPrompt,
             LocalModelPath = LocalModelPath,
             AutoUpdateLocalModel = AutoUpdateLocalModel,
@@ -300,24 +284,9 @@ public enum TranslationEngine
     Local,
     
     /// <summary>
-    /// Google Translate
+    /// Google Gemini AI翻訳（クラウド）
     /// </summary>
-    GoogleTranslate,
-    
-    /// <summary>
-    /// DeepL Translator
-    /// </summary>
-    DeepL,
-    
-    /// <summary>
-    /// Microsoft Bing Translator
-    /// </summary>
-    BingTranslator,
-    
-    /// <summary>
-    /// OpenAI ChatGPT
-    /// </summary>
-    OpenAI
+    Gemini
 }
 
 /// <summary>

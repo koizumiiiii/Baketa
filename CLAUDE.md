@@ -18,7 +18,7 @@ Baketa is a Windows-specific real-time text translation overlay application for 
 ## Quick Start Commands
 
 ### Building the Solution
-```bash
+```cmd
 # Build entire solution
 dotnet build
 
@@ -30,7 +30,7 @@ dotnet build --configuration Debug --arch x64
 ```
 
 ### Running Tests
-```bash
+```cmd
 # Run all tests
 dotnet test
 
@@ -42,10 +42,13 @@ dotnet test tests/Baketa.UI.Tests/
 # Run specific test categories
 dotnet test --filter "ClassName~RealSentencePieceTokenizerTests"
 dotnet test --filter "Category=Performance"
+
+# Run specific test with verbose output
+dotnet test --filter "AlphaTestSettingsValidatorTests" --verbosity normal
 ```
 
 ### Running the Application
-```bash
+```cmd
 # Run UI project
 dotnet run --project Baketa.UI
 
@@ -55,8 +58,8 @@ dotnet run --project Baketa.UI --configuration Release
 
 ### OPUS-MT Model Setup
 Before running translation features, download required models:
-```powershell
-# Download OPUS-MT models (Windows PowerShell)
+```cmd
+# Download OPUS-MT models (Windows Command Prompt)
 .\scripts\download_opus_mt_models.ps1
 
 # Verify model files

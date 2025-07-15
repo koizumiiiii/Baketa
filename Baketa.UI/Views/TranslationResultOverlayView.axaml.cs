@@ -4,21 +4,22 @@ using Avalonia.Interactivity;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Utils;
 using System;
+using System.Globalization;
 using System.IO;
 
 namespace Baketa.UI.Views;
 
-public partial class TranslationResultOverlayView : Window
+public partial class TranslationResultOverlayView : Window, IDisposable
 {
     public TranslationResultOverlayView()
     {
         Console.WriteLine("🖥️ TranslationResultOverlayView初期化開始");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView初期化開始");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView初期化開始");
         
         InitializeComponent();
         
         Console.WriteLine("🖥️ TranslationResultOverlayView - InitializeComponent完了");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView - InitializeComponent完了");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView - InitializeComponent完了");
         
         // ウィンドウの設定
         DataContextChanged += OnDataContextChanged;
@@ -27,83 +28,83 @@ public partial class TranslationResultOverlayView : Window
         this.IsHitTestVisible = false;
         
         Console.WriteLine($"🖥️ TranslationResultOverlayView初期化完了 - IsHitTestVisible: {IsHitTestVisible}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView初期化完了 - IsHitTestVisible: {IsHitTestVisible}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView初期化完了 - IsHitTestVisible: {IsHitTestVisible}");
     }
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
         Console.WriteLine($"🖥️ TranslationResultOverlayView.OnDataContextChanged呼び出し - DataContext: {DataContext?.GetType().Name ?? "null"}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnDataContextChanged呼び出し - DataContext: {DataContext?.GetType().Name ?? "null"}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnDataContextChanged呼び出し - DataContext: {DataContext?.GetType().Name ?? "null"}");
         
         if (DataContext is TranslationResultOverlayViewModel viewModel)
         {
-            var viewInstanceId = this.GetHashCode().ToString("X8");
-            var viewModelInstanceId = viewModel.GetHashCode().ToString("X8");
+            var viewInstanceId = this.GetHashCode().ToString("X8", CultureInfo.InvariantCulture);
+            var viewModelInstanceId = viewModel.GetHashCode().ToString("X8", CultureInfo.InvariantCulture);
             Console.WriteLine($"🖥️ TranslationResultOverlayView - ViewModelのPropertyChangedイベント購読開始");
             Console.WriteLine($"   🔗 View インスタンスID: {viewInstanceId}");
             Console.WriteLine($"   🔗 ViewModel インスタンスID: {viewModelInstanceId}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - ViewModelのPropertyChangedイベント購読開始");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔗 View インスタンスID: {viewInstanceId}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔗 ViewModel インスタンスID: {viewModelInstanceId}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - ViewModelのPropertyChangedイベント購読開始");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔗 View インスタンスID: {viewInstanceId}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔗 ViewModel インスタンスID: {viewModelInstanceId}");
             
             // ViewModelの変更を監視
             viewModel.PropertyChanged += (s, e) =>
             {
-                var senderInstanceId = s?.GetHashCode().ToString("X8") ?? "NULL";
+                var senderInstanceId = s?.GetHashCode().ToString("X8", CultureInfo.InvariantCulture) ?? "NULL";
                 Console.WriteLine($"🖥️ TranslationResultOverlayView - PropertyChanged受信: {e.PropertyName} (Sender: {senderInstanceId})");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - PropertyChanged受信: {e.PropertyName} (Sender: {senderInstanceId})");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - PropertyChanged受信: {e.PropertyName} (Sender: {senderInstanceId})");
                 
                 if (e.PropertyName == nameof(TranslationResultOverlayViewModel.IsOverlayVisible))
                 {
                     Console.WriteLine($"🖥️ TranslationResultOverlayView - IsOverlayVisibleプロパティ変更検出: {viewModel.IsOverlayVisible}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - IsOverlayVisibleプロパティ変更検出: {viewModel.IsOverlayVisible}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - IsOverlayVisibleプロパティ変更検出: {viewModel.IsOverlayVisible}");
                     
                     Console.WriteLine($"🔍 UpdateVisibility呼び出し前 - View.IsVisible: {IsVisible}, ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 UpdateVisibility呼び出し前 - View.IsVisible: {IsVisible}, ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 UpdateVisibility呼び出し前 - View.IsVisible: {IsVisible}, ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
                     
                     UpdateVisibility(viewModel.IsOverlayVisible);
                     
                     Console.WriteLine($"🔍 UpdateVisibility呼び出し後 - View.IsVisible: {IsVisible}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 UpdateVisibility呼び出し後 - View.IsVisible: {IsVisible}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 UpdateVisibility呼び出し後 - View.IsVisible: {IsVisible}");
                 }
                 else if (e.PropertyName == nameof(TranslationResultOverlayViewModel.PositionX) ||
                          e.PropertyName == nameof(TranslationResultOverlayViewModel.PositionY))
                 {
                     Console.WriteLine($"🖥️ TranslationResultOverlayView - 位置プロパティ変更検出: X={viewModel.PositionX}, Y={viewModel.PositionY}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - 位置プロパティ変更検出: X={viewModel.PositionX}, Y={viewModel.PositionY}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - 位置プロパティ変更検出: X={viewModel.PositionX}, Y={viewModel.PositionY}");
                     UpdatePosition(viewModel.PositionX, viewModel.PositionY);
                 }
                 else
                 {
                     // 他のプロパティ変更もログに記録
                     Console.WriteLine($"🖥️ TranslationResultOverlayView - その他プロパティ変更: {e.PropertyName}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - その他プロパティ変更: {e.PropertyName}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - その他プロパティ変更: {e.PropertyName}");
                 }
             };
             
             Console.WriteLine("✅ TranslationResultOverlayView - PropertyChangedイベント購読完了");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayView - PropertyChangedイベント購読完了");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayView - PropertyChangedイベント購読完了");
             
             // 初期状態を同期（PropertyChangedイベントを逃した場合に備えて）
             Console.WriteLine($"🔄 初期状態同期開始 - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 初期状態同期開始 - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 初期状態同期開始 - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
             
             UpdateVisibility(viewModel.IsOverlayVisible);
             UpdatePosition(viewModel.PositionX, viewModel.PositionY);
             
             Console.WriteLine("✅ 初期状態同期完了");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 初期状態同期完了");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 初期状態同期完了");
             
             // PropertyChangedイベントの代替として定期的な状態同期を開始
             StartPeriodicSync(viewModel);
             
             Console.WriteLine("🔄 定期的状態同期を開始しました");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 定期的状態同期を開始しました");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 定期的状態同期を開始しました");
         }
         else
         {
             Console.WriteLine("⚠️ TranslationResultOverlayView - DataContextがTranslationResultOverlayViewModelではありません");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ TranslationResultOverlayView - DataContextがTranslationResultOverlayViewModelではありません");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ TranslationResultOverlayView - DataContextがTranslationResultOverlayViewModelではありません");
         }
     }
 
@@ -118,7 +119,7 @@ public partial class TranslationResultOverlayView : Window
         _syncTimer = new System.Threading.Timer(SyncWithViewModel, null, TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(200));
     }
     
-    private bool _lastTargetVisibility = false;
+    private bool _lastTargetVisibility;
     
     private void SyncWithViewModel(object? state)
     {
@@ -145,7 +146,7 @@ public partial class TranslationResultOverlayView : Window
                     if (currentViewVisibility != targetVisibility)
                     {
                         Console.WriteLine($"🔄 強制状態同期: View.IsVisible={currentViewVisibility} -> Target={targetVisibility}");
-                        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 強制状態同期: View.IsVisible={currentViewVisibility} -> Target={targetVisibility}");
+                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 強制状態同期: View.IsVisible={currentViewVisibility} -> Target={targetVisibility}");
                         
                         UpdateVisibility(targetVisibility);
                         _lastTargetVisibility = targetVisibility;
@@ -154,28 +155,28 @@ public partial class TranslationResultOverlayView : Window
                     {
                         // 表示状態は一致しているが、targetが変更された場合
                         Console.WriteLine($"🔄 状態変更検出: Target={targetVisibility} (View既に同期済み)");
-                        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 状態変更検出: Target={targetVisibility} (View既に同期済み)");
+                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 状態変更検出: Target={targetVisibility} (View既に同期済み)");
                         _lastTargetVisibility = targetVisibility;
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"⚠️ 状態同期エラー: {ex.Message}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ 状態同期エラー: {ex.Message}");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ 状態同期エラー: {ex.Message}");
                 }
             });
         }
         catch (Exception ex)
         {
             Console.WriteLine($"⚠️ 定期同期エラー: {ex.Message}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ 定期同期エラー: {ex.Message}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ 定期同期エラー: {ex.Message}");
         }
     }
 
     private void UpdateVisibility(bool isVisible)
     {
         Console.WriteLine($"🖥️ TranslationResultOverlayView.UpdateVisibility呼び出し: {isVisible}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.UpdateVisibility呼び出し: {isVisible}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.UpdateVisibility呼び出し: {isVisible}");
         
         if (isVisible)
         {
@@ -183,13 +184,13 @@ public partial class TranslationResultOverlayView : Window
             if (DataContext is TranslationResultOverlayViewModel vm)
             {
                 Console.WriteLine($"🔍 表示前デバッグ - TranslatedText: '{vm.TranslatedText}', OriginalText: '{vm.OriginalText}', HasText: {vm.HasText}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 表示前デバッグ - TranslatedText: '{vm.TranslatedText}', OriginalText: '{vm.OriginalText}', HasText: {vm.HasText}");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 表示前デバッグ - TranslatedText: '{vm.TranslatedText}', OriginalText: '{vm.OriginalText}', HasText: {vm.HasText}");
                 
                 // HasTextがfalseの場合は表示しない
                 if (!vm.HasText)
                 {
                     Console.WriteLine("⚠️ HasText=false のため表示をスキップ");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ HasText=false のため表示をスキップ");
+                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ HasText=false のため表示をスキップ");
                     return;
                 }
                 
@@ -207,18 +208,18 @@ public partial class TranslationResultOverlayView : Window
             Console.WriteLine($"   - Topmost: {Topmost}");
             Console.WriteLine($"   - WindowState: {WindowState}");
             
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.Show()実行完了:");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - IsVisible: {IsVisible}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Position: ({Position.X}, {Position.Y})");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Size: {Width}x{Height}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Topmost: {Topmost}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - WindowState: {WindowState}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.Show()実行完了:");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - IsVisible: {IsVisible}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Position: ({Position.X}, {Position.Y})");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Size: {Width}x{Height}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - Topmost: {Topmost}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   - WindowState: {WindowState}");
         }
         else
         {
             Hide();
             Console.WriteLine($"🖥️ TranslationResultOverlayView.Hide()実行完了 - IsVisible: {IsVisible}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.Hide()実行完了 - IsVisible: {IsVisible}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.Hide()実行完了 - IsVisible: {IsVisible}");
         }
     }
 
@@ -243,38 +244,38 @@ public partial class TranslationResultOverlayView : Window
     protected override void OnLoaded(RoutedEventArgs e)
     {
         Console.WriteLine("🖥️ TranslationResultOverlayView.OnLoaded呼び出し");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded呼び出し");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded呼び出し");
         
         base.OnLoaded(e);
         
         // 初期状態で非表示（ViewModelのIsOverlayVisibleに従って表示制御）
         Console.WriteLine($"🖥️ TranslationResultOverlayView.OnLoaded - DataContext: {DataContext?.GetType().Name ?? "null"}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnLoaded - DataContext: {DataContext?.GetType().Name ?? "null"}");
+        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnLoaded - DataContext: {DataContext?.GetType().Name ?? "null"}");
         
         if (DataContext is TranslationResultOverlayViewModel viewModel)
         {
             Console.WriteLine($"🖥️ TranslationResultOverlayView.OnLoaded - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnLoaded - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView.OnLoaded - ViewModel.IsOverlayVisible: {viewModel.IsOverlayVisible}");
             
             // ViewModelの状態に応じて表示/非表示
             if (!viewModel.IsOverlayVisible)
             {
                 Hide();
                 Console.WriteLine("🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（ViewModelのIsOverlayVisible=false）");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（ViewModelのIsOverlayVisible=false）");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（ViewModelのIsOverlayVisible=false）");
             }
             else
             {
                 Show();
                 Console.WriteLine("🖥️ TranslationResultOverlayView.OnLoaded - Show()実行（ViewModelのIsOverlayVisible=true）");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Show()実行（ViewModelのIsOverlayVisible=true）");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Show()実行（ViewModelのIsOverlayVisible=true）");
             }
         }
         else
         {
             Hide();
             Console.WriteLine("🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（DataContextがnull）");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（DataContextがnull）");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayView.OnLoaded - Hide()実行（DataContextがnull）");
         }
     }
 
@@ -289,4 +290,36 @@ public partial class TranslationResultOverlayView : Window
         // オーバーレイはマウスイベントを無視
         e.Handled = false;
     }
+
+    #region IDisposable実装
+
+    private bool _disposed;
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                // マネージドリソースの解放
+                _syncTimer?.Dispose();
+                _syncTimer = null;
+                _currentViewModel = null;
+            }
+            _disposed = true;
+        }
+    }
+
+    ~TranslationResultOverlayView()
+    {
+        Dispose(false);
+    }
+
+    #endregion
 }

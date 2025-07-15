@@ -43,22 +43,20 @@
       
       <!-- 翻訳済みテキスト（メイン） -->
       <TextBlock Text="{Binding TranslatedText}"
-                 FontSize="14"
+                 FontSize="{Binding FontSize}"
                  FontWeight="Medium"
                  Foreground="{StaticResource TranslationTextBrush}"
                  TextWrapping="Wrap"
-                 LineHeight="18"
                  MaxWidth="{Binding MaxWidth}"
                  IsVisible="True"
                  Classes="TranslationText"/>
       
       <!-- 元テキスト（デバッグ用、αテストでは表示） -->
       <TextBlock Text="{Binding OriginalText}"
-                 FontSize="11"
+                 FontSize="{Binding SmallFontSize}"
                  FontWeight="Normal"
                  Foreground="{StaticResource OriginalTextBrush}"
                  TextWrapping="Wrap"
-                 LineHeight="14"
                  MaxWidth="{Binding MaxWidth}"
                  IsVisible="True"
                  Classes="TranslationText"/>
