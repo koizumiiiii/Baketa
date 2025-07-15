@@ -20,7 +20,7 @@ public static class DebugHelper
     [System.Diagnostics.Conditional("DEBUG")]
     public static void Log(string message)
     {
-        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
         var logMessage = $"[{timestamp}] {message}";
         
         // コンソール出力
