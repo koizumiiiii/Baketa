@@ -176,64 +176,67 @@ public class AlphaTestSettingsValidatorTests
 
     #region 透明度検証テスト
 
-    [Fact]
-    public void Validate_ValidOpacity_ShouldSucceed()
-    {
-        // Arrange
-        var settings = new AppSettings
-        {
-            MainUi = new MainUiSettings
-            {
-                PanelOpacity = 0.8 // 80%
-            }
-        };
+    // 注記: 透明度設定は削除済み（固定値0.9を使用）- issue_74.mdより
+    // 以下のテストはαテストでは無効化
 
-        // Act
-        var result = _validator.Validate(settings);
+    // [Fact]
+    // public void Validate_ValidOpacity_ShouldSucceed()
+    // {
+    //     // Arrange
+    //     var settings = new AppSettings
+    //     {
+    //         MainUi = new MainUiSettings
+    //         {
+    //             PanelOpacity = 0.8 // 80%
+    //         }
+    //     };
 
-        // Assert
-        Assert.True(result.IsValid);
-    }
+    //     // Act
+    //     var result = _validator.Validate(settings);
 
-    [Fact]
-    public void Validate_TooLowOpacity_ShouldFail()
-    {
-        // Arrange
-        var settings = new AppSettings
-        {
-            MainUi = new MainUiSettings
-            {
-                PanelOpacity = 0.05 // 5%（範囲外）
-            }
-        };
+    //     // Assert
+    //     Assert.True(result.IsValid);
+    // }
 
-        // Act
-        var result = _validator.Validate(settings);
+    // [Fact]
+    // public void Validate_TooLowOpacity_ShouldFail()
+    // {
+    //     // Arrange
+    //     var settings = new AppSettings
+    //     {
+    //         MainUi = new MainUiSettings
+    //         {
+    //             PanelOpacity = 0.05 // 5%（範囲外）
+    //         }
+    //     };
 
-        // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("10%以上90%以下"));
-    }
+    //     // Act
+    //     var result = _validator.Validate(settings);
 
-    [Fact]
-    public void Validate_TooHighOpacity_ShouldFail()
-    {
-        // Arrange
-        var settings = new AppSettings
-        {
-            MainUi = new MainUiSettings
-            {
-                PanelOpacity = 0.95 // 95%（範囲外）
-            }
-        };
+    //     // Assert
+    //     Assert.False(result.IsValid);
+    //     Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("10%以上90%以下"));
+    // }
 
-        // Act
-        var result = _validator.Validate(settings);
+    // [Fact]
+    // public void Validate_TooHighOpacity_ShouldFail()
+    // {
+    //     // Arrange
+    //     var settings = new AppSettings
+    //     {
+    //         MainUi = new MainUiSettings
+    //         {
+    //             PanelOpacity = 0.95 // 95%（範囲外）
+    //         }
+    //     };
 
-        // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("10%以上90%以下"));
-    }
+    //     // Act
+    //     var result = _validator.Validate(settings);
+
+    //     // Assert
+    //     Assert.False(result.IsValid);
+    //     Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("10%以上90%以下"));
+    // }
 
     #endregion
 
