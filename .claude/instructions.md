@@ -98,8 +98,8 @@ Code completion → Gemini review → Quality enhancement
 
 After all code implementation, fixes, and refactoring, **always execute** the following:
 
-#### **1. WSL Environment Limitations**
-**IMPORTANT: WSL環境では`net8.0-windows`ターゲットフレームワークの制約により、dotnetコマンドによるビルド・テスト実行はサポートされていません。**
+#### **1. Windows Native Environment**
+**IMPORTANT: Windows環境でClaude Codeを使用します。WindowsコマンドプロンプトまたはPowerShellでのdotnetコマンド実行が推奨されます。**
 
 #### **2. Code Analysis Alternative Methods**
 ```bash
@@ -138,27 +138,24 @@ WSL環境での実装完了確認フォーマット:
 - Implementation Content: [Brief description of implementation]
 ```
 
-#### **5. Error Handling (WSL Environment)**
-- **Static Analysis Issues**: コードパターン検索で発見された問題を修正
-- **Architecture Violations**: クリーンアーキテクチャ違反の修正
-- **Code Pattern Issues**: 非同期プログラミングパターンの修正
+#### **5. Error Handling (Windows Native Environment)**
+- **Compilation Issues**: dotnet buildコマンドで直接コンパイルエラーを確認
+- **Test Failures**: dotnet testコマンドで単体テストエラーを確認
+- **Architecture Violations**: 静的解析ツールでクリーンアーキテクチャ違反を確認
 
-#### **6. WSL Alternative Verification**
-```bash
-# WSL環境での包括的チェック
-echo "Checking for common C# issues..."
-rg "ConfigureAwait\(true\)|\.Result\b|\.Wait\(\)" --type cs
-echo "Checking for potential null reference issues..."
-rg "null!" --type cs
-echo "Checking architecture compliance..."
-find . -name "*.cs" -path "*/Baketa.Core/*" | head -10
+#### **6. Windows Native Verification**
+```cmd
+# Windows環境でのビルド・テスト確認
+dotnet build --configuration Debug
+dotnet test --verbosity normal
+dotnet test --filter "AlphaTestSettingsValidatorTests" --verbosity normal
 ```
-**WSL ENVIRONMENT LIMITATIONS**
+**WINDOWS NATIVE ENVIRONMENT BENEFITS**
 
-- **Current Environment**: WSL (Windows Subsystem for Linux)
-- **Limitation**: `net8.0-windows` target framework not supported in WSL
-- **Alternative**: Use static analysis and code pattern verification
-- **Future Consideration**: Actual compilation testing requires Windows environment or cross-platform target
+- **Current Environment**: Windows Native with Claude Code
+- **Advantages**: Full `net8.0-windows` target framework support
+- **Capabilities**: Complete build and test execution
+- **Performance**: Faster feedback loop for development
 
 ### **Language Specification**
 **ALL RESPONSES MUST BE IN JAPANESE**
@@ -531,38 +528,39 @@ mockService.Setup(x => x.GetDataAsync()).ReturnsAsync(testData);
 
 ### デバッグコマンド / Debug Commands
 
-**重要: コマンド実行はPowerShellを使用してください（BashのPATH問題回避）**
+**重要: Windows環境でClaude Codeを使用し、コマンドプロンプトまたはPowerShellでコマンドを実行します**
 
-**Windows専用プロジェクトのWSL/Linux環境対応**: EnableWindowsTargetingプロパティが必要
+**Windows専用プロジェクトのネイティブ環境対応**: 制限なしで全機能利用可能
 
-```powershell
-# 全体的なビルド検証（PowerShell）- WSL対応版
-dotnet build --configuration Debug -p:EnableWindowsTargeting=true
+```cmd
+# 全体的なビルド検証（Windows環境）
+dotnet build --configuration Debug
 
-# 特定プロジェクトビルド（PowerShell）- WSL対応版
-dotnet build Baketa.UI --configuration Debug -p:EnableWindowsTargeting=true
+# 特定プロジェクトビルド（Windows環境）
+dotnet build Baketa.UI --configuration Debug
 
-# 推奨: プロジェクト専用スクリプト使用（PowerShell）
+# 推奨: プロジェクト専用スクリプト使用
 .\scripts\run_build.ps1 -Verbosity normal
 .\scripts\run_tests.ps1 -Verbosity detailed
 .\scripts\check_implementation.ps1
 
-# テスト実行（PowerShell）- 注意: WSL環境ではWindowsDesktop.App制限あり
-dotnet test --logger "console;verbosity=detailed" -p:EnableWindowsTargeting=true
+# テスト実行（Windows環境）
+dotnet test --logger "console;verbosity=detailed"
 
-# UIテスト実行（PowerShell）- 注意: WSL環境制限
-dotnet test tests/Baketa.UI.Tests/ --logger "console;verbosity=detailed" -p:EnableWindowsTargeting=true
+# UIテスト実行（Windows環境）
+dotnet test tests/Baketa.UI.Tests/ --logger "console;verbosity=detailed"
+
+# 特定テストフィルタ実行
+dotnet test --filter "AlphaTestSettingsValidatorTests" --verbosity normal
 ```
 
-**WSL/Linux環境での制限事項**:
-- `net8.0-windows`ターゲットのテスト実行には`Microsoft.WindowsDesktop.App`が必要
-- UI関連テストは実際のWindows環境での実行を推奨
-- ビルド検証は`EnableWindowsTargeting=true`で実行可能
+**Windows環境での利点**:
+- `net8.0-windows`ターゲットフレームワークの完全サポート
+- UI関連テストの完全実行
+- ビルド・テスト・デバッグの制限なし
 
-**Claude Codeでのコマンド実行指示例:**
-```
-「PowerShellで以下を実行してください: dotnet test tests/Baketa.UI.Tests/」
-```
+**Claude Codeでのコマンド実行:**
+Claude Codeが直接コマンドを実行し、結果を即座に確認できます
 
 ## 新機能開発フロー / New Feature Development Flow
 

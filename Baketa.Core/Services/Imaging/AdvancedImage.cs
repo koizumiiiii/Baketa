@@ -149,10 +149,10 @@ namespace Baketa.Core.Services.Imaging;
             if (!filtersList.SafeAny())
                 return this.Clone() as IAdvancedImage;
                 
-            IAdvancedImage result = this;
+            AdvancedImage result = this;
             foreach (var filter in filtersList)
             {
-                result = await result.ApplyFilterAsync(filter).ConfigureAwait(false);
+                result = (AdvancedImage)await result.ApplyFilterAsync(filter).ConfigureAwait(false);
             }
             
             return result;
@@ -548,12 +548,12 @@ namespace Baketa.Core.Services.Imaging;
                 
             // CPU負荷の高い処理なので、Task.Runで実行
             return Task.Run(async () => {
-                IAdvancedImage result = this;
+                AdvancedImage result = this;
                 
                 // グレースケール変換が必要な場合
                 if (options.OptimizeForTextDetection && Format != ImageFormat.Grayscale8)
                 {
-                    result = await ToGrayscaleAsync().ConfigureAwait(false);
+                    result = (AdvancedImage)await ToGrayscaleAsync().ConfigureAwait(false);
                 }
                 
                 // 明るさ・コントラスト調整
@@ -583,7 +583,7 @@ namespace Baketa.Core.Services.Imaging;
                 // 二値化処理
                 if (options.BinarizationThreshold > 0)
                 {
-                    result = await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
+                    result = (AdvancedImage)await result.ToBinaryAsync((byte)options.BinarizationThreshold).ConfigureAwait(false);
                 }
                 else if (options.UseAdaptiveThreshold)
                 {
@@ -592,7 +592,7 @@ namespace Baketa.Core.Services.Imaging;
                     // サンプル実装のため、現在の画像をそのまま返す
                 }
                 
-                return result;
+                return (IAdvancedImage)result;
             });
         }
         

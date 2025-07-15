@@ -577,13 +577,13 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             PublishProgress(translationId, TranslationStatus.ProcessingOCR, 0.3f, "テキスト認識中...");
             
             Console.WriteLine($"🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}{Environment.NewLine}");
             
             // OCRエンジンが初期化されていない場合は初期化
             if (!_ocrEngine.IsInitialized)
             {
                 Console.WriteLine($"🛠️ OCRエンジン初期化開始");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛠️ OCRエンジン初期化開始{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛠️ OCRエンジン初期化開始{Environment.NewLine}");
                 
                 var settings = new OcrEngineSettings
                 {
@@ -596,12 +596,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     await _ocrEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
                     Console.WriteLine($"✅ OCRエンジン初期化完了");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCRエンジン初期化完了{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCRエンジン初期化完了{Environment.NewLine}");
                 }
                 catch (Exception initEx)
                 {
                     Console.WriteLine($"❌ OCRエンジン初期化エラー: {initEx.Message}");
-                    System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCRエンジン初期化エラー: {initEx.Message}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCRエンジン初期化エラー: {initEx.Message}{Environment.NewLine}");
                     throw;
                 }
             }
@@ -611,31 +611,32 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Console.WriteLine($"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}");
             Console.WriteLine($"   📊 画像null判定: {image == null}");
             
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 画像オブジェクト確認:{Environment.NewLine}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}{Environment.NewLine}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 画像null判定: {image == null}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 画像オブジェクト確認:{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 画像null判定: {image == null}{Environment.NewLine}");
             
             try
             {
-                Console.WriteLine($"🔍 OCR処理開始 - 画像サイズ: {image.Width}x{image.Height}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image.Width}x{image.Height}{Environment.NewLine}");
+                Console.WriteLine($"🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}{Environment.NewLine}");
             }
             catch (Exception sizeEx)
             {
                 Console.WriteLine($"❌ 画像サイズ取得エラー: {sizeEx.Message}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 画像サイズ取得エラー: {sizeEx.Message}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 画像サイズ取得エラー: {sizeEx.Message}{Environment.NewLine}");
                 throw;
             }
             
+            ArgumentNullException.ThrowIfNull(image, nameof(image));
             var ocrResults = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
             
             Console.WriteLine($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}{Environment.NewLine}");
             
             if (ocrResults.HasText)
             {
                 originalText = ocrResults.Text;
-                ocrConfidence = ocrResults.TextRegions.Count > 0 
+                ocrConfidence = ocrResults.TextRegions?.Count > 0 
                     ? ocrResults.TextRegions.Average(r => r.Confidence) 
                     : 0.0;
                 
@@ -644,10 +645,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 Console.WriteLine($"   📊 信頼度: {ocrConfidence:F2}");
                 Console.WriteLine($"   🔢 テキスト長: {originalText.Length}");
                 
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCR認識成功:{Environment.NewLine}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 認識テキスト: '{originalText}'{Environment.NewLine}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {ocrConfidence:F2}{Environment.NewLine}");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔢 テキスト長: {originalText.Length}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCR認識成功:{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 認識テキスト: '{originalText}'{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 信頼度: {ocrConfidence:F2}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔢 テキスト長: {originalText.Length}{Environment.NewLine}");
                     
                 _logger?.LogDebug("OCR認識成功: テキスト長={Length}, 信頼度={Confidence:F2}", 
                     originalText.Length, ocrConfidence);
@@ -655,7 +656,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             else
             {
                 Console.WriteLine("❌ OCR処理でテキストが検出されませんでした");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCR処理でテキストが検出されませんでした{Environment.NewLine}");
+                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCR処理でテキストが検出されませんでした{Environment.NewLine}");
                 _logger?.LogWarning("OCR処理でテキストが検出されませんでした");
                 originalText = string.Empty;
             }
@@ -704,10 +705,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Console.WriteLine($"   📝 例外メッセージ: {ex.Message}");
             Console.WriteLine($"   📍 スタックトレース: {ex.StackTrace}");
             
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 翻訳処理で例外発生:{Environment.NewLine}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔍 例外タイプ: {ex.GetType().Name}{Environment.NewLine}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📝 例外メッセージ: {ex.Message}{Environment.NewLine}");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 スタックトレース: {ex.StackTrace}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 翻訳処理で例外発生:{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔍 例外タイプ: {ex.GetType().Name}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📝 例外メッセージ: {ex.Message}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 スタックトレース: {ex.StackTrace}{Environment.NewLine}");
             
             _logger?.LogError(ex, "翻訳処理で例外が発生しました: TranslationId={TranslationId}", translationId);
             
