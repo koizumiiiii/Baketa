@@ -3,6 +3,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Extensions;
+using Baketa.Core.Utilities;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;
@@ -12,6 +13,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Security;
 using System.IO;
+using System.Reflection;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -167,9 +169,19 @@ public sealed class PaddleOcrEngine(
 
         var stopwatch = Stopwatch.StartNew();
         
+        DebugLogUtility.WriteLog($"🔍 PaddleOcrEngine.RecognizeAsync開始:");
+        DebugLogUtility.WriteLog($"   ✅ 初期化状態: {IsInitialized}");
+        DebugLogUtility.WriteLog($"   🌐 現在の言語: {CurrentLanguage}");
+        DebugLogUtility.WriteLog($"   📏 画像サイズ: {image.Width}x{image.Height}");
+        DebugLogUtility.WriteLog($"   🎯 ROI: {regionOfInterest?.ToString() ?? "なし（全体）"}");
+        
         // テスト環境ではダミー結果を返す
-        if (IsTestEnvironment())
+        var isTestEnv = IsTestEnvironment();
+        DebugLogUtility.WriteLog($"   🧪 テスト環境判定: {isTestEnv}");
+        
+        if (isTestEnv)
         {
+            DebugLogUtility.WriteLog("🧪 テスト環境: ダミーOCR結果を返却");
             _logger?.LogDebug("テスト環境: ダミーOCR結果を返却");
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
             
@@ -189,13 +201,18 @@ public sealed class PaddleOcrEngine(
 
         try
         {
+            DebugLogUtility.WriteLog("🎬 実際のOCR処理を開始");
             progressCallback?.Report(new OcrProgress(0.1, "OCR処理を開始"));
             
             // IImageからMatに変換
+            DebugLogUtility.WriteLog("🔄 IImageからMatに変換中...");
             using var mat = await ConvertToMatAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
+            
+            DebugLogUtility.WriteLog($"🖼️ Mat変換完了: Empty={mat.Empty()}, Size={mat.Width}x{mat.Height}");
             
             if (mat.Empty())
             {
+                DebugLogUtility.WriteLog("❌ 変換後の画像が空です");
                 _logger?.LogWarning("変換後の画像が空です");
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
@@ -203,11 +220,14 @@ public sealed class PaddleOcrEngine(
             progressCallback?.Report(new OcrProgress(0.3, "OCR処理実行中"));
 
             // OCR実行
+            DebugLogUtility.WriteLog("🚀 ExecuteOcrAsync呼び出し開始");
             var textRegions = await ExecuteOcrAsync(mat, progressCallback, cancellationToken).ConfigureAwait(false);
+            DebugLogUtility.WriteLog($"🚀 ExecuteOcrAsync完了: 検出されたリージョン数={textRegions?.Count ?? 0}");
             
             // ROI座標の補正
             if (regionOfInterest.HasValue)
             {
+                DebugLogUtility.WriteLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
                 textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
             }
             
@@ -226,6 +246,7 @@ public sealed class PaddleOcrEngine(
                 regionOfInterest
             );
             
+            DebugLogUtility.WriteLog($"✅ OCR処理完了: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms");
             _logger?.LogDebug("OCR処理完了 - 検出されたテキスト数: {Count}, 処理時間: {ElapsedMs}ms", 
                 result.TextRegions.Count, stopwatch.ElapsedMilliseconds);
             
@@ -765,6 +786,11 @@ public sealed class PaddleOcrEngine(
         IProgress<OcrProgress>? progressCallback,
         CancellationToken cancellationToken)
     {
+        DebugLogUtility.WriteLog($"⚙️ ExecuteOcrAsync開始:");
+        DebugLogUtility.WriteLog($"   🧵 マルチスレッド有効: {IsMultiThreadEnabled}");
+        DebugLogUtility.WriteLog($"   🔧 QueuedEngineが利用可能: {_queuedEngine != null}");
+        DebugLogUtility.WriteLog($"   🔧 OcrEngineが利用可能: {_ocrEngine != null}");
+        
         progressCallback?.Report(new OcrProgress(0.4, "テキスト検出"));
         
         // OCR実行
@@ -772,11 +798,13 @@ public sealed class PaddleOcrEngine(
         
         if (IsMultiThreadEnabled && _queuedEngine != null)
         {
+            DebugLogUtility.WriteLog("🧵 マルチスレッドOCRエンジンで処理実行");
             _logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
             result = await Task.Run(() => _queuedEngine.Run(mat), cancellationToken).ConfigureAwait(false);
         }
         else if (_ocrEngine != null)
         {
+            DebugLogUtility.WriteLog("🔧 シングルスレッドOCRエンジンで処理実行");
             _logger?.LogDebug("シングルスレッドOCRエンジンで処理実行");
             result = await Task.Run(() => _ocrEngine.Run(mat), cancellationToken).ConfigureAwait(false);
         }
@@ -800,32 +828,245 @@ public sealed class PaddleOcrEngine(
         
         try
         {
-            // 実際のPaddleOCRの結果形式に応じて変換処理を実装
-            // 現在はダミー実装
+            DebugLogUtility.WriteLog($"🔍 PaddleOCR結果の詳細デバッグ:");
+            DebugLogUtility.WriteLog($"   🔢 result == null: {result == null}");
+            
             if (result != null)
             {
-                // TODO: 実際のPaddleOCRの結果構造に応じた変換処理
-                textRegions.Add(new OcrTextRegion(
-                    "サンプルテキスト",
-                    new Rectangle(10, 10, 100, 30),
-                    0.95
-                ));
+                DebugLogUtility.WriteLog($"   📝 result型: {result.GetType().FullName}");
+                DebugLogUtility.WriteLog($"   📄 result値: {result}");
+                
+                // PaddleOCRの結果を処理 - 配列または単一オブジェクト
+                if (result is PaddleOcrResult[] paddleResults)
+                {
+                    DebugLogUtility.WriteLog($"   ✅ PaddleOcrResult[]として認識: 件数={paddleResults.Length}");
+                    
+                    for (int i = 0; i < paddleResults.Length; i++)
+                    {
+                        ProcessSinglePaddleResult(paddleResults[i], i + 1, textRegions);
+                    }
+                }
+                else if (result is PaddleOcrResult singleResult)
+                {
+                    DebugLogUtility.WriteLog($"   ✅ 単一PaddleOcrResultとして認識");
+                    ProcessSinglePaddleResult(singleResult, 1, textRegions);
+                }
+                else
+                {
+                    DebugLogUtility.WriteLog($"   ❌ 予期しない結果型: {result.GetType().FullName}");
+                    
+                    // PaddleOcrResultかどうか判定してフォールバック処理
+                    if (result.GetType().Name == "PaddleOcrResult")
+                    {
+                        DebugLogUtility.WriteLog($"   🔧 型名によるフォールバック処理を実行");
+                        ProcessSinglePaddleResult(result, 1, textRegions);
+                    }
+                }
+            }
+            else
+            {
+                DebugLogUtility.WriteLog($"   ❌ PaddleOCR結果がnull");
             }
         }
         catch (ArgumentNullException ex)
         {
+            DebugLogUtility.WriteLog($"   ❌ ArgumentNullException: {ex.Message}");
             _logger?.LogWarning(ex, "PaddleOCR結果がnullです");
         }
         catch (InvalidOperationException ex)
         {
+            DebugLogUtility.WriteLog($"   ❌ InvalidOperationException: {ex.Message}");
             _logger?.LogWarning(ex, "PaddleOCR結果の変換で操作エラーが発生");
         }
         catch (InvalidCastException ex)
         {
+            DebugLogUtility.WriteLog($"   ❌ InvalidCastException: {ex.Message}");
             _logger?.LogWarning(ex, "PaddleOCR結果の型変換エラーが発生");
         }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"   ❌ 予期しない例外: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogError(ex, "PaddleOCR結果の変換で予期しない例外が発生");
+        }
         
+        DebugLogUtility.WriteLog($"   🔢 最終的なtextRegions数: {textRegions.Count}");
         return textRegions;
+    }
+
+    /// <summary>
+    /// 単一のPaddleOcrResultを処理してOcrTextRegionに変換
+    /// </summary>
+    private void ProcessSinglePaddleResult(object paddleResult, int index, List<OcrTextRegion> textRegions)
+    {
+        try
+        {
+            DebugLogUtility.WriteLog($"   リザルト {index}:");
+            
+            // PaddleOcrResultの実際のプロパティをリフレクションで調査
+            var type = paddleResult.GetType();
+            DebugLogUtility.WriteLog($"     🔍 型: {type.FullName}");
+            
+            var properties = type.GetProperties();
+            foreach (var prop in properties)
+            {
+                try
+                {
+                    var value = prop.GetValue(paddleResult);
+                    DebugLogUtility.WriteLog($"     🔧 {prop.Name}: {value ?? "(null)"} (型: {prop.PropertyType.Name})");
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"     ❌ {prop.Name}: エラー - {ex.Message}");
+                }
+            }
+            
+            // Regionsプロパティを探してテキストリージョンを取得
+            var regionsProperty = type.GetProperty("Regions");
+            if (regionsProperty != null)
+            {
+                var regionsValue = regionsProperty.GetValue(paddleResult);
+                if (regionsValue is Array regionsArray)
+                {
+                    DebugLogUtility.WriteLog($"     📍 Regionsプロパティ発見: 件数={regionsArray.Length}");
+                    
+                    for (int i = 0; i < regionsArray.Length; i++)
+                    {
+                        var regionItem = regionsArray.GetValue(i);
+                        if (regionItem != null)
+                        {
+                            ProcessPaddleRegion(regionItem, i + 1, textRegions);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Regionsプロパティがない場合、結果全体からテキストを抽出
+                var textProperty = type.GetProperty("Text");
+                var text = textProperty?.GetValue(paddleResult) as string ?? string.Empty;
+                DebugLogUtility.WriteLog($"     📖 全体テキスト: '{text}'");
+                
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    // テキストを改行で分割して個別のリージョンとして処理
+                    var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        var line = lines[i].Trim();
+                        if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            // 簡単な座標計算（縦に並べる）
+                            var boundingBox = new Rectangle(10, 10 + i * 25, 200, 20);
+                            
+                            textRegions.Add(new OcrTextRegion(
+                                line,
+                                boundingBox,
+                                0.8 // デフォルト信頼度
+                            ));
+                            
+                            DebugLogUtility.WriteLog($"     ✅ テキストリージョン追加: '{line}' at ({boundingBox.X}, {boundingBox.Y})");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"     ❌ ProcessSinglePaddleResult エラー: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// PaddleOcrResultRegionを処理してOcrTextRegionに変換
+    /// </summary>
+    private void ProcessPaddleRegion(object regionItem, int index, List<OcrTextRegion> textRegions)
+    {
+        try
+        {
+            DebugLogUtility.WriteLog($"       リージョン {index}:");
+            
+            var regionType = regionItem.GetType();
+            DebugLogUtility.WriteLog($"         🔍 リージョン型: {regionType.FullName}");
+            
+            // テキストプロパティを取得
+            var textProperty = regionType.GetProperty("Text");
+            var text = textProperty?.GetValue(regionItem) as string ?? string.Empty;
+            DebugLogUtility.WriteLog($"         📖 テキスト: '{text}'");
+            
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // 信頼度の取得を試行
+                double confidence = 0.8; // デフォルト値
+                var confidenceProperty = regionType.GetProperty("Confidence") ?? 
+                                        regionType.GetProperty("Score") ?? 
+                                        regionType.GetProperty("Conf");
+                if (confidenceProperty != null)
+                {
+                    var confValue = confidenceProperty.GetValue(regionItem);
+                    if (confValue is float f) confidence = f;
+                    else if (confValue is double d) confidence = d;
+                }
+                
+                // 境界ボックスの取得を試行
+                var boundingBox = new Rectangle(10, 10 + index * 25, 200, 20); // デフォルト値
+                var regionProperty = regionType.GetProperty("Region") ?? 
+                                   regionType.GetProperty("Rect") ?? 
+                                   regionType.GetProperty("Box");
+                
+                if (regionProperty != null)
+                {
+                    var regionValue = regionProperty.GetValue(regionItem);
+                    DebugLogUtility.WriteLog($"         📍 リージョン値: {regionValue} (型: {regionValue?.GetType().Name ?? "null"})");
+                    
+                    // 座標配列として処理
+                    if (regionValue is Array pointArray && pointArray.Length >= 4)
+                    {
+                        // 座標を取得して境界ボックスを計算
+                        var points = new List<PointF>();
+                        for (int j = 0; j < Math.Min(4, pointArray.Length); j++)
+                        {
+                            var point = pointArray.GetValue(j);
+                            if (point != null)
+                            {
+                                var pointType = point.GetType();
+                                var xProp = pointType.GetProperty("X");
+                                var yProp = pointType.GetProperty("Y");
+                                
+                                if (xProp != null && yProp != null)
+                                {
+                                    var x = Convert.ToSingle(xProp.GetValue(point), System.Globalization.CultureInfo.InvariantCulture);
+                                    var y = Convert.ToSingle(yProp.GetValue(point), System.Globalization.CultureInfo.InvariantCulture);
+                                    points.Add(new PointF(x, y));
+                                }
+                            }
+                        }
+                        
+                        if (points.Count >= 4)
+                        {
+                            var minX = (int)points.Min(p => p.X);
+                            var maxX = (int)points.Max(p => p.X);
+                            var minY = (int)points.Min(p => p.Y);
+                            var maxY = (int)points.Max(p => p.Y);
+                            boundingBox = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                            
+                            DebugLogUtility.WriteLog($"         📍 計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                        }
+                    }
+                }
+                
+                textRegions.Add(new OcrTextRegion(
+                    text.Trim(),
+                    boundingBox,
+                    confidence
+                ));
+                
+                DebugLogUtility.WriteLog($"         ✅ OcrTextRegion追加: '{text.Trim()}' (confidence: {confidence})");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"         ❌ ProcessPaddleRegion エラー: {ex.Message}");
+        }
     }
 
     /// <summary>

@@ -42,9 +42,10 @@ public interface ITranslationOrchestrationService
     /// <summary>
     /// 自動翻訳を開始します
     /// </summary>
+    /// <param name="targetWindowHandle">翻訳対象ウィンドウハンドル（nullの場合は画面全体）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>自動翻訳実行タスク</returns>
-    Task StartAutomaticTranslationAsync(CancellationToken cancellationToken = default);
+    Task StartAutomaticTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 自動翻訳を停止します
@@ -56,9 +57,10 @@ public interface ITranslationOrchestrationService
     /// <summary>
     /// 単発翻訳を実行します
     /// </summary>
+    /// <param name="targetWindowHandle">翻訳対象ウィンドウハンドル（nullの場合は画面全体）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>単発翻訳実行タスク</returns>
-    Task TriggerSingleTranslationAsync(CancellationToken cancellationToken = default);
+    Task TriggerSingleTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default);
 
     #endregion
 

@@ -7,6 +7,8 @@ using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Utilities;
+using ReactiveUI;
 
 namespace Baketa.UI.Services;
 
@@ -60,7 +62,8 @@ public class TranslationFlowEventProcessor :
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
+        Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow.Title} (Handle={eventData.TargetWindow.Handle})");
+        Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
         
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
@@ -140,21 +143,25 @@ public class TranslationFlowEventProcessor :
             // 4. 継続的翻訳結果購読を停止
             if (_continuousTranslationSubscription != null)
             {
+                Console.WriteLine("🛑 継続的翻訳結果購読を停止中...");
                 _continuousTranslationSubscription.Dispose();
                 _continuousTranslationSubscription = null;
                 _logger.LogInformation("継続的翻訳結果購読を停止");
-                Console.WriteLine("🛑 継続的翻訳結果購読を停止");
-                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 継続的翻訳結果購読を停止{Environment.NewLine}");
+                Console.WriteLine("🛑 継続的翻訳結果購読を停止完了");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ 継続的翻訳結果購読がnull - 停止処理スキップ");
             }
 
-            // 5. 処理中ウィンドウリストをクリア
+            // 5. 処理中ウィンドウリストをクリア - 継続翻訳の再開を許可するため
             lock (_processedEventLock)
             {
                 var processingCount = _processingWindows.Count;
+                Console.WriteLine($"🧹 処理中ウィンドウリストをクリア中: {processingCount} 個のウィンドウ");
                 _processingWindows.Clear();
                 _logger.LogInformation("処理中ウィンドウリストをクリア: {Count} 個のウィンドウ", processingCount);
-                Console.WriteLine($"🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ");
-                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 処理中ウィンドウリストをクリア: {processingCount} 個のウィンドウ{Environment.NewLine}");
+                Console.WriteLine($"🧹 処理中ウィンドウリストクリア完了: {processingCount} 個のウィンドウを解放");
             }
 
             _logger.LogInformation("✅ 翻訳停止処理が完了しました");
@@ -254,14 +261,17 @@ public class TranslationFlowEventProcessor :
 
             // 2. 翻訳結果のObservableを購読してUIイベントに変換
             _logger.LogDebug("Setting up translation result subscription for continuous translation");
+            DebugLogUtility.WriteLog("🔗 継続翻訳結果のObservable購読を設定中");
+            DebugLogUtility.WriteLog($"🔍 現在の購読状態(設定前): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
             _continuousTranslationSubscription = _translationService.TranslationResults
+                .ObserveOn(RxApp.MainThreadScheduler) // UIスレッドスケジューラで実行
                 .Subscribe(result => 
                 {
-                    Console.WriteLine($"📝 継続的翻訳結果受信:");
-                    Console.WriteLine($"   📖 オリジナル: '{result.OriginalText}'");
-                    Console.WriteLine($"   🌐 翻訳結果: '{result.TranslatedText}'");
-                    Console.WriteLine($"   📊 信頼度: {result.Confidence}");
-                    Console.WriteLine($"   📍 表示位置: (100, 200)");
+                    DebugLogUtility.WriteLog($"📝 継続的翻訳結果受信:");
+                    DebugLogUtility.WriteLog($"   📖 オリジナル: '{result.OriginalText}'");
+                    DebugLogUtility.WriteLog($"   🌐 翻訳結果: '{result.TranslatedText}'");
+                    DebugLogUtility.WriteLog($"   📊 信頼度: {result.Confidence}");
+                    DebugLogUtility.WriteLog($"   📍 表示位置: (100, 200)");
                     
                     // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 継続的翻訳結果受信:{Environment.NewLine}");
                     // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '{result.OriginalText}'{Environment.NewLine}");
@@ -285,12 +295,12 @@ public class TranslationFlowEventProcessor :
                         try
                         {
                             await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
-                            Console.WriteLine("✅ 継続的翻訳結果表示イベント発行完了");
-                            // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳結果表示イベント発行完了{Environment.NewLine}");
+                            DebugLogUtility.WriteLog("✅ 継続的翻訳結果表示イベント発行完了");
                             _logger.LogDebug("Continuous translation result display event published");
                         }
                         catch (Exception eventEx)
                         {
+                            DebugLogUtility.WriteLog($"❌ 翻訳結果表示イベント発行エラー: {eventEx.Message}");
                             _logger.LogError(eventEx, "Failed to publish continuous translation display event");
                         }
                     });
@@ -298,10 +308,16 @@ public class TranslationFlowEventProcessor :
 
             // 3. 継続的翻訳を開始
             _logger.LogDebug("Starting continuous automatic translation");
-            await _translationService.StartAutomaticTranslationAsync().ConfigureAwait(false);
+            DebugLogUtility.WriteLog("🏁 TranslationService.StartAutomaticTranslationAsync呼び出し中...");
+            DebugLogUtility.WriteLog($"   🔍 サービス状態: {(_translationService != null ? "利用可能" : "null")}");
+            
+            await _translationService.StartAutomaticTranslationAsync(targetWindow.Handle).ConfigureAwait(false);
+            DebugLogUtility.WriteLog("🏁 TranslationService.StartAutomaticTranslationAsync完了");
+            DebugLogUtility.WriteLog($"   🔍 自動翻訳アクティブ: {_translationService.IsAutomaticTranslationActive}");
 
             _logger.LogInformation("✅ Continuous translation started successfully for window: {WindowTitle}", targetWindow.Title);
-            Console.WriteLine($"✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
+            DebugLogUtility.WriteLog($"✅ 継続的翻訳開始完了: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
+            DebugLogUtility.WriteLog($"🔍 購読状態(終了時): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle}){Environment.NewLine}");
         }
         catch (Exception ex)

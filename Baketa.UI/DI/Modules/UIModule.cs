@@ -69,6 +69,7 @@ namespace Baketa.UI.DI.Modules;
             services.AddSingleton<AccessibilitySettingsViewModel>();
             services.AddSingleton<LanguagePairsViewModel>();
             services.AddSingleton<SettingsViewModel>();
+            services.AddSingleton<SimpleSettingsViewModel>();
             
             // 認証ビューモデル
             services.AddTransient<LoginViewModel>();

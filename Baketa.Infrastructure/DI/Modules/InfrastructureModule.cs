@@ -4,7 +4,13 @@ using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Services;
 using Baketa.Infrastructure.Services;
+using Baketa.Infrastructure.Translation.Local.Onnx;
+using Baketa.Infrastructure.Translation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Translation.Abstractions;
+using Baketa.Core.Translation.Models;
 using System;
 using System.Collections.Generic;
 
@@ -35,6 +41,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 翻訳サービス
             RegisterTranslationServices(services);
             
+            // αテスト向けOPUS-MT翻訳サービス（TranslationServiceExtensionsで登録されるためコメントアウト）
+            // RegisterAlphaOpusMTServices(services);
+            
             // データ永続化
             RegisterPersistenceServices(services, environment);
         }
@@ -61,32 +70,41 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// 翻訳サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterTranslationServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterTranslationServices(IServiceCollection services)
         {
-            // 翻訳エンジンやサービスの登録
-            // 例: services.AddSingleton<ITranslationEngine, OnnxTranslationEngine>();
-            // 例: services.AddSingleton<ITranslationCache, MemoryTranslationCache>();
+            // αテスト向けのTranslationServiceExtensionsを使用
+            services.AddTranslationServices();
+        }
+        
+        /// <summary>
+        /// αテスト向けOPUS-MT翻訳サービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterAlphaOpusMTServices(IServiceCollection services)
+        {
+            // αテスト向けOPUS-MT設定
+            services.AddSingleton<AlphaOpusMtConfiguration>(provider =>
+            {
+                // 実際のアプリケーションでは設定サービスから取得
+                return new AlphaOpusMtConfiguration
+                {
+                    IsEnabled = true,
+                    ModelsDirectory = "Models/OpusMT",
+                    MaxSequenceLength = 256,
+                    MemoryLimitMb = 300,
+                    ThreadCount = 2
+                };
+            });
             
-            // バックアップ翻訳サービス（APIベース）
-            // 例: services.AddSingleton<ICloudTranslationProvider, GoogleTranslationProvider>();
+            // αテスト向けOPUS-MT翻訳エンジンファクトリー
+            services.AddSingleton<AlphaOpusMtEngineFactory>();
             
-            // 言語検出
-            // 例: services.AddSingleton<ILanguageDetector, FastTextLanguageDetector>();
+            // αテスト向けOPUS-MT翻訳サービス
+            services.AddSingleton<AlphaOpusMtTranslationService>();
             
-            // 翻訳ファクトリーは実装クラスが存在しないためコメントアウト
-            // 例: services.AddSingleton<Func<string, ITranslationEngine>>(sp => engineType =>
-            // {
-            //     return engineType switch
-            //     {
-            //         "onnx" => sp.GetRequiredService<OnnxTranslationEngine>(),
-            //         "cloud" => new CloudTranslationEngine(
-            //             sp.GetRequiredService<ICloudTranslationProvider>(),
-            //             sp.GetRequiredService<ITranslationCache>()
-            //         ),
-            //         _ => throw new ArgumentException($"不明な翻訳エンジンタイプ: {engineType}")
-            //     };
-            // });
+            // TODO: AlphaOpusMT翻訳エンジンをITranslationEngineとして登録
+            // 現在は別の箇所でMockTranslationEngineが登録されている
         }
         
         /// <summary>

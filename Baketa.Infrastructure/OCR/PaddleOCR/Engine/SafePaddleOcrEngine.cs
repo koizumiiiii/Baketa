@@ -65,7 +65,6 @@ public class SafePaddleOcrEngine(
         ThrowIfDisposed();
         
         Console.WriteLine("⚠️ SafePaddleOcrEngine初期化 - これはモックエンジンです！");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ SafePaddleOcrEngine初期化 - これはモックエンジンです！{Environment.NewLine}");
         
         if (_skipRealInitialization)
         {

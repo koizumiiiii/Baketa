@@ -128,18 +128,26 @@ public class TranslationResultOverlayManager(
                 }
             });
             
-            Console.WriteLine("⏰ UIスレッド処理のタイムアウト監視開始（10秒）");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⏰ UIスレッド処理のタイムアウト監視開始（10秒）");
+            Console.WriteLine("⏰ UIスレッド処理のタイムアウト監視開始（30秒）");
+            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⏰ UIスレッド処理のタイムアウト監視開始（30秒）");
             
-            // タイムアウト付きでUIスレッド処理を待機
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10));
+            // タイムアウト付きでUIスレッド処理を待機（時間を延長）
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
             var completedTask = await Task.WhenAny(uiTask.GetTask(), timeoutTask).ConfigureAwait(false);
             
             if (completedTask == timeoutTask)
             {
-                Console.WriteLine("💥 UIスレッド処理がタイムアウトしました（10秒）");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "💥 UIスレッド処理がタイムアウトしました（10秒）");
-                throw new TimeoutException("TranslationResultOverlayView の作成がタイムアウトしました");
+                Console.WriteLine("⚠️ UIスレッド処理がタイムアウトしました（30秒）- オーバーレイ機能を無効化して続行");
+                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ UIスレッド処理がタイムアウトしました（30秒）");
+                _logger?.LogWarning("TranslationResultOverlayViewの作成がタイムアウトしました。オーバーレイ機能を無効化して続行します。");
+                
+                // エラーではなく無効化して続行
+                lock (_initializeLock)
+                {
+                    _isInitialized = false;
+                    _disposed = true; // オーバーレイ機能を無効化
+                }
+                return;
             }
             
             // UIスレッド処理の完了を待機

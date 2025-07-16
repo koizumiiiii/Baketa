@@ -52,6 +52,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             new HistoryViewModel(mockEventAggregator),
             CreateStubSettingsViewModel(mockEventAggregator), // テスト簡素化のためStubSettingsViewModel作成
             new AccessibilitySettingsViewModel(mockEventAggregator, Mock.Of<Core.Services.ISettingsService>()),
+            Mock.Of<INavigationService>(), // 追加されたINavigationServiceパラメータ
             Mock.Of<ILogger>());
         
         SetupMocks();

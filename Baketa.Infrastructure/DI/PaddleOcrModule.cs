@@ -69,7 +69,6 @@ public class PaddleOcrModule : IServiceModule
             
             // 環境判定を実行
             Console.WriteLine("🔍 PaddleOCR環境判定開始");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 PaddleOCR環境判定開始{Environment.NewLine}");
             
             // 環境変数で本番モードを強制できるようにする
             string? envValue = Environment.GetEnvironmentVariable("BAKETA_FORCE_PRODUCTION_OCR");
@@ -79,11 +78,9 @@ public class PaddleOcrModule : IServiceModule
             if (string.IsNullOrEmpty(envValue))
             {
                 Console.WriteLine("⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用");
-                System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用{Environment.NewLine}");
                 forceProduction = true; // デバッグ用：強制的に本番エンジンを使用
             }
             Console.WriteLine($"📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '{envValue}' (強制本番モード: {forceProduction})");
-            System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '{envValue}' (強制本番モード: {forceProduction}){Environment.NewLine}");
             if (forceProduction)
             {
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");

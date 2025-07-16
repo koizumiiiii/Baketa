@@ -121,7 +121,11 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         // 自動翻訳モード変更時の処理
         var subscription1 = this.WhenAnyValue(x => x.IsAutomaticMode)
             .Skip(1) // 初期値をスキップ
-            .Subscribe(async isAutomatic => await OnAutomaticModeChangedAsync(isAutomatic).ConfigureAwait(true));
+            .Subscribe(async isAutomatic => 
+            {
+                Console.WriteLine($"🎛️ UI - IsAutomaticMode変更検知: {isAutomatic}");
+                await OnAutomaticModeChangedAsync(isAutomatic).ConfigureAwait(true);
+            });
         Disposables.Add(subscription1);
 
         // 翻訳中状態の変更時にコマンド実行可否を更新
@@ -191,8 +195,10 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         try
         {
             var previousMode = CurrentMode;
+            Console.WriteLine($"🎛️ UI - モード切り替え: {previousMode} -> {!IsAutomaticMode}");
             IsAutomaticMode = !IsAutomaticMode;
             var newMode = CurrentMode;
+            Console.WriteLine($"🎛️ UI - モード切り替え完了: {newMode}");
 
             // モード変更イベントを発行
             await PublishEventAsync(new TranslationModeChangedEvent(newMode, previousMode)).ConfigureAwait(true);
@@ -272,13 +278,17 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         {
             if (isAutomatic)
             {
+                Console.WriteLine($"🎛️ UI - 自動翻訳モードを開始します");
                 Logger?.LogInformation("自動翻訳モードを開始します");
                 await _translationOrchestrationService.StartAutomaticTranslationAsync().ConfigureAwait(true);
+                Console.WriteLine($"🎛️ UI - 自動翻訳開始完了");
             }
             else
             {
+                Console.WriteLine($"🎛️ UI - 自動翻訳モードを停止します");
                 Logger?.LogInformation("自動翻訳モードを停止します");
                 await _translationOrchestrationService.StopAutomaticTranslationAsync().ConfigureAwait(true);
+                Console.WriteLine($"🎛️ UI - 自動翻訳停止完了");
             }
         }
         catch (InvalidOperationException ex)

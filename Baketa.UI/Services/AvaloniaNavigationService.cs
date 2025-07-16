@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Views.Auth;
 using Baketa.UI.Views;
+using Baketa.UI.ViewModels;
 
 namespace Baketa.UI.Services;
 
@@ -127,12 +128,16 @@ internal sealed class AvaloniaNavigationService(
         {
             _logNavigating(_logger, "Settings", null);
 
-            // TODO: 設定画面の実装
-            // var settingsViewModel = _serviceProvider.GetRequiredService<SettingsWindowViewModel>();
-            // var settingsWindow = new SettingsWindow(settingsViewModel);
-            // await ShowDialogAsync(settingsWindow).ConfigureAwait(false);
-
-            await Task.CompletedTask.ConfigureAwait(false);
+            // αテスト向けSimpleSettings画面を表示
+            var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
+            var settingsWindow = new SimpleSettingsView
+            {
+                DataContext = settingsViewModel
+            };
+            
+            Console.WriteLine("🔧 設定画面を表示");
+            await ShowDialogAsync(settingsWindow).ConfigureAwait(false);
+            Console.WriteLine("🔧 設定画面表示完了");
         }
         catch (Exception ex)
         {

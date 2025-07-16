@@ -72,7 +72,19 @@ public partial class TranslationResultOverlayView : Window, IDisposable
                 {
                     Console.WriteLine($"🖥️ TranslationResultOverlayView - 位置プロパティ変更検出: X={viewModel.PositionX}, Y={viewModel.PositionY}");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖥️ TranslationResultOverlayView - 位置プロパティ変更検出: X={viewModel.PositionX}, Y={viewModel.PositionY}");
-                    UpdatePosition(viewModel.PositionX, viewModel.PositionY);
+                    
+                    // UIスレッドで位置更新を実行
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            UpdatePosition(viewModel.PositionX, viewModel.PositionY);
+                        }
+                        catch (Exception posEx)
+                        {
+                            Console.WriteLine($"⚠️ 位置更新エラー: {posEx.Message}");
+                        }
+                    });
                 }
                 else
                 {
