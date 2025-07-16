@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
+using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<ICaptureService> _captureServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<IOcrEngine> _ocrEngineMock;
+    private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
     
@@ -46,6 +48,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _captureServiceMock = new Mock<ICaptureService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _ocrEngineMock = new Mock<IOcrEngine>();
+        _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
         _imageMock = new Mock<IImage>();
 

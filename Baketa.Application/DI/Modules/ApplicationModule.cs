@@ -10,6 +10,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Baketa.Core.Abstractions.Services;
+using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
+using Baketa.Infrastructure.Translation;
 using Baketa.Application.Services.Capture;
 using Baketa.Core.Events.Implementation;
 using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
@@ -70,6 +72,12 @@ namespace Baketa.Application.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTranslationApplicationServices(IServiceCollection services)
         {
+            // TranslationServiceExtensionsが呼ばれていない場合の保険でDefaultTranslationServiceを登録
+            if (!services.Any(s => s.ServiceType == typeof(TranslationAbstractions.ITranslationService)))
+            {
+                services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
+            }
+            
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(

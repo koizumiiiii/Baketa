@@ -125,7 +125,7 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     /// <inheritdoc />
     public IReadOnlyList<IValidationRule> GetRules()
     {
-        return _globalRules.Values.SelectMany(rules => rules).ToList();
+        return [.. _globalRules.Values.SelectMany(rules => rules)];
     }
 
     /// <inheritdoc />
@@ -135,7 +135,7 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
         
         if (_categoryRules.TryGetValue(category, out var categoryRules))
         {
-            return categoryRules.Values.SelectMany(rules => rules).ToList();
+            return [.. categoryRules.Values.SelectMany(rules => rules)];
         }
         
         return [];

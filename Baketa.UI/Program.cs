@@ -15,6 +15,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using ReactiveUI;
+using System.Reactive;
 
 namespace Baketa.UI;
 
@@ -212,7 +214,40 @@ namespace Baketa.UI;
             Console.WriteLine("✅ ServiceProvider構築完了");
             System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
             
+            // ReactiveUIスケジューラの設定
+            ConfigureReactiveUI();
+            
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
+        }
+        
+        /// <summary>
+        /// ReactiveUIの設定を行います
+        /// </summary>
+        private static void ConfigureReactiveUI()
+        {
+            try
+            {
+                Console.WriteLine("🔧 ReactiveUI設定開始");
+                
+                // デフォルトエラーハンドラを設定
+                RxApp.DefaultExceptionHandler = Observer.Create<Exception>(ex =>
+                {
+                    Console.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
+                    // UIスレッド違反例外は詳細ログを出力
+                    if (ex is InvalidOperationException && ex.Message.Contains("thread"))
+                    {
+                        Console.WriteLine($"🧵 UIスレッド違反詳細: {ex.StackTrace}");
+                    }
+                });
+                
+                Console.WriteLine("✅ ReactiveUI設定完了");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ ReactiveUI設定失敗: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"⚠️ ReactiveUI設定失敗: {ex.Message}");
+            }
         }
         
         /// <summary>

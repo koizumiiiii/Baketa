@@ -68,19 +68,20 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// <returns>値が変更されたかどうか</returns>
     protected bool SetPropertySafe<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
+        // 値が同じかどうかを事前にチェック
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+
         // UIスレッドかどうかを確認
         if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
             // UIスレッドの場合は通常のRaiseAndSetIfChangedを使用
             this.RaiseAndSetIfChanged(ref field, value, propertyName);
-            return !EqualityComparer<T>.Default.Equals(field, value);
+            return true;
         }
         else
         {
             // UIスレッド外の場合は値のみ設定し、後でUIスレッドで通知
-            if (EqualityComparer<T>.Default.Equals(field, value))
-                return false;
-            
             field = value;
             
             // UIスレッドで非同期に通知を送信

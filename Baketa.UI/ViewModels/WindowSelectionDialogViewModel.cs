@@ -6,6 +6,7 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Utilities;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
@@ -284,12 +285,15 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             });
 
             // ウィンドウ選択イベントを発行
+            DebugLogUtility.WriteLog($"📢 ウィンドウ選択イベント発行開始: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
             Logger?.LogInformation("Publishing StartTranslationRequestEvent");
             var startEvent = new StartTranslationRequestEvent(selectedWindow);
             Logger?.LogDebug("Event created: TargetWindow='{Title}' (Handle={Handle}), EventId={EventId}", 
                 startEvent.TargetWindow.Title, startEvent.TargetWindow.Handle, startEvent.Id);
-                
+            
+            DebugLogUtility.WriteLog($"📢 StartTranslationRequestEvent作成完了: EventId={startEvent.Id}");
             await EventAggregator.PublishAsync(startEvent).ConfigureAwait(false);
+            DebugLogUtility.WriteLog($"📢 StartTranslationRequestEvent発行完了: EventId={startEvent.Id}");
             Logger?.LogInformation("StartTranslationRequestEvent published: EventId={EventId}", startEvent.Id);
             
             Logger?.LogDebug("Window selection processing completed");

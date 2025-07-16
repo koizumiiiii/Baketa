@@ -1,0 +1,25 @@
+2025-07-16 12:00:30.138 ExecuteSettings 呼び出し確認
+2025-07-16 12:00:34.967 ExecuteSettings 呼び出し確認
+2025-07-16 12:01:21.116 ExecuteSettings 呼び出し確認
+2025-07-16 12:04:32.383 ExecuteSettings 呼び出し確認
+2025-07-16 12:04:32.597 ExecuteSettings エラー: Call from invalid thread
+2025-07-16 12:04:32.598 スタックトレース:    at Avalonia.Threading.Dispatcher.<VerifyAccess>g__ThrowVerifyAccess|16_0()
+   at Avalonia.AvaloniaObject.SetValue[T](StyledProperty`1 property, T value, BindingPriority priority)
+   at Avalonia.Visual.set_IsVisible(Boolean value)
+   at Avalonia.Controls.Window.ShowCore(Window owner)
+   at Avalonia.Controls.Window.Show()
+   at Baketa.UI.ViewModels.MainOverlayViewModel.ExecuteSettings() in E:\dev\Baketa\Baketa.UI\ViewModels\MainOverlayViewModel.cs:line 652
+2025-07-16 12:04:45.951 ExecuteSettings 呼び出し確認
+2025-07-16 12:04:46.014 ExecuteSettings エラー: Call from invalid thread
+2025-07-16 12:04:46.016 スタックトレース:    at Avalonia.Threading.Dispatcher.<VerifyAccess>g__ThrowVerifyAccess|16_0()
+   at Avalonia.AvaloniaObject.SetValue[T](StyledProperty`1 property, T value, BindingPriority priority)
+   at Avalonia.Visual.set_IsVisible(Boolean value)
+   at Avalonia.Controls.Window.ShowCore(Window owner)
+   at Avalonia.Controls.Window.Show()
+   at Baketa.UI.ViewModels.MainOverlayViewModel.ExecuteSettings() in E:\dev\Baketa\Baketa.UI\ViewModels\MainOverlayViewModel.cs:line 652
+2025-07-16 12:11:00.299 ExecuteSettings 呼び出し確認
+2025-07-16 12:11:09.693 ExecuteSettings 呼び出し確認
+2025-07-16 12:11:22.402 ExecuteSettings 呼び出し確認
+2025-07-16 12:11:57.388 ExecuteSettings 呼び出し確認
+2025-07-16 12:21:31.008 ExecuteSettings 呼び出し確認
+2025-07-16 12:21:36.162 ExecuteSettings 呼び出し確認
