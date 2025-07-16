@@ -35,18 +35,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     public string? ErrorMessage
     {
         get => _errorMessage;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _errorMessage, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でErrorMessage設定失敗 - 直接設定で続行");
-                _errorMessage = value;
-            }
-        }
+        set { SetPropertySafe(ref _errorMessage, value); }
     }
     
     /// <summary>
@@ -56,18 +45,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     public bool IsLoading
     {
         get => _isLoading;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _isLoading, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でIsLoading設定失敗 - 直接設定で続行");
-                _isLoading = value;
-            }
-        }
+        set { SetPropertySafe(ref _isLoading, value); }
     }
     
     /// <summary>
@@ -79,6 +57,51 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// 廃棄フラグ
     /// </summary>
     private bool _disposed;
+    
+    /// <summary>
+    /// UIスレッド安全なプロパティ設定メソッド
+    /// </summary>
+    /// <typeparam name="T">プロパティの型</typeparam>
+    /// <param name="field">バッキングフィールド</param>
+    /// <param name="value">新しい値</param>
+    /// <param name="propertyName">プロパティ名（CallerMemberNameで自動取得）</param>
+    /// <returns>値が変更されたかどうか</returns>
+    protected bool SetPropertySafe<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        // UIスレッドかどうかを確認
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            // UIスレッドの場合は通常のRaiseAndSetIfChangedを使用
+            this.RaiseAndSetIfChanged(ref field, value, propertyName);
+            return !EqualityComparer<T>.Default.Equals(field, value);
+        }
+        else
+        {
+            // UIスレッド外の場合は値のみ設定し、後でUIスレッドで通知
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return false;
+            
+            field = value;
+            
+            // UIスレッドで非同期に通知を送信
+            if (!string.IsNullOrEmpty(propertyName))
+            {
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        this.RaisePropertyChanged(propertyName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger?.LogWarning(ex, "UIスレッドでのプロパティ変更通知に失敗: {PropertyName}", propertyName);
+                    }
+                });
+            }
+            
+            return true;
+        }
+    }
     
     /// <summary>
     /// 新しいビューモデルを初期化します（イベント集約器のみ）
