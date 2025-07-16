@@ -19,8 +19,8 @@ namespace Baketa.UI.ViewModels;
 /// </summary>
 public class TranslationResultOverlayViewModel : ViewModelBase
 {
-    private string _translatedText = "デバッグ: 翻訳結果テスト"; // デバッグ用ダミーデータ
-    private string _originalText = "Debug: Original Text"; // デバッグ用ダミーデータ
+    private string _translatedText = string.Empty;
+    private string _originalText = string.Empty;
     private bool _isOverlayVisible;
     private double _overlayOpacity = 0.9;
     private double _positionX = 100;
@@ -56,14 +56,28 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         get => _translatedText;
         set
         {
-            try
+            var changed = SetPropertySafe(ref _translatedText, value);
+            if (changed)
             {
-                this.RaiseAndSetIfChanged(ref _translatedText, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でTranslatedText設定失敗 - 直接設定で続行");
-                _translatedText = value;
+                // HasTextプロパティの変更通知も安全に送信
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(HasText));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            this.RaisePropertyChanged(nameof(HasText));
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger?.LogWarning(ex, "HasTextプロパティ変更通知失敗");
+                        }
+                    });
+                }
             }
         }
     }
@@ -74,18 +88,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public string OriginalText
     {
         get => _originalText;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _originalText, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でOriginalText設定失敗 - 直接設定で続行");
-                _originalText = value;
-            }
-        }
+        set { SetPropertySafe(ref _originalText, value); }
     }
 
     /// <summary>
@@ -94,55 +97,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public bool IsOverlayVisible
     {
         get => _isOverlayVisible;
-        set
-        {
-            var instanceId = this.GetHashCode().ToString("X8", CultureInfo.InvariantCulture);
-            Console.WriteLine($"🔧 IsOverlayVisibleプロパティセッター呼び出し: {_isOverlayVisible} -> {value} (インスタンスID: {instanceId})");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 IsOverlayVisibleプロパティセッター呼び出し: {_isOverlayVisible} -> {value} (インスタンスID: {instanceId})");
-            
-            try
-            {
-                Console.WriteLine($"🔧 RaiseAndSetIfChangedを実行中 - 現在値: {_isOverlayVisible}, 新しい値: {value}, 値の比較: {_isOverlayVisible.Equals(value)}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 RaiseAndSetIfChangedを実行中 - 現在値: {_isOverlayVisible}, 新しい値: {value}, 値の比較: {_isOverlayVisible.Equals(value)}");
-                
-                // RaiseAndSetIfChangedが値の変更を検出するかチェック
-                var oldValue = _isOverlayVisible;
-                var changed = this.RaiseAndSetIfChanged(ref _isOverlayVisible, value);
-                
-                Console.WriteLine($"✅ RaiseAndSetIfChanged実行完了: _isOverlayVisible = {_isOverlayVisible}, 戻り値: {changed}, 実際に変更: {oldValue != _isOverlayVisible}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ RaiseAndSetIfChanged実行完了: _isOverlayVisible = {_isOverlayVisible}, 戻り値: {changed}, 実際に変更: {oldValue != _isOverlayVisible}");
-                
-                if (!changed)
-                {
-                    Console.WriteLine("⚠️ RaiseAndSetIfChangedが変更なしと判定 - 強制的にPropertyChangedを送信");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ RaiseAndSetIfChangedが変更なしと判定 - 強制的にPropertyChangedを送信");
-                    this.RaisePropertyChanged(nameof(IsOverlayVisible));
-                    Console.WriteLine("✅ 強制PropertyChanged送信完了");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 強制PropertyChanged送信完了");
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                Console.WriteLine($"⚠️ RaiseAndSetIfChanged失敗: {ex.Message}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ RaiseAndSetIfChanged失敗: {ex.Message}");
-                Logger?.LogWarning(ex, "UIスレッド違反でIsOverlayVisible設定失敗 - 直接設定で続行");
-                _isOverlayVisible = value;
-                
-                try
-                {
-                    Console.WriteLine("🔧 手動でPropertyChanged送信中（例外ハンドラ内）");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 手動でPropertyChanged送信中（例外ハンドラ内）");
-                    this.RaisePropertyChanged(nameof(IsOverlayVisible));
-                    Console.WriteLine("✅ 手動PropertyChanged送信完了（例外ハンドラ内）");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 手動PropertyChanged送信完了（例外ハンドラ内）");
-                }
-                catch (Exception propEx)
-                {
-                    Console.WriteLine($"💥 手動PropertyChanged送信失敗（例外ハンドラ内）: {propEx.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 手動PropertyChanged送信失敗（例外ハンドラ内）: {propEx.Message}");
-                }
-            }
-        }
+        set { SetPropertySafe(ref _isOverlayVisible, value); }
     }
 
     /// <summary>
@@ -151,18 +106,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public double OverlayOpacity
     {
         get => _overlayOpacity;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _overlayOpacity, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でOverlayOpacity設定失敗 - 直接設定で続行");
-                _overlayOpacity = value;
-            }
-        }
+        set { SetPropertySafe(ref _overlayOpacity, value); }
     }
 
     /// <summary>
@@ -171,18 +115,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public double PositionX
     {
         get => _positionX;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _positionX, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でPositionX設定失敗 - 直接設定で続行");
-                _positionX = value;
-            }
-        }
+        set { SetPropertySafe(ref _positionX, value); }
     }
 
     /// <summary>
@@ -191,18 +124,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public double PositionY
     {
         get => _positionY;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _positionY, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でPositionY設定失敗 - 直接設定で続行");
-                _positionY = value;
-            }
-        }
+        set { SetPropertySafe(ref _positionY, value); }
     }
 
     /// <summary>
@@ -211,18 +133,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
     public double MaxWidth
     {
         get => _maxWidth;
-        set
-        {
-            try
-            {
-                this.RaiseAndSetIfChanged(ref _maxWidth, value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でMaxWidth設定失敗 - 直接設定で続行");
-                _maxWidth = value;
-            }
-        }
+        set { SetPropertySafe(ref _maxWidth, value); }
     }
 
     /// <summary>
@@ -233,15 +144,28 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         get => _fontSize;
         set
         {
-            try
+            var changed = SetPropertySafe(ref _fontSize, value);
+            if (changed)
             {
-                this.RaiseAndSetIfChanged(ref _fontSize, value);
-                this.RaisePropertyChanged(nameof(SmallFontSize));
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger?.LogWarning(ex, "UIスレッド違反でFontSize設定失敗 - 直接設定で続行");
-                _fontSize = value;
+                // SmallFontSizeプロパティの変更通知も安全に送信
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(SmallFontSize));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            this.RaisePropertyChanged(nameof(SmallFontSize));
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger?.LogWarning(ex, "SmallFontSizeプロパティ変更通知失敗");
+                        }
+                    });
+                }
             }
         }
     }
@@ -304,178 +228,40 @@ public class TranslationResultOverlayViewModel : ViewModelBase
             Console.WriteLine("🔄 プロパティ設定開始");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 プロパティ設定開始");
             
-            // 翻訳結果を表示
-            Console.WriteLine("🔄 OriginalText設定中");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 OriginalText設定中");
-            OriginalText = originalText;
-            
-            Console.WriteLine("🔄 TranslatedText設定中");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 TranslatedText設定中");
-            TranslatedText = translatedText;
-            
-            Console.WriteLine("🔄 位置更新開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 位置更新開始");
-            
-            // 位置を更新（OCR検出位置ベース）
-            if (displayEvent.DetectedPosition.HasValue)
+            // すべてのUIプロパティ設定とHasText判定を1つのUIスレッド呼び出しにまとめる
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                var position = displayEvent.DetectedPosition.Value;
-                Console.WriteLine($"🔄 位置設定: X={position.X}, Y={position.Y}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔄 位置設定: X={position.X}, Y={position.Y}");
-                PositionX = Math.Max(0, position.X);
-                PositionY = Math.Max(0, position.Y);
-            }
-            
-            Console.WriteLine("🔄 HasText判定開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 HasText判定開始");
-            
-            // 翻訳が有効な場合のみ表示
-            Console.WriteLine($"🔍 HasText判定: {HasText}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 HasText判定: {HasText}");
-            
-            if (HasText)
-            {
-                Console.WriteLine("🔄 IsOverlayVisible=true設定中");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 IsOverlayVisible=true設定中");
+                Console.WriteLine("🧵 UIスレッドで翻訳結果とプロパティ設定中");
                 
-                // UIスレッドで確実にIsOverlayVisibleを設定
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                // 翻訳結果を設定
+                OriginalText = originalText;
+                TranslatedText = translatedText;
+                
+                // 位置を設定
+                if (displayEvent.DetectedPosition.HasValue)
                 {
-                    Console.WriteLine($"🧵 UIスレッドでIsOverlayVisible=true設定中 (現在のスレッドID: {Environment.CurrentManagedThreadId})");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🧵 UIスレッドでIsOverlayVisible=true設定中");
-                    
-                    Console.WriteLine($"🔍 IsOverlayVisible設定前: {_isOverlayVisible}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 IsOverlayVisible設定前: {_isOverlayVisible}");
-                    
-                    IsOverlayVisible = true;
-                    
-                    Console.WriteLine($"🔍 IsOverlayVisible設定後: {_isOverlayVisible}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 IsOverlayVisible設定後: {_isOverlayVisible}");
-                    
-                    // UIスレッドでプロパティ変更通知を確実に送信
-                    try
-                    {
-                        Console.WriteLine("🔔 手動でIsOverlayVisibleプロパティ変更通知を送信中");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔔 手動でIsOverlayVisibleプロパティ変更通知を送信中");
-                        
-                        // UIスレッドで確実にPropertyChangedを発火
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        {
-                            try
-                            {
-                                Console.WriteLine($"🔔 UIスレッド内でRaisePropertyChanged実行開始 - プロパティ名: {nameof(IsOverlayVisible)}");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔔 UIスレッド内でRaisePropertyChanged実行開始 - プロパティ名: {nameof(IsOverlayVisible)}");
-                                
-                                // PropertyChangedイベントの購読者数をチェック（複数のアプローチで）
-                                try 
-                                {
-                                    // ReactiveUIライブラリのバージョン情報を確認
-                                    var reactiveObjectType = typeof(ReactiveUI.ReactiveObject);
-                                    var assembly = reactiveObjectType.Assembly;
-                                    var version = assembly.GetName().Version;
-                                    Console.WriteLine($"📦 ReactiveUIアセンブリバージョン: {version}");
-                                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   📦 ReactiveUIアセンブリバージョン: {version}");
-
-                                    // ReactiveObjectのフィールド構造を詳細調査
-                                    var allFields = reactiveObjectType.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-                                    Console.WriteLine($"🔍 ReactiveObjectの全フィールド: {string.Join(", ", allFields.Select(f => $"{f.Name}({f.FieldType.Name})"))}");
-                                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 ReactiveObjectの全フィールド: {string.Join(", ", allFields.Select(f => $"{f.Name}({f.FieldType.Name})"))}");
-                                    
-                                    // イベント情報も調査
-                                    var allEvents = reactiveObjectType.GetEvents(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-                                    Console.WriteLine($"🔍 ReactiveObjectの全イベント: {string.Join(", ", allEvents.Select(e => $"{e.Name}({e.EventHandlerType?.Name})"))}");
-                                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 ReactiveObjectの全イベント: {string.Join(", ", allEvents.Select(e => $"{e.Name}({e.EventHandlerType?.Name})"))}");
-                                    
-                                    // アプローチ1: ReactiveObjectのPropertyChangedHandlerフィールド
-                                    var propertyChangedField = reactiveObjectType.GetField("PropertyChangedHandler", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                                    if (propertyChangedField?.GetValue(this) is System.ComponentModel.PropertyChangedEventHandler handler1)
-                                    {
-                                        var subscriberCount1 = handler1.GetInvocationList().Length;
-                                        Console.WriteLine($"🔔 PropertyChangedイベント購読者数(PropertyChangedHandler): {subscriberCount1}");
-                                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔔 PropertyChangedイベント購読者数(PropertyChangedHandler): {subscriberCount1}");
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"🔔 PropertyChangedHandlerフィールドが見つからない、またはnull");
-                                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔔 PropertyChangedHandlerフィールドが見つからない、またはnull");
-                                    }
-                                    
-                                    // アプローチ2: INotifyPropertyChangedのPropertyChangedイベント
-                                    var notifyInterface = this as System.ComponentModel.INotifyPropertyChanged;
-                                    var eventInfo = typeof(System.ComponentModel.INotifyPropertyChanged).GetEvent("PropertyChanged");
-                                    if (eventInfo != null)
-                                    {
-                                        var field = this.GetType().GetField("PropertyChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-                                        if (field?.GetValue(this) is System.ComponentModel.PropertyChangedEventHandler handler2)
-                                        {
-                                            var subscriberCount2 = handler2.GetInvocationList().Length;
-                                            Console.WriteLine($"🔔 PropertyChangedイベント購読者数(INotifyPropertyChanged): {subscriberCount2}");
-                                            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔔 PropertyChangedイベント購読者数(INotifyPropertyChanged): {subscriberCount2}");
-                                        }
-                                        else
-                                        {
-                                            Console.WriteLine("⚠️ PropertyChangedイベントフィールドが見つからない(INotifyPropertyChanged)");
-                                            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   ⚠️ PropertyChangedイベントフィールドが見つからない(INotifyPropertyChanged)");
-                                        }
-                                    }
-                                    
-                                    // アプローチ3: 基底クラスのすべてのフィールドを調査
-                                    var instanceFields = this.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-                                    var propertyChangedFields = instanceFields.Where(f => f.FieldType == typeof(System.ComponentModel.PropertyChangedEventHandler)).ToList();
-                                    Console.WriteLine($"🔍 PropertyChangedEventHandlerタイプのフィールド数: {propertyChangedFields.Count}");
-                                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 PropertyChangedEventHandlerタイプのフィールド数: {propertyChangedFields.Count}");
-                                    
-                                    foreach (var field in propertyChangedFields)
-                                    {
-                                        if (field.GetValue(this) is System.ComponentModel.PropertyChangedEventHandler handler3)
-                                        {
-                                            var subscriberCount3 = handler3.GetInvocationList().Length;
-                                            Console.WriteLine($"🔔 フィールド '{field.Name}' 購読者数: {subscriberCount3}");
-                                            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔔 フィールド '{field.Name}' 購読者数: {subscriberCount3}");
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"⚠️ PropertyChangedイベント購読者チェック失敗: {ex.Message}");
-                                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   ⚠️ PropertyChangedイベント購読者チェック失敗: {ex.Message}");
-                                }
-                                
-                                this.RaisePropertyChanged(nameof(IsOverlayVisible));
-                                Console.WriteLine("✅ UIスレッドでIsOverlayVisibleプロパティ変更通知送信完了");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   ✅ UIスレッドでIsOverlayVisibleプロパティ変更通知送信完了");
-                            }
-                            catch (Exception uiPropEx)
-                            {
-                                Console.WriteLine($"💥 UIスレッドでのプロパティ変更通知送信失敗: {uiPropEx.Message}");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   💥 UIスレッドでのプロパティ変更通知送信失敗: {uiPropEx.Message}");
-                            }
-                        });
-                        
-                        Console.WriteLine("✅ 手動プロパティ変更通知送信スケジュール完了");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   ✅ 手動プロパティ変更通知送信スケジュール完了");
-                    }
-                    catch (Exception propEx)
-                    {
-                        Console.WriteLine($"💥 手動プロパティ変更通知送信失敗: {propEx.Message}");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   💥 手動プロパティ変更通知送信失敗: {propEx.Message}");
-                    }
-                    
-                    Console.WriteLine($"✅ UIスレッドでオーバーレイ表示ON: IsOverlayVisible = {IsOverlayVisible}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   ✅ UIスレッドでオーバーレイ表示ON: IsOverlayVisible = {IsOverlayVisible}");
-                });
+                    var position = displayEvent.DetectedPosition.Value;
+                    Console.WriteLine($"📍 位置設定: X={position.X}, Y={position.Y}");
+                    PositionX = Math.Max(0, position.X);
+                    PositionY = Math.Max(0, position.Y);
+                }
                 
-                Logger?.LogDebug("Translation result displayed: {Text}", TranslatedText);
-            }
-            else
-            {
-                Console.WriteLine("🔄 IsOverlayVisible=false設定中");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 IsOverlayVisible=false設定中");
-                IsOverlayVisible = false;
-                Console.WriteLine($"❌ オーバーレイ表示OFF: IsOverlayVisible = {IsOverlayVisible} (テキストが空)");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   ❌ オーバーレイ表示OFF: IsOverlayVisible = {IsOverlayVisible} (テキストが空)");
-                Logger?.LogDebug("Translation result hidden: empty text");
-            }
+                // HasText判定と表示設定（UIスレッド内で実行）
+                Console.WriteLine($"🔍 HasText判定: {HasText}");
+                
+                if (HasText)
+                {
+                    Console.WriteLine($"🔍 IsOverlayVisible設定前: {_isOverlayVisible}");
+                    IsOverlayVisible = true;
+                    Console.WriteLine($"🔍 IsOverlayVisible設定後: {_isOverlayVisible}");
+                }
+                
+                Console.WriteLine("✅ UIプロパティ設定完了");
+            });
+            
+            displayTimer.Stop();
+            Console.WriteLine($"⏱️ 翻訳結果表示処理完了: {displayTimer.ElapsedMilliseconds}ms");
+            Logger?.LogDebug("Translation result displayed: {Text}", TranslatedText);
         }
         catch (Exception ex)
         {
@@ -487,32 +273,40 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         }
     }
 
-    private Task OnTranslationDisplayVisibilityChanged(TranslationDisplayVisibilityChangedEvent visibilityEvent)
+    private async Task OnTranslationDisplayVisibilityChanged(TranslationDisplayVisibilityChangedEvent visibilityEvent)
     {
-        IsOverlayVisible = visibilityEvent.IsVisible && HasText;
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            IsOverlayVisible = visibilityEvent.IsVisible && HasText;
+        });
         Logger?.LogDebug("Translation display visibility changed: {IsOverlayVisible}", IsOverlayVisible);
-        return Task.CompletedTask;
     }
 
-    private Task OnStopTranslationRequest(StopTranslationRequestEvent stopEvent)
+    private async Task OnStopTranslationRequest(StopTranslationRequestEvent stopEvent)
     {
-        // 翻訳停止時は表示をクリア
-        IsOverlayVisible = false;
-        TranslatedText = string.Empty;
-        OriginalText = string.Empty;
+        // 翻訳停止時は表示をクリア（UIスレッドで実行）
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            IsOverlayVisible = false;
+            TranslatedText = string.Empty;
+            OriginalText = string.Empty;
+        });
         Logger?.LogDebug("Translation overlay cleared");
-        return Task.CompletedTask;
     }
 
-    private Task OnSettingsChanged(SettingsChangedEvent settingsEvent)
+    private async Task OnSettingsChanged(SettingsChangedEvent settingsEvent)
     {
         try
         {
-            // フォントサイズを更新
-            FontSize = settingsEvent.FontSize;
-            
-            // 透明度を更新
-            OverlayOpacity = settingsEvent.OverlayOpacity;
+            // UI設定更新もUIスレッドで実行
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // フォントサイズを更新
+                FontSize = settingsEvent.FontSize;
+                
+                // 透明度を更新
+                OverlayOpacity = settingsEvent.OverlayOpacity;
+            });
             
             Logger?.LogDebug("Translation overlay settings updated - FontSize: {FontSize}, Opacity: {OverlayOpacity}", FontSize, OverlayOpacity);
         }
@@ -520,8 +314,6 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         {
             Logger?.LogWarning(ex, "Failed to update translation overlay settings");
         }
-        
-        return Task.CompletedTask;
     }
 
     #endregion
