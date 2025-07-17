@@ -33,7 +33,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
-        ValidValues = new object[] { "ja", "en", "zh-cn", "zh-tw", "ko", "fr", "de", "es", "pt", "ru" })]
+        ValidValues = new object[] { "ja", "en" })]
     public string DefaultSourceLanguage { get; set; } = "ja";
     
     /// <summary>
@@ -41,7 +41,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
-        ValidValues = new object[] { "ja", "en", "zh-cn", "zh-tw", "ko", "fr", "de", "es", "pt", "ru" })]
+        ValidValues = new object[] { "ja", "en" })]
     public string DefaultTargetLanguage { get; set; } = "en";
     
     /// <summary>

@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows.NativeMethods;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Utilities;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 
@@ -118,9 +119,25 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
                 throw new InvalidOperationException($"ウィンドウの領域取得に失敗: {hWnd}");
             }
             
+            // ウィンドウが最小化されている場合はエラー
+            if (User32Methods.IsIconic(hWnd))
+            {
+                DebugLogUtility.WriteLog($"❌ ウィンドウが最小化されています: Handle={hWnd}");
+                throw new InvalidOperationException("最小化されたウィンドウはキャプチャできません");
+            }
+            
+            // ウィンドウが表示されているか確認
+            if (!User32Methods.IsWindowVisible(hWnd))
+            {
+                DebugLogUtility.WriteLog($"⚠️ ウィンドウが非表示です: Handle={hWnd}");
+            }
+            
             // クライアント領域のキャプチャ
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
+            
+            DebugLogUtility.WriteLog($"📏 ウィンドウ座標: {rect.left}, {rect.top}, {rect.right}, {rect.bottom}");
+            DebugLogUtility.WriteLog($"📐 ウィンドウサイズ: {width}x{height}");
             
             if (width <= 0 || height <= 0)
             {
@@ -144,20 +161,27 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
                 
                 Gdi32Methods.SelectObject(memoryDC.DangerousGetHandle(), bitmapHandle.DangerousGetHandle());
                 
-                // PrintWindowを使用してウィンドウをキャプチャ
-                if (!User32Methods.PrintWindow(hWnd, memoryDC.DangerousGetHandle(), PrintWindowFlags.PW_CLIENTONLY))
+                // まず直接BitBltを試行（より信頼性が高い）
+                DebugLogUtility.WriteLog($"🔸 BitBlt試行: 領域({rect.left}, {rect.top}, {width}, {height})");
+                bool captureSuccess = Gdi32Methods.BitBlt(
+                    memoryDC.DangerousGetHandle(),
+                    0, 0, width, height,
+                    screenDC.DangerousGetHandle(),
+                    rect.left, rect.top,
+                    BitBltFlags.SRCCOPY);
+                
+                DebugLogUtility.WriteLog($"🔸 BitBlt結果: {(captureSuccess ? "成功" : "失敗")}");
+                
+                // BitBltが失敗した場合、PrintWindowにフォールバック
+                if (!captureSuccess)
                 {
                     if (_logger != null)
-                        Log.PrintWindowFallback(_logger, "PrintWindow失敗 - BitBltにフォールバック");
+                        Log.PrintWindowFallback(_logger, "BitBlt失敗 - PrintWindowにフォールバック");
                     
-                    // PrintWindowが失敗した場合、BitBltにフォールバック
-                    // ただしこれはウィンドウが表示されている場合のみ機能する
-                    Gdi32Methods.BitBlt(
-                        memoryDC.DangerousGetHandle(),
-                        0, 0, width, height,
-                        screenDC.DangerousGetHandle(),
-                        rect.left, rect.top,
-                        BitBltFlags.SRCCOPY);
+                    DebugLogUtility.WriteLog($"🔸 PrintWindow試行: PW_DEFAULT");
+                    // PW_CLIENTONLYを使わず、デフォルトでウィンドウ全体をキャプチャ
+                    bool printWindowSuccess = User32Methods.PrintWindow(hWnd, memoryDC.DangerousGetHandle(), PrintWindowFlags.PW_DEFAULT);
+                    DebugLogUtility.WriteLog($"🔸 PrintWindow結果: {(printWindowSuccess ? "成功" : "失敗")}");
                 }
                 
                 // ビットマップからイメージを作成

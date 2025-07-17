@@ -277,6 +277,8 @@ public class WindowSelectionDialogViewModel : ViewModelBase
 
             Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})", 
                 selectedWindow.Title, selectedWindow.Handle);
+            
+            DebugLogUtility.WriteLog($"📢 ウィンドウ選択実行: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
 
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -284,23 +286,13 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                 IsClosed = true;
             });
 
-            // ウィンドウ選択イベントを発行
-            DebugLogUtility.WriteLog($"📢 ウィンドウ選択イベント発行開始: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
-            Logger?.LogInformation("Publishing StartTranslationRequestEvent");
-            var startEvent = new StartTranslationRequestEvent(selectedWindow);
-            Logger?.LogDebug("Event created: TargetWindow='{Title}' (Handle={Handle}), EventId={EventId}", 
-                startEvent.TargetWindow.Title, startEvent.TargetWindow.Handle, startEvent.Id);
-            
-            DebugLogUtility.WriteLog($"📢 StartTranslationRequestEvent作成完了: EventId={startEvent.Id}");
-            await EventAggregator.PublishAsync(startEvent).ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"📢 StartTranslationRequestEvent発行完了: EventId={startEvent.Id}");
-            Logger?.LogInformation("StartTranslationRequestEvent published: EventId={EventId}", startEvent.Id);
-            
+            DebugLogUtility.WriteLog($"✅ ウィンドウ選択ダイアログ完了: DialogResult設定済み");
             Logger?.LogDebug("Window selection processing completed");
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Error during window selection processing: {ErrorMessage}", ex.Message);
+            DebugLogUtility.WriteLog($"❌ ウィンドウ選択処理エラー: {ex.Message}");
         }
     }
 

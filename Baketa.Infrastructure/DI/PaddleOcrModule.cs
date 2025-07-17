@@ -65,6 +65,7 @@ public class PaddleOcrModule : IServiceModule
         services.AddSingleton<IOcrEngine>(serviceProvider =>
         {
             var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
+            var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
             var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
             
             // 環境判定を実行
@@ -85,7 +86,7 @@ public class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
-                return new PaddleOcrEngine(modelPathResolver, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
             }
             
             bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
@@ -102,7 +103,7 @@ public class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("✅ 本番環境検出 - PaddleOcrEngineを使用");
                 logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
-                return new PaddleOcrEngine(modelPathResolver, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
             }
         });
         
@@ -122,8 +123,9 @@ public class PaddleOcrModule : IServiceModule
                 // SafePaddleOcrEngineが使用されている場合は、PaddleOcrEngineの直接取得要求には
                 // 開発環境であることを前提として、元のPaddleOcrEngineではなくSafePaddleOcrEngineを返す
                 var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
+                var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
                 var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-                return new PaddleOcrEngine(modelPathResolver, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
             }
         });
         

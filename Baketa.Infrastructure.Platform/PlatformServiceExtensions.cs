@@ -39,7 +39,7 @@ namespace Baketa.Infrastructure.Platform;
         {
             // Windowsサービス実装の登録
             services.AddSingleton<Core.Abstractions.Factories.IWindowsImageFactory, Windows.WindowsImageFactory>();
-            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.WindowsCapturerStub>();
+            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.GdiWindowsCapturer>();
             services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManagerStub>();
 
             return services;

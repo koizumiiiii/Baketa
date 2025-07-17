@@ -4,6 +4,7 @@ using System.IO;
 using System.Reactive;
 using System.Threading.Tasks;
 using Baketa.Core.Events;
+using Baketa.Core.Services;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Services;
@@ -729,7 +730,7 @@ public sealed class SettingsViewModel : Framework.ViewModelBase
             };
             await PublishEventAsync(generalEvent).ConfigureAwait(false);
 
-            // TODO: 永続化処理を実装
+            // TODO: 設定の永続化は別の方法で実装する予定
 
             // 変更フラグをリセット
             HasChanges = false;
@@ -974,7 +975,7 @@ public bool IsDarkTheme { get; set; }
 /// <summary>
 /// 言語設定変更イベント
 /// </summary>
-internal sealed class LanguageSettingsChangedEvent : CoreEvents.EventBase
+public sealed class LanguageSettingsChangedEvent : CoreEvents.EventBase
 {
 /// <inheritdoc/>
 public override string Name => "LanguageSettingsChanged";

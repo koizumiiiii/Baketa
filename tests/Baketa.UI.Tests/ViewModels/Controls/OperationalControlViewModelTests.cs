@@ -166,7 +166,7 @@ public class OperationalControlViewModelTests
         // Assert
         viewModel.IsAutomaticMode.Should().BeTrue();
         _translationOrchestrationServiceMock.Verify(
-            x => x.StartAutomaticTranslationAsync(It.IsAny<CancellationToken>()), 
+            x => x.StartAutomaticTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()), 
             Times.Once);
 
         // Act - 自動翻訳モードをOFFに
@@ -193,7 +193,7 @@ public class OperationalControlViewModelTests
 
         // Assert
         _translationOrchestrationServiceMock.Verify(
-            x => x.TriggerSingleTranslationAsync(It.IsAny<CancellationToken>()), 
+            x => x.TriggerSingleTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()), 
             Times.Once);
     }
 
@@ -208,7 +208,7 @@ public class OperationalControlViewModelTests
         var expectedException = new InvalidOperationException("テストエラー");
         
         _translationOrchestrationServiceMock
-            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(expectedException);
 
         // Act
@@ -336,7 +336,7 @@ public class OperationalControlViewModelTests
         var timeoutException = new TimeoutException("タイムアウトが発生しました");
         
         _translationOrchestrationServiceMock
-            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(timeoutException);
 
         // Act
@@ -357,7 +357,7 @@ public class OperationalControlViewModelTests
         var invalidOpException = new InvalidOperationException("無効な操作です");
         
         _translationOrchestrationServiceMock
-            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(invalidOpException);
 
         // Act
@@ -378,7 +378,7 @@ public class OperationalControlViewModelTests
         var unexpectedException = new Exception("予期しないエラー");
         
         _translationOrchestrationServiceMock
-            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(unexpectedException);
 
         // Act
@@ -510,7 +510,7 @@ public class OperationalControlViewModelTests
 
         // 非同期メソッドの設定
         _translationOrchestrationServiceMock
-            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.StartAutomaticTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         _translationOrchestrationServiceMock
@@ -518,7 +518,7 @@ public class OperationalControlViewModelTests
             .Returns(Task.CompletedTask);
 
         _translationOrchestrationServiceMock
-            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.TriggerSingleTranslationAsync(It.IsAny<IntPtr?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         _translationOrchestrationServiceMock

@@ -9,6 +9,7 @@ using Baketa.Application.Tests.TestUtilities;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Services;
 using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
@@ -31,7 +32,8 @@ public class TranslationOrchestrationServiceTests : IDisposable
 {
     private readonly Mock<ICaptureService> _captureServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
-    private readonly Mock<IOcrEngine> _ocrEngineMock;
+    private readonly Mock<Baketa.Core.Abstractions.OCR.IOcrEngine> _ocrEngineMock;
+    private readonly Mock<ITranslationEngineFactory> _translationEngineFactoryMock;
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
@@ -47,7 +49,8 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // Mock オブジェクトの初期化
         _captureServiceMock = new Mock<ICaptureService>();
         _settingsServiceMock = new Mock<ISettingsService>();
-        _ocrEngineMock = new Mock<IOcrEngine>();
+        _ocrEngineMock = new Mock<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+        _translationEngineFactoryMock = new Mock<ITranslationEngineFactory>();
         _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
         _imageMock = new Mock<IImage>();
@@ -66,6 +69,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
             _ocrEngineMock.Object,
+            _translationEngineFactoryMock.Object,
             _loggerMock.Object);
     }
 
@@ -78,7 +82,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task StartAutomaticTranslationAsync_WhenCalled_StartsAutomaticLoop()
     {
         // Act
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeTrue();
@@ -95,10 +99,10 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task StartAutomaticTranslationAsync_WhenAlreadyRunning_LogsWarning()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
         // Act
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeTrue();
@@ -117,7 +121,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task StopAutomaticTranslationAsync_WhenRunning_StopsGracefully()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
         _service.IsAutomaticTranslationActive.Should().BeTrue();
 
         // Act
@@ -163,7 +167,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             .Subscribe(result => receivedResult = result);
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
         
         // 翻訳処理の完了を待機（模擬処理で約500ms + 800ms = 1300ms）
         await Task.Delay(1500);
@@ -195,8 +199,8 @@ public class TranslationOrchestrationServiceTests : IDisposable
             });
 
         // Act - 並行して2つの単発翻訳を実行
-        var task1 = _service.TriggerSingleTranslationAsync();
-        var task2 = _service.TriggerSingleTranslationAsync();
+        var task1 = _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
+        var task2 = _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         await Task.WhenAll(task1, task2);
 
@@ -224,7 +228,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             });
 
         // Act
-        var translationTask = _service.TriggerSingleTranslationAsync(cts.Token);
+        var translationTask = _service.TriggerSingleTranslationAsync(null, cts.Token);
         cts.CancelAfter(100); // 100ms後にキャンセル
 
         // Assert
@@ -242,11 +246,11 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task SingleTranslation_DuringAutomaticMode_TakesPriority()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
         _service.IsAutomaticTranslationActive.Should().BeTrue();
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         // Assert - 単発翻訳が実行されたことを確認
         _captureServiceMock.Verify(
@@ -264,7 +268,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task AutomaticTranslation_WaitsDuringSingleTranslation()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
         
         // キャプチャに時間がかかるように設定
         _captureServiceMock
@@ -276,7 +280,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             });
 
         // Act
-        var singleTranslationTask = _service.TriggerSingleTranslationAsync();
+        var singleTranslationTask = _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
         
         // 単発翻訳の完了を待機
         await singleTranslationTask;
@@ -295,10 +299,10 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task AutomaticMode_ResumesAfterSingleTranslationCompletes()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         // Assert - 自動翻訳モードが継続していることを確認
         _service.IsAutomaticTranslationActive.Should().BeTrue();
@@ -324,7 +328,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             .Subscribe(result => receivedResult = result);
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         // Assert
         receivedResult.Should().NotBeNull();
@@ -344,7 +348,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             .Subscribe(status => statusUpdates.Add(status));
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         // Assert
         statusUpdates.Should().NotBeEmpty();
@@ -363,7 +367,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             .Subscribe(progress => progressUpdates.Add(progress));
 
         // Act
-        await _service.TriggerSingleTranslationAsync();
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
 
         // Assert
         progressUpdates.Should().NotBeEmpty();
@@ -396,7 +400,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             });
 
         // Act
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
         
         // エラー発生後も処理が継続されるまで少し待機
         await Task.Delay(300);
@@ -418,7 +422,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     public async Task Dispose_StopsAllOperationsAndReleasesResources()
     {
         // Arrange
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
         _service.IsAutomaticTranslationActive.Should().BeTrue();
 
         // Act
@@ -439,7 +443,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     {
         // Arrange
         await _service.StartAsync();
-        await _service.StartAutomaticTranslationAsync();
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
         // Act
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
