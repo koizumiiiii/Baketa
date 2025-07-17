@@ -21,7 +21,7 @@ namespace Baketa.Infrastructure.Platform.DI;
             
             // Windowsサービス実装の登録
             services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, Baketa.Infrastructure.Platform.Windows.WindowsImageFactory>();
-            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowsCapturer, Baketa.Infrastructure.Platform.Windows.WindowsCapturerStub>();
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowsCapturer, Baketa.Infrastructure.Platform.Windows.GdiWindowsCapturer>();
             services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager, Baketa.Infrastructure.Platform.Windows.WindowsManagerStub>();
 
             // アダプターインターフェースとスタブ実装を登録

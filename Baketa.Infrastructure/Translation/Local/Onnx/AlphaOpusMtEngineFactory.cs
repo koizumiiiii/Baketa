@@ -233,7 +233,7 @@ public class AlphaOpusMtEngineFactory
         return sourceCode switch
         {
             "ja" when string.Equals(targetCode, "en", StringComparison.OrdinalIgnoreCase) => "opus-mt-ja-en",
-            "en" when string.Equals(targetCode, "ja", StringComparison.OrdinalIgnoreCase) => "opus-mt-en-ja",
+            "en" when string.Equals(targetCode, "ja", StringComparison.OrdinalIgnoreCase) => "opus-mt-en-jap",
             _ => throw new ArgumentException($"モデル名が定義されていません: {languagePair.SourceLanguage.Code} -> {languagePair.TargetLanguage.Code}")
         };
     }

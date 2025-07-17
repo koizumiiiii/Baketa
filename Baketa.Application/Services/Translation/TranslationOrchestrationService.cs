@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -8,12 +10,17 @@ using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Common;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
+using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using Baketa.Core.Utilities;
+using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
-using Baketa.Core.Translation.Models;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -25,7 +32,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 {
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
-    private readonly IOcrEngine _ocrEngine;
+    private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
+    private readonly ITranslationEngineFactory _translationEngineFactory;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -43,7 +51,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly Subject<TranslationProgress> _progressUpdatesSubject = new();
 
     // 前回のキャプチャ画像（差分検出用）
-    private IImage? _previousCapturedImage;
+#pragma warning disable CS0649 // フィールドが割り当てられていない - 将来的に使用予定
+    private readonly IImage? _previousCapturedImage;
+#pragma warning restore CS0649
 
     // 翻訳対象ウィンドウハンドル
     private IntPtr? _targetWindowHandle;
@@ -60,20 +70,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="captureService">キャプチャサービス</param>
     /// <param name="settingsService">設定サービス</param>
     /// <param name="ocrEngine">OCRエンジン</param>
+    /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
         ISettingsService settingsService,
-        IOcrEngine ocrEngine,
+        Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
+        ITranslationEngineFactory translationEngineFactory,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
+        ArgumentNullException.ThrowIfNull(translationEngineFactory);
         
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
+        _translationEngineFactory = translationEngineFactory;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -106,9 +120,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     public async Task StartAutomaticTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default)
     {
         DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し");
-        DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed}");
-        DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive}");
-        DebugLogUtility.WriteLog($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString() ?? "null (画面全体)")}");
+        DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
+        DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
+        DebugLogUtility.WriteLog($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString(CultureInfo.InvariantCulture) ?? "null (画面全体)")}");
         
         // 翻訳対象ウィンドウハンドルを保存
         _targetWindowHandle = targetWindowHandle;
@@ -266,15 +280,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <inheritdoc />
     public TimeSpan GetSingleTranslationDisplayDuration()
     {
-        var settings = GetTranslationSettings();
-        return TimeSpan.FromSeconds(settings.SingleTranslationDisplaySeconds);
+        var displaySeconds = _settingsService.GetValue("Translation:SingleTranslationDisplaySeconds", 5);
+        return TimeSpan.FromSeconds(displaySeconds);
     }
 
     /// <inheritdoc />
     public TimeSpan GetAutomaticTranslationInterval()
     {
-        var settings = GetTranslationSettings();
-        return TimeSpan.FromMilliseconds(settings.AutomaticTranslationIntervalMs);
+        var intervalMs = _settingsService.GetValue("Translation:AutomaticTranslationIntervalMs", 100);
+        return TimeSpan.FromMilliseconds(intervalMs);
     }
 
     /// <inheritdoc />
@@ -353,12 +367,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private void InitializeCaptureOptions()
     {
-        var settings = GetTranslationSettings();
+        var intervalMs = _settingsService.GetValue("Translation:AutomaticTranslationIntervalMs", 100);
         var captureOptions = new CaptureOptions
         {
             Quality = 85, // 品質を少し下げてパフォーマンスを向上
             IncludeCursor = false,
-            CaptureInterval = settings.AutomaticTranslationIntervalMs,
+            CaptureInterval = intervalMs,
             OptimizationLevel = 2
         };
 
@@ -371,16 +385,42 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <summary>
     /// 翻訳設定を取得
     /// </summary>
-    private TranslationSettings GetTranslationSettings()
+    private CoreTranslationSettings GetTranslationSettings()
     {
-        // デフォルト設定を返す（実際の実装では設定サービスから取得）
-        // TODO: ISettingsServiceから実際の設定を取得
-        return new TranslationSettings
+        // 実際の設定サービスから設定を取得
+        var sourceLanguage = _settingsService.GetValue("Translation:Languages:DefaultSourceLanguage", "ja");
+        var targetLanguage = _settingsService.GetValue("Translation:Languages:DefaultTargetLanguage", "en");
+        
+        return new CoreTranslationSettings
         {
+            // 実際の言語設定を使用
+            DefaultSourceLanguage = sourceLanguage,
+            DefaultTargetLanguage = targetLanguage,
             // テスト環境では短い間隔を使用して高速化
-            AutomaticTranslationIntervalMs = 100, // 100ms間隔でテストを高速化
-            SingleTranslationDisplaySeconds = 5,
-            ChangeDetectionThreshold = 0.1f
+            TranslationDelayMs = 100 // 100ms間隔でテストを高速化
+        };
+    }
+    
+    /// <summary>
+    /// 言語コードから表示名を取得
+    /// </summary>
+    /// <param name="languageCode">言語コード</param>
+    /// <returns>言語の表示名</returns>
+    private static string GetLanguageDisplayName(string languageCode)
+    {
+        return languageCode.ToLowerInvariant() switch
+        {
+            "ja" => "Japanese",
+            "en" => "English",
+            "zh" or "zh-cn" or "zh-hans" => "Chinese (Simplified)",
+            "zh-tw" or "zh-hant" => "Chinese (Traditional)",
+            "ko" => "Korean",
+            "fr" => "French",
+            "de" => "German",
+            "es" => "Spanish",
+            "pt" => "Portuguese",
+            "ru" => "Russian",
+            _ => languageCode.ToUpperInvariant()
         };
     }
 
@@ -392,8 +432,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Console.WriteLine($"🔄 ExecuteAutomaticTranslationLoopAsync開始");
         Console.WriteLine($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         
-        var settings = GetTranslationSettings();
-        var interval = TimeSpan.FromMilliseconds(settings.AutomaticTranslationIntervalMs);
+        var intervalMs = _settingsService.GetValue("Translation:AutomaticTranslationIntervalMs", 100);
+        var interval = TimeSpan.FromMilliseconds(intervalMs);
 
         Console.WriteLine($"🔄 自動翻訳ループを開始しました（間隔: {interval.TotalMilliseconds}ms）");
         _logger?.LogDebug("自動翻訳ループを開始しました（間隔: {Interval}ms）", interval.TotalMilliseconds);
@@ -645,27 +685,47 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // OCRエンジンが初期化されていない場合は初期化
             if (!_ocrEngine.IsInitialized)
             {
-                Console.WriteLine($"🛠️ OCRエンジン初期化開始");
-                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛠️ OCRエンジン初期化開始{Environment.NewLine}");
+                DebugLogUtility.WriteLog($"🛠️ OCRエンジン初期化開始");
                 
-                var settings = new OcrEngineSettings
+                var ocrSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.3,
-                    RecognitionThreshold = 0.5
+                    DetectionThreshold = 0.1f, // 公式推奨値で精度と速度のバランスを取る
+                    RecognitionThreshold = 0.1f // 公式推奨値で誤認識を減らす
                 };
                 
                 try
                 {
-                    await _ocrEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
-                    Console.WriteLine($"✅ OCRエンジン初期化完了");
-                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ OCRエンジン初期化完了{Environment.NewLine}");
+                    await _ocrEngine.InitializeAsync(ocrSettings, cancellationToken).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog($"✅ OCRエンジン初期化完了");
                 }
                 catch (Exception initEx)
                 {
-                    Console.WriteLine($"❌ OCRエンジン初期化エラー: {initEx.Message}");
-                    // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCRエンジン初期化エラー: {initEx.Message}{Environment.NewLine}");
+                    DebugLogUtility.WriteLog($"❌ OCRエンジン初期化エラー: {initEx.Message}");
                     throw;
+                }
+            }
+            else
+            {
+                // 既に初期化されているが、閾値設定を更新する
+                DebugLogUtility.WriteLog($"🔄 既に初期化されたOCRエンジンの設定を更新");
+                
+                var updatedSettings = new OcrEngineSettings
+                {
+                    Language = "jpn", // 日本語
+                    DetectionThreshold = 0.1f, // 公式推奨値で精度と速度のバランスを取る
+                    RecognitionThreshold = 0.1f // 公式推奨値で誤認識を減らす
+                };
+                
+                try
+                {
+                    await _ocrEngine.ApplySettingsAsync(updatedSettings, cancellationToken).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog($"✅ OCRエンジン設定更新完了");
+                }
+                catch (Exception applyEx)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ OCRエンジン設定更新エラー: {applyEx.Message}");
+                    // 設定更新に失敗しても翻訳処理は続行する
                 }
             }
             
@@ -681,6 +741,22 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             try
             {
                 DebugLogUtility.WriteLog($"🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}");
+                
+                // デバッグ用: キャプチャした画像を保存
+                if (image != null)
+                {
+                    try
+                    {
+                        var debugImagePath = Path.Combine(Directory.GetCurrentDirectory(), $"debug_captured_{translationId}.png");
+                        await SaveImageForDebugAsync(image, debugImagePath).ConfigureAwait(false);
+                        DebugLogUtility.WriteLog($"🖼️ デバッグ用画像保存: {debugImagePath}");
+                    }
+                    catch (Exception saveEx)
+                    {
+                        DebugLogUtility.WriteLog($"⚠️ デバッグ画像保存エラー: {saveEx.Message}");
+                    }
+                }
+                
                 // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}{Environment.NewLine}");
             }
             catch (Exception sizeEx)
@@ -754,18 +830,43 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 翻訳処理
             PublishProgress(translationId, TranslationStatus.Translating, 0.7f, "翻訳中...");
             
+            // 翻訳設定を取得
+            var settings = GetTranslationSettings();
+            
             string translatedText;
             if (!string.IsNullOrWhiteSpace(originalText))
             {
                 try
                 {
-                    // 一時的に簡単なMock翻訳を使用（実際の翻訳サービス統合までの暫定処理）
-                    DebugLogUtility.WriteLog($"🌍 Mock翻訳開始: '{originalText}'");
-                    await Task.Delay(500, cancellationToken).ConfigureAwait(false); // 翻訳処理のシミュレート
+                    // 設定から言語ペアを取得
+                    var sourceCode = settings.DefaultSourceLanguage ?? "ja";
+                    var targetCode = settings.DefaultTargetLanguage ?? "en";
                     
-                    // MockTranslationEngineと同様のフォーマットで翻訳結果を生成
-                    translatedText = $"[日→英] {originalText}";
-                    DebugLogUtility.WriteLog($"🌍 Mock翻訳完了: '{translatedText}'");
+                    DebugLogUtility.WriteLog($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
+                    
+                    // 改善されたMock翻訳処理（実際の翻訳ロジックをシミュレート）
+                    DebugLogUtility.WriteLog($"🌍 改善された翻訳処理開始: '{originalText}' ({sourceCode} → {targetCode})");
+                    
+                    // 簡素な翻訳ロジックを実装
+                    await Task.Delay(200, cancellationToken).ConfigureAwait(false); // 少し短く
+                    
+                    if (sourceCode == "ja" && targetCode == "en")
+                    {
+                        // 日本語から英語への翻訳
+                        translatedText = TranslateJapaneseToEnglish(originalText);
+                    }
+                    else if (sourceCode == "en" && targetCode == "ja")
+                    {
+                        // 英語から日本語への翻訳
+                        translatedText = TranslateEnglishToJapanese(originalText);
+                    }
+                    else
+                    {
+                        // その他の言語ペア
+                        translatedText = $"[{sourceCode}→{targetCode}] {originalText}";
+                    }
+                    
+                    DebugLogUtility.WriteLog($"🌍 翻訳完了: '{translatedText}'");
                 }
                 catch (Exception translationEx)
                 {
@@ -790,8 +891,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 Mode = mode,
                 OriginalText = originalText,
                 TranslatedText = translatedText,
-                DetectedLanguage = "ja", // 実際の検出言語で置き換え
-                TargetLanguage = "en",   // 実際の設定で置き換え
+                DetectedLanguage = settings.DefaultSourceLanguage ?? "ja", // 実際の設定を使用
+                TargetLanguage = settings.DefaultTargetLanguage ?? "en",   // 実際の設定を使用
                 Confidence = (float)ocrConfidence,
                 CapturedImage = null,    // 必要に応じて画像を保持
                 ProcessingTime = processingTime
@@ -846,6 +947,111 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _statusChangesSubject.OnNext(status);
     }
 
+    /// <summary>
+    /// 日本語から英語への基本的な翻訳
+    /// </summary>
+    private static string TranslateJapaneseToEnglish(string text)
+    {
+        var result = text
+            .Replace("こんにちは", "hello")
+            .Replace("ありがとう", "thank you")
+            .Replace("さようなら", "goodbye")
+            .Replace("はい", "yes")
+            .Replace("いいえ", "no")
+            .Replace("すみません", "excuse me")
+            .Replace("お疲れ様", "good job")
+            .Replace("開始", "start")
+            .Replace("終了", "end")
+            .Replace("設定", "settings")
+            .Replace("メニュー", "menu")
+            .Replace("ファイル", "file")
+            .Replace("編集", "edit")
+            .Replace("表示", "view")
+            .Replace("ツール", "tools")
+            .Replace("ヘルプ", "help")
+            .Replace("ゲーム", "game")
+            .Replace("プレイ", "play")
+            .Replace("スタート", "start")
+            .Replace("ストップ", "stop")
+            .Replace("ポーズ", "pause")
+            .Replace("続行", "continue")
+            .Replace("保存", "save")
+            .Replace("読み込み", "load")
+            .Replace("終了", "quit")
+            .Replace("レベル", "level")
+            .Replace("スコア", "score")
+            .Replace("ライフ", "life")
+            .Replace("ポイント", "point")
+            .Replace("コイン", "coin")
+            .Replace("アイテム", "item")
+            .Replace("武器", "weapon")
+            .Replace("防具", "armor")
+            .Replace("マジック", "magic")
+            .Replace("スキル", "skill")
+            .Replace("キャラクター", "character")
+            .Replace("プレイヤー", "player")
+            .Replace("エネミー", "enemy")
+            .Replace("ボス", "boss")
+            .Replace("バトル", "battle")
+            .Replace("戦闘", "fight")
+            .Replace("勝利", "victory")
+            .Replace("敗北", "defeat")
+            .Replace("ゲームオーバー", "game over");
+        return result;
+    }
+    
+    /// <summary>
+    /// 英語から日本語への基本的な翻訳
+    /// </summary>
+    private static string TranslateEnglishToJapanese(string text)
+    {
+        var result = text.ToLowerInvariant()
+            .Replace("hello", "こんにちは")
+            .Replace("thank you", "ありがとう")
+            .Replace("goodbye", "さようなら")
+            .Replace("yes", "はい")
+            .Replace("no", "いいえ")
+            .Replace("excuse me", "すみません")
+            .Replace("good job", "お疲れ様")
+            .Replace("start", "開始")
+            .Replace("end", "終了")
+            .Replace("settings", "設定")
+            .Replace("menu", "メニュー")
+            .Replace("file", "ファイル")
+            .Replace("edit", "編集")
+            .Replace("view", "表示")
+            .Replace("tools", "ツール")
+            .Replace("help", "ヘルプ")
+            .Replace("game", "ゲーム")
+            .Replace("play", "プレイ")
+            .Replace("stop", "ストップ")
+            .Replace("pause", "ポーズ")
+            .Replace("continue", "続行")
+            .Replace("save", "保存")
+            .Replace("load", "読み込み")
+            .Replace("quit", "終了")
+            .Replace("level", "レベル")
+            .Replace("score", "スコア")
+            .Replace("life", "ライフ")
+            .Replace("point", "ポイント")
+            .Replace("coin", "コイン")
+            .Replace("item", "アイテム")
+            .Replace("weapon", "武器")
+            .Replace("armor", "防具")
+            .Replace("magic", "マジック")
+            .Replace("skill", "スキル")
+            .Replace("character", "キャラクター")
+            .Replace("player", "プレイヤー")
+            .Replace("enemy", "エネミー")
+            .Replace("boss", "ボス")
+            .Replace("battle", "バトル")
+            .Replace("fight", "戦闘")
+            .Replace("victory", "勝利")
+            .Replace("defeat", "敗北")
+            .Replace("game over", "ゲームオーバー");
+        return result;
+    }
+
     #endregion
 
     #region IDisposable 実装
@@ -892,4 +1098,109 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     #endregion
+
+    #region デバッグ用メソッド
+
+    /// <summary>
+    /// デバッグ用に画像を保存します
+    /// </summary>
+    /// <param name="image">保存する画像</param>
+    /// <param name="filePath">保存先ファイルパス</param>
+    private async Task SaveImageForDebugAsync(IImage image, string filePath)
+    {
+        try
+        {
+            // IImageからバイト配列に変換
+            byte[] imageBytes = await ConvertImageToBytesAsync(image).ConfigureAwait(false);
+            
+            // ファイルに保存
+            await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
+            
+            DebugLogUtility.WriteLog($"✅ デバッグ画像保存完了: {filePath} (サイズ: {imageBytes.Length} bytes)");
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"❌ デバッグ画像保存エラー: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// IImageをバイト配列に変換します
+    /// </summary>
+    /// <param name="image">変換する画像</param>
+    /// <returns>バイト配列</returns>
+    private async Task<byte[]> ConvertImageToBytesAsync(IImage image)
+    {
+        try
+        {
+            // IImageの実装によって変換方法が異なる可能性があるため、
+            // 一般的な方法を試す
+            
+            // 方法1: ToByteArrayAsyncメソッドがある場合（WindowsImageAdapterでサポート）
+            if (image is WindowsImageAdapter adapter)
+            {
+                DebugLogUtility.WriteLog($"🔄 WindowsImageAdapterから直接バイト配列を取得");
+                return await adapter.ToByteArrayAsync().ConfigureAwait(false);
+            }
+            
+            // 方法2: リフレクションでToByteArrayAsyncを呼び出し
+            var imageType = image.GetType();
+            var toByteArrayMethod = imageType.GetMethod("ToByteArrayAsync");
+            if (toByteArrayMethod != null)
+            {
+                DebugLogUtility.WriteLog($"🔄 リフレクションでToByteArrayAsyncを呼び出し");
+                if (toByteArrayMethod.Invoke(image, null) is Task<byte[]> task)
+                {
+                    return await task.ConfigureAwait(false);
+                }
+            }
+            
+            // 方法3: Streamプロパティがある場合
+            var streamProperty = imageType.GetProperty("Stream");
+            if (streamProperty != null)
+            {
+                if (streamProperty.GetValue(image) is Stream stream)
+                {
+                    DebugLogUtility.WriteLog($"🔄 Streamプロパティから変換");
+                    using var memoryStream = new MemoryStream();
+                    stream.Position = 0;
+                    await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
+                    return memoryStream.ToArray();
+                }
+            }
+            
+            // 方法4: Dataプロパティがある場合
+            var dataProperty = imageType.GetProperty("Data");
+            if (dataProperty != null)
+            {
+                if (dataProperty.GetValue(image) is byte[] data)
+                {
+                    DebugLogUtility.WriteLog($"🔄 Dataプロパティから変換");
+                    return data;
+                }
+            }
+            
+            // 最後の手段: ToString()でデバッグ情報を取得
+            var debugInfo = $"Image Debug Info: Type={imageType.Name}, Width={image.Width}, Height={image.Height}";
+            DebugLogUtility.WriteLog($"⚠️ 画像バイト変換失敗 - {debugInfo}");
+            return System.Text.Encoding.UTF8.GetBytes(debugInfo);
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"❌ 画像バイト変換中にエラー: {ex.Message}");
+            var errorInfo = $"Image Conversion Error: {ex.Message}, Type={image.GetType().Name}";
+            return System.Text.Encoding.UTF8.GetBytes(errorInfo);
+        }
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// バイト配列を持つ画像インターフェース
+/// </summary>
+public interface IImageBytes
+{
+    byte[] ToByteArray();
 }

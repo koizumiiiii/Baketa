@@ -143,7 +143,6 @@
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartStopText}"
               Name="StartStopButton"
-              Click="OnStartStopButtonClick"
               IsEnabled="{Binding IsStartStopEnabled}">
         <StackPanel Orientation="Vertical" Spacing="4">
           <PathIcon Width="20" Height="20"

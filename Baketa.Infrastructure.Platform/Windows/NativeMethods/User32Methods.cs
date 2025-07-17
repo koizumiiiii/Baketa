@@ -100,6 +100,10 @@ internal static class User32Methods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool IsZoomed(IntPtr hWnd);
     
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(IntPtr hWnd);
+    
     // マルチモニターサポート用の追加API
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     internal static extern IntPtr MonitorFromPoint(POINT pt, MonitorFlags dwFlags);

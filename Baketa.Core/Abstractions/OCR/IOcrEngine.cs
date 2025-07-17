@@ -140,12 +140,12 @@ public class OcrEngineSettings
     /// <summary>
     /// テキスト検出の信頼度閾値（0.0～1.0）
     /// </summary>
-    public double DetectionThreshold { get; set; } = 0.3;
+    public double DetectionThreshold { get; set; } = 0.15;
     
     /// <summary>
     /// テキスト認識の信頼度閾値（0.0～1.0）
     /// </summary>
-    public double RecognitionThreshold { get; set; } = 0.5;
+    public double RecognitionThreshold { get; set; } = 0.25;
     
     /// <summary>
     /// 使用するモデル名
@@ -155,7 +155,7 @@ public class OcrEngineSettings
     /// <summary>
     /// 最大テキスト検出数
     /// </summary>
-    public int MaxDetections { get; set; } = 100;
+    public int MaxDetections { get; set; } = 200;
     
     /// <summary>
     /// 方向分類を使用するか（将来拡張用）

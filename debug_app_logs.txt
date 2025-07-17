@@ -1,413 +1,50 @@
-2025-07-16 10:03:55.847 🔍 PaddleOCR環境判定開始
-2025-07-16 10:03:55.849 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:03:55.851 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:04:09.629 🔧 MainOverlayView初期化開始
-2025-07-16 10:04:09.856 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:04:09.869 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:04:09.872 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:04:10.104 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:04:10.106 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:04:15.964 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=4368081
-2025-07-16 10:04:15.966 📢 イベント購読を開始
-2025-07-16 10:04:15.967 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:04:15.968 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:04:15.969 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:04:15.971 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:04:15.972 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:04:15.983 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:04:15.985 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:04:15.990 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:04:16.004 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:04:18.685 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:04:18.688 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:04:18.689 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:04:18.690 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:04:25.822 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:04:25.843 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:04:25.851 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:04:25.869 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:04:25.873 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:04:25.906 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:04:25.911 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: a6024e2f-94eb-4f2f-8eb8-ca6d7f8f60c5)
-2025-07-16 10:04:25.912 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:05:25.003 🔴 ExitButtonClick呼び出し
-2025-07-16 10:05:25.004 🔴 アプリケーション終了を実行
-2025-07-16 10:05:25.037 🚀 ViewModelBase.PublishEventAsync開始: ConfirmationRequestEvent (ID: 941a88d2-44fe-4cc4-aa95-7501cc73ccfc)
-2025-07-16 10:05:25.039 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ConfirmationRequestEvent
-2025-07-16 10:06:54.687 🔍 PaddleOCR環境判定開始
-2025-07-16 10:06:54.689 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:06:54.690 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:07:07.802 🔧 MainOverlayView初期化開始
-2025-07-16 10:07:07.998 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:07:08.016 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:07:08.027 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:07:08.275 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:07:08.276 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:07:14.021 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=15044627
-2025-07-16 10:07:14.022 📢 イベント購読を開始
-2025-07-16 10:07:14.024 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:07:14.025 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:07:14.026 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:07:14.027 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:07:14.028 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:07:14.040 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:07:14.041 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:07:14.045 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:07:14.047 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:07:33.398 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:07:33.400 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:07:33.402 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:07:33.403 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:07:37.161 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:07:37.175 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:07:37.181 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:07:37.203 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:07:37.207 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:07:37.244 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:07:37.247 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 2aa678b5-93ec-4dad-89c3-1e6d4151752a)
-2025-07-16 10:07:37.248 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:07:45.370 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:07:45.373 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:07:45.374 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:07:45.375 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:07:45.397 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 81d673a0-f51d-4b63-b7aa-18798d8bcbcd)
-2025-07-16 10:07:45.399 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:07:52.769 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:07:52.771 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:07:52.772 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:07:52.774 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:07:56.494 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:07:56.508 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:07:56.537 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:07:56.549 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:07:56.551 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:07:56.580 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:07:56.583 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 8be98858-248b-4b38-898d-8c3865224401)
-2025-07-16 10:07:56.585 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:08:08.296 🔴 ExitButtonClick呼び出し
-2025-07-16 10:08:08.297 🔴 アプリケーション終了を実行
-2025-07-16 10:08:08.328 🚀 ViewModelBase.PublishEventAsync開始: ConfirmationRequestEvent (ID: 9deff86a-7ab5-4820-b33e-fc49cbc9656f)
-2025-07-16 10:08:08.349 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ConfirmationRequestEvent
-2025-07-16 10:10:04.790 🔍 PaddleOCR環境判定開始
-2025-07-16 10:10:04.792 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:10:04.793 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:10:16.174 🔧 MainOverlayView初期化開始
-2025-07-16 10:10:16.335 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:10:16.347 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:10:16.350 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:10:16.646 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:10:16.647 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:10:21.940 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=15044627
-2025-07-16 10:10:21.942 📢 イベント購読を開始
-2025-07-16 10:10:21.943 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:10:21.944 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:10:21.945 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:10:21.946 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:10:21.947 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:10:21.955 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:10:21.957 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:10:21.959 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:10:21.960 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:11:45.028 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:11:45.029 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:11:45.031 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:11:45.038 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:11:47.903 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:11:47.916 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:11:47.924 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:11:47.947 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:11:47.951 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:11:47.961 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:11:47.964 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 4a4f039c-438d-41a8-98ac-3bb4d03153a9)
-2025-07-16 10:11:47.965 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:12:31.539 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:12:31.542 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:12:31.543 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:12:31.545 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:12:31.562 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 7f0987ca-3b86-4cc5-8dc4-0c1ba1ebff50)
-2025-07-16 10:12:31.564 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:12:32.148 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:12:32.149 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:12:32.150 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:12:32.151 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:13:52.735 🔴 ExitButtonClick呼び出し
-2025-07-16 10:13:52.736 🔴 アプリケーション終了を実行
-2025-07-16 10:13:52.759 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: dae73d19-a1da-47bd-92f8-044a8c4bf43b)
-2025-07-16 10:13:52.760 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 10:20:03.170 🔍 PaddleOCR環境判定開始
-2025-07-16 10:20:03.172 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:20:03.173 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:20:14.427 🔧 MainOverlayView初期化開始
-2025-07-16 10:20:14.595 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:20:14.608 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:20:14.609 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:20:14.798 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:20:14.800 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:20:20.095 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:20:20.096 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:20:20.100 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:20:20.111 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:20:37.980 🔴 ExitButtonClick呼び出し
-2025-07-16 10:20:37.982 🔴 アプリケーション終了を実行
-2025-07-16 10:20:38.021 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: a77ee08f-3770-438a-afcf-161cb03b7fda)
-2025-07-16 10:20:38.023 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 10:22:57.720 🔍 PaddleOCR環境判定開始
-2025-07-16 10:22:57.722 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:22:57.723 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:23:09.891 🔧 MainOverlayView初期化開始
-2025-07-16 10:23:10.064 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:23:10.080 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:23:10.082 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:23:10.350 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:23:10.351 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:23:16.098 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:23:16.100 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:23:16.104 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:23:16.106 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:24:36.769 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:24:36.771 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:24:36.772 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:24:36.774 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:24:39.488 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:24:39.500 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:24:39.506 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:24:39.527 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:24:39.532 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:24:39.560 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:24:39.564 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 0068dcad-62a2-42f6-8870-d5ecff0a5809)
-2025-07-16 10:24:39.565 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:25:02.469 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:25:02.471 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:25:02.472 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:25:02.473 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:25:02.480 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 31109c3e-2c15-4b7d-acb4-3ab11d90049a)
-2025-07-16 10:25:02.494 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:25:05.640 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:25:05.642 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:25:05.643 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:25:05.644 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:25:09.273 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:25:09.277 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:25:09.279 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:25:09.287 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:25:09.288 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:25:09.299 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:25:09.308 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: b0b8a1ab-d0c3-4a80-b145-68951b476c1e)
-2025-07-16 10:25:09.309 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:25:20.918 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:25:20.920 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:25:20.921 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:25:20.921 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:25:20.937 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 380a8b74-a44f-4305-9e86-6c0be66cc1c5)
-2025-07-16 10:25:20.939 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:25:22.336 🔴 ExitButtonClick呼び出し
-2025-07-16 10:25:22.338 🔴 アプリケーション終了を実行
-2025-07-16 10:25:22.361 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 9c7b5cc6-bb3b-408a-961e-bb4753e3fc67)
-2025-07-16 10:25:22.362 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 10:33:05.939 🔍 PaddleOCR環境判定開始
-2025-07-16 10:33:05.941 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:33:05.942 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:33:18.009 🔧 MainOverlayView初期化開始
-2025-07-16 10:33:18.183 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:33:18.199 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:33:18.201 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:33:18.517 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:33:18.520 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:33:29.767 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:33:29.878 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:33:30.091 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:33:30.299 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:33:32.702 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:33:32.821 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:33:32.939 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:33:33.099 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:33:38.360 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:33:38.521 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:33:38.542 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:33:38.574 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:33:38.581 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:33:38.610 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:33:38.623 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: c5856bab-0da4-470e-b8f0-6525693d63fc)
-2025-07-16 10:33:38.624 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:33:50.490 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:33:50.493 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:33:50.494 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:33:50.496 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:33:50.512 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 8f33ccd9-cbd8-41e3-b3e3-f7cf077c436a)
-2025-07-16 10:33:50.539 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:33:51.923 🔴 ExitButtonClick呼び出し
-2025-07-16 10:33:51.938 🔴 アプリケーション終了を実行
-2025-07-16 10:33:51.969 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: f00e6f5f-08e2-4fba-9474-509966f733a0)
-2025-07-16 10:33:51.976 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 10:39:12.423 🔍 PaddleOCR環境判定開始
-2025-07-16 10:39:12.426 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:39:12.427 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:39:26.293 🔧 MainOverlayView初期化開始
-2025-07-16 10:39:26.553 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:39:26.570 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:39:26.586 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:39:27.071 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:39:27.074 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:39:33.091 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=10212927
-2025-07-16 10:39:33.092 📢 イベント購読を開始
-2025-07-16 10:39:33.096 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:39:33.097 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:39:33.099 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:39:33.100 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:39:33.101 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:39:33.114 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:39:33.116 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:39:33.123 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:39:33.134 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:39:48.895 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:39:48.899 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:39:48.901 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:39:48.902 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:39:52.543 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:39:52.563 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:39:52.570 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:39:52.596 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:39:52.600 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:39:52.636 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:39:52.641 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 3c574028-5157-4d91-ba67-5530b819f99e)
-2025-07-16 10:39:52.644 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:40:40.318 🔴 ExitButtonClick呼び出し
-2025-07-16 10:40:40.320 🔴 アプリケーション終了を実行
-2025-07-16 10:40:40.376 🚀 ViewModelBase.PublishEventAsync開始: ConfirmationRequestEvent (ID: 703479bd-3b57-4585-b294-296a98ae79c5)
-2025-07-16 10:40:40.378 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ConfirmationRequestEvent
-2025-07-16 10:47:21.458 🔍 PaddleOCR環境判定開始
-2025-07-16 10:47:21.461 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:47:21.462 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:47:35.408 🔧 MainOverlayView初期化開始
-2025-07-16 10:47:35.607 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:47:35.622 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:47:35.624 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:47:36.033 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:47:36.035 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:47:42.314 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=10212927
-2025-07-16 10:47:42.315 📢 イベント購読を開始
-2025-07-16 10:47:42.317 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:47:42.318 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:47:42.320 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:47:42.322 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:47:42.324 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:47:42.339 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:47:42.341 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:47:42.345 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:47:42.359 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:47:44.640 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:47:44.643 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:47:44.644 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:47:44.645 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:47:50.215 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:47:50.226 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:47:50.237 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:47:50.252 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:47:50.255 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:47:50.265 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:47:50.268 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 2201d9a1-887a-489b-aa0a-5af2b99169f1)
-2025-07-16 10:47:50.269 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:47:59.808 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:47:59.809 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:47:59.810 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:47:59.811 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:47:59.847 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 33eec8a5-5fbd-47ff-b594-87871b37502d)
-2025-07-16 10:47:59.865 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:48:01.678 🔴 ExitButtonClick呼び出し
-2025-07-16 10:48:01.680 🔴 アプリケーション終了を実行
-2025-07-16 10:48:01.710 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 7a1c7e65-ffce-409a-801d-2d40cd4dfb98)
-2025-07-16 10:48:01.712 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 10:50:12.373 🔍 PaddleOCR環境判定開始
-2025-07-16 10:50:12.375 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 10:50:12.377 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 10:50:25.928 🔧 MainOverlayView初期化開始
-2025-07-16 10:50:26.078 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 10:50:26.092 🔧 MainOverlayView - IsVisible: False
-2025-07-16 10:50:26.094 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 10:50:26.371 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 10:50:26.373 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 10:50:31.619 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=10212927
-2025-07-16 10:50:31.621 📢 イベント購読を開始
-2025-07-16 10:50:31.622 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 10:50:31.623 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 10:50:31.624 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 10:50:31.624 ✅ SettingsChangedEvent購読完了
-2025-07-16 10:50:31.625 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 10:50:31.635 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 10:50:31.636 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 10:50:31.639 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 10:50:31.640 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 10:50:31.710 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:50:31.711 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:50:31.712 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:50:31.713 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:50:34.073 🔄 LoadingOverlayManager.ShowAsync開始
-2025-07-16 10:50:34.084 🔄 LoadingOverlayView初期化開始
-2025-07-16 10:50:34.090 ✅ LoadingOverlayView初期化完了
-2025-07-16 10:50:34.105 ✅ ローディングオーバーレイ表示完了
-2025-07-16 10:50:34.108 🔄 LoadingOverlayManager.HideAsync開始
-2025-07-16 10:50:34.119 ✅ ローディングオーバーレイ非表示完了
-2025-07-16 10:50:34.122 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 49e590a9-f02e-4615-acf3-69402b93edad)
-2025-07-16 10:50:34.124 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
-2025-07-16 10:50:39.505 🎯 StartStopButtonがクリックされました（Clickイベント）
-2025-07-16 10:50:39.507 🎯 DataContext: MainOverlayViewModel
-2025-07-16 10:50:39.508 🎯 StartStopCommand: ReactiveCommand`2
-2025-07-16 10:50:39.509 🎯 手動でStartStopCommandを実行します
-2025-07-16 10:50:39.524 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 6e259883-672b-4010-99cb-29c8b4777c6b)
-2025-07-16 10:50:39.537 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
-2025-07-16 10:50:40.760 🔴 ExitButtonClick呼び出し
-2025-07-16 10:50:40.762 🔴 アプリケーション終了を実行
-2025-07-16 10:50:40.806 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 353594f0-26cb-45e8-b979-15cb3aceceed)
-2025-07-16 10:50:40.808 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 11:47:26.395 🔍 PaddleOCR環境判定開始
-2025-07-16 11:47:26.397 ⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用
-2025-07-16 11:47:26.398 📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
-2025-07-16 11:47:36.954 🔧 MainOverlayView初期化開始
-2025-07-16 11:47:37.074 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 11:47:37.084 🔧 MainOverlayView - IsVisible: False
-2025-07-16 11:47:37.085 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 11:47:37.255 🔄 TranslationFlowModuleの初期化を開始
-2025-07-16 11:47:37.256 📡 TranslationFlowEventProcessorを取得中
-2025-07-16 11:47:42.073 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=10212927
-2025-07-16 11:47:42.075 📢 イベント購読を開始
-2025-07-16 11:47:42.076 ✅ StartTranslationRequestEvent購読完了
-2025-07-16 11:47:42.077 ✅ StopTranslationRequestEvent購読完了
-2025-07-16 11:47:42.078 ✅ ToggleTranslationDisplayRequestEvent購読完了
-2025-07-16 11:47:42.078 ✅ SettingsChangedEvent購読完了
-2025-07-16 11:47:42.079 🎉 翻訳フローイベントプロセッサーを正常に登録しました
-2025-07-16 11:47:42.088 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 11:47:42.089 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 11:47:42.091 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 11:47:42.093 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 15:09:28.838 🔧 MainOverlayView初期化開始
-2025-07-16 15:09:28.991 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 15:09:29.002 🔧 MainOverlayView - IsVisible: False
-2025-07-16 15:09:29.004 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 15:09:34.773 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 15:09:34.774 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 15:09:34.778 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 15:09:34.790 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 15:18:48.685 🔴 ExitButtonClick呼び出し
-2025-07-16 15:18:48.687 🔴 アプリケーション終了を実行
-2025-07-16 15:18:48.726 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: b90e2100-ccaf-4799-88ec-982302a682a8)
-2025-07-16 15:18:48.728 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 15:46:42.304 🔧 MainOverlayView初期化開始
-2025-07-16 15:46:42.427 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 15:46:42.437 🔧 MainOverlayView - IsVisible: False
-2025-07-16 15:46:42.438 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 15:46:47.504 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 15:46:47.506 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 15:46:47.508 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
-2025-07-16 15:46:47.509 🔧 MainOverlayView - Show()とActivate()を実行
-2025-07-16 15:49:31.736 🔴 ExitButtonClick呼び出し
-2025-07-16 15:49:31.737 🔴 アプリケーション終了を実行
-2025-07-16 15:49:31.783 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 8cbfcb63-c20f-4ad0-b54f-57eee6e5e3eb)
-2025-07-16 15:49:31.784 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
-2025-07-16 16:39:34.314 🔧 MainOverlayView初期化開始
-2025-07-16 16:39:34.443 🔧 MainOverlayView - InitializeComponent完了
-2025-07-16 16:39:34.448 🔧 MainOverlayView - IsVisible: False
-2025-07-16 16:39:34.451 🔧 MainOverlayView - WindowState: Normal
-2025-07-16 16:39:34.672 🔧 MainOverlayView - OnLoaded呼び出し
-2025-07-16 16:39:34.674 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
-2025-07-16 16:39:34.676 🔧 MainOverlayView - Position: 0, 0, Width: 110, Height: 600
-2025-07-16 16:39:34.678 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 18:17:15.890 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-17 18:17:15.924 🔍 StartStopCommand canExecute変更: True
+2025-07-17 18:17:15.935 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-17 18:17:15.937 ✅ StartStopCommand実行完了
+2025-07-17 18:17:16.013 🔧 MainOverlayView初期化開始
+2025-07-17 18:17:16.112 🔧 MainOverlayView - InitializeComponent完了
+2025-07-17 18:17:16.134 🔧 MainOverlayView - IsVisible: False
+2025-07-17 18:17:16.135 🔧 MainOverlayView - WindowState: Normal
+2025-07-17 18:17:16.291 🔄 TranslationFlowModuleの初期化を開始
+2025-07-17 18:17:16.292 📡 TranslationFlowEventProcessorを取得中
+2025-07-17 18:17:21.288 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=28788263
+2025-07-17 18:17:21.290 📢 イベント購読を開始
+2025-07-17 18:17:21.291 ✅ StartTranslationRequestEvent購読完了
+2025-07-17 18:17:21.292 ✅ StopTranslationRequestEvent購読完了
+2025-07-17 18:17:21.294 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-17 18:17:21.295 ✅ SettingsChangedEvent購読完了
+2025-07-17 18:17:21.296 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-17 18:17:21.304 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-17 18:17:21.305 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-17 18:17:21.307 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
+2025-07-17 18:17:21.318 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 18:18:04.243 🔴 ExitButtonClick呼び出し
+2025-07-17 18:18:04.244 🔴 アプリケーション終了を実行
+2025-07-17 18:18:04.279 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 096f6a56-d312-47c3-9a24-9869ed3641cc)
+2025-07-17 18:18:04.281 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-17 20:40:42.389 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-17 20:40:42.424 🔍 StartStopCommand canExecute変更: True
+2025-07-17 20:40:42.433 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-17 20:40:42.435 ✅ StartStopCommand実行完了
+2025-07-17 20:40:42.502 🔧 MainOverlayView初期化開始
+2025-07-17 20:40:42.589 🔧 MainOverlayView - InitializeComponent完了
+2025-07-17 20:40:42.597 🔧 MainOverlayView - IsVisible: False
+2025-07-17 20:40:42.599 🔧 MainOverlayView - WindowState: Normal
+2025-07-17 20:40:42.745 🔄 TranslationFlowModuleの初期化を開始
+2025-07-17 20:40:42.991 📡 TranslationFlowEventProcessorを取得中
+2025-07-17 20:40:47.732 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=28788263
+2025-07-17 20:40:47.734 📢 イベント購読を開始
+2025-07-17 20:40:47.735 ✅ StartTranslationRequestEvent購読完了
+2025-07-17 20:40:47.736 ✅ StopTranslationRequestEvent購読完了
+2025-07-17 20:40:47.737 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-17 20:40:47.738 ✅ SettingsChangedEvent購読完了
+2025-07-17 20:40:47.739 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-17 20:40:47.745 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-17 20:40:47.746 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-17 20:40:47.749 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
+2025-07-17 20:40:47.750 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 21:27:22.220 🔴 ExitButtonClick呼び出し
+2025-07-17 21:27:22.221 🔴 アプリケーション終了を実行
+2025-07-17 21:27:22.259 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: ac6637fb-437d-4964-98b9-ef9d21641c3e)
+2025-07-17 21:27:22.261 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent

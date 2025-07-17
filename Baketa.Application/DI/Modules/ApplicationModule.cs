@@ -37,6 +37,10 @@ namespace Baketa.Application.DI.Modules;
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
             
+            // OCR処理モジュールを登録
+            var ocrProcessingModule = new OcrProcessingModule();
+            ocrProcessingModule.RegisterServices(services);
+            
             // OCRアプリケーションサービス
             RegisterOcrApplicationServices(services);
             

@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Services;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
@@ -14,9 +16,11 @@ namespace Baketa.UI.Services;
 /// </summary>
 public class TranslationResultOverlayManager(
     IEventAggregator eventAggregator,
+    ISettingsService settingsService,
     ILogger<TranslationResultOverlayManager> logger) : IDisposable
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly ISettingsService _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
     private readonly ILogger<TranslationResultOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private TranslationResultOverlayView? _overlayWindow;
     private TranslationResultOverlayViewModel? _viewModel;
@@ -60,6 +64,11 @@ public class TranslationResultOverlayManager(
             var viewModelLogger = loggerFactory.CreateLogger<TranslationResultOverlayViewModel>();
             
             _viewModel = new TranslationResultOverlayViewModel(_eventAggregator, viewModelLogger);
+            
+            // 初期フォントサイズを設定から取得して適用
+            var fontSize = _settingsService.GetValue("UI:FontSize", 14);
+            _viewModel.FontSize = fontSize;
+            Console.WriteLine($"🔤 初期フォントサイズ適用: {fontSize}");
             
             Console.WriteLine("✅ TranslationResultOverlayViewModel作成完了 (OverlayManager内)");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayViewModel作成完了 (OverlayManager内)");
@@ -279,6 +288,18 @@ public class TranslationResultOverlayManager(
         if (_viewModel != null)
         {
             _viewModel.MaxWidth = Math.Max(200, Math.Min(800, maxWidth));
+        }
+    }
+
+    /// <summary>
+    /// オーバーレイのフォントサイズを設定
+    /// </summary>
+    public void SetFontSize(int fontSize)
+    {
+        if (_viewModel != null)
+        {
+            _viewModel.FontSize = Math.Max(8, Math.Min(72, fontSize));
+            Console.WriteLine($"🔤 フォントサイズ設定: {fontSize}");
         }
     }
 

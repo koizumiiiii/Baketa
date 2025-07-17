@@ -139,7 +139,15 @@ public class MainOverlayViewModel : ViewModelBase
     // UI状態の計算プロパティ
     public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
     public bool SettingsEnabled => !IsLoading; // ローディング中のみ無効（翻訳中でも設定可能）
-    public bool IsStartStopEnabled => !IsLoading; // ローディング中は無効
+    public bool IsStartStopEnabled 
+    { 
+        get 
+        {
+            var enabled = !IsLoading; // ローディング中は無効
+            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, 結果={enabled}");
+            return enabled;
+        }
+    }
     public string StartStopText 
     { 
         get 
@@ -180,15 +188,53 @@ public class MainOverlayViewModel : ViewModelBase
         // 各コマンドをUIスレッドで安全に初期化
         try
         {
+            // canExecute Observableをデバッグ
+            var canExecuteObservable = this.WhenAnyValue(x => x.IsStartStopEnabled)
+                .Do(canExecute => 
+                {
+                    DebugLogUtility.WriteLog($"🔍 StartStopCommand canExecute変更: {canExecute}");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopCommand canExecute変更: {canExecute}");
+                })
+                .ObserveOn(RxApp.MainThreadScheduler);
+                
+            DebugLogUtility.WriteLog("🏗️ ReactiveCommand.CreateFromTask開始");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏗️ ReactiveCommand.CreateFromTask開始");
+                
             var startStopCmd = ReactiveCommand.CreateFromTask(ExecuteStartStopAsync,
-                this.WhenAnyValue(x => x.IsStartStopEnabled).ObserveOn(RxApp.MainThreadScheduler), // ローディング中は無効
+                canExecuteObservable, // ローディング中は無効
                 outputScheduler: RxApp.MainThreadScheduler);
+                
+            DebugLogUtility.WriteLog("✅ ReactiveCommand.CreateFromTask完了");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ ReactiveCommand.CreateFromTask完了");
             
-            // StartStopCommandの実行をトラッキング
-            startStopCmd.Subscribe(_ => 
+            // StartStopCommandの実行をトラッキング（開始と完了を分けて記録）
+            startStopCmd.IsExecuting.Subscribe(isExecuting =>
             {
-                DebugLogUtility.WriteLog("🎬 StartStopCommandが実行されました");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎬 StartStopCommandが実行されました");
+                if (isExecuting)
+                {
+                    DebugLogUtility.WriteLog("🚀 StartStopCommand実行開始");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartStopCommand実行開始");
+                }
+                else
+                {
+                    DebugLogUtility.WriteLog("✅ StartStopCommand実行完了");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ StartStopCommand実行完了");
+                }
+            });
+            
+            // コマンド結果の監視
+            startStopCmd.Subscribe(result => 
+            {
+                DebugLogUtility.WriteLog($"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
+            });
+            
+            // StartStopCommandのエラーをトラッキング
+            startStopCmd.ThrownExceptions.Subscribe(ex =>
+            {
+                DebugLogUtility.WriteLog($"❌ StartStopCommandでエラー発生: {ex.Message}");
+                DebugLogUtility.WriteLog($"❌ スタックトレース: {ex.StackTrace}");
+                Logger?.LogError(ex, "StartStopCommandでエラーが発生しました");
             });
             
             StartStopCommand = startStopCmd;
@@ -248,24 +294,28 @@ public class MainOverlayViewModel : ViewModelBase
 
     private async Task ExecuteStartStopAsync()
     {
+        Console.WriteLine("🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
+        Console.WriteLine($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+        DebugLogUtility.WriteLog("🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         DebugLogUtility.WriteLog($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
-        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
         
         try
         {
             DebugLogUtility.WriteLog($"🔍 IsTranslationActive = {IsTranslationActive}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 IsTranslationActive = {IsTranslationActive}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 IsTranslationActive = {IsTranslationActive}");
             
             if (IsTranslationActive)
             {
                 DebugLogUtility.WriteLog("🔴 StopTranslationAsync呼び出し");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 StopTranslationAsync呼び出し");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 StopTranslationAsync呼び出し");
                 await StopTranslationAsync().ConfigureAwait(false);
             }
             else
             {
                 DebugLogUtility.WriteLog("🟢 StartTranslationAsync呼び出し");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🟢 StartTranslationAsync呼び出し");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🟢 StartTranslationAsync呼び出し");
                 await StartTranslationAsync().ConfigureAwait(false);
             }
         }
@@ -285,7 +335,7 @@ public class MainOverlayViewModel : ViewModelBase
     {
         var overallTimer = System.Diagnostics.Stopwatch.StartNew();
         DebugLogUtility.WriteLog("🚀 StartTranslationAsync開始");
-        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
         Logger?.LogInformation("🚀 翻訳ワークフローを開始");
 
         try
@@ -293,7 +343,7 @@ public class MainOverlayViewModel : ViewModelBase
             // 1. ウィンドウ選択ダイアログを表示
             var dialogTimer = System.Diagnostics.Stopwatch.StartNew();
             DebugLogUtility.WriteLog("🔍 ウィンドウ選択ダイアログを表示開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 ウィンドウ選択ダイアログを表示開始");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 ウィンドウ選択ダイアログを表示開始");
             Logger?.LogDebug("🔍 ウィンドウ選択ダイアログを表示");
             var selectedWindow = await ShowWindowSelectionDialogAsync().ConfigureAwait(false);
             dialogTimer.Stop();
@@ -411,6 +461,12 @@ public class MainOverlayViewModel : ViewModelBase
     {
         try
         {
+            DebugLogUtility.WriteLog("🏁 ShowWindowSelectionDialogAsync開始");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏁 ShowWindowSelectionDialogAsync開始");
+            
+            DebugLogUtility.WriteLog("🏁 WindowManagerAdapter確認開始");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 WindowManagerAdapter状態: {(_windowManager != null ? "利用可能" : "null")}");
+            
             var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, 
                 Microsoft.Extensions.Logging.LoggerFactoryExtensions.CreateLogger<WindowSelectionDialogViewModel>(
                     Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance), _windowManager);
@@ -418,6 +474,9 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 DataContext = dialogViewModel
             };
+
+            DebugLogUtility.WriteLog("🏁 ダイアログViewModel・View作成完了");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏁 ダイアログViewModel・View作成完了");
 
             // UIスレッドで安全にApplication.Currentにアクセス
             var owner = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -427,28 +486,39 @@ public class MainOverlayViewModel : ViewModelBase
                     ? desktop.MainWindow : null;
             });
             
+            DebugLogUtility.WriteLog($"🏁 オーナーウィンドウ取得: {(owner != null ? "成功" : "null")}");
+            
             WindowInfo? result = null;
             if (owner != null)
             {
+                DebugLogUtility.WriteLog("🏁 ShowDialogでダイアログ表示開始");
                 result = await dialog.ShowDialog<WindowInfo?>(owner).ConfigureAwait(false);
+                DebugLogUtility.WriteLog($"🏁 ShowDialog完了: {(result != null ? $"結果='{result.Title}'" : "null")}");
             }
             else
             {
+                DebugLogUtility.WriteLog("🏁 Showでダイアログ表示開始（フォールバック）");
                 dialog.Show();
                 // ShowDialogではなくShowで表示し、IsClosedで制御
                 while (!dialogViewModel.IsClosed)
                 {
                     await Task.Delay(100).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog($"🏁 ダイアログ待機中: IsClosed={dialogViewModel.IsClosed}");
                 }
                 result = dialogViewModel.DialogResult;
+                DebugLogUtility.WriteLog($"🏁 ダイアログ結果取得: {(result != null ? $"結果='{result.Title}'" : "null")}");
                 dialog.Close();
             }
 
+            DebugLogUtility.WriteLog($"🏁 ShowWindowSelectionDialogAsync完了: {(result != null ? $"成功='{result.Title}'" : "キャンセル")}");
             return result;
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Failed to show window selection dialog");
+            DebugLogUtility.WriteLog($"🏁 ShowWindowSelectionDialogAsyncエラー: {ex.Message}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 ShowWindowSelectionDialogAsyncエラー: {ex.Message}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 エラースタックトレース: {ex.StackTrace}");
             return null;
         }
     }

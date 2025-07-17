@@ -90,7 +90,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 return new AlphaOpusMtConfiguration
                 {
                     IsEnabled = true,
-                    ModelsDirectory = "Models/OpusMT",
+                    ModelsDirectory = "Models/SentencePiece",
                     MaxSequenceLength = 256,
                     MemoryLimitMb = 300,
                     ThreadCount = 2

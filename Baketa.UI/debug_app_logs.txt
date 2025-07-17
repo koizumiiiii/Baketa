@@ -1,0 +1,207 @@
+2025-07-17 19:50:59.189 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-17 19:50:59.227 🔍 StartStopCommand canExecute変更: True
+2025-07-17 19:50:59.237 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-17 19:50:59.239 ✅ StartStopCommand実行完了
+2025-07-17 19:50:59.315 🔧 MainOverlayView初期化開始
+2025-07-17 19:50:59.439 🔧 MainOverlayView - InitializeComponent完了
+2025-07-17 19:50:59.459 🔧 MainOverlayView - IsVisible: False
+2025-07-17 19:50:59.460 🔧 MainOverlayView - WindowState: Normal
+2025-07-17 19:50:59.623 🔄 TranslationFlowModuleの初期化を開始
+2025-07-17 19:50:59.858 📡 TranslationFlowEventProcessorを取得中
+2025-07-17 19:51:04.971 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=28788263
+2025-07-17 19:51:04.973 📢 イベント購読を開始
+2025-07-17 19:51:04.974 ✅ StartTranslationRequestEvent購読完了
+2025-07-17 19:51:04.975 ✅ StopTranslationRequestEvent購読完了
+2025-07-17 19:51:04.976 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-17 19:51:04.977 ✅ SettingsChangedEvent購読完了
+2025-07-17 19:51:04.978 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-17 19:51:04.984 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-17 19:51:04.985 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-17 19:51:04.987 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
+2025-07-17 19:51:04.988 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 19:53:11.295 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 19:53:11.296 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=False, IsLoading=False
+2025-07-17 19:53:11.298 🔍 IsTranslationActive = False
+2025-07-17 19:53:11.300 🟢 StartTranslationAsync呼び出し
+2025-07-17 19:53:11.303 🚀 StartTranslationAsync開始
+2025-07-17 19:53:11.305 🔍 ウィンドウ選択ダイアログを表示開始
+2025-07-17 19:53:11.308 🏁 ShowWindowSelectionDialogAsync開始
+2025-07-17 19:53:11.309 🏁 WindowManagerAdapter状態: 利用可能
+2025-07-17 19:53:11.351 🏁 ダイアログViewModel・View作成完了
+2025-07-17 19:53:11.361 🚀 StartStopCommand実行開始
+2025-07-17 19:53:13.392 🔍 StartStopCommand canExecute変更: False
+2025-07-17 19:53:13.397 🔄 LoadingOverlayManager.ShowAsync開始
+2025-07-17 19:53:13.406 🔄 LoadingOverlayView初期化開始
+2025-07-17 19:53:13.411 ✅ LoadingOverlayView初期化完了
+2025-07-17 19:53:13.422 ✅ ローディングオーバーレイ表示完了
+2025-07-17 19:53:13.431 🔍 StartStopCommand canExecute変更: True
+2025-07-17 19:53:13.448 🔄 LoadingOverlayManager.HideAsync開始
+2025-07-17 19:53:13.460 ✅ ローディングオーバーレイ非表示完了
+2025-07-17 19:53:13.469 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 3634fc16-8c37-4fdc-9cc7-127d70452985)
+2025-07-17 19:53:13.475 🚀 TranslationFlowEventProcessor.HandleAsync開始: 3634fc16-8c37-4fdc-9cc7-127d70452985
+2025-07-17 19:53:13.476 🔍 ターゲットウィンドウ: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 19:53:13.477 🔍 現在の購読状態: null
+2025-07-17 19:53:13.478 🔍 重複チェック: 現在処理中のウィンドウ数=0
+2025-07-17 19:53:13.480 ✅ ウィンドウを処理中リストに追加: 461282
+2025-07-17 19:53:13.481 🔄 翻訳開始要求処理開始: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 19:53:13.481 📊 翻訳状態をキャプチャ中に変更
+2025-07-17 19:53:13.485 ✅ 翻訳状態変更イベント発行完了
+2025-07-17 19:53:13.485 🔄 オーバーレイマネージャー初期化開始
+2025-07-17 19:53:13.487 ✅ オーバーレイマネージャー初期化完了
+2025-07-17 19:53:13.488 🚀 実際の翻訳処理開始
+2025-07-17 19:53:13.507 ✅ 翻訳処理完了
+2025-07-17 19:53:13.509 ✅ 翻訳開始処理が完了しました
+2025-07-17 19:53:13.510 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
+2025-07-17 19:53:13.517 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 19:53:13.519 ✅ StartStopCommand実行完了
+2025-07-17 19:53:46.410 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 19:53:46.411 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=True, IsLoading=False
+2025-07-17 19:53:46.413 🔍 IsTranslationActive = True
+2025-07-17 19:53:46.416 🔴 StopTranslationAsync呼び出し
+2025-07-17 19:53:46.421 🚀 StartStopCommand実行開始
+2025-07-17 19:53:46.440 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: f9d0ee92-2bc0-45aa-ae52-263874914132)
+2025-07-17 19:53:47.390 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
+2025-07-17 19:53:47.393 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 19:53:47.395 ✅ StartStopCommand実行完了
+2025-07-17 19:54:13.695 🔴 ExitButtonClick呼び出し
+2025-07-17 19:54:13.696 🔴 アプリケーション終了を実行
+2025-07-17 19:54:13.717 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 842ba96a-6767-49c1-9f91-556e6692c450)
+2025-07-17 19:54:13.719 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-17 19:56:43.899 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-17 19:56:43.943 🔍 StartStopCommand canExecute変更: True
+2025-07-17 19:56:43.959 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-17 19:56:43.961 ✅ StartStopCommand実行完了
+2025-07-17 19:56:44.035 🔧 MainOverlayView初期化開始
+2025-07-17 19:56:44.121 🔧 MainOverlayView - InitializeComponent完了
+2025-07-17 19:56:44.131 🔧 MainOverlayView - IsVisible: False
+2025-07-17 19:56:44.133 🔧 MainOverlayView - WindowState: Normal
+2025-07-17 19:56:44.364 🔄 TranslationFlowModuleの初期化を開始
+2025-07-17 19:56:44.674 📡 TranslationFlowEventProcessorを取得中
+2025-07-17 19:56:45.468 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=28788263
+2025-07-17 19:56:45.469 📢 イベント購読を開始
+2025-07-17 19:56:45.470 ✅ StartTranslationRequestEvent購読完了
+2025-07-17 19:56:45.471 ✅ StopTranslationRequestEvent購読完了
+2025-07-17 19:56:45.472 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-17 19:56:45.473 ✅ SettingsChangedEvent購読完了
+2025-07-17 19:56:45.474 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-17 19:56:45.480 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-17 19:56:45.482 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-17 19:56:45.484 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
+2025-07-17 19:56:45.485 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 19:56:49.285 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 19:56:49.286 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=False, IsLoading=False
+2025-07-17 19:56:49.288 🔍 IsTranslationActive = False
+2025-07-17 19:56:49.289 🟢 StartTranslationAsync呼び出し
+2025-07-17 19:56:49.293 🚀 StartTranslationAsync開始
+2025-07-17 19:56:49.296 🔍 ウィンドウ選択ダイアログを表示開始
+2025-07-17 19:56:49.298 🏁 ShowWindowSelectionDialogAsync開始
+2025-07-17 19:56:49.300 🏁 WindowManagerAdapter状態: 利用可能
+2025-07-17 19:56:49.346 🏁 ダイアログViewModel・View作成完了
+2025-07-17 19:56:49.357 🚀 StartStopCommand実行開始
+2025-07-17 19:56:51.240 🔍 StartStopCommand canExecute変更: False
+2025-07-17 19:56:51.248 🔄 LoadingOverlayManager.ShowAsync開始
+2025-07-17 19:56:51.259 🔄 LoadingOverlayView初期化開始
+2025-07-17 19:56:51.265 ✅ LoadingOverlayView初期化完了
+2025-07-17 19:56:51.284 ✅ ローディングオーバーレイ表示完了
+2025-07-17 19:56:51.297 🔍 StartStopCommand canExecute変更: True
+2025-07-17 19:56:51.325 🔄 LoadingOverlayManager.HideAsync開始
+2025-07-17 19:56:51.336 ✅ ローディングオーバーレイ非表示完了
+2025-07-17 19:56:51.345 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: abc1fcdc-6c76-4b3c-bec6-bf5f489d72a2)
+2025-07-17 19:56:51.352 🚀 TranslationFlowEventProcessor.HandleAsync開始: abc1fcdc-6c76-4b3c-bec6-bf5f489d72a2
+2025-07-17 19:56:51.354 🔍 ターゲットウィンドウ: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 19:56:51.355 🔍 現在の購読状態: null
+2025-07-17 19:56:51.356 🔍 重複チェック: 現在処理中のウィンドウ数=0
+2025-07-17 19:56:51.358 ✅ ウィンドウを処理中リストに追加: 461282
+2025-07-17 19:56:51.359 🔄 翻訳開始要求処理開始: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 19:56:51.360 📊 翻訳状態をキャプチャ中に変更
+2025-07-17 19:56:51.365 ✅ 翻訳状態変更イベント発行完了
+2025-07-17 19:56:51.366 🔄 オーバーレイマネージャー初期化開始
+2025-07-17 19:56:51.367 ✅ オーバーレイマネージャー初期化完了
+2025-07-17 19:56:51.369 🚀 実際の翻訳処理開始
+2025-07-17 19:56:51.387 ✅ 翻訳処理完了
+2025-07-17 19:56:51.389 ✅ 翻訳開始処理が完了しました
+2025-07-17 19:56:51.392 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
+2025-07-17 19:56:51.401 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 19:56:51.405 ✅ StartStopCommand実行完了
+2025-07-17 19:57:48.752 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 19:57:48.753 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=True, IsLoading=False
+2025-07-17 19:57:48.756 🔍 IsTranslationActive = True
+2025-07-17 19:57:48.758 🔴 StopTranslationAsync呼び出し
+2025-07-17 19:57:48.764 🚀 StartStopCommand実行開始
+2025-07-17 19:57:48.793 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 87cbfff8-7555-4ec3-b376-5d50a1c959ba)
+2025-07-17 19:57:50.138 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
+2025-07-17 19:57:50.141 ✅ StartStopCommand実行完了
+2025-07-17 19:57:50.142 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 20:00:31.642 🔴 ExitButtonClick呼び出し
+2025-07-17 20:00:31.644 🔴 アプリケーション終了を実行
+2025-07-17 20:00:31.661 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 35daf431-b768-4c5f-9517-d51c0903d9c9)
+2025-07-17 20:00:31.663 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-17 20:36:33.430 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-17 20:36:33.465 🔍 StartStopCommand canExecute変更: True
+2025-07-17 20:36:33.475 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-17 20:36:33.477 ✅ StartStopCommand実行完了
+2025-07-17 20:36:33.552 🔧 MainOverlayView初期化開始
+2025-07-17 20:36:33.649 🔧 MainOverlayView - InitializeComponent完了
+2025-07-17 20:36:33.658 🔧 MainOverlayView - IsVisible: False
+2025-07-17 20:36:33.660 🔧 MainOverlayView - WindowState: Normal
+2025-07-17 20:36:33.801 🔄 TranslationFlowModuleの初期化を開始
+2025-07-17 20:36:33.803 📡 TranslationFlowEventProcessorを取得中
+2025-07-17 20:36:38.509 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=28788263
+2025-07-17 20:36:38.510 📢 イベント購読を開始
+2025-07-17 20:36:38.511 ✅ StartTranslationRequestEvent購読完了
+2025-07-17 20:36:38.512 ✅ StopTranslationRequestEvent購読完了
+2025-07-17 20:36:38.513 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-17 20:36:38.514 ✅ SettingsChangedEvent購読完了
+2025-07-17 20:36:38.515 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-17 20:36:38.521 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-17 20:36:38.522 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-17 20:36:38.524 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 380
+2025-07-17 20:36:38.536 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-17 20:36:40.034 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 20:36:40.034 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=False, IsLoading=False
+2025-07-17 20:36:40.037 🔍 IsTranslationActive = False
+2025-07-17 20:36:40.038 🟢 StartTranslationAsync呼び出し
+2025-07-17 20:36:40.041 🚀 StartTranslationAsync開始
+2025-07-17 20:36:40.044 🔍 ウィンドウ選択ダイアログを表示開始
+2025-07-17 20:36:40.046 🏁 ShowWindowSelectionDialogAsync開始
+2025-07-17 20:36:40.048 🏁 WindowManagerAdapter状態: 利用可能
+2025-07-17 20:36:40.087 🏁 ダイアログViewModel・View作成完了
+2025-07-17 20:36:40.096 🚀 StartStopCommand実行開始
+2025-07-17 20:36:41.609 🔍 StartStopCommand canExecute変更: False
+2025-07-17 20:36:41.614 🔄 LoadingOverlayManager.ShowAsync開始
+2025-07-17 20:36:41.621 🔄 LoadingOverlayView初期化開始
+2025-07-17 20:36:41.627 ✅ LoadingOverlayView初期化完了
+2025-07-17 20:36:41.638 ✅ ローディングオーバーレイ表示完了
+2025-07-17 20:36:41.648 🔍 StartStopCommand canExecute変更: True
+2025-07-17 20:36:41.668 🔄 LoadingOverlayManager.HideAsync開始
+2025-07-17 20:36:41.679 ✅ ローディングオーバーレイ非表示完了
+2025-07-17 20:36:41.688 🚀 ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 7d12cabe-e07d-4aa8-8236-c410dc349652)
+2025-07-17 20:36:41.694 🚀 TranslationFlowEventProcessor.HandleAsync開始: 7d12cabe-e07d-4aa8-8236-c410dc349652
+2025-07-17 20:36:41.695 🔍 ターゲットウィンドウ: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 20:36:41.696 🔍 現在の購読状態: null
+2025-07-17 20:36:41.697 🔍 重複チェック: 現在処理中のウィンドウ数=0
+2025-07-17 20:36:41.699 ✅ ウィンドウを処理中リストに追加: 461282
+2025-07-17 20:36:41.700 🔄 翻訳開始要求処理開始: 個人開発 完全ガイド | izanami - Google Chrome (Handle=461282)
+2025-07-17 20:36:41.701 📊 翻訳状態をキャプチャ中に変更
+2025-07-17 20:36:41.704 ✅ 翻訳状態変更イベント発行完了
+2025-07-17 20:36:41.705 🔄 オーバーレイマネージャー初期化開始
+2025-07-17 20:36:41.706 ✅ オーバーレイマネージャー初期化完了
+2025-07-17 20:36:41.707 🚀 実際の翻訳処理開始
+2025-07-17 20:36:41.726 ✅ 翻訳処理完了
+2025-07-17 20:36:41.728 ✅ 翻訳開始処理が完了しました
+2025-07-17 20:36:41.729 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
+2025-07-17 20:36:41.736 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 20:36:41.738 ✅ StartStopCommand実行完了
+2025-07-17 20:37:11.868 🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥
+2025-07-17 20:37:11.870 🔘 ExecuteStartStopAsync開始 - IsTranslationActive=True, IsLoading=False
+2025-07-17 20:37:11.872 🔍 IsTranslationActive = True
+2025-07-17 20:37:11.876 🔴 StopTranslationAsync呼び出し
+2025-07-17 20:37:11.884 🚀 StartStopCommand実行開始
+2025-07-17 20:37:11.929 🚀 ViewModelBase.PublishEventAsync開始: StopTranslationRequestEvent (ID: 6cbeb5a3-08f2-4bb2-bacc-965a09b26c2d)
+2025-07-17 20:37:12.074 ✅ ViewModelBase.PublishEventAsync呼び出し完了: StopTranslationRequestEvent
+2025-07-17 20:37:12.077 ✅ StartStopCommand実行完了
+2025-07-17 20:37:12.086 🎬 StartStopCommandの結果を受信: Unit
+2025-07-17 20:37:20.020 🔴 ExitButtonClick呼び出し
+2025-07-17 20:37:20.021 🔴 アプリケーション終了を実行
+2025-07-17 20:37:20.047 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 17d24549-6722-428e-847d-d6ce73fc0171)
+2025-07-17 20:37:20.049 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent

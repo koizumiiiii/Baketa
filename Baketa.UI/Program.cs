@@ -269,6 +269,30 @@ namespace Baketa.UI;
                 System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
             }
             
+            // ITranslationEngineの登録確認
+            var translationEngines = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine));
+            System.Console.WriteLine($"ITranslationEngine registrations count: {translationEngines.Count()}");
+            
+            foreach (var service in translationEngines)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "N/A"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
+            // ITranslationServiceの登録確認
+            var translationServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationService));
+            System.Console.WriteLine($"ITranslationService registrations count: {translationServices.Count()}");
+            
+            foreach (var service in translationServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "N/A"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
             // AccessibilitySettingsViewModelの登録確認
             var accessibilityVM = services.Where(s => s.ServiceType == typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel));
             System.Console.WriteLine($"AccessibilitySettingsViewModel registrations count: {accessibilityVM.Count()}");

@@ -7,6 +7,8 @@ using Baketa.Core.Abstractions.Dependency;
 using Baketa.Infrastructure.Imaging.Filters;
 using Baketa.Infrastructure.Imaging.Pipeline;
 using Baketa.Infrastructure.OCR.TextDetection;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Infrastructure.Services.OCR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.DI;
@@ -46,6 +48,9 @@ namespace Baketa.Infrastructure.DI;
             
             // フィルター登録
             services.AddTransient<TextRegionDetectionFilter>();
+            
+            // OCR前処理サービス - 簡単なスタブ実装
+            services.AddTransient<IOcrPreprocessingService, SimpleOcrPreprocessingService>();
             
             // パイプラインのイベントリスナー
             services.AddTransient<IPipelineEventListener, DefaultPipelineEventListener>();

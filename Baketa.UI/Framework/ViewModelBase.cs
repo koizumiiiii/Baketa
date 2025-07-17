@@ -189,15 +189,14 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// <typeparam name="TEvent">イベント型</typeparam>
     /// <param name="eventData">イベントインスタンス</param>
     /// <returns>発行タスク</returns>
-    protected Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    protected async Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(eventData);
         Console.WriteLine($"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
-        var task = EventAggregator.PublishAsync(eventData);
+        await EventAggregator.PublishAsync(eventData).ConfigureAwait(false);
         Console.WriteLine($"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
-        return task;
     }
     
     /// <summary>

@@ -7,7 +7,10 @@ using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Services;
 using Baketa.Core.Utilities;
+using Baketa.UI.ViewModels;
+using Baketa.UI.Utils;
 using ReactiveUI;
 
 namespace Baketa.UI.Services;
@@ -20,13 +23,15 @@ public class TranslationFlowEventProcessor :
     IEventProcessor<StartTranslationRequestEvent>,
     IEventProcessor<StopTranslationRequestEvent>,
     IEventProcessor<ToggleTranslationDisplayRequestEvent>,
-    IEventProcessor<SettingsChangedEvent>
+    IEventProcessor<SettingsChangedEvent>,
+    IEventProcessor<LanguageSettingsChangedEvent>
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly TranslationResultOverlayManager _overlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
+    private readonly ISettingsService _settingsService;
     
     // 重複処理防止用
     private readonly HashSet<string> _processedEventIds = [];
@@ -42,13 +47,15 @@ public class TranslationFlowEventProcessor :
         IEventAggregator eventAggregator,
         TranslationResultOverlayManager overlayManager,
         ICaptureService captureService,
-        ITranslationOrchestrationService translationService)
+        ITranslationOrchestrationService translationService,
+        ISettingsService settingsService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
         _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
@@ -62,61 +69,130 @@ public class TranslationFlowEventProcessor :
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow.Title} (Handle={eventData.TargetWindow.Handle})");
+        Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
         Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+        
+        DebugLogUtility.WriteLog($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+        DebugLogUtility.WriteLog($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
+        DebugLogUtility.WriteLog($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+        
+        // ファイルログで確実に記録
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
         
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
-            eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
+            eventData.TargetWindow?.Title ?? "null", eventData.TargetWindow?.Handle ?? IntPtr.Zero);
+        
+        // イベントデータの妥当性チェック
+        if (eventData.TargetWindow == null)
+        {
+            var errorMessage = "ターゲットウィンドウがnullです";
+            Console.WriteLine($"❌ {errorMessage}");
+            DebugLogUtility.WriteLog($"❌ {errorMessage}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ {errorMessage}");
+            _logger.LogError(errorMessage);
+            return;
+        }
         
         // 重複処理防止チェック（ウィンドウハンドルベース）
         lock (_processedEventLock)
         {
             _logger.LogInformation("🔍 重複チェック: 現在処理中のウィンドウ数={Count}", _processingWindows.Count);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 重複チェック: 現在処理中のウィンドウ数={_processingWindows.Count}");
+            
             if (_processingWindows.Contains(eventData.TargetWindow.Handle))
             {
                 _logger.LogWarning("⚠️ 重複処理をスキップ: {WindowTitle} (Handle={Handle})", 
                     eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ 重複処理をスキップ: {eventData.TargetWindow.Title} (Handle={eventData.TargetWindow.Handle})");
                 return;
             }
             _processingWindows.Add(eventData.TargetWindow.Handle);
             _logger.LogInformation("✅ ウィンドウを処理中リストに追加: {Handle}", eventData.TargetWindow.Handle);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ウィンドウを処理中リストに追加: {eventData.TargetWindow.Handle}");
         }
         
         try
         {
             _logger.LogInformation("Processing translation start request for window: {WindowTitle} (Handle={Handle})", 
                 eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 翻訳開始要求処理開始: {eventData.TargetWindow.Title} (Handle={eventData.TargetWindow.Handle})");
 
             // 1. 翻訳状態を「キャプチャ中」に変更
             _logger.LogDebug("Changing translation status to capturing");
-            var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Capturing);
-            await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📊 翻訳状態をキャプチャ中に変更");
+            try
+            {
+                var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Capturing);
+                await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳状態変更イベント発行完了");
+            }
+            catch (Exception ex)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 翻訳状態変更イベント発行エラー: {ex.Message}");
+                _logger.LogError(ex, "翻訳状態変更イベント発行エラー");
+            }
 
             // 2. オーバーレイマネージャーを初期化
             _logger.LogDebug("Initializing overlay manager");
-            await _overlayManager.InitializeAsync().ConfigureAwait(false);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 オーバーレイマネージャー初期化開始");
+            try
+            {
+                await _overlayManager.InitializeAsync().ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー初期化完了");
+            }
+            catch (Exception ex)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ オーバーレイマネージャー初期化エラー: {ex.Message}");
+                _logger.LogError(ex, "オーバーレイマネージャー初期化エラー");
+            }
 
             // 3. 実際の翻訳処理を開始
             _logger.LogDebug("Starting translation process");
-            await ProcessTranslationAsync(eventData.TargetWindow).ConfigureAwait(false);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 実際の翻訳処理開始");
+            try
+            {
+                await ProcessTranslationAsync(eventData.TargetWindow).ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳処理完了");
+            }
+            catch (Exception ex)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 翻訳処理エラー: {ex.Message}");
+                _logger.LogError(ex, "翻訳処理エラー");
+                throw; // 外側のcatchで処理させる
+            }
 
             _logger.LogInformation("✅ 翻訳開始処理が完了しました");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳開始処理が完了しました");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred during translation start processing: {ErrorMessage}", ex.Message);
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 翻訳開始処理で例外発生: {ex.GetType().Name}: {ex.Message}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ スタックトレース: {ex.StackTrace}");
             
             // エラー時のみ処理中リストから削除
             lock (_processedEventLock)
             {
                 _processingWindows.Remove(eventData.TargetWindow.Handle);
                 _logger.LogDebug("Translation processing error cleanup for window handle: {Handle}", eventData.TargetWindow.Handle);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🧹 エラー時のウィンドウハンドル削除: {eventData.TargetWindow.Handle}");
             }
             
             // エラー状態に変更
-            var errorEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
-            await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+            try
+            {
+                var errorEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
+                await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ エラー状態イベント発行完了");
+            }
+            catch (Exception eventEx)
+            {
+                _logger.LogError(eventEx, "エラー状態イベント発行失敗");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ エラー状態イベント発行失敗: {eventEx.Message}");
+            }
         }
         // 注意: finallyブロックを削除 - 継続的翻訳では処理中状態をStop時まで維持
     }
@@ -219,8 +295,13 @@ public class TranslationFlowEventProcessor :
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ透明度設定: {eventData.OverlayOpacity}");
             _overlayManager.SetOpacity(eventData.OverlayOpacity);
             
+            // フォントサイズを設定から取得して設定
+            var fontSize = _settingsService.GetValue("UI:FontSize", eventData.FontSize);
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] フォントサイズ設定: {fontSize}");
+            _overlayManager.SetFontSize(fontSize);
+            
             // フォントサイズに基づいて最大幅を調整
-            var maxWidth = eventData.FontSize * 25; // フォントサイズの25倍を最大幅とする
+            var maxWidth = fontSize * 25; // フォントサイズの25倍を最大幅とする
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ最大幅設定: {maxWidth}");
             _overlayManager.SetMaxWidth(maxWidth);
 
@@ -399,5 +480,59 @@ public class TranslationFlowEventProcessor :
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 言語設定変更イベントの処理
+    /// </summary>
+    public async Task HandleAsync(LanguageSettingsChangedEvent eventData)
+    {
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        try
+        {
+            _logger.LogInformation("言語設定変更イベントを処理します: {TranslationLanguage}", eventData.TranslationLanguage);
+
+            // 翻訳言語ペアを設定サービスに保存
+            if (!string.IsNullOrEmpty(eventData.TranslationLanguage))
+            {
+                var parts = eventData.TranslationLanguage.Split('→');
+                if (parts.Length == 2)
+                {
+                    var sourceLanguage = parts[0].Trim();
+                    var targetLanguage = parts[1].Trim();
+                    
+                    // 言語コードに変換（表示名から言語コードへ）
+                    var sourceCode = ConvertDisplayNameToLanguageCode(sourceLanguage);
+                    var targetCode = ConvertDisplayNameToLanguageCode(targetLanguage);
+                    
+                    _logger.LogInformation("言語設定を保存: {Source} → {Target}", sourceCode, targetCode);
+                    
+                    // 設定サービスに保存
+                    _settingsService.SetValue("Translation:Languages:DefaultSourceLanguage", sourceCode);
+                    _settingsService.SetValue("Translation:Languages:DefaultTargetLanguage", targetCode);
+                    
+                    _logger.LogInformation("言語設定の保存が完了しました");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "言語設定変更イベントの処理中にエラーが発生しました");
+        }
+    }
+
+    /// <summary>
+    /// 表示名から言語コードに変換
+    /// </summary>
+    private static string ConvertDisplayNameToLanguageCode(string displayName)
+    {
+        return displayName switch
+        {
+            "日本語" or "Japanese" => "ja",
+            "英語" or "English" => "en",
+            "中国語" or "Chinese" => "zh",
+            _ => "en" // デフォルト
+        };
     }
 }
