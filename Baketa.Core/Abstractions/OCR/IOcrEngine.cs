@@ -89,7 +89,8 @@ public class OcrResults(
     IImage sourceImage,
     TimeSpan processingTime,
     string languageCode,
-    Rectangle? regionOfInterest = null)
+    Rectangle? regionOfInterest = null,
+    string? mergedText = null)
 {
     /// <summary>
     /// 認識されたテキスト領域のリスト
@@ -117,9 +118,10 @@ public class OcrResults(
     public string LanguageCode { get; } = languageCode ?? throw new ArgumentNullException(nameof(languageCode));
 
     /// <summary>
-    /// 画像内のすべてのテキストを結合（改行区切り）
+    /// 画像内のすべてのテキストを結合
+    /// 高度なテキスト結合アルゴリズムが適用されている場合はその結果、そうでなければ改行区切り結合
     /// </summary>
-    public string Text => string.Join(Environment.NewLine, TextRegions.Select(r => r.Text));
+    public string Text => mergedText ?? string.Join(Environment.NewLine, TextRegions.Select(r => r.Text));
     
     /// <summary>
     /// 有効なテキストが検出されているかどうか
