@@ -3,6 +3,8 @@ using Xunit;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Validation;
+using Baketa.Core.Abstractions.Settings;
+using FluentAssertions;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -37,8 +39,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.Empty(result.Errors);
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
     }
 
     [Fact]
@@ -57,9 +59,9 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.NotEmpty(result.Errors);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("Local (OPUS-MT)"));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("Local (OPUS-MT)"));
     }
 
     #endregion
@@ -74,6 +76,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
+                DefaultEngine = TranslationEngine.Local,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             }
@@ -83,7 +86,7 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -103,8 +106,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("同じ言語"));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("同じ言語"));
     }
 
     [Fact]
@@ -124,8 +127,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("日本語↔英語"));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("日本語↔英語"));
     }
 
     #endregion
@@ -138,6 +141,12 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var settings = new AppSettings
         {
+            Translation = new TranslationSettings
+            {
+                DefaultEngine = TranslationEngine.Local,
+                DefaultSourceLanguage = "ja",
+                DefaultTargetLanguage = "en"
+            },
             MainUi = new MainUiSettings
             {
                 PanelSize = UiSize.Small
@@ -148,7 +157,7 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -157,6 +166,12 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var settings = new AppSettings
         {
+            Translation = new TranslationSettings
+            {
+                DefaultEngine = TranslationEngine.Local,
+                DefaultSourceLanguage = "ja",
+                DefaultTargetLanguage = "en"
+            },
             MainUi = new MainUiSettings
             {
                 PanelSize = UiSize.Large
@@ -167,9 +182,9 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.NotEmpty(result.Warnings);
-        Assert.Contains(result.Warnings, w => w.WarningMessage!.Contains("画面を多く占有"));
+        result.IsValid.Should().BeTrue();
+        result.Warnings.Should().NotBeEmpty();
+        result.Warnings.Should().Contain(w => w.WarningMessage!.Contains("画面を多く占有"));
     }
 
     #endregion
@@ -248,6 +263,12 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var settings = new AppSettings
         {
+            Translation = new TranslationSettings
+            {
+                DefaultEngine = TranslationEngine.Local,
+                DefaultSourceLanguage = "ja",
+                DefaultTargetLanguage = "en"
+            },
             Capture = new CaptureSettings
             {
                 CaptureIntervalMs = 1000 // 1秒
@@ -258,7 +279,7 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -277,8 +298,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.ErrorMessage!.Contains("100ms以上5000ms以下"));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("100ms以上5000ms以下"));
     }
 
     [Fact]
@@ -287,6 +308,12 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var settings = new AppSettings
         {
+            Translation = new TranslationSettings
+            {
+                DefaultEngine = TranslationEngine.Local,
+                DefaultSourceLanguage = "ja",
+                DefaultTargetLanguage = "en"
+            },
             Capture = new CaptureSettings
             {
                 CaptureIntervalMs = 300 // 300ms（有効だが警告対象）
@@ -297,9 +324,9 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate(settings);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.NotEmpty(result.Warnings);
-        Assert.Contains(result.Warnings, w => w.WarningMessage!.Contains("CPU"));
+        result.IsValid.Should().BeTrue();
+        result.Warnings.Should().NotBeEmpty();
+        result.Warnings.Should().Contain(w => w.WarningMessage!.Contains("CPU"));
     }
 
     #endregion
@@ -321,8 +348,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate("Translation", translationSettings);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.Equal("Translation", result.Category);
+        result.IsValid.Should().BeTrue();
+        result.Category.Should().Be("Translation");
     }
 
     [Fact]
@@ -338,8 +365,8 @@ public class AlphaTestSettingsValidatorTests
         var result = _validator.Validate("Translation", translationSettings);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.NotEmpty(result.Errors);
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
     }
 
     #endregion
@@ -353,9 +380,9 @@ public class AlphaTestSettingsValidatorTests
         var rules = _validator.GetRules();
 
         // Assert
-        Assert.NotEmpty(rules);
-        Assert.Contains(rules, r => r.PropertyPath == "DefaultEngine");
-        Assert.Contains(rules, r => r.PropertyPath == "DefaultSourceLanguage");
+        rules.Should().NotBeEmpty();
+        rules.Should().Contain(r => r.PropertyPath == "DefaultEngine");
+        rules.Should().Contain(r => r.PropertyPath == "DefaultSourceLanguage");
     }
 
     [Fact]
@@ -365,9 +392,9 @@ public class AlphaTestSettingsValidatorTests
         var translationRules = _validator.GetRules("Translation");
 
         // Assert
-        Assert.NotEmpty(translationRules);
-        Assert.All(translationRules, rule => 
-            Assert.True(rule.PropertyPath == "DefaultEngine" || rule.PropertyPath == "DefaultSourceLanguage"));
+        translationRules.Should().NotBeEmpty();
+        translationRules.Should().OnlyContain(rule => 
+            rule.PropertyPath == "DefaultEngine" || rule.PropertyPath == "DefaultSourceLanguage");
     }
 
     #endregion
