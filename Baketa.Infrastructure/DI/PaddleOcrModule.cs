@@ -10,6 +10,10 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing.NgramModels;
 using Baketa.Infrastructure.OCR.Benchmarking;
 using Baketa.Infrastructure.OCR.PaddleOCR.Enhancement;
+using Baketa.Infrastructure.OCR.MultiScale;
+using Baketa.Infrastructure.OCR.AdaptivePreprocessing;
+using Baketa.Infrastructure.OCR.Ensemble;
+using Baketa.Infrastructure.OCR.Ensemble.Strategies;
 using System.IO;
 using System.Net.Http;
 using System.Diagnostics;
@@ -162,6 +166,101 @@ public class PaddleOcrModule : IServiceModule
             var logger = serviceProvider.GetService<ILogger<Phase1BenchmarkRunner>>() ?? 
                         Microsoft.Extensions.Logging.Abstractions.NullLogger<Phase1BenchmarkRunner>.Instance;
             return new Phase1BenchmarkRunner(serviceProvider, logger);
+        });
+        
+        // マルチスケールOCR処理（Phase 2）
+        services.AddSingleton<IMultiScaleOcrProcessor>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<SimpleMultiScaleOcrProcessor>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<SimpleMultiScaleOcrProcessor>.Instance;
+            return new SimpleMultiScaleOcrProcessor(logger);
+        });
+        
+        // マルチスケールテストランナー
+        services.AddSingleton<MultiScaleTestRunner>(serviceProvider =>
+        {
+            var multiScaleProcessor = serviceProvider.GetRequiredService<IMultiScaleOcrProcessor>();
+            var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
+            var logger = serviceProvider.GetService<ILogger<MultiScaleTestRunner>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiScaleTestRunner>.Instance;
+            return new MultiScaleTestRunner(multiScaleProcessor, ocrEngine, logger);
+        });
+        
+        // Phase 3: 適応的前処理パラメータ決定システム
+        services.AddSingleton<IImageQualityAnalyzer>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<ImageQualityAnalyzer>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<ImageQualityAnalyzer>.Instance;
+            return new ImageQualityAnalyzer(logger);
+        });
+        
+        services.AddSingleton<IAdaptivePreprocessingParameterOptimizer>(serviceProvider =>
+        {
+            var imageQualityAnalyzer = serviceProvider.GetRequiredService<IImageQualityAnalyzer>();
+            var logger = serviceProvider.GetService<ILogger<AdaptivePreprocessingParameterOptimizer>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<AdaptivePreprocessingParameterOptimizer>.Instance;
+            return new AdaptivePreprocessingParameterOptimizer(imageQualityAnalyzer, logger);
+        });
+        
+        services.AddSingleton<AdaptivePreprocessingBenchmark>(serviceProvider =>
+        {
+            var parameterOptimizer = serviceProvider.GetRequiredService<IAdaptivePreprocessingParameterOptimizer>();
+            var testCaseGenerator = serviceProvider.GetRequiredService<TestCaseGenerator>();
+            var logger = serviceProvider.GetService<ILogger<AdaptivePreprocessingBenchmark>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<AdaptivePreprocessingBenchmark>.Instance;
+            return new AdaptivePreprocessingBenchmark(parameterOptimizer, testCaseGenerator, logger);
+        });
+        
+        // Phase 4: アンサンブルOCR処理システム
+        
+        // 結果融合戦略
+        services.AddTransient<WeightedVotingFusionStrategy>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<WeightedVotingFusionStrategy>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<WeightedVotingFusionStrategy>.Instance;
+            return new WeightedVotingFusionStrategy(logger);
+        });
+        
+        services.AddTransient<ConfidenceBasedFusionStrategy>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<ConfidenceBasedFusionStrategy>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<ConfidenceBasedFusionStrategy>.Instance;
+            return new ConfidenceBasedFusionStrategy(logger);
+        });
+        
+        // デフォルトの融合戦略（重み付き投票）
+        services.AddSingleton<IResultFusionStrategy>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<WeightedVotingFusionStrategy>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<WeightedVotingFusionStrategy>.Instance;
+            return new WeightedVotingFusionStrategy(logger);
+        });
+        
+        // エンジンバランサー
+        services.AddSingleton<IEnsembleEngineBalancer>(serviceProvider =>
+        {
+            var imageQualityAnalyzer = serviceProvider.GetRequiredService<IImageQualityAnalyzer>();
+            var logger = serviceProvider.GetService<ILogger<EnsembleEngineBalancer>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<EnsembleEngineBalancer>.Instance;
+            return new EnsembleEngineBalancer(imageQualityAnalyzer, logger);
+        });
+        
+        // アンサンブルOCRエンジン
+        services.AddSingleton<IEnsembleOcrEngine>(serviceProvider =>
+        {
+            var defaultFusionStrategy = serviceProvider.GetRequiredService<IResultFusionStrategy>();
+            var logger = serviceProvider.GetService<ILogger<EnsembleOcrEngine>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<EnsembleOcrEngine>.Instance;
+            return new EnsembleOcrEngine(defaultFusionStrategy, logger);
+        });
+        
+        // アンサンブルベンチマーク
+        services.AddSingleton<EnsembleBenchmark>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<EnsembleBenchmark>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<EnsembleBenchmark>.Instance;
+            var testCaseGenerator = serviceProvider.GetRequiredService<TestCaseGenerator>();
+            return new EnsembleBenchmark(logger, testCaseGenerator);
         });
         
         // OCRエンジン（IOcrEngineインターフェース準拠）
