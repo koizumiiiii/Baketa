@@ -350,10 +350,10 @@ public class OcrEngineSettingsTests
 
         // Assert
         Assert.Equal("jpn", settings.Language);
-        Assert.Equal(0.3, settings.DetectionThreshold);
-        Assert.Equal(0.5, settings.RecognitionThreshold);
+        Assert.Equal(0.15, settings.DetectionThreshold);
+        Assert.Equal(0.25, settings.RecognitionThreshold);
         Assert.Equal("standard", settings.ModelName);
-        Assert.Equal(100, settings.MaxDetections);
+        Assert.Equal(200, settings.MaxDetections);
         Assert.False(settings.UseDirectionClassification);
         Assert.False(settings.UseGpu);
         Assert.Equal(0, settings.GpuDeviceId);
@@ -362,7 +362,7 @@ public class OcrEngineSettingsTests
     }
 
     [Theory]
-    [InlineData("jpn", 0.3, 0.5, "standard", 100, 0, 2, true)]
+    [InlineData("jpn", 0.3, 0.5, "standard", 200, 0, 2, true)]
     [InlineData("eng", 0.4, 0.6, "v2", 50, 1, 4, true)]
     public void IsValid_WithValidSettings_ShouldReturnTrue(
         string language, double detThreshold, double recThreshold, 
@@ -388,13 +388,13 @@ public class OcrEngineSettingsTests
     }
 
     [Theory]
-    [InlineData("", 0.3, 0.5, "standard", 100, 0, 2, false)] // Empty language
-    [InlineData("jpn", -0.1, 0.5, "standard", 100, 0, 2, false)] // Invalid detection threshold
-    [InlineData("jpn", 0.3, 1.5, "standard", 100, 0, 2, false)] // Invalid recognition threshold
-    [InlineData("jpn", 0.3, 0.5, "", 100, 0, 2, false)] // Empty model name
+    [InlineData("", 0.3, 0.5, "standard", 200, 0, 2, false)] // Empty language
+    [InlineData("jpn", -0.1, 0.5, "standard", 200, 0, 2, false)] // Invalid detection threshold
+    [InlineData("jpn", 0.3, 1.5, "standard", 200, 0, 2, false)] // Invalid recognition threshold
+    [InlineData("jpn", 0.3, 0.5, "", 200, 0, 2, false)] // Empty model name
     [InlineData("jpn", 0.3, 0.5, "standard", 0, 0, 2, false)] // Invalid max detections
-    [InlineData("jpn", 0.3, 0.5, "standard", 100, -1, 2, false)] // Invalid GPU device ID
-    [InlineData("jpn", 0.3, 0.5, "standard", 100, 0, 0, false)] // Invalid worker count
+    [InlineData("jpn", 0.3, 0.5, "standard", 200, -1, 2, false)] // Invalid GPU device ID
+    [InlineData("jpn", 0.3, 0.5, "standard", 200, 0, 0, false)] // Invalid worker count
     public void IsValid_WithInvalidSettings_ShouldReturnFalse(
         string language, double detThreshold, double recThreshold, 
         string modelName, int maxDetections, int gpuDeviceId, int workerCount, bool expected)

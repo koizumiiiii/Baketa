@@ -536,8 +536,12 @@ public class TranslationOrchestrationServiceTests : IDisposable
     /// </summary>
     private void SetupSettingsServiceMocks()
     {
-        // 必要に応じて設定関連のモックを追加
-        // 現在は TranslationOrchestrationService が設定に直接依存していないため空
+        // 翻訳関連設定のモック
+        _settingsServiceMock.Setup(x => x.GetValue("Translation:SingleTranslationDisplaySeconds", It.IsAny<int>()))
+            .Returns(5);
+        
+        _settingsServiceMock.Setup(x => x.GetValue("Translation:AutomaticTranslationIntervalMs", It.IsAny<int>()))
+            .Returns(2000);
     }
 
     /// <summary>
