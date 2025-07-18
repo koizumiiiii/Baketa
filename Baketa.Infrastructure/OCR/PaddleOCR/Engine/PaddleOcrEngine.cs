@@ -13,10 +13,11 @@ using System.Drawing;
 using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Security;
-using System.IO;
 using System.Reflection;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging;
+using Baketa.Infrastructure.OCR.TextProcessing;
+using Baketa.Infrastructure.OCR.PostProcessing;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -26,10 +27,14 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 public sealed class PaddleOcrEngine(
     IModelPathResolver modelPathResolver,
     IOcrPreprocessingService ocrPreprocessingService,
+    ITextMerger textMerger,
+    IOcrPostProcessor ocrPostProcessor,
     ILogger<PaddleOcrEngine>? logger = null) : IOcrEngine
 {
     private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
     private readonly IOcrPreprocessingService _ocrPreprocessingService = ocrPreprocessingService ?? throw new ArgumentNullException(nameof(ocrPreprocessingService));
+    private readonly ITextMerger _textMerger = textMerger ?? throw new ArgumentNullException(nameof(textMerger));
+    private readonly IOcrPostProcessor _ocrPostProcessor = ocrPostProcessor ?? throw new ArgumentNullException(nameof(ocrPostProcessor));
     private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly object _lockObject = new();
     
@@ -200,7 +205,8 @@ public sealed class PaddleOcrEngine(
                 image,
                 stopwatch.Elapsed,
                 CurrentLanguage ?? "jpn",
-                regionOfInterest
+                regionOfInterest,
+                "テストテキスト" // テスト環境では結合テキストも固定
             );
         }
 
@@ -243,12 +249,52 @@ public sealed class PaddleOcrEngine(
             
             progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了"));
             
+            // テキスト結合アルゴリズムを適用
+            string? mergedText = null;
+            if (textRegions != null && textRegions.Count > 0)
+            {
+                try
+                {
+                    DebugLogUtility.WriteLog("🔗 テキスト結合アルゴリズム適用開始");
+                    mergedText = _textMerger.MergeTextRegions(textRegions);
+                    DebugLogUtility.WriteLog($"🔗 テキスト結合完了: 結果文字数={mergedText.Length}");
+                    _logger?.LogDebug("テキスト結合アルゴリズム適用完了: 結果文字数={Length}", mergedText.Length);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"❌ テキスト結合エラー: {ex.Message}");
+                    _logger?.LogWarning(ex, "テキスト結合中にエラーが発生しました。元のテキストを使用します");
+                    mergedText = null; // フォールバック
+                }
+            }
+            
+            // OCR後処理を適用
+            string? postProcessedText = mergedText;
+            if (!string.IsNullOrWhiteSpace(mergedText))
+            {
+                try
+                {
+                    DebugLogUtility.WriteLog("🔧 OCR後処理（誤認識修正）開始");
+                    postProcessedText = await _ocrPostProcessor.ProcessAsync(mergedText, 0.8f).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog($"🔧 OCR後処理完了: 修正前='{mergedText}' → 修正後='{postProcessedText}'");
+                    _logger?.LogDebug("OCR後処理完了: 修正前長={Before}, 修正後長={After}", 
+                        mergedText.Length, postProcessedText.Length);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"❌ OCR後処理エラー: {ex.Message}");
+                    _logger?.LogWarning(ex, "OCR後処理中にエラーが発生しました。修正前のテキストを使用します");
+                    postProcessedText = mergedText; // フォールバック
+                }
+            }
+            
             var result = new OcrResults(
                 textRegions ?? [],
                 image,
                 stopwatch.Elapsed,
                 CurrentLanguage ?? "jpn",
-                regionOfInterest
+                regionOfInterest,
+                postProcessedText
             );
             
             DebugLogUtility.WriteLog($"✅ OCR処理完了: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms");
@@ -1921,7 +1967,8 @@ public sealed class PaddleOcrEngine(
             image,
             processingTime,
             CurrentLanguage ?? "jpn",
-            regionOfInterest
+            regionOfInterest,
+            string.Empty // 空の場合は空文字列
         );
     }
 

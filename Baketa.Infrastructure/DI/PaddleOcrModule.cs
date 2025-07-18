@@ -5,6 +5,11 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.TextProcessing;
+using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Infrastructure.OCR.PostProcessing.NgramModels;
+using Baketa.Infrastructure.OCR.Benchmarking;
+using Baketa.Infrastructure.OCR.PaddleOCR.Enhancement;
 using System.IO;
 using System.Net.Http;
 using System.Diagnostics;
@@ -61,11 +66,111 @@ public class PaddleOcrModule : IServiceModule
             return new OcrModelManager(modelPathResolver, httpClient, tempDirectory, logger);
         });
         
+        // テキスト結合アルゴリズム
+        services.AddSingleton<ITextMerger>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<JapaneseTextMerger>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<JapaneseTextMerger>.Instance;
+            return new JapaneseTextMerger(logger);
+        });
+        
+        // N-gram学習サービス
+        services.AddSingleton<NgramTrainingService>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<NgramTrainingService>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<NgramTrainingService>.Instance;
+            return new NgramTrainingService(logger);
+        });
+        
+        // ハイブリッドOCR後処理ファクトリ
+        services.AddSingleton<HybridOcrPostProcessorFactory>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<HybridOcrPostProcessorFactory>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridOcrPostProcessorFactory>.Instance;
+            var trainingService = serviceProvider.GetRequiredService<NgramTrainingService>();
+            return new HybridOcrPostProcessorFactory(logger, trainingService);
+        });
+        
+        // N-gramベンチマーク
+        services.AddSingleton<NgramPostProcessingBenchmark>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<NgramPostProcessingBenchmark>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<NgramPostProcessingBenchmark>.Instance;
+            var trainingService = serviceProvider.GetRequiredService<NgramTrainingService>();
+            return new NgramPostProcessingBenchmark(logger, trainingService);
+        });
+        
+        // OCR後処理 (ハイブリッド版を使用)
+        services.AddSingleton<IOcrPostProcessor>(serviceProvider =>
+        {
+            // 環境に応じて処理を選択
+            var environmentVar = Environment.GetEnvironmentVariable("BAKETA_USE_HYBRID_POSTPROCESSING");
+            var useHybrid = environmentVar == "true" || string.IsNullOrEmpty(environmentVar); // デフォルトでハイブリッド使用
+            
+            if (useHybrid)
+            {
+                var factory = serviceProvider.GetRequiredService<HybridOcrPostProcessorFactory>();
+                // 非同期初期化のため、タスクを同期的に実行
+                return factory.CreateAsync().GetAwaiter().GetResult();
+            }
+            else
+            {
+                // 従来の辞書ベースのみ
+                var logger = serviceProvider.GetService<ILogger<JapaneseOcrPostProcessor>>() ?? 
+                            Microsoft.Extensions.Logging.Abstractions.NullLogger<JapaneseOcrPostProcessor>.Instance;
+                return new JapaneseOcrPostProcessor(logger);
+            }
+        });
+        
+        // OCRベンチマーク機能
+        services.AddSingleton<IOcrBenchmark>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<OcrBenchmark>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<OcrBenchmark>.Instance;
+            return new OcrBenchmark(logger);
+        });
+        
+        // PaddleOCR高度最適化機能
+        services.AddSingleton<AdvancedPaddleOcrOptimizer>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<AdvancedPaddleOcrOptimizer>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<AdvancedPaddleOcrOptimizer>.Instance;
+            return new AdvancedPaddleOcrOptimizer(logger);
+        });
+        
+        // OCRパラメータベンチマークランナー
+        services.AddSingleton<OcrParameterBenchmarkRunner>(serviceProvider =>
+        {
+            var benchmark = serviceProvider.GetRequiredService<IOcrBenchmark>();
+            var optimizer = serviceProvider.GetRequiredService<AdvancedPaddleOcrOptimizer>();
+            var logger = serviceProvider.GetService<ILogger<OcrParameterBenchmarkRunner>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<OcrParameterBenchmarkRunner>.Instance;
+            return new OcrParameterBenchmarkRunner(benchmark, optimizer, logger);
+        });
+        
+        // テストケース生成器
+        services.AddSingleton<TestCaseGenerator>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<TestCaseGenerator>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<TestCaseGenerator>.Instance;
+            return new TestCaseGenerator(logger);
+        });
+        
+        // Phase 1ベンチマークランナー
+        services.AddSingleton<Phase1BenchmarkRunner>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<Phase1BenchmarkRunner>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<Phase1BenchmarkRunner>.Instance;
+            return new Phase1BenchmarkRunner(serviceProvider, logger);
+        });
+        
         // OCRエンジン（IOcrEngineインターフェース準拠）
         services.AddSingleton<IOcrEngine>(serviceProvider =>
         {
             var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
             var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
+            var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
+            var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
             var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
             
             // 環境判定を実行
@@ -86,7 +191,7 @@ public class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
             }
             
             bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
@@ -103,7 +208,7 @@ public class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("✅ 本番環境検出 - PaddleOcrEngineを使用");
                 logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
             }
         });
         
@@ -124,8 +229,10 @@ public class PaddleOcrModule : IServiceModule
                 // 開発環境であることを前提として、元のPaddleOcrEngineではなくSafePaddleOcrEngineを返す
                 var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
                 var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
+                var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
+                var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
                 var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
             }
         });
         
