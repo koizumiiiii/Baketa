@@ -23,7 +23,7 @@ namespace Baketa.Application.DI.Modules;
     /// ビジネスロジックやユースケースの実装が含まれます。
     /// </summary>
     [ModulePriority(ModulePriority.Application)]
-    public class ApplicationModule : ServiceModuleBase
+    public sealed class ApplicationModule : ServiceModuleBase
     {
         /// <summary>
         /// アプリケーションサービスを登録します。

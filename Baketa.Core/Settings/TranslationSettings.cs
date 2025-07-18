@@ -18,7 +18,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = new object[] { TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT })]
+        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT])]
     public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.AlphaOpusMT;
     
     /// <summary>
@@ -33,7 +33,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
-        ValidValues = new object[] { "ja", "en" })]
+        ValidValues = ["ja", "en"])]
     public string DefaultSourceLanguage { get; set; } = "ja";
     
     /// <summary>
@@ -41,7 +41,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
-        ValidValues = new object[] { "ja", "en" })]
+        ValidValues = ["ja", "en"])]
     public string DefaultTargetLanguage { get; set; } = "en";
     
     /// <summary>
@@ -66,7 +66,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳スタイル", 
         Description = "翻訳の文体・スタイル", 
-        ValidValues = new object[] { TranslationStyle.Natural, TranslationStyle.Literal, TranslationStyle.Formal, TranslationStyle.Casual })]
+        ValidValues = [TranslationStyle.Natural, TranslationStyle.Literal, TranslationStyle.Formal, TranslationStyle.Casual])]
     public TranslationStyle Style { get; set; } = TranslationStyle.Natural;
     
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = new object[] { TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT })]
+        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT])]
     public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>

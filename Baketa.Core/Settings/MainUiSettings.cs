@@ -92,7 +92,7 @@ public sealed class MainUiSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "MainUi", "パネルサイズ", 
         Description = "翻訳パネルの表示サイズ", 
-        ValidValues = new object[] { UiSize.Small, UiSize.Medium, UiSize.Large })]
+        ValidValues = [UiSize.Small, UiSize.Medium, UiSize.Large])]
     public UiSize PanelSize { get; set; } = UiSize.Small;
     
     /// <summary>
@@ -177,7 +177,7 @@ public sealed class MainUiSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "MainUi", "テーマスタイル", 
         Description = "翻訳パネルの外観テーマ", 
-        ValidValues = new object[] { UiTheme.Light, UiTheme.Dark, UiTheme.Auto })]
+        ValidValues = [UiTheme.Light, UiTheme.Dark, UiTheme.Auto])]
     public UiTheme ThemeStyle { get; set; } = UiTheme.Auto;
     
     /// <summary>

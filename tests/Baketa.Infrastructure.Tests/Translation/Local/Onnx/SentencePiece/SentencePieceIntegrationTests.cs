@@ -281,7 +281,7 @@ public class SentencePieceIntegrationTests : IDisposable
         }
 
         // Act - 複数のトークナイザーを並行作成（各タスクで異なるモデルを使用）
-        var tasks = new Task[5];
+        Task[] tasks = new Task[5];
         for (int i = 0; i < tasks.Length; i++)
         {
             int taskId = i;

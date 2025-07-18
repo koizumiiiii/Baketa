@@ -53,7 +53,7 @@ public class MultiScaleOcrResult
     /// <summary>
     /// 各スケールでの処理結果
     /// </summary>
-    public IReadOnlyList<ScaleProcessingResult> ScaleResults { get; init; } = new List<ScaleProcessingResult>();
+    public IReadOnlyList<ScaleProcessingResult> ScaleResults { get; init; } = [];
     
     /// <summary>
     /// 統合された最終結果

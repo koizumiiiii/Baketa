@@ -489,7 +489,7 @@ public sealed class JsonSettingsService : ISettingsService
     /// <inheritdoc />
     public Task CreateBackupAsync(string? backupFilePath = null)
     {
-        backupFilePath ??= $"{_settingsFilePath}.backup_{DateTime.Now:yyyyMMdd_HHmmss}";
+        backupFilePath ??= $"{_settingsFilePath}.backup_{DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture)}";
         
         try
         {
@@ -575,7 +575,7 @@ public sealed class JsonSettingsService : ISettingsService
     public IReadOnlyList<SettingChangeRecord> GetChangeHistory(int maxEntries = 100)
     {
         // TODO: 実際の変更履歴を実装
-        return ((List<SettingChangeRecord>)[]).AsReadOnly();
+        return [];
     }
 
     /// <inheritdoc />
@@ -596,7 +596,7 @@ public sealed class JsonSettingsService : ISettingsService
     public IReadOnlyList<string> GetFavoriteSettings()
     {
         // TODO: 実際のお気に入り機能を実装
-        return ((List<string>)[]).AsReadOnly();
+        return [];
     }
 
     /// <inheritdoc />

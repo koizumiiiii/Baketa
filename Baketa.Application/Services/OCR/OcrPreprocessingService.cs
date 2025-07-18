@@ -13,15 +13,10 @@ namespace Baketa.Application.Services.OCR;
 /// <summary>
 /// OCR前処理サービス（基本実装版）
 /// </summary>
-public class OcrPreprocessingService : IOcrPreprocessingService
+public sealed class OcrPreprocessingService(ILogger<OcrPreprocessingService> logger) : IOcrPreprocessingService
 {
-    private readonly ILogger<OcrPreprocessingService> _logger;
-    
-    public OcrPreprocessingService(ILogger<OcrPreprocessingService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly ILogger<OcrPreprocessingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
     /// 画像を処理し、OCRのためのテキスト領域を検出します
     /// </summary>

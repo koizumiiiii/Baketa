@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
@@ -527,15 +528,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 画面またはウィンドウをキャプチャ
             if (_targetWindowHandle.HasValue)
             {
-                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ開始: Handle={_targetWindowHandle.Value}");
-                currentImage = await _captureService.CaptureWindowAsync(_targetWindowHandle.Value).ConfigureAwait(false);
-                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ完了: {(currentImage != null ? "成功" : "失敗")}");
+                var windowHandle = _targetWindowHandle.Value;
+                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ開始: Handle={windowHandle}");
+                currentImage = await _captureService!.CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+                if (currentImage is null)
+                {
+                    throw new TranslationException("ウィンドウキャプチャに失敗しました");
+                }
+                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
             else
             {
                 DebugLogUtility.WriteLog($"📷 画面全体キャプチャ開始");
-                currentImage = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
-                DebugLogUtility.WriteLog($"📷 画面全体キャプチャ完了: {(currentImage != null ? "成功" : "失敗")}");
+                currentImage = await _captureService!.CaptureScreenAsync().ConfigureAwait(false);
+                if (currentImage is null)
+                {
+                    throw new TranslationException("画面キャプチャに失敗しました");
+                }
+                DebugLogUtility.WriteLog($"📷 画面全体キャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
             
             // キャンセルチェック
@@ -572,7 +582,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // 翻訳を実行
             DebugLogUtility.WriteLog($"🌍 翻訳処理開始: ID={translationId}");
-            var result = await ExecuteTranslationAsync(translationId, currentImage, TranslationMode.Automatic, cancellationToken)
+            var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
                 .ConfigureAwait(false);
             DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
 
@@ -628,7 +638,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             using (currentImage)
             {
                 // 翻訳を実行
-                var result = await ExecuteTranslationAsync(translationId, currentImage, TranslationMode.Manual, cancellationToken)
+                var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Manual, cancellationToken)
                     .ConfigureAwait(false);
 
                 // 単発翻訳の表示時間を設定
@@ -773,7 +783,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             DebugLogUtility.WriteLog($"   ✅ 初期化状態: {_ocrEngine?.IsInitialized ?? false}");
             DebugLogUtility.WriteLog($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
             
-            var ocrResults = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
             
             DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し完了");
             

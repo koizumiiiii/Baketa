@@ -286,7 +286,7 @@ public sealed class SettingsServiceModuleTests
         // Root cause solution: Use separate service providers for each task to prevent file access conflicts
         // This tests service registration and DI isolation rather than single-instance concurrency
         
-        var tasks = new Task[10];
+        Task[] tasks = new Task[10];
         for (int i = 0; i < 10; i++)
         {
             int taskId = i;
@@ -334,8 +334,8 @@ public sealed class SettingsServiceModuleTests
         var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
         
         const int concurrentTasks = 5; // Reduced to minimize file contention
-        var tasks = new Task[concurrentTasks];
-        var results = new bool[concurrentTasks];
+        Task[] tasks = new Task[concurrentTasks];
+        bool[] results = new bool[concurrentTasks];
         
         // Act - Test internal synchronization mechanisms
         for (int i = 0; i < concurrentTasks; i++)

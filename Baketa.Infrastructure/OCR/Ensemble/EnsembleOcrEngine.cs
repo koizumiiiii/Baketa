@@ -10,34 +10,25 @@ namespace Baketa.Infrastructure.OCR.Ensemble;
 /// <summary>
 /// 複数OCRエンジンによるアンサンブル処理を実装するメインクラス
 /// </summary>
-public class EnsembleOcrEngine : IEnsembleOcrEngine
+public class EnsembleOcrEngine(
+    IResultFusionStrategy defaultFusionStrategy,
+    ILogger<EnsembleOcrEngine> logger) : IEnsembleOcrEngine
 {
-    private readonly ILogger<EnsembleOcrEngine> _logger;
     private readonly List<EnsembleEngineInfo> _engines = [];
     private readonly ConcurrentDictionary<string, EnsembleEngineStats> _engineStats = new();
-    private IResultFusionStrategy _fusionStrategy;
     private OcrEngineSettings? _currentSettings;
-    private bool _isInitialized = false;
 
     // IOcrEngineプロパティの実装
     public string EngineName => "EnsembleOCR";
     public string EngineVersion => "1.0.0";
-    public bool IsInitialized => _isInitialized;
+    public bool IsInitialized { get; private set; }
     public string? CurrentLanguage => _currentSettings?.Language;
-
-    public EnsembleOcrEngine(
-        IResultFusionStrategy defaultFusionStrategy,
-        ILogger<EnsembleOcrEngine> logger)
-    {
-        _fusionStrategy = defaultFusionStrategy;
-        _logger = logger;
-    }
 
     #region IEnsembleOcrEngine Implementation
 
     public void AddEngine(IOcrEngine engine, double weight = 1.0, EnsembleEngineRole role = EnsembleEngineRole.Primary)
     {
-        if (engine == null) throw new ArgumentNullException(nameof(engine));
+        ArgumentNullException.ThrowIfNull(engine);
         if (weight <= 0) throw new ArgumentException("Weight must be positive", nameof(weight));
 
         var engineInfo = new EnsembleEngineInfo(
@@ -51,7 +42,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
         _engines.Add(engineInfo);
         _engineStats.TryAdd(engine.EngineName, engineInfo.Stats);
 
-        _logger.LogInformation("アンサンブルエンジン追加: {EngineName}, 重み={Weight}, 役割={Role}",
+        logger.LogInformation("アンサンブルエンジン追加: {EngineName}, 重み={Weight}, 役割={Role}",
             engine.EngineName, weight, role);
     }
 
@@ -65,7 +56,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             _engines.RemoveAt(index);
             _engineStats.TryRemove(engine.EngineName, out _);
 
-            _logger.LogInformation("アンサンブルエンジン削除: {EngineName}", engine.EngineName);
+            logger.LogInformation("アンサンブルエンジン削除: {EngineName}", engine.EngineName);
             return true;
         }
 
@@ -79,8 +70,8 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
 
     public void SetFusionStrategy(IResultFusionStrategy strategy)
     {
-        _fusionStrategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
-        _logger.LogInformation("融合戦略変更: {StrategyName}", strategy.StrategyName);
+        defaultFusionStrategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+        logger.LogInformation("融合戦略変更: {StrategyName}", strategy.StrategyName);
     }
 
     public async Task<EnsembleOcrResults> RecognizeWithDetailsAsync(
@@ -89,12 +80,12 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("アンサンブルOCR認識開始: {Width}x{Height}, エンジン数={EngineCount}",
+        logger.LogInformation("アンサンブルOCR認識開始: {Width}x{Height}, エンジン数={EngineCount}",
             image.Width, image.Height, _engines.Count(e => e.IsEnabled));
 
         try
         {
-            if (!_isInitialized)
+            if (!IsInitialized)
             {
                 throw new InvalidOperationException("アンサンブルエンジンが初期化されていません");
             }
@@ -106,27 +97,27 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
 
             // 各エンジンで並列処理実行
-            var individualResults = await ExecuteEnginesInParallelAsync(activeEngines, image, progress, cancellationToken);
+            var individualResults = await ExecuteEnginesInParallelAsync(activeEngines, image, progress, cancellationToken).ConfigureAwait(false);
 
             // 結果融合
-            var fusionParameters = _fusionStrategy.GetRecommendedParameters(activeEngines);
-            var ensembleResults = await _fusionStrategy.FuseResultsAsync(individualResults, fusionParameters, cancellationToken);
+            var fusionParameters = defaultFusionStrategy.GetRecommendedParameters(activeEngines);
+            var ensembleResults = await defaultFusionStrategy.FuseResultsAsync(individualResults, fusionParameters, cancellationToken).ConfigureAwait(false);
 
             // 統計更新
             UpdateEngineStatistics(individualResults);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "アンサンブルOCR認識完了: {FinalRegions}領域, 総時間={TotalMs}ms, 融合戦略={Strategy}",
-                ensembleResults.TextRegions.Count, sw.ElapsedMilliseconds, _fusionStrategy.StrategyName);
+                ensembleResults.TextRegions.Count, sw.ElapsedMilliseconds, defaultFusionStrategy.StrategyName);
 
             return ensembleResults;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "アンサンブルOCR認識中にエラーが発生しました");
+            logger.LogError(ex, "アンサンブルOCR認識中にエラーが発生しました");
             
             // フォールバック: 最も重みの大きいエンジンで処理
-            return await ExecuteFallbackRecognitionAsync(image, progress, cancellationToken, sw.Elapsed);
+            return await ExecuteFallbackRecognitionAsync(image, progress, sw.Elapsed, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -141,9 +132,9 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             kvp => kvp.Key,
             kvp => kvp.Value);
 
-        var fusionStrategyUsage = new Dictionary<string, int>
+        Dictionary<string, int> fusionStrategyUsage = new()
         {
-            [_fusionStrategy.StrategyName] = totalExecutions
+            [defaultFusionStrategy.StrategyName] = totalExecutions
         };
 
         return new EnsemblePerformanceStats(
@@ -161,7 +152,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
 
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("アンサンブルエンジン初期化開始");
+        logger.LogInformation("アンサンブルエンジン初期化開始");
         _currentSettings = settings;
 
         try
@@ -170,45 +161,45 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             {
                 try
                 {
-                    var result = await engineInfo.Engine.InitializeAsync(settings, cancellationToken);
-                    _logger.LogDebug("エンジン初期化結果: {EngineName}={Result}", 
+                    var result = await engineInfo.Engine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
+                    logger.LogDebug("エンジン初期化結果: {EngineName}={Result}", 
                         engineInfo.EngineName, result);
                     return (engineInfo.EngineName, result);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "エンジン初期化エラー: {EngineName}", engineInfo.EngineName);
+                    logger.LogWarning(ex, "エンジン初期化エラー: {EngineName}", engineInfo.EngineName);
                     return (engineInfo.EngineName, false);
                 }
             });
 
-            var results = await Task.WhenAll(initializationTasks);
+            var results = await Task.WhenAll(initializationTasks).ConfigureAwait(false);
             var successCount = results.Count(r => r.Item2);
 
-            _isInitialized = successCount > 0;
+            IsInitialized = successCount > 0;
 
-            if (_isInitialized)
+            if (IsInitialized)
             {
-                _logger.LogInformation("アンサンブルエンジン初期化完了: {Success}/{Total}エンジン成功",
+                logger.LogInformation("アンサンブルエンジン初期化完了: {Success}/{Total}エンジン成功",
                     successCount, _engines.Count);
             }
             else
             {
-                _logger.LogError("アンサンブルエンジン初期化失敗: すべてのエンジンの初期化に失敗");
+                logger.LogError("アンサンブルエンジン初期化失敗: すべてのエンジンの初期化に失敗");
             }
 
-            return _isInitialized;
+            return IsInitialized;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "アンサンブルエンジン初期化中にエラーが発生しました");
+            logger.LogError(ex, "アンサンブルエンジン初期化中にエラーが発生しました");
             return false;
         }
     }
 
-    public async Task<OcrResults> RecognizeAsync(IImage image, IProgress<OcrProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<OcrResults> RecognizeAsync(IImage image, IProgress<OcrProgress>? progressCallback = null, CancellationToken cancellationToken = default)
     {
-        var ensembleResults = await RecognizeWithDetailsAsync(image, progress, cancellationToken);
+        var ensembleResults = await RecognizeWithDetailsAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
         
         // EnsembleOcrResultsからOcrResultsに変換
         return new OcrResults(
@@ -220,10 +211,10 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             ensembleResults.Text);
     }
 
-    public async Task<OcrResults> RecognizeAsync(IImage image, Rectangle? region = null, IProgress<OcrProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<OcrResults> RecognizeAsync(IImage image, Rectangle? regionOfInterest = null, IProgress<OcrProgress>? progressCallback = null, CancellationToken cancellationToken = default)
     {
         // 簡易実装：領域指定は無視してフル画像で処理
-        return await RecognizeAsync(image, progress, cancellationToken);
+        return await RecognizeAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
     }
 
     public OcrEngineSettings GetSettings()
@@ -239,20 +230,20 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
         {
             try
             {
-                await engineInfo.Engine.ApplySettingsAsync(settings, cancellationToken);
+                await engineInfo.Engine.ApplySettingsAsync(settings, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "エンジン設定適用エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "エンジン設定適用エラー: {EngineName}", engineInfo.EngineName);
             }
         });
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     public IReadOnlyList<string> GetAvailableLanguages()
     {
-        var allLanguages = new HashSet<string>();
+        HashSet<string> allLanguages = [];
         
         foreach (var engineInfo in _engines)
         {
@@ -266,16 +257,16 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "言語取得エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "言語取得エラー: {EngineName}", engineInfo.EngineName);
             }
         }
 
-        return allLanguages.ToList();
+        return [.. allLanguages];
     }
 
     public IReadOnlyList<string> GetAvailableModels()
     {
-        var allModels = new HashSet<string>();
+        HashSet<string> allModels = [];
         
         foreach (var engineInfo in _engines)
         {
@@ -289,20 +280,20 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "モデル取得エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "モデル取得エラー: {EngineName}", engineInfo.EngineName);
             }
         }
 
-        return allModels.ToList();
+        return [.. allModels];
     }
 
-    public async Task<bool> IsLanguageAvailableAsync(string language, CancellationToken cancellationToken = default)
+    public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default)
     {
         var tasks = _engines.Select(async engineInfo =>
         {
             try
             {
-                return await engineInfo.Engine.IsLanguageAvailableAsync(language, cancellationToken);
+                return await engineInfo.Engine.IsLanguageAvailableAsync(languageCode, cancellationToken).ConfigureAwait(false);
             }
             catch
             {
@@ -310,7 +301,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
         });
 
-        var results = await Task.WhenAll(tasks);
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         return results.Any(r => r);
     }
 
@@ -342,12 +333,13 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "エンジン破棄エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "エンジン破棄エラー: {EngineName}", engineInfo.EngineName);
             }
         }
         
         _engines.Clear();
         _engineStats.Clear();
+        GC.SuppressFinalize(this);
     }
 
     public async ValueTask DisposeAsync()
@@ -358,7 +350,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             {
                 if (engineInfo.Engine is IAsyncDisposable asyncDisposable)
                 {
-                    await asyncDisposable.DisposeAsync();
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
                 }
                 else if (engineInfo.Engine is IDisposable disposable)
                 {
@@ -367,7 +359,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "エンジン非同期破棄エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "エンジン非同期破棄エラー: {EngineName}", engineInfo.EngineName);
             }
         }
 
@@ -388,14 +380,14 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
         IProgress<OcrProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var results = new List<IndividualEngineResult>();
+        List<IndividualEngineResult> results = [];
         var tasks = activeEngines.Select(async engineInfo =>
         {
             var engineSw = Stopwatch.StartNew();
             
             try
             {
-                var result = await engineInfo.Engine.RecognizeAsync(image, progress, cancellationToken);
+                var result = await engineInfo.Engine.RecognizeAsync(image, progress, cancellationToken).ConfigureAwait(false);
                 engineSw.Stop();
 
                 return new IndividualEngineResult(
@@ -409,12 +401,12 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             catch (Exception ex)
             {
                 engineSw.Stop();
-                _logger.LogWarning(ex, "エンジン実行エラー: {EngineName}", engineInfo.EngineName);
+                logger.LogWarning(ex, "エンジン実行エラー: {EngineName}", engineInfo.EngineName);
 
                 return new IndividualEngineResult(
                     engineInfo.EngineName,
                     engineInfo.Role,
-                    new OcrResults(new List<OcrTextRegion>(), image, engineSw.Elapsed, null),
+                    new OcrResults([], image, engineSw.Elapsed, "unknown"),
                     engineSw.Elapsed,
                     engineInfo.Weight,
                     false,
@@ -422,7 +414,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
             }
         });
 
-        var engineResults = await Task.WhenAll(tasks);
+        var engineResults = await Task.WhenAll(tasks).ConfigureAwait(false);
         results.AddRange(engineResults);
 
         return results;
@@ -434,8 +426,8 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
     private async Task<EnsembleOcrResults> ExecuteFallbackRecognitionAsync(
         IImage image,
         IProgress<OcrProgress>? progress,
-        CancellationToken cancellationToken,
-        TimeSpan processingTime)
+        TimeSpan processingTime,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -446,9 +438,9 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
 
             if (fallbackEngine != null)
             {
-                _logger.LogInformation("フォールバック実行: {EngineName}", fallbackEngine.EngineName);
+                logger.LogInformation("フォールバック実行: {EngineName}", fallbackEngine.EngineName);
                 
-                var result = await fallbackEngine.Engine.RecognizeAsync(image, progress, cancellationToken);
+                var result = await fallbackEngine.Engine.RecognizeAsync(image, progress, cancellationToken).ConfigureAwait(false);
                 
                 return new EnsembleOcrResults(
                     result.TextRegions,
@@ -468,7 +460,7 @@ public class EnsembleOcrEngine : IEnsembleOcrEngine
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "フォールバック実行中にもエラーが発生しました");
+            logger.LogError(ex, "フォールバック実行中にもエラーが発生しました");
         }
 
         // 完全な失敗の場合は空の結果を返す

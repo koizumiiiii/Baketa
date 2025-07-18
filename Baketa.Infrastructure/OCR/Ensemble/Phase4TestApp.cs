@@ -44,11 +44,11 @@ public static class Phase4TestApp
             var serviceProvider = services.BuildServiceProvider();
             
             // 各コンポーネントのテスト
-            await TestResultFusionStrategiesAsync(serviceProvider);
-            await TestEnsembleOcrEngineAsync(serviceProvider);
-            await TestEngineBalancerAsync(serviceProvider);
-            await TestEnsembleBenchmarkAsync(serviceProvider);
-            await TestIntegratedWorkflowAsync(serviceProvider);
+            await TestResultFusionStrategiesAsync(serviceProvider).ConfigureAwait(false);
+            await TestEnsembleOcrEngineAsync(serviceProvider).ConfigureAwait(false);
+            await TestEngineBalancerAsync(serviceProvider).ConfigureAwait(false);
+            await TestEnsembleBenchmarkAsync(serviceProvider).ConfigureAwait(false);
+            await TestIntegratedWorkflowAsync(serviceProvider).ConfigureAwait(false);
             
             Console.WriteLine("✅ Phase 4 包括的テスト完了");
         }
@@ -82,7 +82,7 @@ public static class Phase4TestApp
             Console.WriteLine("  📊 重み付き投票戦略テスト実行中...");
             var sw = Stopwatch.StartNew();
             var weightedResult = await weightedVotingStrategy.FuseResultsAsync(
-                individualResults, fusionParameters);
+                individualResults, fusionParameters).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"    戦略: {weightedResult.FusionStrategy}");
@@ -94,7 +94,7 @@ public static class Phase4TestApp
             Console.WriteLine("  🎯 信頼度ベース戦略テスト実行中...");
             sw.Restart();
             var confidenceResult = await confidenceBasedStrategy.FuseResultsAsync(
-                individualResults, fusionParameters);
+                individualResults, fusionParameters).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"    戦略: {confidenceResult.FusionStrategy}");
@@ -148,7 +148,7 @@ public static class Phase4TestApp
                 RecognitionThreshold = 0.3
             };
             
-            var initialized = await ensembleEngine.InitializeAsync(settings);
+            var initialized = await ensembleEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 Console.WriteLine("  ❌ アンサンブルエンジンの初期化に失敗");
@@ -159,11 +159,11 @@ public static class Phase4TestApp
             
             // テスト画像でアンサンブル認識実行
             var testCaseGenerator = serviceProvider.GetRequiredService<Benchmarking.TestCaseGenerator>();
-            var testImage = await testCaseGenerator.GenerateHighQualityImageAsync("アンサンブルテスト");
+            var testImage = await testCaseGenerator.GenerateHighQualityImageAsync("アンサンブルテスト").ConfigureAwait(false);
             
             Console.WriteLine("  🔍 アンサンブル認識実行中...");
             var sw = Stopwatch.StartNew();
-            var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(testImage);
+            var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(testImage).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"    最終領域数: {ensembleResult.TextRegions.Count}");
@@ -202,7 +202,7 @@ public static class Phase4TestApp
             
             // テスト画像生成
             var testCaseGenerator = serviceProvider.GetRequiredService<Benchmarking.TestCaseGenerator>();
-            var testImage = await testCaseGenerator.GenerateLowQualityImageAsync("バランサーテスト", 0.3, 0.4, 0.2);
+            var testImage = await testCaseGenerator.GenerateLowQualityImageAsync("バランサーテスト", 0.3, 0.4, 0.2).ConfigureAwait(false);
             
             // テスト用エンジン構成
             var mockEngines = CreateMockEngineConfiguration();
@@ -211,7 +211,7 @@ public static class Phase4TestApp
             Console.WriteLine("  📊 エンジン重み最適化実行中...");
             var sw = Stopwatch.StartNew();
             var optimizationResult = await balancer.OptimizeEngineWeightsAsync(
-                testImage, mockEngines, balancingParameters);
+                testImage, mockEngines, balancingParameters).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"    最適化理由: {optimizationResult.PrimaryReason}");
@@ -236,7 +236,7 @@ public static class Phase4TestApp
                 2000.0, 0.8, 0.7, false, true, new ResourceConstraints());
             
             var recommendation = await balancer.RecommendConfigurationAsync(
-                imageCharacteristics, performanceRequirements);
+                imageCharacteristics, performanceRequirements).ConfigureAwait(false);
             
             Console.WriteLine($"    推奨理由: {recommendation.RecommendationReason}");
             Console.WriteLine($"    期待性能: {recommendation.ExpectedPerformance:F3}");
@@ -272,7 +272,7 @@ public static class Phase4TestApp
             var baseOcrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
             ensembleEngine.AddEngine(baseOcrEngine, 1.0, EnsembleEngineRole.Primary);
             
-            await ensembleEngine.InitializeAsync(new OcrEngineSettings { Language = "jpn" });
+            await ensembleEngine.InitializeAsync(new OcrEngineSettings { Language = "jpn" }).ConfigureAwait(false);
             
             // ベンチマークパラメータ
             var benchmarkParams = new EnsembleBenchmarkParameters(
@@ -286,7 +286,7 @@ public static class Phase4TestApp
             {
                 var sw = Stopwatch.StartNew();
                 var comparisonResult = await benchmark.RunComparisonBenchmarkAsync(
-                    ensembleEngine, [baseOcrEngine], benchmarkParams);
+                    ensembleEngine, [baseOcrEngine], benchmarkParams).ConfigureAwait(false);
                 sw.Stop();
                 
                 Console.WriteLine($"    テストケース数: {comparisonResult.TotalTestCases}");
@@ -305,14 +305,14 @@ public static class Phase4TestApp
             try
             {
                 var confidenceLogger = serviceProvider.GetRequiredService<ILogger<ConfidenceBasedFusionStrategy>>();
-                var strategies = new List<IResultFusionStrategy>
-                {
+                List<IResultFusionStrategy> strategies =
+                [
                     new WeightedVotingFusionStrategy(fusionLogger),
                     new ConfidenceBasedFusionStrategy(confidenceLogger)
-                };
+                ];
                 
                 var strategyResult = await benchmark.CompareFusionStrategiesAsync(
-                    ensembleEngine, strategies, benchmarkParams);
+                    ensembleEngine, strategies, benchmarkParams).ConfigureAwait(false);
                 
                 Console.WriteLine($"    テスト戦略数: {strategies.Count}");
                 Console.WriteLine($"    最適戦略: {strategyResult.BestStrategy.StrategyName}");
@@ -372,15 +372,15 @@ public static class Phase4TestApp
             ensembleEngine.AddEngine(adaptiveEngine, 0.9, EnsembleEngineRole.Secondary);
             
             var settings = new OcrEngineSettings { Language = "jpn" };
-            await ensembleEngine.InitializeAsync(settings);
+            await ensembleEngine.InitializeAsync(settings).ConfigureAwait(false);
             
             // 統合ワークフローテスト
             var testCaseGenerator = serviceProvider.GetRequiredService<Benchmarking.TestCaseGenerator>();
             var testCases = new[]
             {
-                await testCaseGenerator.GenerateHighQualityImageAsync("統合テスト高品質"),
-                await testCaseGenerator.GenerateLowQualityImageAsync("統合テスト低品質", 0.2, 0.3, 0.4),
-                await testCaseGenerator.GenerateSmallTextImageAsync("統合テスト小文字", 8)
+                await testCaseGenerator.GenerateHighQualityImageAsync("統合テスト高品質").ConfigureAwait(false),
+                await testCaseGenerator.GenerateLowQualityImageAsync("統合テスト低品質", 0.2, 0.3, 0.4).ConfigureAwait(false),
+                await testCaseGenerator.GenerateSmallTextImageAsync("統合テスト小文字", 8).ConfigureAwait(false)
             };
             
             for (int i = 0; i < testCases.Length; i++)
@@ -399,15 +399,15 @@ public static class Phase4TestApp
                 var sw = Stopwatch.StartNew();
                 
                 // Step 1: 画像品質分析
-                var qualityMetrics = await imageQualityAnalyzer.AnalyzeAsync(testImage);
+                var qualityMetrics = await imageQualityAnalyzer.AnalyzeAsync(testImage).ConfigureAwait(false);
                 
                 // Step 2: エンジン重み最適化
                 var mockEngines = CreateMockEngineConfiguration();
                 var optimizationResult = await balancer.OptimizeEngineWeightsAsync(
-                    testImage, mockEngines, new BalancingParameters());
+                    testImage, mockEngines, new BalancingParameters()).ConfigureAwait(false);
                 
                 // Step 3: アンサンブル認識実行
-                var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(testImage);
+                var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(testImage).ConfigureAwait(false);
                 
                 sw.Stop();
                 
@@ -456,7 +456,7 @@ public static class Phase4TestApp
             var serviceProvider = services.BuildServiceProvider();
             
             // 画像読み込み
-            var imageBytes = await File.ReadAllBytesAsync(imagePath);
+            var imageBytes = await File.ReadAllBytesAsync(imagePath).ConfigureAwait(false);
             var image = new Core.Services.Imaging.AdvancedImage(
                 imageBytes, 800, 600, Core.Abstractions.Imaging.ImageFormat.Png);
             
@@ -476,16 +476,16 @@ public static class Phase4TestApp
             ensembleEngine.AddEngine(baseOcrEngine, 1.0, EnsembleEngineRole.Primary);
             ensembleEngine.AddEngine(adaptiveEngine, 0.8, EnsembleEngineRole.Secondary);
             
-            await ensembleEngine.InitializeAsync(new OcrEngineSettings { Language = "jpn" });
+            await ensembleEngine.InitializeAsync(new OcrEngineSettings { Language = "jpn" }).ConfigureAwait(false);
             
             Console.WriteLine("統合解析・認識実行中...");
             var totalSw = Stopwatch.StartNew();
             
             // Phase 3: 画像品質分析・適応的前処理
-            var qualityMetrics = await imageQualityAnalyzer.AnalyzeAsync(image);
+            var qualityMetrics = await imageQualityAnalyzer.AnalyzeAsync(image).ConfigureAwait(false);
             
             // Phase 4: アンサンブル認識
-            var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(image);
+            var ensembleResult = await ensembleEngine.RecognizeWithDetailsAsync(image).ConfigureAwait(false);
             
             totalSw.Stop();
             
@@ -549,7 +549,7 @@ public static class Phase4TestApp
             new IndividualEngineResult(
                 "PaddleOCR",
                 EnsembleEngineRole.Primary,
-                new OcrResults([], new MockImage(), TimeSpan.FromMilliseconds(100), null),
+                new OcrResults([], new MockImage(), TimeSpan.FromMilliseconds(100), "jpn"),
                 TimeSpan.FromMilliseconds(500),
                 1.0,
                 true),
@@ -557,7 +557,7 @@ public static class Phase4TestApp
             new IndividualEngineResult(
                 "AdaptiveOCR",
                 EnsembleEngineRole.Secondary,
-                new OcrResults([], new MockImage(), TimeSpan.FromMilliseconds(100), null),
+                new OcrResults([], new MockImage(), TimeSpan.FromMilliseconds(100), "jpn"),
                 TimeSpan.FromMilliseconds(800),
                 0.8,
                 true)
@@ -592,7 +592,7 @@ public static class Phase4TestApp
     /// <summary>
     /// モック画像クラス
     /// </summary>
-    private class MockImage : Baketa.Core.Abstractions.Imaging.IImage
+    private sealed class MockImage : Baketa.Core.Abstractions.Imaging.IImage
     {
         public int Width => 800;
         public int Height => 600;
@@ -600,7 +600,7 @@ public static class Phase4TestApp
         
         public async Task<byte[]> ToByteArrayAsync()
         {
-            await Task.Delay(1); // 非同期処理のシミュレーション
+            await Task.Delay(1).ConfigureAwait(false); // 非同期処理のシミュレーション
             return new byte[Width * Height * 3]; // RGB24フォーマット
         }
         
@@ -611,7 +611,7 @@ public static class Phase4TestApp
         
         public async Task<Baketa.Core.Abstractions.Imaging.IImage> ResizeAsync(int width, int height)
         {
-            await Task.Delay(1); // 非同期処理のシミュレーション
+            await Task.Delay(1).ConfigureAwait(false); // 非同期処理のシミュレーション
             return new MockImage(); // 簡易実装
         }
         

@@ -16,7 +16,7 @@ namespace Baketa.Core.Events.Implementation;
 /// </remarks>
 /// <param name="logger">ロガー（オプション）</param>
 // プライマリコンストラクターの使用を拒否（IDE0290）
-public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.Core.Abstractions.Events.IEventAggregator
+public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.Core.Abstractions.Events.IEventAggregator
     {
         private readonly ILogger<EventAggregator>? _logger = logger;
         // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）

@@ -1,4 +1,5 @@
 using Baketa.Core.Settings;
+using Baketa.Core.Settings.Validation;
 
 namespace Baketa.Core.Abstractions.Settings;
 

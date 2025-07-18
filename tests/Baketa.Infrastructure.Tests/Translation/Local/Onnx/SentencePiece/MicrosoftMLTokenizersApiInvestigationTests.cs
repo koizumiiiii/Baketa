@@ -383,7 +383,7 @@ public class MicrosoftMLTokenizersApiInvestigationTests(ITestOutputHelper output
         {
             try
             {
-                var testTokens = new int[] { 1, 2, 3 };
+                int[] testTokens = [1, 2, 3];
                 var result = decodeMethod.Invoke(tokenizer, [testTokens]);
                 output.WriteLine($"   📥 Decode test: {result?.GetType().Name ?? "null"}");
             }

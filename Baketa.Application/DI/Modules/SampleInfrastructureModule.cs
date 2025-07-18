@@ -11,7 +11,7 @@ namespace Baketa.Application.DI.Modules;
     /// サンプルのインフラストラクチャモジュール実装。
     /// </summary>
     [ModulePriority(ModulePriority.Infrastructure)]
-    public class SampleInfrastructureModule : ServiceModuleBase
+    public sealed class SampleInfrastructureModule : ServiceModuleBase
     {
         /// <summary>
         /// インフラストラクチャサービスを登録します。

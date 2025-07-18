@@ -11,7 +11,7 @@ namespace Baketa.Core.Services.Imaging;
     /// <summary>
     /// IAdvancedImageの実装
     /// </summary>
-    public class AdvancedImage : CoreImage, IAdvancedImage
+    public sealed class AdvancedImage : CoreImage, IAdvancedImage
     {
         private readonly byte[] _rawPixelData;
         private readonly int _stride;

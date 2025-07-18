@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -10,15 +11,10 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Enhancement;
 /// <summary>
 /// PaddleOCRの高度な最適化パラメータを管理するクラス
 /// </summary>
-public class AdvancedPaddleOcrOptimizer
+public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logger)
 {
-    private readonly ILogger<AdvancedPaddleOcrOptimizer> _logger;
-    
-    public AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly ILogger<AdvancedPaddleOcrOptimizer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
     /// 小さい文字に最適化されたパラメータを適用
     /// </summary>
@@ -213,7 +209,7 @@ public class AdvancedPaddleOcrOptimizer
     /// <summary>
     /// 値を指定された型に変換
     /// </summary>
-    private object ConvertValue(object value, Type targetType)
+    private object? ConvertValue(object value, Type targetType)
     {
         if (value == null) return null;
         
@@ -221,17 +217,17 @@ public class AdvancedPaddleOcrOptimizer
             return value.ToString();
         
         if (targetType == typeof(bool))
-            return Convert.ToBoolean(value);
+            return Convert.ToBoolean(value, CultureInfo.InvariantCulture);
         
         if (targetType == typeof(int))
-            return Convert.ToInt32(value);
+            return Convert.ToInt32(value, CultureInfo.InvariantCulture);
         
         if (targetType == typeof(float))
-            return Convert.ToSingle(value);
+            return Convert.ToSingle(value, CultureInfo.InvariantCulture);
         
         if (targetType == typeof(double))
-            return Convert.ToDouble(value);
+            return Convert.ToDouble(value, CultureInfo.InvariantCulture);
         
-        return Convert.ChangeType(value, targetType);
+        return Convert.ChangeType(value, targetType, CultureInfo.InvariantCulture);
     }
 }

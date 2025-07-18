@@ -12,10 +12,17 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx;
 /// <summary>
 /// AlphaOpusMtTranslationEngineを旧インターフェースに適応させるアダプター
 /// </summary>
-public class AlphaOpusMtTranslationEngineAdapter : ITranslationEngine
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="adaptee">適応対象のエンジン</param>
+/// <param name="logger">ロガー</param>
+public class AlphaOpusMtTranslationEngineAdapter(
+    AlphaOpusMtTranslationEngine adaptee,
+    ILogger<AlphaOpusMtTranslationEngineAdapter> logger) : ITranslationEngine
 {
-    private readonly AlphaOpusMtTranslationEngine _adaptee;
-    private readonly ILogger<AlphaOpusMtTranslationEngineAdapter> _logger;
+    private readonly AlphaOpusMtTranslationEngine _adaptee = adaptee ?? throw new ArgumentNullException(nameof(adaptee));
+    private readonly ILogger<AlphaOpusMtTranslationEngineAdapter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc/>
     public string Name => _adaptee.Name;
@@ -25,19 +32,6 @@ public class AlphaOpusMtTranslationEngineAdapter : ITranslationEngine
 
     /// <inheritdoc/>
     public bool RequiresNetwork => _adaptee.RequiresNetwork;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="adaptee">適応対象のエンジン</param>
-    /// <param name="logger">ロガー</param>
-    public AlphaOpusMtTranslationEngineAdapter(
-        AlphaOpusMtTranslationEngine adaptee,
-        ILogger<AlphaOpusMtTranslationEngineAdapter> logger)
-    {
-        _adaptee = adaptee ?? throw new ArgumentNullException(nameof(adaptee));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()

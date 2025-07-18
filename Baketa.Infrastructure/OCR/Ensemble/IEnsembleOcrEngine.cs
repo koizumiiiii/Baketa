@@ -81,7 +81,13 @@ public record EnsembleEngineStats(
 /// <summary>
 /// アンサンブル処理結果
 /// </summary>
-public class EnsembleOcrResults : OcrResults
+public class EnsembleOcrResults(
+    IReadOnlyList<OcrTextRegion> textRegions,
+    IImage sourceImage,
+    TimeSpan processingTime,
+    string languageCode,
+    Rectangle? regionOfInterest = null,
+    string? mergedText = null) : OcrResults(textRegions, sourceImage, processingTime, languageCode, regionOfInterest, mergedText)
 {
     /// <summary>各エンジンの個別結果</summary>
     public IReadOnlyList<IndividualEngineResult> IndividualResults { get; init; } = [];
@@ -97,17 +103,6 @@ public class EnsembleOcrResults : OcrResults
     
     /// <summary>アンサンブル処理時間</summary>
     public TimeSpan EnsembleProcessingTime { get; init; }
-
-    public EnsembleOcrResults(
-        IReadOnlyList<OcrTextRegion> textRegions,
-        IImage sourceImage,
-        TimeSpan processingTime,
-        string languageCode,
-        Rectangle? regionOfInterest = null,
-        string? mergedText = null)
-        : base(textRegions, sourceImage, processingTime, languageCode, regionOfInterest, mergedText)
-    {
-    }
 }
 
 /// <summary>

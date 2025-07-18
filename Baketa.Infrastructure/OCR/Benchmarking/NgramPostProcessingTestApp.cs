@@ -40,7 +40,7 @@ public static class NgramPostProcessingTestApp
         {
             // N-gramベンチマークの実行
             var benchmark = serviceProvider.GetRequiredService<NgramPostProcessingBenchmark>();
-            var result = await benchmark.RunComprehensiveBenchmarkAsync();
+            var result = await benchmark.RunComprehensiveBenchmarkAsync().ConfigureAwait(false);
             
             // 結果の表示
             Console.WriteLine("\n=== ベンチマーク結果 ===");
@@ -98,7 +98,7 @@ public static class NgramPostProcessingTestApp
         {
             // ハイブリッドプロセッサを取得
             var hybridFactory = serviceProvider.GetRequiredService<HybridOcrPostProcessorFactory>();
-            var processor = await hybridFactory.CreateAsync();
+            var processor = await hybridFactory.CreateAsync().ConfigureAwait(false);
             
             // テストケース
             var testCases = new[]
@@ -116,15 +116,15 @@ public static class NgramPostProcessingTestApp
             
             foreach (var testCase in testCases)
             {
-                var result = await processor.ProcessAsync(testCase);
+                var result = await processor.ProcessAsync(testCase).ConfigureAwait(false);
                 var status = testCase == result ? "(変更なし)" : "(修正済み)";
                 Console.WriteLine($"{testCase} → {result} {status}");
             }
             
             // 処理順序比較テスト
             Console.WriteLine("\n=== 処理順序比較テスト ===");
-            var hybridProcessor = await hybridFactory.CreateAsync();
-            var comparisonResult = await hybridProcessor.CompareProcessingOrdersAsync("車体テストの役計");
+            var hybridProcessor = await hybridFactory.CreateAsync().ConfigureAwait(false);
+            var comparisonResult = await hybridProcessor.CompareProcessingOrdersAsync("車体テストの役計").ConfigureAwait(false);
             
             Console.WriteLine($"元テキスト: {comparisonResult.OriginalText}");
             Console.WriteLine($"N-gram → Dictionary: {comparisonResult.NgramFirstResult}");
@@ -171,11 +171,11 @@ public static class NgramPostProcessingTestApp
             
             // モデルの学習
             Console.WriteLine("Bigramモデルを学習中...");
-            var model = await trainingService.TrainJapaneseBigramModelAsync();
+            var model = await trainingService.TrainJapaneseBigramModelAsync().ConfigureAwait(false);
             
             // モデルの評価
             Console.WriteLine("モデルの品質を評価中...");
-            var evaluationResult = await trainingService.EvaluateModelAsync(model);
+            var evaluationResult = await trainingService.EvaluateModelAsync(model).ConfigureAwait(false);
             
             Console.WriteLine($"モデル精度: {evaluationResult.Accuracy:F2}%");
             Console.WriteLine($"評価ケース数: {evaluationResult.Cases.Count}");
@@ -206,7 +206,7 @@ public static class NgramPostProcessingTestApp
 /// </summary>
 public class NgramTestProgram
 {
-    public static async Task Main(string[] args)
+    public static async Task Main(string[] _)
     {
         Console.WriteLine("N-gramベース後処理テストアプリケーション");
         Console.WriteLine("1. 包括的ベンチマークテスト");
@@ -219,17 +219,17 @@ public class NgramTestProgram
         switch (input)
         {
             case "1":
-                await NgramPostProcessingTestApp.RunComprehensiveTestAsync();
+                await NgramPostProcessingTestApp.RunComprehensiveTestAsync().ConfigureAwait(false);
                 break;
             case "2":
-                await NgramPostProcessingTestApp.RunIndividualProcessingTestAsync();
+                await NgramPostProcessingTestApp.RunIndividualProcessingTestAsync().ConfigureAwait(false);
                 break;
             case "3":
-                await NgramPostProcessingTestApp.RunModelEvaluationTestAsync();
+                await NgramPostProcessingTestApp.RunModelEvaluationTestAsync().ConfigureAwait(false);
                 break;
             default:
                 Console.WriteLine("無効な選択です。包括的テストを実行します。");
-                await NgramPostProcessingTestApp.RunComprehensiveTestAsync();
+                await NgramPostProcessingTestApp.RunComprehensiveTestAsync().ConfigureAwait(false);
                 break;
         }
         

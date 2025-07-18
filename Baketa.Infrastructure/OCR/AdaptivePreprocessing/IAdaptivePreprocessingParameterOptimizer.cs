@@ -51,7 +51,7 @@ public record AdaptivePreprocessingParameters
     /// <summary>
     /// 明度調整値
     /// </summary>
-    public double Brightness { get; init; } = 0.0;
+    public double Brightness { get; init; }
     
     /// <summary>
     /// ノイズ除去強度 (0.0-1.0)
@@ -61,7 +61,7 @@ public record AdaptivePreprocessingParameters
     /// <summary>
     /// シャープニング強度 (0.0-1.0)
     /// </summary>
-    public double Sharpening { get; init; } = 0.0;
+    public double Sharpening { get; init; }
     
     /// <summary>
     /// 二値化閾値 (0-255、-1で自動)
@@ -76,12 +76,12 @@ public record AdaptivePreprocessingParameters
     /// <summary>
     /// ガウシアンブラーのカーネルサイズ
     /// </summary>
-    public int GaussianBlurKernelSize { get; init; } = 0;
+    public int GaussianBlurKernelSize { get; init; }
     
     /// <summary>
     /// エッジ保持平滑化の強度 (0.0-1.0)
     /// </summary>
-    public double EdgePreservingSmoothing { get; init; } = 0.0;
+    public double EdgePreservingSmoothing { get; init; }
     
     /// <summary>
     /// OCR検出閾値
@@ -173,7 +173,7 @@ public record AdaptivePreprocessingResult
     /// <summary>
     /// 予想される改善効果 (0.0-1.0)
     /// </summary>
-    public double ExpectedImprovement { get; init; } = 0.0;
+    public double ExpectedImprovement { get; init; }
     
     /// <summary>
     /// パラメータの信頼度 (0.0-1.0)

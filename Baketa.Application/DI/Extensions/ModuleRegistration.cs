@@ -27,15 +27,14 @@ namespace Baketa.Application.DI.Extensions;
             BaketaEnvironment environment = BaketaEnvironment.Production)
         {
             // 標準モジュールのインスタンスを作成
-            var standardModules = new IServiceModule[]
-            {
+            IServiceModule[] standardModules = [
                 new CoreModule(),              // コアレイヤー
                 new InfrastructureModule(),    // インフラストラクチャレイヤー
                 new PlatformModule(),          // プラットフォーム依存レイヤー
                 new ApplicationModule(),       // アプリケーションレイヤー
                 // UIModuleは別途登録する
                 // new UIModule()                 // UIレイヤー
-            };
+            ];
             
             // ServiceCollectionExtensions.AddBaketaServicesを使用して登録
             return services.AddBaketaServices(scanForModules, environment, standardModules);

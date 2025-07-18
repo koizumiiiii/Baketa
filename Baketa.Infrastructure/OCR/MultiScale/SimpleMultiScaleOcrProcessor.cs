@@ -13,24 +13,19 @@ namespace Baketa.Infrastructure.OCR.MultiScale;
 /// <summary>
 /// 簡単なマルチスケールOCR処理実装
 /// </summary>
-public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
+public class SimpleMultiScaleOcrProcessor(ILogger<SimpleMultiScaleOcrProcessor> logger) : IMultiScaleOcrProcessor
 {
-    private readonly ILogger<SimpleMultiScaleOcrProcessor> _logger;
-    private readonly List<float> _scaleFactors = new List<float> { 1.0f, 1.5f, 2.0f };
+    private readonly ILogger<SimpleMultiScaleOcrProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly List<float> _scaleFactors = [1.0f, 1.5f, 2.0f];
     
     public IReadOnlyList<float> ScaleFactors => _scaleFactors;
     public bool UseDynamicScaling { get; set; } = true;
-    
-    public SimpleMultiScaleOcrProcessor(ILogger<SimpleMultiScaleOcrProcessor> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+
     public async Task<OcrResults> ProcessAsync(IAdvancedImage image, IOcrEngine ocrEngine)
     {
         _logger.LogInformation("マルチスケールOCR処理開始");
         
-        var detailedResult = await ProcessWithDetailsAsync(image, ocrEngine);
+        var detailedResult = await ProcessWithDetailsAsync(image, ocrEngine).ConfigureAwait(false);
         return detailedResult.MergedResult;
     }
     
@@ -46,20 +41,20 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
                 ProcessAtScaleAsync(image, ocrEngine, scale, sw.ElapsedMilliseconds)
             ).ToList();
             
-            var scaleResults = await Task.WhenAll(tasks);
+            var scaleResults = await Task.WhenAll(tasks).ConfigureAwait(false);
             
             // 結果を統合
-            var mergedResult = MergeResults(scaleResults.ToList());
+            var mergedResult = MergeResults([.. scaleResults]);
             
             // 統計情報を計算
-            var stats = CalculateStats(scaleResults.ToList(), mergedResult, sw.ElapsedMilliseconds);
+            var stats = CalculateStats([.. scaleResults], mergedResult, sw.ElapsedMilliseconds);
             
             _logger.LogInformation("マルチスケール処理完了: {ResultCount}→{MergedCount}リージョン, 改善スコア: {Score:F2}", 
                 stats.TotalRegionsBeforeMerge, stats.TotalRegionsAfterMerge, stats.ImprovementScore);
             
             return new MultiScaleOcrResult
             {
-                ScaleResults = scaleResults.ToList(),
+                ScaleResults = [.. scaleResults],
                 MergedResult = mergedResult,
                 Stats = stats
             };
@@ -69,14 +64,14 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
             _logger.LogError(ex, "マルチスケール処理中にエラーが発生しました");
             
             // フォールバック: ベースライン処理
-            var fallbackResult = await ocrEngine.RecognizeAsync(image);
+            var fallbackResult = await ocrEngine.RecognizeAsync(image).ConfigureAwait(false);
             return CreateFallbackResult(fallbackResult, sw.ElapsedMilliseconds);
         }
     }
     
     public async Task<IReadOnlyList<float>> DetermineOptimalScalesAsync(IAdvancedImage image)
     {
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
         return _scaleFactors;
     }
     
@@ -87,7 +82,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
         IAdvancedImage originalImage, 
         IOcrEngine ocrEngine, 
         float scaleFactor,
-        long startTime)
+        long _)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         _logger.LogDebug("スケール {Scale}x で処理開始", scaleFactor);
@@ -99,11 +94,11 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
             // スケーリングが必要な場合
             if (Math.Abs(scaleFactor - 1.0f) > 0.001f)
             {
-                processImage = await ScaleImageAsync(originalImage, scaleFactor);
+                processImage = await ScaleImageAsync(originalImage, scaleFactor).ConfigureAwait(false);
             }
             
             // OCR処理
-            var ocrResult = await ocrEngine.RecognizeAsync(processImage);
+            var ocrResult = await ocrEngine.RecognizeAsync(processImage).ConfigureAwait(false);
             
             // 座標を元のスケールに戻す
             if (Math.Abs(scaleFactor - 1.0f) > 0.001f && ocrResult.HasText)
@@ -166,37 +161,33 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
                     image.Width, image.Height, newWidth, newHeight, scaleFactor);
                 
                 // 元の画像データを取得
-                var originalBytes = await image.ToByteArrayAsync();
-                
+                var originalBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
+
                 // OpenCVを使用してスケーリング処理を実行
-                using (var mat = CreateMatFromBytes(originalBytes, image.Width, image.Height, image.Format))
-                {
-                    using (var scaledMat = new OpenCvSharp.Mat())
-                    {
-                        // バイキュービック補間でスケーリング（高品質）
-                        var interpolation = scaleFactor > 1.0f ? 
-                            OpenCvSharp.InterpolationFlags.Cubic :  // 拡大時はキュービック
-                            OpenCvSharp.InterpolationFlags.Area;   // 縮小時はエリア補間
-                        
-                        OpenCvSharp.Cv2.Resize(mat, scaledMat, new OpenCvSharp.Size(newWidth, newHeight), 
-                            0, 0, interpolation);
-                        
-                        // スケーリングされた画像をバイト配列に変換
-                        var scaledBytes = ConvertMatToBytes(scaledMat, image.Format);
-                        
-                        return new AdvancedImage(scaledBytes, newWidth, newHeight, image.Format);
-                    }
-                }
+                using var mat = CreateMatFromBytes(originalBytes, image.Width, image.Height, image.Format);
+                using var scaledMat = new OpenCvSharp.Mat();
+                // バイキュービック補間でスケーリング（高品質）
+                var interpolation = scaleFactor > 1.0f ?
+                    OpenCvSharp.InterpolationFlags.Cubic :  // 拡大時はキュービック
+                    OpenCvSharp.InterpolationFlags.Area;   // 縮小時はエリア補間
+
+                OpenCvSharp.Cv2.Resize(mat, scaledMat, new OpenCvSharp.Size(newWidth, newHeight),
+                    0, 0, interpolation);
+
+                // スケーリングされた画像をバイト配列に変換
+                var scaledBytes = ConvertMatToBytes(scaledMat, image.Format);
+
+                return new AdvancedImage(scaledBytes, newWidth, newHeight, image.Format);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "画像スケーリングに失敗、元の画像を返します。スケール: {Scale}x", scaleFactor);
                 
                 // エラー時は元の画像を返す
-                var originalBytes = await image.ToByteArrayAsync();
+                var originalBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
                 return new AdvancedImage(originalBytes, image.Width, image.Height, image.Format);
             }
-        });
+        }).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -232,7 +223,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
     /// <summary>
     /// Matをバイト配列に変換
     /// </summary>
-    private byte[] ConvertMatToBytes(OpenCvSharp.Mat mat, ImageFormat format)
+    private byte[] ConvertMatToBytes(OpenCvSharp.Mat mat, ImageFormat _)
     {
         var channels = mat.Channels();
         var totalSize = mat.Width * mat.Height * channels;
@@ -254,7 +245,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
         }
         
         var inverseScale = 1.0f / scaleFactor;
-        var adjustedRegions = new List<OcrTextRegion>();
+        List<OcrTextRegion> adjustedRegions = [];
         
         foreach (var region in ocrResult.TextRegions)
         {
@@ -269,7 +260,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
                 );
                 
                 // 角座標を調整（OcrTextRegionにCornersプロパティがない場合はnull）
-                System.Drawing.Point[]? adjustedCorners = null;
+                // System.Drawing.Point[]? adjustedCorners = null; // 未使用のため削除
                 
                 // 調整されたリージョンを作成
                 var adjustedRegion = new OcrTextRegion(
@@ -317,7 +308,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
     /// </summary>
     private OcrResults MergeResults(List<ScaleProcessingResult> scaleResults)
     {
-        if (!scaleResults.Any() || scaleResults.All(r => !r.OcrResult.HasText))
+        if (scaleResults.Count == 0 || scaleResults.All(r => !r.OcrResult.HasText))
         {
             _logger.LogWarning("統合可能な結果がありません");
             return CreateEmptyOcrResult(null);
@@ -326,7 +317,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
         _logger.LogDebug("結果統合開始: {ScaleCount}個のスケール結果", scaleResults.Count);
         
         // 全スケールのテキストリージョンを収集
-        var allRegions = new List<(OcrTextRegion region, float scale, float confidence)>();
+        List<(OcrTextRegion region, float scale, float confidence)> allRegions = [];
         
         foreach (var scaleResult in scaleResults.Where(r => r.OcrResult.HasText))
         {
@@ -336,7 +327,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
             }
         }
         
-        if (!allRegions.Any())
+        if (allRegions.Count == 0)
         {
             return CreateEmptyOcrResult(null);
         }
@@ -428,19 +419,19 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
     /// </summary>
     private OcrTextRegion? CreateMergedRegion(List<(OcrTextRegion region, float scale, float confidence)> group)
     {
-        if (!group.Any()) return null;
+        if (group.Count == 0) return null;
         
         // 最高信頼度のリージョンを基準とする
         var bestRegion = group.OrderByDescending(g => g.confidence).First();
         
         // より良いテキストが見つかった場合は置き換え
-        var bestText = group
+        var (region, scale, confidence) = group
             .Where(g => !string.IsNullOrWhiteSpace(g.region.Text))
             .OrderByDescending(g => g.region.Text.Length)  // より長いテキストを優先
             .ThenByDescending(g => g.confidence)
             .FirstOrDefault();
         
-        var finalText = bestText.region?.Text ?? bestRegion.region.Text;
+        var finalText = region?.Text ?? bestRegion.region.Text;
         var finalConfidence = group.Average(g => g.confidence);
         
         _logger.LogDebug("リージョン統合: {GroupCount}個 → \"{Text}\" (信頼度: {Confidence:F2})", 
@@ -510,7 +501,7 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
         
         return new MultiScaleOcrResult
         {
-            ScaleResults = new List<ScaleProcessingResult> { scaleResult },
+            ScaleResults = [scaleResult],
             MergedResult = fallbackResult,
             Stats = stats
         };
@@ -522,10 +513,10 @@ public class SimpleMultiScaleOcrProcessor : IMultiScaleOcrProcessor
     private OcrResults CreateEmptyOcrResult(IAdvancedImage? sourceImage)
     {
         var dummyImage = sourceImage ?? new AdvancedImage(
-            new byte[] { 0 }, 1, 1, ImageFormat.Rgb24);
+            [0], 1, 1, ImageFormat.Rgb24);
         
         return new OcrResults(
-            new List<OcrTextRegion>(), 
+            [], 
             dummyImage, 
             TimeSpan.Zero, 
             "ja");

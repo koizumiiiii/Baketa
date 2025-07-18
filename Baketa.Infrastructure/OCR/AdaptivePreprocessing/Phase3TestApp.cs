@@ -38,10 +38,10 @@ public static class Phase3TestApp
             var serviceProvider = services.BuildServiceProvider();
             
             // 各コンポーネントのテスト
-            await TestImageQualityAnalyzerAsync(serviceProvider);
-            await TestAdaptiveParameterOptimizerAsync(serviceProvider);
-            await TestAdaptiveOcrEngineAsync(serviceProvider);
-            await TestAdaptivePreprocessingBenchmarkAsync(serviceProvider);
+            await TestImageQualityAnalyzerAsync(serviceProvider).ConfigureAwait(false);
+            await TestAdaptiveParameterOptimizerAsync(serviceProvider).ConfigureAwait(false);
+            await TestAdaptiveOcrEngineAsync(serviceProvider).ConfigureAwait(false);
+            await TestAdaptivePreprocessingBenchmarkAsync(serviceProvider).ConfigureAwait(false);
             
             Console.WriteLine("✅ Phase 3 包括的テスト完了");
         }
@@ -65,12 +65,12 @@ public static class Phase3TestApp
         try
         {
             // テスト画像生成
-            var testImage = await testCaseGenerator.GenerateSmallTextImageAsync("品質テスト", 12);
+            var testImage = await testCaseGenerator.GenerateSmallTextImageAsync("品質テスト", 12).ConfigureAwait(false);
             
             // 品質分析実行
             var sw = Stopwatch.StartNew();
-            var qualityMetrics = await analyzer.AnalyzeAsync(testImage);
-            var textDensityMetrics = await analyzer.AnalyzeTextDensityAsync(testImage);
+            var qualityMetrics = await analyzer.AnalyzeAsync(testImage).ConfigureAwait(false);
+            var textDensityMetrics = await analyzer.AnalyzeTextDensityAsync(testImage).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"  品質分析結果:");
@@ -113,14 +113,14 @@ public static class Phase3TestApp
                 ("ノイズ", () => testCaseGenerator.GenerateNoisyImageAsync("ノイズテスト", "Gaussian", 0.3))
             };
 
-            foreach (var testCase in testCases)
+            foreach (var (Name, Generator) in testCases)
             {
-                var testImage = await testCase.Generator();
+                var testImage = await Generator().ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                var result = await optimizer.OptimizeWithDetailsAsync(testImage);
+                var result = await optimizer.OptimizeWithDetailsAsync(testImage).ConfigureAwait(false);
                 sw.Stop();
 
-                Console.WriteLine($"  {testCase.Name}画像の最適化結果:");
+                Console.WriteLine($"  {Name}画像の最適化結果:");
                 Console.WriteLine($"    戦略: {result.OptimizationStrategy}");
                 Console.WriteLine($"    理由: {result.OptimizationReason}");
                 Console.WriteLine($"    改善予想: {result.ExpectedImprovement:F2}");
@@ -165,7 +165,7 @@ public static class Phase3TestApp
                 RecognitionThreshold = 0.3
             };
             
-            var initialized = await adaptiveEngine.InitializeAsync(settings);
+            var initialized = await adaptiveEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 Console.WriteLine("  ❌ 適応的OCRエンジンの初期化に失敗");
@@ -173,10 +173,10 @@ public static class Phase3TestApp
             }
             
             // テスト画像でOCR実行
-            var testImage = await testCaseGenerator.GenerateSmallTextImageAsync("適応的OCRテスト", 10);
+            var testImage = await testCaseGenerator.GenerateSmallTextImageAsync("適応的OCRテスト", 10).ConfigureAwait(false);
             
             var sw = Stopwatch.StartNew();
-            var result = await adaptiveEngine.RecognizeAsync(testImage, progress: null, cancellationToken: default);
+            var result = await adaptiveEngine.RecognizeAsync(testImage, progressCallback: null, cancellationToken: default).ConfigureAwait(false);
             sw.Stop();
             
             Console.WriteLine($"  適応的OCR結果:");
@@ -215,7 +215,7 @@ public static class Phase3TestApp
                 RecognitionThreshold = 0.3
             };
             
-            var initialized = await ocrEngine.InitializeAsync(settings);
+            var initialized = await ocrEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 Console.WriteLine("  ❌ OCRエンジンの初期化に失敗");
@@ -224,7 +224,7 @@ public static class Phase3TestApp
             
             // 簡易ベンチマーク実行（時間短縮のため品質特化テスト）
             Console.WriteLine("  低品質画像特化ベンチマーク実行中...");
-            var qualityResult = await benchmark.RunQualitySpecificBenchmarkAsync(ocrEngine, ImageQualityLevel.Low);
+            var qualityResult = await benchmark.RunQualitySpecificBenchmarkAsync(ocrEngine, ImageQualityLevel.Low).ConfigureAwait(false);
             
             Console.WriteLine($"  低品質画像ベンチマーク結果:");
             Console.WriteLine($"    テストケース数: {qualityResult.TestCaseCount}");
@@ -235,7 +235,7 @@ public static class Phase3TestApp
             
             // パフォーマンステスト
             Console.WriteLine("  パフォーマンスベンチマーク実行中...");
-            var performanceResult = await benchmark.RunPerformanceBenchmarkAsync(ocrEngine);
+            var performanceResult = await benchmark.RunPerformanceBenchmarkAsync(ocrEngine).ConfigureAwait(false);
             
             Console.WriteLine($"  パフォーマンスベンチマーク結果:");
             Console.WriteLine($"    平均実行時間: {performanceResult.PerformanceAnalysis.AverageExecutionTime:F1}ms");
@@ -285,7 +285,7 @@ public static class Phase3TestApp
             var logger = serviceProvider.GetRequiredService<ILogger<AdaptiveOcrEngine>>();
             
             // 画像読み込み
-            var imageBytes = await File.ReadAllBytesAsync(imagePath);
+            var imageBytes = await File.ReadAllBytesAsync(imagePath).ConfigureAwait(false);
             var image = new Core.Services.Imaging.AdvancedImage(
                 imageBytes, 800, 600, Core.Abstractions.Imaging.ImageFormat.Png);
             
@@ -297,7 +297,7 @@ public static class Phase3TestApp
                 RecognitionThreshold = 0.3
             };
             
-            var initialized = await baseOcrEngine.InitializeAsync(settings);
+            var initialized = await baseOcrEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 Console.WriteLine("❌ OCRエンジンの初期化に失敗");
@@ -307,14 +307,14 @@ public static class Phase3TestApp
             // 通常のOCR処理
             Console.WriteLine("通常のOCR処理実行中...");
             var normalStart = DateTime.Now;
-            var normalResult = await baseOcrEngine.RecognizeAsync(image);
+            var normalResult = await baseOcrEngine.RecognizeAsync(image).ConfigureAwait(false);
             var normalTime = DateTime.Now - normalStart;
             
             // 適応的OCR処理
             Console.WriteLine("適応的OCR処理実行中...");
             var adaptiveEngine = new AdaptiveOcrEngine(baseOcrEngine, parameterOptimizer, logger);
             var adaptiveStart = DateTime.Now;
-            var adaptiveResult = await adaptiveEngine.RecognizeAsync(image, progress: null, cancellationToken: default);
+            var adaptiveResult = await adaptiveEngine.RecognizeAsync(image, progressCallback: null, cancellationToken: default).ConfigureAwait(false);
             var adaptiveTime = DateTime.Now - adaptiveStart;
             
             // 結果比較

@@ -11,7 +11,7 @@ namespace Baketa.Application.DI.Modules;
     /// サンプルのコアモジュール実装。
     /// </summary>
     [ModulePriority(ModulePriority.Core)]
-    public class SampleCoreModule : ServiceModuleBase
+    public sealed class SampleCoreModule : ServiceModuleBase
     {
         /// <summary>
         /// コアサービスを登録します。

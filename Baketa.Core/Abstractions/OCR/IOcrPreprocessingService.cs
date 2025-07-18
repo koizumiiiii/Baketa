@@ -70,5 +70,5 @@ public class OcrPreprocessingResult(
     /// <summary>
     /// 検出されたテキスト領域
     /// </summary>
-    public IReadOnlyList<OCRTextRegion> DetectedRegions { get; } = detectedRegions ?? Array.Empty<OCRTextRegion>();
+    public IReadOnlyList<OCRTextRegion> DetectedRegions { get; } = detectedRegions ?? [];
 }

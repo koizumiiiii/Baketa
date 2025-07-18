@@ -7,7 +7,7 @@ namespace Baketa.Application.DI;
 /// <summary>
 /// OCRアプリケーションサービスのDIモジュール
 /// </summary>
-public class OcrApplicationModule : IServiceModule
+public sealed class OcrApplicationModule : IServiceModule
 {
     /// <summary>
     /// サービスを登録します

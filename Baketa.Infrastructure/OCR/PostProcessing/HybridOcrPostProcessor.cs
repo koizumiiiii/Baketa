@@ -10,25 +10,16 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// <summary>
 /// 辞書ベースとN-gramベースの後処理を統合したハイブリッドプロセッサ
 /// </summary>
-public class HybridOcrPostProcessor : IOcrPostProcessor
+public sealed class HybridOcrPostProcessor(
+    ILogger<HybridOcrPostProcessor> logger,
+    JapaneseOcrPostProcessor dictionaryProcessor,
+    NgramOcrPostProcessor ngramProcessor,
+    bool useNgramFirst = true) : IOcrPostProcessor
 {
-    private readonly ILogger<HybridOcrPostProcessor> _logger;
-    private readonly JapaneseOcrPostProcessor _dictionaryProcessor;
-    private readonly NgramOcrPostProcessor _ngramProcessor;
-    private readonly bool _useNgramFirst;
-    
-    public HybridOcrPostProcessor(
-        ILogger<HybridOcrPostProcessor> logger,
-        JapaneseOcrPostProcessor dictionaryProcessor,
-        NgramOcrPostProcessor ngramProcessor,
-        bool useNgramFirst = true)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _dictionaryProcessor = dictionaryProcessor ?? throw new ArgumentNullException(nameof(dictionaryProcessor));
-        _ngramProcessor = ngramProcessor ?? throw new ArgumentNullException(nameof(ngramProcessor));
-        _useNgramFirst = useNgramFirst;
-    }
-    
+    private readonly ILogger<HybridOcrPostProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly JapaneseOcrPostProcessor _dictionaryProcessor = dictionaryProcessor ?? throw new ArgumentNullException(nameof(dictionaryProcessor));
+    private readonly NgramOcrPostProcessor _ngramProcessor = ngramProcessor ?? throw new ArgumentNullException(nameof(ngramProcessor));
+
     /// <summary>
     /// ハイブリッド後処理を実行
     /// </summary>
@@ -41,21 +32,21 @@ public class HybridOcrPostProcessor : IOcrPostProcessor
         
         string processedText;
         
-        if (_useNgramFirst)
+        if (useNgramFirst)
         {
             // N-gramベース処理を最初に実行
-            var ngramResult = await _ngramProcessor.ProcessAsync(rawText, confidence);
+            var ngramResult = await _ngramProcessor.ProcessAsync(rawText, confidence).ConfigureAwait(false);
             
             // 辞書ベース処理で仕上げ
-            processedText = await _dictionaryProcessor.ProcessAsync(ngramResult, confidence);
+            processedText = await _dictionaryProcessor.ProcessAsync(ngramResult, confidence).ConfigureAwait(false);
         }
         else
         {
             // 辞書ベース処理を最初に実行
-            var dictionaryResult = await _dictionaryProcessor.ProcessAsync(rawText, confidence);
+            var dictionaryResult = await _dictionaryProcessor.ProcessAsync(rawText, confidence).ConfigureAwait(false);
             
             // N-gramベース処理で仕上げ
-            processedText = await _ngramProcessor.ProcessAsync(dictionaryResult, confidence);
+            processedText = await _ngramProcessor.ProcessAsync(dictionaryResult, confidence).ConfigureAwait(false);
         }
         
         _logger.LogDebug("ハイブリッドOCR後処理完了: {OriginalText} -> {ProcessedText}", rawText, processedText);
@@ -68,7 +59,7 @@ public class HybridOcrPostProcessor : IOcrPostProcessor
     /// </summary>
     public async Task<string> ProcessAsync(string ocrText)
     {
-        return await ProcessAsync(ocrText, 1.0f);
+        return await ProcessAsync(ocrText, 1.0f).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -104,7 +95,7 @@ public class HybridOcrPostProcessor : IOcrPostProcessor
     public async Task<IEnumerable<string>> ProcessBatchAsync(IEnumerable<string> ocrTexts)
     {
         var tasks = ocrTexts.Select(text => ProcessAsync(text));
-        return await Task.WhenAll(tasks);
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -115,18 +106,18 @@ public class HybridOcrPostProcessor : IOcrPostProcessor
         _logger.LogDebug("処理順序比較開始: {Text}", ocrText);
         
         // N-gram → Dictionary
-        var ngramResult = await _ngramProcessor.ProcessAsync(ocrText);
-        var ngramFirstResult = await _dictionaryProcessor.ProcessAsync(ngramResult, 1.0f);
+        var ngramResult = await _ngramProcessor.ProcessAsync(ocrText).ConfigureAwait(false);
+        var ngramFirstResult = await _dictionaryProcessor.ProcessAsync(ngramResult, 1.0f).ConfigureAwait(false);
         
         // Dictionary → N-gram
-        var dictionaryResult = await _dictionaryProcessor.ProcessAsync(ocrText, 1.0f);
-        var dictionaryFirstResult = await _ngramProcessor.ProcessAsync(dictionaryResult);
+        var dictionaryResult = await _dictionaryProcessor.ProcessAsync(ocrText, 1.0f).ConfigureAwait(false);
+        var dictionaryFirstResult = await _ngramProcessor.ProcessAsync(dictionaryResult).ConfigureAwait(false);
         
         // N-gramのみ
-        var ngramOnlyResult = await _ngramProcessor.ProcessAsync(ocrText);
+        var ngramOnlyResult = await _ngramProcessor.ProcessAsync(ocrText).ConfigureAwait(false);
         
         // Dictionaryのみ
-        var dictionaryOnlyResult = await _dictionaryProcessor.ProcessAsync(ocrText, 1.0f);
+        var dictionaryOnlyResult = await _dictionaryProcessor.ProcessAsync(ocrText, 1.0f).ConfigureAwait(false);
         
         return new ProcessingComparisonResult(
             ocrText,
@@ -140,28 +131,19 @@ public class HybridOcrPostProcessor : IOcrPostProcessor
 /// <summary>
 /// 処理順序比較結果
 /// </summary>
-public class ProcessingComparisonResult
+public sealed class ProcessingComparisonResult(
+    string originalText,
+    string ngramFirstResult,
+    string dictionaryFirstResult,
+    string ngramOnlyResult,
+    string dictionaryOnlyResult)
 {
-    public string OriginalText { get; }
-    public string NgramFirstResult { get; }
-    public string DictionaryFirstResult { get; }
-    public string NgramOnlyResult { get; }
-    public string DictionaryOnlyResult { get; }
-    
-    public ProcessingComparisonResult(
-        string originalText,
-        string ngramFirstResult,
-        string dictionaryFirstResult,
-        string ngramOnlyResult,
-        string dictionaryOnlyResult)
-    {
-        OriginalText = originalText;
-        NgramFirstResult = ngramFirstResult;
-        DictionaryFirstResult = dictionaryFirstResult;
-        NgramOnlyResult = ngramOnlyResult;
-        DictionaryOnlyResult = dictionaryOnlyResult;
-    }
-    
+    public string OriginalText { get; } = originalText;
+    public string NgramFirstResult { get; } = ngramFirstResult;
+    public string DictionaryFirstResult { get; } = dictionaryFirstResult;
+    public string NgramOnlyResult { get; } = ngramOnlyResult;
+    public string DictionaryOnlyResult { get; } = dictionaryOnlyResult;
+
     /// <summary>
     /// 全ての結果が同じかチェック
     /// </summary>
@@ -175,28 +157,20 @@ public class ProcessingComparisonResult
     /// </summary>
     public IEnumerable<string> GetUniqueResults()
     {
-        return new[] { NgramFirstResult, DictionaryFirstResult, NgramOnlyResult, DictionaryOnlyResult }
-            .Distinct()
-            .ToList();
+        return [.. new[] { NgramFirstResult, DictionaryFirstResult, NgramOnlyResult, DictionaryOnlyResult }.Distinct()];
     }
 }
 
 /// <summary>
 /// ハイブリッド後処理のファクトリクラス
 /// </summary>
-public class HybridOcrPostProcessorFactory
+public sealed class HybridOcrPostProcessorFactory(
+    ILogger<HybridOcrPostProcessorFactory> logger,
+    NgramTrainingService trainingService)
 {
-    private readonly ILogger<HybridOcrPostProcessorFactory> _logger;
-    private readonly NgramTrainingService _trainingService;
-    
-    public HybridOcrPostProcessorFactory(
-        ILogger<HybridOcrPostProcessorFactory> logger,
-        NgramTrainingService trainingService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _trainingService = trainingService ?? throw new ArgumentNullException(nameof(trainingService));
-    }
-    
+    private readonly ILogger<HybridOcrPostProcessorFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly NgramTrainingService _trainingService = trainingService ?? throw new ArgumentNullException(nameof(trainingService));
+
     /// <summary>
     /// ハイブリッドプロセッサを作成
     /// </summary>
@@ -209,7 +183,7 @@ public class HybridOcrPostProcessorFactory
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JapaneseOcrPostProcessor>.Instance);
         
         // N-gramモデルの読み込み
-        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync();
+        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync().ConfigureAwait(false);
         
         // N-gramベースプロセッサ
         var ngramProcessor = new NgramOcrPostProcessor(
@@ -240,7 +214,7 @@ public class HybridOcrPostProcessorFactory
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JapaneseOcrPostProcessor>.Instance);
         
         // カスタムデータでN-gramモデルを訓練
-        var ngramModel = await _trainingService.RetrainWithCustomDataAsync(customTexts);
+        var ngramModel = await _trainingService.RetrainWithCustomDataAsync(customTexts).ConfigureAwait(false);
         
         // N-gramベースプロセッサ
         var ngramProcessor = new NgramOcrPostProcessor(

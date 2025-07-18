@@ -1144,7 +1144,7 @@ public sealed class PaddleOcrEngine(
     /// <summary>
     /// デフォルトローカルモデルの取得
     /// </summary>
-    private static FullOcrModel GetDefaultLocalModel(string language)
+    private static FullOcrModel? GetDefaultLocalModel(string language)
     {
         DebugLogUtility.WriteLog($"🔍 GetDefaultLocalModel呼び出し - 言語: {language}");
         
@@ -1780,7 +1780,7 @@ public sealed class PaddleOcrEngine(
     /// </summary>
     /// <param name="mat">変換元Mat</param>
     /// <returns>IAdvancedImage</returns>
-    private IAdvancedImage ConvertMatToAdvancedImage(Mat mat)
+    private AdvancedImage ConvertMatToAdvancedImage(Mat mat)
     {
         try
         {

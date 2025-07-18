@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Baketa.Core.Settings;
+namespace Baketa.Core.Settings.Validation;
 
 /// <summary>
 /// 検証コンテキストクラス

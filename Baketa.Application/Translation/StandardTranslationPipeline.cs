@@ -32,7 +32,7 @@ namespace Baketa.Application.Translation;
 /// <param name="eventAggregator">イベント集約器</param>
 /// <param name="options">翻訳オプション</param>
 #pragma warning disable CA2016 // CancellationTokenパラメーターの転送問題を一時的に拘束します
-public class StandardTranslationPipeline(
+public sealed class StandardTranslationPipeline(
         ILogger<StandardTranslationPipeline> logger,
         ITranslationEngineFactory engineFactory,
         ITranslationCache cache,

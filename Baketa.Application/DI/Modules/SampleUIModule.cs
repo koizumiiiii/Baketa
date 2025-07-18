@@ -12,7 +12,7 @@ namespace Baketa.Application.DI.Modules;
     /// </summary>
     [ModulePriority(ModulePriority.UI)]
     [AutoRegister] // 自動検出の対象としてマーク
-    public class SampleUIModule : ServiceModuleBase
+    public sealed class SampleUIModule : ServiceModuleBase
     {
         /// <summary>
         /// UIサービスを登録します。

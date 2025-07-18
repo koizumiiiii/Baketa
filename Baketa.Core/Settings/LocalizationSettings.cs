@@ -13,7 +13,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Localization", "表示言語", 
         Description = "アプリケーションのユーザーインターフェース言語", 
-        ValidValues = new object[] { "ja-JP", "en-US", "zh-CN", "zh-TW", "ko-KR" })]
+        ValidValues = ["ja-JP", "en-US", "zh-CN", "zh-TW", "ko-KR"])]
     public string UiLanguage { get; set; } = "ja-JP";
     
     /// <summary>
@@ -21,7 +21,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Localization", "翻訳元言語", 
         Description = "自動検出時のフォールバック言語", 
-        ValidValues = new object[] { "ja", "en", "zh", "ko", "auto" })]
+        ValidValues = ["ja", "en", "zh", "ko", "auto"])]
     public string DefaultSourceLanguage { get; set; } = "ja";
     
     /// <summary>
@@ -29,7 +29,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Localization", "翻訳先言語", 
         Description = "翻訳の出力言語", 
-        ValidValues = new object[] { "ja", "en", "zh-cn", "zh-tw", "ko" })]
+        ValidValues = ["ja", "en", "zh-cn", "zh-tw", "ko"])]
     public string DefaultTargetLanguage { get; set; } = "en";
     
     /// <summary>
@@ -37,7 +37,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Localization", "日付時刻形式", 
         Description = "日付と時刻の表示形式", 
-        ValidValues = new object[] { DateTimeFormat.System, DateTimeFormat.ISO8601, DateTimeFormat.US, DateTimeFormat.European })]
+        ValidValues = [DateTimeFormat.System, DateTimeFormat.ISO8601, DateTimeFormat.US, DateTimeFormat.European])]
     public DateTimeFormat DateTimeFormat { get; set; } = DateTimeFormat.System;
     
     /// <summary>
@@ -45,7 +45,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Localization", "数値形式", 
         Description = "数値や通貨の表示形式", 
-        ValidValues = new object[] { NumberFormat.System, NumberFormat.Invariant, NumberFormat.Japanese, NumberFormat.English })]
+        ValidValues = [NumberFormat.System, NumberFormat.Invariant, NumberFormat.Japanese, NumberFormat.English])]
     public NumberFormat NumberFormat { get; set; } = NumberFormat.System;
     
     /// <summary>
@@ -53,7 +53,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Localization", "テキスト方向", 
         Description = "テキストの読み方向", 
-        ValidValues = new object[] { TextDirection.LeftToRight, TextDirection.RightToLeft, TextDirection.Auto })]
+        ValidValues = [TextDirection.LeftToRight, TextDirection.RightToLeft, TextDirection.Auto])]
     public TextDirection TextDirection { get; set; } = TextDirection.LeftToRight;
     
     /// <summary>
@@ -61,7 +61,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Localization", "文字エンコーディング", 
         Description = "ファイル入出力時の文字エンコーディング", 
-        ValidValues = new object[] { "UTF-8", "UTF-16", "Shift_JIS", "EUC-JP" })]
+        ValidValues = ["UTF-8", "UTF-16", "Shift_JIS", "EUC-JP"])]
     public string DefaultEncoding { get; set; } = "UTF-8";
     
     /// <summary>
@@ -69,7 +69,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Localization", "タイムゾーン", 
         Description = "使用するタイムゾーン", 
-        ValidValues = new object[] { "System", "UTC", "Asia/Tokyo", "America/New_York", "Europe/London", "Asia/Shanghai" })]
+        ValidValues = ["System", "UTC", "Asia/Tokyo", "America/New_York", "Europe/London", "Asia/Shanghai"])]
     public string TimeZone { get; set; } = "System";
     
     /// <summary>
@@ -77,7 +77,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Localization", "フォントレンダリング", 
         Description = "多言語フォントのレンダリング設定", 
-        ValidValues = new object[] { FontRendering.System, FontRendering.ClearType, FontRendering.Optimized })]
+        ValidValues = [FontRendering.System, FontRendering.ClearType, FontRendering.Optimized])]
     public FontRendering FontRendering { get; set; } = FontRendering.System;
     
     /// <summary>
@@ -85,7 +85,7 @@ public sealed class LocalizationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Localization", "言語検出精度", 
         Description = "自動言語検出の精度レベル", 
-        ValidValues = new object[] { LanguageDetectionAccuracy.Fast, LanguageDetectionAccuracy.Balanced, LanguageDetectionAccuracy.Accurate })]
+        ValidValues = [LanguageDetectionAccuracy.Fast, LanguageDetectionAccuracy.Balanced, LanguageDetectionAccuracy.Accurate])]
     public LanguageDetectionAccuracy LanguageDetectionAccuracy { get; set; } = LanguageDetectionAccuracy.Balanced;
     
     /// <summary>

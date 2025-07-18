@@ -11,25 +11,21 @@ namespace Baketa.Infrastructure.OCR.PostProcessing.NgramModels;
 /// <summary>
 /// 日本語・英語混在テキスト用のBigramモデル
 /// </summary>
-public class BigramModel : INgramModel
+public class BigramModel(ILogger<BigramModel> logger, double smoothingFactor = 0.01) : INgramModel
 {
-    private readonly ILogger<BigramModel> _logger;
-    private readonly Dictionary<string, Dictionary<string, int>> _bigramCounts;
-    private readonly Dictionary<string, int> _unigramCounts;
-    private readonly Dictionary<string, double> _bigramProbabilities;
+    private readonly ILogger<BigramModel> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly Dictionary<string, Dictionary<string, int>> _bigramCounts = [];
+    private readonly Dictionary<string, int> _unigramCounts = [];
+    private readonly Dictionary<string, double> _bigramProbabilities = [];
     private int _totalBigrams;
     private int _totalUnigrams;
-    private readonly double _smoothingFactor;
-    
-    public BigramModel(ILogger<BigramModel> logger, double smoothingFactor = 0.01)
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _bigramCounts = new Dictionary<string, Dictionary<string, int>>();
-        _unigramCounts = new Dictionary<string, int>();
-        _bigramProbabilities = new Dictionary<string, double>();
-        _smoothingFactor = smoothingFactor;
-    }
-    
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public int N => 2;
     
     /// <summary>
@@ -56,7 +52,7 @@ public class BigramModel : INgramModel
             }
             
             CalculateProbabilities();
-        });
+        }).ConfigureAwait(false);
         
         _logger.LogInformation("Bigramモデルの学習完了: {BigramCount}個のBigram, {UnigramCount}個のUnigram", 
             _bigramCounts.Count, _unigramCounts.Count);
@@ -85,7 +81,7 @@ public class BigramModel : INgramModel
             
             // Bigramカウント
             if (!_bigramCounts.ContainsKey(char1))
-                _bigramCounts[char1] = new Dictionary<string, int>();
+                _bigramCounts[char1] = [];
             
             if (!_bigramCounts[char1].ContainsKey(char2))
                 _bigramCounts[char1][char2] = 0;
@@ -97,7 +93,7 @@ public class BigramModel : INgramModel
         // 最後の文字のUnigramカウント
         if (cleanText.Length > 0)
         {
-            var lastChar = cleanText[cleanText.Length - 1].ToString();
+            var lastChar = cleanText[^1].ToString();
             if (!_unigramCounts.ContainsKey(lastChar))
                 _unigramCounts[lastChar] = 0;
             _unigramCounts[lastChar]++;
@@ -120,7 +116,7 @@ public class BigramModel : INgramModel
                 var bigramKey = $"{firstChar}{secondChar}";
                 
                 // スムージング適用
-                var probability = (bigramCount + _smoothingFactor) / (firstCharCount + _smoothingFactor * _unigramCounts.Count);
+                var probability = (bigramCount + smoothingFactor) / (firstCharCount + smoothingFactor * _unigramCounts.Count);
                 _bigramProbabilities[bigramKey] = probability;
             }
         }
@@ -132,14 +128,14 @@ public class BigramModel : INgramModel
     public IEnumerable<(string character, double probability)> GetCandidates(string context)
     {
         if (string.IsNullOrEmpty(context))
-            return Enumerable.Empty<(string, double)>();
+            return [];
         
-        var lastChar = context[context.Length - 1].ToString();
+        var lastChar = context[^1].ToString();
         
-        if (!_bigramCounts.ContainsKey(lastChar))
-            return Enumerable.Empty<(string, double)>();
+        if (!_bigramCounts.TryGetValue(lastChar, out var counts))
+            return [];
         
-        return _bigramCounts[lastChar]
+        return counts
             .Select(kvp => (kvp.Key, _bigramProbabilities.GetValueOrDefault($"{lastChar}{kvp.Key}", 0.0)))
             .OrderByDescending(x => x.Item2)
             .Take(10); // 上位10候補
@@ -153,7 +149,7 @@ public class BigramModel : INgramModel
         if (string.IsNullOrEmpty(ngram) || ngram.Length != 2)
             return 0.0;
         
-        return _bigramProbabilities.GetValueOrDefault(ngram, _smoothingFactor / _totalUnigrams);
+        return _bigramProbabilities.GetValueOrDefault(ngram, smoothingFactor / _totalUnigrams);
     }
     
     /// <summary>
@@ -174,7 +170,7 @@ public class BigramModel : INgramModel
             if (probability > 0)
                 logLikelihood += Math.Log(probability);
             else
-                logLikelihood += Math.Log(_smoothingFactor / _totalUnigrams);
+                logLikelihood += Math.Log(smoothingFactor / _totalUnigrams);
         }
         
         return logLikelihood;
@@ -194,16 +190,12 @@ public class BigramModel : INgramModel
             BigramProbabilities = _bigramProbabilities,
             TotalBigrams = _totalBigrams,
             TotalUnigrams = _totalUnigrams,
-            SmoothingFactor = _smoothingFactor
+            SmoothingFactor = smoothingFactor
         };
         
-        var json = JsonSerializer.Serialize(modelData, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        });
+        var json = JsonSerializer.Serialize(modelData, JsonOptions);
         
-        await File.WriteAllTextAsync(filePath, json);
+        await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -219,7 +211,7 @@ public class BigramModel : INgramModel
             return;
         }
         
-        var json = await File.ReadAllTextAsync(filePath);
+        var json = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
         var modelData = JsonSerializer.Deserialize<JsonElement>(json);
         
         _bigramCounts.Clear();
@@ -232,7 +224,7 @@ public class BigramModel : INgramModel
             foreach (var firstCharProperty in bigramCountsElement.EnumerateObject())
             {
                 var firstChar = firstCharProperty.Name;
-                _bigramCounts[firstChar] = new Dictionary<string, int>();
+                _bigramCounts[firstChar] = [];
                 
                 foreach (var secondCharProperty in firstCharProperty.Value.EnumerateObject())
                 {

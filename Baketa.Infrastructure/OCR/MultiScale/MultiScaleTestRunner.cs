@@ -10,21 +10,14 @@ namespace Baketa.Infrastructure.OCR.MultiScale;
 /// <summary>
 /// マルチスケールOCR処理のテストランナー
 /// </summary>
-public class MultiScaleTestRunner
+public class MultiScaleTestRunner(
+    IMultiScaleOcrProcessor multiScaleProcessor,
+    IOcrEngine ocrEngine,
+    ILogger<MultiScaleTestRunner> logger)
 {
-    private readonly IMultiScaleOcrProcessor _multiScaleProcessor;
-    private readonly IOcrEngine _ocrEngine;
-    private readonly ILogger<MultiScaleTestRunner> _logger;
-
-    public MultiScaleTestRunner(
-        IMultiScaleOcrProcessor multiScaleProcessor,
-        IOcrEngine ocrEngine,
-        ILogger<MultiScaleTestRunner> logger)
-    {
-        _multiScaleProcessor = multiScaleProcessor ?? throw new ArgumentNullException(nameof(multiScaleProcessor));
-        _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IMultiScaleOcrProcessor _multiScaleProcessor = multiScaleProcessor ?? throw new ArgumentNullException(nameof(multiScaleProcessor));
+    private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly ILogger<MultiScaleTestRunner> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 小文字テキスト認識のマルチスケール効果をテスト
@@ -74,7 +67,7 @@ public class MultiScaleTestRunner
     /// <summary>
     /// 詳細結果をログ出力
     /// </summary>
-    private void LogDetailedResults(OcrResults normalResult, MultiScaleOcrResult multiScaleResult)
+    private void LogDetailedResults(OcrResults _, MultiScaleOcrResult multiScaleResult)
     {
         _logger.LogInformation("📊 詳細結果分析:");
         
@@ -155,7 +148,7 @@ public class MultiScaleTestRunner
     /// <summary>
     /// テスト用画像を作成
     /// </summary>
-    private IAdvancedImage CreateTestImage()
+    private AdvancedImage CreateTestImage()
     {
         // 実際の画像データの代わりに、テストメタデータを使用
         var testData = System.Text.Encoding.UTF8.GetBytes("MultiScaleTest:SmallText:12px");

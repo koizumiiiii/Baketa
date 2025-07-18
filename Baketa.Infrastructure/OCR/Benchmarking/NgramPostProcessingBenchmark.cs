@@ -11,19 +11,13 @@ namespace Baketa.Infrastructure.OCR.Benchmarking;
 /// <summary>
 /// N-gramベース後処理のベンチマーク実行クラス
 /// </summary>
-public class NgramPostProcessingBenchmark
+public class NgramPostProcessingBenchmark(
+    ILogger<NgramPostProcessingBenchmark> logger,
+    NgramTrainingService trainingService)
 {
-    private readonly ILogger<NgramPostProcessingBenchmark> _logger;
-    private readonly NgramTrainingService _trainingService;
-    
-    public NgramPostProcessingBenchmark(
-        ILogger<NgramPostProcessingBenchmark> logger,
-        NgramTrainingService trainingService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _trainingService = trainingService ?? throw new ArgumentNullException(nameof(trainingService));
-    }
-    
+    private readonly ILogger<NgramPostProcessingBenchmark> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly NgramTrainingService _trainingService = trainingService ?? throw new ArgumentNullException(nameof(trainingService));
+
     /// <summary>
     /// N-gramベース後処理の包括的ベンチマーク
     /// </summary>
@@ -34,19 +28,19 @@ public class NgramPostProcessingBenchmark
         var results = new List<PostProcessingMethodResult>();
         
         // 1. 辞書ベースのみ
-        var dictionaryResult = await BenchmarkDictionaryOnlyAsync();
+        var dictionaryResult = await BenchmarkDictionaryOnlyAsync().ConfigureAwait(false);
         results.Add(dictionaryResult);
         
         // 2. N-gramベースのみ
-        var ngramResult = await BenchmarkNgramOnlyAsync();
+        var ngramResult = await BenchmarkNgramOnlyAsync().ConfigureAwait(false);
         results.Add(ngramResult);
         
         // 3. ハイブリッド (N-gram → Dictionary)
-        var hybridNgramFirstResult = await BenchmarkHybridNgramFirstAsync();
+        var hybridNgramFirstResult = await BenchmarkHybridNgramFirstAsync().ConfigureAwait(false);
         results.Add(hybridNgramFirstResult);
         
         // 4. ハイブリッド (Dictionary → N-gram)
-        var hybridDictionaryFirstResult = await BenchmarkHybridDictionaryFirstAsync();
+        var hybridDictionaryFirstResult = await BenchmarkHybridDictionaryFirstAsync().ConfigureAwait(false);
         results.Add(hybridDictionaryFirstResult);
         
         // 最適手法の決定
@@ -78,7 +72,7 @@ public class NgramPostProcessingBenchmark
         
         foreach (var testCase in testCases)
         {
-            var processedText = await dictionaryProcessor.ProcessAsync(testCase.Input, 1.0f);
+            var processedText = await dictionaryProcessor.ProcessAsync(testCase.Input, 1.0f).ConfigureAwait(false);
             var accuracy = CalculateAccuracy(testCase.Expected, processedText);
             
             results.Add(new PostProcessingTestResult(
@@ -108,7 +102,7 @@ public class NgramPostProcessingBenchmark
     {
         _logger.LogInformation("N-gramベースのみのベンチマーク開始");
         
-        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync();
+        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync().ConfigureAwait(false);
         var ngramProcessor = new NgramOcrPostProcessor(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<NgramOcrPostProcessor>.Instance, 
             ngramModel);
@@ -119,7 +113,7 @@ public class NgramPostProcessingBenchmark
         
         foreach (var testCase in testCases)
         {
-            var processedText = await ngramProcessor.ProcessAsync(testCase.Input, 1.0f);
+            var processedText = await ngramProcessor.ProcessAsync(testCase.Input, 1.0f).ConfigureAwait(false);
             var accuracy = CalculateAccuracy(testCase.Expected, processedText);
             
             results.Add(new PostProcessingTestResult(
@@ -152,7 +146,7 @@ public class NgramPostProcessingBenchmark
         var factory = new HybridOcrPostProcessorFactory(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridOcrPostProcessorFactory>.Instance, 
             _trainingService);
-        var hybridProcessor = await factory.CreateAsync();
+        var hybridProcessor = await factory.CreateAsync().ConfigureAwait(false);
         var testCases = GetTestCases();
         var results = new List<PostProcessingTestResult>();
         
@@ -160,7 +154,7 @@ public class NgramPostProcessingBenchmark
         
         foreach (var testCase in testCases)
         {
-            var processedText = await hybridProcessor.ProcessAsync(testCase.Input, 1.0f);
+            var processedText = await hybridProcessor.ProcessAsync(testCase.Input, 1.0f).ConfigureAwait(false);
             var accuracy = CalculateAccuracy(testCase.Expected, processedText);
             
             results.Add(new PostProcessingTestResult(
@@ -192,7 +186,7 @@ public class NgramPostProcessingBenchmark
         
         var dictionaryProcessor = new JapaneseOcrPostProcessor(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<JapaneseOcrPostProcessor>.Instance);
-        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync();
+        var ngramModel = await _trainingService.LoadJapaneseBigramModelAsync().ConfigureAwait(false);
         var ngramProcessor = new NgramOcrPostProcessor(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<NgramOcrPostProcessor>.Instance, 
             ngramModel);
@@ -209,7 +203,7 @@ public class NgramPostProcessingBenchmark
         
         foreach (var testCase in testCases)
         {
-            var processedText = await hybridProcessor.ProcessAsync(testCase.Input, 1.0f);
+            var processedText = await hybridProcessor.ProcessAsync(testCase.Input, 1.0f).ConfigureAwait(false);
             var accuracy = CalculateAccuracy(testCase.Expected, processedText);
             
             results.Add(new PostProcessingTestResult(
@@ -237,8 +231,8 @@ public class NgramPostProcessingBenchmark
     /// </summary>
     private IEnumerable<PostProcessingTestCase> GetTestCases()
     {
-        return new[]
-        {
+        return
+        [
             // 実際に報告された誤認識パターン
             new PostProcessingTestCase("車体テスト", "単体テスト"),
             new PostProcessingTestCase("オンボーデイシグ (院法体勝)の恐計", "オンボーディング（魔法体験）の設計"),
@@ -273,7 +267,7 @@ public class NgramPostProcessingBenchmark
             new PostProcessingTestCase("ポート番号808O", "ポート番号8080"),
             new PostProcessingTestCase("HTTPコード2OO", "HTTPコード200"),
             new PostProcessingTestCase("エラーコード4O4", "エラーコード404"),
-        };
+        ];
     }
     
     /// <summary>
@@ -350,81 +344,50 @@ public class NgramPostProcessingBenchmark
 /// <summary>
 /// 後処理テストケース
 /// </summary>
-public class PostProcessingTestCase
+public class PostProcessingTestCase(string input, string expected)
 {
-    public string Input { get; }
-    public string Expected { get; }
-    
-    public PostProcessingTestCase(string input, string expected)
-    {
-        Input = input;
-        Expected = expected;
-    }
+    public string Input { get; } = input;
+    public string Expected { get; } = expected;
 }
 
 /// <summary>
 /// 後処理テスト結果
 /// </summary>
-public class PostProcessingTestResult
+public class PostProcessingTestResult(string input, string expected, string actual, double accuracy, bool wasCorrected)
 {
-    public string Input { get; }
-    public string Expected { get; }
-    public string Actual { get; }
-    public double Accuracy { get; }
-    public bool WasCorrected { get; }
-    
-    public PostProcessingTestResult(string input, string expected, string actual, double accuracy, bool wasCorrected)
-    {
-        Input = input;
-        Expected = expected;
-        Actual = actual;
-        Accuracy = accuracy;
-        WasCorrected = wasCorrected;
-    }
+    public string Input { get; } = input;
+    public string Expected { get; } = expected;
+    public string Actual { get; } = actual;
+    public double Accuracy { get; } = accuracy;
+    public bool WasCorrected { get; } = wasCorrected;
 }
 
 /// <summary>
 /// 後処理手法の結果
 /// </summary>
-public class PostProcessingMethodResult
+public class PostProcessingMethodResult(
+    string methodName,
+    double accuracyScore,
+    double correctionRate,
+    TimeSpan processingTime,
+    IEnumerable<PostProcessingTestResult> detailedResults)
 {
-    public string MethodName { get; }
-    public double AccuracyScore { get; }
-    public double CorrectionRate { get; }
-    public TimeSpan ProcessingTime { get; }
-    public IReadOnlyList<PostProcessingTestResult> DetailedResults { get; }
-    
-    public PostProcessingMethodResult(
-        string methodName,
-        double accuracyScore,
-        double correctionRate,
-        TimeSpan processingTime,
-        IEnumerable<PostProcessingTestResult> detailedResults)
-    {
-        MethodName = methodName;
-        AccuracyScore = accuracyScore;
-        CorrectionRate = correctionRate;
-        ProcessingTime = processingTime;
-        DetailedResults = detailedResults.ToList();
-    }
+    public string MethodName { get; } = methodName;
+    public double AccuracyScore { get; } = accuracyScore;
+    public double CorrectionRate { get; } = correctionRate;
+    public TimeSpan ProcessingTime { get; } = processingTime;
+    public IReadOnlyList<PostProcessingTestResult> DetailedResults { get; } = [.. detailedResults];
 }
 
 /// <summary>
 /// N-gramベンチマーク結果
 /// </summary>
-public class NgramBenchmarkResult
+public class NgramBenchmarkResult(
+    IEnumerable<PostProcessingMethodResult> results,
+    PostProcessingMethodResult bestMethod,
+    string recommendations)
 {
-    public IReadOnlyList<PostProcessingMethodResult> Results { get; }
-    public PostProcessingMethodResult BestMethod { get; }
-    public string Recommendations { get; }
-    
-    public NgramBenchmarkResult(
-        IEnumerable<PostProcessingMethodResult> results,
-        PostProcessingMethodResult bestMethod,
-        string recommendations)
-    {
-        Results = results.ToList();
-        BestMethod = bestMethod;
-        Recommendations = recommendations;
-    }
+    public IReadOnlyList<PostProcessingMethodResult> Results { get; } = [.. results];
+    public PostProcessingMethodResult BestMethod { get; } = bestMethod;
+    public string Recommendations { get; } = recommendations;
 }

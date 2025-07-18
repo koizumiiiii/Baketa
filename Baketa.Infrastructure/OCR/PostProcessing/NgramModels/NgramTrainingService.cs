@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -38,10 +39,10 @@ public class NgramTrainingService
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BigramModel>.Instance);
         var trainingTexts = GetJapaneseTrainingData();
         
-        await model.TrainAsync(trainingTexts);
+        await model.TrainAsync(trainingTexts).ConfigureAwait(false);
         
         var modelPath = Path.Combine(_modelDirectory, "japanese_bigram_model.json");
-        await model.SaveAsync(modelPath);
+        await model.SaveAsync(modelPath).ConfigureAwait(false);
         
         _logger.LogInformation("日本語Bigramモデルの訓練完了: {ModelPath}", modelPath);
         
@@ -58,12 +59,12 @@ public class NgramTrainingService
         if (!File.Exists(modelPath))
         {
             _logger.LogWarning("日本語Bigramモデルが見つかりません。新規作成します: {ModelPath}", modelPath);
-            return await TrainJapaneseBigramModelAsync();
+            return await TrainJapaneseBigramModelAsync().ConfigureAwait(false);
         }
         
         var model = new BigramModel(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BigramModel>.Instance);
-        await model.LoadAsync(modelPath);
+        await model.LoadAsync(modelPath).ConfigureAwait(false);
         
         return model;
     }
@@ -71,7 +72,7 @@ public class NgramTrainingService
     /// <summary>
     /// 日本語学習データの取得
     /// </summary>
-    private IEnumerable<string> GetJapaneseTrainingData()
+    private List<string> GetJapaneseTrainingData()
     {
         var basicTexts = new List<string>
         {
@@ -181,7 +182,7 @@ public class NgramTrainingService
             {
                 foreach (var verb in verbs)
                 {
-                    extendedTexts.Add(string.Format(pattern, noun, verb));
+                    extendedTexts.Add(string.Format(CultureInfo.InvariantCulture, pattern, noun, verb));
                 }
             }
         }
@@ -201,10 +202,10 @@ public class NgramTrainingService
         var baseTrainingTexts = GetJapaneseTrainingData();
         var allTrainingTexts = baseTrainingTexts.Concat(additionalTexts);
         
-        await model.TrainAsync(allTrainingTexts);
+        await model.TrainAsync(allTrainingTexts).ConfigureAwait(false);
         
         var modelPath = Path.Combine(_modelDirectory, "japanese_bigram_model_custom.json");
-        await model.SaveAsync(modelPath);
+        await model.SaveAsync(modelPath).ConfigureAwait(false);
         
         _logger.LogInformation("カスタムBigramモデルの訓練完了: {ModelPath}", modelPath);
         
@@ -214,23 +215,23 @@ public class NgramTrainingService
     /// <summary>
     /// モデルの品質を評価
     /// </summary>
-    public async Task<ModelEvaluationResult> EvaluateModelAsync(BigramModel model)
+    public Task<ModelEvaluationResult> EvaluateModelAsync(BigramModel model)
     {
         _logger.LogInformation("Bigramモデルの品質評価開始");
         
         var testTexts = GetTestTexts();
         var results = new List<EvaluationCase>();
         
-        foreach (var testCase in testTexts)
+        foreach (var (correctText, corruptedText) in testTexts)
         {
-            var likelihood = model.CalculateLikelihood(testCase.correctText);
-            var corruptedLikelihood = model.CalculateLikelihood(testCase.corruptedText);
+            var likelihood = model.CalculateLikelihood(correctText);
+            var corruptedLikelihood = model.CalculateLikelihood(corruptedText);
             
             var isCorrect = likelihood > corruptedLikelihood;
             
             results.Add(new EvaluationCase(
-                testCase.correctText,
-                testCase.corruptedText,
+                correctText,
+                corruptedText,
                 likelihood,
                 corruptedLikelihood,
                 isCorrect));
@@ -240,7 +241,7 @@ public class NgramTrainingService
         
         _logger.LogInformation("Bigramモデルの品質評価完了: 精度 {Accuracy:F2}%", accuracy * 100);
         
-        return new ModelEvaluationResult(accuracy, results);
+        return Task.FromResult(new ModelEvaluationResult(accuracy, results));
     }
     
     /// <summary>
@@ -248,8 +249,8 @@ public class NgramTrainingService
     /// </summary>
     private IEnumerable<(string correctText, string corruptedText)> GetTestTexts()
     {
-        return new[]
-        {
+        return
+        [
             ("単体テスト", "車体テスト"),
             ("設計書", "役計書"),
             ("データベース", "データベース"),
@@ -270,42 +271,27 @@ public class NgramTrainingService
             ("XMLファイル", "XMLファイル"),
             ("REST API", "REST API"),
             ("WebSocket", "WebSocket"),
-        };
+        ];
     }
 }
 
 /// <summary>
 /// モデル評価結果
 /// </summary>
-public class ModelEvaluationResult
+public class ModelEvaluationResult(double accuracy, IEnumerable<EvaluationCase> cases)
 {
-    public double Accuracy { get; }
-    public IReadOnlyList<EvaluationCase> Cases { get; }
-    
-    public ModelEvaluationResult(double accuracy, IEnumerable<EvaluationCase> cases)
-    {
-        Accuracy = accuracy;
-        Cases = cases.ToList();
-    }
+    public double Accuracy { get; } = accuracy;
+    public IReadOnlyList<EvaluationCase> Cases { get; } = [.. cases];
 }
 
 /// <summary>
 /// 評価ケース
 /// </summary>
-public class EvaluationCase
+public class EvaluationCase(string correctText, string corruptedText, double correctLikelihood, double corruptedLikelihood, bool isCorrect)
 {
-    public string CorrectText { get; }
-    public string CorruptedText { get; }
-    public double CorrectLikelihood { get; }
-    public double CorruptedLikelihood { get; }
-    public bool IsCorrect { get; }
-    
-    public EvaluationCase(string correctText, string corruptedText, double correctLikelihood, double corruptedLikelihood, bool isCorrect)
-    {
-        CorrectText = correctText;
-        CorruptedText = corruptedText;
-        CorrectLikelihood = correctLikelihood;
-        CorruptedLikelihood = corruptedLikelihood;
-        IsCorrect = isCorrect;
-    }
+    public string CorrectText { get; } = correctText;
+    public string CorruptedText { get; } = corruptedText;
+    public double CorrectLikelihood { get; } = correctLikelihood;
+    public double CorruptedLikelihood { get; } = corruptedLikelihood;
+    public bool IsCorrect { get; } = isCorrect;
 }

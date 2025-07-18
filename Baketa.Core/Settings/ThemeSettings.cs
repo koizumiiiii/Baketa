@@ -11,7 +11,7 @@ public sealed class ThemeSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Theme", "アプリケーションテーマ", 
         Description = "アプリケーション全体のテーマ", 
-        ValidValues = new object[] { UiTheme.Light, UiTheme.Dark, UiTheme.Auto })]
+        ValidValues = [UiTheme.Light, UiTheme.Dark, UiTheme.Auto])]
     public UiTheme AppTheme { get; set; } = UiTheme.Auto;
     
     /// <summary>
@@ -73,7 +73,7 @@ public sealed class ThemeSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Theme", "アニメーション速度", 
         Description = "アニメーション効果の速度調整", 
-        ValidValues = new object[] { AnimationSpeed.Slow, AnimationSpeed.Normal, AnimationSpeed.Fast })]
+        ValidValues = [AnimationSpeed.Slow, AnimationSpeed.Normal, AnimationSpeed.Fast])]
     public AnimationSpeed AnimationSpeed { get; set; } = AnimationSpeed.Normal;
     
     /// <summary>

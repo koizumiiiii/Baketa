@@ -289,7 +289,7 @@ public interface ITranslationEngineFactory
 /// <summary>
 /// 翻訳エンジンファクトリーの実装
 /// </summary>
-public class TranslationEngineFactory(
+public sealed class TranslationEngineFactory(
     IServiceProvider serviceProvider,
     ILogger<TranslationEngineFactory> logger) : ITranslationEngineFactory
 {
@@ -327,7 +327,7 @@ public class TranslationEngineFactory(
 /// <summary>
 /// 拡張翻訳サービス
 /// </summary>
-public class EnhancedTranslationService(
+public sealed class EnhancedTranslationService(
     ITranslationEngineFactory engineFactory,
     IConfiguration configuration,
     ILogger<EnhancedTranslationService> logger) : ITranslationService
