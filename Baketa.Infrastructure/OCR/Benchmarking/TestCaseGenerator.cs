@@ -6,21 +6,28 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Infrastructure.Imaging;
+using Baketa.Infrastructure.OCR.MultiScale;
 
 namespace Baketa.Infrastructure.OCR.Benchmarking;
 
 /// <summary>
 /// OCRテスト用のテストケース生成クラス
 /// </summary>
-public class TestCaseGenerator
+public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
 {
-    private readonly ILogger<TestCaseGenerator> _logger;
-    
-    public TestCaseGenerator(ILogger<TestCaseGenerator> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly ILogger<TestCaseGenerator> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    private static readonly string[] UiTexts = [
+        "OK", "キャンセル", "保存", "開く", "設定",
+        "ファイル名:", "サイズ: 1.2MB", "更新日: 2024/01/01"
+    ];
+
+    private static readonly string[] ChartLabels = [
+        "0", "10", "20", "30", "40", "50",
+        "1月", "2月", "3月", "4月", "5月", "6月",
+        "売上高", "利益率", "成長率(%)"
+    ];
+
     /// <summary>
     /// 日本語・英語混在テキストのテストケースを生成
     /// </summary>
@@ -80,7 +87,7 @@ public class TestCaseGenerator
                 foreach (var fontSize in fontSizes)
                 {
                     var testName = $"{text}_{fontSize}px";
-                    var image = await GenerateTextImageAsync(text, fontSize);
+                    var image = await GenerateTextImageAsync(text, fontSize).ConfigureAwait(false);
                     
                     var testCase = new TestCase(testName, image, text);
                     testCases.Add(testCase);
@@ -132,7 +139,7 @@ public class TestCaseGenerator
             try
             {
                 var testName = $"ErrorPattern_{correctText}";
-                var image = await GenerateTextImageAsync(correctText, 16);
+                var image = await GenerateTextImageAsync(correctText, 16).ConfigureAwait(false);
                 
                 var testCase = new TestCase(testName, image, correctText);
                 testCases.Add(testCase);
@@ -163,7 +170,7 @@ public class TestCaseGenerator
             var height = Math.Max(50, fontSize + 20);
             
             return new PlaceholderImageWithSize(imageData, width, height);
-        });
+        }).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -191,7 +198,7 @@ public class TestCaseGenerator
             try
             {
                 var fileName = Path.GetFileNameWithoutExtension(imageFile);
-                var imageBytes = await File.ReadAllBytesAsync(imageFile);
+                var imageBytes = await File.ReadAllBytesAsync(imageFile).ConfigureAwait(false);
                 var image = new BitmapImage(imageBytes);
                 
                 // ファイル名からテキストを抽出（例：expected_text_単体テスト.png）
@@ -225,28 +232,145 @@ public class TestCaseGenerator
         // デフォルトでファイル名をそのまま使用
         return filename;
     }
+    
+    /// <summary>
+    /// 小さいテキストの画像を生成
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateSmallTextImageAsync(string text, int fontSize)
+    {
+        return await Task.Run(() =>
+        {
+            // 小さいフォントサイズのテキスト画像を生成
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"SmallText:{text}:{fontSize}px");
+            
+            // テキストサイズに基づいて画像サイズを計算
+            var width = Math.Max(100, text.Length * fontSize);
+            var height = Math.Max(fontSize + 10, 30);
+            
+            return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// 複数サイズのテキストが混在する画像を生成
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateMixedSizeTextImageAsync((string text, int fontSize)[] textItems)
+    {
+        return await Task.Run(() =>
+        {
+            // 混在テキストのメタデータを構築
+            var metadata = string.Join(";", textItems.Select(t => $"{t.text}:{t.fontSize}px"));
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"MixedText:{metadata}");
+            
+            // 最大フォントサイズと合計高さを計算
+            var maxFontSize = textItems.Max(t => t.fontSize);
+            var totalHeight = textItems.Sum(t => t.fontSize + 5) + 20;
+            var maxWidth = textItems.Max(t => t.text.Length * t.fontSize);
+            
+            return new Core.Services.Imaging.AdvancedImage(imageData, maxWidth, totalHeight, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// UI要素（ボタン、ラベル等）を含む画像を生成
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateUIElementsImageAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // UI要素のサンプルテキスト
+            var uiTexts = UiTexts;
+            
+            var metadata = string.Join(";", uiTexts);
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"UIElements:{metadata}");
+            
+            // UI要素を含む画像のサイズ
+            return new Core.Services.Imaging.AdvancedImage(imageData, 400, 300, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// グラフやチャートのラベルを含む画像を生成
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateChartWithLabelsAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // チャートラベルのサンプル
+            var labels = ChartLabels;
+            
+            var metadata = string.Join(";", labels);
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"ChartLabels:{metadata}");
+            
+            // チャート画像のサイズ
+            return new Core.Services.Imaging.AdvancedImage(imageData, 600, 400, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 低品質画像を生成します
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateLowQualityImageAsync(string text, double contrast, double brightness, double noise)
+    {
+        return await Task.Run(() =>
+        {
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"LowQuality:{text}:C{contrast:F1}B{brightness:F1}N{noise:F1}");
+            var width = Math.Max(200, text.Length * 16);
+            var height = 50;
+            return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// ノイズを含む画像を生成します
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateNoisyImageAsync(string text, string noiseType, double noiseLevel)
+    {
+        return await Task.Run(() =>
+        {
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"Noisy:{text}:{noiseType}:{noiseLevel:F1}");
+            var width = Math.Max(200, text.Length * 16);
+            var height = 50;
+            return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 高品質画像を生成します
+    /// </summary>
+    public async Task<IAdvancedImage> GenerateHighQualityImageAsync(string text)
+    {
+        return await Task.Run(() =>
+        {
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"HighQuality:{text}");
+            var width = Math.Max(300, text.Length * 20);
+            var height = 60;
+            return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// パフォーマンステスト用の画像を生成します
+    /// </summary>
+    public async Task<IAdvancedImage> GeneratePerformanceTestImageAsync(string text, int width, int height)
+    {
+        return await Task.Run(() =>
+        {
+            var imageData = System.Text.Encoding.UTF8.GetBytes($"Performance:{text}:{width}x{height}");
+            return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
+        }).ConfigureAwait(false);
+    }
 }
 
 /// <summary>
 /// バイト配列から作成されるビットマップ画像
 /// </summary>
-public class BitmapImage : IImage
+public class BitmapImage(byte[] imageBytes) : IImage
 {
-    private readonly byte[] _imageBytes;
-    private readonly int _width;
-    private readonly int _height;
-    
-    public BitmapImage(byte[] imageBytes)
-    {
-        _imageBytes = imageBytes ?? throw new ArgumentNullException(nameof(imageBytes));
-        
-        // 実際の画像解析は省略し、デフォルト値を使用
-        _width = 800;
-        _height = 100;
-    }
-    
-    public int Width => _width;
-    public int Height => _height;
+    private readonly byte[] _imageBytes = imageBytes ?? throw new ArgumentNullException(nameof(imageBytes));
+
+    public int Width { get; } = 800;
+    public int Height { get; } = 100;
     public ImageFormat Format => ImageFormat.Png;
     
     public Task<byte[]> ToByteArrayAsync()
@@ -271,27 +395,19 @@ public class BitmapImage : IImage
     public void Dispose()
     {
         // バイト配列は自動的にガベージコレクションされるため、特別な処理は不要
+        GC.SuppressFinalize(this);
     }
 }
 
 /// <summary>
 /// サイズ指定可能なプレースホルダー画像
 /// </summary>
-public class PlaceholderImageWithSize : IImage
+public class PlaceholderImageWithSize(byte[] imageBytes, int width, int height) : IImage
 {
-    private readonly byte[] _imageBytes;
-    private readonly int _width;
-    private readonly int _height;
-    
-    public PlaceholderImageWithSize(byte[] imageBytes, int width, int height)
-    {
-        _imageBytes = imageBytes ?? throw new ArgumentNullException(nameof(imageBytes));
-        _width = width;
-        _height = height;
-    }
-    
-    public int Width => _width;
-    public int Height => _height;
+    private readonly byte[] _imageBytes = imageBytes ?? throw new ArgumentNullException(nameof(imageBytes));
+
+    public int Width => width;
+    public int Height => height;
     public ImageFormat Format => ImageFormat.Png;
     
     public Task<byte[]> ToByteArrayAsync()
@@ -303,7 +419,7 @@ public class PlaceholderImageWithSize : IImage
     {
         var clonedBytes = new byte[_imageBytes.Length];
         Array.Copy(_imageBytes, clonedBytes, _imageBytes.Length);
-        return new PlaceholderImageWithSize(clonedBytes, _width, _height);
+        return new PlaceholderImageWithSize(clonedBytes, width, height);
     }
     
     public Task<IImage> ResizeAsync(int width, int height)
@@ -316,5 +432,6 @@ public class PlaceholderImageWithSize : IImage
     public void Dispose()
     {
         // バイト配列は自動的にガベージコレクションされるため、特別な処理は不要
+        GC.SuppressFinalize(this);
     }
 }

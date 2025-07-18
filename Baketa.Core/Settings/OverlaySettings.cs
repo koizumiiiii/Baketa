@@ -154,7 +154,7 @@ public sealed class OverlaySettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "表示位置モード", 
         Description = "オーバーレイの表示位置の決定方法", 
-        ValidValues = new object[] { OverlayPositionMode.Fixed, OverlayPositionMode.NearText, OverlayPositionMode.MouseCursor })]
+        ValidValues = [OverlayPositionMode.Fixed, OverlayPositionMode.NearText, OverlayPositionMode.MouseCursor])]
     public OverlayPositionMode PositionMode { get; set; } = OverlayPositionMode.NearText;
     
     /// <summary>

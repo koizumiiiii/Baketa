@@ -92,7 +92,7 @@ public class TranslationFlowEventProcessor :
             Console.WriteLine($"❌ {errorMessage}");
             DebugLogUtility.WriteLog($"❌ {errorMessage}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ {errorMessage}");
-            _logger.LogError(errorMessage);
+            _logger.LogError("{ErrorMessage}", errorMessage);
             return;
         }
         
@@ -392,7 +392,7 @@ public class TranslationFlowEventProcessor :
             DebugLogUtility.WriteLog("🏁 TranslationService.StartAutomaticTranslationAsync呼び出し中...");
             DebugLogUtility.WriteLog($"   🔍 サービス状態: {(_translationService != null ? "利用可能" : "null")}");
             
-            await _translationService.StartAutomaticTranslationAsync(targetWindow.Handle).ConfigureAwait(false);
+            await _translationService!.StartAutomaticTranslationAsync(targetWindow.Handle).ConfigureAwait(false);
             DebugLogUtility.WriteLog("🏁 TranslationService.StartAutomaticTranslationAsync完了");
             DebugLogUtility.WriteLog($"   🔍 自動翻訳アクティブ: {_translationService.IsAutomaticTranslationActive}");
 
@@ -520,6 +520,8 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogError(ex, "言語設定変更イベントの処理中にエラーが発生しました");
         }
+        
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>

@@ -10,18 +10,10 @@ namespace Baketa.Infrastructure.OCR.Ensemble;
 /// <summary>
 /// アンサンブルOCRの効果を測定するベンチマーククラス
 /// </summary>
-public class EnsembleBenchmark
+public sealed class EnsembleBenchmark(
+    ILogger<EnsembleBenchmark> logger,
+    TestCaseGenerator testCaseGenerator)
 {
-    private readonly ILogger<EnsembleBenchmark> _logger;
-    private readonly TestCaseGenerator _testCaseGenerator;
-
-    public EnsembleBenchmark(
-        ILogger<EnsembleBenchmark> logger,
-        TestCaseGenerator testCaseGenerator)
-    {
-        _logger = logger;
-        _testCaseGenerator = testCaseGenerator;
-    }
 
     /// <summary>
     /// アンサンブルと単一エンジンの比較ベンチマークを実行
@@ -33,21 +25,21 @@ public class EnsembleBenchmark
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("アンサンブル比較ベンチマーク開始: アンサンブル vs {EngineCount}個別エンジン",
+        logger.LogInformation("アンサンブル比較ベンチマーク開始: アンサンブル vs {EngineCount}個別エンジン",
             individualEngines.Count);
 
         try
         {
             // テストケース生成
-            var testCases = await GenerateComprehensiveTestCasesAsync(parameters);
-            _logger.LogInformation("テストケース生成完了: {TestCaseCount}件", testCases.Count);
+            var testCases = await GenerateComprehensiveTestCasesAsync(parameters).ConfigureAwait(false);
+            logger.LogInformation("テストケース生成完了: {TestCaseCount}件", testCases.Count);
 
             // アンサンブルエンジンでのテスト
-            var ensembleResults = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken);
+            var ensembleResults = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken).ConfigureAwait(false);
 
             // 個別エンジンでのテスト
             var individualResults = await RunIndividualEngineTestsAsync(
-                individualEngines, testCases, cancellationToken);
+                individualEngines, testCases, cancellationToken).ConfigureAwait(false);
 
             // 結果比較分析
             var comparisonAnalysis = AnalyzeComparison(ensembleResults, individualResults);
@@ -70,7 +62,7 @@ public class EnsembleBenchmark
                 BenchmarkDate = DateTime.UtcNow
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "アンサンブル比較ベンチマーク完了: 精度改善={AccuracyImprovement:F3}, " +
                 "速度比={SpeedRatio:F2}x, 実行時間={ElapsedMs}ms",
                 comparisonAnalysis.OverallAccuracyImprovement,
@@ -81,7 +73,7 @@ public class EnsembleBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "アンサンブル比較ベンチマーク中にエラーが発生しました");
+            logger.LogError(ex, "アンサンブル比較ベンチマーク中にエラーが発生しました");
             throw;
         }
     }
@@ -95,19 +87,19 @@ public class EnsembleBenchmark
         EnsembleBenchmarkParameters parameters,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("融合戦略比較ベンチマーク開始: {StrategyCount}戦略", strategies.Count);
+        logger.LogInformation("融合戦略比較ベンチマーク開始: {StrategyCount}戦略", strategies.Count);
 
         try
         {
-            var testCases = await GenerateStrategyTestCasesAsync(parameters);
-            var strategyResults = new Dictionary<string, List<EnsembleTestResult>>();
+            var testCases = await GenerateStrategyTestCasesAsync(parameters).ConfigureAwait(false);
+            Dictionary<string, List<EnsembleTestResult>> strategyResults = [];
 
             foreach (var strategy in strategies)
             {
-                _logger.LogDebug("戦略テスト開始: {StrategyName}", strategy.StrategyName);
+                logger.LogDebug("戦略テスト開始: {StrategyName}", strategy.StrategyName);
                 
                 ensembleEngine.SetFusionStrategy(strategy);
-                var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken);
+                var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken).ConfigureAwait(false);
                 strategyResults[strategy.StrategyName] = results;
             }
 
@@ -121,7 +113,7 @@ public class EnsembleBenchmark
                 TestCaseCount = testCases.Count
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "融合戦略比較完了: 最適戦略={BestStrategy}, 改善効果={Improvement:F3}",
                 result.BestStrategy.StrategyName, result.BestStrategy.OverallScore);
 
@@ -129,7 +121,7 @@ public class EnsembleBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "融合戦略比較ベンチマーク中にエラーが発生しました");
+            logger.LogError(ex, "融合戦略比較ベンチマーク中にエラーが発生しました");
             throw;
         }
     }
@@ -143,21 +135,21 @@ public class EnsembleBenchmark
         EnsembleBenchmarkParameters parameters,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("スケーラビリティベンチマーク開始: 最大{MaxEngines}エンジン",
+        logger.LogInformation("スケーラビリティベンチマーク開始: 最大{MaxEngines}エンジン",
             availableEngines.Count);
 
         try
         {
-            var testCases = await GenerateScalabilityTestCasesAsync(parameters);
-            var scalabilityResults = new Dictionary<int, ScalabilityDataPoint>();
+            var testCases = await GenerateScalabilityTestCasesAsync(parameters).ConfigureAwait(false);
+            Dictionary<int, ScalabilityDataPoint> scalabilityResults = [];
 
             // エンジン数を段階的に増やしてテスト
             for (int engineCount = 1; engineCount <= availableEngines.Count; engineCount++)
             {
-                _logger.LogDebug("エンジン数={EngineCount}でのテスト開始", engineCount);
+                logger.LogDebug("エンジン数={EngineCount}でのテスト開始", engineCount);
 
-                var ensembleEngine = await ensembleEngineFactory(engineCount);
-                var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken);
+                var ensembleEngine = await ensembleEngineFactory(engineCount).ConfigureAwait(false);
+                var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken).ConfigureAwait(false);
                 
                 var dataPoint = CalculateScalabilityMetrics(results, engineCount);
                 scalabilityResults[engineCount] = dataPoint;
@@ -173,7 +165,7 @@ public class EnsembleBenchmark
                 TestCaseCount = testCases.Count
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "スケーラビリティベンチマーク完了: 最適エンジン数={OptimalCount}, " +
                 "最大改善効果={MaxImprovement:F3}",
                 result.OptimalEngineCount, result.ScalabilityAnalysis.MaxImprovementRatio);
@@ -182,7 +174,7 @@ public class EnsembleBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "スケーラビリティベンチマーク中にエラーが発生しました");
+            logger.LogError(ex, "スケーラビリティベンチマーク中にエラーが発生しました");
             throw;
         }
     }
@@ -195,20 +187,20 @@ public class EnsembleBenchmark
         EnsembleBenchmarkParameters parameters,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("耐障害性ベンチマーク開始");
+        logger.LogInformation("耐障害性ベンチマーク開始");
 
         try
         {
-            var testCases = await GenerateFaultToleranceTestCasesAsync(parameters);
+            var testCases = await GenerateFaultToleranceTestCasesAsync(parameters).ConfigureAwait(false);
             var faultScenarios = GenerateFaultScenarios(ensembleEngine.GetEnsembleConfiguration());
-            var faultResults = new Dictionary<string, FaultToleranceResult>();
+            Dictionary<string, FaultToleranceResult> faultResults = [];
 
             foreach (var scenario in faultScenarios)
             {
-                _logger.LogDebug("障害シナリオテスト: {ScenarioName}", scenario.ScenarioName);
+                logger.LogDebug("障害シナリオテスト: {ScenarioName}", scenario.ScenarioName);
 
                 var results = await RunFaultScenarioTestAsync(
-                    ensembleEngine, testCases, scenario, cancellationToken);
+                    ensembleEngine, testCases, scenario, cancellationToken).ConfigureAwait(false);
                 
                 faultResults[scenario.ScenarioName] = results;
             }
@@ -223,7 +215,7 @@ public class EnsembleBenchmark
                 TestCaseCount = testCases.Count
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "耐障害性ベンチマーク完了: 総合耐性={Resilience:F3}, " +
                 "最悪ケース性能維持={WorstCase:F3}",
                 result.OverallResilience, result.FaultToleranceAnalysis.WorstCasePerformanceRetention);
@@ -232,7 +224,7 @@ public class EnsembleBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "耐障害性ベンチマーク中にエラーが発生しました");
+            logger.LogError(ex, "耐障害性ベンチマーク中にエラーが発生しました");
             throw;
         }
     }
@@ -245,24 +237,24 @@ public class EnsembleBenchmark
     private async Task<List<TestCase>> GenerateComprehensiveTestCasesAsync(
         EnsembleBenchmarkParameters parameters)
     {
-        var testCases = new List<TestCase>();
+        List<TestCase> testCases = [];
 
         // 基本テストケース
-        var basicCases = await _testCaseGenerator.GenerateErrorPatternTestCasesAsync();
+        var basicCases = await testCaseGenerator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(basicCases);
 
         // 品質別テストケース
         for (int quality = 1; quality <= 5; quality++)
         {
-            var qualityCases = await GenerateQualitySpecificTestCasesAsync(quality, parameters.TestCasesPerQuality);
+            var qualityCases = await GenerateQualitySpecificTestCasesAsync(quality, parameters.TestCasesPerQuality).ConfigureAwait(false);
             testCases.AddRange(qualityCases);
         }
 
         // 複雑度別テストケース
-        var complexityCases = await GenerateComplexityTestCasesAsync(parameters.ComplexityLevels);
+        var complexityCases = await GenerateComplexityTestCasesAsync(parameters.ComplexityLevels).ConfigureAwait(false);
         testCases.AddRange(complexityCases);
 
-        return testCases.Take(parameters.MaxTestCases).ToList();
+        return [.. testCases.Take(parameters.MaxTestCases)];
     }
 
     /// <summary>
@@ -273,7 +265,7 @@ public class EnsembleBenchmark
         List<TestCase> testCases,
         CancellationToken cancellationToken)
     {
-        var results = new List<EnsembleTestResult>();
+        List<EnsembleTestResult> results = [];
 
         foreach (var testCase in testCases)
         {
@@ -281,7 +273,7 @@ public class EnsembleBenchmark
             {
                 var sw = Stopwatch.StartNew();
                 var result = await ensembleEngine.RecognizeWithDetailsAsync(
-                    testCase.Image, null, cancellationToken);
+                    testCase.Image, null, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
 
                 var accuracy = CalculateAccuracy(result.TextRegions, testCase.ExpectedText);
@@ -297,7 +289,7 @@ public class EnsembleBenchmark
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "テストケース実行エラー: {TestCase}", testCase.Name);
+                logger.LogWarning(ex, "テストケース実行エラー: {TestCase}", testCase.Name);
                 results.Add(new EnsembleTestResult
                 {
                     TestCaseName = testCase.Name,
@@ -321,18 +313,18 @@ public class EnsembleBenchmark
         List<TestCase> testCases,
         CancellationToken cancellationToken)
     {
-        var results = new Dictionary<string, List<IndividualEngineTestResult>>();
+        Dictionary<string, List<IndividualEngineTestResult>> results = [];
 
         foreach (var engine in engines)
         {
-            var engineResults = new List<IndividualEngineTestResult>();
+            List<IndividualEngineTestResult> engineResults = [];
 
             foreach (var testCase in testCases)
             {
                 try
                 {
                     var sw = Stopwatch.StartNew();
-                    var result = await engine.RecognizeAsync(testCase.Image, null, cancellationToken);
+                    var result = await engine.RecognizeAsync(testCase.Image, null, cancellationToken).ConfigureAwait(false);
                     sw.Stop();
 
                     var accuracy = CalculateAccuracy(result.TextRegions, testCase.ExpectedText);
@@ -349,7 +341,7 @@ public class EnsembleBenchmark
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "個別エンジンテストエラー: {Engine} - {TestCase}",
+                    logger.LogWarning(ex, "個別エンジンテストエラー: {Engine} - {TestCase}",
                         engine.EngineName, testCase.Name);
                     
                     engineResults.Add(new IndividualEngineTestResult
@@ -426,57 +418,57 @@ public class EnsembleBenchmark
     /// <summary>
     /// 他のプライベートメソッドは省略形で実装（実際の実装では完全に実装する必要があります）
     /// </summary>
-    private async Task<List<TestCase>> GenerateQualitySpecificTestCasesAsync(int quality, int count) =>
-        await Task.FromResult(new List<TestCase>());
+    private async Task<List<TestCase>> GenerateQualitySpecificTestCasesAsync(int _, int _2) =>
+        await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
-    private async Task<List<TestCase>> GenerateComplexityTestCasesAsync(int levels) =>
-        await Task.FromResult(new List<TestCase>());
+    private async Task<List<TestCase>> GenerateComplexityTestCasesAsync(int _) =>
+        await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
-    private ComparisonAnalysis AnalyzeComparison(List<EnsembleTestResult> ensemble, 
-        Dictionary<string, List<IndividualEngineTestResult>> individual) =>
+    private ComparisonAnalysis AnalyzeComparison(List<EnsembleTestResult> _, 
+        Dictionary<string, List<IndividualEngineTestResult>> _2) =>
         new() { OverallAccuracyImprovement = 0.1, SpeedRatio = 1.2 };
 
-    private PerformanceAnalysis AnalyzePerformance(List<EnsembleTestResult> ensemble,
-        Dictionary<string, List<IndividualEngineTestResult>> individual) => new();
+    private PerformanceAnalysis AnalyzePerformance(List<EnsembleTestResult> _,
+        Dictionary<string, List<IndividualEngineTestResult>> _2) => new();
 
-    private QualityAnalysis AnalyzeQualityImprovements(List<EnsembleTestResult> ensemble,
-        Dictionary<string, List<IndividualEngineTestResult>> individual) => new();
+    private QualityAnalysis AnalyzeQualityImprovements(List<EnsembleTestResult> _,
+        Dictionary<string, List<IndividualEngineTestResult>> _2) => new();
 
-    private async Task<List<TestCase>> GenerateStrategyTestCasesAsync(EnsembleBenchmarkParameters parameters) =>
-        await Task.FromResult(new List<TestCase>());
+    private async Task<List<TestCase>> GenerateStrategyTestCasesAsync(EnsembleBenchmarkParameters _) =>
+        await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
     private Dictionary<string, StrategyEffectivenessMetrics> AnalyzeFusionStrategyEffectiveness(
-        Dictionary<string, List<EnsembleTestResult>> results, List<TestCase> testCases) =>
-        new();
+        Dictionary<string, List<EnsembleTestResult>> _, List<TestCase> _2) =>
+        [];
 
-    private BestStrategyResult DetermineBestStrategy(Dictionary<string, StrategyEffectivenessMetrics> analysis) =>
+    private BestStrategyResult DetermineBestStrategy(Dictionary<string, StrategyEffectivenessMetrics> _) =>
         new("WeightedVoting", 0.8);
 
-    private async Task<List<TestCase>> GenerateScalabilityTestCasesAsync(EnsembleBenchmarkParameters parameters) =>
-        await Task.FromResult(new List<TestCase>());
+    private async Task<List<TestCase>> GenerateScalabilityTestCasesAsync(EnsembleBenchmarkParameters _) =>
+        await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
-    private ScalabilityDataPoint CalculateScalabilityMetrics(List<EnsembleTestResult> results, int engineCount) =>
+    private ScalabilityDataPoint CalculateScalabilityMetrics(List<EnsembleTestResult> _, int engineCount) =>
         new(engineCount, 0.8, TimeSpan.FromMilliseconds(1000), 1.1);
 
-    private ScalabilityAnalysis AnalyzeScalabilityTrends(Dictionary<int, ScalabilityDataPoint> data) =>
+    private ScalabilityAnalysis AnalyzeScalabilityTrends(Dictionary<int, ScalabilityDataPoint> _) =>
         new() { MaxImprovementRatio = 1.3 };
 
-    private int DetermineOptimalEngineCount(Dictionary<int, ScalabilityDataPoint> data) => 3;
+    private int DetermineOptimalEngineCount(Dictionary<int, ScalabilityDataPoint> _) => 3;
 
-    private async Task<List<TestCase>> GenerateFaultToleranceTestCasesAsync(EnsembleBenchmarkParameters parameters) =>
-        await Task.FromResult(new List<TestCase>());
+    private async Task<List<TestCase>> GenerateFaultToleranceTestCasesAsync(EnsembleBenchmarkParameters _) =>
+        await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
-    private List<FaultScenario> GenerateFaultScenarios(IReadOnlyList<EnsembleEngineInfo> engines) =>
-        new();
+    private List<FaultScenario> GenerateFaultScenarios(IReadOnlyList<EnsembleEngineInfo> _) =>
+        [];
 
-    private async Task<FaultToleranceResult> RunFaultScenarioTestAsync(IEnsembleOcrEngine engine,
-        List<TestCase> testCases, FaultScenario scenario, CancellationToken cancellationToken) =>
-        await Task.FromResult(new FaultToleranceResult());
+    private async Task<FaultToleranceResult> RunFaultScenarioTestAsync(IEnsembleOcrEngine _,
+        List<TestCase> _2, FaultScenario _3, CancellationToken _4) =>
+        await Task.FromResult(new FaultToleranceResult()).ConfigureAwait(false);
 
-    private FaultToleranceAnalysis AnalyzeFaultTolerance(Dictionary<string, FaultToleranceResult> results) =>
+    private FaultToleranceAnalysis AnalyzeFaultTolerance(Dictionary<string, FaultToleranceResult> _) =>
         new() { WorstCasePerformanceRetention = 0.7 };
 
-    private double CalculateOverallResilience(Dictionary<string, FaultToleranceResult> results) => 0.8;
+    private double CalculateOverallResilience(Dictionary<string, FaultToleranceResult> _) => 0.8;
 
     #endregion
 }
@@ -500,7 +492,7 @@ public record EnsembleBenchmarkParameters(
 public record EnsembleComparisonBenchmarkResult
 {
     public List<EnsembleTestResult> EnsembleResults { get; init; } = [];
-    public Dictionary<string, List<IndividualEngineTestResult>> IndividualEngineResults { get; init; } = new();
+    public Dictionary<string, List<IndividualEngineTestResult>> IndividualEngineResults { get; init; } = [];
     public ComparisonAnalysis ComparisonAnalysis { get; init; } = new();
     public PerformanceAnalysis PerformanceAnalysis { get; init; } = new();
     public QualityAnalysis QualityAnalysis { get; init; } = new();
@@ -538,7 +530,7 @@ public record ComparisonAnalysis
     public double OverallAccuracyImprovement { get; init; }
     public double SpeedRatio { get; init; }
     public double ReliabilityImprovement { get; init; }
-    public Dictionary<string, double> CategoryPerformance { get; init; } = new();
+    public Dictionary<string, double> CategoryPerformance { get; init; } = [];
 }
 
 public record PerformanceAnalysis
@@ -546,21 +538,21 @@ public record PerformanceAnalysis
     public double AverageSpeedupRatio { get; init; }
     public double ParallelizationEfficiency { get; init; }
     public double ResourceUtilizationEfficiency { get; init; }
-    public Dictionary<string, TimeSpan> ProcessingTimeBreakdown { get; init; } = new();
+    public Dictionary<string, TimeSpan> ProcessingTimeBreakdown { get; init; } = [];
 }
 
 public record QualityAnalysis
 {
     public double OverallQualityImprovement { get; init; }
-    public Dictionary<string, double> QualityMetricImprovements { get; init; } = new();
+    public Dictionary<string, double> QualityMetricImprovements { get; init; } = [];
     public double ConsistencyImprovement { get; init; }
     public double EdgeCaseHandling { get; init; }
 }
 
 public record FusionStrategyComparisonResult
 {
-    public Dictionary<string, List<EnsembleTestResult>> StrategyResults { get; init; } = new();
-    public Dictionary<string, StrategyEffectivenessMetrics> StrategyAnalysis { get; init; } = new();
+    public Dictionary<string, List<EnsembleTestResult>> StrategyResults { get; init; } = [];
+    public Dictionary<string, StrategyEffectivenessMetrics> StrategyAnalysis { get; init; } = [];
     public BestStrategyResult BestStrategy { get; init; } = new("", 0);
     public int TestCaseCount { get; init; }
 }
@@ -577,7 +569,7 @@ public record BestStrategyResult(string StrategyName, double OverallScore);
 
 public record ScalabilityBenchmarkResult
 {
-    public Dictionary<int, ScalabilityDataPoint> ScalabilityData { get; init; } = new();
+    public Dictionary<int, ScalabilityDataPoint> ScalabilityData { get; init; } = [];
     public ScalabilityAnalysis ScalabilityAnalysis { get; init; } = new();
     public int OptimalEngineCount { get; init; }
     public int TestCaseCount { get; init; }
@@ -594,7 +586,7 @@ public record ScalabilityAnalysis
 
 public record FaultToleranceBenchmarkResult
 {
-    public Dictionary<string, FaultToleranceResult> FaultScenarios { get; init; } = new();
+    public Dictionary<string, FaultToleranceResult> FaultScenarios { get; init; } = [];
     public FaultToleranceAnalysis FaultToleranceAnalysis { get; init; } = new();
     public double OverallResilience { get; init; }
     public int TestCaseCount { get; init; }

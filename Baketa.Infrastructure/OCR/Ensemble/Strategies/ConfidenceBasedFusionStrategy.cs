@@ -7,17 +7,10 @@ namespace Baketa.Infrastructure.OCR.Ensemble.Strategies;
 /// <summary>
 /// 信頼度ベースの結果融合戦略
 /// </summary>
-public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
+public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy> logger) : ResultFusionStrategyBase
 {
-    private readonly ILogger<ConfidenceBasedFusionStrategy> _logger;
-
     public override string StrategyName => "ConfidenceBased";
     public override string Description => "各エンジンの信頼度に基づいて最適な結果を選択";
-
-    public ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy> logger)
-    {
-        _logger = logger;
-    }
 
     public override async Task<EnsembleOcrResults> FuseResultsAsync(
         IReadOnlyList<IndividualEngineResult> individualResults,
@@ -25,7 +18,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("信頼度ベース融合開始: {EngineCount}エンジン", individualResults.Count);
+        logger.LogInformation("信頼度ベース融合開始: {EngineCount}エンジン", individualResults.Count);
 
         try
         {
@@ -38,20 +31,20 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
 
             // エンジンごとの信頼度スコアを計算
             var engineScores = CalculateEngineConfidenceScores(successfulResults);
-            _logger.LogDebug("エンジン信頼度スコア: {Scores}", 
+            logger.LogDebug("エンジン信頼度スコア: {Scores}", 
                 string.Join(", ", engineScores.Select(kvp => $"{kvp.Key}={kvp.Value:F3}")));
 
             // 信頼度ベースの融合を実行
-            var fusedRegions = await PerformConfidenceBasedFusionAsync(successfulResults, engineScores, parameters);
+            var fusedRegions = await PerformConfidenceBasedFusionAsync(successfulResults, engineScores, parameters).ConfigureAwait(false);
             
             // 融合詳細情報を作成
             var fusionDetails = CreateFusionDetails(successfulResults, fusedRegions, engineScores);
 
             var ensembleResults = new EnsembleOcrResults(
                 fusedRegions,
-                individualResults.FirstOrDefault()?.Results.SourceImage ?? throw new InvalidOperationException("No source image available"),
+                individualResults.Count > 0 ? individualResults[0].Results.SourceImage : throw new InvalidOperationException("No source image available"),
                 sw.Elapsed,
-                individualResults.FirstOrDefault()?.Results.LanguageCode ?? "unknown")
+                individualResults.Count > 0 ? individualResults[0].Results.LanguageCode ?? "unknown" : "unknown")
             {
                 IndividualResults = individualResults,
                 FusionDetails = fusionDetails,
@@ -60,7 +53,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
                 EnsembleProcessingTime = sw.Elapsed
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "信頼度ベース融合完了: {FinalRegions}領域, 融合時間={ElapsedMs}ms",
                 fusedRegions.Count, sw.ElapsedMilliseconds);
 
@@ -68,7 +61,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "信頼度ベース融合中にエラーが発生しました");
+            logger.LogError(ex, "信頼度ベース融合中にエラーが発生しました");
             return CreateEmptyResult(individualResults, sw.Elapsed);
         }
     }
@@ -79,7 +72,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
     private Dictionary<string, double> CalculateEngineConfidenceScores(
         IReadOnlyList<IndividualEngineResult> results)
     {
-        var engineScores = new Dictionary<string, double>();
+        Dictionary<string, double> engineScores = [];
 
         foreach (var result in results)
         {
@@ -126,13 +119,14 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         Dictionary<string, double> engineScores,
         FusionParameters parameters)
     {
-        var fusedRegions = new List<OcrTextRegion>();
+        List<OcrTextRegion> fusedRegions = [];
 
         // 最も信頼度の高いエンジンを特定
-        var bestEngine = engineScores.OrderByDescending(kvp => kvp.Value).First().Key;
+        var sortedEngines = engineScores.OrderByDescending(kvp => kvp.Value).ToList();
+        var bestEngine = sortedEngines[0].Key;
         var bestResult = results.First(r => r.EngineName == bestEngine);
         
-        _logger.LogDebug("最高信頼度エンジン: {EngineName} (スコア: {Score:F3})", 
+        logger.LogDebug("最高信頼度エンジン: {EngineName} (スコア: {Score:F3})", 
             bestEngine, engineScores[bestEngine]);
 
         // 基準となる領域を取得
@@ -144,7 +138,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         {
             // 他のエンジンから対応する領域を探索
             var correspondingRegions = await FindCorrespondingRegionsAsync(
-                baseRegion, results, bestEngine, parameters);
+                baseRegion, results, bestEngine, parameters).ConfigureAwait(false);
 
             // 信頼度ベースで最適な領域を選択
             var selectedRegion = SelectBestRegionByConfidence(
@@ -157,7 +151,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         }
 
         // 他のエンジンからの高信頼度領域も追加検討
-        await AddSupplementaryRegionsAsync(fusedRegions, results, engineScores, parameters);
+        await AddSupplementaryRegionsAsync(fusedRegions, results, engineScores, parameters).ConfigureAwait(false);
 
         return fusedRegions;
     }
@@ -165,13 +159,13 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
     /// <summary>
     /// 対応する領域を他のエンジンから探索
     /// </summary>
-    private async Task<List<CorrespondingRegion>> FindCorrespondingRegionsAsync(
+    private Task<List<CorrespondingRegion>> FindCorrespondingRegionsAsync(
         OcrTextRegion baseRegion,
         IReadOnlyList<IndividualEngineResult> results,
         string baseEngine,
         FusionParameters parameters)
     {
-        var correspondingRegions = new List<CorrespondingRegion>();
+        List<CorrespondingRegion> correspondingRegions = [];
 
         foreach (var result in results.Where(r => r.EngineName != baseEngine))
         {
@@ -187,7 +181,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
             }
         }
 
-        return correspondingRegions;
+        return Task.FromResult(correspondingRegions);
     }
 
     /// <summary>
@@ -199,10 +193,10 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         Dictionary<string, double> engineScores,
         FusionParameters parameters)
     {
-        var candidates = new List<CandidateSelection>
-        {
+        List<CandidateSelection> candidates =
+        [
             new(baseRegion, "base", 1.0, baseRegion.Confidence)
-        };
+        ];
 
         // 対応領域を候補に追加
         foreach (var corrRegion in correspondingRegions)
@@ -215,7 +209,8 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         }
 
         // 最も調整信頼度の高い候補を選択
-        var bestCandidate = candidates.OrderByDescending(c => c.AdjustedConfidence).First();
+        var sortedCandidates = candidates.OrderByDescending(c => c.AdjustedConfidence).ToList();
+        var bestCandidate = sortedCandidates[0];
         
         return bestCandidate.AdjustedConfidence >= parameters.MinimumConfidenceThreshold 
             ? bestCandidate.Region 
@@ -225,7 +220,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
     /// <summary>
     /// 補完的な高信頼度領域を追加
     /// </summary>
-    private async Task AddSupplementaryRegionsAsync(
+    private Task AddSupplementaryRegionsAsync(
         List<OcrTextRegion> fusedRegions,
         IReadOnlyList<IndividualEngineResult> results,
         Dictionary<string, double> engineScores,
@@ -247,6 +242,8 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
                 }
             }
         }
+        
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -267,7 +264,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
         Dictionary<string, double> engineScores)
     {
         var totalCandidates = results.Sum(r => r.Results.TextRegions.Count);
-        var regionDetails = new List<RegionFusionDetail>();
+        List<RegionFusionDetail> regionDetails = [];
 
         for (int i = 0; i < fusedRegions.Count; i++)
         {
@@ -325,9 +322,9 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
     {
         return new EnsembleOcrResults(
             [],
-            individualResults.FirstOrDefault()?.Results.SourceImage ?? throw new InvalidOperationException("No source image available"),
+            individualResults.Count > 0 ? individualResults[0].Results.SourceImage : throw new InvalidOperationException("No source image available"),
             processingTime,
-            individualResults.FirstOrDefault()?.Results.LanguageCode ?? "unknown")
+            individualResults.Count > 0 ? individualResults[0].Results.LanguageCode ?? "unknown" : "unknown")
         {
             IndividualResults = individualResults,
             FusionDetails = new ResultFusionDetails(0, 0, 0, 0, 0, []),
@@ -341,7 +338,7 @@ public class ConfidenceBasedFusionStrategy : ResultFusionStrategyBase
 /// <summary>
 /// 対応領域情報
 /// </summary>
-internal record CorrespondingRegion(
+internal sealed record CorrespondingRegion(
     OcrTextRegion Region,
     string EngineName,
     double Similarity);
@@ -349,7 +346,7 @@ internal record CorrespondingRegion(
 /// <summary>
 /// 候補選択情報
 /// </summary>
-internal record CandidateSelection(
+internal sealed record CandidateSelection(
     OcrTextRegion Region,
     string EngineName,
     double Similarity,

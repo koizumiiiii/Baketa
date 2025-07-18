@@ -5,6 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Infrastructure.DI;
+using Baketa.Infrastructure.OCR.MultiScale;
+using Baketa.Infrastructure.OCR.AdaptivePreprocessing;
+using Baketa.Core.Abstractions.OCR;
 
 namespace Baketa.Infrastructure.OCR.Benchmarking;
 
@@ -50,7 +53,7 @@ public static class BenchmarkTestApp
             var benchmarkRunner = serviceProvider.GetRequiredService<Phase1BenchmarkRunner>();
             
             // ベンチマークの実行
-            var report = await benchmarkRunner.RunAsync();
+            var report = await benchmarkRunner.RunAsync().ConfigureAwait(false);
             
             // 結果の表示
             Console.WriteLine("=== ベンチマーク実行完了 ===");
@@ -113,7 +116,7 @@ public static class BenchmarkTestApp
                 RecognitionThreshold = 0.3
             };
             
-            var initialized = await ocrEngine.InitializeAsync(settings);
+            var initialized = await ocrEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 Console.WriteLine("OCRエンジンの初期化に失敗しました");
@@ -122,13 +125,13 @@ public static class BenchmarkTestApp
             
             // 簡単なテストケースの生成
             Console.WriteLine("テストケース生成中...");
-            var testCases = await testCaseGenerator.GenerateErrorPatternTestCasesAsync();
+            var testCases = await testCaseGenerator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false);
             var limitedTestCases = testCases.Take(5).ToList(); // 最初の5件のみ
             
             // ベンチマークの実行
             Console.WriteLine("ベンチマーク実行中...");
             var result = await benchmarkRunner.RunParameterOptimizationBenchmarkAsync(
-                ocrEngine, limitedTestCases);
+                ocrEngine, limitedTestCases).ConfigureAwait(false);
             
             // 結果の表示
             Console.WriteLine("\n=== クイックベンチマーク結果 ===");
@@ -162,11 +165,14 @@ public static class BenchmarkTestApp
 /// </summary>
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task Main(string[] _)
     {
         Console.WriteLine("OCRベンチマークテストアプリケーション");
         Console.WriteLine("1. Phase 1完全ベンチマーク");
         Console.WriteLine("2. クイックベンチマーク");
+        Console.WriteLine("3. Phase 2 マルチスケールOCRテスト");
+        Console.WriteLine("4. Phase 3 適応的前処理システムテスト");
+        Console.WriteLine("5. Phase 3 適応的前処理ベンチマーク");
         Console.WriteLine("実行する番号を入力してください: ");
         
         var input = Console.ReadLine();
@@ -174,18 +180,174 @@ public class Program
         switch (input)
         {
             case "1":
-                await BenchmarkTestApp.RunPhase1BenchmarkAsync();
+                await BenchmarkTestApp.RunPhase1BenchmarkAsync().ConfigureAwait(false);
                 break;
             case "2":
-                await BenchmarkTestApp.RunQuickBenchmarkAsync();
+                await BenchmarkTestApp.RunQuickBenchmarkAsync().ConfigureAwait(false);
+                break;
+            case "3":
+                await RunMultiScaleBenchmarkAsync().ConfigureAwait(false);
+                break;
+            case "4":
+                await RunPhase3ComprehensiveTestAsync().ConfigureAwait(false);
+                break;
+            case "5":
+                await RunPhase3BenchmarkAsync().ConfigureAwait(false);
                 break;
             default:
                 Console.WriteLine("無効な選択です。クイックベンチマークを実行します。");
-                await BenchmarkTestApp.RunQuickBenchmarkAsync();
+                await BenchmarkTestApp.RunQuickBenchmarkAsync().ConfigureAwait(false);
                 break;
         }
         
         Console.WriteLine("\nEnterキーを押して終了...");
         Console.ReadLine();
+    }
+    
+    /// <summary>
+    /// Phase 2: マルチスケールOCRベンチマークを実行
+    /// </summary>
+    public static async Task RunMultiScaleBenchmarkAsync()
+    {
+        Console.WriteLine("🔍 Phase 2: マルチスケールOCRベンチマーク開始");
+        
+        try
+        {
+            // DI設定
+            var services = new ServiceCollection();
+            
+            // ログ設定
+            services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                builder.SetMinimumLevel(LogLevel.Information);
+            });
+            
+            // 全てのDIモジュールを登録
+            var paddleOcrModule = new PaddleOcrModule();
+            paddleOcrModule.RegisterServices(services);
+            
+            var serviceProvider = services.BuildServiceProvider();
+            
+            // マルチスケールテストを実行
+            var testRunner = serviceProvider.GetRequiredService<MultiScaleTestRunner>();
+            await testRunner.TestSmallTextRecognitionAsync().ConfigureAwait(false);
+            
+            // デバッグ用のキャプチャ画像でのテスト
+            var debugImagePath = @"E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\debug_captured_1fc74558.png";
+            if (System.IO.File.Exists(debugImagePath))
+            {
+                Console.WriteLine("\n🖼️ デバッグキャプチャ画像でのマルチスケールテスト");
+                await MultiScaleTestApp.TestWithRealImageAsync(debugImagePath).ConfigureAwait(false);
+            }
+            
+            Console.WriteLine("✅ マルチスケールベンチマーク完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ マルチスケールベンチマークエラー: {ex.Message}");
+            Console.WriteLine($"詳細: {ex}");
+        }
+    }
+    
+    /// <summary>
+    /// Phase 3: 適応的前処理システムの包括的テスト
+    /// </summary>
+    public static async Task RunPhase3ComprehensiveTestAsync()
+    {
+        Console.WriteLine("🔧 Phase 3: 適応的前処理システム包括的テスト開始");
+        
+        try
+        {
+            await AdaptivePreprocessing.Phase3TestApp.RunComprehensiveTestAsync().ConfigureAwait(false);
+            
+            // デバッグキャプチャ画像でのテスト
+            var debugImagePath = @"E:\dev\Baketa\Baketa.UI\bin\x64\Debug\net8.0-windows\debug_captured_1fc74558.png";
+            if (System.IO.File.Exists(debugImagePath))
+            {
+                Console.WriteLine("\n🖼️ デバッグキャプチャ画像での実地テスト");
+                await AdaptivePreprocessing.Phase3TestApp.TestWithRealCaptureAsync(debugImagePath).ConfigureAwait(false);
+            }
+            
+            Console.WriteLine("✅ Phase 3 包括的テスト完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Phase 3 包括的テストエラー: {ex.Message}");
+            Console.WriteLine($"詳細: {ex}");
+        }
+    }
+    
+    /// <summary>
+    /// Phase 3: 適応的前処理ベンチマークを実行
+    /// </summary>
+    public static async Task RunPhase3BenchmarkAsync()
+    {
+        Console.WriteLine("📊 Phase 3: 適応的前処理ベンチマーク開始");
+        
+        try
+        {
+            // DI設定
+            var services = new ServiceCollection();
+            
+            // ログ設定
+            services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                builder.SetMinimumLevel(LogLevel.Information);
+            });
+            
+            // 全てのDIモジュールを登録
+            var paddleOcrModule = new PaddleOcrModule();
+            paddleOcrModule.RegisterServices(services);
+            
+            var serviceProvider = services.BuildServiceProvider();
+            
+            // ベンチマーク実行
+            var benchmark = serviceProvider.GetRequiredService<AdaptivePreprocessing.AdaptivePreprocessingBenchmark>();
+            var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
+            
+            // OCRエンジン初期化
+            var settings = new OcrEngineSettings
+            {
+                Language = "jpn",
+                DetectionThreshold = 0.3,
+                RecognitionThreshold = 0.3
+            };
+            
+            var initialized = await ocrEngine.InitializeAsync(settings).ConfigureAwait(false);
+            if (!initialized)
+            {
+                Console.WriteLine("❌ OCRエンジンの初期化に失敗しました");
+                return;
+            }
+            
+            // 包括的ベンチマーク実行
+            Console.WriteLine("包括的ベンチマーク実行中...");
+            var result = await benchmark.RunComprehensiveBenchmarkAsync(ocrEngine).ConfigureAwait(false);
+            
+            // 結果表示
+            Console.WriteLine("\n📈 ベンチマーク結果:");
+            Console.WriteLine($"  総テストケース数: {result.TotalTestCases}");
+            Console.WriteLine($"  成功ケース数: {result.Analysis.SuccessfulTestCases}");
+            Console.WriteLine($"  平均改善率: {result.Analysis.AverageImprovementPercentage:F2}%");
+            Console.WriteLine($"  平均信頼度改善: {result.Analysis.AverageConfidenceImprovement:F3}");
+            Console.WriteLine($"  平均最適化時間: {result.Analysis.AverageOptimizationTimeMs:F1}ms");
+            Console.WriteLine($"  平均実行時間: {result.Analysis.AverageExecutionTimeMs:F1}ms");
+            Console.WriteLine($"  総ベンチマーク時間: {result.TotalBenchmarkTimeMs}ms");
+            
+            Console.WriteLine("\n🎯 最適化戦略別分析:");
+            foreach (var strategy in result.Analysis.OptimizationStrategies)
+            {
+                Console.WriteLine($"  {strategy.Key}: {strategy.Value}件");
+            }
+            
+            Console.WriteLine("✅ Phase 3 ベンチマーク完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Phase 3 ベンチマークエラー: {ex.Message}");
+            Console.WriteLine($"詳細: {ex}");
+        }
     }
 }

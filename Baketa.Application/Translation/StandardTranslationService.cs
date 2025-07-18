@@ -21,7 +21,7 @@ namespace Baketa.Application.Translation;
 /// <param name="logger">ロガー</param>
 /// <param name="pipeline">翻訳パイプライン</param>
 /// <param name="engineDiscovery">翻訳エンジン検出サービス</param>
-public class StandardTranslationService(
+public sealed class StandardTranslationService(
         ILogger<StandardTranslationService> logger,
         ITranslationPipeline pipeline,
         ITranslationEngineDiscovery engineDiscovery) : ITranslationService

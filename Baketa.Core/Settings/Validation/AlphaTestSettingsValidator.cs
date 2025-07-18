@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Settings.Validation.Rules;
 
 namespace Baketa.Core.Settings.Validation;
 

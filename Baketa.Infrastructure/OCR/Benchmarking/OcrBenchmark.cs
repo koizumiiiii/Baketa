@@ -12,15 +12,10 @@ namespace Baketa.Infrastructure.OCR.Benchmarking;
 /// <summary>
 /// OCR精度とパフォーマンスのベンチマーク測定実装
 /// </summary>
-public class OcrBenchmark : IOcrBenchmark
+public class OcrBenchmark(ILogger<OcrBenchmark> logger) : IOcrBenchmark
 {
-    private readonly ILogger<OcrBenchmark> _logger;
-    
-    public OcrBenchmark(ILogger<OcrBenchmark> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly ILogger<OcrBenchmark> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
     /// OCR処理の精度とパフォーマンスを測定
     /// </summary>
@@ -33,7 +28,7 @@ public class OcrBenchmark : IOcrBenchmark
         try
         {
             // OCR処理実行
-            var ocrResult = await ocrEngine.RecognizeAsync(testImage);
+            var ocrResult = await ocrEngine.RecognizeAsync(testImage).ConfigureAwait(false);
             stopwatch.Stop();
             
             var recognizedText = ocrResult.Text;
@@ -70,7 +65,7 @@ public class OcrBenchmark : IOcrBenchmark
                 expectedText.Length,
                 0,
                 expectedText.Length,
-                new[] { $"例外: {ex.Message}" });
+                [$"例外: {ex.Message}"]);
         }
     }
     
@@ -86,7 +81,7 @@ public class OcrBenchmark : IOcrBenchmark
         
         foreach (var testCase in testCases)
         {
-            var result = await MeasureAsync(testCase.Name, testCase.Image, testCase.ExpectedText, ocrEngine);
+            var result = await MeasureAsync(testCase.Name, testCase.Image, testCase.ExpectedText, ocrEngine).ConfigureAwait(false);
             results.Add(result);
         }
         
@@ -121,7 +116,7 @@ public class OcrBenchmark : IOcrBenchmark
         var baselineTask = MeasureAsync($"{testName}_Baseline", testImage, expectedText, baselineEngine);
         var improvedTask = MeasureAsync($"{testName}_Improved", testImage, expectedText, improvedEngine);
         
-        var results = await Task.WhenAll(baselineTask, improvedTask);
+        var results = await Task.WhenAll(baselineTask, improvedTask).ConfigureAwait(false);
         var baselineResult = results[0];
         var improvedResult = results[1];
         

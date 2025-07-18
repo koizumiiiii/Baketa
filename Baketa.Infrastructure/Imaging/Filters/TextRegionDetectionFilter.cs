@@ -19,7 +19,7 @@ namespace Baketa.Infrastructure.Imaging.Filters;
 /// </remarks>
 /// <param name="detector">テキスト領域検出器</param>
 /// <param name="logger">ロガー</param>
-public class TextRegionDetectionFilter(
+public sealed class TextRegionDetectionFilter(
         ITextRegionDetector detector,
         ILogger<TextRegionDetectionFilter>? logger = null) : BaseImageFilter(logger)
     {

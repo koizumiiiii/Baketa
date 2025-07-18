@@ -7,17 +7,10 @@ namespace Baketa.Infrastructure.OCR.Ensemble.Strategies;
 /// <summary>
 /// 重み付き投票による結果融合戦略
 /// </summary>
-public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
+public class WeightedVotingFusionStrategy(ILogger<WeightedVotingFusionStrategy> logger) : ResultFusionStrategyBase
 {
-    private readonly ILogger<WeightedVotingFusionStrategy> _logger;
-
     public override string StrategyName => "WeightedVoting";
     public override string Description => "重み付き投票により複数エンジンの結果を融合";
-
-    public WeightedVotingFusionStrategy(ILogger<WeightedVotingFusionStrategy> logger)
-    {
-        _logger = logger;
-    }
 
     public override async Task<EnsembleOcrResults> FuseResultsAsync(
         IReadOnlyList<IndividualEngineResult> individualResults,
@@ -25,7 +18,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("重み付き投票融合開始: {EngineCount}エンジン", individualResults.Count);
+        logger.LogInformation("重み付き投票融合開始: {EngineCount}エンジン", individualResults.Count);
 
         try
         {
@@ -38,15 +31,15 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
 
             // 全ての候補領域を収集
             var allRegions = CollectAllRegions(successfulResults);
-            _logger.LogDebug("候補領域数: {RegionCount}", allRegions.Count);
+            logger.LogDebug("候補領域数: {RegionCount}", allRegions.Count);
 
             // 類似領域をグループ化
             var regionGroups = GroupSimilarRegions(allRegions, parameters);
-            _logger.LogDebug("領域グループ数: {GroupCount}", regionGroups.Count);
+            logger.LogDebug("領域グループ数: {GroupCount}", regionGroups.Count);
 
             // 各グループで重み付き投票を実行
-            var fusedRegions = await ProcessRegionGroupsAsync(regionGroups, parameters);
-            _logger.LogDebug("融合後領域数: {FinalCount}", fusedRegions.Count);
+            var fusedRegions = await ProcessRegionGroupsAsync(regionGroups, parameters).ConfigureAwait(false);
+            logger.LogDebug("融合後領域数: {FinalCount}", fusedRegions.Count);
 
             // 融合詳細情報を作成
             var fusionDetails = CreateFusionDetails(regionGroups, fusedRegions);
@@ -54,9 +47,9 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
             // 最終結果を構築
             var ensembleResults = new EnsembleOcrResults(
                 fusedRegions,
-                individualResults.FirstOrDefault()?.Results.SourceImage ?? throw new InvalidOperationException("No source image available"),
+                individualResults.Count > 0 ? individualResults[0].Results.SourceImage : throw new InvalidOperationException("No source image available"),
                 sw.Elapsed,
-                individualResults.FirstOrDefault()?.Results.LanguageCode ?? "unknown")
+                individualResults.Count > 0 ? individualResults[0].Results.LanguageCode ?? "unknown" : "unknown")
             {
                 IndividualResults = individualResults,
                 FusionDetails = fusionDetails,
@@ -65,7 +58,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
                 EnsembleProcessingTime = sw.Elapsed
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "重み付き投票融合完了: {FinalRegions}領域, 融合時間={ElapsedMs}ms",
                 fusedRegions.Count, sw.ElapsedMilliseconds);
 
@@ -73,7 +66,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "重み付き投票融合中にエラーが発生しました");
+            logger.LogError(ex, "重み付き投票融合中にエラーが発生しました");
             return CreateEmptyResult(individualResults, sw.Elapsed);
         }
     }
@@ -83,7 +76,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
     /// </summary>
     private List<CandidateRegion> CollectAllRegions(IReadOnlyList<IndividualEngineResult> results)
     {
-        var candidates = new List<CandidateRegion>();
+        List<CandidateRegion> candidates = [];
 
         foreach (var result in results)
         {
@@ -107,8 +100,8 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         List<CandidateRegion> allRegions,
         FusionParameters parameters)
     {
-        var groups = new List<RegionGroup>();
-        var processed = new HashSet<CandidateRegion>();
+        List<RegionGroup> groups = [];
+        HashSet<CandidateRegion> processed = [];
 
         foreach (var region in allRegions)
         {
@@ -143,7 +136,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         List<RegionGroup> regionGroups,
         FusionParameters parameters)
     {
-        var fusedRegions = new List<OcrTextRegion>();
+        List<OcrTextRegion> fusedRegions = [];
 
         foreach (var group in regionGroups)
         {
@@ -163,7 +156,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
             }
 
             // 重み付き投票で融合
-            var fusedRegion = await FuseRegionGroupAsync(group, parameters);
+            var fusedRegion = await FuseRegionGroupAsync(group, parameters).ConfigureAwait(false);
             if (fusedRegion != null)
             {
                 fusedRegions.Add(fusedRegion);
@@ -176,7 +169,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
     /// <summary>
     /// 領域グループを融合
     /// </summary>
-    private async Task<OcrTextRegion?> FuseRegionGroupAsync(
+    private Task<OcrTextRegion?> FuseRegionGroupAsync(
         RegionGroup group,
         FusionParameters parameters)
     {
@@ -187,7 +180,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         // 信頼度チェック
         if (weightedConfidence < parameters.MinimumConfidenceThreshold)
         {
-            return null;
+            return Task.FromResult<OcrTextRegion?>(null);
         }
 
         // 重み付き境界を計算
@@ -199,10 +192,10 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         var texts = group.Regions.Select(r => r.Region.Text).ToList();
         var consensusText = GenerateConsensusText(texts, weights);
 
-        return new OcrTextRegion(
+        return Task.FromResult<OcrTextRegion?>(new OcrTextRegion(
             consensusText,
             consensusBounds,
-            weightedConfidence);
+            weightedConfidence));
     }
 
     /// <summary>
@@ -216,7 +209,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
         var agreedRegions = regionGroups.Count(g => g.Regions.Count > 1);
         var conflictedRegions = regionGroups.Count(g => g.Regions.Count > 2);
 
-        var regionDetails = new List<RegionFusionDetail>();
+        List<RegionFusionDetail> regionDetails = [];
         for (int i = 0; i < fusedRegions.Count; i++)
         {
             var correspondingGroup = regionGroups[i];
@@ -290,9 +283,9 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
     {
         return new EnsembleOcrResults(
             [],
-            individualResults.FirstOrDefault()?.Results.SourceImage ?? throw new InvalidOperationException("No source image available"),
+            individualResults.Count > 0 ? individualResults[0].Results.SourceImage : throw new InvalidOperationException("No source image available"),
             processingTime,
-            individualResults.FirstOrDefault()?.Results.LanguageCode ?? "unknown")
+            individualResults.Count > 0 ? individualResults[0].Results.LanguageCode ?? "unknown" : "unknown")
         {
             IndividualResults = individualResults,
             FusionDetails = new ResultFusionDetails(0, 0, 0, 0, 0, []),
@@ -306,7 +299,7 @@ public class WeightedVotingFusionStrategy : ResultFusionStrategyBase
 /// <summary>
 /// 候補領域情報
 /// </summary>
-internal record CandidateRegion(
+internal sealed record CandidateRegion(
     OcrTextRegion Region,
     string EngineName,
     double Weight,
@@ -315,7 +308,7 @@ internal record CandidateRegion(
 /// <summary>
 /// 領域グループ
 /// </summary>
-internal class RegionGroup
+internal sealed class RegionGroup
 {
     public List<CandidateRegion> Regions { get; set; } = [];
 }

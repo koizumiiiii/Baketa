@@ -34,7 +34,7 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "OCR", "OCRエンジン", 
         Description = "使用するOCRエンジンの種類", 
-        ValidValues = new object[] { OcrEngine.PaddleOCR, OcrEngine.Tesseract, OcrEngine.WindowsOCR })]
+        ValidValues = [OcrEngine.PaddleOCR, OcrEngine.Tesseract, OcrEngine.WindowsOCR])]
     public OcrEngine Engine { get; set; } = OcrEngine.PaddleOCR;
     
     /// <summary>
@@ -42,7 +42,7 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "OCR", "認識言語", 
         Description = "OCRで認識する言語", 
-        ValidValues = new object[] { "ja", "en", "zh", "ko", "multi" })]
+        ValidValues = ["ja", "en", "zh", "ko", "multi"])]
     public string RecognitionLanguage { get; set; } = "ja";
     
     /// <summary>

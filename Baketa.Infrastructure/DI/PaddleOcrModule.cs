@@ -23,7 +23,7 @@ namespace Baketa.Infrastructure.DI;
 /// <summary>
 /// PaddleOCR統合基盤のサービス登録モジュール（更新版）
 /// </summary>
-public class PaddleOcrModule : IServiceModule
+public sealed class PaddleOcrModule : IServiceModule
 {
     /// <summary>
     /// サービスを登録します

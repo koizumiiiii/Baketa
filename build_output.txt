@@ -1,0 +1,20 @@
+  復元対象のプロジェクトを決定しています...
+  復元対象のすべてのプロジェクトは最新です。
+  Baketa.Core -> E:\dev\Baketa\Baketa.Core\bin\Release\net8.0-windows\Baketa.Core.dll
+  Baketa.Infrastructure -> E:\dev\Baketa\Baketa.Infrastructure\bin\Release\net8.0-windows\Baketa.Infrastructure.dll
+  Baketa.Infrastructure.Platform -> E:\dev\Baketa\Baketa.Infrastructure.Platform\bin\Release\net8.0-windows\Baketa.Infrastructure.Platform.dll
+  Baketa.Application -> E:\dev\Baketa\Baketa.Application\bin\Release\net8.0-windows\Baketa.Application.dll
+  Baketa.Infrastructure.Platform.Tests -> E:\dev\Baketa\tests\Baketa.Infrastructure.Platform.Tests\bin\x64\Release\net8.0-windows\Baketa.Infrastructure.Platform.Tests.dll
+  Baketa.Infrastructure.Tests -> E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\bin\x64\Release\net8.0-windows\Baketa.Infrastructure.Tests.dll
+  Baketa.UI -> E:\dev\Baketa\Baketa.UI\bin\Release\net8.0-windows\Baketa.UI.dll
+  Baketa.Integration.Tests -> E:\dev\Baketa\tests\Baketa.Integration.Tests\bin\x64\Release\net8.0-windows\Baketa.Integration.Tests.dll
+  Baketa.UI.IntegrationTests -> E:\dev\Baketa\tests\Baketa.UI.IntegrationTests\bin\x64\Release\net8.0-windows\Baketa.UI.IntegrationTests.dll
+  Baketa.UI.Tests -> E:\dev\Baketa\tests\Baketa.UI.Tests\bin\x64\Release\net8.0-windows\Baketa.UI.Tests.dll
+  Baketa.Core.Tests -> E:\dev\Baketa\tests\Baketa.Core.Tests\bin\x64\Release\net8.0-windows\Baketa.Core.Tests.dll
+  Baketa.Application.Tests -> E:\dev\Baketa\tests\Baketa.Application.Tests\bin\x64\Release\net8.0-windows\Baketa.Application.Tests.dll
+
+ビルドに成功しました。
+    0 個の警告
+    0 エラー
+
+経過時間 00:00:01.53

@@ -1,8 +1,9 @@
 using System;
 using System.Linq;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Settings.Validation;
 
-namespace Baketa.Core.Settings.Validation;
+namespace Baketa.Core.Settings.Validation.Rules;
 
 /// <summary>
 /// αテスト用検証ルールの基底クラス

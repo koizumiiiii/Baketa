@@ -12,7 +12,7 @@ namespace Baketa.Application.DI.Modules;
     /// サンプルのアプリケーションモジュール実装。
     /// </summary>
     [ModulePriority(ModulePriority.Application)]
-    public class SampleApplicationModule : ServiceModuleBase
+    public sealed class SampleApplicationModule : ServiceModuleBase
     {
         /// <summary>
         /// アプリケーションサービスを登録します。

@@ -11,9 +11,9 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// 日本語OCR結果の後処理を行うクラス
 /// 一般的な誤認識パターンを修正し、精度を向上させる
 /// </summary>
-public class JapaneseOcrPostProcessor : IOcrPostProcessor
+public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) : IOcrPostProcessor
 {
-    private readonly ILogger<JapaneseOcrPostProcessor> _logger;
+    private readonly ILogger<JapaneseOcrPostProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ConcurrentDictionary<string, int> _correctionStats = new();
     private int _totalProcessed;
     private int _correctionsApplied;
@@ -173,12 +173,7 @@ public class JapaneseOcrPostProcessor : IOcrPostProcessor
         { "焼良無料神", "機能無料版" },
         { "横印限無料神", "機能限定無料版" },
     };
-    
-    public JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+
     /// <summary>
     /// OCR認識結果のテキストを後処理して精度を向上させる
     /// </summary>

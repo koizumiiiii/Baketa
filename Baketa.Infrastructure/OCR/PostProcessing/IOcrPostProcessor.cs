@@ -32,7 +32,7 @@ public interface IOcrPostProcessor
 /// <summary>
 /// 後処理統計情報
 /// </summary>
-public class PostProcessingStats
+public sealed class PostProcessingStats
 {
     /// <summary>
     /// 処理した文字列の総数
@@ -47,5 +47,5 @@ public class PostProcessingStats
     /// <summary>
     /// 最も多く修正されたパターンのトップ5
     /// </summary>
-    public Dictionary<string, int> TopCorrectionPatterns { get; init; } = new();
+    public Dictionary<string, int> TopCorrectionPatterns { get; init; } = [];
 }

@@ -13,7 +13,7 @@ namespace Baketa.Application.Services.Capture;
 /// <summary>
 /// AdvancedCaptureServiceのデモンストレーションプログラム
 /// </summary>
-public class CaptureServiceDemo(
+public sealed class CaptureServiceDemo(
     IAdvancedCaptureService captureService,
     ILogger<CaptureServiceDemo> logger)
 {

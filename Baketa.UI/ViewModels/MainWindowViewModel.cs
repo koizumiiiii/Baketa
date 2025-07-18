@@ -404,7 +404,7 @@ namespace Baketa.UI.ViewModels;
                     
                     if (response.IsSuccess)
                     {
-                        TranslationTestOutput = response.TranslatedText;
+                        TranslationTestOutput = response.TranslatedText ?? string.Empty;
                         TranslationTestStatus = $"翻訳完了 (エンジン: {response.EngineName})";
                     }
                     else

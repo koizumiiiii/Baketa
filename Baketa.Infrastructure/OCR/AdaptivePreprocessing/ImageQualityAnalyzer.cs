@@ -7,14 +7,8 @@ namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 /// <summary>
 /// 画像品質分析の実装クラス
 /// </summary>
-public class ImageQualityAnalyzer : IImageQualityAnalyzer
+public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImageQualityAnalyzer
 {
-    private readonly ILogger<ImageQualityAnalyzer> _logger;
-
-    public ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 画像の品質指標を分析します
@@ -22,7 +16,7 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
     public async Task<ImageQualityMetrics> AnalyzeAsync(IAdvancedImage image)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogDebug("画像品質分析開始: {Width}x{Height}", image.Width, image.Height);
+        logger.LogDebug("画像品質分析開始: {Width}x{Height}", image.Width, image.Height);
 
         try
         {
@@ -32,12 +26,12 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             var noiseTask = CalculateNoiseAsync(image);
             var sharpnessTask = CalculateSharpnessAsync(image);
 
-            await Task.WhenAll(contrastTask, brightnessTask, noiseTask, sharpnessTask);
+            await Task.WhenAll(contrastTask, brightnessTask, noiseTask, sharpnessTask).ConfigureAwait(false);
 
-            var contrast = await contrastTask;
-            var brightness = await brightnessTask;
-            var noise = await noiseTask;
-            var sharpness = await sharpnessTask;
+            var contrast = await contrastTask.ConfigureAwait(false);
+            var brightness = await brightnessTask.ConfigureAwait(false);
+            var noise = await noiseTask.ConfigureAwait(false);
+            var sharpness = await sharpnessTask.ConfigureAwait(false);
 
             // 総合品質スコアを計算
             var overallQuality = CalculateOverallQuality(contrast, brightness, noise, sharpness);
@@ -53,7 +47,7 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
                 OverallQuality = overallQuality
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "画像品質分析完了: C={Contrast:F3}, B={Brightness:F3}, N={Noise:F3}, S={Sharpness:F3}, Q={Quality:F3} ({ElapsedMs}ms)",
                 contrast, brightness, noise, sharpness, overallQuality, sw.ElapsedMilliseconds);
 
@@ -61,7 +55,7 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "画像品質分析中にエラーが発生しました");
+            logger.LogError(ex, "画像品質分析中にエラーが発生しました");
             return CreateFallbackMetrics(image);
         }
     }
@@ -88,10 +82,10 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "コントラスト計算でエラーが発生しました");
+                logger.LogWarning(ex, "コントラスト計算でエラーが発生しました");
                 return 0.5; // デフォルト値
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -111,10 +105,10 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "明度計算でエラーが発生しました");
+                logger.LogWarning(ex, "明度計算でエラーが発生しました");
                 return 0.5; // デフォルト値
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -162,10 +156,10 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ノイズ計算でエラーが発生しました");
+                logger.LogWarning(ex, "ノイズ計算でエラーが発生しました");
                 return 0.1; // デフォルト値
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -225,10 +219,10 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "テキスト密度分析でエラーが発生しました");
+                logger.LogWarning(ex, "テキスト密度分析でエラーが発生しました");
                 return CreateDefaultTextDensityMetrics();
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -271,10 +265,10 @@ public class ImageQualityAnalyzer : IImageQualityAnalyzer
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "シャープネス計算でエラーが発生しました");
+                logger.LogWarning(ex, "シャープネス計算でエラーが発生しました");
                 return 0.5;
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>

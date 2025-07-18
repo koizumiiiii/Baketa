@@ -12,18 +12,12 @@ namespace Baketa.Infrastructure.Services.OCR;
 /// <summary>
 /// 簡単なOCR前処理サービスの実装
 /// </summary>
-public class SimpleOcrPreprocessingService : IOcrPreprocessingService
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="logger">ロガー</param>
+public class SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService>? logger = null) : IOcrPreprocessingService
 {
-    private readonly ILogger<SimpleOcrPreprocessingService>? _logger;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="logger">ロガー</param>
-    public SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService>? logger = null)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 画像を処理し、OCRのためのテキスト領域を検出します
@@ -41,7 +35,7 @@ public class SimpleOcrPreprocessingService : IOcrPreprocessingService
 
         try
         {
-            _logger?.LogDebug("簡単なOCR前処理を開始 (プロファイル: {ProfileName})", 
+            logger?.LogDebug("簡単なOCR前処理を開始 (プロファイル: {ProfileName})", 
                 profileName ?? "デフォルト");
 
             // 簡単な前処理：グレースケール変換のみ
@@ -50,13 +44,13 @@ public class SimpleOcrPreprocessingService : IOcrPreprocessingService
             // 全体を単一のテキスト領域として扱う
             var detectedRegions = new List<OCRTextRegion>
             {
-                new OCRTextRegion(
+                new(
                     new System.Drawing.Rectangle(0, 0, processedImage.Width, processedImage.Height),
                     1.0f // 信頼度100%
                 )
             };
 
-            _logger?.LogDebug("簡単なOCR前処理が完了 (検出テキスト領域: {RegionCount}個)", 
+            logger?.LogDebug("簡単なOCR前処理が完了 (検出テキスト領域: {RegionCount}個)", 
                 detectedRegions.Count);
 
             return new OcrPreprocessingResult(
@@ -67,21 +61,21 @@ public class SimpleOcrPreprocessingService : IOcrPreprocessingService
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogInformation("簡単なOCR前処理がキャンセルされました");
+            logger?.LogInformation("簡単なOCR前処理がキャンセルされました");
             return new OcrPreprocessingResult(
                 true,
                 null,
                 image,
-                Array.Empty<OCRTextRegion>());
+                []);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "簡単なOCR前処理中にエラーが発生しました");
+            logger?.LogError(ex, "簡単なOCR前処理中にエラーが発生しました");
             return new OcrPreprocessingResult(
                 false,
                 ex,
                 image,
-                Array.Empty<OCRTextRegion>());
+                []);
         }
     }
 
@@ -102,7 +96,7 @@ public class SimpleOcrPreprocessingService : IOcrPreprocessingService
 
         try
         {
-            _logger?.LogDebug("簡単なテキスト領域検出を開始 (検出器: {DetectorTypes})", 
+            logger?.LogDebug("簡単なテキスト領域検出を開始 (検出器: {DetectorTypes})", 
                 string.Join(", ", detectorTypes));
 
             // 簡単な実装：全体を単一のテキスト領域として返す
@@ -110,25 +104,25 @@ public class SimpleOcrPreprocessingService : IOcrPreprocessingService
 
             var detectedRegions = new List<OCRTextRegion>
             {
-                new OCRTextRegion(
+                new(
                     new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
                     1.0f // 信頼度100%
                 )
             };
 
-            _logger?.LogDebug("簡単なテキスト領域検出が完了 (検出領域: {RegionCount}個)", 
+            logger?.LogDebug("簡単なテキスト領域検出が完了 (検出領域: {RegionCount}個)", 
                 detectedRegions.Count);
 
             return detectedRegions;
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogInformation("簡単なテキスト領域検出がキャンセルされました");
+            logger?.LogInformation("簡単なテキスト領域検出がキャンセルされました");
             throw;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "簡単なテキスト領域検出中にエラーが発生しました");
+            logger?.LogError(ex, "簡単なテキスト領域検出中にエラーが発生しました");
             throw;
         }
     }

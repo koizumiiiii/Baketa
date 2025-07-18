@@ -10,7 +10,7 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// <summary>
 /// N-gramモデルベースのOCR後処理プロセッサ
 /// </summary>
-public class NgramOcrPostProcessor : IOcrPostProcessor
+public sealed class NgramOcrPostProcessor : IOcrPostProcessor
 {
     private readonly ILogger<NgramOcrPostProcessor> _logger;
     private readonly INgramModel _ngramModel;
@@ -38,7 +38,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
         
         _logger.LogDebug("N-gramベース後処理開始: {Text} (信頼度: {Confidence})", rawText, confidence);
         
-        var correctedText = await Task.Run(() => CorrectText(rawText));
+        var correctedText = await Task.Run(() => CorrectText(rawText)).ConfigureAwait(false);
         
         _logger.LogDebug("N-gramベース後処理完了: {OriginalText} -> {CorrectedText}", rawText, correctedText);
         
@@ -50,7 +50,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     /// </summary>
     public async Task<string> ProcessAsync(string ocrText)
     {
-        return await ProcessAsync(ocrText, 1.0f);
+        return await ProcessAsync(ocrText, 1.0f).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -59,7 +59,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     public async Task<IEnumerable<string>> ProcessBatchAsync(IEnumerable<string> ocrTexts)
     {
         var tasks = ocrTexts.Select(text => ProcessAsync(text));
-        return await Task.WhenAll(tasks);
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -79,7 +79,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
         {
             TotalProcessed = 0, // 統計追跡機能は将来実装
             CorrectionsApplied = 0,
-            TopCorrectionPatterns = new Dictionary<string, int>()
+            TopCorrectionPatterns = []
         };
     }
     
@@ -115,32 +115,30 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     /// </summary>
     private TextCorrection? FindBestCorrection(string text, int position)
     {
-        var currentChar = text[position].ToString();
+        var currentChar = text[position].ToString(System.Globalization.CultureInfo.InvariantCulture);
         
         // 混同行列から候補文字を取得
-        if (!_confusionMatrix.ContainsKey(currentChar))
+        if (!_confusionMatrix.TryGetValue(currentChar, out var candidates))
             return null;
-        
-        var candidates = _confusionMatrix[currentChar];
         var bestCorrection = (string.Empty, double.MinValue);
         
         foreach (var candidate in candidates)
         {
-            var modifiedText = text.Substring(0, position) + candidate + text.Substring(position + 1);
+            var modifiedText = text[..position] + candidate + text[(position + 1)..];
             var originalLikelihood = CalculateLocalLikelihood(text, position);
             var candidateLikelihood = CalculateLocalLikelihood(modifiedText, position);
             
             var improvement = candidateLikelihood - originalLikelihood;
             
-            if (improvement > bestCorrection.Item2 && improvement > _correctionThreshold)
+            if (improvement > bestCorrection.MinValue && improvement > _correctionThreshold)
             {
                 bestCorrection = (candidate, improvement);
             }
         }
         
-        if (bestCorrection.Item2 > double.MinValue)
+        if (bestCorrection.MinValue > double.MinValue)
         {
-            return new TextCorrection(position, 1, bestCorrection.Item1, bestCorrection.Item2);
+            return new TextCorrection(position, 1, bestCorrection.Empty, bestCorrection.MinValue);
         }
         
         return null;
@@ -153,7 +151,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     {
         var startPos = Math.Max(0, position - 2);
         var endPos = Math.Min(text.Length, position + 3);
-        var localText = text.Substring(startPos, endPos - startPos);
+        var localText = text[startPos..endPos];
         
         return _ngramModel.CalculateLikelihood(localText);
     }
@@ -179,7 +177,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
             }
         }
         
-        return nonOverlapping.OrderBy(c => c.Position).ToList();
+        return [.. nonOverlapping.OrderBy(c => c.Position)];
     }
     
     /// <summary>
@@ -187,7 +185,7 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     /// </summary>
     private string ApplyCorrections(string text, List<TextCorrection> corrections)
     {
-        if (!corrections.Any())
+        if (corrections.Count == 0)
             return text;
         
         var result = text;
@@ -196,8 +194,8 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
         foreach (var correction in corrections)
         {
             var adjustedPosition = correction.Position + offset;
-            var before = result.Substring(0, adjustedPosition);
-            var after = result.Substring(adjustedPosition + correction.Length);
+            var before = result[..adjustedPosition];
+            var after = result[(adjustedPosition + correction.Length)..];
             
             result = before + correction.ReplacementText + after;
             offset += correction.ReplacementText.Length - correction.Length;
@@ -273,8 +271,8 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
     /// </summary>
     public static IEnumerable<string> GetJapaneseSampleTexts()
     {
-        return new[]
-        {
+        return
+        [
             // 技術用語
             "単体テスト",
             "設計書",
@@ -322,25 +320,17 @@ public class NgramOcrPostProcessor : IOcrPostProcessor
             "OAuth認証",
             "SSL証明書",
             "DNS設定",
-        };
+        ];
     }
 }
 
 /// <summary>
 /// テキスト修正情報
 /// </summary>
-internal class TextCorrection
+internal sealed class TextCorrection(int position, int length, string replacementText, double score)
 {
-    public int Position { get; }
-    public int Length { get; }
-    public string ReplacementText { get; }
-    public double Score { get; }
-    
-    public TextCorrection(int position, int length, string replacementText, double score)
-    {
-        Position = position;
-        Length = length;
-        ReplacementText = replacementText ?? throw new ArgumentNullException(nameof(replacementText));
-        Score = score;
-    }
+    public int Position { get; } = position;
+    public int Length { get; } = length;
+    public string ReplacementText { get; } = replacementText ?? throw new ArgumentNullException(nameof(replacementText));
+    public double Score { get; } = score;
 }

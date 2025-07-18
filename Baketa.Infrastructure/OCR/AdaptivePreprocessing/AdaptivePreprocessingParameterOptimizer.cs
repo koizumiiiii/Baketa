@@ -7,25 +7,17 @@ namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 /// <summary>
 /// 適応的前処理パラメータ最適化の実装クラス
 /// </summary>
-public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingParameterOptimizer
+public class AdaptivePreprocessingParameterOptimizer(
+    IImageQualityAnalyzer imageQualityAnalyzer,
+    ILogger<AdaptivePreprocessingParameterOptimizer> logger) : IAdaptivePreprocessingParameterOptimizer
 {
-    private readonly IImageQualityAnalyzer _imageQualityAnalyzer;
-    private readonly ILogger<AdaptivePreprocessingParameterOptimizer> _logger;
-
-    public AdaptivePreprocessingParameterOptimizer(
-        IImageQualityAnalyzer imageQualityAnalyzer,
-        ILogger<AdaptivePreprocessingParameterOptimizer> logger)
-    {
-        _imageQualityAnalyzer = imageQualityAnalyzer;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 画像特性に基づいて最適な前処理パラメータを決定します
     /// </summary>
     public async Task<AdaptivePreprocessingParameters> OptimizeParametersAsync(IAdvancedImage image)
     {
-        var result = await OptimizeWithDetailsAsync(image);
+        var result = await OptimizeWithDetailsAsync(image).ConfigureAwait(false);
         return result.Parameters;
     }
 
@@ -38,7 +30,7 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
     {
         return await Task.Run(() =>
         {
-            _logger.LogDebug("パラメータ調整開始: 品質={Quality:F3}, エッジ密度={EdgeDensity:F3}",
+            logger.LogDebug("パラメータ調整開始: 品質={Quality:F3}, エッジ密度={EdgeDensity:F3}",
                 qualityMetrics.OverallQuality, textDensityMetrics.EdgeDensity);
 
             var parameters = new AdaptivePreprocessingParameters();
@@ -52,12 +44,12 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
             // 総合的な最適化
             parameters = ApplyFinalOptimization(parameters, qualityMetrics, textDensityMetrics);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "パラメータ調整完了: γ={Gamma:F2}, C={Contrast:F2}, B={Brightness:F2}, NR={NoiseReduction:F2}",
                 parameters.Gamma, parameters.Contrast, parameters.Brightness, parameters.NoiseReduction);
 
             return parameters;
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -69,19 +61,19 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
         
         try
         {
-            _logger.LogInformation("適応的前処理最適化開始: {Width}x{Height}", image.Width, image.Height);
+            logger.LogInformation("適応的前処理最適化開始: {Width}x{Height}", image.Width, image.Height);
 
             // 画像品質とテキスト密度を並列分析
-            var qualityTask = _imageQualityAnalyzer.AnalyzeAsync(image);
-            var textDensityTask = _imageQualityAnalyzer.AnalyzeTextDensityAsync(image);
+            var qualityTask = imageQualityAnalyzer.AnalyzeAsync(image);
+            var textDensityTask = imageQualityAnalyzer.AnalyzeTextDensityAsync(image);
 
-            await Task.WhenAll(qualityTask, textDensityTask);
+            await Task.WhenAll(qualityTask, textDensityTask).ConfigureAwait(false);
 
-            var qualityMetrics = await qualityTask;
-            var textDensityMetrics = await textDensityTask;
+            var qualityMetrics = await qualityTask.ConfigureAwait(false);
+            var textDensityMetrics = await textDensityTask.ConfigureAwait(false);
 
             // パラメータを最適化
-            var parameters = await AdjustParametersAsync(qualityMetrics, textDensityMetrics);
+            var parameters = await AdjustParametersAsync(qualityMetrics, textDensityMetrics).ConfigureAwait(false);
 
             // 最適化戦略の決定
             var strategy = DetermineOptimizationStrategy(qualityMetrics, textDensityMetrics);
@@ -101,7 +93,7 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
                 ParameterConfidence = confidence
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "適応的前処理最適化完了: 戦略={Strategy}, 改善予想={Improvement:F2}, 信頼度={Confidence:F2} ({ElapsedMs}ms)",
                 strategy, expectedImprovement, confidence, sw.ElapsedMilliseconds);
 
@@ -109,7 +101,7 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "適応的前処理最適化中にエラーが発生しました");
+            logger.LogError(ex, "適応的前処理最適化中にエラーが発生しました");
             return CreateFallbackResult(image, sw.ElapsedMilliseconds);
         }
     }
@@ -318,8 +310,8 @@ public class AdaptivePreprocessingParameterOptimizer : IAdaptivePreprocessingPar
     }
 
     private string GenerateOptimizationReason(
-        ImageQualityMetrics qualityMetrics, 
-        TextDensityMetrics textMetrics, 
+        ImageQualityMetrics _, 
+        TextDensityMetrics _2, 
         AdaptivePreprocessingParameters parameters)
     {
         var reasons = new List<string>();

@@ -423,7 +423,7 @@ public class ImprovedSentencePieceTokenizerTests : IDisposable
     public void TokenizerFactory_CanCreateMultipleInstances()
     {
         // Arrange & Act
-        var tokenizers = new ImprovedSentencePieceTokenizer[5];
+        ImprovedSentencePieceTokenizer[] tokenizers = new ImprovedSentencePieceTokenizer[5];
         
         try
         {

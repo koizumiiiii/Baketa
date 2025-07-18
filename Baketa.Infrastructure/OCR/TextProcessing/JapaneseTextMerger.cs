@@ -10,27 +10,22 @@ namespace Baketa.Infrastructure.OCR.TextProcessing;
 /// <summary>
 /// 日本語テキストに特化した結合アルゴリズム
 /// </summary>
-public class JapaneseTextMerger : ITextMerger
+public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITextMerger
 {
-    private readonly ILogger<JapaneseTextMerger> _logger;
+    private readonly ILogger<JapaneseTextMerger> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
     // 日本語の文末文字パターン
-    private static readonly HashSet<char> SentenceEndings = new()
-    {
+    private static readonly HashSet<char> SentenceEndings =
+    [
         '。', '！', '？', '．', '!', '?', '」', '』', '）', ')'
-    };
+    ];
     
     // 継続が期待される文字パターン
-    private static readonly HashSet<char> ContinuationExpected = new()
-    {
+    private static readonly HashSet<char> ContinuationExpected =
+    [
         '、', ',', '「', '『', '（', '(', '・', '：', ':'
-    };
-    
-    public JapaneseTextMerger(ILogger<JapaneseTextMerger> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    ];
+
     /// <summary>
     /// テキスト領域を適切に結合して文章を再構成
     /// </summary>
@@ -94,7 +89,7 @@ public class JapaneseTextMerger : ITextMerger
     /// </summary>
     public List<List<OcrTextRegion>> GroupTextRegionsByLine(IReadOnlyList<OcrTextRegion> textRegions)
     {
-        var lines = new List<List<OcrTextRegion>>();
+        List<List<OcrTextRegion>> lines = [];
         var processed = new HashSet<OcrTextRegion>();
         
         foreach (var region in textRegions)
@@ -103,7 +98,7 @@ public class JapaneseTextMerger : ITextMerger
                 continue;
             
             // 同じ行と判定される領域を収集
-            var sameLine = new List<OcrTextRegion> { region };
+            List<OcrTextRegion> sameLine = [region];
             processed.Add(region);
             
             var baseY = region.Bounds.Y + region.Bounds.Height / 2; // 中央Y座標

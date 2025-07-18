@@ -13,7 +13,7 @@ namespace Baketa.Infrastructure.Translation;
 /// <param name="customName">カスタムエンジン名</param>
 /// <param name="simulatedDelayMs">シミュレートする処理遅延（ミリ秒）</param>
 /// <param name="simulatedErrorRate">シミュレートするエラー率（0.0～1.0）</param>
-public class CustomNamedMockTranslationEngine(
+public sealed class CustomNamedMockTranslationEngine(
         ILogger<MockTranslationEngine> logger,
         string customName,
         int simulatedDelayMs = 0,

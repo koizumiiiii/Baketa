@@ -224,7 +224,7 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters.DefaultWindowsImageAdapt
         public async Task CreateAdvancedImageFromBytesAsync_InvalidData_ThrowsArgumentException()
         {
             // Arrange
-            var invalidData = new byte[] { 0, 1, 2, 3, 4, 5 }; // 無効な画像データ
+            byte[] invalidData = [0, 1, 2, 3, 4, 5]; // 無効な画像データ
             
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(async () => 

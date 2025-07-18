@@ -12,17 +12,17 @@ namespace Baketa.Infrastructure.OCR.Benchmarking;
 /// <summary>
 /// Phase 1: PaddleOCRパラメータ最適化の実行とレポート生成
 /// </summary>
-public class Phase1BenchmarkRunner
+public class Phase1BenchmarkRunner(IServiceProvider serviceProvider, ILogger<Phase1BenchmarkRunner> logger)
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<Phase1BenchmarkRunner> _logger;
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<Phase1BenchmarkRunner> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
-    public Phase1BenchmarkRunner(IServiceProvider serviceProvider, ILogger<Phase1BenchmarkRunner> logger)
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     /// <summary>
     /// Phase 1のベンチマークを実行
     /// </summary>
@@ -38,20 +38,20 @@ public class Phase1BenchmarkRunner
             var testCaseGenerator = _serviceProvider.GetRequiredService<TestCaseGenerator>();
             
             // OCRエンジンの初期化
-            await InitializeOcrEngineAsync(ocrEngine);
+            await InitializeOcrEngineAsync(ocrEngine).ConfigureAwait(false);
             
             // テストケースの生成
-            var testCases = await GenerateTestCasesAsync(testCaseGenerator);
+            var testCases = await GenerateTestCasesAsync(testCaseGenerator).ConfigureAwait(false);
             
             // ベンチマークの実行
             var optimizationResult = await benchmarkRunner.RunParameterOptimizationBenchmarkAsync(
-                ocrEngine, testCases);
+                ocrEngine, testCases).ConfigureAwait(false);
             
             // レポートの生成
             var report = GenerateReport(optimizationResult);
             
             // レポートの出力
-            await OutputReportAsync(report);
+            await OutputReportAsync(report).ConfigureAwait(false);
             
             _logger.LogInformation("=== Phase 1: PaddleOCRパラメータ最適化ベンチマーク完了 ===");
             
@@ -82,7 +82,7 @@ public class Phase1BenchmarkRunner
                 MaxDetections = 100
             };
             
-            var initialized = await ocrEngine.InitializeAsync(settings);
+            var initialized = await ocrEngine.InitializeAsync(settings).ConfigureAwait(false);
             if (!initialized)
             {
                 throw new InvalidOperationException("OCRエンジンの初期化に失敗しました");
@@ -103,18 +103,18 @@ public class Phase1BenchmarkRunner
         var testCases = new List<TestCase>();
         
         // 日本語・英語混在テキストのテストケース
-        var mixedTextCases = await generator.GenerateJapaneseMixedTextTestCasesAsync();
+        var mixedTextCases = await generator.GenerateJapaneseMixedTextTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(mixedTextCases);
         
         // 誤認識パターンのテストケース
-        var errorPatternCases = await generator.GenerateErrorPatternTestCasesAsync();
+        var errorPatternCases = await generator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(errorPatternCases);
         
         // スクリーンショットのテストケース（存在する場合）
         var screenshotDirectory = "test_screenshots";
         if (System.IO.Directory.Exists(screenshotDirectory))
         {
-            var screenshotCases = await generator.GenerateFromScreenshotsAsync(screenshotDirectory);
+            var screenshotCases = await generator.GenerateFromScreenshotsAsync(screenshotDirectory).ConfigureAwait(false);
             testCases.AddRange(screenshotCases);
         }
         
@@ -145,7 +145,7 @@ public class Phase1BenchmarkRunner
             AccuracyImprovement = result.AverageAccuracy - baselineResult.AverageAccuracy,
             SpeedChange = result.ProcessingSpeed - baselineResult.ProcessingSpeed,
             ErrorReduction = baselineResult.ErrorAnalysis.TotalErrors - result.ErrorAnalysis.TotalErrors,
-            TopErrors = result.ErrorAnalysis.CommonErrors.Take(5).ToList()
+            TopErrors = [.. result.ErrorAnalysis.CommonErrors.Take(5)]
         }).ToList();
         
         // 推奨設定の決定
@@ -251,14 +251,10 @@ public class Phase1BenchmarkRunner
         Console.WriteLine(report.ImprovementSummary);
         
         // ファイル出力
-        var reportJson = System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        });
+        var reportJson = System.Text.Json.JsonSerializer.Serialize(report, JsonOptions);
         
         var reportFileName = $"phase1_benchmark_report_{DateTime.Now:yyyyMMdd_HHmmss}.json";
-        await System.IO.File.WriteAllTextAsync(reportFileName, reportJson);
+        await System.IO.File.WriteAllTextAsync(reportFileName, reportJson).ConfigureAwait(false);
         
         _logger.LogInformation("Phase 1レポート出力完了: {FileName}", reportFileName);
     }

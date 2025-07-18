@@ -9,7 +9,7 @@ namespace Baketa.Application.DI.Modules;
 /// <summary>
 /// キャプチャサービス関連のDIモジュール
 /// </summary>
-public class CaptureModule : EnhancedServiceModuleBase
+public sealed class CaptureModule : EnhancedServiceModuleBase
 {
     /// <summary>
     /// サービスを登録します

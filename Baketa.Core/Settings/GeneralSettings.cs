@@ -63,7 +63,7 @@ public sealed class GeneralSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "General", "ログレベル", 
         Description = "出力するログの詳細レベル", 
-        ValidValues = new object[] { Microsoft.Extensions.Logging.LogLevel.Error, Microsoft.Extensions.Logging.LogLevel.Warning, Microsoft.Extensions.Logging.LogLevel.Information, Microsoft.Extensions.Logging.LogLevel.Debug, Microsoft.Extensions.Logging.LogLevel.Trace })]
+        ValidValues = [Microsoft.Extensions.Logging.LogLevel.Error, Microsoft.Extensions.Logging.LogLevel.Warning, Microsoft.Extensions.Logging.LogLevel.Information, Microsoft.Extensions.Logging.LogLevel.Debug, Microsoft.Extensions.Logging.LogLevel.Trace])]
     public Microsoft.Extensions.Logging.LogLevel LogLevel { get; set; } = Microsoft.Extensions.Logging.LogLevel.Information;
     
     /// <summary>

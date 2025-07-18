@@ -16,7 +16,7 @@ namespace Baketa.Infrastructure.Translation.Local.SentencePiece;
 /// SentencePieceモデルのみを使用した簡易翻訳エンジン
 /// ONNXモデルファイルが不要で、SentencePieceトークナイザーを使用してシンプルな翻訳を実行
 /// </summary>
-public class SimpleSentencePieceEngine : TranslationEngineBase
+public sealed class SimpleSentencePieceEngine : TranslationEngineBase
 {
     private readonly RealSentencePieceTokenizer _tokenizer;
     private readonly LanguagePair _languagePair;
@@ -70,39 +70,39 @@ public class SimpleSentencePieceEngine : TranslationEngineBase
     }
 
     /// <inheritdoc/>
-    public override async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
+    public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
     {
-        return _supportedLanguagePairs;
+        return Task.FromResult<IReadOnlyCollection<LanguagePair>>(_supportedLanguagePairs);
     }
 
     /// <inheritdoc/>
-    public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
+    public override Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
     {
         ArgumentNullException.ThrowIfNull(languagePair);
         ArgumentNullException.ThrowIfNull(languagePair.SourceLanguage);
         ArgumentNullException.ThrowIfNull(languagePair.TargetLanguage);
 
-        return _supportedLanguagePairs.Any(pair =>
+        return Task.FromResult(_supportedLanguagePairs.Any(pair =>
             string.Equals(pair.SourceLanguage.Code, languagePair.SourceLanguage.Code, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(pair.TargetLanguage.Code, languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase));
+            string.Equals(pair.TargetLanguage.Code, languagePair.TargetLanguage.Code, StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <inheritdoc/>
-    protected override async Task<bool> InitializeInternalAsync()
+    protected override Task<bool> InitializeInternalAsync()
     {
         try
         {
             // SentencePieceトークナイザーの初期化状態を確認
             if (!_tokenizer.IsInitialized)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
-            return true;
+            return Task.FromResult(true);
         }
-        catch (Exception ex)
+        catch
         {
-            return false;
+            return Task.FromResult(false);
         }
     }
 
@@ -174,7 +174,7 @@ public class SimpleSentencePieceEngine : TranslationEngineBase
     /// <summary>
     /// パターンベースの翻訳を適用
     /// </summary>
-    private Task<string> ApplyPatternBasedTranslation(string sourceText, CancellationToken cancellationToken)
+    private Task<string> ApplyPatternBasedTranslation(string sourceText, CancellationToken _)
     {
         // 言語ペアに応じた基本的な翻訳
         if (_languagePair.SourceLanguage.Code == "ja" && _languagePair.TargetLanguage.Code == "en")

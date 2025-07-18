@@ -13,26 +13,20 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx;
 /// αテスト向けOPUS-MT翻訳サービス
 /// 複数の言語ペアを管理し、翻訳リクエストを適切なエンジンに転送
 /// </summary>
-public class AlphaOpusMtTranslationService : IDisposable
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="engineFactory">エンジンファクトリー</param>
+/// <param name="logger">ロガー</param>
+public class AlphaOpusMtTranslationService(
+    AlphaOpusMtEngineFactory engineFactory,
+    ILogger<AlphaOpusMtTranslationService> logger) : IDisposable
 {
-    private readonly AlphaOpusMtEngineFactory _engineFactory;
-    private readonly ILogger<AlphaOpusMtTranslationService> _logger;
+    private readonly AlphaOpusMtEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+    private readonly ILogger<AlphaOpusMtTranslationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly Dictionary<string, AlphaOpusMtTranslationEngine> _engines = [];
     private readonly SemaphoreSlim _engineLock = new(1, 1);
     private bool _disposed;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="engineFactory">エンジンファクトリー</param>
-    /// <param name="logger">ロガー</param>
-    public AlphaOpusMtTranslationService(
-        AlphaOpusMtEngineFactory engineFactory,
-        ILogger<AlphaOpusMtTranslationService> logger)
-    {
-        _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// サポートされている言語ペアを取得

@@ -469,7 +469,7 @@ public class MainOverlayViewModel : ViewModelBase
             
             var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, 
                 Microsoft.Extensions.Logging.LoggerFactoryExtensions.CreateLogger<WindowSelectionDialogViewModel>(
-                    Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance), _windowManager);
+                    Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance), _windowManager!);
             var dialog = new WindowSelectionDialogView
             {
                 DataContext = dialogViewModel
@@ -663,7 +663,7 @@ public class MainOverlayViewModel : ViewModelBase
             });
 
             // ダイアログが閉じられたときの処理
-            _currentSettingsDialog.Closed += (_, _) =>
+            _currentSettingsDialog!.Closed += (_, _) =>
             {
                 DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] Settings dialog Closedイベント - ダイアログ: {dialogHash}");
                 Logger?.LogDebug("Settings dialog closed event received");

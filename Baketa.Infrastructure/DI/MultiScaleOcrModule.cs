@@ -9,7 +9,7 @@ namespace Baketa.Infrastructure.DI;
 /// <summary>
 /// マルチスケールOCR処理のDIモジュール
 /// </summary>
-public class MultiScaleOcrModule : ServiceModuleBase
+public sealed class MultiScaleOcrModule : ServiceModuleBase
 {
     public override void RegisterServices(IServiceCollection services)
     {

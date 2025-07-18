@@ -15,22 +15,15 @@ namespace Baketa.Infrastructure.OCR.Benchmarking;
 /// <summary>
 /// OCRパラメータの最適化効果を測定するベンチマークランナー
 /// </summary>
-public class OcrParameterBenchmarkRunner
+public sealed class OcrParameterBenchmarkRunner(
+    IOcrBenchmark benchmark,
+    AdvancedPaddleOcrOptimizer optimizer,
+    ILogger<OcrParameterBenchmarkRunner> logger)
 {
-    private readonly IOcrBenchmark _benchmark;
-    private readonly AdvancedPaddleOcrOptimizer _optimizer;
-    private readonly ILogger<OcrParameterBenchmarkRunner> _logger;
-    
-    public OcrParameterBenchmarkRunner(
-        IOcrBenchmark benchmark,
-        AdvancedPaddleOcrOptimizer optimizer,
-        ILogger<OcrParameterBenchmarkRunner> logger)
-    {
-        _benchmark = benchmark ?? throw new ArgumentNullException(nameof(benchmark));
-        _optimizer = optimizer ?? throw new ArgumentNullException(nameof(optimizer));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-    
+    private readonly IOcrBenchmark _benchmark = benchmark ?? throw new ArgumentNullException(nameof(benchmark));
+    private readonly AdvancedPaddleOcrOptimizer _optimizer = optimizer ?? throw new ArgumentNullException(nameof(optimizer));
+    private readonly ILogger<OcrParameterBenchmarkRunner> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
     /// Phase 1: PaddleOCRパラメータ最適化の効果測定
     /// </summary>
@@ -47,7 +40,7 @@ public class OcrParameterBenchmarkRunner
             "ベースライン（デフォルト設定）", 
             baselineEngine, 
             testCases, 
-            null);
+            null).ConfigureAwait(false);
         results.Add(baselineResults);
         
         // 各最適化手法の測定
@@ -65,7 +58,7 @@ public class OcrParameterBenchmarkRunner
                 methodName, 
                 baselineEngine, 
                 testCases, 
-                optimizationMethod);
+                optimizationMethod).ConfigureAwait(false);
             results.Add(result);
         }
         
@@ -115,7 +108,7 @@ public class OcrParameterBenchmarkRunner
         var benchmarkResult = await _benchmark.RunBenchmarkSuiteAsync(
             $"OCR_Parameter_Optimization_{methodName}", 
             testCases, 
-            ocrEngine);
+            ocrEngine).ConfigureAwait(false);
         
         // 詳細分析
         var characterAccuracy = CalculateCharacterAccuracy(benchmarkResult.Results);
@@ -229,8 +222,10 @@ public class OcrParameterBenchmarkRunner
             CharacterAccuracyImprovement = result.CharacterAccuracy - baseline.CharacterAccuracy
         }).OrderByDescending(i => i.AccuracyImprovement).ToList();
         
-        var summary = new List<string>();
-        summary.Add($"ベースライン精度: {baseline.AverageAccuracy:F2}%");
+        var summary = new List<string>
+        {
+            $"ベースライン精度: {baseline.AverageAccuracy:F2}%"
+        };
         
         foreach (var improvement in improvements)
         {
@@ -286,7 +281,7 @@ public class OcrParameterBenchmarkRunner
     /// <summary>
     /// プレースホルダー画像を作成（実際の実装では実際の画像を使用）
     /// </summary>
-    private static IImage CreatePlaceholderImage(string text)
+    private static PlaceholderImage CreatePlaceholderImage(string text)
     {
         // 実際の実装では、テキストから画像を生成するか、
         // 既存の画像ファイルを読み込む
@@ -298,15 +293,8 @@ public class OcrParameterBenchmarkRunner
 /// <summary>
 /// プレースホルダー画像クラス
 /// </summary>
-public class PlaceholderImage : IImage
+public sealed class PlaceholderImage(string text) : IImage
 {
-    private readonly string _text;
-    
-    public PlaceholderImage(string text)
-    {
-        _text = text;
-    }
-    
     public int Width => 800;
     public int Height => 100;
     public ImageFormat Format => ImageFormat.Png;
@@ -316,17 +304,17 @@ public class PlaceholderImage : IImage
     public Task<byte[]> ToByteArrayAsync()
     {
         // 実際の実装では画像データを返す
-        return Task.FromResult(new byte[0]);
+        return Task.FromResult(Array.Empty<byte>());
     }
     
     public IImage Clone()
     {
-        return new PlaceholderImage(_text);
+        return new PlaceholderImage(text);
     }
     
     public Task<IImage> ResizeAsync(int width, int height)
     {
-        return Task.FromResult<IImage>(new PlaceholderImage(_text));
+        return Task.FromResult<IImage>(new PlaceholderImage(text));
     }
 }
 

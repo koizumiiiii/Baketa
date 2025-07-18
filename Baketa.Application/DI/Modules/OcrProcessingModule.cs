@@ -14,7 +14,7 @@ namespace Baketa.Application.DI.Modules;
 /// OCR処理関連のサービスを登録するモジュール
 /// </summary>
 [ModulePriority(ModulePriority.Application)]
-public class OcrProcessingModule : ServiceModuleBase
+public sealed class OcrProcessingModule : ServiceModuleBase
 {
     /// <summary>
     /// OCR処理サービスを登録します

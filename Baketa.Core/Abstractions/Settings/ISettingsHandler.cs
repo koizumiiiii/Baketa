@@ -68,64 +68,53 @@ public interface ISettingsHandler
 /// <summary>
 /// 設定適用結果
 /// </summary>
-public sealed class SettingsApplicationResult
+/// <remarks>
+/// SettingsApplicationResultを初期化します
+/// </remarks>
+public sealed class SettingsApplicationResult(
+    bool isSuccess,
+    string? errorMessage = null,
+    string? warningMessage = null,
+    string? appliedCategory = null,
+    long elapsedMilliseconds = 0,
+    bool requiresRestart = false,
+    IReadOnlyDictionary<string, object>? additionalInfo = null)
 {
     /// <summary>
     /// 適用が成功したかどうか
     /// </summary>
-    public bool IsSuccess { get; }
-    
+    public bool IsSuccess { get; } = isSuccess;
+
     /// <summary>
     /// エラーメッセージ（失敗時）
     /// </summary>
-    public string? ErrorMessage { get; }
-    
+    public string? ErrorMessage { get; } = errorMessage;
+
     /// <summary>
     /// 警告メッセージ（成功時でも注意が必要な場合）
     /// </summary>
-    public string? WarningMessage { get; }
-    
+    public string? WarningMessage { get; } = warningMessage;
+
     /// <summary>
     /// 適用されたカテゴリ
     /// </summary>
-    public string? AppliedCategory { get; }
-    
+    public string? AppliedCategory { get; } = appliedCategory;
+
     /// <summary>
     /// 実行時間（ミリ秒）
     /// </summary>
-    public long ElapsedMilliseconds { get; }
-    
+    public long ElapsedMilliseconds { get; } = elapsedMilliseconds;
+
     /// <summary>
     /// 再起動が必要かどうか
     /// </summary>
-    public bool RequiresRestart { get; }
-    
+    public bool RequiresRestart { get; } = requiresRestart;
+
     /// <summary>
     /// 追加情報
     /// </summary>
-    public IReadOnlyDictionary<string, object> AdditionalInfo { get; }
+    public IReadOnlyDictionary<string, object> AdditionalInfo { get; } = additionalInfo ?? new Dictionary<string, object>();
 
-    /// <summary>
-    /// SettingsApplicationResultを初期化します
-    /// </summary>
-    public SettingsApplicationResult(
-        bool isSuccess,
-        string? errorMessage = null,
-        string? warningMessage = null,
-        string? appliedCategory = null,
-        long elapsedMilliseconds = 0,
-        bool requiresRestart = false,
-        IReadOnlyDictionary<string, object>? additionalInfo = null)
-    {
-        IsSuccess = isSuccess;
-        ErrorMessage = errorMessage;
-        WarningMessage = warningMessage;
-        AppliedCategory = appliedCategory;
-        ElapsedMilliseconds = elapsedMilliseconds;
-        RequiresRestart = requiresRestart;
-        AdditionalInfo = additionalInfo ?? new Dictionary<string, object>();
-    }
-    
     /// <summary>
     /// 成功結果を作成します
     /// </summary>

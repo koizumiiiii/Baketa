@@ -9,21 +9,11 @@ namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 /// <summary>
 /// 適応的前処理のベンチマーククラス
 /// </summary>
-public class AdaptivePreprocessingBenchmark
+public class AdaptivePreprocessingBenchmark(
+    IAdaptivePreprocessingParameterOptimizer parameterOptimizer,
+    TestCaseGenerator testCaseGenerator,
+    ILogger<AdaptivePreprocessingBenchmark> logger)
 {
-    private readonly IAdaptivePreprocessingParameterOptimizer _parameterOptimizer;
-    private readonly TestCaseGenerator _testCaseGenerator;
-    private readonly ILogger<AdaptivePreprocessingBenchmark> _logger;
-
-    public AdaptivePreprocessingBenchmark(
-        IAdaptivePreprocessingParameterOptimizer parameterOptimizer,
-        TestCaseGenerator testCaseGenerator,
-        ILogger<AdaptivePreprocessingBenchmark> logger)
-    {
-        _parameterOptimizer = parameterOptimizer;
-        _testCaseGenerator = testCaseGenerator;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 適応的前処理の包括的ベンチマークを実行
@@ -31,13 +21,13 @@ public class AdaptivePreprocessingBenchmark
     public async Task<AdaptivePreprocessingBenchmarkResult> RunComprehensiveBenchmarkAsync(IOcrEngine ocrEngine)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("適応的前処理ベンチマーク開始");
+        logger.LogInformation("適応的前処理ベンチマーク開始");
 
         try
         {
             // テストケース生成
-            var testCases = await GenerateTestCasesAsync();
-            _logger.LogInformation("テストケース生成完了: {Count}件", testCases.Count);
+            var testCases = await GenerateTestCasesAsync().ConfigureAwait(false);
+            logger.LogInformation("テストケース生成完了: {Count}件", testCases.Count);
 
             // ベンチマーク実行
             var results = new List<AdaptiveTestResult>();
@@ -45,14 +35,14 @@ public class AdaptivePreprocessingBenchmark
 
             foreach (var testCase in testCases)
             {
-                _logger.LogDebug("テストケース実行: {Name}", testCase.Name);
+                logger.LogDebug("テストケース実行: {Name}", testCase.Name);
 
                 // ベースライン（従来手法）での実行
-                var baselineResult = await RunBaselineTestAsync(ocrEngine, testCase);
+                var baselineResult = await RunBaselineTestAsync(ocrEngine, testCase).ConfigureAwait(false);
                 baselineResults.Add(baselineResult);
 
                 // 適応的前処理での実行
-                var adaptiveResult = await RunAdaptiveTestAsync(ocrEngine, testCase);
+                var adaptiveResult = await RunAdaptiveTestAsync(ocrEngine, testCase).ConfigureAwait(false);
                 results.Add(adaptiveResult);
             }
 
@@ -69,7 +59,7 @@ public class AdaptivePreprocessingBenchmark
                 BenchmarkDate = DateTime.UtcNow
             };
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "適応的前処理ベンチマーク完了: {TestCases}件, 平均改善={Improvement:F2}%, 実行時間={TimeMs}ms",
                 testCases.Count, analysis.AverageImprovementPercentage, sw.ElapsedMilliseconds);
 
@@ -77,7 +67,7 @@ public class AdaptivePreprocessingBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "適応的前処理ベンチマーク中にエラーが発生しました");
+            logger.LogError(ex, "適応的前処理ベンチマーク中にエラーが発生しました");
             throw;
         }
     }
@@ -89,14 +79,14 @@ public class AdaptivePreprocessingBenchmark
         IOcrEngine ocrEngine, 
         ImageQualityLevel qualityLevel)
     {
-        _logger.LogInformation("品質特化ベンチマーク開始: {QualityLevel}", qualityLevel);
+        logger.LogInformation("品質特化ベンチマーク開始: {QualityLevel}", qualityLevel);
 
-        var testCases = await GenerateQualitySpecificTestCasesAsync(qualityLevel);
+        var testCases = await GenerateQualitySpecificTestCasesAsync(qualityLevel).ConfigureAwait(false);
         var results = new List<AdaptiveTestResult>();
 
         foreach (var testCase in testCases)
         {
-            var result = await RunAdaptiveTestAsync(ocrEngine, testCase);
+            var result = await RunAdaptiveTestAsync(ocrEngine, testCase).ConfigureAwait(false);
             results.Add(result);
         }
 
@@ -116,14 +106,14 @@ public class AdaptivePreprocessingBenchmark
     /// </summary>
     public async Task<AdaptivePerformanceBenchmarkResult> RunPerformanceBenchmarkAsync(IOcrEngine ocrEngine)
     {
-        _logger.LogInformation("パフォーマンスベンチマーク開始");
+        logger.LogInformation("パフォーマンスベンチマーク開始");
 
-        var testCases = await GeneratePerformanceTestCasesAsync();
+        var testCases = await GeneratePerformanceTestCasesAsync().ConfigureAwait(false);
         var performanceResults = new List<PerformanceTestResult>();
 
         foreach (var testCase in testCases)
         {
-            var result = await RunPerformanceTestAsync(ocrEngine, testCase);
+            var result = await RunPerformanceTestAsync(ocrEngine, testCase).ConfigureAwait(false);
             performanceResults.Add(result);
         }
 
@@ -144,19 +134,19 @@ public class AdaptivePreprocessingBenchmark
         var testCases = new List<TestCase>();
 
         // 基本的なエラーパターンテストケース
-        var errorPatternCases = await _testCaseGenerator.GenerateErrorPatternTestCasesAsync();
-        testCases.AddRange(errorPatternCases.ToList());
+        var errorPatternCases = await testCaseGenerator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false);
+        testCases.AddRange([.. errorPatternCases]);
 
         // 小文字テキストテストケース
-        var smallTextCases = await GenerateSmallTextTestCasesAsync();
+        var smallTextCases = await GenerateSmallTextTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(smallTextCases);
 
         // 低品質画像テストケース
-        var lowQualityCases = await GenerateLowQualityTestCasesAsync();
+        var lowQualityCases = await GenerateLowQualityTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(lowQualityCases);
 
         // 高ノイズテストケース
-        var noisyCases = await GenerateNoisyTestCasesAsync();
+        var noisyCases = await GenerateNoisyTestCasesAsync().ConfigureAwait(false);
         testCases.AddRange(noisyCases);
 
         return testCases;
@@ -172,7 +162,7 @@ public class AdaptivePreprocessingBenchmark
         {
             foreach (var fontSize in fontSizes)
             {
-                var image = await _testCaseGenerator.GenerateSmallTextImageAsync(text, fontSize);
+                var image = await testCaseGenerator.GenerateSmallTextImageAsync(text, fontSize).ConfigureAwait(false);
                 testCases.Add(new TestCase($"SmallText_{text}_{fontSize}px", image, text));
             }
         }
@@ -193,8 +183,8 @@ public class AdaptivePreprocessingBenchmark
 
         foreach (var param in qualityParameters)
         {
-            var image = await _testCaseGenerator.GenerateLowQualityImageAsync(
-                "テスト文字列", param.Contrast, param.Brightness, param.Noise);
+            var image = await testCaseGenerator.GenerateLowQualityImageAsync(
+                "テスト文字列", param.Contrast, param.Brightness, param.Noise).ConfigureAwait(false);
             
             testCases.Add(new TestCase($"LowQuality_{param.Name}", image, "テスト文字列"));
         }
@@ -212,8 +202,8 @@ public class AdaptivePreprocessingBenchmark
         {
             foreach (var noiseLevel in noiseLevels)
             {
-                var image = await _testCaseGenerator.GenerateNoisyImageAsync(
-                    "ノイズテスト", noiseType, noiseLevel);
+                var image = await testCaseGenerator.GenerateNoisyImageAsync(
+                    "ノイズテスト", noiseType, noiseLevel).ConfigureAwait(false);
                 
                 testCases.Add(new TestCase($"Noisy_{noiseType}_{noiseLevel:F1}", image, "ノイズテスト"));
             }
@@ -226,10 +216,10 @@ public class AdaptivePreprocessingBenchmark
     {
         return qualityLevel switch
         {
-            ImageQualityLevel.Low => await GenerateLowQualityTestCasesAsync(),
-            ImageQualityLevel.Medium => (await _testCaseGenerator.GenerateErrorPatternTestCasesAsync()).ToList(),
-            ImageQualityLevel.High => await GenerateHighQualityTestCasesAsync(),
-            _ => (await _testCaseGenerator.GenerateErrorPatternTestCasesAsync()).ToList()
+            ImageQualityLevel.Low => await GenerateLowQualityTestCasesAsync().ConfigureAwait(false),
+            ImageQualityLevel.Medium => [.. (await testCaseGenerator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false))],
+            ImageQualityLevel.High => await GenerateHighQualityTestCasesAsync().ConfigureAwait(false),
+            _ => [.. (await testCaseGenerator.GenerateErrorPatternTestCasesAsync().ConfigureAwait(false))]
         };
     }
 
@@ -240,7 +230,7 @@ public class AdaptivePreprocessingBenchmark
 
         foreach (var text in texts)
         {
-            var image = await _testCaseGenerator.GenerateHighQualityImageAsync(text);
+            var image = await testCaseGenerator.GenerateHighQualityImageAsync(text).ConfigureAwait(false);
             testCases.Add(new TestCase($"HighQuality_{text}", image, text));
         }
 
@@ -258,8 +248,8 @@ public class AdaptivePreprocessingBenchmark
 
         foreach (var size in imageSizes)
         {
-            var image = await _testCaseGenerator.GeneratePerformanceTestImageAsync(
-                $"パフォーマンステスト {size.Width}x{size.Height}", size.Width, size.Height);
+            var image = await testCaseGenerator.GeneratePerformanceTestImageAsync(
+                $"パフォーマンステスト {size.Width}x{size.Height}", size.Width, size.Height).ConfigureAwait(false);
             
             testCases.Add(new TestCase($"Performance_{size.Width}x{size.Height}", image, 
                 $"パフォーマンステスト {size.Width}x{size.Height}"));
@@ -278,7 +268,7 @@ public class AdaptivePreprocessingBenchmark
         
         try
         {
-            var result = await ocrEngine.RecognizeAsync(testCase.Image);
+            var result = await ocrEngine.RecognizeAsync(testCase.Image).ConfigureAwait(false);
             
             return new BaselineTestResult
             {
@@ -292,7 +282,7 @@ public class AdaptivePreprocessingBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "ベースラインテスト実行エラー: {TestCase}", testCase.Name);
+            logger.LogWarning(ex, "ベースラインテスト実行エラー: {TestCase}", testCase.Name);
             return new BaselineTestResult
             {
                 TestCaseName = testCase.Name,
@@ -313,22 +303,22 @@ public class AdaptivePreprocessingBenchmark
         try
         {
             // IImageをIAdvancedImageに変換
-            var imageBytes = await testCase.Image.ToByteArrayAsync();
+            var imageBytes = await testCase.Image.ToByteArrayAsync().ConfigureAwait(false);
             var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height, 
                 testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png 
                     ? Core.Abstractions.Imaging.ImageFormat.Png 
                     : Core.Abstractions.Imaging.ImageFormat.Rgb24);
             
             // 適応的前処理パラメータを最適化
-            var optimizationResult = await _parameterOptimizer.OptimizeWithDetailsAsync(advancedImage);
+            var optimizationResult = await parameterOptimizer.OptimizeWithDetailsAsync(advancedImage).ConfigureAwait(false);
             var optimizationTime = sw.ElapsedMilliseconds;
 
             // 適応的OCRエンジンでOCR実行
             var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
-            var adaptiveEngine = new AdaptiveOcrEngine(ocrEngine, _parameterOptimizer, 
+            var adaptiveEngine = new AdaptiveOcrEngine(ocrEngine, parameterOptimizer, 
                 loggerFactory.CreateLogger<AdaptiveOcrEngine>());
             
-            var result = await adaptiveEngine.RecognizeAsync(testCase.Image, progress: null, cancellationToken: default);
+            var result = await adaptiveEngine.RecognizeAsync(testCase.Image, progressCallback: null, cancellationToken: default).ConfigureAwait(false);
             var totalTime = sw.ElapsedMilliseconds;
 
             return new AdaptiveTestResult
@@ -347,7 +337,7 @@ public class AdaptivePreprocessingBenchmark
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "適応的テスト実行エラー: {TestCase}", testCase.Name);
+            logger.LogWarning(ex, "適応的テスト実行エラー: {TestCase}", testCase.Name);
             return new AdaptiveTestResult
             {
                 TestCaseName = testCase.Name,
@@ -368,7 +358,7 @@ public class AdaptivePreprocessingBenchmark
         var optimizationTimes = new List<long>();
 
         // IImageをIAdvancedImageに変換
-        var imageBytes = await testCase.Image.ToByteArrayAsync();
+        var imageBytes = await testCase.Image.ToByteArrayAsync().ConfigureAwait(false);
         var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height, 
             testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png 
                 ? Core.Abstractions.Imaging.ImageFormat.Png 
@@ -378,10 +368,10 @@ public class AdaptivePreprocessingBenchmark
         {
             var sw = Stopwatch.StartNew();
             
-            var optimizationResult = await _parameterOptimizer.OptimizeWithDetailsAsync(advancedImage);
+            await parameterOptimizer.OptimizeWithDetailsAsync(advancedImage).ConfigureAwait(false);
             var optimizationTime = sw.ElapsedMilliseconds;
             
-            await ocrEngine.RecognizeAsync(testCase.Image);
+            await ocrEngine.RecognizeAsync(testCase.Image).ConfigureAwait(false);
             var totalTime = sw.ElapsedMilliseconds;
 
             optimizationTimes.Add(optimizationTime);
@@ -425,8 +415,8 @@ public class AdaptivePreprocessingBenchmark
         {
             TotalTestCases = adaptiveResults.Count,
             SuccessfulTestCases = adaptiveResults.Count(r => r.Success),
-            AverageImprovementPercentage = improvements.Any() ? improvements.Average() * 100 : 0,
-            AverageConfidenceImprovement = confidenceImprovements.Any() ? confidenceImprovements.Average() : 0,
+            AverageImprovementPercentage = improvements.Count > 0 ? improvements.Average() * 100 : 0,
+            AverageConfidenceImprovement = confidenceImprovements.Count > 0 ? confidenceImprovements.Average() : 0,
             AverageOptimizationTimeMs = adaptiveResults.Average(r => r.OptimizationTimeMs),
             AverageExecutionTimeMs = adaptiveResults.Average(r => r.ExecutionTimeMs),
             OptimizationStrategies = adaptiveResults
@@ -552,7 +542,7 @@ public record AdaptiveBenchmarkAnalysis
     public double AverageConfidenceImprovement { get; init; }
     public double AverageOptimizationTimeMs { get; init; }
     public double AverageExecutionTimeMs { get; init; }
-    public Dictionary<string, int> OptimizationStrategies { get; init; } = new();
+    public Dictionary<string, int> OptimizationStrategies { get; init; } = [];
 }
 
 public record QualitySpecificAnalysis

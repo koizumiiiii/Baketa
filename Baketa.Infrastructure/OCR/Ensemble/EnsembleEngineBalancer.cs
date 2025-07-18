@@ -9,20 +9,12 @@ namespace Baketa.Infrastructure.OCR.Ensemble;
 /// <summary>
 /// アンサンブルエンジンの重みとバランスを動的に最適化する実装クラス
 /// </summary>
-public class EnsembleEngineBalancer : IEnsembleEngineBalancer
+public class EnsembleEngineBalancer(
+    IImageQualityAnalyzer imageQualityAnalyzer,
+    ILogger<EnsembleEngineBalancer> logger) : IEnsembleEngineBalancer
 {
-    private readonly IImageQualityAnalyzer _imageQualityAnalyzer;
-    private readonly ILogger<EnsembleEngineBalancer> _logger;
-    private readonly Dictionary<string, EnginePerformanceProfile> _engineProfiles = new();
-    private readonly List<EnsembleExecutionHistory> _executionHistory = new();
-
-    public EnsembleEngineBalancer(
-        IImageQualityAnalyzer imageQualityAnalyzer,
-        ILogger<EnsembleEngineBalancer> logger)
-    {
-        _imageQualityAnalyzer = imageQualityAnalyzer;
-        _logger = logger;
-    }
+    private readonly Dictionary<string, EnginePerformanceProfile> _engineProfiles = [];
+    private readonly List<EnsembleExecutionHistory> _executionHistory = [];
 
     public async Task<EngineWeightOptimizationResult> OptimizeEngineWeightsAsync(
         IAdvancedImage image,
@@ -31,37 +23,37 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogInformation("エンジン重み最適化開始: {EngineCount}エンジン", engines.Count);
+        logger.LogInformation("エンジン重み最適化開始: {EngineCount}エンジン", engines.Count);
 
         try
         {
             // 画像特性を分析
-            var imageCharacteristics = await AnalyzeImageCharacteristicsAsync(image);
-            _logger.LogDebug("画像特性分析完了: 品質={Quality}, 複雑度={Complexity}",
+            var imageCharacteristics = await AnalyzeImageCharacteristicsAsync(image).ConfigureAwait(false);
+            logger.LogDebug("画像特性分析完了: 品質={Quality}, 複雑度={Complexity}",
                 imageCharacteristics.QualityLevel, imageCharacteristics.Complexity);
 
             // 各エンジンの適合性を評価
             var engineSuitability = await EvaluateEngineSuitabilityAsync(
-                imageCharacteristics, engines, parameters);
+                imageCharacteristics, engines, parameters).ConfigureAwait(false);
 
             // 重みを最適化
             var optimizedWeights = CalculateOptimizedWeights(
                 engineSuitability, parameters);
 
             // 期待される改善効果を推定
-            var expectedImprovements = EstimatePerformanceImprovements(
+            var (AccuracyImprovement, SpeedImprovement) = EstimatePerformanceImprovements(
                 optimizedWeights, imageCharacteristics, engines);
 
             var result = new EngineWeightOptimizationResult(
                 optimizedWeights,
-                expectedImprovements.AccuracyImprovement,
-                expectedImprovements.SpeedImprovement,
+                AccuracyImprovement,
+                SpeedImprovement,
                 DetermineOptimizationReason(imageCharacteristics, parameters),
                 GenerateOptimizationDetails(engineSuitability, optimizedWeights),
                 CalculateConfidenceScore(imageCharacteristics, engines),
                 sw.Elapsed);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "エンジン重み最適化完了: 精度改善={Accuracy:F3}, 速度改善={Speed:F3}, 信頼度={Confidence:F3} ({ElapsedMs}ms)",
                 result.ExpectedAccuracyImprovement, result.ExpectedSpeedImprovement, 
                 result.ConfidenceScore, sw.ElapsedMilliseconds);
@@ -70,7 +62,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "エンジン重み最適化中にエラーが発生しました");
+            logger.LogError(ex, "エンジン重み最適化中にエラーが発生しました");
             return CreateFallbackOptimizationResult(engines, sw.Elapsed);
         }
     }
@@ -80,13 +72,13 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         LearningParameters parameters,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("履歴学習開始: {HistorySize}件のデータ", executionHistory.Count);
+        logger.LogInformation("履歴学習開始: {HistorySize}件のデータ", executionHistory.Count);
 
         try
         {
             if (executionHistory.Count < parameters.MinimumHistorySize)
             {
-                _logger.LogWarning("履歴データが不足しています: {Current}/{Required}",
+                logger.LogWarning("履歴データが不足しています: {Current}/{Required}",
                     executionHistory.Count, parameters.MinimumHistorySize);
                 return CreateEmptyLearningResult();
             }
@@ -99,7 +91,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
 
             // 重み学習を実行
             var learnedWeights = await ExecuteWeightLearningAsync(
-                filteredHistory, performanceAnalysis, parameters);
+                filteredHistory, performanceAnalysis, parameters).ConfigureAwait(false);
 
             // 学習の洞察を生成
             var insights = GenerateLearningInsights(performanceAnalysis, filteredHistory);
@@ -112,7 +104,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
                 performanceAnalysis,
                 insights);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "履歴学習完了: 学習進度={Progress:F3}, 処理サンプル={Samples}, モデル信頼度={Confidence:F3}",
                 result.LearningProgress, result.ProcessedSamples, result.ModelConfidence);
 
@@ -120,7 +112,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "履歴学習中にエラーが発生しました");
+            logger.LogError(ex, "履歴学習中にエラーが発生しました");
             return CreateEmptyLearningResult();
         }
     }
@@ -130,14 +122,14 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         PerformanceRequirements performanceReqs,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("エンジン構成推奨開始: 品質={Quality}, 要件=速度重視={Speed}",
+        logger.LogInformation("エンジン構成推奨開始: 品質={Quality}, 要件=速度重視={Speed}",
             imageCharacteristics.QualityLevel, performanceReqs.PrioritizeSpeed);
 
         try
         {
             // 利用可能なエンジン構成を評価
             var engineConfigs = await EvaluateAvailableEngineConfigurationsAsync(
-                imageCharacteristics, performanceReqs);
+                imageCharacteristics, performanceReqs).ConfigureAwait(false);
 
             // 最適な構成を選択
             var bestConfig = SelectBestConfiguration(engineConfigs, performanceReqs);
@@ -155,7 +147,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
                 tradeoffs,
                 alternatives);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "エンジン構成推奨完了: 推奨エンジン数={EngineCount}, 期待性能={Performance:F3}",
                 recommendation.RecommendedEngines.Count, recommendation.ExpectedPerformance);
 
@@ -163,7 +155,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "エンジン構成推奨中にエラーが発生しました");
+            logger.LogError(ex, "エンジン構成推奨中にエラーが発生しました");
             return CreateFallbackRecommendation();
         }
     }
@@ -173,7 +165,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         MonitoringParameters parameters,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("パフォーマンス監視開始: {ResultCount}件の結果", recentResults.Count);
+        logger.LogDebug("パフォーマンス監視開始: {ResultCount}件の結果", recentResults.Count);
 
         try
         {
@@ -181,7 +173,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
             {
                 return new PerformanceAdjustmentSuggestion(
                     AdjustmentType.WeightAdjustment,
-                    new Dictionary<string, double>(),
+                    [],
                     "監視データが不足しています",
                     0.0,
                     AdjustmentUrgency.Low,
@@ -195,7 +187,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
             {
                 return new PerformanceAdjustmentSuggestion(
                     AdjustmentType.WeightAdjustment,
-                    new Dictionary<string, double>(),
+                    [],
                     "パフォーマンスに問題はありません",
                     0.0,
                     AdjustmentUrgency.Low,
@@ -204,9 +196,9 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
 
             // 調整案を生成
             var adjustmentSuggestion = await GenerateAdjustmentSuggestionAsync(
-                performanceIssues, recentResults, parameters);
+                performanceIssues, recentResults, parameters).ConfigureAwait(false);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "パフォーマンス調整提案: タイプ={Type}, 緊急度={Urgency}, 期待改善={Improvement:F3}",
                 adjustmentSuggestion.AdjustmentType, adjustmentSuggestion.Urgency, 
                 adjustmentSuggestion.ExpectedImprovement);
@@ -215,7 +207,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "パフォーマンス監視中にエラーが発生しました");
+            logger.LogError(ex, "パフォーマンス監視中にエラーが発生しました");
             return CreateEmptyAdjustmentSuggestion();
         }
     }
@@ -227,8 +219,8 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
     /// </summary>
     private async Task<ImageCharacteristics> AnalyzeImageCharacteristicsAsync(IAdvancedImage image)
     {
-        var qualityMetrics = await _imageQualityAnalyzer.AnalyzeAsync(image);
-        var textDensityMetrics = await _imageQualityAnalyzer.AnalyzeTextDensityAsync(image);
+        var qualityMetrics = await imageQualityAnalyzer.AnalyzeAsync(image).ConfigureAwait(false);
+        var textDensityMetrics = await imageQualityAnalyzer.AnalyzeTextDensityAsync(image).ConfigureAwait(false);
 
         return new ImageCharacteristics(
             DetermineQualityLevel(qualityMetrics.OverallQuality),
@@ -245,12 +237,12 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
     /// <summary>
     /// エンジン適合性を評価
     /// </summary>
-    private async Task<Dictionary<string, double>> EvaluateEngineSuitabilityAsync(
+    private Task<Dictionary<string, double>> EvaluateEngineSuitabilityAsync(
         ImageCharacteristics characteristics,
         IReadOnlyList<EnsembleEngineInfo> engines,
         BalancingParameters parameters)
     {
-        var suitability = new Dictionary<string, double>();
+        Dictionary<string, double> suitability = [];
 
         foreach (var engine in engines)
         {
@@ -258,7 +250,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
             suitability[engine.EngineName] = score;
         }
 
-        return suitability;
+        return Task.FromResult(suitability);
     }
 
     /// <summary>
@@ -267,7 +259,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
     private double CalculateEngineSuitabilityScore(
         EnsembleEngineInfo engine,
         ImageCharacteristics characteristics,
-        BalancingParameters parameters)
+        BalancingParameters _)
     {
         double score = 1.0;
 
@@ -308,7 +300,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
         Dictionary<string, double> suitability,
         BalancingParameters parameters)
     {
-        var optimizedWeights = new Dictionary<string, double>();
+        Dictionary<string, double> optimizedWeights = [];
         var totalSuitability = suitability.Values.Sum();
 
         if (totalSuitability == 0)
@@ -340,7 +332,7 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
     private (double AccuracyImprovement, double SpeedImprovement) EstimatePerformanceImprovements(
         Dictionary<string, double> optimizedWeights,
         ImageCharacteristics characteristics,
-        IReadOnlyList<EnsembleEngineInfo> engines)
+        IReadOnlyList<EnsembleEngineInfo> _)
     {
         // 簡易推定（実際の実装ではより複雑な予測モデルを使用）
         var weightVariance = CalculateWeightVariance(optimizedWeights);
@@ -437,65 +429,65 @@ public class EnsembleEngineBalancer : IEnsembleEngineBalancer
     /// <summary>
     /// その他のヘルパーメソッド群の実装は省略（実際の実装では完全に実装する必要があります）
     /// </summary>
-    private OptimizationReason DetermineOptimizationReason(ImageCharacteristics characteristics, BalancingParameters parameters) =>
+    private OptimizationReason DetermineOptimizationReason(ImageCharacteristics _, BalancingParameters _2) =>
         OptimizationReason.ImageQualityAdaptation;
 
-    private List<string> GenerateOptimizationDetails(Dictionary<string, double> suitability, Dictionary<string, double> weights) =>
+    private List<string> GenerateOptimizationDetails(Dictionary<string, double> _, Dictionary<string, double> _2) =>
         ["重み最適化完了"];
 
-    private double CalculateConfidenceScore(ImageCharacteristics characteristics, IReadOnlyList<EnsembleEngineInfo> engines) =>
+    private double CalculateConfidenceScore(ImageCharacteristics _, IReadOnlyList<EnsembleEngineInfo> _2) =>
         0.8;
 
     private EngineWeightLearningResult CreateEmptyLearningResult() =>
-        new(new Dictionary<string, double>(), 0.0, 0, 0.0, new Dictionary<string, double>(), 
+        new([], 0.0, 0, 0.0, new Dictionary<string, double>(), 
             new LearningInsights(new Dictionary<string, double>(), new Dictionary<string, double>(), 
                 [], [], 0.0));
 
-    private List<EnsembleExecutionHistory> FilterRelevantHistory(IReadOnlyList<EnsembleExecutionHistory> history, LearningParameters parameters) =>
-        history.ToList();
+    private List<EnsembleExecutionHistory> FilterRelevantHistory(IReadOnlyList<EnsembleExecutionHistory> history, LearningParameters _) =>
+        [.. history];
 
-    private Dictionary<string, double> AnalyzeEnginePerformance(List<EnsembleExecutionHistory> history) =>
-        new Dictionary<string, double>();
+    private Dictionary<string, double> AnalyzeEnginePerformance(List<EnsembleExecutionHistory> _) =>
+        [];
 
-    private async Task<Dictionary<string, double>> ExecuteWeightLearningAsync(List<EnsembleExecutionHistory> history, 
-        Dictionary<string, double> performance, LearningParameters parameters) =>
-        await Task.FromResult(new Dictionary<string, double>());
+    private async Task<Dictionary<string, double>> ExecuteWeightLearningAsync(List<EnsembleExecutionHistory> _, 
+        Dictionary<string, double> _2, LearningParameters _3) =>
+        await Task.FromResult<Dictionary<string, double>>([]).ConfigureAwait(false);
 
-    private LearningInsights GenerateLearningInsights(Dictionary<string, double> performance, List<EnsembleExecutionHistory> history) =>
+    private LearningInsights GenerateLearningInsights(Dictionary<string, double> _, List<EnsembleExecutionHistory> _2) =>
         new(new Dictionary<string, double>(), new Dictionary<string, double>(), [], [], 0.0);
 
-    private double CalculateLearningProgress(List<EnsembleExecutionHistory> history, LearningParameters parameters) => 0.0;
-    private double CalculateModelConfidence(Dictionary<string, double> performance) => 0.0;
+    private double CalculateLearningProgress(List<EnsembleExecutionHistory> _, LearningParameters _2) => 0.0;
+    private double CalculateModelConfidence(Dictionary<string, double> _) => 0.0;
 
     // 他のメソッドも同様に省略形で実装
-    private async Task<List<ConfigurationOption>> EvaluateAvailableEngineConfigurationsAsync(ImageCharacteristics characteristics, PerformanceRequirements requirements) =>
-        await Task.FromResult(new List<ConfigurationOption>());
+    private async Task<List<ConfigurationOption>> EvaluateAvailableEngineConfigurationsAsync(ImageCharacteristics _, PerformanceRequirements _2) =>
+        await Task.FromResult<List<ConfigurationOption>>([]).ConfigureAwait(false);
 
-    private ConfigurationOption SelectBestConfiguration(List<ConfigurationOption> configs, PerformanceRequirements requirements) =>
-        new([], null, 1.0);
+    private ConfigurationOption SelectBestConfiguration(List<ConfigurationOption> _, PerformanceRequirements _2) =>
+        new([], "フォールバック構成", 1.0);
 
-    private PerformanceTradeoffs AnalyzePerformanceTradeoffs(ConfigurationOption config, PerformanceRequirements requirements) =>
+    private PerformanceTradeoffs AnalyzePerformanceTradeoffs(ConfigurationOption _, PerformanceRequirements _2) =>
         new(1.0, 1.0, 1.0, []);
 
-    private List<string> GenerateAlternativeConfigurations(List<ConfigurationOption> configs, ConfigurationOption best) => [];
+    private List<string> GenerateAlternativeConfigurations(List<ConfigurationOption> _, ConfigurationOption _2) => [];
 
     private EngineConfigurationRecommendation CreateFallbackRecommendation() =>
         new([], "フォールバック推奨", 0.5, new PerformanceTradeoffs(1.0, 1.0, 1.0, []), []);
 
-    private List<PerformanceIssue> DetectPerformanceIssues(IReadOnlyList<IndividualEngineResult> results, MonitoringParameters parameters) =>
+    private List<PerformanceIssue> DetectPerformanceIssues(IReadOnlyList<IndividualEngineResult> _, MonitoringParameters _2) =>
         [];
 
-    private async Task<PerformanceAdjustmentSuggestion> GenerateAdjustmentSuggestionAsync(List<PerformanceIssue> issues, 
-        IReadOnlyList<IndividualEngineResult> results, MonitoringParameters parameters) =>
-        await Task.FromResult(CreateEmptyAdjustmentSuggestion());
+    private async Task<PerformanceAdjustmentSuggestion> GenerateAdjustmentSuggestionAsync(List<PerformanceIssue> _, 
+        IReadOnlyList<IndividualEngineResult> _2, MonitoringParameters _3) =>
+        await Task.FromResult(CreateEmptyAdjustmentSuggestion()).ConfigureAwait(false);
 
     private PerformanceAdjustmentSuggestion CreateEmptyAdjustmentSuggestion() =>
-        new(AdjustmentType.WeightAdjustment, new Dictionary<string, double>(), "調整不要", 0.0, AdjustmentUrgency.Low, []);
+        new(AdjustmentType.WeightAdjustment, [], "調整不要", 0.0, AdjustmentUrgency.Low, []);
 
     #endregion
 }
 
 // ヘルパークラス群
-internal record EnginePerformanceProfile(double AverageSuccessRate, double AverageProcessingTime, double AverageAccuracy);
-internal record ConfigurationOption(List<RecommendedEngineConfig> RecommendedEngines, string RecommendationReason, double ExpectedPerformance);
-internal record PerformanceIssue(string Issue, AdjustmentUrgency Urgency);
+internal sealed record EnginePerformanceProfile(double AverageSuccessRate, double AverageProcessingTime, double AverageAccuracy);
+internal sealed record ConfigurationOption(List<RecommendedEngineConfig> RecommendedEngines, string RecommendationReason, double ExpectedPerformance);
+internal sealed record PerformanceIssue(string Issue, AdjustmentUrgency Urgency);

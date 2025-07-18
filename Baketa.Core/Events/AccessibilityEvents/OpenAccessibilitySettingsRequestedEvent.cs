@@ -5,7 +5,7 @@ namespace Baketa.Core.Events.AccessibilityEvents;
     /// <summary>
     /// アクセシビリティ設定画面を開くリクエストイベント
     /// </summary>
-    public class OpenAccessibilitySettingsRequestedEvent : EventBase
+    public sealed class OpenAccessibilitySettingsRequestedEvent : EventBase
     {
         /// <summary>
         /// イベント名

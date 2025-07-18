@@ -11,23 +11,17 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx;
 /// αテスト向けOPUS-MT翻訳エンジンファクトリー
 /// 日英・英日の2言語ペアのみサポート
 /// </summary>
-public class AlphaOpusMtEngineFactory
+/// <remarks>
+/// コンストラクタ
+/// </remarks>
+/// <param name="configuration">設定</param>
+/// <param name="loggerFactory">ロガーファクトリー</param>
+public class AlphaOpusMtEngineFactory(
+    AlphaOpusMtConfiguration configuration,
+    ILoggerFactory loggerFactory)
 {
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly AlphaOpusMtConfiguration _configuration;
-
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="configuration">設定</param>
-    /// <param name="loggerFactory">ロガーファクトリー</param>
-    public AlphaOpusMtEngineFactory(
-        AlphaOpusMtConfiguration configuration,
-        ILoggerFactory loggerFactory)
-    {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-    }
+    private readonly ILoggerFactory _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+    private readonly AlphaOpusMtConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
     /// <summary>
     /// サポートされている言語ペアを取得
