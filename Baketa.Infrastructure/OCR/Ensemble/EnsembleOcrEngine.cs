@@ -323,6 +323,27 @@ public class EnsembleOcrEngine(
         };
     }
 
+    /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// アンサンブルエンジンではすべての子エンジンに転送
+    /// </summary>
+    public void CancelCurrentOcrTimeout()
+    {
+        logger.LogDebug("EnsembleOcrEngine: CancelCurrentOcrTimeout呼び出し");
+        
+        foreach (var engineInfo in _engines)
+        {
+            try
+            {
+                engineInfo.Engine.CancelCurrentOcrTimeout();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "子エンジンでのタイムアウトキャンセルエラー: {EngineName}", engineInfo.EngineName);
+            }
+        }
+    }
+
     public void Dispose()
     {
         foreach (var engineInfo in _engines)

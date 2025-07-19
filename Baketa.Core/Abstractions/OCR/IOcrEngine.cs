@@ -345,6 +345,12 @@ public interface IOcrEngine : IDisposable
     /// </summary>
     /// <returns>パフォーマンス統計</returns>
     OcrPerformanceStats GetPerformanceStats();
+    
+    /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// 翻訳結果が表示された際に呼び出されます
+    /// </summary>
+    void CancelCurrentOcrTimeout();
 }
 
 /// <summary>

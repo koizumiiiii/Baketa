@@ -260,6 +260,17 @@ public class SafePaddleOcrEngine(
         };
     }
 
+    /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// SafePaddleOcrEngineではスタブ実装
+    /// </summary>
+    public void CancelCurrentOcrTimeout()
+    {
+        // SafePaddleOcrEngineではタイムアウト処理がないため何もしない
+        // ログで記録のみ
+        _logger?.LogDebug("SafePaddleOcrEngine: CancelCurrentOcrTimeout呼び出し（スタブ実装）");
+    }
+
     #endregion
 
     #region 言語切り替え支援メソッド（Safe版）
