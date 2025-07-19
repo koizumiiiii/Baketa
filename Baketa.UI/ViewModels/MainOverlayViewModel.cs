@@ -369,7 +369,17 @@ public class MainOverlayViewModel : ViewModelBase
             });
             
             // 画面中央ローディングオーバーレイ表示
-            await _loadingManager.ShowAsync().ConfigureAwait(false);
+            DebugLogUtility.WriteLog("🔄 LoadingOverlayManager.ShowAsync呼び出し開始");
+            try
+            {
+                await _loadingManager.ShowAsync().ConfigureAwait(false);
+                DebugLogUtility.WriteLog("✅ LoadingOverlayManager.ShowAsync呼び出し完了");
+            }
+            catch (Exception loadingEx)
+            {
+                DebugLogUtility.WriteLog($"❌ LoadingOverlayManager.ShowAsync例外: {loadingEx.Message}");
+                Logger?.LogError(loadingEx, "ローディングオーバーレイ表示に失敗");
+            }
 
             // 2. 翻訳開始
             var uiTimer = System.Diagnostics.Stopwatch.StartNew();
@@ -387,7 +397,17 @@ public class MainOverlayViewModel : ViewModelBase
             });
             
             // 画面中央ローディングオーバーレイ非表示
-            await _loadingManager.HideAsync().ConfigureAwait(false);
+            DebugLogUtility.WriteLog("🔄 LoadingOverlayManager.HideAsync呼び出し開始");
+            try
+            {
+                await _loadingManager.HideAsync().ConfigureAwait(false);
+                DebugLogUtility.WriteLog("✅ LoadingOverlayManager.HideAsync呼び出し完了");
+            }
+            catch (Exception loadingEx)
+            {
+                DebugLogUtility.WriteLog($"❌ LoadingOverlayManager.HideAsync例外: {loadingEx.Message}");
+                Logger?.LogError(loadingEx, "ローディングオーバーレイ非表示に失敗");
+            }
             uiTimer.Stop();
             DebugLogUtility.WriteLog($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
