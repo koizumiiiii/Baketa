@@ -172,6 +172,15 @@ public class AdaptiveOcrEngine(
     }
 
     /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// </summary>
+    public void CancelCurrentOcrTimeout()
+    {
+        // ベースエンジンがPaddleOcrEngineの場合はキャンセル処理を転送
+        baseOcrEngine.CancelCurrentOcrTimeout();
+    }
+
+    /// <summary>
     /// Dispose実装
     /// </summary>
     public void Dispose()

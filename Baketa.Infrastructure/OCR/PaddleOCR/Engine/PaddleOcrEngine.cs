@@ -48,6 +48,13 @@ public sealed class PaddleOcrEngine(
     
     // パフォーマンス統計
     private readonly ConcurrentQueue<double> _processingTimes = new();
+    
+    // 適応的タイムアウト用の統計
+    private DateTime _lastOcrTime = DateTime.MinValue;
+    private int _consecutiveTimeouts = 0;
+    
+    // 進行中OCRタスクのキャンセレーション管理
+    private CancellationTokenSource? _currentOcrCancellation;
     private int _totalProcessedImages;
     private int _errorCount;
     private readonly DateTime _startTime = DateTime.UtcNow;
@@ -91,6 +98,7 @@ public sealed class PaddleOcrEngine(
         {
             _logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
                 settings.Language, settings.UseGpu, settings.EnableMultiThread);
+            DebugLogUtility.WriteLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
 
             // ネイティブライブラリの事前チェック
             if (!CheckNativeLibraries())
@@ -614,12 +622,14 @@ public sealed class PaddleOcrEngine(
                     
                     _ocrEngine = new PaddleOcrAll(models)
                     {
-                        // V4モデル用の最適化設定（V4の高度機能を活用）
-                        AllowRotateDetection = isV4ModelForCreation ? true : true,   // V4では回転検出を有効化
-                        Enable180Classification = isV4ModelForCreation ? true : true // V4では180度回転認識を有効化
+                        // PP-OCRv5安全設定（AccessViolationException回避）
+                        AllowRotateDetection = isV4ModelForCreation,   // V5では回転検出を無効化
+                        Enable180Classification = isV4ModelForCreation // V5では180度回転認識を無効化
                     };
                     DebugLogUtility.WriteLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
-                    DebugLogUtility.WriteLog($"🔧 V4専用設定適用: RotateDetection={true}, 180Classification={true}");
+                    var rotateDetection = isV4ModelForCreation;
+                    var classification180 = isV4ModelForCreation;
+                    DebugLogUtility.WriteLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
                 }
                 catch (Exception createEx)
                 {
@@ -920,8 +930,8 @@ public sealed class PaddleOcrEngine(
                         _queuedEngine = new QueuedPaddleOcrAll(
                             () => new PaddleOcrAll(models)
                             {
-                                AllowRotateDetection = true,  // V4でも回転検出有効化
-                                Enable180Classification = true  // V4でも180度分類有効化
+                                AllowRotateDetection = _isV4ModelForCreation,  // V5では回転検出無効化
+                                Enable180Classification = _isV4ModelForCreation  // V5では180度分類無効化
                             },
                             consumerCount: Math.Max(1, Math.Min(settings.WorkerCount, Environment.ProcessorCount))
                         );
@@ -1054,41 +1064,20 @@ public sealed class PaddleOcrEngine(
 
         try
         {
-            // PP-OCRv5モデルファイルのパスを構築
-            var modelBasePath = @"E:\dev\Baketa\models\ppocrv5";
-            
-            // PP-OCRv5検出モデルファイルのパス
-            var detectionModelPath = Path.Combine(modelBasePath, "det", "inference.pdiparams");
-            var detectionConfigPath = Path.Combine(modelBasePath, "det", "inference.yml");
-            
-            // PP-OCRv5認識モデルファイルのパス
-            var recognitionModelPath = Path.Combine(modelBasePath, "rec", "inference.pdiparams");
-            var recognitionConfigPath = Path.Combine(modelBasePath, "rec", "inference.yml");
-            
-            DebugLogUtility.WriteLog($"🔍 PP-OCRv5モデルパス確認:");
-            DebugLogUtility.WriteLog($"   🎯 検出モデル: {detectionModelPath}");
-            DebugLogUtility.WriteLog($"   📝 認識モデル: {recognitionModelPath}");
-            
-            // PP-OCRv5モデルファイルの存在確認
-            if (!File.Exists(detectionModelPath) || !File.Exists(recognitionModelPath))
+            // PP-OCRv5モデルが利用可能かチェック
+            if (!Models.PPOCRv5ModelProvider.IsAvailable())
             {
-                DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデルファイルが見つかりません");
-                DebugLogUtility.WriteLog($"   📁 検出モデル存在: {File.Exists(detectionModelPath)}");
-                DebugLogUtility.WriteLog($"   📁 認識モデル存在: {File.Exists(recognitionModelPath)}");
+                DebugLogUtility.WriteLog("❌ PP-OCRv5モデルが利用できません");
                 return null;
             }
-
-            // PP-OCRv5カスタムモデルの作成
-            var ppocrv5Model = await CreatePPOCRv5CustomModelAsync(
-                detectionModelPath, 
-                recognitionModelPath, 
-                language, 
-                cancellationToken).ConfigureAwait(false);
+            
+            // PP-OCRv5多言語モデルを取得
+            var ppocrv5Model = Models.PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel();
             
             if (ppocrv5Model != null)
             {
-                DebugLogUtility.WriteLog($"   🎯 PP-OCRv5カスタムモデル作成成功");
-                _logger?.LogInformation("PP-OCRv5カスタムモデルを使用 - 言語: {Language}", language);
+                DebugLogUtility.WriteLog("✅ PP-OCRv5多言語モデルを使用します");
+                _logger?.LogInformation("PP-OCRv5多言語モデルを使用 - 言語: {Language}", language);
                 return ppocrv5Model;
             }
             
@@ -1506,24 +1495,7 @@ public sealed class PaddleOcrEngine(
             var ocrStartTime = System.Diagnostics.Stopwatch.StartNew();
             
             // V4モデル安定化: Task.Run分離でハングアップ対策
-            try
-            {
-                result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
-            }
-            catch (TimeoutException) when (isV4Model)
-            {
-                // V4でタイムアウトした場合、V3にフォールバック
-                DebugLogUtility.WriteLog("⚠️ V4モデルタイムアウト - V3にフォールバック試行");
-                
-                // V3モデルに切り替え
-                var v3Model = LocalFullModels.JapanV3;
-                _ocrEngine = new PaddleOcrAll(v3Model);
-                DebugLogUtility.WriteLog("✅ V3モデルに切り替え完了");
-                
-                // V3で再実行
-                result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
-                DebugLogUtility.WriteLog("✅ V3フォールバック成功");
-            }
+            result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
             
             ocrStartTime.Stop();
             DebugLogUtility.WriteLog($"⏱️ OCR実行完了: {ocrStartTime.ElapsedMilliseconds}ms");
@@ -2430,8 +2402,15 @@ public sealed class PaddleOcrEngine(
     {
         DebugLogUtility.WriteLog("🚀 強化OCR実行開始 - Task.WhenAny版");
         
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // 10秒に短縮
-        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts.Token);
+        // 適応的タイムアウト設定 - 連続処理による性能劣化を考慮
+        var baseTimeout = _isV4ModelForCreation ? 45 : 75;  // V5の基本タイムアウトを延長
+        var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
+        DebugLogUtility.WriteLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
+        
+        // 現在のOCRキャンセレーション管理
+        _currentOcrCancellation?.Dispose();
+        _currentOcrCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(adaptiveTimeout));
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _currentOcrCancellation.Token);
         
         var ocrTask = Task.Run(() =>
         {
@@ -2445,7 +2424,7 @@ public sealed class PaddleOcrEngine(
             return result;
         }, combinedCts.Token);
 
-        var timeoutTask = Task.Delay(10000, cancellationToken); // 10秒タイムアウト
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(adaptiveTimeout), cancellationToken); // 適応的タイムアウト
         
         var completedTask = await Task.WhenAny(ocrTask, timeoutTask).ConfigureAwait(false);
         
@@ -2453,15 +2432,98 @@ public sealed class PaddleOcrEngine(
         {
             var result = await ocrTask.ConfigureAwait(false);
             DebugLogUtility.WriteLog("✅ OCR処理正常完了 - Task.WhenAny版");
+            
+            // 成功時の統計更新とクリーンアップ
+            _lastOcrTime = DateTime.UtcNow;
+            _consecutiveTimeouts = 0;
+            _currentOcrCancellation = null;
+            
             return result;
         }
         else
         {
-            DebugLogUtility.WriteLog("⏰ OCR処理10秒タイムアウト - 強制終了");
-            // タスクキャンセルを試行（ネイティブコードは停止しない可能性あり）
-            cts.Cancel();
-            throw new TimeoutException("OCR処理が10秒でタイムアウトしました（強化ハングアップ対策）");
+            var modelVersion = _isV4ModelForCreation ? "V4" : "V5";
+            DebugLogUtility.WriteLog($"⏰ {modelVersion}モデルOCR処理{adaptiveTimeout}秒タイムアウト");
+            
+            // バックグラウンドタスクのキャンセルを要求
+            combinedCts.Cancel();
+            
+            // バックグラウンドで完了する可能性があるため、少し待機してチェック
+            try
+            {
+                await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
+                if (ocrTask.IsCompleted && !ocrTask.IsFaulted && !ocrTask.IsCanceled)
+                {
+                    var lateResult = await ocrTask.ConfigureAwait(false);
+                    DebugLogUtility.WriteLog("✅ OCR処理がタイムアウト後に完了 - 結果を返します");
+                    
+                    // 遅延完了時の統計更新とクリーンアップ
+                    _lastOcrTime = DateTime.UtcNow;
+                    _consecutiveTimeouts = Math.Max(0, _consecutiveTimeouts - 1);
+                    _currentOcrCancellation = null;
+                    
+                    return lateResult;
+                }
+            }
+            catch
+            {
+                // 遅延チェックで例外が発生した場合は無視
+            }
+            
+            // タイムアウト時の統計更新とクリーンアップ
+            _consecutiveTimeouts++;
+            _currentOcrCancellation = null;
+            
+            throw new TimeoutException($"{modelVersion}モデルのOCR処理が{adaptiveTimeout}秒でタイムアウトしました");
         }
+    }
+
+    /// <summary>
+    /// 翻訳結果が表示された際に進行中のタイムアウト処理をキャンセル
+    /// </summary>
+    public void CancelCurrentOcrTimeout()
+    {
+        try
+        {
+            if (_currentOcrCancellation?.Token.CanBeCanceled == true && !_currentOcrCancellation.Token.IsCancellationRequested)
+            {
+                DebugLogUtility.WriteLog("🛑 翻訳結果表示により進行中OCRタイムアウトをキャンセル");
+                _currentOcrCancellation.Cancel();
+                _currentOcrCancellation = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル中にエラー: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 適応的タイムアウト値を計算
+    /// </summary>
+    private int GetAdaptiveTimeout(int baseTimeout)
+    {
+        var timeSinceLastOcr = DateTime.UtcNow - _lastOcrTime;
+        
+        // 連続処理による性能劣化を考慮
+        var adaptiveTimeout = baseTimeout;
+        
+        // 短時間での連続処理の場合、タイムアウトを延長
+        if (timeSinceLastOcr.TotalSeconds < 10)
+        {
+            adaptiveTimeout = (int)(baseTimeout * 1.5);
+            DebugLogUtility.WriteLog($"🔄 連続処理検出: 前回から{timeSinceLastOcr.TotalSeconds:F1}秒, タイムアウト延長");
+        }
+        
+        // 連続タイムアウトの場合、さらに延長
+        if (_consecutiveTimeouts > 0)
+        {
+            adaptiveTimeout = (int)(adaptiveTimeout * (1 + 0.3 * _consecutiveTimeouts));
+            DebugLogUtility.WriteLog($"⚠️ 連続タイムアウト={_consecutiveTimeouts}回, タイムアウト追加延長");
+        }
+        
+        // 最大値制限
+        return Math.Min(adaptiveTimeout, baseTimeout * 3);
     }
 
     /// <summary>
@@ -2475,6 +2537,8 @@ public sealed class PaddleOcrEngine(
         if (disposing)
         {
             _logger?.LogDebug("PaddleOcrEngineのリソースを解放中");
+            _currentOcrCancellation?.Dispose();
+            _currentOcrCancellation = null;
             DisposeEngines();
         }
 

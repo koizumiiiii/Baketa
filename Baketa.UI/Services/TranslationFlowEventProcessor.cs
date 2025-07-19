@@ -12,6 +12,7 @@ using Baketa.Core.Utilities;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Utils;
 using ReactiveUI;
+using Baketa.Core.Abstractions.OCR;
 
 namespace Baketa.UI.Services;
 
@@ -32,6 +33,7 @@ public class TranslationFlowEventProcessor :
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
+    private readonly IOcrEngine _ocrEngine;
     
     // 重複処理防止用
     private readonly HashSet<string> _processedEventIds = [];
@@ -48,7 +50,8 @@ public class TranslationFlowEventProcessor :
         TranslationResultOverlayManager overlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        IOcrEngine ocrEngine)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -56,6 +59,7 @@ public class TranslationFlowEventProcessor :
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         
         _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
@@ -377,6 +381,17 @@ public class TranslationFlowEventProcessor :
                         {
                             await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
                             DebugLogUtility.WriteLog("✅ 継続的翻訳結果表示イベント発行完了");
+                            
+                            // 翻訳結果が表示されたため、進行中のOCRタイムアウト処理をキャンセル
+                            try
+                            {
+                                _ocrEngine.CancelCurrentOcrTimeout();
+                            }
+                            catch (Exception cancelEx)
+                            {
+                                DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル試行中にエラー: {cancelEx.Message}");
+                            }
+                            
                             _logger.LogDebug("Continuous translation result display event published");
                         }
                         catch (Exception eventEx)
