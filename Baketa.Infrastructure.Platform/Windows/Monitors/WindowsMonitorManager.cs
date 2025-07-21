@@ -1058,7 +1058,7 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
         var wndClass = new WNDCLASS
         {
             style = 0,
-            lpfnWndProc = wndProc,
+            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(wndProc),  // デリゲートをIntPtrに変換
             cbClsExtra = 0,
             cbWndExtra = 0,
             hInstance = User32Methods.GetModuleHandle(null),
