@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "BaketaCaptureNative.h"
 
 // グローバル状態
