@@ -228,7 +228,7 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
     internal struct WNDCLASS
     {
         public uint style;
-        public WndProcDelegate lpfnWndProc;
+        public IntPtr lpfnWndProc;  // デリゲートではなくIntPtrを使用
         public int cbClsExtra;
         public int cbWndExtra;
         public IntPtr hInstance;
