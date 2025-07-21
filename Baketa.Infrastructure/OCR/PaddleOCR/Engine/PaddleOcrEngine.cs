@@ -2388,8 +2388,8 @@ public sealed class PaddleOcrEngine(
     {
         DebugLogUtility.WriteLog("🚀 強化OCR実行開始 - Task.WhenAny版");
         
-        // 適応的タイムアウト設定 - V5シングルスレッド最適化
-        var baseTimeout = _isV4ModelForCreation ? 30 : 20;  // V4=30秒, V5=20秒（シングルスレッド最適化）
+        // 適応的タイムアウト設定 - 解像度とモデルに応じた最適化
+        var baseTimeout = CalculateBaseTimeout(processedMat);  // 動的タイムアウト計算
         var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
         DebugLogUtility.WriteLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
         
@@ -2486,6 +2486,37 @@ public sealed class PaddleOcrEngine(
         {
             DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル中にエラー: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 解像度とモデルに応じた基本タイムアウトを計算
+    /// </summary>
+    /// <param name="mat">処理対象の画像Mat</param>
+    /// <returns>基本タイムアウト（秒）</returns>
+    private int CalculateBaseTimeout(Mat mat)
+    {
+        var pixelCount = mat.Width * mat.Height;
+        var isV4Model = _isV4ModelForCreation;
+        
+        // 解像度ベースのタイムアウト計算
+        int baseTimeout = isV4Model ? 25 : 15; // V4=25秒, V5=15秒（初期値）
+        
+        // ピクセル数に応じたタイムアウト調整
+        if (pixelCount > 2500000) // 2.5M pixel超 (2560x1080相当以上)
+        {
+            baseTimeout = isV4Model ? 45 : 35; // 大画面対応
+        }
+        else if (pixelCount > 2000000) // 2M pixel超 (1920x1080相当以上)
+        {
+            baseTimeout = isV4Model ? 35 : 25;
+        }
+        else if (pixelCount > 1000000) // 1M pixel超 (1280x720相当以上)
+        {
+            baseTimeout = isV4Model ? 30 : 20;
+        }
+        
+        DebugLogUtility.WriteLog($"🖼️ 解像度ベースタイムアウト: {mat.Width}x{mat.Height}({pixelCount:N0}px) → {baseTimeout}秒 (V4={isV4Model})");
+        return baseTimeout;
     }
 
     /// <summary>

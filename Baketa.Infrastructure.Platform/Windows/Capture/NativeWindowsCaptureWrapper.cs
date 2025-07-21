@@ -128,7 +128,20 @@ public class NativeWindowsCaptureWrapper : IDisposable
             if (result != NativeWindowsCapture.ErrorCodes.Success)
             {
                 string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
-                _logger?.LogError("キャプチャセッション作成に失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
+                
+                // 2560x1080などの大画面解像度の場合のメモリ不足エラーを特定
+                if (result == NativeWindowsCapture.ErrorCodes.Memory)
+                {
+                    _logger?.LogError("大画面キャプチャでメモリ不足: WindowHandle=0x{WindowHandle:X8}, {ErrorMessage}", windowHandle.ToInt64(), errorMsg);
+                }
+                else if (result == NativeWindowsCapture.ErrorCodes.Device)
+                {
+                    _logger?.LogError("Graphics Device初期化失敗: WindowHandle=0x{WindowHandle:X8}, {ErrorMessage}", windowHandle.ToInt64(), errorMsg);
+                }
+                else
+                {
+                    _logger?.LogError("キャプチャセッション作成に失敗: ErrorCode={ErrorCode}, WindowHandle=0x{WindowHandle:X8}, {ErrorMessage}", result, windowHandle.ToInt64(), errorMsg);
+                }
                 return false;
             }
 

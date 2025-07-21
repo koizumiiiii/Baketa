@@ -167,9 +167,9 @@ internal static partial class OverlayInterop
     [LibraryImport("user32.dll")]
     public static partial int ReleaseDC(nint hWnd, nint hDC);
     
-    // GetLastErrorはDllImportを使用（従来のP/Invoke）
-    [DllImport("kernel32.dll")]
-    public static extern uint GetLastError();
+    // GetLastErrorもLibraryImportに統一
+    [LibraryImport("kernel32.dll")]
+    public static partial uint GetLastError();
 }
 
 /// <summary>
