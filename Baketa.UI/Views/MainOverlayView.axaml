@@ -138,6 +138,24 @@
         </StackPanel>
       </Button>
       
+      <!-- ウィンドウ選択ボタン -->
+      <Button Classes="menu-item"
+              Command="{Binding SelectWindowCommand}"
+              ToolTip.Tip="翻訳対象ウィンドウを選択"
+              Name="SelectWindowButton"
+              IsEnabled="{Binding IsSelectWindowEnabled}">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <PathIcon Width="18" Height="18"
+                    Data="{StaticResource WindowSelectIcon}"
+                    Foreground="{StaticResource IconBrush}"/>
+          <TextBlock Text="Select"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
+      </Button>
+      
       <!-- ホーム/開始ボタン -->
       <Button Classes="menu-item"
               Command="{Binding StartStopCommand}"

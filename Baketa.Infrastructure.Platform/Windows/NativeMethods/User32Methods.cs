@@ -163,6 +163,9 @@ internal static class User32Methods
     
     // 特殊ウィンドウハンドル
     internal static readonly IntPtr HWND_MESSAGE = new(-3);
+    
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = false)]
+    internal static extern int GetClassName(IntPtr hWnd, char[] lpClassName, int nMaxCount);
 }
 
 [Flags]

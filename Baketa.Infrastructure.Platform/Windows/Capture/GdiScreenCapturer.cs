@@ -18,6 +18,7 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
     {
         private readonly Baketa.Core.Abstractions.Factories.IWindowsImageFactory _imageFactory;
         private readonly ILogger<GdiScreenCapturer>? _logger;
+        private readonly WinRTWindowCapture _winRTCapture;
         
         // LoggerMessageデリゲートの定義
         private static class Log
@@ -77,6 +78,7 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
         {
             _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
             _logger = logger;
+            _winRTCapture = new WinRTWindowCapture(imageFactory, logger as ILogger<WinRTWindowCapture>);
             
             _hdcMemory = IntPtr.Zero;
             _hBitmap = IntPtr.Zero;
@@ -113,12 +115,6 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
             if (_logger != null)
                 Log.WindowCaptureStart(_logger, hWnd);
             
-            // ウィンドウの領域を取得
-            if (!User32Methods.GetWindowRect(hWnd, out RECT rect))
-            {
-                throw new InvalidOperationException($"ウィンドウの領域取得に失敗: {hWnd}");
-            }
-            
             // ウィンドウが最小化されている場合はエラー
             if (User32Methods.IsIconic(hWnd))
             {
@@ -132,7 +128,48 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
                 DebugLogUtility.WriteLog($"⚠️ ウィンドウが非表示です: Handle={hWnd}");
             }
             
-            // クライアント領域のキャプチャ
+            DebugLogUtility.WriteLog($"🚀 Windows Graphics Capture API を使用してキャプチャ開始: Handle={hWnd}");
+            Console.WriteLine($"🚀 GdiScreenCapturer: Windows Graphics Capture API を使用してキャプチャ開始: Handle={hWnd.ToInt64():X8}");
+
+            try
+            {
+                // Windows Graphics Capture API を使用
+                Console.WriteLine($"📞 GdiScreenCapturer: _winRTCapture.CaptureWindowAsync呼び出し中...");
+                var result = await _winRTCapture.CaptureWindowAsync(hWnd).ConfigureAwait(false);
+                
+                DebugLogUtility.WriteLog($"✅ Windows Graphics Capture API キャプチャ成功: {result.Width}x{result.Height}");
+                Console.WriteLine($"✅ GdiScreenCapturer: Windows Graphics Capture API キャプチャ成功: {result.Width}x{result.Height}");
+                
+                if (_logger != null)
+                    Log.CaptureCompleted(_logger, result.Width, result.Height);
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                DebugLogUtility.WriteLog($"❌ Windows Graphics Capture API 失敗: {ex.Message}");
+                Console.WriteLine($"❌ GdiScreenCapturer: Windows Graphics Capture API 失敗: {ex.Message}");
+                DebugLogUtility.WriteLog($"❌ Windows Graphics Capture API 失敗: {ex.Message}");
+                _logger?.LogWarning(ex, "Windows Graphics Capture API failed, falling back to BitBlt");
+                
+                // フォールバック: BitBlt を使用
+                return await CaptureWindowWithBitBltFallback(hWnd).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// BitBltフォールバック処理
+        /// </summary>
+        private async Task<IWindowsImage> CaptureWindowWithBitBltFallback(IntPtr hWnd)
+        {
+            DebugLogUtility.WriteLog($"🔄 BitBltフォールバック開始: Handle={hWnd}");
+            
+            // ウィンドウの領域を取得
+            if (!User32Methods.GetWindowRect(hWnd, out RECT rect))
+            {
+                throw new InvalidOperationException($"ウィンドウの領域取得に失敗: {hWnd}");
+            }
+            
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
             
@@ -159,39 +196,42 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
                     throw new InvalidOperationException("デバイスコンテキストまたはビットマップの作成に失敗しました");
                 }
                 
-                Gdi32Methods.SelectObject(memoryDC.DangerousGetHandle(), bitmapHandle.DangerousGetHandle());
+                var oldBitmap = Gdi32Methods.SelectObject(memoryDC.DangerousGetHandle(), bitmapHandle.DangerousGetHandle());
                 
-                // まず直接BitBltを試行（より信頼性が高い）
-                DebugLogUtility.WriteLog($"🔸 BitBlt試行: 領域({rect.left}, {rect.top}, {width}, {height})");
-                bool captureSuccess = Gdi32Methods.BitBlt(
-                    memoryDC.DangerousGetHandle(),
-                    0, 0, width, height,
-                    screenDC.DangerousGetHandle(),
-                    rect.left, rect.top,
-                    BitBltFlags.SRCCOPY);
-                
-                DebugLogUtility.WriteLog($"🔸 BitBlt結果: {(captureSuccess ? "成功" : "失敗")}");
-                
-                // BitBltが失敗した場合、PrintWindowにフォールバック
-                if (!captureSuccess)
+                try
                 {
-                    if (_logger != null)
-                        Log.PrintWindowFallback(_logger, "BitBlt失敗 - PrintWindowにフォールバック");
+                    DebugLogUtility.WriteLog($"🔸 BitBltフォールバック実行: 領域({rect.left}, {rect.top}, {width}, {height})");
                     
-                    DebugLogUtility.WriteLog($"🔸 PrintWindow試行: PW_DEFAULT");
-                    // PW_CLIENTONLYを使わず、デフォルトでウィンドウ全体をキャプチャ
-                    bool printWindowSuccess = User32Methods.PrintWindow(hWnd, memoryDC.DangerousGetHandle(), PrintWindowFlags.PW_DEFAULT);
-                    DebugLogUtility.WriteLog($"🔸 PrintWindow結果: {(printWindowSuccess ? "成功" : "失敗")}");
+                    bool bitBltSuccess = Gdi32Methods.BitBlt(
+                        memoryDC.DangerousGetHandle(),
+                        0, 0, width, height,
+                        screenDC.DangerousGetHandle(),
+                        rect.left, rect.top,
+                        BitBltFlags.SRCCOPY);
+                    
+                    DebugLogUtility.WriteLog($"🔸 BitBlt結果: {(bitBltSuccess ? "成功" : "失敗")}");
+                    
+                    if (!bitBltSuccess)
+                    {
+                        throw new InvalidOperationException("BitBltキャプチャに失敗しました");
+                    }
+                    
+                    DebugLogUtility.WriteLog($"📋 キャプチャ方式: BitBlt API（画面領域キャプチャ）");
+                
+                    // ビットマップからイメージを作成
+                    var bitmap = System.Drawing.Image.FromHbitmap(bitmapHandle.DangerousGetHandle());
+                    var windowsImage = _imageFactory.CreateFromBitmap((Bitmap)bitmap);
+                    
+                    if (_logger != null)
+                        Log.CaptureCompleted(_logger, width, height);
+                    
+                    return windowsImage;
                 }
-                
-                // ビットマップからイメージを作成
-                var bitmap = System.Drawing.Image.FromHbitmap(bitmapHandle.DangerousGetHandle());
-                var windowsImage = _imageFactory.CreateFromBitmap((Bitmap)bitmap);
-                
-                if (_logger != null)
-                    Log.CaptureCompleted(_logger, width, height);
-                
-                return windowsImage;
+                finally
+                {
+                    // 旧ビットマップを復元
+                    Gdi32Methods.SelectObject(memoryDC.DangerousGetHandle(), oldBitmap);
+                }
             }).ConfigureAwait(false);
         }
         
@@ -299,6 +339,106 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
             _lastHeight = 0;
         }
         
+        /// <summary>
+        /// キャプチャした画像の詳細分析
+        /// </summary>
+        private void AnalyzeCapturedImage(IntPtr hdc, int width, int height, string method)
+        {
+            try
+            {
+                DebugLogUtility.WriteLog($"🔍 画像分析開始: {method}");
+                DebugLogUtility.WriteLog($"📐 画像サイズ: {width}x{height}");
+                
+                // 簡易的な画像内容チェック（ピクセル値のサンプリング）
+                var samplePoints = new[]
+                {
+                    new Point(width / 4, height / 4),
+                    new Point(width / 2, height / 2), 
+                    new Point(3 * width / 4, 3 * height / 4)
+                };
+                
+                bool hasNonBlackPixels = false;
+                foreach (var point in samplePoints)
+                {
+                    var pixel = Gdi32Methods.GetPixel(hdc, point.X, point.Y);
+                    if (pixel != 0) // 0 = 黒色
+                    {
+                        hasNonBlackPixels = true;
+                        break;
+                    }
+                }
+                
+                DebugLogUtility.WriteLog($"🎨 画像内容: {(hasNonBlackPixels ? "有効なコンテンツあり" : "黒画像または空")}");
+                
+                if (!hasNonBlackPixels)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ 警告: {method}で取得した画像が黒画像の可能性");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogUtility.WriteLog($"❌ 画像分析エラー: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ウィンドウ状態の詳細分析
+        /// </summary>
+        private void AnalyzeWindowState(IntPtr hWnd)
+        {
+            try
+            {
+                DebugLogUtility.WriteLog($"🔍 ウィンドウ状態分析開始: {hWnd}");
+                
+                var isVisible = User32Methods.IsWindowVisible(hWnd);
+                var isIconic = User32Methods.IsIconic(hWnd);
+                var isZoomed = User32Methods.IsZoomed(hWnd);
+                
+                DebugLogUtility.WriteLog($"👁️ 表示状態: {(isVisible ? "表示" : "非表示")}");
+                DebugLogUtility.WriteLog($"📉 最小化: {(isIconic ? "はい" : "いいえ")}");
+                DebugLogUtility.WriteLog($"📈 最大化: {(isZoomed ? "はい" : "いいえ")}");
+                
+                // ウィンドウクラス名を取得
+                var className = GetWindowClassName(hWnd);
+                DebugLogUtility.WriteLog($"🏷️ ウィンドウクラス: {className}");
+                
+                // ウィンドウのスタイル情報
+                var style = User32Methods.GetWindowLong(hWnd, GetWindowLongIndex.GWL_STYLE);
+                var exStyle = User32Methods.GetWindowLong(hWnd, GetWindowLongIndex.GWL_EXSTYLE);
+                
+                DebugLogUtility.WriteLog($"🎨 ウィンドウスタイル: 0x{style:X8}");
+                DebugLogUtility.WriteLog($"🎨 拡張スタイル: 0x{exStyle:X8}");
+                
+                // LayeredWindow かどうかチェック
+                const int WS_EX_LAYERED = 0x80000;
+                if ((exStyle & WS_EX_LAYERED) != 0)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ LayeredWindow検出: PrintWindowが動作しない可能性");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogUtility.WriteLog($"❌ ウィンドウ状態分析エラー: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ウィンドウクラス名を取得
+        /// </summary>
+        private string GetWindowClassName(IntPtr hWnd)
+        {
+            try
+            {
+                var className = new char[256];
+                var length = User32Methods.GetClassName(hWnd, className, className.Length);
+                return length > 0 ? new string(className, 0, length) : "Unknown";
+            }
+            catch
+            {
+                return "Error";
+            }
+        }
+
         /// <summary>
         /// ファイナライザー
         /// </summary>

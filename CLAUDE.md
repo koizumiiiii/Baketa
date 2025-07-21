@@ -19,13 +19,18 @@ Baketa is a Windows-specific real-time text translation overlay application for 
 
 ### Building the Solution
 ```cmd
-# Build entire solution
+# 1. ネイティブDLLをビルド（Visual Studio 2022必須）
+# BaketaCaptureNative.slnをVisual Studio 2022で開いてビルド
+# または MSBuild を使用：
+msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64
+
+# 2. .NETソリューション全体をビルド
 dotnet build
 
-# Build for Release
+# 3. Release ビルド
 dotnet build --configuration Release
 
-# Build for specific platform (x64 required for most projects)
+# 4. x64プラットフォーム指定ビルド（推奨）
 dotnet build --configuration Debug --arch x64
 ```
 
@@ -90,6 +95,7 @@ Before running translation features, download required models:
    - OpenCV wrapper for Windows
    - Windows overlay system
    - Monitor management
+   - P/Invoke wrappers for native DLL
 
 4. **Baketa.Application**: Business logic and feature integration
    - Capture services
@@ -102,6 +108,12 @@ Before running translation features, download required models:
    - Settings screens
    - Overlay components
    - Navigation and theming
+
+6. **BaketaCaptureNative**: C++/WinRT native DLL for Windows Graphics Capture API
+   - Native Windows Graphics Capture API implementation
+   - DirectX/OpenGL content capture
+   - BGRA pixel format conversion
+   - Memory-efficient texture processing
 
 ### Key Architectural Patterns
 
@@ -134,16 +146,28 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 
 ### Platform Requirements
 - **Windows-only**: No cross-platform support planned
-- **x64 Architecture**: Required for OCR and OpenCV components
+- **x64 Architecture**: Required for OCR, OpenCV, and native DLL components
 - **.NET 8 Windows**: Target framework is `net8.0-windows`
-- **Visual Studio 2022**: Recommended for development
+- **Visual Studio 2022**: Required for C++/WinRT native DLL development
+- **Windows SDK**: Windows 10/11 SDK for WinRT development
+- **VC++ Redistributable**: Visual C++ 2019/2022 Redistributable (x64) for deployment
 
 ### OCR and Translation Pipeline
-1. **Screen Capture**: GDI-based capture with difference detection
+1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
-3. **OCR**: PaddleOCR for text detection
+3. **OCR**: PaddleOCR PP-OCRv5 for text detection
 4. **Translation**: Multiple engines (OPUS-MT local, Gemini cloud)
 5. **Overlay Display**: Transparent Avalonia windows
+
+### Native DLL Implementation Details
+- **Purpose**: Bypass .NET 8 MarshalDirectiveException with Windows Graphics Capture API
+- **Technology**: C++/WinRT for native Windows Runtime API access
+- **Benefits**: DirectX/OpenGL content capture, better game compatibility
+- **Files**: 
+  - `BaketaCaptureNative/src/BaketaCaptureNative.cpp` - DLL entry point
+  - `BaketaCaptureNative/src/WindowsCaptureSession.cpp` - Core capture implementation
+  - `Baketa.Infrastructure.Platform/Windows/Capture/NativeWindowsCapture.cs` - P/Invoke declarations
+  - `Baketa.Infrastructure.Platform/Windows/Capture/NativeWindowsCaptureWrapper.cs` - High-level wrapper
 
 ### Testing Strategy
 - **Unit Tests**: Each layer has corresponding test project
@@ -187,8 +211,9 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 
 ### Core Technologies
 - **UI Framework**: Avalonia 11.2.7 with ReactiveUI
-- **OCR Engine**: PaddleOCR (native integration)
+- **OCR Engine**: PaddleOCR PP-OCRv5 (native integration)
 - **Image Processing**: OpenCV (Windows wrapper)
+- **Screen Capture**: Windows Graphics Capture API (C++/WinRT native DLL)
 - **Translation**: OPUS-MT (local), Google Gemini (cloud)
 - **DI Container**: Microsoft.Extensions.DependencyInjection
 - **Logging**: Microsoft.Extensions.Logging
@@ -223,6 +248,67 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 2. Create event processor implementing `IEventProcessor<TEvent>`
 3. Register processor in appropriate DI module
 4. Publish events via `IEventAggregator`
+
+### Working with Native DLL
+1. **C++ Changes**: Modify files in `BaketaCaptureNative/src/`
+2. **Build Native DLL**: Use Visual Studio 2022 or MSBuild for x64
+3. **P/Invoke Updates**: Update `NativeWindowsCapture.cs` for new functions
+4. **Wrapper Changes**: Modify `NativeWindowsCaptureWrapper.cs` for high-level API
+5. **DLL Deployment**: Ensure DLL is copied to output directory automatically
+
+## Windows Graphics Capture API Implementation (Completed)
+
+### Implementation Status: ✅ COMPLETED
+
+**Problem Solved**: MarshalDirectiveException in .NET 8 when using Windows Graphics Capture API
+
+**Solution**: C++/WinRT native DLL implementation bypassing .NET COM interop limitations
+
+### Key Implementation Files
+- `BaketaCaptureNative/src/BaketaCaptureNative.cpp` - DLL entry point and session management
+- `BaketaCaptureNative/src/WindowsCaptureSession.cpp` - Core Windows Graphics Capture API implementation
+- `Baketa.Infrastructure.Platform/Windows/Capture/NativeWindowsCapture.cs` - P/Invoke declarations
+- `Baketa.Infrastructure.Platform/Windows/Capture/NativeWindowsCaptureWrapper.cs` - High-level wrapper
+- `Baketa.Infrastructure.Platform/Adapters/CoreWindowManagerAdapterStub.cs` - Integration with capture system
+
+### Build Process (CRITICAL - MUST FOLLOW ORDER)
+```cmd
+# 1. Build Native DLL (Visual Studio 2022 required)
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64
+
+# 2. Copy DLL (manual until automation implemented)
+Copy-Item 'BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll' 'Baketa.UI\bin\x64\Debug\net8.0-windows10.0.19041.0\'
+
+# 3. Build .NET Solution
+dotnet build Baketa.sln --configuration Debug
+
+# 4. Run Application
+dotnet run --project Baketa.UI
+```
+
+### Technical Benefits Achieved
+- **DirectX/OpenGL Capture**: Full game content capture capability
+- **PP-OCRv5 Performance**: Optimized text detection without timeout issues
+- **Fallback Compatibility**: PrintWindow backup for older applications
+- **Memory Efficiency**: Direct BGRA texture processing
+
+### Development Requirements
+- **Visual Studio 2022**: Required for C++/WinRT development
+- **Windows 10/11 SDK**: WinRT API support
+- **C++ Desktop Development**: Visual Studio workload
+- **x64 Platform**: Mandatory for all components
+
+### Deployment Requirements
+- Visual C++ 2019/2022 Redistributable (x64)
+- .NET 8.0 Windows Desktop Runtime
+- Windows 10 version 1903 or later (for Graphics Capture API)
+
+### Known Issues & Warnings
+- C4819 warnings: Character encoding issues (non-critical)
+- CA1707/CA1401: P/Invoke naming conventions (suppressed)
+- Manual DLL copy required (automation planned)
+- Build order dependency (native DLL first)
 
 ## Pre-Implementation Required Procedures
 
