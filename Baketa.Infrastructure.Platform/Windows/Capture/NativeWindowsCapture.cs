@@ -57,7 +57,7 @@ public static class NativeWindowsCapture
     /// <param name="sessionId">作成されたセッションID（出力）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int BaketaCapture_CreateSession(IntPtr hwnd, out int sessionId);
+    public static extern int BaketaCapture_CreateSession(IntPtr hwnd, ref int sessionId);
 
     /// <summary>
     /// フレームをキャプチャ
@@ -67,7 +67,7 @@ public static class NativeWindowsCapture
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int BaketaCapture_CaptureFrame(int sessionId, out BaketaCaptureFrame frame, int timeoutMs);
+    public static extern int BaketaCapture_CaptureFrame(int sessionId, ref BaketaCaptureFrame frame, int timeoutMs);
 
     /// <summary>
     /// フレームデータを解放
@@ -97,7 +97,7 @@ public static class NativeWindowsCapture
     /// <param name="bufferSize">バッファサイズ</param>
     /// <returns>実際のメッセージ長</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    public static extern int BaketaCapture_GetLastError([Out] byte[] buffer, int bufferSize);
+    public static extern int BaketaCapture_GetLastError(IntPtr buffer, int bufferSize);
 
     /// <summary>
     /// 最後のエラーメッセージを取得（文字列版）
@@ -106,12 +106,19 @@ public static class NativeWindowsCapture
     public static string GetLastErrorMessage()
     {
         const int bufferSize = 1024;
-        var buffer = new byte[bufferSize];
-        int length = BaketaCapture_GetLastError(buffer, bufferSize);
-        
-        if (length <= 0)
-            return string.Empty;
+        IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+        try
+        {
+            int length = BaketaCapture_GetLastError(buffer, bufferSize);
             
-        return System.Text.Encoding.UTF8.GetString(buffer, 0, Math.Min(length, bufferSize - 1));
+            if (length <= 0)
+                return string.Empty;
+                
+            return Marshal.PtrToStringAnsi(buffer, Math.Min(length, bufferSize - 1)) ?? string.Empty;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 }
