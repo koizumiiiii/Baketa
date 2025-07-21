@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -6,7 +7,7 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
 /// <summary>
 /// BaketaCaptureNative.dll の P/Invoke インターフェース
 /// </summary>
-public static class NativeWindowsCapture
+public static partial class NativeWindowsCapture
 {
     private const string DllName = "BaketaCaptureNative.dll";
 
