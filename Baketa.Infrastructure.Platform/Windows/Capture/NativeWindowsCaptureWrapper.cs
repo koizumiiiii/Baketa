@@ -124,7 +124,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 _sessionId = -1;
             }
 
-            int result = NativeWindowsCapture.BaketaCapture_CreateSession(windowHandle, out _sessionId);
+            int result = NativeWindowsCapture.BaketaCapture_CreateSession(windowHandle, ref _sessionId);
             if (result != NativeWindowsCapture.ErrorCodes.Success)
             {
                 string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
@@ -161,7 +161,8 @@ public class NativeWindowsCaptureWrapper : IDisposable
         {
             try
             {
-                int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, out var frame, timeoutMs);
+                var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+                int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, ref frame, timeoutMs);
                 if (result != NativeWindowsCapture.ErrorCodes.Success)
                 {
                     string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
