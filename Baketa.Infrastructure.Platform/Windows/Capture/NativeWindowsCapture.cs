@@ -27,13 +27,14 @@ public static class NativeWindowsCapture
     /// <summary>
     /// フレームデータ構造体
     /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 8)]
     public struct BaketaCaptureFrame
     {
         public IntPtr bgraData;         // BGRA ピクセルデータ
         public int width;               // 幅
         public int height;              // 高さ
         public int stride;              // 行バイト数
+        [MarshalAs(UnmanagedType.I8)]
         public long timestamp;          // キャプチャ時刻 (100ns 単位)
     }
 
@@ -57,7 +58,7 @@ public static class NativeWindowsCapture
     /// <param name="sessionId">作成されたセッションID（出力）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int BaketaCapture_CreateSession(IntPtr hwnd, ref int sessionId);
+    public static extern int BaketaCapture_CreateSession([In] IntPtr hwnd, [Out] out int sessionId);
 
     /// <summary>
     /// フレームをキャプチャ
@@ -67,14 +68,14 @@ public static class NativeWindowsCapture
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern int BaketaCapture_CaptureFrame(int sessionId, ref BaketaCaptureFrame frame, int timeoutMs);
+    public static extern int BaketaCapture_CaptureFrame(int sessionId, [Out] out BaketaCaptureFrame frame, int timeoutMs);
 
     /// <summary>
     /// フレームデータを解放
     /// </summary>
     /// <param name="frame">解放するフレーム</param>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void BaketaCapture_ReleaseFrame(ref BaketaCaptureFrame frame);
+    public static extern void BaketaCapture_ReleaseFrame([In, Out] ref BaketaCaptureFrame frame);
 
     /// <summary>
     /// キャプチャセッションを削除
@@ -96,8 +97,9 @@ public static class NativeWindowsCapture
     /// <param name="buffer">メッセージバッファ</param>
     /// <param name="bufferSize">バッファサイズ</param>
     /// <returns>実際のメッセージ長</returns>
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    public static extern int BaketaCapture_GetLastError(IntPtr buffer, int bufferSize);
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, 
+              CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
+    public static extern int BaketaCapture_GetLastError([Out] IntPtr buffer, int bufferSize);
 
     /// <summary>
     /// 最後のエラーメッセージを取得（文字列版）
