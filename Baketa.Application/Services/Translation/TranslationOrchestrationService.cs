@@ -45,6 +45,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private CancellationTokenSource? _automaticTranslationCts;
     private Task? _automaticTranslationTask;
     private readonly SemaphoreSlim _singleTranslationSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _ocrExecutionSemaphore = new(1, 1);
+    private CancellationTokenSource? _latestOcrRequestCts;
 
     // Observable ストリーム
     private readonly Subject<TranslationResult> _translationResultsSubject = new();
@@ -52,9 +54,16 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly Subject<TranslationProgress> _progressUpdatesSubject = new();
 
     // 前回のキャプチャ画像（差分検出用）
-#pragma warning disable CS0649 // フィールドが割り当てられていない - 将来的に使用予定
-    private readonly IImage? _previousCapturedImage;
-#pragma warning restore CS0649
+    private IImage? _previousCapturedImage;
+    private readonly object _previousImageLock = new();
+
+    // 翻訳完了後の一時停止制御
+    private DateTime _lastTranslationCompletedAt = DateTime.MinValue;
+    private readonly object _lastTranslationTimeLock = new();
+    
+    // 前回の翻訳結果（重複チェック用）
+    private string _lastTranslatedText = string.Empty;
+    private readonly object _lastTranslatedTextLock = new();
 
     // 翻訳対象ウィンドウハンドル
     private IntPtr? _targetWindowHandle;
@@ -519,6 +528,23 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         DebugLogUtility.WriteLog($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         DebugLogUtility.WriteLog($"   📡 CaptureServiceが利用可能: {_captureService != null}");
         
+        // 翻訳完了後のクールダウン期間チェック
+        DateTime lastTranslationTime;
+        lock (_lastTranslationTimeLock)
+        {
+            lastTranslationTime = _lastTranslationCompletedAt;
+        }
+        
+        var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
+        var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
+        
+        if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
+        {
+            var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
+            DebugLogUtility.WriteLog($"⏳ 翻訳完了後のクールダウン中: ID={translationId}, 残り{remainingCooldown:F1}秒");
+            return; // クールダウン中はスキップ
+        }
+        
         IImage? currentImage = null;
         try
         {
@@ -551,20 +577,53 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
             
-            // 差分検出は一時的に無効化（ObjectDisposedException対策）
-            // if (_previousCapturedImage != null)
-            // {
-            //     var hasChanges = await _captureService.DetectChangesAsync(
-            //         _previousCapturedImage, currentImage, GetTranslationSettings().ChangeDetectionThreshold)
-            //         .ConfigureAwait(false);
-            //
-            //     if (!hasChanges)
-            //     {
-            //         _logger?.LogTrace("画面に変化がないため翻訳をスキップします");
-            //         currentImage?.Dispose();
-            //         return;
-            //     }
-            // }
+            // 画面変化検出による無駄な処理の削減
+            IImage? previousImageForComparison = null;
+            lock (_previousImageLock)
+            {
+                if (_previousCapturedImage != null)
+                {
+                    try
+                    {
+                        // 比較用に前回画像をクローン（lock外で比較するため）
+                        previousImageForComparison = _previousCapturedImage.Clone();
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogUtility.WriteLog($"⚠️ 前回画像クローン失敗、翻訳処理を継続: {ex.Message}");
+                        _logger?.LogWarning(ex, "前回画像のクローンに失敗しましたが、翻訳処理を継続します");
+                    }
+                }
+            }
+            
+            if (previousImageForComparison != null && currentImage != null)
+            {
+                try
+                {
+                    var hasChanges = await _captureService.DetectChangesAsync(
+                        previousImageForComparison, currentImage, 0.05f)
+                        .ConfigureAwait(false);
+
+                    if (!hasChanges)
+                    {
+                        DebugLogUtility.WriteLog($"🔄 画面に変化がないため翻訳をスキップ: ID={translationId}");
+                        _logger?.LogTrace("画面に変化がないため翻訳をスキップします");
+                        currentImage?.Dispose();
+                        previousImageForComparison?.Dispose();
+                        return;
+                    }
+                    DebugLogUtility.WriteLog($"📸 画面変化を検出、翻訳処理を継続: ID={translationId}");
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ 画面変化検出でエラー、翻訳処理を継続: {ex.Message}");
+                    _logger?.LogWarning(ex, "画面変化検出でエラーが発生しましたが、翻訳処理を継続します");
+                }
+                finally
+                {
+                    previousImageForComparison?.Dispose();
+                }
+            }
 
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
@@ -582,24 +641,79 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // 翻訳を実行
             DebugLogUtility.WriteLog($"🌍 翻訳処理開始: ID={translationId}");
-            var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
-                .ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
+            try
+            {
+                var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
+                    .ConfigureAwait(false);
+                DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
 
-            // キャンセルチェック
-            cancellationToken.ThrowIfCancellationRequested();
+                // キャンセルチェック
+                cancellationToken.ThrowIfCancellationRequested();
 
-            // 結果を通知（UI層でスケジューラ制御）
-            DebugLogUtility.WriteLog($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
-            _translationResultsSubject.OnNext(result);
-            DebugLogUtility.WriteLog($"✅ 翻訳結果発行完了");
+                // 翻訳結果の重複チェック
+                string lastTranslatedText;
+                lock (_lastTranslatedTextLock)
+                {
+                    lastTranslatedText = _lastTranslatedText;
+                }
+                
+                if (!string.IsNullOrEmpty(lastTranslatedText) && 
+                    string.Equals(result.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
+                {
+                    DebugLogUtility.WriteLog($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result.TranslatedText}'");
+                    return;
+                }
+                
+                // 翻訳完了時刻と結果を記録（重複翻訳防止用）
+                lock (_lastTranslationTimeLock)
+                {
+                    _lastTranslationCompletedAt = DateTime.UtcNow;
+                }
+                lock (_lastTranslatedTextLock)
+                {
+                    _lastTranslatedText = result.TranslatedText;
+                }
+                
+                // 結果を通知（UI層でスケジューラ制御）
+                DebugLogUtility.WriteLog($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
+                _translationResultsSubject.OnNext(result);
+                DebugLogUtility.WriteLog($"✅ 翻訳結果発行完了");
+            }
+            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") || 
+                                                  translationEx.Message.Contains("OCR") ||
+                                                  translationEx is OperationCanceledException)
+            {
+                // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
+                DebugLogUtility.WriteLog($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
+                _logger?.LogWarning(translationEx, "OCRエラーにより翻訳をスキップしました: TranslationId={TranslationId}", translationId);
+                
+                // 現在の画像を破棄して早期リターン
+                currentImage?.Dispose();
+                return;
+            }
 
-            // 前回のキャプチャ画像を更新（一旦無効化）
-            // var oldImage = _previousCapturedImage;
-            // _previousCapturedImage = currentImage; // 参照を保持
-            // oldImage?.Dispose(); // 古い画像を安全に破棄
+            // 前回のキャプチャ画像を安全に更新
+            lock (_previousImageLock)
+            {
+                var oldImage = _previousCapturedImage;
+                _previousCapturedImage = null; // 一旦クリア
+                
+                try
+                {
+                    // 現在の画像のコピーを作成して保持
+                    _previousCapturedImage = currentImage.Clone();
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ 前回画像の更新に失敗: {ex.Message}");
+                    _logger?.LogWarning(ex, "前回キャプチャ画像の更新に失敗しました");
+                }
+                
+                // 古い画像を安全に破棄
+                oldImage?.Dispose();
+            }
             
-            // 一旦画像を破棄してObjectDisposedExceptionを回避
+            // 現在の画像を破棄
             currentImage?.Dispose();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -644,6 +758,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 単発翻訳の表示時間を設定
                 result = result with { DisplayDuration = GetSingleTranslationDisplayDuration() };
 
+                // 翻訳完了時刻を記録（重複翻訳防止用）
+                lock (_lastTranslationTimeLock)
+                {
+                    _lastTranslationCompletedAt = DateTime.UtcNow;
+                }
+                
                 // 結果を通知（UI層でスケジューラ制御）
                 _translationResultsSubject.OnNext(result);
 
@@ -751,6 +871,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             try
             {
                 DebugLogUtility.WriteLog($"🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}");
+                DebugLogUtility.WriteLog($"🖼️ 画像情報: 型={image?.GetType().Name ?? "null"}");
                 
                 // デバッグ用: キャプチャした画像を保存
                 if (image != null)
@@ -778,19 +899,67 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             ArgumentNullException.ThrowIfNull(image, nameof(image));
             
-            DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し開始:");
+            // 最新要求優先: 前のOCR要求を強制キャンセル
+            var oldCts = _latestOcrRequestCts;
+            _latestOcrRequestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            
+            if (oldCts != null)
+            {
+                try
+                {
+                    DebugLogUtility.WriteLog($"🛑 前のOCR要求を強制キャンセル: ID={translationId}");
+                    oldCts.Cancel();
+                    
+                    // PaddleOCRエンジンのタイムアウトもキャンセル
+                    _ocrEngine.CancelCurrentOcrTimeout();
+                }
+                catch (Exception cancelEx)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ OCR強制キャンセル中にエラー: {cancelEx.Message}");
+                }
+                finally
+                {
+                    oldCts.Dispose();
+                }
+            }
+            
+            var currentRequestToken = _latestOcrRequestCts.Token;
+            
+            DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し開始（排他制御付き）:");
             DebugLogUtility.WriteLog($"   🔧 エンジン名: {_ocrEngine?.EngineName ?? "(null)"}");
             DebugLogUtility.WriteLog($"   ✅ 初期化状態: {_ocrEngine?.IsInitialized ?? false}");
             DebugLogUtility.WriteLog($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
             
-            var ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+            OcrResults ocrResults;
+            
+            // OCR処理の排他制御
+            await _ocrExecutionSemaphore.WaitAsync(currentRequestToken).ConfigureAwait(false);
+            try
+            {
+                // 最新要求かどうかチェック
+                if (_latestOcrRequestCts?.Token != currentRequestToken)
+                {
+                    DebugLogUtility.WriteLog($"🚫 古いOCR要求のためキャンセル: ID={translationId}");
+                    currentRequestToken.ThrowIfCancellationRequested();
+                }
+                
+                DebugLogUtility.WriteLog($"🔒 OCR処理を排他実行開始: ID={translationId}");
+                ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
+                DebugLogUtility.WriteLog($"🔓 OCR処理を排他実行完了: ID={translationId}");
+            }
+            finally
+            {
+                _ocrExecutionSemaphore.Release();
+            }
             
             DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し完了");
             
-            DebugLogUtility.WriteLog($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions?.Count ?? 0}");
+            DebugLogUtility.WriteLog($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions.Count}");
+            DebugLogUtility.WriteLog($"⏱️ OCR処理時間: {ocrResults.ProcessingTime.TotalMilliseconds:F1}ms");
+            DebugLogUtility.WriteLog($"🌐 OCR言語: {ocrResults.LanguageCode}");
             
             // 詳細なOCRデバッグ情報を表示
-            if (ocrResults.TextRegions != null && ocrResults.TextRegions.Count > 0)
+            if (ocrResults.TextRegions.Count > 0)
             {
                 DebugLogUtility.WriteLog($"🔍 詳細なOCRテキストリージョン情報:");
                 for (int i = 0; i < Math.Min(5, ocrResults.TextRegions.Count); i++) // 最初の5個だけ表示
@@ -809,13 +978,39 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             else
             {
-                DebugLogUtility.WriteLog($"📝 TextRegionsが空またはnullです");
+                DebugLogUtility.WriteLog($"📝 TextRegionsが空です");
+                DebugLogUtility.WriteLog($"❌ OCR処理でテキストが検出されませんでした");
+                DebugLogUtility.WriteLog($"🖼️ 確認事項: 画像内にテキストが含まれているか、OCRエンジンが正常に動作しているか");
             }
             
             if (ocrResults.HasText)
             {
-                originalText = ocrResults.Text;
-                ocrConfidence = ocrResults.TextRegions?.Count > 0 
+                // 設定に基づいてテキスト結合方法を選択
+                var enableTextGrouping = _settingsService.GetValue("Translation:EnableTextGrouping", true);
+                
+                if (enableTextGrouping)
+                {
+                    // レイアウト情報を活用した改良されたテキスト結合を使用
+                    var preserveParagraphs = _settingsService.GetValue("Translation:PreserveParagraphs", true);
+                    var sameLineThreshold = _settingsService.GetValue("Translation:SameLineThreshold", 0.5);
+                    var paragraphSeparationThreshold = _settingsService.GetValue("Translation:ParagraphSeparationThreshold", 1.5);
+                    
+                    originalText = ocrResults.GetGroupedText(
+                        preserveParagraphs: preserveParagraphs,
+                        sameLineThreshold: sameLineThreshold,
+                        paragraphSeparationThreshold: paragraphSeparationThreshold);
+                    
+                    DebugLogUtility.WriteLog($"📋 テキストグループ化を使用: 段落保持={preserveParagraphs}");
+                }
+                else
+                {
+                    // 従来の単純な改行区切り結合
+                    originalText = ocrResults.Text;
+                    
+                    DebugLogUtility.WriteLog($"📋 従来のテキスト結合を使用");
+                }
+                
+                ocrConfidence = ocrResults.TextRegions.Count > 0 
                     ? ocrResults.TextRegions.Average(r => r.Confidence) 
                     : 0.0;
                 
@@ -925,7 +1120,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             _logger?.LogError(ex, "翻訳処理で例外が発生しました: TranslationId={TranslationId}", translationId);
             
-            // エラーの場合もResultを返す
+            // OCRエラーかその他のエラーかを分類
+            bool isOcrError = ex.Message.Contains("PaddlePredictor") || 
+                             ex.Message.Contains("OCR") ||
+                             ex is OperationCanceledException;
+            
+            if (isOcrError)
+            {
+                DebugLogUtility.WriteLog($"🚫 OCRエラーのため翻訳結果を発行せず: ID={translationId}, Error={ex.Message}");
+                
+                // OCRエラーはステータス更新のみ行い、翻訳結果は発行しない
+                PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"OCRエラー: {ex.Message}");
+                
+                // OCRエラーの場合は例外を再スローして、上位でキャッチさせる
+                throw;
+            }
+            
+            // その他のエラーの場合は従来通り翻訳結果として返す
+            DebugLogUtility.WriteLog($"⚠️ 一般的な翻訳エラー、結果として発行: ID={translationId}, Error={ex.Message}");
             return new TranslationResult
             {
                 Id = translationId,
@@ -1095,12 +1307,18 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         
         _automaticTranslationCts?.Dispose();
         _singleTranslationSemaphore.Dispose();
+        _ocrExecutionSemaphore.Dispose();
+        _latestOcrRequestCts?.Dispose();
         
         _translationResultsSubject.Dispose();
         _statusChangesSubject.Dispose();
         _progressUpdatesSubject.Dispose();
         
-        _previousCapturedImage?.Dispose();
+        // 前回画像を安全に破棄
+        lock (_previousImageLock)
+        {
+            _previousCapturedImage?.Dispose();
+        }
 
         _disposed = true;
         

@@ -17,7 +17,8 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 ## ✨ 主要機能
 
 ### 🔍 OCR・画像処理
-- **PaddleOCR**: 高精度なテキスト検出エンジン
+- **PaddleOCR**: 高精度なテキスト検出エンジン（PP-OCRv5対応）
+- **Windows Graphics Capture API**: ネイティブC++/WinRT実装によるDirectX/OpenGLコンテンツキャプチャ
 - **OpenCV画像フィルタ**: モルフォロジー、ガウシアンフィルタによる前処理最適化
 - **差分検出**: 画面変更の高速検出によるパフォーマンス向上
 - **アダプティブ閾値**: ゲーム画面に応じた動的調整
@@ -50,6 +51,7 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 3. **Baketa.Infrastructure.Platform**: Windows専用プラットフォーム実装
 4. **Baketa.Application**: ビジネスロジック・機能統合層
 5. **Baketa.UI**: Avalonia UIによるプレゼンテーション層
+6. **BaketaCaptureNative**: C++/WinRT ネイティブDLL（Windows Graphics Capture API）
 
 ### ⚡ 設計パターン
 - **イベント集約**: `IEventAggregator`による疎結合通信
@@ -69,6 +71,7 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 - **メモリ**: 4GB RAM 推奨（8GB以上を強く推奨）
 - **ストレージ**: 2GB 空き容量（OPUS-MTモデル含む）
 - **ランタイム**: .NET 8.0 Windows Desktop Runtime（自己完結型）
+- **VC++ Redistributable**: Visual C++ 2019/2022 Redistributable (x64)（ネイティブDLL用）
 - **GPU**: CUDA対応GPU（オプション、OCR高速化用）
 
 ### インストール手順
@@ -82,8 +85,10 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 ### 📋 開発要件
 - **IDE**: Visual Studio 2022 / JetBrains Rider / VS Code
 - **SDK**: .NET 8.0 SDK
-- **OS**: Windows 10/11（開発・テスト）、WSL2（ビルドのみ）
-- **言語**: C# 12.0（最新機能活用）
+- **C++ コンパイラ**: Visual Studio 2022 C++ Build Tools（ネイティブDLL用）
+- **Windows SDK**: Windows 10/11 SDK（WinRT開発用）
+- **OS**: Windows 10/11（開発・テスト）、WSL2（.NETビルドのみ）
+- **言語**: C# 12.0、C++/WinRT
 
 ### 🚀 クイックスタート
 
@@ -96,13 +101,18 @@ cd Baketa
 # 2. 依存関係復元
 dotnet restore
 
-# 3. ビルド実行
+# 3. ネイティブDLLビルド（Visual Studio 2022が必要）
+# BaketaCaptureNative.slnをVisual Studio 2022で開いてビルド
+# または MSBuild を使用：
+# msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64
+
+# 4. .NETプロジェクトビルド
 dotnet build --configuration Debug
 
-# 4. テスト実行
+# 5. テスト実行
 dotnet test
 
-# 5. アプリケーション実行
+# 6. アプリケーション実行
 dotnet run --project Baketa.UI
 ```
 
@@ -169,6 +179,11 @@ Baketa/
 ├── 📂 Baketa.Infrastructure.Platform/ # 🖥️ Windows専用実装
 ├── 📂 Baketa.Application/      # 📋 ビジネスロジック
 ├── 📂 Baketa.UI/              # 🎨 ユーザーインターフェース
+├── 📂 BaketaCaptureNative/     # 🔧 C++/WinRT ネイティブDLL
+│   ├── src/                   # C++ソースコード
+│   ├── include/               # ヘッダーファイル
+│   ├── CMakeLists.txt         # CMakeBuild設定
+│   └── BaketaCaptureNative.sln # Visual Studio ソリューション
 └── 📂 tests/                   # 🧪 テストプロジェクト
     ├── Baketa.Core.Tests/
     ├── Baketa.Infrastructure.Tests/

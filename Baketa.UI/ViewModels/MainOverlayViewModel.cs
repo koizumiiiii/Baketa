@@ -28,6 +28,9 @@ public class MainOverlayViewModel : ViewModelBase
     private bool _isTranslationActive;
     private TranslationStatus _currentStatus;
     private bool _isTranslationResultVisible; // 初期状態は非表示
+    private bool _isWindowSelected;
+    private bool _isOcrInitialized;
+    private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
         IEventAggregator eventAggregator,
@@ -40,6 +43,17 @@ public class MainOverlayViewModel : ViewModelBase
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
+        
+        // 初期状態設定 - OCR初期化状態を動的に管理
+        _isOcrInitialized = false; // 初期状態は未初期化
+        _currentStatus = TranslationStatus.Initializing; // 初期化中状態から開始
+        
+        DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
+        
+        // OCR初期化状態を監視するタスクを開始
+        _ = Task.Run(MonitorOcrInitializationAsync);
+        
         InitializeCommands();
         InitializeEventHandlers();
         InitializePropertyChangeHandlers();
@@ -97,12 +111,14 @@ public class MainOverlayViewModel : ViewModelBase
                 if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
                 {
                     this.RaisePropertyChanged(nameof(StatusIndicatorClass));
+                    this.RaisePropertyChanged(nameof(InitializationText));
                 }
                 else
                 {
                     Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         this.RaisePropertyChanged(nameof(StatusIndicatorClass));
+                        this.RaisePropertyChanged(nameof(InitializationText));
                     });
                 }
             }
@@ -135,16 +151,71 @@ public class MainOverlayViewModel : ViewModelBase
         }
     }
 
+    public bool IsWindowSelected
+    {
+        get => _isWindowSelected;
+        set
+        {
+            var changed = SetPropertySafe(ref _isWindowSelected, value);
+            if (changed)
+            {
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                    this.RaisePropertyChanged(nameof(StartStopText));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                        this.RaisePropertyChanged(nameof(StartStopText));
+                    });
+                }
+            }
+        }
+    }
+
+    public bool IsOcrInitialized
+    {
+        get => _isOcrInitialized;
+        set
+        {
+            var changed = SetPropertySafe(ref _isOcrInitialized, value);
+            if (changed)
+            {
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                    });
+                }
+            }
+        }
+    }
+
+    public WindowInfo? SelectedWindow
+    {
+        get => _selectedWindow;
+        set => SetPropertySafe(ref _selectedWindow, value);
+    }
+
 
     // UI状態の計算プロパティ
     public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
     public bool SettingsEnabled => !IsLoading; // ローディング中のみ無効（翻訳中でも設定可能）
+    public bool IsSelectWindowEnabled => IsOcrInitialized && !IsLoading; // OCR初期化完了かつローディング中以外
     public bool IsStartStopEnabled 
     { 
         get 
         {
-            var enabled = !IsLoading; // ローディング中は無効
-            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, 結果={enabled}");
+            var enabled = !IsLoading && IsWindowSelected; // ローディング中以外かつウィンドウ選択済み
+            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, 結果={enabled}");
             return enabled;
         }
     }
@@ -161,18 +232,31 @@ public class MainOverlayViewModel : ViewModelBase
     public string LoadingText => IsLoading ? "🔄 翻訳準備中..." : "";
     public string ShowHideText => IsTranslationResultVisible ? "Hide" : "Show"; // 非表示ボタンのテキスト
     public string ShowHideIcon => IsTranslationResultVisible ? "👁️" : "🙈"; // 非表示ボタンのアイコン（例）
+    public string InitializationText => CurrentStatus switch
+    {
+        TranslationStatus.Initializing => "初期化中...",
+        TranslationStatus.Idle => "未選択",
+        TranslationStatus.Ready => "準備完了",
+        TranslationStatus.Capturing or TranslationStatus.ProcessingOCR or TranslationStatus.Translating => "翻訳中",
+        _ => "待機中"
+    };
     public string StatusIndicatorClass => CurrentStatus switch
     {
-        TranslationStatus.Idle => "inactive",
-        TranslationStatus.Capturing or TranslationStatus.Translating => "active",
-        TranslationStatus.Completed => "inactive",
-        _ => "inactive"
+        TranslationStatus.Initializing => "initializing",
+        TranslationStatus.Idle => "idle",
+        TranslationStatus.Ready => "ready",
+        TranslationStatus.Capturing or TranslationStatus.ProcessingOCR or TranslationStatus.Translating => "active",
+        TranslationStatus.Completed => "completed",
+        TranslationStatus.Error => "error",
+        TranslationStatus.Cancelled => "cancelled",
+        _ => "idle"
     };
 
     #endregion
 
     #region Commands
 
+    public ICommand SelectWindowCommand { get; private set; } = null!;
     public ICommand StartStopCommand { get; private set; } = null!;
     public ICommand ShowHideCommand { get; private set; } = null!;
     public ICommand SettingsCommand { get; private set; } = null!;
@@ -238,6 +322,11 @@ public class MainOverlayViewModel : ViewModelBase
             });
             
             StartStopCommand = startStopCmd;
+            
+            SelectWindowCommand = ReactiveCommand.CreateFromTask(ExecuteSelectWindowAsync,
+                this.WhenAnyValue(x => x.IsSelectWindowEnabled).ObserveOn(RxApp.MainThreadScheduler),
+                outputScheduler: RxApp.MainThreadScheduler);
+                
             ShowHideCommand = ReactiveCommand.Create(ExecuteShowHide,
                 this.WhenAnyValue(x => x.IsTranslationActive).ObserveOn(RxApp.MainThreadScheduler), // 翻訳中のみ有効
                 outputScheduler: RxApp.MainThreadScheduler);
@@ -280,17 +369,171 @@ public class MainOverlayViewModel : ViewModelBase
             .Subscribe(isLoading =>
             {
                 DebugLogUtility.WriteLog($"🔄 IsLoading状態変更: {isLoading}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 IsLoading状態変更: {isLoading}");
                 this.RaisePropertyChanged(nameof(LoadingText));
                 this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
                 this.RaisePropertyChanged(nameof(SettingsEnabled));
-                this.RaisePropertyChanged(nameof(StartStopText)); // StartStopTextも更新
+                this.RaisePropertyChanged(nameof(StartStopText));
+            });
+            
+        // IsOcrInitializedプロパティの変更を監視
+        this.WhenAnyValue(x => x.IsOcrInitialized)
+            .Subscribe(isInitialized =>
+            {
+                DebugLogUtility.WriteLog($"🔄 OCR初期化状態変更: {isInitialized}");
+                this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+            });
+            
+        // IsWindowSelectedプロパティの変更を監視
+        this.WhenAnyValue(x => x.IsWindowSelected)
+            .Subscribe(isSelected =>
+            {
+                DebugLogUtility.WriteLog($"🔄 ウィンドウ選択状態変更: {isSelected}");
+                this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                this.RaisePropertyChanged(nameof(StartStopText));
             });
     }
 
     #endregion
 
+    #region OCR Initialization Monitoring
+
+    /// <summary>
+    /// OCR初期化状態を監視し、完了時にUI状態を更新
+    /// </summary>
+    private async Task MonitorOcrInitializationAsync()
+    {
+        try
+        {
+            DebugLogUtility.WriteLog("🔄 OCR初期化監視開始");
+            
+            var timeout = TimeSpan.FromSeconds(30); // 30秒でタイムアウト
+            var startTime = DateTime.UtcNow;
+            
+            while (DateTime.UtcNow - startTime < timeout)
+            {
+                try
+                {
+                    // ServiceProviderからOCRサービスを取得して初期化状態をチェック
+                    var serviceProvider = Program.ServiceProvider;
+                    if (serviceProvider != null)
+                    {
+                        var ocrService = serviceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+                        if (ocrService != null)
+                        {
+                            // OCRサービスが初期化済みかチェック
+                            var isInitialized = await CheckOcrServiceInitialized(ocrService).ConfigureAwait(false);
+                            if (isInitialized)
+                            {
+                                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                                {
+                                    IsOcrInitialized = true;
+                                    CurrentStatus = TranslationStatus.Idle;
+                                    DebugLogUtility.WriteLog("✅ OCR初期化完了 - UI状態更新");
+                                });
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLogUtility.WriteLog($"⚠️ OCR初期化チェックエラー: {ex.Message}");
+                }
+                
+                await Task.Delay(500).ConfigureAwait(false); // 500ms間隔でチェック
+            }
+            
+            // タイムアウト時の処理
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsOcrInitialized = true; // タイムアウト時は強制的に初期化済みとする
+                CurrentStatus = TranslationStatus.Idle;
+                DebugLogUtility.WriteLog("⏰ OCR初期化監視タイムアウト - 強制的に初期化済み状態に移行");
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "OCR初期化監視でエラーが発生");
+            DebugLogUtility.WriteLog($"❌ OCR初期化監視エラー: {ex.Message}");
+            
+            // エラー時も強制的に初期化済み状態にする
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsOcrInitialized = true;
+                CurrentStatus = TranslationStatus.Idle;
+            });
+        }
+    }
+
+    /// <summary>
+    /// OCRサービスの初期化状態をチェック
+    /// </summary>
+    private async Task<bool> CheckOcrServiceInitialized(Baketa.Core.Abstractions.OCR.IOcrEngine ocrService)
+    {
+        try
+        {
+            // OCRサービスに初期化済みかどうかの確認メソッドがあるかチェック
+            if (ocrService.GetType().GetProperty("IsInitialized") is var prop && prop != null)
+            {
+                var isInitialized = (bool)(prop.GetValue(ocrService) ?? false);
+                return isInitialized;
+            }
+            
+            // フォールバック: InitializeAsyncを呼んでみて、すでに初期化済みの場合は即座に完了する
+            await ocrService.InitializeAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    #endregion
+
     #region Command Handlers
+
+    private async Task ExecuteSelectWindowAsync()
+    {
+        DebugLogUtility.WriteLog("🖥️ ExecuteSelectWindowAsync開始");
+        Logger?.LogInformation("ウィンドウ選択処理開始");
+        
+        try
+        {
+            var selectedWindow = await ShowWindowSelectionDialogAsync().ConfigureAwait(false);
+            if (selectedWindow == null)
+            {
+                DebugLogUtility.WriteLog("❌ ウィンドウ選択がキャンセルされました");
+                Logger?.LogDebug("ウィンドウ選択がキャンセルされました");
+                return;
+            }
+            
+            DebugLogUtility.WriteLog($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Logger?.LogInformation("ウィンドウが選択されました: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
+            
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SelectedWindow = selectedWindow;
+                IsWindowSelected = true;
+                CurrentStatus = TranslationStatus.Ready; // 準備完了状態
+            });
+            
+            DebugLogUtility.WriteLog($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
+            Logger?.LogInformation("ウィンドウ選択処理完了");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "ウィンドウ選択処理中にエラーが発生");
+            DebugLogUtility.WriteLog($"❌ ウィンドウ選択処理エラー: {ex.Message}");
+            
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsWindowSelected = false;
+                SelectedWindow = null;
+            });
+        }
+    }
 
     private async Task ExecuteStartStopAsync()
     {
@@ -340,25 +583,17 @@ public class MainOverlayViewModel : ViewModelBase
 
         try
         {
-            // 1. ウィンドウ選択ダイアログを表示
-            var dialogTimer = System.Diagnostics.Stopwatch.StartNew();
-            DebugLogUtility.WriteLog("🔍 ウィンドウ選択ダイアログを表示開始");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 ウィンドウ選択ダイアログを表示開始");
-            Logger?.LogDebug("🔍 ウィンドウ選択ダイアログを表示");
-            var selectedWindow = await ShowWindowSelectionDialogAsync().ConfigureAwait(false);
-            dialogTimer.Stop();
+            // 既に選択されたウィンドウを使用
+            var selectedWindow = SelectedWindow;
             if (selectedWindow == null)
             {
-                DebugLogUtility.WriteLog("❌ ウィンドウ選択がキャンセルされました");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ ウィンドウ選択がキャンセルされました");
-                Logger?.LogDebug("❌ ウィンドウ選択がキャンセルされました");
-                return; // キャンセル
+                DebugLogUtility.WriteLog("❌ ウィンドウが選択されていません");
+                Logger?.LogError("ウィンドウが選択されていない状態で翻訳開始が要求されました");
+                return;
             }
 
-            DebugLogUtility.WriteLog($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle}) - 選択時間: {dialogTimer.ElapsedMilliseconds}ms");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle}) - 選択時間: {dialogTimer.ElapsedMilliseconds}ms");
-            Logger?.LogInformation("✅ ウィンドウが選択されました: '{Title}' (Handle={Handle}) - 選択時間: {ElapsedMs}ms", 
-                selectedWindow.Title, selectedWindow.Handle, dialogTimer.ElapsedMilliseconds);
+            DebugLogUtility.WriteLog($"✅ 選択済みウィンドウを使用: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Logger?.LogInformation("選択済みウィンドウを使用: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
 
             // ローディング状態開始（ウィンドウ選択後）
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -443,9 +678,8 @@ public class MainOverlayViewModel : ViewModelBase
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
 
             overallTimer.Stop();
-            DebugLogUtility.WriteLog($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (ダイアログ: {dialogTimer.ElapsedMilliseconds}ms, UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (ダイアログ: {dialogTimer.ElapsedMilliseconds}ms, UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
-
+            DebugLogUtility.WriteLog($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
+            
             Logger?.LogInformation("🎉 翻訳が正常に開始されました: '{Title}' - 総処理時間: {TotalMs}ms", selectedWindow.Title, overallTimer.ElapsedMilliseconds);
         }
         catch (Exception ex)
@@ -546,19 +780,17 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task StopTranslationAsync()
     {
         DebugLogUtility.WriteLog("🔴 翻訳停止処理開始");
-        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳停止処理開始");
         Logger?.LogInformation("Stopping translation");
 
-        // 翻訳停止 + ウィンドウ選択解除
+        // 翻訳停止（ウィンドウ選択状態は維持）
         DebugLogUtility.WriteLog("🔴 翻訳状態をアイドルに設定");
-        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 翻訳状態をアイドルに設定");
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
-            CurrentStatus = TranslationStatus.Idle;
+            CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
             IsTranslationActive = false;
             IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
-            DebugLogUtility.WriteLog($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}");
+            // IsWindowSelectedとSelectedWindowは維持（再選択不要）
+            DebugLogUtility.WriteLog($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
         });
 
         // オーバーレイを非表示にしてリセット
@@ -793,7 +1025,9 @@ public class MainOverlayViewModel : ViewModelBase
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentStatus = statusEvent.Status;
-            IsTranslationActive = statusEvent.Status == TranslationStatus.Capturing || statusEvent.Status == TranslationStatus.Translating;
+            IsTranslationActive = statusEvent.Status == TranslationStatus.Capturing 
+                                  || statusEvent.Status == TranslationStatus.ProcessingOCR 
+                                  || statusEvent.Status == TranslationStatus.Translating;
         });
         
         Logger?.LogInformation("📊 翻訳状態変更: {PreviousStatus} -> {CurrentStatus}", 

@@ -2,12 +2,13 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<Platforms>AnyCPU;x64</Platforms>
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<!-- WPFとWinFormsを無効化してAvaloniaとの競合を回避 -->
 		<!-- <UseWPF>true</UseWPF> -->
 		<!-- <UseWindowsForms>true</UseWindowsForms> -->
@@ -15,7 +16,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822;NU1701</NoWarn>
 		
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>

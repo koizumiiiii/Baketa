@@ -51,7 +51,7 @@ public sealed class PaddleOcrEngine(
     
     // 適応的タイムアウト用の統計
     private DateTime _lastOcrTime = DateTime.MinValue;
-    private int _consecutiveTimeouts = 0;
+    private int _consecutiveTimeouts;
     
     // 進行中OCRタスクのキャンセレーション管理
     private CancellationTokenSource? _currentOcrCancellation;
@@ -614,7 +614,9 @@ public sealed class PaddleOcrEngine(
                 try
                 {
                     // V4モデル専用設定: モデルバージョンによる正確な検出（ファクトリーパターン対応）
-                    var isV4ModelForCreation = models.RecognizationModel?.Version == V4;
+#pragma warning disable CS8602 // null参照の可能性があるものの逆参照 - nullチェック済み
+                    var isV4ModelForCreation = models.RecognizationModel != null && models.RecognizationModel.Version == V4;
+#pragma warning restore CS8602
                     _isV4ModelForCreation = isV4ModelForCreation; // 実行時に使用するため保存
                     DebugLogUtility.WriteLog($"🔍 V4モデル検出 (バージョン検出): {isV4ModelForCreation}");
                     DebugLogUtility.WriteLog($"   📋 認識モデルタイプ: {models.RecognizationModel?.GetType()?.Name ?? "null"}");
@@ -622,13 +624,13 @@ public sealed class PaddleOcrEngine(
                     
                     _ocrEngine = new PaddleOcrAll(models)
                     {
-                        // PP-OCRv5安全設定（AccessViolationException回避）
-                        AllowRotateDetection = isV4ModelForCreation,   // V5では回転検出を無効化
-                        Enable180Classification = isV4ModelForCreation // V5では180度回転認識を無効化
+                        // PP-OCRv5最適化設定（高性能化）
+                        AllowRotateDetection = true,   // V5では回転検出を有効化して高速化
+                        Enable180Classification = true // V5では180度回転認識を有効化して高速化
                     };
                     DebugLogUtility.WriteLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
-                    var rotateDetection = isV4ModelForCreation;
-                    var classification180 = isV4ModelForCreation;
+                    var rotateDetection = true;  // PP-OCRv5高速化設定
+                    var classification180 = true;  // PP-OCRv5高速化設定
                     DebugLogUtility.WriteLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
                 }
                 catch (Exception createEx)
@@ -641,11 +643,11 @@ public sealed class PaddleOcrEngine(
                 try
                 {
                     // リフレクションを使用して内部プロパティにアクセス
-                    var ocrType = _ocrEngine.GetType();
-                    var isV4ModelForSettings = models.RecognizationModel?.Version == V4;
+                    var ocrType = _ocrEngine?.GetType();
+                    var isV4ModelForSettings = models.RecognizationModel != null && models.RecognizationModel.Version == V4;
                     
                     // V4モデル専用の安定化設定
-                    if (isV4ModelForSettings)
+                    if (isV4ModelForSettings && ocrType != null)
                     {
                         DebugLogUtility.WriteLog($"🔧 V4モデル専用設定を適用中...");
                         
@@ -668,61 +670,42 @@ public sealed class PaddleOcrEngine(
                             DebugLogUtility.WriteLog($"   📦 V4専用ボックス閾値設定: 0.3（安定性重視）");
                         }
                     }
-                    else
-                    {
-                        // V3モデル用の高精度設定（従来通り）
-                        var detThresholdProp = ocrType.GetProperty("DetectionThreshold") ?? 
-                                              ocrType.GetProperty("DetDbThresh") ??
-                                              ocrType.GetProperty("DetThreshold");
-                        if (detThresholdProp != null && detThresholdProp.CanWrite)
-                        {
-                            detThresholdProp.SetValue(_ocrEngine, 0.2f); // V3用高感度値
-                            DebugLogUtility.WriteLog($"   🎯 V3用検出閾値設定: 0.2（高感度）");
-                        }
-                        
-                        var boxThresholdProp = ocrType.GetProperty("BoxThreshold") ?? 
-                                              ocrType.GetProperty("DetDbBoxThresh") ??
-                                              ocrType.GetProperty("RecognitionThreshold");
-                        if (boxThresholdProp != null && boxThresholdProp.CanWrite)
-                        {
-                            boxThresholdProp.SetValue(_ocrEngine, 0.1f); // V3用高精度値
-                            DebugLogUtility.WriteLog($"   📦 V3用ボックス閾値設定: 0.1（高精度）");
-                        }
-                    }
                     
                     // det_db_unclip_ratio（テキスト領域拡張比率）の設定
-                    var unclipRatioProp = ocrType.GetProperty("UnclipRatio") ?? 
-                                         ocrType.GetProperty("DetDbUnclipRatio") ??
-                                         ocrType.GetProperty("ExpandRatio");
-                    if (unclipRatioProp != null && unclipRatioProp.CanWrite)
+                    if (ocrType != null)
                     {
-                        unclipRatioProp.SetValue(_ocrEngine, 3.0f); // 公式推奨値で日本語文字の検出を改善
-                        DebugLogUtility.WriteLog($"   📏 PP-OCRv5相当テキスト領域拡張比率設定成功: 3.0（公式推奨値）");
-                    }
-                    
-                    // PP-OCRv5の改良されたテキスト認識閾値（公式推奨値）
-                    var textThresholdProp = ocrType.GetProperty("TextThreshold") ?? 
-                                           ocrType.GetProperty("RecThreshold") ??
-                                           ocrType.GetProperty("TextScore");
-                    if (textThresholdProp != null && textThresholdProp.CanWrite)
-                    {
-                        textThresholdProp.SetValue(_ocrEngine, 0.1f); // 公式推奨値で誤認識を減らす
-                        DebugLogUtility.WriteLog($"   📝 PP-OCRv5相当テキスト認識閾値設定成功: 0.1（公式推奨値）");
-                    }
-                    
-                    // 日本語漢字認識特化設定
-                    var langProp = ocrType.GetProperty("Language") ?? ocrType.GetProperty("LanguageCode");
-                    if (langProp != null && langProp.CanWrite)
-                    {
-                        langProp.SetValue(_ocrEngine, "jpn");
-                        DebugLogUtility.WriteLog($"   🇯🇵 日本語漢字認識強化: jpn");
-                    }
-                    
-                    // 日本語専用Recognizerの最適化設定
-                    var recognizerProp = ocrType.GetProperty("Recognizer");
-                    if (recognizerProp != null && recognizerProp.CanWrite)
-                    {
-                        var recognizer = recognizerProp.GetValue(_ocrEngine);
+                        var unclipRatioProp = ocrType.GetProperty("UnclipRatio") ?? 
+                                             ocrType.GetProperty("DetDbUnclipRatio") ??
+                                             ocrType.GetProperty("ExpandRatio");
+                        if (unclipRatioProp != null && unclipRatioProp.CanWrite)
+                        {
+                            unclipRatioProp.SetValue(_ocrEngine, 3.0f); // 公式推奨値で日本語文字の検出を改善
+                            DebugLogUtility.WriteLog($"   📏 PP-OCRv5相当テキスト領域拡張比率設定成功: 3.0（公式推奨値）");
+                        }
+                        
+                        // PP-OCRv5の改良されたテキスト認識閾値（公式推奨値）
+                        var textThresholdProp = ocrType.GetProperty("TextThreshold") ?? 
+                                               ocrType.GetProperty("RecThreshold") ??
+                                               ocrType.GetProperty("TextScore");
+                        if (textThresholdProp != null && textThresholdProp.CanWrite)
+                        {
+                            textThresholdProp.SetValue(_ocrEngine, 0.1f); // 公式推奨値で誤認識を減らす
+                            DebugLogUtility.WriteLog($"   📝 PP-OCRv5相当テキスト認識閾値設定成功: 0.1（公式推奨値）");
+                        }
+                        
+                        // 日本語漢字認識特化設定
+                        var langProp = ocrType.GetProperty("Language") ?? ocrType.GetProperty("LanguageCode");
+                        if (langProp != null && langProp.CanWrite)
+                        {
+                            langProp.SetValue(_ocrEngine, "jpn");
+                            DebugLogUtility.WriteLog($"   🇯🇵 日本語漢字認識強化: jpn");
+                        }
+                        
+                        // 日本語専用Recognizerの最適化設定
+                        var recognizerProp = ocrType.GetProperty("Recognizer");
+                        if (recognizerProp != null && recognizerProp.CanWrite)
+                        {
+                            var recognizer = recognizerProp.GetValue(_ocrEngine);
                         if (recognizer != null)
                         {
                             var recType = recognizer.GetType();
@@ -897,25 +880,26 @@ public sealed class PaddleOcrEngine(
                         }
                         catch { /* プロパティ取得エラーは無視 */ }
                     }
-                }
+                        }
+                    }
                 catch (Exception propEx)
                 {
                     DebugLogUtility.WriteLog($"   ⚠️ プロパティ設定エラー: {propEx.Message}");
                 }
                 
                 DebugLogUtility.WriteLog($"🎯 PP-OCRv5最適化設定でPaddleOCR初期化:");
-                DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine.AllowRotateDetection}");
-                DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine.Enable180Classification}");
+                DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection}");
+                DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification}");
                 DebugLogUtility.WriteLog($"   PP-OCRv5相当パラメータ適用完了");
                 
                 _logger?.LogInformation("シングルスレッドOCRエンジン作成成功");
 
                 // マルチスレッド版は慎重に作成
-                // V4モデル対応: V4でもマルチスレッド使用可能（安定性確認済み）
+                // PP-OCRv5では安定性のためシングルスレッドを推奨
                 var isV4ModelForMultiThread = models.RecognizationModel?.Version == V4;
-                var shouldEnableMultiThread = settings.EnableMultiThread; // V4制限を除去
+                var shouldEnableMultiThread = isV4ModelForMultiThread; // V5ではマルチスレッド無効化
                 
-                DebugLogUtility.WriteLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread}");
+                DebugLogUtility.WriteLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread} (V5は安定性重視でシングルスレッド)");
                 
                 if (isV4ModelForMultiThread)
                 {
@@ -926,12 +910,12 @@ public sealed class PaddleOcrEngine(
                 {
                     try
                     {
-                        // マルチスレッド版にも同じ最適化設定を適用
+                        // V4モデルのマルチスレッド版に最適化設定を適用
                         _queuedEngine = new QueuedPaddleOcrAll(
                             () => new PaddleOcrAll(models)
                             {
-                                AllowRotateDetection = _isV4ModelForCreation,  // V5では回転検出無効化
-                                Enable180Classification = _isV4ModelForCreation  // V5では180度分類無効化
+                                AllowRotateDetection = true,  // V4では回転検出有効化
+                                Enable180Classification = true  // V4では180度分類有効化
                             },
                             consumerCount: Math.Max(1, Math.Min(settings.WorkerCount, Environment.ProcessorCount))
                         );
@@ -1015,9 +999,9 @@ public sealed class PaddleOcrEngine(
             var detectionModelPath = _modelPathResolver.GetDetectionModelPath("det_db_standard");
             if (!_modelPathResolver.FileExists(detectionModelPath))
             {
-                _logger?.LogWarning("検出モデルが見つかりません。デフォルトモデルを使用: {Path}", detectionModelPath);
-                // ローカルモデルにフォールバック
-                return await Task.FromResult(LocalFullModels.EnglishV3).ConfigureAwait(false);
+                _logger?.LogWarning("検出モデルが見つかりません。V4デフォルトモデルを使用: {Path}", detectionModelPath);
+                // V4ローカルモデルにフォールバック
+                return await Task.FromResult(LocalFullModels.EnglishV4).ConfigureAwait(false);
             }
 
             // 認識モデルの設定
@@ -1064,15 +1048,22 @@ public sealed class PaddleOcrEngine(
 
         try
         {
+            DebugLogUtility.WriteLog("🔍 PP-OCRv5モデル作成開始");
+            
             // PP-OCRv5モデルが利用可能かチェック
-            if (!Models.PPOCRv5ModelProvider.IsAvailable())
+            var isAvailable = Models.PPOCRv5ModelProvider.IsAvailable();
+            DebugLogUtility.WriteLog($"🔍 PPOCRv5ModelProvider.IsAvailable() = {isAvailable}");
+            
+            if (!isAvailable)
             {
                 DebugLogUtility.WriteLog("❌ PP-OCRv5モデルが利用できません");
                 return null;
             }
             
             // PP-OCRv5多言語モデルを取得
+            DebugLogUtility.WriteLog("🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel()呼び出し");
             var ppocrv5Model = Models.PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel();
+            DebugLogUtility.WriteLog($"🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel() = {ppocrv5Model != null}");
             
             if (ppocrv5Model != null)
             {
@@ -1081,7 +1072,7 @@ public sealed class PaddleOcrEngine(
                 return ppocrv5Model;
             }
             
-            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデル作成失敗");
+            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデル作成失敗 - GetPPOCRv5MultilingualModel()がnullを返しました");
             return null;
         }
         catch (Exception ex)
@@ -1197,17 +1188,22 @@ public sealed class PaddleOcrEngine(
             catch (Exception modelEx)
             {
                 DebugLogUtility.WriteLog($"   ❌ V4モデル初期化エラー: {modelEx.Message}");
-                DebugLogUtility.WriteLog($"   🔄 V3フォールバックに切り替え");
+                DebugLogUtility.WriteLog($"   🔄 V5フォールバックに切り替え");
                 improvedModel = language switch
                 {
-                    "jpn" => LocalFullModels.JapanV3,
-                    "eng" => LocalFullModels.EnglishV3,
-                    _ => LocalFullModels.JapanV3
+                    "jpn" => LocalFullModels.ChineseV5, // 日本語はV5多言語モデルを使用
+                    "eng" => LocalFullModels.ChineseV5, // 英語もV5多言語モデルを使用
+                    _ => LocalFullModels.ChineseV5
                 };
             }
             
-            // V4モデル確認と適切なメッセージ
-            var selectedModelInfo = improvedModel?.RecognizationModel?.Version == V4 ? "V4高精度モデル" : "V3フォールバックモデル";
+            // モデル確認と適切なメッセージ
+            var selectedModelInfo = improvedModel?.RecognizationModel?.Version switch
+            {
+                V4 => "V4高精度モデル",
+                V5 => "V5多言語モデル",
+                _ => "フォールバックモデル"
+            };
             DebugLogUtility.WriteLog($"   🎯 改良モデル選択成功: {selectedModelInfo}");
             DebugLogUtility.WriteLog($"   🌍 使用モデル: {improvedModel?.GetType()?.Name ?? "null"} ({language})");
             DebugLogUtility.WriteLog($"   📝 PP-OCRv5モデルファイル確認済み: {detectionModelDir}");
@@ -1225,9 +1221,9 @@ public sealed class PaddleOcrEngine(
             DebugLogUtility.WriteLog($"   🔄 標準モデルにフォールバック");
             var fallbackModel = language switch
             {
-                "jpn" => LocalFullModels.JapanV3,
-                "eng" => LocalFullModels.EnglishV3,
-                _ => LocalFullModels.JapanV3
+                "jpn" => LocalFullModels.ChineseV5, // V5多言語モデルを使用
+                "eng" => LocalFullModels.ChineseV5, // V5多言語モデルを使用
+                _ => LocalFullModels.ChineseV5
             };
             return fallbackModel;
         }
@@ -1257,13 +1253,12 @@ public sealed class PaddleOcrEngine(
         {
             DebugLogUtility.WriteLog($"🔍 GetPPOCRv5Model呼び出し - 言語: {language}");
             
-            // PP-OCRv5の場合、既存のLocalFullModelsを使用しつつ、
-            // 内部的にはPP-OCRv5認識モデルを使用するよう設定
+            // PP-OCRv5多言語モデルを使用
             var model = language switch
             {
-                "jpn" => LocalFullModels.JapanV3, // 日本語の場合は韓国語モデルを内部的に使用
-                "eng" => LocalFullModels.EnglishV3, // 英語の場合はラテン語モデルを内部的に使用
-                _ => LocalFullModels.JapanV3 // デフォルト
+                "jpn" => LocalFullModels.ChineseV5, // 日本語はV5多言語モデルを使用
+                "eng" => LocalFullModels.ChineseV5, // 英語もV5多言語モデルを使用
+                _ => LocalFullModels.ChineseV5 // デフォルト
             };
             
             DebugLogUtility.WriteLog($"🔍 PP-OCRv5ベースモデル選択: {model?.GetType()?.Name ?? "null"}");
@@ -1286,9 +1281,9 @@ public sealed class PaddleOcrEngine(
         
         var model = language switch
         {
-            "jpn" => LocalFullModels.JapanV3,
-            "eng" => LocalFullModels.EnglishV3,
-            _ => LocalFullModels.EnglishV3
+            "jpn" => LocalFullModels.JapanV4, // V4モデルを使用
+            "eng" => LocalFullModels.EnglishV4, // V4モデルを使用
+            _ => LocalFullModels.EnglishV4
         };
         
         DebugLogUtility.WriteLog($"🔍 選択されたモデル: {model?.GetType()?.Name ?? "null"}");
@@ -1460,21 +1455,12 @@ public sealed class PaddleOcrEngine(
         var isV4Model = _isV4ModelForCreation; // 初期化時に設定された値を使用
         DebugLogUtility.WriteLog($"🔍 V4モデル検出結果: {isV4Model} (初期化時設定値)");
         
-        Mat tempMat;
-        if (isV4Model)
-        {
-            // V4モデル最適化: 画像サイズ調整
-            DebugLogUtility.WriteLog($"🔧 V4モデル対応 - 画像最適化実行: {mat.Width}x{mat.Height}");
-            DebugLogUtility.WriteLog($"   📐 元画像サイズ: {mat.Width}x{mat.Height}");
-            DebugLogUtility.WriteLog($"   🎯 最適化開始...");
-            tempMat = await OptimizeImageForV4Async(mat).ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"   ✅ 最適化完了: {tempMat.Width}x{tempMat.Height}");
-        }
-        else
-        {
-            DebugLogUtility.WriteLog("🔧 標準前処理を使用（V4以外のモデル）");
-            tempMat = await FallbackPreprocessingAsync(mat).ConfigureAwait(false);
-        }
+        // PP-OCRv5でも高速前処理を使用 - V4モデル最適化
+        DebugLogUtility.WriteLog($"🔧 V4モデル対応 - 画像最適化実行: {mat.Width}x{mat.Height}");
+        DebugLogUtility.WriteLog($"   📐 元画像サイズ: {mat.Width}x{mat.Height}");
+        DebugLogUtility.WriteLog($"   🎯 最適化開始...");
+        var tempMat = await OptimizeImageForV4Async(mat).ConfigureAwait(false);
+        DebugLogUtility.WriteLog($"   ✅ 最適化完了: {tempMat.Width}x{tempMat.Height}");
         
         // タイムアウト対策: Matオブジェクトのコピーを作成してバックグラウンド処理を安全に
         using var processedMat = tempMat.Clone();
@@ -2402,8 +2388,8 @@ public sealed class PaddleOcrEngine(
     {
         DebugLogUtility.WriteLog("🚀 強化OCR実行開始 - Task.WhenAny版");
         
-        // 適応的タイムアウト設定 - 連続処理による性能劣化を考慮
-        var baseTimeout = _isV4ModelForCreation ? 45 : 75;  // V5の基本タイムアウトを延長
+        // 適応的タイムアウト設定 - V5シングルスレッド最適化
+        var baseTimeout = _isV4ModelForCreation ? 30 : 20;  // V4=30秒, V5=20秒（シングルスレッド最適化）
         var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
         DebugLogUtility.WriteLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
         
@@ -2419,6 +2405,10 @@ public sealed class PaddleOcrEngine(
             DebugLogUtility.WriteLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}");
             
             DebugLogUtility.WriteLog("🎯 PaddleOCR.Run()実行開始");
+            if (_ocrEngine == null)
+            {
+                throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            }
             var result = _ocrEngine.Run(taskSafeMat);
             DebugLogUtility.WriteLog($"✅ PaddleOCR.Run()完了");
             return result;

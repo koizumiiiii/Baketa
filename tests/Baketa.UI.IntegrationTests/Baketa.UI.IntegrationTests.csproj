@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <LangVersion>12</LangVersion>
@@ -14,7 +15,8 @@
     <!-- テストプロジェクトでのCA2007警告抑制 -->
     <!-- ConfigureAwait(false)はテストで使用すべきではないため -->
     <!-- CA1848警告抑制: LoggerMessageパターンはテストでは不要 -->
-    <NoWarn>$(NoWarn);CA2007;CA1822;CA1848</NoWarn>
+    <!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+    <NoWarn>$(NoWarn);CA2007;CA1822;CA1848;NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

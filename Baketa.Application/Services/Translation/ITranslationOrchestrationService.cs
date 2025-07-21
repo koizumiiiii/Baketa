@@ -192,9 +192,19 @@ public sealed record TranslationResult
 public enum TranslationStatus
 {
     /// <summary>
-    /// アイドル状態
+    /// 初期化中（OCRエンジン初期化中）
+    /// </summary>
+    Initializing,
+
+    /// <summary>
+    /// アイドル状態（ウィンドウ未選択）
     /// </summary>
     Idle,
+
+    /// <summary>
+    /// 準備完了（ウィンドウ選択済み、翻訳開始可能）
+    /// </summary>
+    Ready,
 
     /// <summary>
     /// キャプチャ中
