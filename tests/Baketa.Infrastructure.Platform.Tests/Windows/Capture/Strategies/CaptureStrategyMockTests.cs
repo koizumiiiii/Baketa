@@ -106,7 +106,7 @@ public class CaptureStrategyMockTests
         Assert.False(result.Success, "キャプチャは失敗するべき");
         Assert.Empty(result.Images);
         Assert.Equal("DirectFullScreen", result.StrategyName);
-        Assert.Contains("キャプチャに失敗しました", result.ErrorMessage);
+        Assert.Contains("キャプチャイメージの取得に失敗", result.ErrorMessage);
     }
 
     [Fact]
