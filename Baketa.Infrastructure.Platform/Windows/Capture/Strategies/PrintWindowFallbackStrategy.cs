@@ -86,12 +86,12 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
             _logger.LogDebug("PrintWindowFallbackキャプチャ開始");
 
             // PrintWindow API を使用した確実なキャプチャ
-            var capturedImage = await CaptureWithPrintWindowAsync(hwnd, options);
+            var capturedImage = await CaptureWithPrintWindowAsync(hwnd, options).ConfigureAwait(false);
             
             if (capturedImage != null)
             {
                 result.Success = true;
-                result.Images = new List<IWindowsImage> { capturedImage };
+                result.Images = [capturedImage];
                 result.Metrics.ActualCaptureTime = stopwatch.Elapsed;
                 result.Metrics.FrameCount = 1;
                 result.Metrics.PerformanceCategory = "Reliable";
@@ -130,7 +130,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
 
             // 既存のIWindowsCapturerを使用
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(options.TDRTimeoutMs));
-            var capturedImage = await _windowsCapturer.CaptureWindowAsync(hwnd);
+            var capturedImage = await _windowsCapturer.CaptureWindowAsync(hwnd).ConfigureAwait(false);
 
             if (capturedImage != null)
             {

@@ -93,12 +93,12 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             _logger.LogDebug("DirectFullScreenキャプチャ開始");
 
             // Windows Graphics Capture APIで直接キャプチャ
-            var capturedImage = await CaptureDirectFullScreenAsync(hwnd, options);
+            var capturedImage = await CaptureDirectFullScreenAsync(hwnd, options).ConfigureAwait(false);
             
             if (capturedImage != null)
             {
                 result.Success = true;
-                result.Images = new List<IWindowsImage> { capturedImage };
+                result.Images = [capturedImage];
                 result.Metrics.ActualCaptureTime = stopwatch.Elapsed;
                 result.Metrics.FrameCount = 1;
                 result.Metrics.PerformanceCategory = "HighPerformance";

@@ -13,20 +13,14 @@ namespace Baketa.Application.Services.Capture;
 /// <summary>
 /// 適応的キャプチャサービスを従来のICaptureServiceインターフェースに適合させるアダプター
 /// </summary>
-public class AdaptiveCaptureServiceAdapter : ICaptureService, IDisposable
+public partial class AdaptiveCaptureServiceAdapter(
+    IAdaptiveCaptureService adaptiveCaptureService,
+    ILogger<AdaptiveCaptureServiceAdapter> logger) : ICaptureService, IDisposable
 {
-    private readonly IAdaptiveCaptureService _adaptiveCaptureService;
-    private readonly ILogger<AdaptiveCaptureServiceAdapter> _logger;
+    private readonly IAdaptiveCaptureService _adaptiveCaptureService = adaptiveCaptureService ?? throw new ArgumentNullException(nameof(adaptiveCaptureService));
+    private readonly ILogger<AdaptiveCaptureServiceAdapter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private ServicesCaptureOptions _currentOptions = new();
-    private bool _disposed = false;
-
-    public AdaptiveCaptureServiceAdapter(
-        IAdaptiveCaptureService adaptiveCaptureService,
-        ILogger<AdaptiveCaptureServiceAdapter> logger)
-    {
-        _adaptiveCaptureService = adaptiveCaptureService ?? throw new ArgumentNullException(nameof(adaptiveCaptureService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private bool _disposed;
 
     public async Task<IImage> CaptureScreenAsync()
     {
@@ -223,8 +217,8 @@ public class AdaptiveCaptureServiceAdapter : ICaptureService, IDisposable
         return GetDesktopWindow();
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern IntPtr GetDesktopWindow();
+    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+    private static partial IntPtr GetDesktopWindow();
     
     /// <summary>
     /// キャプチャサービスを停止

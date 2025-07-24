@@ -205,3 +205,263 @@
 2025-07-17 20:37:20.021 🔴 アプリケーション終了を実行
 2025-07-17 20:37:20.047 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 17d24549-6722-428e-847d-d6ce73fc0171)
 2025-07-17 20:37:20.049 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 11:37:08.539 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 11:37:08.554 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 11:37:08.597 🔍 StartStopCommand canExecute変更: False
+2025-07-24 11:37:08.612 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 11:37:08.614 ✅ StartStopCommand実行完了
+2025-07-24 11:37:08.726 🔧 MainOverlayView初期化開始
+2025-07-24 11:37:08.855 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 11:37:08.865 🔧 MainOverlayView - IsVisible: False
+2025-07-24 11:37:08.867 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 11:37:09.043 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 11:37:09.044 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 11:37:15.643 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 11:37:15.645 📢 イベント購読を開始
+2025-07-24 11:37:15.646 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 11:37:15.648 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 11:37:15.649 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 11:37:15.650 ✅ SettingsChangedEvent購読完了
+2025-07-24 11:37:15.651 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 11:37:15.659 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 11:37:15.661 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 11:37:15.664 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 11:37:15.674 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 11:37:22.443 🔴 ExitButtonClick呼び出し
+2025-07-24 11:37:22.445 🔴 アプリケーション終了を実行
+2025-07-24 11:37:22.479 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 03e570c2-f05f-4537-8b59-36602854897a)
+2025-07-24 11:37:22.481 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 11:44:26.838 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 11:44:26.879 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 11:44:26.954 🔍 StartStopCommand canExecute変更: False
+2025-07-24 11:44:26.969 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 11:44:26.971 ✅ StartStopCommand実行完了
+2025-07-24 11:44:27.111 🔧 MainOverlayView初期化開始
+2025-07-24 11:44:27.353 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 11:44:27.373 🔧 MainOverlayView - IsVisible: False
+2025-07-24 11:44:27.378 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 11:44:27.709 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 11:44:28.175 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 11:44:34.093 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 11:44:34.095 📢 イベント購読を開始
+2025-07-24 11:44:34.096 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 11:44:34.098 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 11:44:34.099 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 11:44:34.100 ✅ SettingsChangedEvent購読完了
+2025-07-24 11:44:34.102 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 11:44:34.111 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 11:44:34.113 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 11:44:34.115 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 11:44:34.116 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 11:45:46.137 🔴 ExitButtonClick呼び出し
+2025-07-24 11:45:46.148 🔴 アプリケーション終了を実行
+2025-07-24 11:45:46.401 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 8570d2b7-c1bd-4158-87a6-8bbcc6946cac)
+2025-07-24 11:45:46.403 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 11:46:17.727 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 11:46:17.750 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 11:46:17.810 🔍 StartStopCommand canExecute変更: False
+2025-07-24 11:46:17.831 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 11:46:17.841 ✅ StartStopCommand実行完了
+2025-07-24 11:46:17.965 🔧 MainOverlayView初期化開始
+2025-07-24 11:46:18.088 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 11:46:18.099 🔧 MainOverlayView - IsVisible: False
+2025-07-24 11:46:18.101 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 11:46:18.313 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 11:46:18.315 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 11:46:19.943 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 11:46:19.945 📢 イベント購読を開始
+2025-07-24 11:46:19.947 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 11:46:19.948 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 11:46:19.949 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 11:46:19.951 ✅ SettingsChangedEvent購読完了
+2025-07-24 11:46:19.952 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 11:46:19.961 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 11:46:19.962 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 11:46:19.965 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 11:46:19.967 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 11:49:17.212 🔴 ExitButtonClick呼び出し
+2025-07-24 11:49:17.213 🔴 アプリケーション終了を実行
+2025-07-24 11:49:17.255 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 2ec0f360-0beb-40cd-a6dd-7384e55c0d06)
+2025-07-24 11:49:17.257 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 11:49:47.278 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 11:49:47.299 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 11:49:47.359 🔍 StartStopCommand canExecute変更: False
+2025-07-24 11:49:47.390 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 11:49:47.393 ✅ StartStopCommand実行完了
+2025-07-24 11:49:47.552 🔧 MainOverlayView初期化開始
+2025-07-24 11:49:47.697 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 11:49:47.710 🔧 MainOverlayView - IsVisible: False
+2025-07-24 11:49:47.713 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 11:49:47.951 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 11:49:47.953 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 11:49:53.585 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 11:49:53.589 📢 イベント購読を開始
+2025-07-24 11:49:53.591 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 11:49:53.594 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 11:49:53.597 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 11:49:53.598 ✅ SettingsChangedEvent購読完了
+2025-07-24 11:49:53.601 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 11:49:53.610 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 11:49:53.612 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 11:49:53.614 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 11:49:53.615 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 11:52:50.291 🔴 ExitButtonClick呼び出し
+2025-07-24 11:52:50.293 🔴 アプリケーション終了を実行
+2025-07-24 11:52:50.341 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 3f620787-fa0d-428d-857b-37a5c1fdfe87)
+2025-07-24 11:52:50.343 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:00:38.752 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:00:38.803 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:00:38.906 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:00:38.942 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:00:38.944 ✅ StartStopCommand実行完了
+2025-07-24 12:00:39.122 🔧 MainOverlayView初期化開始
+2025-07-24 12:00:39.363 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:00:39.391 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:00:39.393 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:00:40.393 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:00:40.395 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:00:46.354 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:00:46.356 📢 イベント購読を開始
+2025-07-24 12:00:46.357 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:00:46.358 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:00:46.359 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:00:46.360 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:00:46.362 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:00:46.371 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:00:46.373 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:00:46.376 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:00:46.386 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:01:09.988 🔴 ExitButtonClick呼び出し
+2025-07-24 12:01:09.990 🔴 アプリケーション終了を実行
+2025-07-24 12:01:10.021 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 58cfa911-1985-40d4-8b50-089b37ad41b5)
+2025-07-24 12:01:10.023 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:01:33.291 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:01:33.306 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:01:33.359 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:01:33.374 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:01:33.376 ✅ StartStopCommand実行完了
+2025-07-24 12:01:33.507 🔧 MainOverlayView初期化開始
+2025-07-24 12:01:33.722 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:01:33.735 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:01:33.743 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:01:34.059 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:01:34.489 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:01:36.559 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:01:36.562 📢 イベント購読を開始
+2025-07-24 12:01:36.564 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:01:36.565 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:01:36.566 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:01:36.567 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:01:36.568 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:01:36.581 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:01:36.583 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:01:36.588 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:01:36.590 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:05:24.074 🔴 ExitButtonClick呼び出し
+2025-07-24 12:05:24.077 🔴 アプリケーション終了を実行
+2025-07-24 12:05:24.128 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 242a92e4-773b-4fc2-95b4-3dd20fb5d0d2)
+2025-07-24 12:05:24.132 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:05:50.455 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:05:50.473 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:05:50.517 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:05:50.533 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:05:50.535 ✅ StartStopCommand実行完了
+2025-07-24 12:05:50.639 🔧 MainOverlayView初期化開始
+2025-07-24 12:05:50.745 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:05:50.757 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:05:50.759 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:05:50.966 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:05:51.304 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:05:57.337 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:05:57.339 📢 イベント購読を開始
+2025-07-24 12:05:57.340 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:05:57.341 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:05:57.342 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:05:57.343 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:05:57.344 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:05:57.352 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:05:57.353 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:05:57.356 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:05:57.357 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:12:29.012 🔴 ExitButtonClick呼び出し
+2025-07-24 12:12:29.015 🔴 アプリケーション終了を実行
+2025-07-24 12:12:29.054 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: aed3cad6-9175-4054-8914-d962c65d890c)
+2025-07-24 12:12:29.056 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:20:19.741 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:20:19.767 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:20:20.087 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:20:20.119 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:20:20.122 ✅ StartStopCommand実行完了
+2025-07-24 12:20:20.269 🔧 MainOverlayView初期化開始
+2025-07-24 12:20:20.456 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:20:20.471 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:20:20.474 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:20:20.673 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:20:20.674 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:20:26.018 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:20:26.020 📢 イベント購読を開始
+2025-07-24 12:20:26.022 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:20:26.023 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:20:26.024 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:20:26.025 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:20:26.026 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:20:26.034 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:20:26.035 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:20:26.038 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:20:26.048 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:25:23.058 🔴 ExitButtonClick呼び出し
+2025-07-24 12:25:23.061 🔴 アプリケーション終了を実行
+2025-07-24 12:25:23.121 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 9a52c6df-c5c8-4290-97db-6c32de9473b2)
+2025-07-24 12:25:23.122 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:27:43.303 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:27:43.342 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:27:43.406 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:27:43.423 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:27:43.425 ✅ StartStopCommand実行完了
+2025-07-24 12:27:43.546 🔧 MainOverlayView初期化開始
+2025-07-24 12:27:43.678 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:27:43.689 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:27:43.691 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:27:43.979 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:27:44.306 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:27:49.669 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:27:49.671 📢 イベント購読を開始
+2025-07-24 12:27:49.676 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:27:49.677 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:27:49.679 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:27:49.680 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:27:49.681 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:27:49.692 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:27:49.693 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:27:49.696 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:27:49.705 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:27:59.638 🔴 ExitButtonClick呼び出し
+2025-07-24 12:27:59.639 🔴 アプリケーション終了を実行
+2025-07-24 12:27:59.675 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: c491c41f-a69c-49fa-ad81-9ef5d97350fd)
+2025-07-24 12:27:59.677 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent
+2025-07-24 12:31:12.881 🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了
+2025-07-24 12:31:12.909 🏗️ ReactiveCommand.CreateFromTask開始
+2025-07-24 12:31:12.996 🔍 StartStopCommand canExecute変更: False
+2025-07-24 12:31:13.019 ✅ ReactiveCommand.CreateFromTask完了
+2025-07-24 12:31:13.022 ✅ StartStopCommand実行完了
+2025-07-24 12:31:13.205 🔧 MainOverlayView初期化開始
+2025-07-24 12:31:13.480 🔧 MainOverlayView - InitializeComponent完了
+2025-07-24 12:31:13.493 🔧 MainOverlayView - IsVisible: False
+2025-07-24 12:31:13.496 🔧 MainOverlayView - WindowState: Normal
+2025-07-24 12:31:13.832 🔄 TranslationFlowModuleの初期化を開始
+2025-07-24 12:31:13.833 📡 TranslationFlowEventProcessorを取得中
+2025-07-24 12:31:20.060 ✅ TranslationFlowEventProcessor取得成功: ハッシュ=45118907
+2025-07-24 12:31:20.075 📢 イベント購読を開始
+2025-07-24 12:31:20.076 ✅ StartTranslationRequestEvent購読完了
+2025-07-24 12:31:20.078 ✅ StopTranslationRequestEvent購読完了
+2025-07-24 12:31:20.080 ✅ ToggleTranslationDisplayRequestEvent購読完了
+2025-07-24 12:31:20.081 ✅ SettingsChangedEvent購読完了
+2025-07-24 12:31:20.082 🎉 翻訳フローイベントプロセッサーを正常に登録しました
+2025-07-24 12:31:20.094 🔧 MainOverlayView - OnLoaded呼び出し
+2025-07-24 12:31:20.095 🔧 MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+2025-07-24 12:31:20.098 🔧 MainOverlayView - Position: 16, 326, Width: 70, Height: 430
+2025-07-24 12:31:20.108 🔧 MainOverlayView - Show()とActivate()を実行
+2025-07-24 12:31:20.801 🔴 ExitButtonClick呼び出し
+2025-07-24 12:31:20.803 🔴 アプリケーション終了を実行
+2025-07-24 12:31:20.849 🚀 ViewModelBase.PublishEventAsync開始: ExitApplicationRequestEvent (ID: 750621ac-36a0-4a44-8876-422491658c22)
+2025-07-24 12:31:20.850 ✅ ViewModelBase.PublishEventAsync呼び出し完了: ExitApplicationRequestEvent

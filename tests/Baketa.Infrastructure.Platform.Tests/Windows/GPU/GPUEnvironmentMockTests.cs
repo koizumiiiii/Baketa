@@ -212,6 +212,9 @@ public class GPUEnvironmentMockTests
         // Assert - 実際のウィンドウAPIを使用するため、結果は環境依存
         // モックテストでは前提条件の検証ロジック自体をテスト
         Assert.True(validWindowHandle != IntPtr.Zero);
+        
+        // Note: isValid は環境依存のため、具体的な値をアサートしない
+        _ = isValid; // 使用されていない警告を抑制
     }
 
     [Fact]

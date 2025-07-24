@@ -266,10 +266,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             // フレームキャプチャを実行
             var capturedImage = await _nativeCapture.CaptureFrameAsync(timeoutMs).ConfigureAwait(false);
 
-            if (capturedImage == null)
-            {
-                throw new InvalidOperationException($"ウィンドウ 0x{windowHandle.ToInt64():X8} のフレームキャプチャに失敗");
-            }
+            ArgumentNullException.ThrowIfNull(capturedImage);
 
             _logger?.LogDebug("ウィンドウキャプチャが完了: {Width}x{Height}", 
                 capturedImage.Width, capturedImage.Height);
