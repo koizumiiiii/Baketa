@@ -182,6 +182,10 @@ namespace Baketa.UI;
             var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
             platformModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // AdaptiveCaptureModuleの登録（ApplicationModuleのAdaptiveCaptureServiceに必要な依存関係を提供）
+            var adaptiveCaptureModule = new Baketa.Infrastructure.Platform.DI.Modules.AdaptiveCaptureModule();
+            adaptiveCaptureModule.RegisterServices(services);
+            
             // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
             var authModule = new AuthModule();
             authModule.RegisterWithDependencies(services, registeredModules, moduleStack);

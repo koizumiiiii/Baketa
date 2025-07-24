@@ -101,7 +101,7 @@ public class AdaptiveCaptureService(
             // 5. メトリクス記録
             RecordMetrics(result);
             
-            // 6. イベント発行
+            // 6. イベント発行（UIスレッドコンテキストを維持）
             await PublishCaptureCompletedEventAsync(result).ConfigureAwait(false);
             
             return result;
