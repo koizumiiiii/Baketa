@@ -145,24 +145,23 @@ namespace Baketa.Application.DI.Modules;
         
         /// <summary>
         /// キャプチャサービスを登録します。
+        /// 実際のキャプチャサービス実装はCaptureModuleで行われます。
         /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private static void RegisterCaptureServices(IServiceCollection services)
+        /// <param name="_">サービスコレクション（使用しない）</param>
+        private static void RegisterCaptureServices(IServiceCollection _)
         {
-            // 適応的キャプチャサービス - ROIベースキャプチャシステムのコア実装
-            services.AddSingleton<IAdaptiveCaptureService, AdaptiveCaptureService>();
+            // キャプチャサービスはCaptureModuleで登録されるため、ここでは何もしない
+            // CaptureModuleにより以下が登録される:
+            // - AdaptiveCaptureService (コア適応的キャプチャ)
+            // - AdaptiveCaptureServiceAdapter (ICaptureService実装)
+            // - AdvancedCaptureService (拡張機能)
             
-            // 基本キャプチャサービス：適応的キャプチャシステム（ROIベースキャプチャシステム要件に準拠）
-            services.AddSingleton<ICaptureService, AdaptiveCaptureServiceAdapter>();
+            // TODO: 将来的な拡張用コメント
+            // ゲームプロファイル管理サービス（未実装）
+            // services.AddSingleton<IGameProfileManager, GameProfileManager>();
             
-            // 拡張キャプチャサービス：連続キャプチャとパフォーマンス最適化機能
-            services.AddSingleton<IAdvancedCaptureService, AdvancedCaptureService>();
-            
-            // ゲームプロファイル管理サービスの登録
-            services.AddSingleton<IGameProfileManager, GameProfileManager>();
-            
-            // ゲーム自動検出サービスの登録
-            services.AddSingleton<IGameDetectionService, GameDetectionService>();
+            // ゲーム自動検出サービス（未実装）
+            // services.AddSingleton<IGameDetectionService, GameDetectionService>();
         }
         
         /// <summary>
@@ -209,5 +208,6 @@ namespace Baketa.Application.DI.Modules;
             yield return typeof(CoreModule);
             yield return typeof(PlatformModule);
             yield return typeof(InfrastructureModule);
+            yield return typeof(CaptureModule); // キャプチャサービス統合
         }
     }

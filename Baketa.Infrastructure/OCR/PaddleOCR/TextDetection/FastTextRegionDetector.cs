@@ -9,16 +9,10 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
 /// <summary>
 /// 高速テキスト領域検出器 - 適応的キャプチャシステム用の軽量実装
 /// </summary>
-public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
+public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logger = null) : ITextRegionDetector, IDisposable
 {
-    private readonly ILogger<FastTextRegionDetector>? _logger;
     private TextDetectionConfig _config = new();
     private bool _disposed;
-
-    public FastTextRegionDetector(ILogger<FastTextRegionDetector>? logger = null)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 画像からテキスト領域を高速検出
@@ -29,14 +23,14 @@ public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
         
         try
         {
-            _logger?.LogDebug("高速テキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
+            logger?.LogDebug("高速テキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
             
             // CPU負荷を軽減するため非同期で実行
             return await Task.Run(() => DetectRegionsInternal(image)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "テキスト領域検出中にエラーが発生");
+            logger?.LogError(ex, "テキスト領域検出中にエラーが発生");
             return [];
         }
     }
@@ -48,13 +42,13 @@ public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
     {
         var regions = await DetectTextRegionsAsync(image).ConfigureAwait(false);
         
-        if (showDebugInfo && _logger != null)
+        if (showDebugInfo && logger != null)
         {
-            _logger.LogInformation("検出されたテキスト領域数: {Count}", regions.Count);
+            logger.LogInformation("検出されたテキスト領域数: {Count}", regions.Count);
             for (int i = 0; i < regions.Count; i++)
             {
                 var rect = regions[i];
-                _logger.LogDebug("領域{Index}: ({X},{Y}) サイズ={Width}x{Height}", 
+                logger.LogDebug("領域{Index}: ({X},{Y}) サイズ={Width}x{Height}", 
                     i, rect.X, rect.Y, rect.Width, rect.Height);
             }
         }
@@ -69,7 +63,7 @@ public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
     {
         ArgumentNullException.ThrowIfNull(config);
         _config = config;
-        _logger?.LogDebug("テキスト検出設定を更新: MinArea={MinArea}, EdgeThreshold={EdgeThreshold}", 
+        logger?.LogDebug("テキスト検出設定を更新: MinArea={MinArea}, EdgeThreshold={EdgeThreshold}", 
             _config.MinTextArea, _config.EdgeDetectionThreshold);
     }
 
@@ -122,11 +116,11 @@ public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
             // 近接領域の統合
             regions = MergeNearbyRegions(regions);
             
-            _logger?.LogDebug("テキスト領域検出完了: {Count}個の領域を検出", regions.Count);
+            logger?.LogDebug("テキスト領域検出完了: {Count}個の領域を検出", regions.Count);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "テキスト領域検出処理中にエラー");
+            logger?.LogError(ex, "テキスト領域検出処理中にエラー");
         }
         
         return regions;
@@ -191,7 +185,7 @@ public sealed class FastTextRegionDetector : ITextRegionDetector, IDisposable
     {
         if (_disposed) return;
         
-        _logger?.LogDebug("FastTextRegionDetector をクリーンアップ");
+        logger?.LogDebug("FastTextRegionDetector をクリーンアップ");
         _disposed = true;
     }
 }

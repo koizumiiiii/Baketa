@@ -22,6 +22,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture;
         public Task<IWindowsImage> CreateFromBytesAsync(byte[] _) => throw new NotImplementedException();
         public IWindowsImage CreateFromBitmap(Bitmap bitmap) => new Mock<IWindowsImage>().Object;
         public Task<IWindowsImage> CreateEmptyAsync(int _, int _1, Color? _2 = null) => throw new NotImplementedException();
+        public IWindowsImage ResizeImage(IWindowsImage _, int _1, int _2) => throw new NotImplementedException();
+        public IWindowsImage CropImage(IWindowsImage _, Rectangle _1) => throw new NotImplementedException();
     }
     
     /// <summary>
