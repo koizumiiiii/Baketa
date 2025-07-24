@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Abstractions.Factories;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
@@ -14,16 +15,22 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 {
     private readonly ILogger<ROIBasedCaptureStrategy> _logger;
     private readonly ITextRegionDetector _textDetector;
+    private readonly NativeWindowsCaptureWrapper _nativeWrapper;
+    private readonly Baketa.Core.Abstractions.Factories.IWindowsImageFactory _imageFactory;
 
     public string StrategyName => "ROIBased";
     public int Priority => 50; // 中優先度（専用GPU環境で効率的）
 
     public ROIBasedCaptureStrategy(
         ILogger<ROIBasedCaptureStrategy> logger,
-        ITextRegionDetector textDetector)
+        ITextRegionDetector textDetector,
+        NativeWindowsCaptureWrapper nativeWrapper,
+        Baketa.Core.Abstractions.Factories.IWindowsImageFactory imageFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
+        _nativeWrapper = nativeWrapper ?? throw new ArgumentNullException(nameof(nativeWrapper));
+        _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
     }
 
     public bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd)
@@ -34,7 +41,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             var canApply = environment.IsDedicatedGPU || 
                           environment.MaximumTexture2DDimension < 8192;
 
-            _logger.LogDebug("ROIBased戦略適用可能性: {CanApply} (専用GPU: {IsDedicated}, MaxTexture: {MaxTexture})", 
+            _logger.LogInformation("ROIBased戦略適用判定: {CanApply} (専用GPU: {IsDedicated}, MaxTexture: {MaxTexture})", 
                 canApply, environment.IsDedicatedGPU, environment.MaximumTexture2DDimension);
 
             return canApply;
@@ -80,7 +87,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
         try
         {
-            _logger.LogDebug("ROIBasedキャプチャ開始");
+            _logger.LogInformation("ROIBasedキャプチャ開始: ウィンドウ=0x{Hwnd:X}", hwnd.ToInt64());
 
             // Phase 1: 低解像度スキャン
             var lowResImage = await CaptureLowResolutionAsync(hwnd, options.ROIScaleFactor).ConfigureAwait(false);
@@ -127,14 +134,44 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
     {
         try
         {
-            _logger.LogDebug("低解像度スキャン実行: スケール={ScaleFactor}", scaleFactor);
-            
-            // TODO: 実際の低解像度キャプチャ実装
-            // 現在はスタブ実装
-            await Task.Delay(50).ConfigureAwait(false);
-            
-            _logger.LogWarning("低解像度キャプチャは現在未実装");
-            return null;
+            _logger.LogInformation("低解像度スキャン実行: スケール={ScaleFactor}, 対象ウィンドウ=0x{Hwnd:X}", 
+                scaleFactor, hwnd.ToInt64());
+
+            // ネイティブラッパーでキャプチャセッション作成
+            if (!_nativeWrapper.CreateCaptureSession(hwnd))
+            {
+                _logger.LogError("ネイティブキャプチャセッション作成失敗");
+                return null;
+            }
+
+            try
+            {
+                // フル解像度キャプチャ
+                var fullImage = await _nativeWrapper.CaptureFrameAsync(5000).ConfigureAwait(false);
+                if (fullImage == null)
+                {
+                    _logger.LogWarning("フル解像度キャプチャに失敗");
+                    return null;
+                }
+
+                // スケールダウン（リサイズ）
+                var targetWidth = Math.Max(1, (int)(fullImage.Width * scaleFactor));
+                var targetHeight = Math.Max(1, (int)(fullImage.Height * scaleFactor));
+
+                var lowResImage = _imageFactory.ResizeImage(fullImage, targetWidth, targetHeight);
+
+                _logger.LogInformation("低解像度キャプチャ完了: {OriginalSize} → {ScaledSize} (スケール: {ScaleFactor})",
+                    $"{fullImage.Width}x{fullImage.Height}", $"{targetWidth}x{targetHeight}", scaleFactor);
+
+                // フル解像度画像はリソース解放
+                fullImage.Dispose();
+
+                return lowResImage;
+            }
+            finally
+            {
+                _nativeWrapper.StopCurrentSession();
+            }
         }
         catch (Exception ex)
         {
@@ -149,23 +186,106 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
         try
         {
-            _logger.LogDebug("高解像度部分キャプチャ実行: {RegionCount}個の領域", textRegions.Count);
+            _logger.LogInformation("高解像度部分キャプチャ実行: {RegionCount}個の領域, 対象ウィンドウ=0x{Hwnd:X}", 
+                textRegions.Count, hwnd.ToInt64());
 
-            foreach (var region in textRegions)
+            if (textRegions.Count == 0)
             {
-                // TODO: 実際の部分キャプチャ実装
-                await Task.Delay(10).ConfigureAwait(false); // 部分キャプチャのシミュレート
-                
-                _logger.LogDebug("領域キャプチャ (未実装): {X},{Y} {Width}x{Height}", 
-                    region.X, region.Y, region.Width, region.Height);
+                _logger.LogDebug("テキスト領域が指定されていません");
+                return results;
             }
 
-            _logger.LogWarning("高解像度部分キャプチャは現在未実装");
+            // ネイティブラッパーでキャプチャセッション作成
+            if (!_nativeWrapper.CreateCaptureSession(hwnd))
+            {
+                _logger.LogError("高解像度キャプチャセッション作成失敗");
+                return results;
+            }
+
+            try
+            {
+                // 高解像度全体キャプチャ
+                var fullImage = await _nativeWrapper.CaptureFrameAsync(5000).ConfigureAwait(false);
+                if (fullImage == null)
+                {
+                    _logger.LogWarning("高解像度フル画像キャプチャに失敗");
+                    return results;
+                }
+
+                try
+                {
+                    // 並列処理でROI領域を切り出し（スレッドセーフなConcurrentBag使用）
+                    var cropTasks = textRegions.Select(async region =>
+                    {
+                        try
+                        {
+                            // 境界チェック
+                            if (region.X < 0 || region.Y < 0 ||
+                                region.Right > fullImage.Width || region.Bottom > fullImage.Height ||
+                                region.Width <= 0 || region.Height <= 0)
+                            {
+                                _logger.LogWarning("無効な領域をスキップ: {Region}, 画像サイズ: {ImageSize}",
+                                    region, $"{fullImage.Width}x{fullImage.Height}");
+                                return null;
+                            }
+
+                            // 並列実行での画像切り出し（CPU集約的処理）
+                            return await Task.Run(() =>
+                            {
+                                var croppedImage = _imageFactory.CropImage(fullImage, region);
+                                if (croppedImage != null)
+                                {
+                                    _logger.LogDebug("領域キャプチャ完了: {Region} → {Size}",
+                                        region, $"{croppedImage.Width}x{croppedImage.Height}");
+                                }
+                                return croppedImage;
+                            }).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "領域 {Region} のキャプチャに失敗", region);
+                            return null;
+                        }
+                    });
+
+                    // 全ての並列タスクを待機
+                    var croppedImages = await Task.WhenAll(cropTasks).ConfigureAwait(false);
+                    
+                    // 成功した画像のみをresultsに追加
+                    foreach (var image in croppedImages)
+                    {
+                        if (image != null)
+                        {
+                            results.Add(image);
+                        }
+                    }
+
+                    _logger.LogInformation("高解像度部分キャプチャ完了: {SuccessCount}/{TotalCount}個の領域を並列処理",
+                        results.Count, textRegions.Count);
+                }
+                finally
+                {
+                    fullImage.Dispose();
+                }
+            }
+            finally
+            {
+                _nativeWrapper.StopCurrentSession();
+            }
+
             return results;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "高解像度部分キャプチャ中にエラー");
+            
+            // エラー時はリソースクリーンアップ
+            foreach (var image in results)
+            {
+                try { image.Dispose(); } catch { /* ignore cleanup errors */ }
+            }
+            results.Clear();
+            
             throw new CaptureStrategyException(StrategyName, "部分キャプチャに失敗", ex);
         }
     }

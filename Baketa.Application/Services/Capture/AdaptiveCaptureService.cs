@@ -42,38 +42,15 @@ public class AdaptiveCaptureService(
         
         try
         {
-            Console.WriteLine("🔥🔥🔥 [SERVICE] AdaptiveCaptureService.CaptureAsync 呼び出されました！HWND=0x{0:X}", hwnd.ToInt64());
-            
-            // ログファイルにも出力
-            try 
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [SERVICE] AdaptiveCaptureService.CaptureAsync 呼び出されました！HWND=0x{hwnd.ToInt64():X}{Environment.NewLine}");
-            }
-            catch { /* ログファイル書き込み失敗は無視 */ }
-            _logger.LogDebug("適応的キャプチャ開始: HWND=0x{Hwnd:X}", hwnd.ToInt64());
+            _logger.LogInformation("適応的キャプチャ開始: HWND=0x{Hwnd:X}", hwnd.ToInt64());
 
             // 1. GPU環境取得（キャッシュ利用）
             result.GPUEnvironment = await GetOrDetectGPUEnvironmentAsync().ConfigureAwait(false);
             
-            // GPU環境をログ出力
-            try 
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 GPU環境: GPU数={result.GPUEnvironment.AvailableAdapters.Count}, Primary={result.GPUEnvironment.GPUName}{Environment.NewLine}");
-            }
-            catch { /* ログファイル書き込み失敗は無視 */ }
             
             // 2. 戦略選択
             var strategy = await SelectOptimalStrategyAsync(result.GPUEnvironment).ConfigureAwait(false);
             
-            // 選択された戦略をログ出力
-            try 
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 選択された戦略: {strategy.StrategyName}{Environment.NewLine}");
-            }
-            catch { /* ログファイル書き込み失敗は無視 */ }
             
             // 3. キャプチャ実行（フォールバック付き）
             var captureResult = await ExecuteWithFallbackAsync(
