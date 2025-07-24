@@ -47,6 +47,9 @@ namespace Baketa.UI.DI.Modules;
             
             // 翻訳フローモジュールをDIコンテナに登録
             services.AddSingleton<TranslationFlowModule>();
+            
+            // 翻訳フローイベントプロセッサーを登録
+            services.AddSingleton<TranslationFlowEventProcessor>();
         }
 
         /// <summary>

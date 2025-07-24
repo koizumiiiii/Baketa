@@ -15,6 +15,8 @@ using Baketa.Infrastructure.Translation;
 using Baketa.Application.Services.Capture;
 using Baketa.Core.Events.Implementation;
 using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
+using Baketa.Core.Abstractions.Capture;
+using Baketa.Infrastructure.DI.Modules;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -147,12 +149,14 @@ namespace Baketa.Application.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterCaptureServices(IServiceCollection services)
         {
-            // キャプチャサービスの実装を登録
-            services.AddSingleton<AdvancedCaptureService>();
+            // 適応的キャプチャサービス - ROIベースキャプチャシステムのコア実装
+            services.AddSingleton<IAdaptiveCaptureService, AdaptiveCaptureService>();
             
-            // 両方のインターフェースが同じインスタンスを参照するように設定
-            services.AddSingleton<ICaptureService>(provider => provider.GetRequiredService<AdvancedCaptureService>());
-            services.AddSingleton<IAdvancedCaptureService>(provider => provider.GetRequiredService<AdvancedCaptureService>());
+            // 基本キャプチャサービス：適応的キャプチャシステム（ROIベースキャプチャシステム要件に準拠）
+            services.AddSingleton<ICaptureService, AdaptiveCaptureServiceAdapter>();
+            
+            // 拡張キャプチャサービス：連続キャプチャとパフォーマンス最適化機能
+            services.AddSingleton<IAdvancedCaptureService, AdvancedCaptureService>();
             
             // ゲームプロファイル管理サービスの登録
             services.AddSingleton<IGameProfileManager, GameProfileManager>();
@@ -204,6 +208,6 @@ namespace Baketa.Application.DI.Modules;
         {
             yield return typeof(CoreModule);
             yield return typeof(PlatformModule);
-            // 現時点ではInfrastructureModuleは参照できない
+            yield return typeof(InfrastructureModule);
         }
     }

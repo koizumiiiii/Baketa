@@ -77,7 +77,7 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         // 適応的キャプチャサービスは Baketa.Application プロジェクトで登録
         // services.AddSingleton<IAdaptiveCaptureService, AdaptiveCaptureService>();
         
-        // テキスト領域検出（後で実装）
-        // services.AddSingleton<ITextRegionDetector, OpenCVTextRegionDetector>();
+        // テキスト領域検出 - 高速軽量実装
+        services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.TextDetection.FastTextRegionDetector>();
     }
 }
