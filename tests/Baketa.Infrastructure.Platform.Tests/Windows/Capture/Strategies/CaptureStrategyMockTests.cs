@@ -191,27 +191,25 @@ public class CaptureStrategyMockTests
         Assert.Equal(string.Empty, metrics.PerformanceCategory);
     }
 
-    public static IEnumerable<object[]> GetGPUEnvironmentTestCases()
+    public static TheoryData<GPUEnvironmentInfo, string, string> GetGPUEnvironmentTestCases()
     {
-        yield return new object[]
+        return new TheoryData<GPUEnvironmentInfo, string, string>
         {
-            GPUEnvironmentMockTests.CreateMockIntegratedGPU(),
-            "DirectFullScreen",
-            "統合GPU（十分な性能）"
-        };
-
-        yield return new object[]
-        {
-            GPUEnvironmentMockTests.CreateMockDedicatedGPU(),
-            "ROIBased",
-            "専用GPU（ROIベース最適）"
-        };
-
-        yield return new object[]
-        {
-            GPUEnvironmentMockTests.CreateMockLowEndIntegratedGPU(),
-            "Fallback",
-            "低性能統合GPU（フォールバック必要）"
+            {
+                GPUEnvironmentMockTests.CreateMockIntegratedGPU(),
+                "DirectFullScreen",
+                "統合GPU（十分な性能）"
+            },
+            {
+                GPUEnvironmentMockTests.CreateMockDedicatedGPU(),
+                "ROIBased",
+                "専用GPU（ROIベース最適）"
+            },
+            {
+                GPUEnvironmentMockTests.CreateMockLowEndIntegratedGPU(),
+                "Fallback",
+                "低性能統合GPU（フォールバック必要）"
+            }
         };
     }
 }

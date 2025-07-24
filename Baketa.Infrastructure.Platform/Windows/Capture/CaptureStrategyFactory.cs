@@ -99,7 +99,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
         catch (Exception ex)
         {
             _logger.LogError(ex, "戦略順序生成中にエラー");
-            return new List<ICaptureStrategy>();
+            return [];
         }
     }
 
@@ -124,7 +124,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
 
     public IList<CaptureStrategyUsed> GetAvailableStrategyTypes()
     {
-        return _strategyCreators.Keys.ToList();
+        return [.. _strategyCreators.Keys];
     }
 
     public async Task<bool> ValidateStrategyAsync(ICaptureStrategy strategy, GPUEnvironmentInfo environment, IntPtr hwnd)
@@ -141,7 +141,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
             }
 
             // 事前条件チェック
-            var prerequisitesValid = await strategy.ValidatePrerequisitesAsync(hwnd);
+            var prerequisitesValid = await strategy.ValidatePrerequisitesAsync(hwnd).ConfigureAwait(false);
             if (!prerequisitesValid)
             {
                 _logger.LogDebug("戦略事前条件不満足: {StrategyName}", strategy.StrategyName);

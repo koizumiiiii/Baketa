@@ -83,7 +83,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             _logger.LogDebug("ROIBasedキャプチャ開始");
 
             // Phase 1: 低解像度スキャン
-            var lowResImage = await CaptureLowResolutionAsync(hwnd, options.ROIScaleFactor);
+            var lowResImage = await CaptureLowResolutionAsync(hwnd, options.ROIScaleFactor).ConfigureAwait(false);
             if (lowResImage == null)
             {
                 result.Success = false;
@@ -92,11 +92,11 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             }
 
             // Phase 2: テキスト領域検出
-            var textRegions = await _textDetector.DetectTextRegionsAsync(lowResImage);
+            var textRegions = await _textDetector.DetectTextRegionsAsync(lowResImage).ConfigureAwait(false);
             result.TextRegions = textRegions;
 
             // Phase 3: 高解像度部分キャプチャ
-            var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions);
+            var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions).ConfigureAwait(false);
             
             result.Success = highResImages.Count > 0;
             result.Images = highResImages;
@@ -131,7 +131,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             
             // TODO: 実際の低解像度キャプチャ実装
             // 現在はスタブ実装
-            await Task.Delay(50);
+            await Task.Delay(50).ConfigureAwait(false);
             
             _logger.LogWarning("低解像度キャプチャは現在未実装");
             return null;
@@ -154,7 +154,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             foreach (var region in textRegions)
             {
                 // TODO: 実際の部分キャプチャ実装
-                await Task.Delay(10); // 部分キャプチャのシミュレート
+                await Task.Delay(10).ConfigureAwait(false); // 部分キャプチャのシミュレート
                 
                 _logger.LogDebug("領域キャプチャ (未実装): {X},{Y} {Width}x{Height}", 
                     region.X, region.Y, region.Width, region.Height);

@@ -16,10 +16,13 @@ public class NativeWindowsCaptureWrapper : IDisposable
     private readonly ILogger<NativeWindowsCaptureWrapper>? _logger;
     private readonly WindowsImageFactory _imageFactory;
     private bool _disposed;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0032:Use auto property", Justification = "Field needs thread-safe access and initialization state tracking")]
     private bool _initialized;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0032:Use auto property", Justification = "Field needs thread-safe access and modification during session management")]
     private int _sessionId = -1;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0032:Use auto property", Justification = "Field needs thread-safe access during session management")]
     private IntPtr _windowHandle;
-    private static readonly object _shutdownLock = new object();
+    private static readonly object _shutdownLock = new();
     private static int _activeInstances;
     private static bool _hasBeenShutdown;
     private static bool _isApplicationExiting;
@@ -392,7 +395,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 for (int i = 0; i < Math.Min(10, frame.width * frame.height); i++)
                 {
                     int offset = i * 4;
-                    pixelSamples.Append($"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
+                    pixelSamples.Append(System.Globalization.CultureInfo.InvariantCulture, $"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
                 }
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎨 最初の10ピクセル: {pixelSamples}{Environment.NewLine}");
             }

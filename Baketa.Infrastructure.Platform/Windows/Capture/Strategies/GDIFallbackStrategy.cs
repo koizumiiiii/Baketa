@@ -46,7 +46,7 @@ public class GDIFallbackStrategy : ICaptureStrategy
             
             // TODO: 実際のGDI実装
             // 現時点ではスタブ実装
-            await Task.Delay(100); // GDIキャプチャのシミュレート
+            await Task.Delay(100).ConfigureAwait(false); // GDIキャプチャのシミュレート
             
             result.Success = false; // 現在は未実装
             result.ErrorMessage = "GDI戦略は未実装";

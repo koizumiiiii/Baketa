@@ -44,12 +44,16 @@ public static partial class NativeWindowsCapture
     /// </summary>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_Initialize();
 
     /// <summary>
     /// ライブラリの終了処理
     /// </summary>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern void BaketaCapture_Shutdown();
 
     /// <summary>
@@ -59,6 +63,8 @@ public static partial class NativeWindowsCapture
     /// <param name="sessionId">作成されたセッションID（出力）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_CreateSession([In] IntPtr hwnd, [Out] out int sessionId);
 
     /// <summary>
@@ -69,6 +75,8 @@ public static partial class NativeWindowsCapture
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>成功時は ErrorCodes.Success</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_CaptureFrame(int sessionId, [Out] out BaketaCaptureFrame frame, int timeoutMs);
 
     /// <summary>
@@ -76,6 +84,8 @@ public static partial class NativeWindowsCapture
     /// </summary>
     /// <param name="frame">解放するフレーム</param>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern void BaketaCapture_ReleaseFrame([In, Out] ref BaketaCaptureFrame frame);
 
     /// <summary>
@@ -83,6 +93,8 @@ public static partial class NativeWindowsCapture
     /// </summary>
     /// <param name="sessionId">セッションID</param>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern void BaketaCapture_ReleaseSession(int sessionId);
 
     /// <summary>
@@ -90,6 +102,8 @@ public static partial class NativeWindowsCapture
     /// </summary>
     /// <returns>サポートされている場合は 1、それ以外は 0</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_IsSupported();
 
     /// <summary>
@@ -100,6 +114,8 @@ public static partial class NativeWindowsCapture
     /// <returns>実際のメッセージ長</returns>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, 
               CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_GetLastError([Out] IntPtr buffer, int bufferSize);
 
     /// <summary>

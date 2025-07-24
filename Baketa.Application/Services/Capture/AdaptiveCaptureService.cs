@@ -28,15 +28,15 @@ public class AdaptiveCaptureService(
     
     // キャンセレーションとリソース管理
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    private readonly List<IDisposable> _activeResources = new();
-    private bool _disposed = false;
+    private readonly List<IDisposable> _activeResources = [];
+    private bool _disposed;
 
     public async Task<AdaptiveCaptureResult> CaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
         var result = new AdaptiveCaptureResult
         {
-            FallbacksAttempted = new List<string>(),
+            FallbacksAttempted = [],
             CaptureTime = DateTime.Now
         };
         
@@ -54,7 +54,7 @@ public class AdaptiveCaptureService(
             _logger.LogDebug("適応的キャプチャ開始: HWND=0x{Hwnd:X}", hwnd.ToInt64());
 
             // 1. GPU環境取得（キャッシュ利用）
-            result.GPUEnvironment = await GetOrDetectGPUEnvironmentAsync();
+            result.GPUEnvironment = await GetOrDetectGPUEnvironmentAsync().ConfigureAwait(false);
             
             // GPU環境をログ出力
             try 
@@ -65,7 +65,7 @@ public class AdaptiveCaptureService(
             catch { /* ログファイル書き込み失敗は無視 */ }
             
             // 2. 戦略選択
-            var strategy = await SelectOptimalStrategyAsync(result.GPUEnvironment);
+            var strategy = await SelectOptimalStrategyAsync(result.GPUEnvironment).ConfigureAwait(false);
             
             // 選択された戦略をログ出力
             try 
@@ -77,7 +77,7 @@ public class AdaptiveCaptureService(
             
             // 3. キャプチャ実行（フォールバック付き）
             var captureResult = await ExecuteWithFallbackAsync(
-                hwnd, options, strategy, result.FallbacksAttempted);
+                hwnd, options, strategy, result.FallbacksAttempted).ConfigureAwait(false);
             
             // 4. 結果構築
             result.Success = captureResult.Success;
@@ -102,7 +102,7 @@ public class AdaptiveCaptureService(
             RecordMetrics(result);
             
             // 6. イベント発行
-            await PublishCaptureCompletedEventAsync(result);
+            await PublishCaptureCompletedEventAsync(result).ConfigureAwait(false);
             
             return result;
         }
@@ -125,7 +125,7 @@ public class AdaptiveCaptureService(
         try
         {
             _logger.LogDebug("GPU環境検出開始");
-            var environment = await _gpuDetector.DetectEnvironmentAsync();
+            var environment = await _gpuDetector.DetectEnvironmentAsync().ConfigureAwait(false);
             
             // キャッシュに保存
             lock (_cacheLock)
@@ -154,7 +154,7 @@ public class AdaptiveCaptureService(
             var strategy = _strategyFactory.GetOptimalStrategy(environment, IntPtr.Zero);
             
             _logger.LogInformation("選択された戦略: {StrategyName}", strategy.StrategyName);
-            return await Task.FromResult(strategy);
+            return await Task.FromResult(strategy).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -192,7 +192,7 @@ public class AdaptiveCaptureService(
             }
         }
 
-        return await DetectGPUEnvironmentAsync();
+        return await DetectGPUEnvironmentAsync().ConfigureAwait(false);
     }
 
     private async Task<CaptureStrategyResult> ExecuteWithFallbackAsync(
@@ -221,7 +221,7 @@ public class AdaptiveCaptureService(
                 }
                 catch { /* ログファイル書き込み失敗は無視 */ }
                 
-                var result = await strategy.ExecuteCaptureAsync(hwnd, options);
+                var result = await strategy.ExecuteCaptureAsync(hwnd, options).ConfigureAwait(false);
                 
                 // 戦略実行結果のログ
                 try 
@@ -247,7 +247,7 @@ public class AdaptiveCaptureService(
                 _logger.LogWarning(ex, "戦略でTDR検出: {StrategyName}", strategy.StrategyName);
                 
                 // TDR検出時の処理
-                await HandleTDRAsync();
+                await HandleTDRAsync().ConfigureAwait(false);
                 
                 // TDRが発生した戦略は継続試行しない
                 continue;
@@ -273,24 +273,19 @@ public class AdaptiveCaptureService(
 
     private bool ShouldTryStrategy(ICaptureStrategy strategy, CaptureOptions options)
     {
-        switch (strategy.StrategyName)
+        return strategy.StrategyName switch
         {
-            case "DirectFullScreen":
-                return options.AllowDirectFullScreen;
-            case "ROIBased":
-                return options.AllowROIProcessing;
-            case "PrintWindowFallback":
-            case "GDIFallback":
-                return options.AllowSoftwareFallback;
-            default:
-                return true;
-        }
+            "DirectFullScreen" => options.AllowDirectFullScreen,
+            "ROIBased" => options.AllowROIProcessing,
+            "PrintWindowFallback" or "GDIFallback" => options.AllowSoftwareFallback,
+            _ => true
+        };
     }
 
     private async Task HandleTDRAsync()
     {
         _logger.LogWarning("TDR検出 - GPU回復待機中");
-        await Task.Delay(3000); // GPU回復待機
+        await Task.Delay(3000).ConfigureAwait(false); // GPU回復待機
         
         // 環境情報リセット（再検出を促す）
         ClearEnvironmentCache();
@@ -336,7 +331,10 @@ public class AdaptiveCaptureService(
             _logger.LogDebug("キャプチャ完了イベント発行準備");
             
             // TODO: 適切なCaptureCompletedEventを実装して発行
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
+            
+            // Note: result は将来のイベント発行で使用予定
+            _ = result; // 未使用警告を抑制
         }
         catch (Exception ex)
         {
@@ -380,7 +378,7 @@ public class AdaptiveCaptureService(
             ClearEnvironmentCache();
             
             _logger.LogInformation("AdaptiveCaptureService停止処理完了");
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -397,7 +395,7 @@ public class AdaptiveCaptureService(
         {
             _logger.LogDebug("現在のキャプチャ操作をキャンセル");
             _cancellationTokenSource.Cancel();
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -158,7 +158,7 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
                 info.HasDirectX11Support = false;
                 info.FeatureLevel = DirectXFeatureLevel.Unknown;
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private async Task EnumerateAdaptersAsync(GPUEnvironmentInfo info)
@@ -184,9 +184,9 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "GPUアダプター列挙中にエラー");
-                info.AvailableAdapters = new List<GPUAdapter>();
+                info.AvailableAdapters = [];
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private void DetermineGPUType(GPUEnvironmentInfo info)
@@ -247,7 +247,7 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
                 _logger.LogWarning(ex, "テクスチャ制限確認中にエラー");
                 info.MaximumTexture2DDimension = 4096; // セーフティデフォルト
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private async Task CheckDisplayCapabilitiesAsync(GPUEnvironmentInfo info)
@@ -269,7 +269,7 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
                 info.HasHDRSupport = false;
                 info.ColorSpaceSupport = "sRGB";
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private void CheckWDDMVersion(GPUEnvironmentInfo info)
@@ -318,11 +318,10 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
         return DirectXFeatureLevel.Level110; // プレースホルダー
     }
 
-    private IList<GPUAdapter> GetAvailableGraphicsAdapters()
+    private List<GPUAdapter> GetAvailableGraphicsAdapters()
     {
         // 実装: DXGI を使用してアダプター情報を取得
-        return new List<GPUAdapter>
-        {
+        return [
             new() {
                 Name = "検出されたGPU", // WMI やレジストリから実際の名前を取得
                 DedicatedVideoMemoryMB = 4096, // 実際の値を取得
@@ -330,7 +329,7 @@ public class GPUEnvironmentDetector : IGPUEnvironmentDetector
                 VendorId = 0x8086, // Intel の例
                 MaximumTexture2DDimension = 16384
             }
-        };
+        ];
     }
 
     private uint GetMaxTextureSize()
