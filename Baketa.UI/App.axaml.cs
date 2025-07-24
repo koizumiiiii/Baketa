@@ -14,6 +14,7 @@ using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
+using Baketa.Infrastructure.Platform.Windows.Capture;
 using ReactiveUI;
 
 namespace Baketa.UI;
@@ -271,7 +272,10 @@ internal sealed partial class App : Avalonia.Application
                     }
                     
                     // シャットダウンイベントハンドラーの登録
-                    // desktop.ShutdownRequested += OnShutdownRequested;
+                    desktop.ShutdownRequested += OnShutdownRequested;
+                    
+                    // アプリケーション終了イベントハンドラーを追加
+                    AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -318,6 +322,63 @@ internal sealed partial class App : Avalonia.Application
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        /// <summary>
+        /// アプリケーションシャットダウン要求処理
+        /// </summary>
+        private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+        {
+            try
+            {
+                _logger?.LogInformation("アプリケーションシャットダウン要求を受信");
+                
+                // ネイティブライブラリの強制終了を設定
+                NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
+                
+                // シャットダウンイベントをパブリッシュ
+                _eventAggregator?.PublishAsync(new ApplicationShutdownEvent()).GetAwaiter().GetResult();
+                
+                if (_logger != null)
+                {
+                    _logShuttingDown(_logger, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_logger != null)
+                {
+                    _logShutdownError(_logger, ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// プロセス終了時の処理
+        /// </summary>
+        private void OnProcessExit(object? sender, EventArgs e)
+        {
+            try
+            {
+                _logger?.LogInformation("プロセス終了処理開始");
+                
+                // ネイティブライブラリの強制終了
+                NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
+                
+                _logger?.LogInformation("プロセス終了処理完了");
+            }
+            catch (Exception ex)
+            {
+                // プロセス終了時は例外を抑制
+                try
+                {
+                    _logger?.LogError(ex, "プロセス終了処理中に例外が発生");
+                }
+                catch
+                {
+                    // ログ出力も失敗する場合は抑制
+                }
+            }
         }
     }
     
