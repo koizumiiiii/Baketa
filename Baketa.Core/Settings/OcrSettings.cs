@@ -205,6 +205,16 @@ public sealed class OcrSettings
     public bool SaveProcessedImages { get; set; } = false;
     
     /// <summary>
+    /// テキスト領域検出設定
+    /// </summary>
+    public TextDetectionSettings TextDetectionSettings { get; set; } = new();
+    
+    /// <summary>
+    /// アンサンブル検出設定
+    /// </summary>
+    public EnsembleSettings TextDetectionEnsemble { get; set; } = new();
+    
+    /// <summary>
     /// 設定のクローンを作成します
     /// </summary>
     /// <returns>クローンされた設定</returns>
@@ -234,9 +244,48 @@ public sealed class OcrSettings
             TimeoutSeconds = TimeoutSeconds,
             EnableVerboseLogging = EnableVerboseLogging,
             SaveOcrResults = SaveOcrResults,
-            SaveProcessedImages = SaveProcessedImages
+            SaveProcessedImages = SaveProcessedImages,
+            TextDetectionSettings = TextDetectionSettings,
+            TextDetectionEnsemble = TextDetectionEnsemble
         };
     }
+}
+
+/// <summary>
+/// テキスト領域検出設定
+/// </summary>
+public class TextDetectionSettings
+{
+    /// <summary>
+    /// 強制使用する検出器名（空の場合は自動選択）
+    /// </summary>
+    public string ForcedDetectorName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// アンサンブル検出設定
+/// </summary>
+public class EnsembleSettings
+{
+    /// <summary>
+    /// アンサンブル検出の有効化
+    /// </summary>
+    public bool EnableEnsemble { get; set; }
+
+    /// <summary>
+    /// 使用する検出器名のリスト
+    /// </summary>
+    public List<string> DetectorNames { get; set; } = ["adaptive", "fast"];
+    
+    /// <summary>
+    /// 重複判定の閾値
+    /// </summary>
+    public double OverlapThreshold { get; set; } = 0.3;
+    
+    /// <summary>
+    /// 最小投票数
+    /// </summary>
+    public int MinVotes { get; set; } = 2;
 }
 
 /// <summary>
