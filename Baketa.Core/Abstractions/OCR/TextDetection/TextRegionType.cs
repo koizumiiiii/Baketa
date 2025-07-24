@@ -53,5 +53,25 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         /// <summary>
         /// ダイアログ
         /// </summary>
-        Dialogue = 9
+        Dialogue = 9,
+        
+        /// <summary>
+        /// テンプレートベース検出
+        /// </summary>
+        Template = 10,
+        
+        /// <summary>
+        /// エッジベース検出
+        /// </summary>
+        Edge = 11,
+        
+        /// <summary>
+        /// 輝度変化ベース検出
+        /// </summary>
+        Luminance = 12,
+        
+        /// <summary>
+        /// テクスチャベース検出
+        /// </summary>
+        Texture = 13
     }

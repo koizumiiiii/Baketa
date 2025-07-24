@@ -40,6 +40,20 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         public TextRegionType RegionType { get; set; }
         
         /// <summary>
+        /// 検出に使用された手法
+        /// </summary>
+        public string DetectionMethod { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 検出の信頼度（TextRegionでは0.0-1.0の範囲）
+        /// </summary>
+        public double Confidence 
+        { 
+            get => ConfidenceScore; 
+            set => ConfidenceScore = (float)Math.Clamp(value, 0.0, 1.0); 
+        }
+        
+        /// <summary>
         /// 領域に対する前処理されたイメージ
         /// </summary>
         public IAdvancedImage? ProcessedImage { get; set; }
