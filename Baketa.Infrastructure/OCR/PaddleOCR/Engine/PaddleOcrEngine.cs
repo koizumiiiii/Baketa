@@ -253,6 +253,22 @@ public sealed class PaddleOcrEngine(
                 textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
             }
             
+            // 📍 座標ログ出力 (ユーザー要求: 認識したテキストとともに座標位置もログで確認)
+            if (textRegions != null && textRegions.Count > 0)
+            {
+                _logger?.LogInformation("📍 OCR座標ログ - 検出されたテキスト領域: {Count}個", textRegions.Count);
+                for (int i = 0; i < textRegions.Count; i++)
+                {
+                    var region = textRegions[i];
+                    _logger?.LogInformation("📍 OCR結果[{Index}]: Text='{Text}' | Bounds=({X},{Y},{Width},{Height}) | Confidence={Confidence:F3}",
+                        i, region.Text, region.Bounds.X, region.Bounds.Y, region.Bounds.Width, region.Bounds.Height, region.Confidence);
+                }
+            }
+            else
+            {
+                _logger?.LogInformation("📍 OCR座標ログ - テキスト領域が検出されませんでした");
+            }
+            
             stopwatch.Stop();
             
             // 統計更新
