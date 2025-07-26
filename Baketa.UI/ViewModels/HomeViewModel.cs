@@ -192,7 +192,7 @@ namespace Baketa.UI.ViewModels;
             try
             {
                 // ウィンドウ選択ダイアログを直接表示（MainOverlayViewModelと同じアプローチ）
-                var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, null, null!);
+                var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, null!, null!);
                 var dialog = new WindowSelectionDialogView
                 {
                     DataContext = dialogViewModel
@@ -216,7 +216,7 @@ namespace Baketa.UI.ViewModels;
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // エラーログ（_loggerがnullの場合もあるため、条件付き）
                 //_logger?.LogError(ex, "ウィンドウ選択ダイアログの表示中にエラーが発生しました");

@@ -112,7 +112,7 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "エッジ強調", 
         Description = "文字の輪郭を強調してOCR精度を向上させます")]
-    public bool EnhanceEdges { get; set; } = false;
+    public bool EnhanceEdges { get; set; } = true;
     
     /// <summary>
     /// 画像拡大率
@@ -121,7 +121,7 @@ public sealed class OcrSettings
         Description = "OCR処理前の画像拡大倍率", 
         MinValue = 1.0, 
         MaxValue = 4.0)]
-    public double ImageScaleFactor { get; set; } = 2.0;
+    public double ImageScaleFactor { get; set; } = 3.0;
     
     /// <summary>
     /// 並列処理の有効化
