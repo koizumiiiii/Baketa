@@ -84,7 +84,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
         ThrowIfDisposed();
         
         if (imageData.Count == 0)
-            return Array.Empty<IReadOnlyList<TextChunk>>();
+            return [];
 
         _logger?.LogInformation("📦 複数画像並列処理開始 - 画像数: {ImageCount}", imageData.Count);
 
@@ -102,7 +102,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
             {
                 _logger?.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}", 
                     data.Image.Width, data.Image.Height);
-                return Array.Empty<TextChunk>();
+                return [];
             }
         });
 
@@ -164,7 +164,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
         catch (Exception ex)
         {
             _logger?.LogError(ex, "❌ バッチOCR処理エラー");
-            return Array.Empty<TextChunk>();
+            return [];
         }
     }
 
@@ -181,7 +181,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
             var ocrResults = await _fallbackOcrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
             
             if (!ocrResults.HasText)
-                return Array.Empty<TextChunk>();
+                return [];
 
             // シンプルなチャンク変換（フォールバック用）
             var chunks = new List<TextChunk>();
@@ -217,7 +217,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
         catch (Exception ex)
         {
             _logger?.LogError(ex, "❌ フォールバックOCR処理エラー");
-            return Array.Empty<TextChunk>();
+            return [];
         }
     }
 

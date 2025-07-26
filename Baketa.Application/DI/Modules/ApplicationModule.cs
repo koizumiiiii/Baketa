@@ -84,6 +84,9 @@ namespace Baketa.Application.DI.Modules;
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
             
+            // 座標ベース翻訳サービス（オプショナル）
+            services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+            
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(

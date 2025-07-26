@@ -100,10 +100,15 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         public Task<byte[]> ToByteArrayAsync()
         {
             ThrowIfDisposed();
-            using var stream = new MemoryStream();
-            var nativeImage = _windowsImage.GetNativeImage();
-            nativeImage.Save(stream, DrawingImageFormat.Png);
-            return Task.FromResult(stream.ToArray());
+            
+            // Sync over Asyncデッドロックを回避するため、Task.Runでスレッドプール実行
+            return Task.Run(() =>
+            {
+                using var stream = new MemoryStream();
+                var nativeImage = _windowsImage.GetNativeImage();
+                nativeImage.Save(stream, DrawingImageFormat.Png);
+                return stream.ToArray();
+            });
         }
         
         /// <summary>

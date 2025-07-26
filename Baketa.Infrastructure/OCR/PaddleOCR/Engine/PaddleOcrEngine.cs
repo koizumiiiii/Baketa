@@ -1482,29 +1482,61 @@ public sealed class PaddleOcrEngine(
         using var processedMat = tempMat.Clone();
         tempMat?.Dispose(); // 元のMatは即座に破棄
         
-        if (IsMultiThreadEnabled && _queuedEngine != null)
+        try
         {
-            DebugLogUtility.WriteLog("🧵 マルチスレッドOCRエンジンで処理実行");
-            _logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
-            result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+            if (IsMultiThreadEnabled && _queuedEngine != null)
+            {
+                DebugLogUtility.WriteLog("🧵 マルチスレッドOCRエンジンで処理実行");
+                _logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
+                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+            }
+            else if (_ocrEngine != null)
+            {
+                DebugLogUtility.WriteLog("🔧 シングルスレッドOCRエンジンで処理実行");
+                _logger?.LogDebug("シングルスレッドOCRエンジンで処理実行");
+                
+                DebugLogUtility.WriteLog("📊 PaddleOCR.Run()呼び出し開始");
+                var ocrStartTime = System.Diagnostics.Stopwatch.StartNew();
+                
+                // V4モデル安定化: Task.Run分離でハングアップ対策
+                result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
+                
+                ocrStartTime.Stop();
+                DebugLogUtility.WriteLog($"⏱️ OCR実行完了: {ocrStartTime.ElapsedMilliseconds}ms");
+            }
+            else
+            {
+                throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            }
         }
-        else if (_ocrEngine != null)
+        catch (Exception ex) when (ex.Message.Contains("PaddlePredictor") || ex.Message.Contains("run failed"))
         {
-            DebugLogUtility.WriteLog("🔧 シングルスレッドOCRエンジンで処理実行");
-            _logger?.LogDebug("シングルスレッドOCRエンジンで処理実行");
+            DebugLogUtility.WriteLog($"⚠️ PaddleOCRエンジンエラー検出: {ex.Message}");
+            _logger?.LogWarning(ex, "PaddleOCRエンジンでエラーが発生しました。リソースをクリアして再試行します");
             
-            DebugLogUtility.WriteLog("📊 PaddleOCR.Run()呼び出し開始");
-            var ocrStartTime = System.Diagnostics.Stopwatch.StartNew();
+            // メモリを明示的に解放
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
             
-            // V4モデル安定化: Task.Run分離でハングアップ対策
-            result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
+            // 少し待機してから再試行
+            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
             
-            ocrStartTime.Stop();
-            DebugLogUtility.WriteLog($"⏱️ OCR実行完了: {ocrStartTime.ElapsedMilliseconds}ms");
-        }
-        else
-        {
-            throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            // 再試行
+            if (IsMultiThreadEnabled && _queuedEngine != null)
+            {
+                DebugLogUtility.WriteLog("🔄 マルチスレッドOCRエンジンで再試行");
+                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+            }
+            else if (_ocrEngine != null)
+            {
+                DebugLogUtility.WriteLog("🔄 シングルスレッドOCRエンジンで再試行");
+                result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                throw;
+            }
         }
         
         progressCallback?.Report(new OcrProgress(0.8, "結果処理"));
@@ -2457,7 +2489,7 @@ public sealed class PaddleOcrEngine(
             // バックグラウンドで完了する可能性があるため、少し待機してチェック
             try
             {
-                await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
+                await Task.Delay(2000, CancellationToken.None).ConfigureAwait(false);
                 if (ocrTask.IsCompleted && !ocrTask.IsFaulted && !ocrTask.IsCanceled)
                 {
                     var lateResult = await ocrTask.ConfigureAwait(false);
@@ -2515,20 +2547,20 @@ public sealed class PaddleOcrEngine(
         var isV4Model = _isV4ModelForCreation;
         
         // 解像度ベースのタイムアウト計算
-        int baseTimeout = isV4Model ? 25 : 15; // V4=25秒, V5=15秒（初期値）
+        int baseTimeout = isV4Model ? 25 : 30; // V4=25秒, V5=30秒（初期値を延長）
         
         // ピクセル数に応じたタイムアウト調整
         if (pixelCount > 2500000) // 2.5M pixel超 (2560x1080相当以上)
         {
-            baseTimeout = isV4Model ? 45 : 35; // 大画面対応
+            baseTimeout = isV4Model ? 45 : 50; // 大画面対応（V5を延長）
         }
         else if (pixelCount > 2000000) // 2M pixel超 (1920x1080相当以上)
         {
-            baseTimeout = isV4Model ? 35 : 25;
+            baseTimeout = isV4Model ? 35 : 40; // V5を延長
         }
         else if (pixelCount > 1000000) // 1M pixel超 (1280x720相当以上)
         {
-            baseTimeout = isV4Model ? 30 : 20;
+            baseTimeout = isV4Model ? 30 : 35; // V5を延長
         }
         
         DebugLogUtility.WriteLog($"🖼️ 解像度ベースタイムアウト: {mat.Width}x{mat.Height}({pixelCount:N0}px) → {baseTimeout}秒 (V4={isV4Model})");

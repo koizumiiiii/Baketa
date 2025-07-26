@@ -184,6 +184,11 @@ public sealed record TranslationResult
     /// 表示時間（単発翻訳の場合）
     /// </summary>
     public TimeSpan? DisplayDuration { get; init; }
+    
+    /// <summary>
+    /// 座標ベース翻訳モードかどうか
+    /// </summary>
+    public bool IsCoordinateBasedMode { get; init; }
 }
 
 /// <summary>

@@ -198,6 +198,14 @@ namespace Baketa.UI;
             var uiModule = new UIModule();
             uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // Phase 2-B: バッチOCRモジュールの登録
+            var batchOcrModule = new Baketa.Infrastructure.DI.BatchOcrModule();
+            batchOcrModule.RegisterServices(services);
+            
+            // Phase 2-C: オーバーレイUIモジュールの登録
+            var overlayUIModule = new OverlayUIModule();
+            overlayUIModule.RegisterServices(services);
+            
             // PaddleOcrModuleの登録
             var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
             paddleOcrModule.RegisterServices(services);
