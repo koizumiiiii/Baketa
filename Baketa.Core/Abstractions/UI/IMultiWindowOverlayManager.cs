@@ -64,7 +64,7 @@ public interface IMultiWindowOverlayManager
     /// </summary>
     /// <param name="region">チェック対象の領域</param>
     /// <returns>重複するオーバーレイのチャンクIDリスト</returns>
-    IReadOnlyList<int> GetOverlappingOverlays(Rectangle region);
+    IReadOnlyList<int> GetOverlappingOverlays(System.Drawing.Rectangle region);
     
     /// <summary>
     /// オーバーレイマネージャーのリソースをクリーンアップ
@@ -180,10 +180,10 @@ public sealed class OverlayWindowInfo
     public required int ChunkId { get; init; }
     
     /// <summary>ウィンドウの位置</summary>
-    public required Point Position { get; init; }
+    public required System.Drawing.Point Position { get; init; }
     
     /// <summary>ウィンドウのサイズ</summary>
-    public required Size Size { get; init; }
+    public required System.Drawing.Size Size { get; init; }
     
     /// <summary>表示状態</summary>
     public required OverlayState State { get; init; }

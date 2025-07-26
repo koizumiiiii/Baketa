@@ -35,6 +35,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ISettingsService _settingsService;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
     private readonly ITranslationEngineFactory _translationEngineFactory;
+    private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -81,27 +82,41 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="settingsService">設定サービス</param>
     /// <param name="ocrEngine">OCRエンジン</param>
     /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
+    /// <param name="coordinateBasedTranslation">座標ベース翻訳サービス</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
         ISettingsService settingsService,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         ITranslationEngineFactory translationEngineFactory,
+        CoordinateBasedTranslationService coordinateBasedTranslation,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
         ArgumentNullException.ThrowIfNull(translationEngineFactory);
+        ArgumentNullException.ThrowIfNull(coordinateBasedTranslation);
         
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
         _translationEngineFactory = translationEngineFactory;
+        _coordinateBasedTranslation = coordinateBasedTranslation;
         _logger = logger;
 
         // キャプチャオプションの初期設定
         InitializeCaptureOptions();
+        
+        // 座標ベース翻訳システムが利用可能かログ出力
+        if (_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true)
+        {
+            _logger?.LogInformation("🚀 座標ベース翻訳システムが利用可能です - 座標ベース翻訳表示が有効");
+        }
+        else
+        {
+            _logger?.LogInformation("📝 座標ベース翻訳システムは利用できません - 従来の翻訳表示を使用");
+        }
     }
 
     #endregion
@@ -444,6 +459,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         
         var intervalMs = _settingsService.GetValue("Translation:AutomaticTranslationIntervalMs", 100);
         var interval = TimeSpan.FromMilliseconds(intervalMs);
+        
+        // PaddleOCRエラー発生時の遅延調整
+        var minInterval = TimeSpan.FromMilliseconds(500); // 最小間隔を500msに設定
+        if (interval < minInterval)
+        {
+            interval = minInterval;
+            _logger?.LogWarning("自動翻訳間隔が短すぎるため、{MinInterval}msに調整しました", minInterval.TotalMilliseconds);
+        }
 
         Console.WriteLine($"🔄 自動翻訳ループを開始しました（間隔: {interval.TotalMilliseconds}ms）");
         _logger?.LogDebug("自動翻訳ループを開始しました（間隔: {Interval}ms）", interval.TotalMilliseconds);
@@ -664,6 +687,18 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     return;
                 }
                 
+                // 座標ベース翻訳モードの場合はObservable発行をスキップ
+                if (result.IsCoordinateBasedMode)
+                {
+                    DebugLogUtility.WriteLog($"🎯 座標ベース翻訳モードのためObservable発行をスキップ");
+                    // 翻訳完了時刻を記録
+                    lock (_lastTranslationTimeLock)
+                    {
+                        _lastTranslationCompletedAt = DateTime.UtcNow;
+                    }
+                    return;
+                }
+                
                 // 翻訳完了時刻と結果を記録（重複翻訳防止用）
                 lock (_lastTranslationTimeLock)
                 {
@@ -686,6 +721,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
                 DebugLogUtility.WriteLog($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
                 _logger?.LogWarning(translationEx, "OCRエラーにより翻訳をスキップしました: TranslationId={TranslationId}", translationId);
+                
+                // PaddleOCRエラーの場合は追加の待機を設定
+                if (translationEx.Message.Contains("PaddlePredictor") || translationEx.Message.Contains("run failed"))
+                {
+                    DebugLogUtility.WriteLog($"⏳ PaddleOCRエラーのため追加待機を実行: 2秒");
+                    _logger?.LogInformation("PaddleOCRエラーが発生したため、次のキャプチャまで2秒待機します");
+                    
+                    // エラー発生時のクールダウンを設定
+                    lock (_lastTranslationTimeLock)
+                    {
+                        _lastTranslationCompletedAt = DateTime.UtcNow.AddSeconds(2);
+                    }
+                }
                 
                 // 現在の画像を破棄して早期リターン
                 currentImage?.Dispose();
@@ -795,11 +843,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {
-        Console.WriteLine($"🚀 ExecuteTranslationAsync開始:");
-        Console.WriteLine($"   🆔 翻訳ID: {translationId}");
-        Console.WriteLine($"   📷 画像: {image?.GetType().Name ?? "null"}");
-        Console.WriteLine($"   🎯 モード: {mode}");
-        Console.WriteLine($"   ⏱️ キャンセル要求: {cancellationToken.IsCancellationRequested}");
+        DebugLogUtility.WriteLog($"🚀 ExecuteTranslationAsync開始:");
+        DebugLogUtility.WriteLog($"   🆔 翻訳ID: {translationId}");
+        DebugLogUtility.WriteLog($"   📷 画像: {image?.GetType().Name ?? "null"}");
+        DebugLogUtility.WriteLog($"   🎯 モード: {mode}");
+        DebugLogUtility.WriteLog($"   ⏱️ キャンセル要求: {cancellationToken.IsCancellationRequested}");
         
         var startTime = DateTime.UtcNow;
         string originalText = string.Empty;
@@ -807,6 +855,74 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
         try
         {
+            // 座標ベース翻訳システムの利用可能性をチェック
+            DebugLogUtility.WriteLog($"🔍 座標ベース翻訳チェック:");
+            DebugLogUtility.WriteLog($"   📦 _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}");
+            DebugLogUtility.WriteLog($"   ✅ IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}");
+            DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}");
+            DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle: {_targetWindowHandle?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}");
+            DebugLogUtility.WriteLog($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
+            
+            // 座標ベース翻訳システムが利用可能な場合は座標ベース処理を実行
+            DebugLogUtility.WriteLog($"🎯 座標ベース翻訳条件評価結果: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true && _targetWindowHandle.HasValue && image is IAdvancedImage}");
+            
+            if (_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true && 
+                _targetWindowHandle.HasValue && 
+                image is IAdvancedImage advancedImage)
+            {
+                DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
+                _logger?.LogDebug("🎯 座標ベース翻訳処理を実行: ID={TranslationId}", translationId);
+                
+                try
+                {
+                    // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
+                    DebugLogUtility.WriteLog($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
+                    await _coordinateBasedTranslation.ProcessWithCoordinateBasedTranslationAsync(
+                        advancedImage, 
+                        _targetWindowHandle.Value, 
+                        cancellationToken)
+                        .ConfigureAwait(false);
+                    
+                    DebugLogUtility.WriteLog($"✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了");
+                    _logger?.LogInformation("✅ 座標ベース翻訳処理完了: ID={TranslationId}", translationId);
+                    
+                    // 座標ベース処理が成功した場合、オーバーレイで直接表示されるため、
+                    // 従来の翻訳結果は空の結果を返す
+                    // ただし、IsCoordinateBasedModeをtrueに設定して、Observableへの発行をスキップする
+                    return new TranslationResult
+                    {
+                        Id = translationId,
+                        Mode = mode,
+                        OriginalText = "",
+                        TranslatedText = "",
+                        DetectedLanguage = "ja",
+                        TargetLanguage = "en",
+                        Confidence = 1.0f,
+                        ProcessingTime = DateTime.UtcNow - startTime,
+                        IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ
+                    };
+                }
+                catch (Exception coordinateEx)
+                {
+                    DebugLogUtility.WriteLog($"❌ 座標ベース処理でエラー発生: {coordinateEx.Message}");
+                    DebugLogUtility.WriteLog($"❌ エラーのスタックトレース: {coordinateEx.StackTrace}");
+                    _logger?.LogWarning(coordinateEx, "⚠️ 座標ベース処理でエラーが発生、従来のOCR処理にフォールバック: ID={TranslationId}", translationId);
+                    // 座標ベース処理でエラーが発生した場合は従来のOCR処理にフォールバック
+                }
+            }
+            else
+            {
+                DebugLogUtility.WriteLog($"⚠️ 座標ベース翻訳をスキップ（条件不一致）");
+                if (_coordinateBasedTranslation == null)
+                    DebugLogUtility.WriteLog($"   理由: _coordinateBasedTranslation is null");
+                else if (_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable() != true)
+                    DebugLogUtility.WriteLog($"   理由: IsCoordinateBasedTranslationAvailable() = {_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable()}");
+                if (!_targetWindowHandle.HasValue)
+                    DebugLogUtility.WriteLog($"   理由: _targetWindowHandle is null");
+                if (!(image is IAdvancedImage))
+                    DebugLogUtility.WriteLog($"   理由: image is not IAdvancedImage (actual type: {image?.GetType()?.Name ?? "null"})");
+            }
+
             // OCR処理
             PublishProgress(translationId, TranslationStatus.ProcessingOCR, 0.3f, "テキスト認識中...");
             

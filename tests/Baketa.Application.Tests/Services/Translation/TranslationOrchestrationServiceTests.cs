@@ -70,6 +70,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _settingsServiceMock.Object,
             _ocrEngineMock.Object,
             _translationEngineFactoryMock.Object,
+            Mock.Of<CoordinateBasedTranslationService>(), // 座標ベース翻訳サービスのモック
             _loggerMock.Object);
     }
 

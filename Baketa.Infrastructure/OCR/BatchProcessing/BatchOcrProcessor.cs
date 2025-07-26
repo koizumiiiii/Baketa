@@ -19,10 +19,10 @@ namespace Baketa.Infrastructure.OCR.BatchProcessing;
 /// バッチOCR処理の実装クラス
 /// Phase 2-B: OCRバッチ処理最適化とパフォーマンス向上
 /// </summary>
-public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
+public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProcessor>? logger = null) : IBatchOcrProcessor, IDisposable
 {
-    private readonly IOcrEngine _ocrEngine;
-    private readonly ILogger<BatchOcrProcessor>? _logger;
+    private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly ILogger<BatchOcrProcessor>? _logger = logger;
     
     private BatchOcrOptions _options = new();
     private readonly ConcurrentQueue<ProcessingMetric> _processingHistory = new();
@@ -35,12 +35,6 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
     private int _errorCount;
     private readonly ConcurrentDictionary<int, TextChunk> _chunkCache = new();
     private readonly object _configLock = new();
-
-    public BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProcessor>? logger = null)
-    {
-        _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
-        _logger = logger;
-    }
 
     /// <summary>
     /// 画像をバッチ処理してテキストチャンクを取得
@@ -61,15 +55,30 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
 
             // 1. 前処理: 画像品質分析
+            System.Console.WriteLine("🔍 Phase 6デバッグ: AnalyzeImageQualityAsync開始");
             var qualityMetrics = await AnalyzeImageQualityAsync(image, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"🔍 Phase 6デバッグ: 画像品質分析完了 - スコア={qualityMetrics.QualityScore:F2}, 推奨処理={qualityMetrics.RecommendedProcessing}");
             _logger?.LogDebug("🔍 画像品質分析完了: スコア={Score:F2}, 推奨処理={ProcessingType}", 
                 qualityMetrics.QualityScore, qualityMetrics.RecommendedProcessing);
 
             // 2. OCR実行
+            System.Console.WriteLine("🚀 Phase 6デバッグ: ExecuteOcrWithOptimizationsAsync開始");
             var ocrResults = await ExecuteOcrWithOptimizationsAsync(image, qualityMetrics, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"🚀 Phase 6デバッグ: OCR実行完了 - 検出領域数={ocrResults.TextRegions.Count}");
+            
+            // メモリ解放を促進（連続OCR実行対策）
+            if (_totalProcessedCount % 10 == 0) // 10回ごとにGC実行
+            {
+                _logger?.LogDebug("🧹 メモリ解放実行中...");
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            }
             
             // 3. テキストチャンクのグルーピング
+            System.Console.WriteLine("📦 Phase 6デバッグ: GroupTextIntoChunksAsync開始");
             var textChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"📦 Phase 6デバッグ: チャンクグルーピング完了 - チャンク数={textChunks.Count}");
             
             stopwatch.Stop();
             
@@ -214,20 +223,30 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
             processingOptions.Threshold, processingOptions.Enhancement);
 
         // OCR設定の動的調整
+        System.Console.WriteLine("⚙️ Phase 6デバッグ: OCR設定取得開始");
         var currentSettings = _ocrEngine.GetSettings();
+        System.Console.WriteLine("⚙️ Phase 6デバッグ: OCR設定取得完了");
+        
         var optimizedSettings = currentSettings.Clone();
         optimizedSettings.DetectionThreshold = processingOptions.Threshold;
 
+        System.Console.WriteLine("⚙️ Phase 6デバッグ: OCR設定適用開始");
         await _ocrEngine.ApplySettingsAsync(optimizedSettings, cancellationToken).ConfigureAwait(false);
+        System.Console.WriteLine("⚙️ Phase 6デバッグ: OCR設定適用完了");
 
         try
         {
-            return await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine("🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync開始");
+            var result = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync完了 - 検出領域数={result.TextRegions.Count}");
+            return result;
         }
         finally
         {
             // 設定を元に戻す
+            System.Console.WriteLine("🔄 Phase 6デバッグ: OCR設定復元開始");
             await _ocrEngine.ApplySettingsAsync(currentSettings, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine("🔄 Phase 6デバッグ: OCR設定復元完了");
         }
     }
 
@@ -241,10 +260,12 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
     {
         return await Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            
             if (!ocrResults.HasText || ocrResults.TextRegions.Count == 0)
             {
                 _logger?.LogDebug("📝 テキスト領域なし - 空のチャンクリストを返却");
-                return (IReadOnlyList<TextChunk>)Array.Empty<TextChunk>();
+                return (IReadOnlyList<TextChunk>)[];
             }
 
             var chunks = new List<TextChunk>();
@@ -253,6 +274,8 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
 
             foreach (var region in ocrResults.TextRegions)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                
                 if (processedRegions.Contains(region))
                     continue;
 
@@ -289,6 +312,9 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
 
                 _logger?.LogDebug("📦 チャンク作成 - ID: {ChunkId}, テキスト: '{Text}', 領域数: {RegionCount}", 
                     chunk.ChunkId, chunk.CombinedText, groupedRegions.Count);
+                    
+                // デバッグ用に詳細情報を出力
+                System.Console.WriteLine($"🎯 チャンク#{chunk.ChunkId} - 位置: ({combinedBounds.X},{combinedBounds.Y}) サイズ: ({combinedBounds.Width}x{combinedBounds.Height}) テキスト: '{chunk.CombinedText}'");
             }
 
             _logger?.LogInformation("📊 チャンクグルーピング完了 - 総チャンク数: {ChunkCount}, 総テキスト領域数: {RegionCount}", 
@@ -299,7 +325,7 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
     }
 
     /// <summary>
-    /// 近接テキスト領域を検索
+    /// 近接テキスト領域を検索（改良版：垂直方向と水平方向で異なる閾値を使用）
     /// </summary>
     private List<OcrTextRegion> FindNearbyRegions(
         OcrTextRegion baseRegion, 
@@ -307,24 +333,33 @@ public sealed class BatchOcrProcessor : IBatchOcrProcessor, IDisposable
         HashSet<OcrTextRegion> processedRegions)
     {
         var nearbyRegions = new List<OcrTextRegion> { baseRegion };
-        var searchQueue = new Queue<OcrTextRegion>();
-        searchQueue.Enqueue(baseRegion);
-
-        while (searchQueue.Count > 0)
+        
+        // 垂直メニューやリストの場合、垂直方向のグループ化を制限
+        var verticalThreshold = _options.ChunkGroupingDistance * 0.5; // 垂直方向は50%に制限
+        var horizontalThreshold = _options.ChunkGroupingDistance;
+        
+        foreach (var region in allRegions)
         {
-            var currentRegion = searchQueue.Dequeue();
+            if (processedRegions.Contains(region) || nearbyRegions.Contains(region))
+                continue;
 
-            foreach (var region in allRegions)
+            // baseRegionとの直接的な距離と方向を計算
+            var deltaX = Math.Abs(region.Bounds.X + region.Bounds.Width / 2 - (baseRegion.Bounds.X + baseRegion.Bounds.Width / 2));
+            var deltaY = Math.Abs(region.Bounds.Y + region.Bounds.Height / 2 - (baseRegion.Bounds.Y + baseRegion.Bounds.Height / 2));
+            
+            // 水平方向に近い（同じ行）の場合
+            if (deltaY <= region.Bounds.Height * 0.5 && deltaX <= horizontalThreshold)
             {
-                if (processedRegions.Contains(region) || nearbyRegions.Contains(region))
+                nearbyRegions.Add(region);
+            }
+            // 垂直方向に近い（同じ列）の場合はより厳しい条件
+            else if (deltaX <= region.Bounds.Width * 0.5 && deltaY <= verticalThreshold)
+            {
+                // Y座標の差が一定以上ある場合は別のチャンクとして扱う
+                if (deltaY > baseRegion.Bounds.Height * 1.5)
                     continue;
-
-                var distance = CalculateDistance(currentRegion.Bounds, region.Bounds);
-                if (distance <= _options.ChunkGroupingDistance)
-                {
-                    nearbyRegions.Add(region);
-                    searchQueue.Enqueue(region);
-                }
+                    
+                nearbyRegions.Add(region);
             }
         }
 
