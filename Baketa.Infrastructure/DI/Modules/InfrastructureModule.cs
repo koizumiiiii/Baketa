@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Infrastructure.OCR.Measurement;
 using System;
 using System.Collections.Generic;
 
@@ -51,8 +53,8 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// OCR関連サービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterOcrServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterOcrServices(IServiceCollection services)
         {
             // OCRエンジンやプロセッサーの登録
             // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
@@ -65,6 +67,17 @@ namespace Baketa.Infrastructure.DI.Modules;
             // OCR検出用
             // 例: services.AddSingleton<ITextBoxDetector, PaddleTextBoxDetector>();
             // 例: services.AddSingleton<ITextRecognizer, PaddleTextRecognizer>();
+            
+            // OCR精度測定システム
+            services.AddSingleton<IOcrAccuracyMeasurement, OcrAccuracyMeasurement>();
+            services.AddSingleton<AccuracyBenchmarkService>();
+            services.AddSingleton<TestImageGenerator>();
+            services.AddSingleton<AccuracyImprovementReporter>();
+            services.AddSingleton<RuntimeOcrAccuracyLogger>();
+            services.AddSingleton<OcrAccuracyTestRunner>();
+            
+            // OCR精度測定スタートアップサービス
+            services.AddOcrAccuracyStartupService();
         }
         
         /// <summary>
