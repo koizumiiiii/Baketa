@@ -13,6 +13,7 @@ using Baketa.UI.ViewModels;
 using Baketa.UI.Utils;
 using ReactiveUI;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.UI;
 
 namespace Baketa.UI.Services;
 
@@ -30,6 +31,7 @@ public class TranslationFlowEventProcessor :
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly TranslationResultOverlayManager _overlayManager;
+    private readonly IMultiWindowOverlayManager _multiWindowOverlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
@@ -48,6 +50,7 @@ public class TranslationFlowEventProcessor :
         ILogger<TranslationFlowEventProcessor> logger,
         IEventAggregator eventAggregator,
         TranslationResultOverlayManager overlayManager,
+        IMultiWindowOverlayManager multiWindowOverlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
@@ -56,6 +59,7 @@ public class TranslationFlowEventProcessor :
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _multiWindowOverlayManager = multiWindowOverlayManager ?? throw new ArgumentNullException(nameof(multiWindowOverlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -216,6 +220,7 @@ public class TranslationFlowEventProcessor :
 
             // 2. オーバーレイを非表示
             await _overlayManager.HideAsync().ConfigureAwait(false);
+            await _multiWindowOverlayManager.HideAllOverlaysAsync().ConfigureAwait(false);
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
