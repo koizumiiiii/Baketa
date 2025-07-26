@@ -136,8 +136,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             try
             {
                 DebugLogUtility.WriteLog($"🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直前 - _overlayManager null?: {_overlayManager == null}");
-                await _overlayManager.DisplayTranslationResultsAsync(textChunks, cancellationToken)
-                    .ConfigureAwait(false);
+                if (_overlayManager != null)
+                {
+                    await _overlayManager.DisplayTranslationResultsAsync(textChunks, cancellationToken)
+                        .ConfigureAwait(false);
+                }
                 DebugLogUtility.WriteLog("🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直後");
             }
             catch (Exception ex)

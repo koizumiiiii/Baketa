@@ -919,7 +919,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     DebugLogUtility.WriteLog($"   理由: IsCoordinateBasedTranslationAvailable() = {_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable()}");
                 if (!_targetWindowHandle.HasValue)
                     DebugLogUtility.WriteLog($"   理由: _targetWindowHandle is null");
-                if (!(image is IAdvancedImage))
+                if (image is not IAdvancedImage)
                     DebugLogUtility.WriteLog($"   理由: image is not IAdvancedImage (actual type: {image?.GetType()?.Name ?? "null"})");
             }
 

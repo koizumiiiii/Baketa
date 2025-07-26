@@ -109,14 +109,11 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
             // 既存のオーバーレイをチェック
             foreach (var (chunkId, windowInfo) in _windowInfos.ToList())
             {
-                var existingKey = _overlayWindows.ContainsKey(chunkId) 
-                    ? GetChunkKey(chunkId) 
-                    : default;
+                var existingKey = GetChunkKey(chunkId);
                 
-                if (existingKey != default && newChunkLookup.ContainsKey(existingKey))
+                if (_overlayWindows.TryGetValue(chunkId, out _) && newChunkLookup.TryGetValue(existingKey, out var newChunk))
                 {
                     // 同じテキストと位置のチャンクが存在する場合は保持
-                    var newChunk = newChunkLookup[existingKey];
                     newChunkLookup.Remove(existingKey);
                     
                     // 翻訳テキストが変わった場合のみ更新
@@ -520,7 +517,7 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
                     creationError = ex;
                     System.Console.WriteLine($"❌ UIスレッドでウィンドウ作成エラー: {ex.Message}");
                 }
-            }, Avalonia.Threading.DispatcherPriority.Normal);
+            }, Avalonia.Threading.DispatcherPriority.Normal, CancellationToken.None);
             
             if (creationError != null)
             {
