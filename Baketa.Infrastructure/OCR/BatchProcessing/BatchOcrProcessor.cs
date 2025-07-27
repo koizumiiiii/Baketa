@@ -6,14 +6,193 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Translation;
+using Microsoft.Extensions.Logging;
 using System.Globalization;
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
+
+/// <summary>
+/// 文字体系の種類
+/// </summary>
+public enum WritingSystem
+{
+    /// <summary>
+    /// 不明
+    /// </summary>
+    Unknown,
+    
+    /// <summary>
+    /// 表意文字（漢字、漢字かな混じり文など）
+    /// </summary>
+    Logographic,
+    
+    /// <summary>
+    /// アルファベット（ラテン文字、キリル文字など）
+    /// </summary>
+    Alphabetic,
+    
+    /// <summary>
+    /// 音節文字（ハングルなど）
+    /// </summary>
+    Syllabic,
+    
+    /// <summary>
+    /// 子音文字（アラビア文字など）
+    /// </summary>
+    Abjad,
+    
+    /// <summary>
+    /// アブギダ（デーヴァナーガリーなど）
+    /// </summary>
+    Abugida
+}
+
+/// <summary>
+/// 言語情報
+/// </summary>
+public readonly record struct LanguageInfo
+{
+    public string Code { get; init; }
+    public string Name { get; init; }
+    public WritingSystem WritingSystem { get; init; }
+    public bool RequiresSpaceSeparation { get; init; }
+    public bool HasParticles { get; init; }
+    public bool IsRightToLeft { get; init; }
+    
+    public static readonly LanguageInfo Japanese = new()
+    {
+        Code = "ja",
+        Name = "Japanese",
+        WritingSystem = WritingSystem.Logographic,
+        RequiresSpaceSeparation = false,
+        HasParticles = true,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo English = new()
+    {
+        Code = "en",
+        Name = "English",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Chinese = new()
+    {
+        Code = "zh",
+        Name = "Chinese",
+        WritingSystem = WritingSystem.Logographic,
+        RequiresSpaceSeparation = false,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Korean = new()
+    {
+        Code = "ko",
+        Name = "Korean",
+        WritingSystem = WritingSystem.Syllabic,
+        RequiresSpaceSeparation = true,
+        HasParticles = true,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo German = new()
+    {
+        Code = "de",
+        Name = "German",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo French = new()
+    {
+        Code = "fr",
+        Name = "French",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Spanish = new()
+    {
+        Code = "es",
+        Name = "Spanish",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Italian = new()
+    {
+        Code = "it",
+        Name = "Italian",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Portuguese = new()
+    {
+        Code = "pt",
+        Name = "Portuguese",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Russian = new()
+    {
+        Code = "ru",
+        Name = "Russian",
+        WritingSystem = WritingSystem.Alphabetic,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Arabic = new()
+    {
+        Code = "ar",
+        Name = "Arabic",
+        WritingSystem = WritingSystem.Abjad,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = true
+    };
+    
+    public static readonly LanguageInfo Hindi = new()
+    {
+        Code = "hi",
+        Name = "Hindi",
+        WritingSystem = WritingSystem.Abugida,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+    
+    public static readonly LanguageInfo Unknown = new()
+    {
+        Code = "unknown",
+        Name = "Unknown",
+        WritingSystem = WritingSystem.Unknown,
+        RequiresSpaceSeparation = true,
+        HasParticles = false,
+        IsRightToLeft = false
+    };
+}
 
 /// <summary>
 /// バッチOCR処理の実装クラス
@@ -296,7 +475,7 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
 
                 // チャンクのバウンディングボックス計算
                 var combinedBounds = CalculateCombinedBounds(groupedRegions);
-                var combinedText = string.Join(" ", groupedRegions.Select(r => r.Text));
+                var combinedText = CombineTextsIntelligently(groupedRegions, ocrResults.LanguageCode);
 
                 var chunk = new TextChunk
                 {
@@ -317,11 +496,100 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
                 System.Console.WriteLine($"🎯 チャンク#{chunk.ChunkId} - 位置: ({combinedBounds.X},{combinedBounds.Y}) サイズ: ({combinedBounds.Width}x{combinedBounds.Height}) テキスト: '{chunk.CombinedText}'");
             }
 
-            _logger?.LogInformation("📊 チャンクグルーピング完了 - 総チャンク数: {ChunkCount}, 総テキスト領域数: {RegionCount}", 
-                chunks.Count, ocrResults.TextRegions.Count);
+            // 空のテキストチャンクや無効なテキストをフィルタリング
+            var validChunks = FilterValidTextChunks(chunks);
+            
+            _logger?.LogInformation("📊 チャンクグルーピング完了 - 総チャンク数: {ChunkCount}, 有効チャンク数: {ValidCount}, 総テキスト領域数: {RegionCount}", 
+                chunks.Count, validChunks.Count, ocrResults.TextRegions.Count);
 
-            return (IReadOnlyList<TextChunk>)chunks.AsReadOnly();
+            return (IReadOnlyList<TextChunk>)validChunks.AsReadOnly();
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 有効なテキストチャンクをフィルタリング
+    /// </summary>
+    /// <param name="chunks">元のチャンクリスト</param>
+    /// <returns>有効なチャンクのみのリスト</returns>
+    private List<TextChunk> FilterValidTextChunks(List<TextChunk> chunks)
+    {
+        var validChunks = new List<TextChunk>();
+        
+        foreach (var chunk in chunks)
+        {
+            // 空のテキストや無効なテキストをスキップ
+            if (string.IsNullOrWhiteSpace(chunk.CombinedText))
+            {
+                _logger?.LogDebug("📝 空のテキストチャンクをスキップ: ChunkId={ChunkId}", chunk.ChunkId);
+                continue;
+            }
+            
+            // 単一文字で意味のないテキストをスキップ（設定可能）
+            if (chunk.CombinedText.Trim().Length == 1 && IsNoiseSingleCharacter(chunk.CombinedText.Trim()))
+            {
+                _logger?.LogDebug("📝 ノイズ単一文字をスキップ: ChunkId={ChunkId}, Text='{Text}'", chunk.ChunkId, chunk.CombinedText);
+                continue;
+            }
+            
+            // 非常に小さな領域（ノイズの可能性）をスキップ
+            if (chunk.CombinedBounds.Width < 5 || chunk.CombinedBounds.Height < 5)
+            {
+                _logger?.LogDebug("📝 極小領域をスキップ: ChunkId={ChunkId}, Size=({Width}x{Height})", 
+                    chunk.ChunkId, chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
+                continue;
+            }
+            
+            // 信頼度が極端に低いテキストをスキップ
+            var averageConfidence = chunk.TextResults.Count > 0 ? 
+                chunk.TextResults.Average(r => r.Confidence) : 1.0f;
+            
+            if (averageConfidence < 0.1f) // 10%未満の信頼度
+            {
+                _logger?.LogDebug("📝 低信頼度テキストをスキップ: ChunkId={ChunkId}, Confidence={Confidence:F3}", 
+                    chunk.ChunkId, averageConfidence);
+                continue;
+            }
+            
+            validChunks.Add(chunk);
+            _logger?.LogDebug("✅ 有効テキストチャンク: ChunkId={ChunkId}, Text='{Text}', Confidence={Confidence:F3}", 
+                chunk.ChunkId, chunk.CombinedText, averageConfidence);
+        }
+        
+        return validChunks;
+    }
+    
+    /// <summary>
+    /// 単一文字がノイズかどうかを判定
+    /// </summary>
+    /// <param name="character">チェックする文字</param>
+    /// <returns>ノイズと判定される場合true</returns>
+    private static bool IsNoiseSingleCharacter(string character)
+    {
+        if (character.Length != 1)
+            return false;
+            
+        var c = character[0];
+        
+        // 一般的なノイズ文字（記号、特殊文字）
+        var noiseCharacters = new HashSet<char>
+        {
+            '.', ',', ':', ';', '!', '?', '-', '_', '=', '+', '*', '#', '@', 
+            '(', ')', '[', ']', '{', '}', '<', '>', '/', '\\', '|', '~', '`',
+            '１', '２', '３', '４', '５', '６', '７', '８', '９', '０', // 全角数字（単体ではノイズの可能性）
+            '－', '＝', '＋', '＊', '＃', '＠', // 全角記号
+            '　' // 全角スペース
+        };
+        
+        // 制御文字や非印字文字
+        if (char.IsControl(c) || char.IsWhiteSpace(c))
+            return true;
+            
+        // ノイズ文字リストに含まれる
+        if (noiseCharacters.Contains(c))
+            return true;
+            
+        // ASCII範囲外の単一文字は有効とみなす（日本語、中国語等）
+        return false;
     }
 
     /// <summary>
@@ -334,36 +602,126 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
     {
         var nearbyRegions = new List<OcrTextRegion> { baseRegion };
         
-        // 垂直メニューやリストの場合、垂直方向のグループ化を制限
-        var verticalThreshold = _options.ChunkGroupingDistance * 0.5; // 垂直方向は50%に制限
-        var horizontalThreshold = _options.ChunkGroupingDistance;
+        // 大幅に拡張されたテキストグループ化: 折り返しテキストをより広範囲で認識
+        var verticalThreshold = _options.ChunkGroupingDistance * 3.0; // 垂直方向を大幅拡張（複数行の段落対応）
+        var horizontalThreshold = _options.ChunkGroupingDistance * 2.0; // 水平方向も拡張（長い文章対応）
         
         foreach (var region in allRegions)
         {
             if (processedRegions.Contains(region) || nearbyRegions.Contains(region))
                 continue;
 
-            // baseRegionとの直接的な距離と方向を計算
+            // baseRegionとの距離と位置関係を計算
             var deltaX = Math.Abs(region.Bounds.X + region.Bounds.Width / 2 - (baseRegion.Bounds.X + baseRegion.Bounds.Width / 2));
             var deltaY = Math.Abs(region.Bounds.Y + region.Bounds.Height / 2 - (baseRegion.Bounds.Y + baseRegion.Bounds.Height / 2));
             
-            // 水平方向に近い（同じ行）の場合
-            if (deltaY <= region.Bounds.Height * 0.5 && deltaX <= horizontalThreshold)
+            // 水平方向に近い（同じ行）の場合 - より寛容な判定
+            if (deltaY <= region.Bounds.Height * 1.0 && deltaX <= horizontalThreshold)
             {
                 nearbyRegions.Add(region);
             }
-            // 垂直方向に近い（同じ列）の場合はより厳しい条件
-            else if (deltaX <= region.Bounds.Width * 0.5 && deltaY <= verticalThreshold)
+            // 垂直方向に近い（次の行/折り返し）の場合 - 大幅に拡張された条件
+            else if (IsTextWrappedOrNextLine(baseRegion, region, deltaY, verticalThreshold))
             {
-                // Y座標の差が一定以上ある場合は別のチャンクとして扱う
-                if (deltaY > baseRegion.Bounds.Height * 1.5)
-                    continue;
-                    
+                nearbyRegions.Add(region);
+            }
+            // 段落内の遠い行も検出（より広範囲のテキストブロック認識）
+            else if (IsParagraphText(baseRegion, region, deltaY, verticalThreshold * 1.5))
+            {
                 nearbyRegions.Add(region);
             }
         }
 
         return nearbyRegions;
+    }
+
+    /// <summary>
+    /// テキストが折り返しまたは次の行かどうかを判定（拡張版）
+    /// </summary>
+    /// <param name="baseRegion">基準テキスト領域</param>
+    /// <param name="targetRegion">対象テキスト領域</param>
+    /// <param name="deltaX">水平距離</param>
+    /// <param name="deltaY">垂直距離</param>
+    /// <param name="verticalThreshold">垂直閾値</param>
+    /// <returns>折り返し/次行と判定される場合true</returns>
+    private static bool IsTextWrappedOrNextLine(OcrTextRegion baseRegion, OcrTextRegion targetRegion, 
+        double deltaY, double verticalThreshold)
+    {
+        // 基本的な垂直距離チェック（拡張）
+        if (deltaY > verticalThreshold)
+            return false;
+
+        // 水平位置の重複または近接をチェック（折り返しテキストの特徴）
+        var baseLeft = baseRegion.Bounds.Left;
+        var baseRight = baseRegion.Bounds.Right;
+        var targetLeft = targetRegion.Bounds.Left;
+        var targetRight = targetRegion.Bounds.Right;
+
+        // 水平方向のオーバーラップまたは近接判定（より寛容に）
+        var horizontalOverlap = Math.Max(0, Math.Min(baseRight, targetRight) - Math.Max(baseLeft, targetLeft));
+        var horizontalDistance = Math.Max(0, Math.Max(targetLeft - baseRight, baseLeft - targetRight));
+
+        // 条件1: 垂直方向に近い（次の行）- より寛容な判定
+        var isVerticallyClose = deltaY <= Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height) * 2.5;
+
+        // 条件2: 水平方向で重複または適度に近い（同じテキストブロック内）- より寛容に
+        var maxWidth = Math.Max(baseRegion.Bounds.Width, targetRegion.Bounds.Width);
+        var isHorizontallyRelated = horizontalOverlap > 0 || horizontalDistance <= maxWidth * 0.8;
+
+        // 条件3: 左端が揃っている（段落の開始位置が同じ）- より寛容に
+        var isLeftAligned = Math.Abs(baseLeft - targetLeft) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.5;
+
+        // 条件4: 右端が揃っている（右揃えテキスト対応）
+        var isRightAligned = Math.Abs(baseRight - targetRight) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.5;
+
+        // 条件5: センター揃い（中央揃えテキスト対応）
+        var baseCenterX = baseLeft + baseRegion.Bounds.Width / 2;
+        var targetCenterX = targetLeft + targetRegion.Bounds.Width / 2;
+        var isCenterAligned = Math.Abs(baseCenterX - targetCenterX) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.3;
+
+        // 折り返しまたは次の行と判定（より多様な条件で）
+        return isVerticallyClose && (isHorizontallyRelated || isLeftAligned || isRightAligned || isCenterAligned);
+    }
+
+    /// <summary>
+    /// 同一段落内のテキストかどうかを判定（より広範囲）
+    /// </summary>
+    /// <param name="baseRegion">基準テキスト領域</param>
+    /// <param name="targetRegion">対象テキスト領域</param>
+    /// <param name="deltaX">水平距離</param>
+    /// <param name="deltaY">垂直距離</param>
+    /// <param name="extendedVerticalThreshold">拡張垂直閾値</param>
+    /// <returns>同一段落と判定される場合true</returns>
+    private static bool IsParagraphText(OcrTextRegion baseRegion, OcrTextRegion targetRegion, 
+        double deltaY, double extendedVerticalThreshold)
+    {
+        // 非常に遠い場合は段落が異なる
+        if (deltaY > extendedVerticalThreshold)
+            return false;
+
+        var baseLeft = baseRegion.Bounds.Left;
+        var baseRight = baseRegion.Bounds.Right;
+        var targetLeft = targetRegion.Bounds.Left;
+        var targetRight = targetRegion.Bounds.Right;
+
+        // 段落レベルでの位置関係判定
+        var paragraphWidth = Math.Max(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 2;
+        
+        // 条件1: 水平方向で大きく重複または近接している
+        var horizontalOverlap = Math.Max(0, Math.Min(baseRight, targetRight) - Math.Max(baseLeft, targetLeft));
+        var isInSameParagraphHorizontally = horizontalOverlap > 0 || 
+                                          Math.Abs(baseLeft - targetLeft) <= paragraphWidth * 0.5;
+
+        // 条件2: 垂直方向で段落内の距離範囲内
+        var maxHeight = Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height);
+        var isInSameParagraphVertically = deltaY <= maxHeight * 4.0; // 4行分程度まで許容
+
+        // 条件3: テキストサイズが類似している（同じフォント・同じ文書の可能性）
+        var heightRatio = Math.Min(baseRegion.Bounds.Height, targetRegion.Bounds.Height) / 
+                         Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height);
+        var isSimilarSize = heightRatio >= 0.5; // 高さが50%以上類似
+
+        return isInSameParagraphHorizontally && isInSameParagraphVertically && isSimilarSize;
     }
 
     /// <summary>
@@ -378,6 +736,293 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
         var dy = center1.Y - center2.Y;
         
         return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    /// <summary>
+    /// インテリジェントなテキスト結合（言語と位置を考慮した多言語対応）
+    /// </summary>
+    /// <param name="regions">テキスト領域のリスト</param>
+    /// <param name="languageCode">検出された言語コード</param>
+    /// <returns>結合されたテキスト</returns>
+    private static string CombineTextsIntelligently(List<OcrTextRegion> regions, string? languageCode)
+    {
+        if (regions.Count == 0)
+            return string.Empty;
+            
+        if (regions.Count == 1)
+            return ApplyLanguageSpecificCorrections(regions[0].Text, languageCode);
+            
+        // 位置でソート（左上から右下へ）
+        var sortedRegions = regions
+            .OrderBy(r => r.Bounds.Y)  // まず縦方向でソート
+            .ThenBy(r => r.Bounds.X)   // 次に横方向でソート
+            .ToList();
+            
+        var languageInfo = GetLanguageInfo(languageCode);
+        
+        return CombineTextByLanguageRules(sortedRegions, languageInfo);
+    }
+    
+    /// <summary>
+    /// 言語情報を取得
+    /// </summary>
+    /// <param name="languageCode">言語コード</param>
+    /// <returns>言語情報</returns>
+    private static LanguageInfo GetLanguageInfo(string? languageCode)
+    {
+        if (string.IsNullOrEmpty(languageCode))
+            return LanguageInfo.Japanese; // デフォルト
+
+        var normalizedCode = languageCode.ToLowerInvariant();
+        
+        return normalizedCode switch
+        {
+            var code when code.StartsWith("ja", StringComparison.Ordinal) || code.StartsWith("jp", StringComparison.Ordinal) => LanguageInfo.Japanese,
+            var code when code.StartsWith("en", StringComparison.Ordinal) => LanguageInfo.English,
+            var code when code.StartsWith("zh", StringComparison.Ordinal) || code.StartsWith("cn", StringComparison.Ordinal) => LanguageInfo.Chinese,
+            var code when code.StartsWith("ko", StringComparison.Ordinal) || code.StartsWith("kr", StringComparison.Ordinal) => LanguageInfo.Korean,
+            var code when code.StartsWith("de", StringComparison.Ordinal) => LanguageInfo.German,
+            var code when code.StartsWith("fr", StringComparison.Ordinal) => LanguageInfo.French,
+            var code when code.StartsWith("es", StringComparison.Ordinal) => LanguageInfo.Spanish,
+            var code when code.StartsWith("it", StringComparison.Ordinal) => LanguageInfo.Italian,
+            var code when code.StartsWith("pt", StringComparison.Ordinal) => LanguageInfo.Portuguese,
+            var code when code.StartsWith("ru", StringComparison.Ordinal) => LanguageInfo.Russian,
+            var code when code.StartsWith("ar", StringComparison.Ordinal) => LanguageInfo.Arabic,
+            var code when code.StartsWith("hi", StringComparison.Ordinal) => LanguageInfo.Hindi,
+            _ => LanguageInfo.Unknown
+        };
+    }
+    
+    /// <summary>
+    /// 言語ルールに従ってテキストを結合
+    /// </summary>
+    /// <param name="regions">位置順にソートされたテキスト領域</param>
+    /// <param name="languageInfo">言語情報</param>
+    /// <returns>結合されたテキスト</returns>
+    private static string CombineTextByLanguageRules(List<OcrTextRegion> regions, LanguageInfo languageInfo)
+    {
+        var textParts = regions.Select(r => r.Text.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+        
+        if (textParts.Count == 0)
+            return string.Empty;
+            
+        if (textParts.Count == 1)
+            return ApplyLanguageSpecificCorrections(textParts[0], languageInfo.Code);
+            
+        var result = new System.Text.StringBuilder();
+        
+        for (int i = 0; i < textParts.Count; i++)
+        {
+            var currentText = ApplyLanguageSpecificCorrections(textParts[i], languageInfo.Code);
+            result.Append(currentText);
+            
+            // 次のテキストとの結合条件をチェック
+            if (i < textParts.Count - 1)
+            {
+                var nextText = textParts[i + 1];
+                var separator = GetTextSeparator(currentText, nextText, languageInfo);
+                result.Append(separator);
+            }
+        }
+        
+        return result.ToString();
+    }
+    
+    /// <summary>
+    /// 言語固有の修正を適用
+    /// </summary>
+    /// <param name="text">元のテキスト</param>
+    /// <param name="languageCode">言語コード</param>
+    /// <returns>修正されたテキスト</returns>
+    private static string ApplyLanguageSpecificCorrections(string text, string? languageCode)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        var languageInfo = GetLanguageInfo(languageCode);
+        
+        return languageInfo.WritingSystem switch
+        {
+            WritingSystem.Logographic => CorrectLogographicText(text), // 日本語、中国語
+            WritingSystem.Alphabetic => CorrectAlphabeticText(text),   // 英語、ドイツ語等
+            WritingSystem.Syllabic => CorrectSyllabicText(text),       // 韓国語
+            WritingSystem.Abjad => CorrectAbjadText(text),             // アラビア語
+            WritingSystem.Abugida => CorrectAbugidaText(text),         // ヒンディー語
+            _ => text
+        };
+    }
+    
+    /// <summary>
+    /// テキスト間の区切り文字を取得
+    /// </summary>
+    /// <param name="currentText">現在のテキスト</param>
+    /// <param name="nextText">次のテキスト</param>
+    /// <param name="languageInfo">言語情報</param>
+    /// <returns>適切な区切り文字</returns>
+    private static string GetTextSeparator(string currentText, string nextText, LanguageInfo languageInfo)
+    {
+        // 文の終わりの場合
+        if (IsEndOfSentence(currentText, languageInfo))
+            return string.Empty;
+            
+        // 言語固有の結合ルール
+        return languageInfo.WritingSystem switch
+        {
+            WritingSystem.Logographic => ShouldCombineDirectlyLogographic(currentText, nextText, languageInfo) ? "" : "",
+            WritingSystem.Alphabetic => ShouldCombineDirectlyAlphabetic(currentText, nextText) ? "" : " ",
+            WritingSystem.Syllabic => ShouldCombineDirectlySyllabic(currentText, nextText, languageInfo) ? "" : " ",
+            WritingSystem.Abjad => " ", // アラビア語等は通常スペース区切り
+            WritingSystem.Abugida => " ", // ヒンディー語等は通常スペース区切り
+            _ => " "
+        };
+    }
+
+    /// <summary>
+    /// 日本語テキストの結合（適切な助詞・接続詞の復元を含む）
+    /// </summary>
+    /// <param name="regions">位置順にソートされたテキスト領域</param>
+    /// <returns>結合されたテキスト</returns>
+    [Obsolete("Use CombineTextByLanguageRules instead")]
+    private static string CombineJapaneseText(List<OcrTextRegion> regions)
+    {
+        var textParts = regions.Select(r => r.Text.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+        
+        if (textParts.Count == 0)
+            return string.Empty;
+            
+        if (textParts.Count == 1)
+            return textParts[0];
+            
+        var result = new System.Text.StringBuilder();
+        
+        for (int i = 0; i < textParts.Count; i++)
+        {
+            var currentText = textParts[i];
+            
+            // 既知の文字誤認識パターンを修正
+            currentText = CorrectCommonMisrecognitions(currentText);
+            
+            result.Append(currentText);
+            
+            // 次のテキストとの結合条件をチェック
+            if (i < textParts.Count - 1)
+            {
+                var nextText = textParts[i + 1];
+                
+                // 助詞・疑問詞の処理（「か」「が」「は」「を」等）
+                if (ShouldCombineDirectly(currentText, nextText))
+                {
+                    // スペースなしで直接結合
+                    continue;
+                }
+                
+                // 文の境界でない場合は結合
+                if (!IsEndOfSentence(currentText))
+                {
+                    // 改行が必要な場合を除いてスペースなしで結合
+                    continue;
+                }
+            }
+        }
+        
+        return result.ToString();
+    }
+    
+    /// <summary>
+    /// よくある文字誤認識パターンを修正
+    /// </summary>
+    /// <param name="text">元のテキスト</param>
+    /// <returns>修正されたテキスト</returns>
+    private static string CorrectCommonMisrecognitions(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // よくある誤認識パターンの辞書
+        var corrections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "加", "か" },  // ユーザー報告の問題
+            { "力", "カ" },
+            { "夕", "タ" },
+            { "卜", "ト" },
+            { "ロ", "口" },
+            { "工", "エ" },
+            { "人", "入" },
+            { "二", "ニ" },
+            { "八", "ハ" },
+            { "入", "人" },
+            { "木", "本" },
+            { "日", "目" },
+            { "月", "用" },
+        };
+        
+        var correctedText = text;
+        
+        // 完全一致の修正
+        if (corrections.TryGetValue(text, out var directCorrection))
+        {
+            return directCorrection;
+        }
+        
+        // 部分的な修正（文末の助詞等）
+        foreach (var (wrong, correct) in corrections)
+        {
+            if (text.EndsWith(wrong, StringComparison.OrdinalIgnoreCase))
+            {
+                correctedText = text[..^wrong.Length] + correct;
+                break;
+            }
+        }
+        
+        return correctedText;
+    }
+    
+    /// <summary>
+    /// 2つのテキストを直接結合すべきかどうかを判定
+    /// </summary>
+    /// <param name="currentText">現在のテキスト</param>
+    /// <param name="nextText">次のテキスト</param>
+    /// <returns>直接結合すべき場合はtrue</returns>
+    private static bool ShouldCombineDirectly(string currentText, string nextText)
+    {
+        if (string.IsNullOrEmpty(currentText) || string.IsNullOrEmpty(nextText))
+            return false;
+            
+        // 助詞・疑問詞・語尾が分離されている場合
+        var particlesAndEndings = new HashSet<string> 
+        { 
+            "か", "が", "は", "を", "に", "へ", "と", "で", "から", "まで", "より", "だ", "である", "です", "ます",
+            "た", "て", "な", "ね", "よ", "ら", "り", "る", "ど", "ば", "ん", "う", "い", "え", "お"
+        };
+        
+        // 次のテキストが助詞・語尾の場合
+        if (particlesAndEndings.Contains(nextText))
+            return true;
+            
+        // 現在のテキストが未完了の動詞・形容詞の場合
+        var incompleteEndings = new HashSet<string> 
+        { 
+            "だっ", "であ", "でし", "まし", "いっ", "やっ", "きっ", "つっ", "とっ" 
+        };
+        
+        if (incompleteEndings.Any(ending => currentText.EndsWith(ending, StringComparison.Ordinal)))
+            return true;
+            
+        return false;
+    }
+    
+    /// <summary>
+    /// 文の終わりかどうかを判定
+    /// </summary>
+    /// <param name="text">テキスト</param>
+    /// <returns>文の終わりの場合はtrue</returns>
+    private static bool IsEndOfSentence(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return false;
+            
+        var sentenceEnders = new HashSet<char> { '。', '！', '？', '!', '?' };
+        return sentenceEnders.Contains(text[^1]);
     }
 
     /// <summary>
@@ -443,6 +1088,221 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
         // TODO: 実際のキャッシュ統計
         return 0.15; // 仮の値
     }
+
+    #region 多言語対応の文字体系別修正メソッド
+    
+    /// <summary>
+    /// 表意文字（日本語・中国語）の修正
+    /// </summary>
+    private static string CorrectLogographicText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // 日本語と中国語共通の漢字誤認識パターン
+        var logographicCorrections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // ユーザー報告の問題
+            { "加", "か" },
+            
+            // 一般的な漢字誤認識パターン
+            { "力", "カ" }, { "夕", "タ" }, { "卜", "ト" },
+            { "工", "エ" }, { "人", "入" }, { "二", "ニ" },
+            { "八", "ハ" }, { "木", "本" }, { "日", "目" },
+            { "月", "用" }, { "石", "右" }, { "白", "自" },
+            { "立", "位" }, { "古", "吉" }, { "土", "士" },
+            { "千", "干" }, { "万", "方" }, { "五", "王" }
+        };
+        
+        return ApplyCorrections(text, logographicCorrections);
+    }
+    
+    /// <summary>
+    /// アルファベット文字の修正
+    /// </summary>
+    private static string CorrectAlphabeticText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // アルファベット誤認識パターン
+        var alphabeticCorrections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // よくある英語OCR誤認識
+            { "rn", "m" }, { "cl", "d" }, { "vv", "w" },
+            { "0", "O" }, { "1", "l" }, { "1", "I" },
+            { "5", "S" }, { "6", "G" }, { "8", "B" },
+            { "l", "1" }, { "I", "1" }, { "O", "0" },
+            { "B", "8" }, { "G", "6" }, { "S", "5" }
+        };
+        
+        return ApplyCorrections(text, alphabeticCorrections);
+    }
+    
+    /// <summary>
+    /// 音節文字（韓国語）の修正
+    /// </summary>
+    private static string CorrectSyllabicText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // ハングル誤認識パターン（基本的なもの）
+        var syllabicCorrections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // 一般的なハングル誤認識
+            { "ㅁ", "모" }, { "ㅇ", "오" }, { "ㅍ", "포" },
+            { "ㄱ", "고" }, { "ㄴ", "노" }, { "ㄷ", "도" }
+        };
+        
+        return ApplyCorrections(text, syllabicCorrections);
+    }
+    
+    /// <summary>
+    /// 子音文字（アラビア語）の修正
+    /// </summary>
+    private static string CorrectAbjadText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // アラビア語は複雑な文脈依存変形があるため、基本的な修正のみ
+        return text.Trim();
+    }
+    
+    /// <summary>
+    /// アブギダ（ヒンディー語等）の修正
+    /// </summary>
+    private static string CorrectAbugidaText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+            
+        // デーヴァナーガリー文字は複雑な合字があるため、基本的な修正のみ
+        return text.Trim();
+    }
+    
+    /// <summary>
+    /// 表意文字の直接結合判定
+    /// </summary>
+    private static bool ShouldCombineDirectlyLogographic(string currentText, string nextText, LanguageInfo languageInfo)
+    {
+        if (string.IsNullOrEmpty(currentText) || string.IsNullOrEmpty(nextText))
+            return false;
+            
+        if (languageInfo.Code == "ja")
+        {
+            // 日本語の助詞・語尾判定
+            var japaneseParticles = new HashSet<string>
+            {
+                "か", "が", "は", "を", "に", "へ", "と", "で", "から", "まで", "より",
+                "だ", "である", "です", "ます", "た", "て", "な", "ね", "よ"
+            };
+            
+            return japaneseParticles.Contains(nextText);
+        }
+        
+        // 中国語等は基本的に直接結合
+        return true;
+    }
+    
+    /// <summary>
+    /// アルファベット文字の直接結合判定
+    /// </summary>
+    private static bool ShouldCombineDirectlyAlphabetic(string currentText, string nextText)
+    {
+        if (string.IsNullOrEmpty(currentText) || string.IsNullOrEmpty(nextText))
+            return false;
+            
+        // アポストロフィや短縮形の場合
+#pragma warning disable CA1865 // Unicode文字のため文字列が必要
+        if (nextText.StartsWith("'", StringComparison.Ordinal) || nextText.StartsWith("'", StringComparison.Ordinal))
+#pragma warning restore CA1865
+            return true;
+            
+        // ハイフンで分割された単語
+        if (currentText.EndsWith('-') || nextText.StartsWith('-'))
+            return true;
+            
+        return false;
+    }
+    
+    /// <summary>
+    /// 音節文字の直接結合判定
+    /// </summary>
+    private static bool ShouldCombineDirectlySyllabic(string currentText, string nextText, LanguageInfo languageInfo)
+    {
+        if (string.IsNullOrEmpty(currentText) || string.IsNullOrEmpty(nextText))
+            return false;
+            
+        if (languageInfo.Code == "ko")
+        {
+            // 韓国語の助詞判定（簡易版）
+            var koreanParticles = new HashSet<string>
+            {
+                "은", "는", "이", "가", "을", "를", "에", "에서", "로", "과", "와"
+            };
+            
+            return koreanParticles.Contains(nextText);
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// 文の終わり判定（多言語対応）
+    /// </summary>
+    private static bool IsEndOfSentence(string text, LanguageInfo languageInfo)
+    {
+        if (string.IsNullOrEmpty(text))
+            return false;
+            
+        var lastChar = text[^1];
+        
+        // 共通の文末記号
+        if (lastChar is '.' or '!' or '?')
+            return true;
+            
+        // 言語固有の文末記号
+        return languageInfo.Code switch
+        {
+            "ja" => lastChar is '。' or '！' or '？',
+            "zh" => lastChar is '。' or '！' or '？',
+            "ar" => lastChar is '.' or '؟' or '！',
+            _ => false
+        };
+    }
+    
+    /// <summary>
+    /// 修正辞書を適用
+    /// </summary>
+    private static string ApplyCorrections(string text, Dictionary<string, string> corrections)
+    {
+        if (string.IsNullOrEmpty(text) || corrections.Count == 0)
+            return text;
+            
+        var correctedText = text;
+        
+        // 完全一致の修正
+        if (corrections.TryGetValue(text, out var directCorrection))
+        {
+            return directCorrection;
+        }
+        
+        // 部分的な修正（文末等）
+        foreach (var (wrong, correct) in corrections)
+        {
+            if (text.EndsWith(wrong, StringComparison.OrdinalIgnoreCase))
+            {
+                correctedText = text[..^wrong.Length] + correct;
+                break;
+            }
+        }
+        
+        return correctedText;
+    }
+    
+    #endregion
 
     private void ThrowIfDisposed()
     {

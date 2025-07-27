@@ -74,54 +74,48 @@ public sealed class TextChunk
     }
     
     /// <summary>
-    /// オーバーレイ表示用の最適位置を計算
-    /// テキスト領域の近くで画面外に出ない位置を計算
+    /// オーバーレイ表示用の最適位置を計算（改良版）
+    /// テキスト領域の座標を正確に反映し、画面外に出ない位置を計算
     /// </summary>
     public Point CalculateOptimalOverlayPosition(Size overlaySize, Rectangle screenBounds)
     {
-        // デフォルト: テキスト領域の下側に表示
-        var x = CombinedBounds.X;
-        var y = CombinedBounds.Y + CombinedBounds.Height + 5;
+        // 優先順位付きポジショニング戦略
         
-        // 画面右端チェック
-        if (x + overlaySize.Width > screenBounds.Right)
+        // 1. テキスト領域の直下（5px余白）
+        var positions = new[]
         {
-            x = screenBounds.Right - overlaySize.Width;
-        }
-        
-        // 画面下端チェック - 下に表示できない場合は上に表示
-        if (y + overlaySize.Height > screenBounds.Bottom)
+            new { X = CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 1 },
+            // 2. テキスト領域の直上（5px余白）
+            new { X = CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 2 },
+            // 3. テキスト領域の右側（5px余白）
+            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Y, Priority = 3 },
+            // 4. テキスト領域の左側（5px余白）
+            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Y, Priority = 4 },
+            // 5. テキスト領域の右下角
+            new { X = CombinedBounds.Right - overlaySize.Width, Y = CombinedBounds.Bottom + 5, Priority = 5 },
+            // 6. テキスト領域の左下角
+            new { X = CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 6 }
+        };
+
+        // 各候補位置を優先順位順で試行
+        foreach (var pos in positions.OrderBy(p => p.Priority))
         {
-            y = CombinedBounds.Y - overlaySize.Height - 5;
+            var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
             
-            // 上にも表示できない場合は右側に表示
-            if (y < screenBounds.Top)
+            // 画面境界内チェック
+            if (screenBounds.Contains(candidateRect))
             {
-                x = CombinedBounds.X + CombinedBounds.Width + 5;
-                y = CombinedBounds.Y;
-                
-                // 右側にも表示できない場合は重複表示
-                if (x + overlaySize.Width > screenBounds.Right)
-                {
-                    x = CombinedBounds.X;
-                    y = CombinedBounds.Y;
-                }
+                return new Point(pos.X, pos.Y);
             }
         }
-        
-        // 画面左端チェック
-        if (x < screenBounds.Left)
-        {
-            x = screenBounds.Left;
-        }
-        
-        // 画面上端チェック
-        if (y < screenBounds.Top)
-        {
-            y = screenBounds.Top;
-        }
-        
-        return new Point(x, y);
+
+        // すべての候補が画面外の場合は座標をクランプして強制表示
+        var clampedX = Math.Max(screenBounds.Left, 
+                       Math.Min(screenBounds.Right - overlaySize.Width, CombinedBounds.X));
+        var clampedY = Math.Max(screenBounds.Top, 
+                       Math.Min(screenBounds.Bottom - overlaySize.Height, CombinedBounds.Bottom + 5));
+                       
+        return new Point(clampedX, clampedY);
     }
     
     /// <summary>

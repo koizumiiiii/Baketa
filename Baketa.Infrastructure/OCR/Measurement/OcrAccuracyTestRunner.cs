@@ -151,7 +151,7 @@ public sealed class OcrAccuracyTestRunner(
             }
         }
         
-        return new string(chars.Where(c => c != '\0').ToArray());
+        return new string([.. chars.Where(c => c != '\0')]);
     }
 
     /// <summary>
@@ -184,40 +184,32 @@ public sealed class OcrAccuracyTestRunner(
 /// <summary>
 /// ダミー画像実装（テスト用）
 /// </summary>
-internal sealed class DummyImage : Baketa.Core.Abstractions.Imaging.IImage
+internal sealed class DummyImage(string path) : Baketa.Core.Abstractions.Imaging.IImage
 {
-    public DummyImage(string path)
-    {
-        FilePath = path;
-        Width = 300;
-        Height = 100;
-        Format = Baketa.Core.Abstractions.Imaging.ImageFormat.Png;
-    }
-
-    public int Width { get; }
-    public int Height { get; }
-    public Baketa.Core.Abstractions.Imaging.ImageFormat Format { get; }
-    public string? FilePath { get; }
+    public int Width { get; } = 300;
+    public int Height { get; } = 100;
+    public Baketa.Core.Abstractions.Imaging.ImageFormat Format { get; } = Baketa.Core.Abstractions.Imaging.ImageFormat.Png;
+    public string? FilePath { get; } = path;
     public DateTime CreatedAt { get; } = DateTime.Now;
     public long SizeInBytes => 1024; // ダミー値
 
     public void Dispose() { }
     public byte[] ToByteArray() => [];
-    public Task<byte[]> ToByteArrayAsync() => Task.FromResult(new byte[0]);
+    public Task<byte[]> ToByteArrayAsync() => Task.FromResult(Array.Empty<byte>());
     public System.Drawing.Bitmap ToBitmap() => new(Width, Height);
     public Baketa.Core.Abstractions.Imaging.IImage Clone() => new DummyImage(FilePath ?? string.Empty);
 
-    public Baketa.Core.Abstractions.Imaging.IImage Crop(System.Drawing.Rectangle cropArea) => 
+    public Baketa.Core.Abstractions.Imaging.IImage Crop(System.Drawing.Rectangle _) => 
         new DummyImage(FilePath ?? string.Empty);
 
-    public Baketa.Core.Abstractions.Imaging.IImage Resize(int newWidth, int newHeight) => 
+    public Baketa.Core.Abstractions.Imaging.IImage Resize(int _1, int _2) => 
         new DummyImage(FilePath ?? string.Empty);
         
-    public Task<Baketa.Core.Abstractions.Imaging.IImage> ResizeAsync(int newWidth, int newHeight) => 
+    public Task<Baketa.Core.Abstractions.Imaging.IImage> ResizeAsync(int _1, int _2) => 
         Task.FromResult<Baketa.Core.Abstractions.Imaging.IImage>(new DummyImage(FilePath ?? string.Empty));
 
-    public void SaveToFile(string filePath) { }
+    public void SaveToFile(string _) { }
 
-    public Task SaveToFileAsync(string filePath, CancellationToken cancellationToken = default) => 
+    public Task SaveToFileAsync(string _1, CancellationToken _2 = default) => 
         Task.CompletedTask;
 }
