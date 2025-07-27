@@ -62,7 +62,7 @@ public sealed class RuntimeOcrAccuracyLogger(
     /// <param name="results">OCR結果</param>
     /// <param name="expectedText">期待される正解テキスト</param>
     /// <param name="imagePath">画像パス（デバッグ用）</param>
-    public async Task LogOcrResultWithExpectedAsync(OcrResults results, string expectedText, string? imagePath = null)
+    public Task LogOcrResultWithExpectedAsync(OcrResults results, string expectedText, string? imagePath = null)
     {
         lock (_lockObject)
         {
@@ -104,6 +104,8 @@ public sealed class RuntimeOcrAccuracyLogger(
         {
             _logger.LogError(ex, "OCR精度測定中にエラーが発生しました");
         }
+        
+        return Task.CompletedTask;
     }
 
     /// <summary>

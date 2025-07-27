@@ -11,22 +11,12 @@ namespace Baketa.Infrastructure.Tests.OCR.Measurement;
 /// <summary>
 /// OCR精度改善効果のベンチマークテスト
 /// </summary>
-public sealed class OcrAccuracyBenchmarkTests
+public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-    private readonly Mock<IImageFactory> _mockImageFactory;
-    private readonly Mock<ILogger<OcrAccuracyMeasurement>> _mockMeasurementLogger;
-    private readonly Mock<ILogger<AccuracyBenchmarkService>> _mockBenchmarkLogger;
-    private readonly Mock<ILogger<TestImageGenerator>> _mockGeneratorLogger;
-
-    public OcrAccuracyBenchmarkTests(ITestOutputHelper output)
-    {
-        _output = output;
-        _mockImageFactory = new Mock<IImageFactory>();
-        _mockMeasurementLogger = new Mock<ILogger<OcrAccuracyMeasurement>>();
-        _mockBenchmarkLogger = new Mock<ILogger<AccuracyBenchmarkService>>();
-        _mockGeneratorLogger = new Mock<ILogger<TestImageGenerator>>();
-    }
+    private readonly Mock<IImageFactory> _mockImageFactory = new();
+    private readonly Mock<ILogger<OcrAccuracyMeasurement>> _mockMeasurementLogger = new();
+    private readonly Mock<ILogger<AccuracyBenchmarkService>> _mockBenchmarkLogger = new();
+    private readonly Mock<ILogger<TestImageGenerator>> _mockGeneratorLogger = new();
 
     [Fact]
     public async Task GenerateTestImages_CreatesAllRequiredTestCases()
@@ -56,7 +46,7 @@ public sealed class OcrAccuracyBenchmarkTests
                 var content = await System.IO.File.ReadAllTextAsync(dummyFile);
                 Assert.Contains(expectedText, content);
                 
-                _output.WriteLine($"✅ テストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
+                output.WriteLine($"✅ テストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
             }
         }
         finally
@@ -73,7 +63,7 @@ public sealed class OcrAccuracyBenchmarkTests
     public async Task AccuracyMeasurement_CalculatesCorrectMetrics()
     {
         // Arrange
-        var measurement = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
+        _ = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
 
         // 完全一致のケース
         var exactMatch = await TestAccuracyCalculation("Hello World", "Hello World");
@@ -90,9 +80,9 @@ public sealed class OcrAccuracyBenchmarkTests
         var noMatch = await TestAccuracyCalculation("Hello World", "Goodbye");
         Assert.True(noMatch.OverallAccuracy < 0.5, $"不一致の精度が高すぎます: {noMatch.OverallAccuracy}");
 
-        _output.WriteLine($"完全一致: {exactMatch.OverallAccuracy:P2}");
-        _output.WriteLine($"部分一致: {partialMatch.OverallAccuracy:P2}");
-        _output.WriteLine($"完全不一致: {noMatch.OverallAccuracy:P2}");
+        output.WriteLine($"完全一致: {exactMatch.OverallAccuracy:P2}");
+        output.WriteLine($"部分一致: {partialMatch.OverallAccuracy:P2}");
+        output.WriteLine($"完全不一致: {noMatch.OverallAccuracy:P2}");
     }
 
     [Fact]
@@ -125,13 +115,13 @@ public sealed class OcrAccuracyBenchmarkTests
         Assert.Equal(0.1, comparison.ProcessingTimeChange, 2);
         Assert.True(comparison.IsSignificantImprovement, "5%以上の改善が検出されるべきです");
 
-        _output.WriteLine($"精度改善: {comparison.AccuracyImprovement:+0.00%;-0.00%;+0.00%}");
-        _output.WriteLine($"処理時間変化: {comparison.ProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
-        _output.WriteLine($"有意な改善: {comparison.IsSignificantImprovement}");
+        output.WriteLine($"精度改善: {comparison.AccuracyImprovement:+0.00%;-0.00%;+0.00%}");
+        output.WriteLine($"処理時間変化: {comparison.ProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
+        output.WriteLine($"有意な改善: {comparison.IsSignificantImprovement}");
     }
 
     [Fact]
-    public async Task BenchmarkService_ProvidesMeaningfulTestCases()
+    public Task BenchmarkService_ProvidesMeaningfulTestCases()
     {
         // Arrange
         var accuracyMeasurement = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
@@ -153,14 +143,16 @@ public sealed class OcrAccuracyBenchmarkTests
 
         foreach (var (imagePath, expectedText) in gameTestCases)
         {
-            _output.WriteLine($"🎮 ゲームテストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
+            output.WriteLine($"🎮 ゲームテストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
         }
+        
+        return Task.CompletedTask;
     }
 
-    private async Task<AccuracyMeasurementResult> TestAccuracyCalculation(string expected, string detected)
+    private Task<AccuracyMeasurementResult> TestAccuracyCalculation(string expected, string detected)
     {
         // プライベートメソッドのテスト用 - リフレクションを使用
-        var measurement = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
+        _ = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
         var type = typeof(OcrAccuracyMeasurement);
         
         var calculateAccuracyMethod = type.GetMethod("CalculateAccuracy", 
@@ -170,11 +162,11 @@ public sealed class OcrAccuracyBenchmarkTests
         var calculateWordAccuracyMethod = type.GetMethod("CalculateWordAccuracy", 
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
 
-        var overallAccuracy = (double)calculateAccuracyMethod!.Invoke(null, new object[] { expected, detected })!;
-        var charAccuracy = (double)calculateCharAccuracyMethod!.Invoke(null, new object[] { expected, detected })!;
-        var wordAccuracy = (double)calculateWordAccuracyMethod!.Invoke(null, new object[] { expected, detected })!;
+        var overallAccuracy = (double)calculateAccuracyMethod!.Invoke(null, [expected, detected])!;
+        var charAccuracy = (double)calculateCharAccuracyMethod!.Invoke(null, [expected, detected])!;
+        var wordAccuracy = (double)calculateWordAccuracyMethod!.Invoke(null, [expected, detected])!;
 
-        return new AccuracyMeasurementResult
+        return Task.FromResult(new AccuracyMeasurementResult
         {
             OverallAccuracy = overallAccuracy,
             CharacterAccuracy = charAccuracy,
@@ -185,7 +177,7 @@ public sealed class OcrAccuracyBenchmarkTests
             ProcessingTime = TimeSpan.FromMilliseconds(100),
             AverageConfidence = 0.9,
             SettingsHash = "test"
-        };
+        });
     }
 
     private static bool ContainsJapanese(string text)
@@ -238,26 +230,19 @@ public sealed class OcrAccuracyBenchmarkTests
 /// 実際のOCRエンジンを使用した統合ベンチマークテスト
 /// </summary>
 [Collection("OCR Integration Tests")]
-public sealed class OcrAccuracyIntegrationBenchmarkTests
+public sealed class OcrAccuracyIntegrationBenchmarkTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public OcrAccuracyIntegrationBenchmarkTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
     [Fact(Skip = "実際のOCRエンジンが必要なため通常はスキップ")]
     public async Task MeasureActualOcrImprovements_WithRealEngine()
     {
         // このテストは実際のPaddleOCRエンジンが利用可能な場合にのみ実行
         // 継続的インテグレーションでは通常スキップされる
         
-        _output.WriteLine("⚠️ 実際のOCRエンジンを使用した統合テストは手動実行が必要です");
-        _output.WriteLine("手動実行方法:");
-        _output.WriteLine("1. PaddleOCRモデルが適切にセットアップされていることを確認");
-        _output.WriteLine("2. [Fact(Skip = \"...\")] の Skip 属性を削除");
-        _output.WriteLine("3. テストを個別実行");
+        output.WriteLine("⚠️ 実際のOCRエンジンを使用した統合テストは手動実行が必要です");
+        output.WriteLine("手動実行方法:");
+        output.WriteLine("1. PaddleOCRモデルが適切にセットアップされていることを確認");
+        output.WriteLine("2. [Fact(Skip = \"...\")] の Skip 属性を削除");
+        output.WriteLine("3. テストを個別実行");
         
         await Task.CompletedTask;
     }

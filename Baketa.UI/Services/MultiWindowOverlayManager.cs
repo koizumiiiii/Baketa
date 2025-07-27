@@ -76,8 +76,31 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
                 _logger?.LogDebug("📝 表示対象のチャンクが0個のため処理をスキップ");
                 System.Console.WriteLine("📝 表示対象のチャンクが0個のため処理をスキップ");
                 DebugLogUtility.WriteLog("📝 表示対象のチャンクが0個のため処理をスキップ");
+                
+                // 既存のオーバーレイをすべて非表示にする
+                await HideAllOverlaysAsync(cancellationToken).ConfigureAwait(false);
                 return;
             }
+            
+            // 有効なテキストを持つチャンクのみフィルタリング
+            var validChunks = chunks.Where(chunk => 
+                !string.IsNullOrWhiteSpace(chunk.CombinedText) && 
+                !string.IsNullOrWhiteSpace(chunk.TranslatedText)
+            ).ToList();
+            
+            if (validChunks.Count == 0)
+            {
+                _logger?.LogDebug("📝 有効なテキストを持つチャンクが0個のため、オーバーレイを非表示");
+                System.Console.WriteLine("📝 有効なテキストを持つチャンクが0個のため、オーバーレイを非表示");
+                DebugLogUtility.WriteLog("📝 有効なテキストを持つチャンクが0個のため、オーバーレイを非表示");
+                
+                // テキストがない場合はオーバーレイを非表示
+                await HideAllOverlaysAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            
+            // 以降の処理は有効なチャンクのみで実行
+            chunks = validChunks;
 
             System.Console.WriteLine($"🔒 セマフォ取得開始");
             await _operationSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -172,9 +195,23 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
                     // テキストサイズを測定
                     var textSize = MeasureTranslatedTextSize(chunk.TranslatedText);
                     
+                    // 詳細デバッグログ: 座標計算情報
+                    System.Console.WriteLine($"🎯 座標計算詳細 - ChunkId: {chunk.ChunkId}");
+                    System.Console.WriteLine($"   📐 OCRテキスト領域: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y}) サイズ:({chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
+                    System.Console.WriteLine($"   📏 翻訳ウィンドウサイズ: ({textSize.Width}x{textSize.Height})");
+                    System.Console.WriteLine($"   🖥️ スクリーン領域: ({screenBounds.X},{screenBounds.Y}) サイズ:({screenBounds.Width}x{screenBounds.Height})");
+                    System.Console.WriteLine($"   🎮 ソースウィンドウハンドル: 0x{chunk.SourceWindowHandle.ToInt64():X8}");
+
+                    // ウィンドウ相対座標をスクリーン絶対座標に変換
+                    var correctedChunk = await ConvertToScreenCoordinatesAsync(chunk).ConfigureAwait(false);
+                    System.Console.WriteLine($"   🔄 座標変換後: ({correctedChunk.CombinedBounds.X},{correctedChunk.CombinedBounds.Y}) サイズ:({correctedChunk.CombinedBounds.Width}x{correctedChunk.CombinedBounds.Height})");
+
                     // 最適な表示位置を計算（衝突回避付き）
                     var position = CalculateOptimalPositionWithCollisionAvoidance(
-                        chunk, textSize, screenBounds, occupiedRegions);
+                        correctedChunk, textSize, screenBounds, occupiedRegions);
+
+                    System.Console.WriteLine($"   🎯 最終位置決定: ({position.X},{position.Y})");
+                    System.Console.WriteLine($"   📊 座標反映確認: 元OCR位置({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y}) → 変換後({correctedChunk.CombinedBounds.X},{correctedChunk.CombinedBounds.Y}) → オーバーレイ位置({position.X},{position.Y})");
 
                     // 占有領域を記録
                     var overlayRect = new DrawingRectangle(position.X, position.Y, textSize.Width, textSize.Height);
@@ -183,8 +220,8 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
                         occupiedRegions.Add(overlayRect);
                     }
 
-                    // オーバーレイウィンドウを作成・表示
-                    var overlayWindow = await CreateAndShowOverlayAsync(chunk, position, textSize, cancellationToken).ConfigureAwait(false);
+                    // オーバーレイウィンドウを作成・表示（座標修正済みチャンクを使用）
+                    var overlayWindow = await CreateAndShowOverlayAsync(correctedChunk, position, textSize, cancellationToken).ConfigureAwait(false);
                     
                     // ウィンドウ情報を記録
                     _overlayWindows[chunk.ChunkId] = overlayWindow;
@@ -197,11 +234,11 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
                         SourceWindowHandle = chunk.SourceWindowHandle
                     };
                     
-                    // チャンクデータをキャッシュに追加
-                    _chunkDataCache[chunk.ChunkId] = (chunk.CombinedText, chunk.CombinedBounds);
+                    // チャンクデータをキャッシュに追加（変換後の座標を使用）
+                    _chunkDataCache[chunk.ChunkId] = (correctedChunk.CombinedText, correctedChunk.CombinedBounds);
 
-                    _logger?.LogInformation("📺 オーバーレイ表示完了 - ChunkId: {ChunkId} | Position: ({X},{Y}) | Size: ({W},{H}) | Text: '{Text}'",
-                        chunk.ChunkId, position.X, position.Y, textSize.Width, textSize.Height, chunk.TranslatedText);
+                    _logger?.LogInformation("📺 オーバーレイ表示完了 - ChunkId: {ChunkId} | 元OCR位置: ({OrigX},{OrigY}) | 変換後位置: ({CorrX},{CorrY}) | オーバーレイ位置: ({X},{Y}) | Size: ({W},{H}) | Text: '{Text}'",
+                        chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, correctedChunk.CombinedBounds.X, correctedChunk.CombinedBounds.Y, position.X, position.Y, textSize.Width, textSize.Height, chunk.TranslatedText);
                         
                     // デバッグ用にウィンドウ数を出力
                     System.Console.WriteLine($"🪟 現在の表示中オーバーレイ数: {_overlayWindows.Count}");
@@ -548,23 +585,58 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
     }
 
     /// <summary>
-    /// 翻訳テキストのサイズを測定
+    /// 翻訳テキストのサイズを測定（改良版）
     /// </summary>
     private DrawingSize MeasureTranslatedTextSize(string translatedText)
     {
         if (string.IsNullOrWhiteSpace(translatedText))
             return new DrawingSize(100, 30);
 
-        // 簡易サイズ計算（実際の実装では TextMeasurementService を使用）
-        var charCount = translatedText.Length;
-        var lineCount = Math.Max(1, translatedText.Count(c => c == '\n') + 1);
+        // 改良されたサイズ計算: テキストの実際の内容を考慮
+        var text = translatedText.Trim();
         
-        var width = Math.Min(_currentOptions.MaxWidth, 
-            Math.Max(200, charCount * _currentOptions.FontSize * 0.6));
-        var height = Math.Min(_currentOptions.MaxHeight, 
-            lineCount * (_currentOptions.FontSize + 4) + _currentOptions.Padding * 2);
+        // 日本語文字とアルファベットの比率を考慮した幅計算
+        var japaneseCharCount = text.Count(c => IsJapaneseCharacter(c));
+        var otherCharCount = text.Length - japaneseCharCount;
+        
+        // 日本語文字は幅が広い、アルファベットは狭い
+        var estimatedWidth = japaneseCharCount * (_currentOptions.FontSize * 1.0) + 
+                           otherCharCount * (_currentOptions.FontSize * 0.6);
+        
+        // 改行を考慮した行数計算
+        var lines = text.Split('\n', StringSplitOptions.None);
+        var lineCount = lines.Length;
+        
+        // 最長行の幅を基準とする
+        var maxLineWidth = lines.Max(line => 
+        {
+            var jpnCount = line.Count(IsJapaneseCharacter);
+            var othCount = line.Length - jpnCount;
+            return jpnCount * (_currentOptions.FontSize * 1.0) + othCount * (_currentOptions.FontSize * 0.6);
+        });
+        
+        // 実際の幅: 最長行幅 + パディング
+        var actualWidth = Math.Min(_currentOptions.MaxWidth,
+            Math.Max(150, (int)maxLineWidth + _currentOptions.Padding * 2));
+        
+        // 高さ: 行数 × 行高 + パディング
+        var lineHeight = _currentOptions.FontSize + 6; // 行間を含む
+        var actualHeight = Math.Min(_currentOptions.MaxHeight,
+            lineCount * lineHeight + _currentOptions.Padding * 2);
             
-        return new DrawingSize((int)width, (int)height);
+        return new DrawingSize(actualWidth, actualHeight);
+    }
+    
+    /// <summary>
+    /// 日本語文字かどうかを判定
+    /// </summary>
+    private static bool IsJapaneseCharacter(char c)
+    {
+        // ひらがな、カタカナ、漢字の範囲をチェック
+        return (c >= 0x3040 && c <= 0x309F) || // ひらがな
+               (c >= 0x30A0 && c <= 0x30FF) || // カタカナ
+               (c >= 0x4E00 && c <= 0x9FAF) || // 漢字
+               (c >= 0x3400 && c <= 0x4DBF);   // 拡張漢字
     }
 
     /// <summary>
@@ -632,12 +704,163 @@ public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDis
     }
 
     /// <summary>
-    /// プライマリ画面の境界を取得
+    /// プライマリ画面の境界を取得（改良版）
     /// </summary>
     private static DrawingRectangle GetPrimaryScreenBounds()
     {
-        // TODO: マルチモニター対応
-        return new DrawingRectangle(0, 0, 1920, 1080); // 仮の値
+        try
+        {
+            // Win32 APIを使用してプライマリディスプレイサイズを取得
+            var screenWidth = GetSystemMetrics(0);  // SM_CXSCREEN
+            var screenHeight = GetSystemMetrics(1); // SM_CYSCREEN
+            
+            if (screenWidth > 0 && screenHeight > 0)
+            {
+                return new DrawingRectangle(0, 0, screenWidth, screenHeight);
+            }
+        }
+        catch
+        {
+            // Win32 API呼び出し失敗時はフォールバック
+        }
+        
+        // フォールバック: 一般的なFHD解像度
+        return new DrawingRectangle(0, 0, 1920, 1080);
+    }
+    
+    /// <summary>
+    /// Win32 API - GetSystemMetrics
+    /// </summary>
+#pragma warning disable SYSLIB1054 // P/Invokeコード生成のためDllImportを使用
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>
+    /// Win32 API - ClientToScreen (クライアント座標をスクリーン座標に変換)
+    /// </summary>
+#pragma warning disable SYSLIB1054 // P/Invokeコード生成のためDllImportを使用
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>
+    /// Win32 API - GetClientRect (クライアント矩形を取得)
+    /// </summary>
+#pragma warning disable SYSLIB1054 // P/Invokeコード生成のためDllImportを使用
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>
+    /// Win32 API - GetWindowRect (ウィンドウ矩形を取得)
+    /// </summary>
+#pragma warning disable SYSLIB1054 // P/Invokeコード生成のためDllImportを使用
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>
+    /// Win32 API - IsWindow (ウィンドウハンドルが有効かチェック)
+    /// </summary>
+#pragma warning disable SYSLIB1054 // P/Invokeコード生成のためDllImportを使用
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>
+    /// Win32 POINT構造体
+    /// </summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    /// <summary>
+    /// Win32 RECT構造体
+    /// </summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    /// <summary>
+    /// ウィンドウ相対座標をスクリーン絶対座標に変換
+    /// ゲーム内テキストの正確な位置を反映するための座標変換
+    /// </summary>
+    private async Task<TextChunk> ConvertToScreenCoordinatesAsync(TextChunk chunk)
+    {
+        await Task.CompletedTask.ConfigureAwait(false); // 非同期形式維持のため
+
+        try
+        {
+            // ウィンドウハンドルが無効な場合はそのまま返す
+            if (chunk.SourceWindowHandle == IntPtr.Zero || !IsWindow(chunk.SourceWindowHandle))
+            {
+                System.Console.WriteLine($"⚠️ 無効なウィンドウハンドル、座標変換スキップ: 0x{chunk.SourceWindowHandle.ToInt64():X8}");
+                return chunk;
+            }
+
+            // クライアント座標からスクリーン座標に変換
+            var topLeft = new POINT { X = chunk.CombinedBounds.X, Y = chunk.CombinedBounds.Y };
+            var bottomRight = new POINT { X = chunk.CombinedBounds.Right, Y = chunk.CombinedBounds.Bottom };
+
+            bool success1 = ClientToScreen(chunk.SourceWindowHandle, ref topLeft);
+            bool success2 = ClientToScreen(chunk.SourceWindowHandle, ref bottomRight);
+
+            if (!success1 || !success2)
+            {
+                System.Console.WriteLine($"❌ ClientToScreen変換失敗、元の座標を使用: HWND=0x{chunk.SourceWindowHandle.ToInt64():X8}");
+                return chunk;
+            }
+
+            // ウィンドウ情報の詳細デバッグ
+            if (GetClientRect(chunk.SourceWindowHandle, out RECT clientRect))
+            {
+                System.Console.WriteLine($"📏 クライアント矩形: ({clientRect.Left},{clientRect.Top}) - ({clientRect.Right},{clientRect.Bottom})");
+            }
+            
+            if (GetWindowRect(chunk.SourceWindowHandle, out RECT windowRect))
+            {
+                System.Console.WriteLine($"🖼️ ウィンドウ矩形: ({windowRect.Left},{windowRect.Top}) - ({windowRect.Right},{windowRect.Bottom})");
+            }
+
+            // 変換された座標で新しいバウンディングボックスを作成
+            var convertedBounds = new DrawingRectangle(
+                topLeft.X, 
+                topLeft.Y, 
+                bottomRight.X - topLeft.X, 
+                bottomRight.Y - topLeft.Y);
+
+            System.Console.WriteLine($"🔄 座標変換詳細:");
+            System.Console.WriteLine($"   元の座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y}) - ({chunk.CombinedBounds.Right},{chunk.CombinedBounds.Bottom})");
+            System.Console.WriteLine($"   変換後座標: ({topLeft.X},{topLeft.Y}) - ({bottomRight.X},{bottomRight.Y})");
+            System.Console.WriteLine($"   バウンディング: ({convertedBounds.X},{convertedBounds.Y}) サイズ:({convertedBounds.Width}x{convertedBounds.Height})");
+
+            // 座標変換済みの新しいTextChunkを作成
+            return new TextChunk
+            {
+                ChunkId = chunk.ChunkId,
+                TextResults = chunk.TextResults,
+                CombinedBounds = convertedBounds,
+                CombinedText = chunk.CombinedText,
+                TranslatedText = chunk.TranslatedText,
+                SourceWindowHandle = chunk.SourceWindowHandle,
+                DetectedLanguage = chunk.DetectedLanguage
+            };
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"❌ 座標変換中に例外発生: {ex.Message}");
+            _logger?.LogError(ex, "座標変換中に例外が発生");
+            return chunk; // エラー時は元のチャンクを返す
+        }
     }
 
     private void ThrowIfDisposed()

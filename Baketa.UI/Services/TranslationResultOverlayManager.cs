@@ -247,26 +247,13 @@ public class TranslationResultOverlayManager(
     }
 
     /// <summary>
-    /// 翻訳結果を表示
+    /// 翻訳結果を表示（非推奨 - マルチウィンドウオーバーレイシステムに移行）
     /// </summary>
+    [Obsolete("Use MultiWindowOverlayManager instead")]
     public async Task DisplayTranslationResultAsync(string originalText, string translatedText, System.Drawing.Point? position = null)
     {
-        if (!_isInitialized || _disposed)
-        {
-            await InitializeAsync().ConfigureAwait(false);
-        }
-
-        if (_viewModel != null)
-        {
-            var displayEvent = new TranslationResultDisplayEvent
-            {
-                OriginalText = originalText,
-                TranslatedText = translatedText,
-                DetectedPosition = position
-            };
-
-            await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
-        }
+        // このメソッドは使用されなくなりました - マルチウィンドウオーバーレイシステムを使用してください
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Baketa.Core.Abstractions.OCR;
 using Microsoft.Extensions.Logging;
@@ -7,14 +8,9 @@ namespace Baketa.Infrastructure.OCR.Measurement;
 /// <summary>
 /// OCR精度改善効果のレポート生成
 /// </summary>
-public sealed class AccuracyImprovementReporter
+public sealed class AccuracyImprovementReporter(ILogger<AccuracyImprovementReporter> logger)
 {
-    private readonly ILogger<AccuracyImprovementReporter> _logger;
-
-    public AccuracyImprovementReporter(ILogger<AccuracyImprovementReporter> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<AccuracyImprovementReporter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 改善効果の詳細レポートを生成
@@ -32,8 +28,8 @@ public sealed class AccuracyImprovementReporter
         // ヘッダー
         report.AppendLine("# OCR精度改善効果測定レポート");
         report.AppendLine();
-        report.AppendLine($"**測定日時**: {timestamp:yyyy-MM-dd HH:mm:ss}");
-        report.AppendLine($"**測定項目数**: {comparisonResults.Count}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"**測定日時**: {timestamp:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"**測定項目数**: {comparisonResults.Count}");
         report.AppendLine();
 
         // サマリー
@@ -45,10 +41,10 @@ public sealed class AccuracyImprovementReporter
         var avgProcessingTimeChange = comparisonResults.Average(r => r.Result.ProcessingTimeChange);
         var significantImprovements = comparisonResults.Where(r => r.Result.IsSignificantImprovement).Count();
 
-        report.AppendLine($"- **改善された項目**: {totalImprovements}/{comparisonResults.Count}");
-        report.AppendLine($"- **平均精度改善**: {avgAccuracyImprovement:+0.00%;-0.00%;+0.00%}");
-        report.AppendLine($"- **平均処理時間変化**: {avgProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
-        report.AppendLine($"- **統計的に有意な改善**: {significantImprovements}/{comparisonResults.Count}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"- **改善された項目**: {totalImprovements}/{comparisonResults.Count}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"- **平均精度改善**: {avgAccuracyImprovement:+0.00%;-0.00%;+0.00%}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"- **平均処理時間変化**: {avgProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
+        report.AppendLine(CultureInfo.InvariantCulture, $"- **統計的に有意な改善**: {significantImprovements}/{comparisonResults.Count}");
         report.AppendLine();
 
         // 詳細結果
@@ -57,7 +53,7 @@ public sealed class AccuracyImprovementReporter
 
         foreach (var (improvementName, result) in comparisonResults)
         {
-            report.AppendLine($"### {improvementName}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"### {improvementName}");
             report.AppendLine();
             
             // 精度改善
@@ -78,26 +74,26 @@ public sealed class AccuracyImprovementReporter
                 _ => "🐌 低速化"
             };
 
-            report.AppendLine($"- **精度改善**: {result.AccuracyImprovement:+0.00%;-0.00%;+0.00%} {accuracyStatus}");
-            report.AppendLine($"- **処理時間変化**: {result.ProcessingTimeChange:+0.00%;-0.00%;+0.00%} {timeStatus}");
-            report.AppendLine($"- **統計的有意性**: {(result.IsSignificantImprovement ? "✅ 有意" : "❌ 非有意")}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- **精度改善**: {result.AccuracyImprovement:+0.00%;-0.00%;+0.00%} {accuracyStatus}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- **処理時間変化**: {result.ProcessingTimeChange:+0.00%;-0.00%;+0.00%} {timeStatus}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- **統計的有意性**: {(result.IsSignificantImprovement ? "✅ 有意" : "❌ 非有意")}");
             report.AppendLine();
 
             // 詳細数値
             report.AppendLine("**基準設定結果**:");
-            report.AppendLine($"- 全体精度: {result.BaselineResult.OverallAccuracy:P2}");
-            report.AppendLine($"- 文字精度: {result.BaselineResult.CharacterAccuracy:P2}");
-            report.AppendLine($"- 単語精度: {result.BaselineResult.WordAccuracy:P2}");
-            report.AppendLine($"- 処理時間: {result.BaselineResult.ProcessingTime.TotalMilliseconds:F0}ms");
-            report.AppendLine($"- 平均信頼度: {result.BaselineResult.AverageConfidence:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 全体精度: {result.BaselineResult.OverallAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 文字精度: {result.BaselineResult.CharacterAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 単語精度: {result.BaselineResult.WordAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 処理時間: {result.BaselineResult.ProcessingTime.TotalMilliseconds:F0}ms");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 平均信頼度: {result.BaselineResult.AverageConfidence:P2}");
             report.AppendLine();
 
             report.AppendLine("**改善設定結果**:");
-            report.AppendLine($"- 全体精度: {result.ImprovedResult.OverallAccuracy:P2}");
-            report.AppendLine($"- 文字精度: {result.ImprovedResult.CharacterAccuracy:P2}");
-            report.AppendLine($"- 単語精度: {result.ImprovedResult.WordAccuracy:P2}");
-            report.AppendLine($"- 処理時間: {result.ImprovedResult.ProcessingTime.TotalMilliseconds:F0}ms");
-            report.AppendLine($"- 平均信頼度: {result.ImprovedResult.AverageConfidence:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 全体精度: {result.ImprovedResult.OverallAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 文字精度: {result.ImprovedResult.CharacterAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 単語精度: {result.ImprovedResult.WordAccuracy:P2}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 処理時間: {result.ImprovedResult.ProcessingTime.TotalMilliseconds:F0}ms");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 平均信頼度: {result.ImprovedResult.AverageConfidence:P2}");
             report.AppendLine();
         }
 
@@ -105,16 +101,16 @@ public sealed class AccuracyImprovementReporter
         report.AppendLine("## 💡 推奨事項");
         report.AppendLine();
 
-        var bestImprovement = comparisonResults
+        var (ImprovementName, Result) = comparisonResults
             .Where(r => r.Result.IsSignificantImprovement)
             .OrderByDescending(r => r.Result.AccuracyImprovement)
             .FirstOrDefault();
 
-        if (bestImprovement.Result != null)
+        if (Result != null)
         {
-            report.AppendLine($"**最も効果的な改善**: {bestImprovement.ImprovementName}");
-            report.AppendLine($"- 精度向上: {bestImprovement.Result.AccuracyImprovement:+0.00%;-0.00%;+0.00%}");
-            report.AppendLine($"- パフォーマンス影響: {bestImprovement.Result.ProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"**最も効果的な改善**: {ImprovementName}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- 精度向上: {Result.AccuracyImprovement:+0.00%;-0.00%;+0.00%}");
+            report.AppendLine(CultureInfo.InvariantCulture, $"- パフォーマンス影響: {Result.ProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
             report.AppendLine();
         }
 
@@ -129,7 +125,7 @@ public sealed class AccuracyImprovementReporter
             report.AppendLine("**推奨する改善項目**（精度向上とパフォーマンスのバランス）:");
             foreach (var (name, result) in goodTradeoffs)
             {
-                report.AppendLine($"- {name}: 精度{result.AccuracyImprovement:+0.0%}, 時間{result.ProcessingTimeChange:+0.0%}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"- {name}: 精度{result.AccuracyImprovement:+0.0%}, 時間{result.ProcessingTimeChange:+0.0%}");
             }
             report.AppendLine();
         }
@@ -139,13 +135,13 @@ public sealed class AccuracyImprovementReporter
             .Where(r => r.Result.AccuracyImprovement < -0.01 || r.Result.ProcessingTimeChange > 0.5)
             .ToList();
 
-        if (problematicItems.Any())
+        if (problematicItems.Count > 0)
         {
             report.AppendLine("⚠️ **注意が必要な項目**:");
             foreach (var (name, result) in problematicItems)
             {
                 var issue = result.AccuracyImprovement < -0.01 ? "精度低下" : "大幅な処理時間増加";
-                report.AppendLine($"- {name}: {issue}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"- {name}: {issue}");
             }
             report.AppendLine();
         }
@@ -153,7 +149,7 @@ public sealed class AccuracyImprovementReporter
         // フッター
         report.AppendLine("---");
         report.AppendLine("*このレポートは自動生成されました*");
-        report.AppendLine($"*生成時刻: {timestamp:yyyy-MM-dd HH:mm:ss}*");
+        report.AppendLine(CultureInfo.InvariantCulture, $"*生成時刻: {timestamp:yyyy-MM-dd HH:mm:ss}*");
 
         // ファイルに保存
         var directory = System.IO.Path.GetDirectoryName(outputPath);
@@ -217,7 +213,7 @@ public sealed class AccuracyImprovementReporter
         // データ行
         foreach (var (name, result) in comparisonResults)
         {
-            csv.AppendLine($"{EscapeCsv(name)}," +
+            csv.AppendLine(CultureInfo.InvariantCulture, $"{EscapeCsv(name)}," +
                           $"{result.AccuracyImprovement:F4}," +
                           $"{result.ProcessingTimeChange:F4}," +
                           $"{result.IsSignificantImprovement}," +

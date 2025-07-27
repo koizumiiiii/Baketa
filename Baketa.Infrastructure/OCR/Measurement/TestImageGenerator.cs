@@ -5,14 +5,9 @@ namespace Baketa.Infrastructure.OCR.Measurement;
 /// <summary>
 /// OCR精度測定用のテスト画像生成ユーティリティ（シンプル実装）
 /// </summary>
-public sealed class TestImageGenerator
+public sealed class TestImageGenerator(ILogger<TestImageGenerator> logger)
 {
-    private readonly ILogger<TestImageGenerator> _logger;
-
-    public TestImageGenerator(ILogger<TestImageGenerator> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<TestImageGenerator> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 基本的なダミー画像パスを生成（実際の画像生成はスキップ）

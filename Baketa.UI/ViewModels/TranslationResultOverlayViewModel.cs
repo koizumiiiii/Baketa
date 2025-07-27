@@ -186,8 +186,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
 
     private void InitializeEventHandlers()
     {
-        // 翻訳結果表示イベントを購読
-        SubscribeToEvent<TranslationResultDisplayEvent>(OnTranslationResultDisplay);
+        // TranslationResultDisplayEvent は削除 - マルチウィンドウオーバーレイシステムに移行
         
         // 翻訳表示切り替えイベントを購読
         SubscribeToEvent<TranslationDisplayVisibilityChangedEvent>(OnTranslationDisplayVisibilityChanged);
@@ -199,79 +198,7 @@ public class TranslationResultOverlayViewModel : ViewModelBase
         SubscribeToEvent<SettingsChangedEvent>(OnSettingsChanged);
     }
 
-    private async Task OnTranslationResultDisplay(TranslationResultDisplayEvent displayEvent)
-    {
-        try
-        {
-            var displayTimer = System.Diagnostics.Stopwatch.StartNew();
-            Console.WriteLine($"🖥️ TranslationResultOverlayViewModel.OnTranslationResultDisplay呼び出し");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayViewModel.OnTranslationResultDisplay呼び出し");
-            
-            Console.WriteLine($"🔍 displayEventチェック: {(displayEvent == null ? "null" : "not null")}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🔍 displayEventチェック: {(displayEvent == null ? "null" : "not null")}");
-            
-            if (displayEvent == null)
-            {
-                Console.WriteLine("💥 displayEventがnullです！");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   💥 displayEventがnullです！");
-                return;
-            }
-            
-            var originalText = displayEvent.OriginalText ?? "";
-            var translatedText = displayEvent.TranslatedText ?? "";
-            
-            Console.WriteLine($"   📖 オリジナル: '{originalText}'");
-            Console.WriteLine($"   🌐 翻訳結果: '{translatedText}'");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   📖 オリジナル: '{originalText}'");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   🌐 翻訳結果: '{translatedText}'");
-        
-            Console.WriteLine("🔄 プロパティ設定開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "   🔄 プロパティ設定開始");
-            
-            // すべてのUIプロパティ設定とHasText判定を1つのUIスレッド呼び出しにまとめる
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                Console.WriteLine("🧵 UIスレッドで翻訳結果とプロパティ設定中");
-                
-                // 翻訳結果を設定
-                OriginalText = originalText;
-                TranslatedText = translatedText;
-                
-                // 位置を設定
-                if (displayEvent.DetectedPosition.HasValue)
-                {
-                    var position = displayEvent.DetectedPosition.Value;
-                    Console.WriteLine($"📍 位置設定: X={position.X}, Y={position.Y}");
-                    PositionX = Math.Max(0, position.X);
-                    PositionY = Math.Max(0, position.Y);
-                }
-                
-                // HasText判定と表示設定（UIスレッド内で実行）
-                Console.WriteLine($"🔍 HasText判定: {HasText}");
-                
-                if (HasText)
-                {
-                    Console.WriteLine($"🔍 IsOverlayVisible設定前: {_isOverlayVisible}");
-                    IsOverlayVisible = true;
-                    Console.WriteLine($"🔍 IsOverlayVisible設定後: {_isOverlayVisible}");
-                }
-                
-                Console.WriteLine("✅ UIプロパティ設定完了");
-            });
-            
-            displayTimer.Stop();
-            Console.WriteLine($"⏱️ 翻訳結果表示処理完了: {displayTimer.ElapsedMilliseconds}ms");
-            Logger?.LogDebug("Translation result displayed: {Text}", TranslatedText);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"💥 TranslationResultOverlayViewModel.OnTranslationResultDisplay例外: {ex.GetType().Name}: {ex.Message}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   💥 TranslationResultOverlayViewModel.OnTranslationResultDisplay例外: {ex.GetType().Name}: {ex.Message}");
-            Console.WriteLine($"💥 スタックトレース: {ex.StackTrace}");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"   💥 スタックトレース: {ex.StackTrace}");
-            Logger?.LogError(ex, "Error displaying translation result");
-        }
-    }
+    // OnTranslationResultDisplay メソッドは削除 - マルチウィンドウオーバーレイシステムに移行
 
     private async Task OnTranslationDisplayVisibilityChanged(TranslationDisplayVisibilityChangedEvent visibilityEvent)
     {

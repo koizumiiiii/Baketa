@@ -14,6 +14,7 @@ using Baketa.UI.Utils;
 using ReactiveUI;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.Translation;
 
 namespace Baketa.UI.Services;
 
@@ -143,19 +144,9 @@ public class TranslationFlowEventProcessor :
                 _logger.LogError(ex, "翻訳状態変更イベント発行エラー");
             }
 
-            // 2. オーバーレイマネージャーを初期化
-            _logger.LogDebug("Initializing overlay manager");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 オーバーレイマネージャー初期化開始");
-            try
-            {
-                await _overlayManager.InitializeAsync().ConfigureAwait(false);
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー初期化完了");
-            }
-            catch (Exception ex)
-            {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ オーバーレイマネージャー初期化エラー: {ex.Message}");
-                _logger.LogError(ex, "オーバーレイマネージャー初期化エラー");
-            }
+            // 2. 古いオーバーレイマネージャーは使用しない（マルチウィンドウシステムに移行）
+            _logger.LogDebug("Skipping old overlay manager - using multi-window system");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⏭️ 古いオーバーレイシステムをスキップ - マルチウィンドウシステムを使用");
 
             // 3. 実際の翻訳処理を開始
             _logger.LogDebug("Starting translation process");
@@ -218,8 +209,7 @@ public class TranslationFlowEventProcessor :
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
-            // 2. オーバーレイを非表示
-            await _overlayManager.HideAsync().ConfigureAwait(false);
+            // 2. マルチウィンドウオーバーレイを非表示（古いオーバーレイは使用しない）
             await _multiWindowOverlayManager.HideAllOverlaysAsync().ConfigureAwait(false);
 
             // 3. 実際の翻訳停止処理
@@ -372,20 +362,29 @@ public class TranslationFlowEventProcessor :
                     _logger.LogInformation("Continuous translation result: '{Original}' -> '{Translated}' (confidence: {Confidence})", 
                         result.OriginalText, result.TranslatedText, result.Confidence);
                         
-                    var displayEvent = new TranslationResultDisplayEvent
+                    // 新しいマルチウィンドウオーバーレイシステムを使用
+                    // フォールバック: 簡易TextChunkを作成（実際の座標情報付きシステムは後で統合）
+                    var textChunk = new Baketa.Core.Abstractions.Translation.TextChunk
                     {
-                        OriginalText = result.OriginalText,
+                        ChunkId = result.GetHashCode(),
+                        TextResults = [],
+                        CombinedBounds = new System.Drawing.Rectangle(100, 200, 300, 50), // 仮の座標
+                        CombinedText = result.OriginalText,
                         TranslatedText = result.TranslatedText,
-                        DetectedPosition = new System.Drawing.Point(100, 200) // 固定位置
+                        SourceWindowHandle = targetWindow.Handle,
+                        DetectedLanguage = result.DetectedLanguage ?? "ja"
                     };
+                    
+                    var textChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk> { textChunk };
+                    DebugLogUtility.WriteLog($"🔍 フォールバックTextChunk作成: '{result.OriginalText}' -> '{result.TranslatedText}'");
 
-                    // 非同期でイベントを発行（Subscribeコールバック内なのでConfigureAwait不要）
+                    // 非同期でマルチウィンドウオーバーレイに表示
                     Task.Run(async () =>
                     {
                         try
                         {
-                            await _eventAggregator.PublishAsync(displayEvent).ConfigureAwait(false);
-                            DebugLogUtility.WriteLog("✅ 継続的翻訳結果表示イベント発行完了");
+                            await _multiWindowOverlayManager.DisplayTranslationResultsAsync(textChunks).ConfigureAwait(false);
+                            DebugLogUtility.WriteLog("✅ 継続的翻訳結果マルチウィンドウ表示完了");
                             
                             // 翻訳結果が表示されたため、進行中のOCRタイムアウト処理をキャンセル
                             try
@@ -397,12 +396,12 @@ public class TranslationFlowEventProcessor :
                                 DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル試行中にエラー: {cancelEx.Message}");
                             }
                             
-                            _logger.LogDebug("Continuous translation result display event published");
+                            _logger.LogDebug("Continuous translation result displayed via multi-window overlay");
                         }
                         catch (Exception eventEx)
                         {
-                            DebugLogUtility.WriteLog($"❌ 翻訳結果表示イベント発行エラー: {eventEx.Message}");
-                            _logger.LogError(eventEx, "Failed to publish continuous translation display event");
+                            DebugLogUtility.WriteLog($"❌ マルチウィンドウオーバーレイ表示エラー: {eventEx.Message}");
+                            _logger.LogError(eventEx, "Failed to display translation result via multi-window overlay");
                         }
                     });
                 });
@@ -433,24 +432,21 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayFallbackTranslationAsync()
     {
-        Console.WriteLine("💥 フォールバック翻訳結果を表示:");
-        Console.WriteLine("   📖 オリジナル: '(キャプチャ失敗)'");
-        Console.WriteLine("   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'");
-        Console.WriteLine("   📍 表示位置: (100, 200)");
+        Console.WriteLine("💥 フォールバック翻訳結果を表示（マルチウィンドウオーバーレイ使用）");
         
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フォールバック翻訳結果を表示:{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(キャプチャ失敗)'{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: 'ウィンドウキャプチャに失敗しました'{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
-        
-        var fallbackEvent = new TranslationResultDisplayEvent
+        // マルチウィンドウオーバーレイでエラーメッセージを表示
+        var fallbackChunk = new Baketa.Core.Abstractions.Translation.TextChunk
         {
-            OriginalText = "(キャプチャ失敗)",
+            ChunkId = "fallback".GetHashCode(),
+            TextResults = [],
+            CombinedBounds = new System.Drawing.Rectangle(100, 200, 300, 50),
+            CombinedText = "(キャプチャ失敗)",
             TranslatedText = "ウィンドウキャプチャに失敗しました",
-            DetectedPosition = new System.Drawing.Point(100, 200)
+            SourceWindowHandle = IntPtr.Zero,
+            DetectedLanguage = "ja"
         };
 
-        await _eventAggregator.PublishAsync(fallbackEvent).ConfigureAwait(false);
+        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([fallbackChunk]).ConfigureAwait(false);
 
         var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
         await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
@@ -461,24 +457,21 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayNoTextFoundMessageAsync()
     {
-        Console.WriteLine("🔍 テキスト未検出メッセージを表示:");
-        Console.WriteLine("   📖 オリジナル: '(テキスト未検出)'");
-        Console.WriteLine("   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'");
-        Console.WriteLine("   📍 表示位置: (100, 200)");
+        Console.WriteLine("🔍 テキスト未検出メッセージを表示（マルチウィンドウオーバーレイ使用）");
         
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 テキスト未検出メッセージを表示:{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📖 オリジナル: '(テキスト未検出)'{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🌐 翻訳結果: '翻訳対象のテキストが見つかりませんでした'{Environment.NewLine}");
-        // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 表示位置: (100, 200){Environment.NewLine}");
-        
-        var noTextEvent = new TranslationResultDisplayEvent
+        // マルチウィンドウオーバーレイでテキスト未検出メッセージを表示
+        var noTextChunk = new Baketa.Core.Abstractions.Translation.TextChunk
         {
-            OriginalText = "(テキスト未検出)",
+            ChunkId = "no-text".GetHashCode(),
+            TextResults = [],
+            CombinedBounds = new System.Drawing.Rectangle(100, 200, 400, 50),
+            CombinedText = "(テキスト未検出)",
             TranslatedText = "翻訳対象のテキストが見つかりませんでした",
-            DetectedPosition = new System.Drawing.Point(100, 200)
+            SourceWindowHandle = IntPtr.Zero,
+            DetectedLanguage = "ja"
         };
 
-        await _eventAggregator.PublishAsync(noTextEvent).ConfigureAwait(false);
+        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([noTextChunk]).ConfigureAwait(false);
 
         var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
         await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
@@ -489,14 +482,19 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayErrorMessageAsync(Exception exception)
     {
-        var errorEvent = new TranslationResultDisplayEvent
+        // マルチウィンドウオーバーレイでエラーメッセージを表示
+        var errorChunk = new Baketa.Core.Abstractions.Translation.TextChunk
         {
-            OriginalText = "(エラー)",
+            ChunkId = "error".GetHashCode(),
+            TextResults = [],
+            CombinedBounds = new System.Drawing.Rectangle(100, 200, 500, 50),
+            CombinedText = "(エラー)",
             TranslatedText = $"翻訳処理中にエラーが発生しました: {exception.Message}",
-            DetectedPosition = new System.Drawing.Point(100, 200)
+            SourceWindowHandle = IntPtr.Zero,
+            DetectedLanguage = "ja"
         };
 
-        await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([errorChunk]).ConfigureAwait(false);
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
