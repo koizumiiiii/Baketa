@@ -150,9 +150,7 @@ public static class UltraHighAccuracyPreprocessor
         for (int i = 0; i < results.Count; i++)
         {
             // コントラスト評価（標準偏差ベース）
-            var mean = new Scalar();
-            var stddev = new Scalar();
-            Cv2.MeanStdDev(results[i], out mean, out stddev);
+            Cv2.MeanStdDev(results[i], out var _, out var stddev);
             
             // エッジ密度評価
             using var edges = new Mat();

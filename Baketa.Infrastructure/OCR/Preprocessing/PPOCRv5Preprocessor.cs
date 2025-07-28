@@ -643,19 +643,14 @@ public static class PPOCRv5Preprocessor
 
         try
         {
-            switch (mode)
+            return mode switch
             {
-                case OptimizationMode.SmallTextEnhanced:
-                    return ProcessBrightSmallText(input);
-                case OptimizationMode.ContrastEnhanced:
-                    return ProcessBrightContrast(input);
-                case OptimizationMode.UltraHighAccuracy:
-                    return ProcessBrightUltraAccuracy(input);
-                case OptimizationMode.PerfectAccuracy:
-                    return ProcessBrightPerfectAccuracy(input);
-                default:
-                    return ProcessBrightStandard(input);
-            }
+                OptimizationMode.SmallTextEnhanced => ProcessBrightSmallText(input),
+                OptimizationMode.ContrastEnhanced => ProcessBrightContrast(input),
+                OptimizationMode.UltraHighAccuracy => ProcessBrightUltraAccuracy(input),
+                OptimizationMode.PerfectAccuracy => ProcessBrightPerfectAccuracy(input),
+                _ => ProcessBrightStandard(input)
+            };
         }
         catch (Exception)
         {
@@ -678,19 +673,14 @@ public static class PPOCRv5Preprocessor
 
         try
         {
-            switch (mode)
+            return mode switch
             {
-                case OptimizationMode.KanjiEnhanced:
-                    return ProcessDarkKanji(input);
-                case OptimizationMode.ContrastEnhanced:
-                    return ProcessDarkContrast(input);
-                case OptimizationMode.UltraHighAccuracy:
-                    return ProcessDarkUltraAccuracy(input);
-                case OptimizationMode.PerfectAccuracy:
-                    return ProcessDarkPerfectAccuracy(input);
-                default:
-                    return ProcessDarkStandard(input);
-            }
+                OptimizationMode.KanjiEnhanced => ProcessDarkKanji(input),
+                OptimizationMode.ContrastEnhanced => ProcessDarkContrast(input),
+                OptimizationMode.UltraHighAccuracy => ProcessDarkUltraAccuracy(input),
+                OptimizationMode.PerfectAccuracy => ProcessDarkPerfectAccuracy(input),
+                _ => ProcessDarkStandard(input)
+            };
         }
         catch (Exception)
         {
@@ -986,6 +976,117 @@ public static class PPOCRv5Preprocessor
     private static Mat ProcessDarkPerfectAccuracy(Mat input)
     {
         return UltraHighAccuracyPreprocessor.ProcessForPerfectAccuracy(input);
+    }
+
+    #endregion
+
+    #region フォント特化統合処理メソッド
+
+    /// <summary>
+    /// PP-OCRv5向けフォント特化適応的前処理（画像・フォント特性を統合分析）
+    /// </summary>
+    public static Mat ProcessForPPOCRv5AdaptiveWithFont(Mat input)
+    {
+        if (input == null || input.Empty())
+            return new Mat();
+
+        try
+        {
+            // 1. 画像特性分析
+            var imageCharacteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(input);
+            
+            // 2. フォント特性分析
+            var fontCharacteristics = FontSpecificPreprocessor.AnalyzeFontCharacteristics(input);
+            
+            Console.WriteLine($"🔍 統合適応的前処理 - 分析結果:");
+            Console.WriteLine($"   📸 画像タイプ: {imageCharacteristics.ImageType}");
+            Console.WriteLine($"   🔤 フォントタイプ: {fontCharacteristics.DetectedType}");
+            Console.WriteLine($"   💡 画像輝度: {imageCharacteristics.AverageBrightness:F1}");
+            Console.WriteLine($"   📏 ストローク幅: {fontCharacteristics.AverageStrokeWidth:F2}");
+            Console.WriteLine($"   🎯 画像推奨: {imageCharacteristics.RecommendedMode}");
+            Console.WriteLine($"   🎯 フォント推奨: {fontCharacteristics.RecommendedMode}");
+
+            // 3. 統合最適化戦略の決定
+            var integratedMode = DetermineIntegratedOptimizationMode(imageCharacteristics, fontCharacteristics);
+            Console.WriteLine($"   ⚡ 統合戦略: {integratedMode}");
+
+            // 4. フォント特化前処理の適用
+            Mat fontOptimized;
+            if (fontCharacteristics.DetectedType != FontSpecificPreprocessor.FontType.Standard)
+            {
+                Console.WriteLine($"🔤 フォント特化前処理適用: {fontCharacteristics.DetectedType}");
+                fontOptimized = FontSpecificPreprocessor.ProcessForFontType(input, fontCharacteristics.DetectedType);
+            }
+            else
+            {
+                fontOptimized = new Mat();
+                input.CopyTo(fontOptimized);
+            }
+
+            // 5. 画像特性に基づく後処理
+            Mat finalResult;
+            if (imageCharacteristics.IsBrightBackground)
+            {
+                Console.WriteLine("🌞 明るい画像向け後処理適用");
+                finalResult = ProcessBrightGameImage(fontOptimized, integratedMode);
+            }
+            else if (imageCharacteristics.IsDarkBackground)
+            {
+                Console.WriteLine("🌙 暗い画像向け後処理適用");
+                finalResult = ProcessDarkGameImage(fontOptimized, integratedMode);
+            }
+            else
+            {
+                Console.WriteLine("⚖️ 標準後処理適用");
+                finalResult = ProcessForPPOCRv5(fontOptimized, integratedMode);
+            }
+
+            fontOptimized.Dispose();
+            return finalResult;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ 統合適応的前処理エラー: {ex.Message}");
+            Console.WriteLine("🔄 基本適応的前処理にフォールバック");
+            return ProcessForPPOCRv5Adaptive(input);
+        }
+    }
+
+    /// <summary>
+    /// 画像特性とフォント特性を統合して最適な処理モードを決定
+    /// </summary>
+    private static OptimizationMode DetermineIntegratedOptimizationMode(
+        dynamic imageChar,
+        FontSpecificPreprocessor.FontCharacteristics fontChar)
+    {
+        // フォント特性を優先し、画像特性で調整
+        var baseMode = fontChar.RecommendedMode;
+        
+        // 小さなフォント + 暗い画像 = 超高精度必要
+        if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.SmallThin && imageChar.IsDarkBackground)
+        {
+            return OptimizationMode.PerfectAccuracy;
+        }
+        
+        // 装飾フォント + 低コントラスト = 完璧な前処理必要
+        if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Decorative && imageChar.IsLowContrast)
+        {
+            return OptimizationMode.PerfectAccuracy;
+        }
+        
+        // 標準フォント + 明るい画像 = 軽量処理で十分
+        if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Standard && imageChar.IsBrightBackground)
+        {
+            return OptimizationMode.ContrastEnhanced;
+        }
+        
+        // ピクセルフォント = 複合処理が効果的
+        if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Pixel)
+        {
+            return OptimizationMode.Combined;
+        }
+
+        return baseMode;
     }
 
     #endregion

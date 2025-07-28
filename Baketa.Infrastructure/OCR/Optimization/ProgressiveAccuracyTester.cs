@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Imaging;
 using System.Text.Json;
 using System.IO;
 using System.Text;
+using System.Globalization;
 
 namespace Baketa.Infrastructure.OCR.Optimization;
 
@@ -14,16 +15,10 @@ namespace Baketa.Infrastructure.OCR.Optimization;
 /// 段階的OCR精度改善テストシステム
 /// 各最適化手法の効果を個別に測定・比較
 /// </summary>
-public class ProgressiveAccuracyTester
+public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePath)
 {
-    private readonly IOcrEngine _ocrEngine;
-    private readonly string _testImagePath;
-
-    public ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePath)
-    {
-        _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
-        _testImagePath = testImagePath ?? throw new ArgumentNullException(nameof(testImagePath));
-    }
+    private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly string _testImagePath = testImagePath ?? throw new ArgumentNullException(nameof(testImagePath));
 
     /// <summary>
     /// 段階的精度改善テストを実行
@@ -124,7 +119,7 @@ public class ProgressiveAccuracyTester
             var avgConfidence = ocrResults.Count > 0 ? ocrResults.Average(r => r.Confidence) : 0.0;
             
             DebugLogUtility.WriteLog($"   ✅ {methodName} OCR完了: {textRegionCount}領域, 平均信頼度 {avgConfidence:F3}");
-            DebugLogUtility.WriteLog($"   📝 認識テキスト: {recognizedText.Substring(0, Math.Min(100, recognizedText.Length))}...");
+            DebugLogUtility.WriteLog($"   📝 認識テキスト: {recognizedText[..Math.Min(100, recognizedText.Length)]}...");
             
             return new ProcessingTestResult
             {
@@ -436,10 +431,10 @@ public class ProgressiveAccuracyTester
         var report = new StringBuilder();
         report.AppendLine("# OCR前処理最適化 段階的効果測定レポート");
         report.AppendLine();
-        report.AppendLine($"**テスト実行日時**: {results.TestStartTime:yyyy-MM-dd HH:mm:ss}");
-        report.AppendLine($"**テスト画像**: {Path.GetFileName(results.OriginalImagePath)}");
-        report.AppendLine($"**画像サイズ**: {results.ImageSize}");
-        report.AppendLine($"**総テスト時間**: {results.TotalTestDuration.TotalSeconds:F1}秒");
+        report.AppendLine(CultureInfo.CurrentCulture, $"**テスト実行日時**: {results.TestStartTime:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine(CultureInfo.CurrentCulture, $"**テスト画像**: {Path.GetFileName(results.OriginalImagePath)}");
+        report.AppendLine(CultureInfo.CurrentCulture, $"**画像サイズ**: {results.ImageSize}");
+        report.AppendLine(CultureInfo.CurrentCulture, $"**総テスト時間**: {results.TotalTestDuration.TotalSeconds:F1}秒");
         report.AppendLine();
 
         // 結果比較テーブル
@@ -461,11 +456,11 @@ public class ProgressiveAccuracyTester
         {
             if (result.Success)
             {
-                report.AppendLine($"| {result.MethodName} | {result.PreprocessingTimeMs}ms | {result.OcrTimeMs}ms | {result.TextRegionCount} | {result.AverageConfidence:F3} | {result.RecognizedText.Length} |");
+                report.AppendLine(CultureInfo.CurrentCulture, $"| {result.MethodName} | {result.PreprocessingTimeMs}ms | {result.OcrTimeMs}ms | {result.TextRegionCount} | {result.AverageConfidence:F3} | {result.RecognizedText.Length} |");
             }
             else
             {
-                report.AppendLine($"| {result.MethodName} | エラー | - | - | - | - |");
+                report.AppendLine(CultureInfo.CurrentCulture, $"| {result.MethodName} | エラー | - | - | - | - |");
             }
         }
 
@@ -477,7 +472,7 @@ public class ProgressiveAccuracyTester
         {
             if (result.Success)
             {
-                report.AppendLine($"### {result.MethodName}");
+                report.AppendLine(CultureInfo.CurrentCulture, $"### {result.MethodName}");
                 report.AppendLine("```");
                 report.AppendLine(result.RecognizedText);
                 report.AppendLine("```");
