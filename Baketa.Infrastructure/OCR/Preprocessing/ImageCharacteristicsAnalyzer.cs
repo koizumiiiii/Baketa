@@ -74,21 +74,21 @@ public static class ImageCharacteristicsAnalyzer
             var textDensity = CalculateTextDensity(gray);
             
             // 色相分析（明るい背景の特徴判定）
-            var colorAnalysis = AnalyzeColorCharacteristics(input);
+            var (HasBrightBackground, HasYellowish, HasBlueish) = AnalyzeColorCharacteristics(input);
             
             // 背景判定
-            var isBright = avgBrightness > BRIGHT_THRESHOLD || colorAnalysis.HasBrightBackground;
-            var isDark = avgBrightness < DARK_THRESHOLD && !colorAnalysis.HasBrightBackground;
+            var isBright = avgBrightness > BRIGHT_THRESHOLD || HasBrightBackground;
+            var isDark = avgBrightness < DARK_THRESHOLD && !HasBrightBackground;
             
             // コントラスト判定
             var isHighContrast = contrast > HIGH_CONTRAST_THRESHOLD;
             var isLowContrast = contrast < LOW_CONTRAST_THRESHOLD;
             
             // 推奨最適化モード決定
-            var recommendedMode = DetermineOptimalMode(avgBrightness, contrast, textDensity, isBright, isDark);
+            var recommendedMode = DetermineOptimalMode(contrast, textDensity, isBright, isDark);
             
             // 画像タイプ分類
-            var imageType = ClassifyImageType(avgBrightness, contrast, textDensity, isBright, isDark);
+            var imageType = ClassifyImageType(contrast, textDensity, isBright, isDark);
             
             return new ImageCharacteristics
             {
@@ -208,7 +208,7 @@ public static class ImageCharacteristicsAnalyzer
     /// <summary>
     /// 最適な最適化モードを決定
     /// </summary>
-    private static OptimizationMode DetermineOptimalMode(double brightness, double contrast, double textDensity, bool isBright, bool isDark)
+    private static OptimizationMode DetermineOptimalMode(double contrast, double textDensity, bool isBright, bool isDark)
     {
         // 明るい背景の場合
         if (isBright)
@@ -242,7 +242,7 @@ public static class ImageCharacteristicsAnalyzer
     /// <summary>
     /// 画像タイプ分類
     /// </summary>
-    private static string ClassifyImageType(double brightness, double contrast, double textDensity, bool isBright, bool isDark)
+    private static string ClassifyImageType(double contrast, double textDensity, bool isBright, bool isDark)
     {
         if (isBright && contrast > HIGH_CONTRAST_THRESHOLD)
             return "明るい高コントラスト（理想的）";

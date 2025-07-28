@@ -19,8 +19,8 @@ using System.Reflection;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging;
 using Baketa.Infrastructure.OCR.Preprocessing;
-using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Infrastructure.OCR.TextProcessing;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -1754,8 +1754,19 @@ public sealed class PaddleOcrEngine(
             {
                 // Regionsプロパティがない場合、結果全体からテキストを抽出
                 var textProperty = type.GetProperty("Text");
-                var text = textProperty?.GetValue(paddleResult) as string ?? string.Empty;
-                DebugLogUtility.WriteLog($"     📖 全体テキスト: '{text}'");
+                var originalText = textProperty?.GetValue(paddleResult) as string ?? string.Empty;
+                DebugLogUtility.WriteLog($"     📖 元全体テキスト: '{originalText}'");
+                
+                // 文字形状類似性に基づく誤認識修正を適用
+                var correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
+                var text = correctedText;
+                
+                if (originalText != correctedText)
+                {
+                    DebugLogUtility.WriteLog($"     🔧 修正後全体テキスト: '{correctedText}'");
+                    var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
+                    DebugLogUtility.WriteLog($"     📊 全体修正信頼度: {correctionConfidence:F2}");
+                }
                 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
@@ -1806,8 +1817,19 @@ public sealed class PaddleOcrEngine(
             
             // テキストプロパティを取得
             var textProperty = regionType.GetProperty("Text");
-            var text = textProperty?.GetValue(regionItem) as string ?? string.Empty;
-            DebugLogUtility.WriteLog($"         📖 テキスト: '{text}'");
+            var originalText = textProperty?.GetValue(regionItem) as string ?? string.Empty;
+            DebugLogUtility.WriteLog($"         📖 元テキスト: '{originalText}'");
+            
+            // 文字形状類似性に基づく誤認識修正を適用
+            var correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
+            var text = correctedText;
+            
+            if (originalText != correctedText)
+            {
+                DebugLogUtility.WriteLog($"         🔧 修正後テキスト: '{correctedText}'");
+                var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
+                DebugLogUtility.WriteLog($"         📊 修正信頼度: {correctionConfidence:F2}");
+            }
             
             if (!string.IsNullOrWhiteSpace(text))
             {
