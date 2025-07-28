@@ -1502,13 +1502,25 @@ public sealed class PaddleOcrEngine(
         var isV5Model = DetectIfV5Model();
         DebugLogUtility.WriteLog($"🔍 モデルバージョン検出: {(isV5Model ? "PP-OCRv5" : "V4以前")}");
         
-        // 2. バージョン別前処理を適用
+        // 2. バージョン別 + 適応的前処理を適用
         Mat gameProcessed;
         if (isV5Model)
         {
-            DebugLogUtility.WriteLog($"🚀 PP-OCRv5専用前処理開始");
-            gameProcessed = PPOCRv5Preprocessor.ProcessGameImageForV5(mat);
-            DebugLogUtility.WriteLog($"✅ PP-OCRv5専用前処理完了");
+            DebugLogUtility.WriteLog($"🚀 PP-OCRv5適応的前処理開始");
+            
+            // 画像特性を分析して適応的前処理を適用
+            var characteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(mat);
+            DebugLogUtility.WriteLog($"📊 画像分析結果:");
+            DebugLogUtility.WriteLog($"   💡 平均輝度: {characteristics.AverageBrightness:F1}");
+            DebugLogUtility.WriteLog($"   📊 コントラスト: {characteristics.Contrast:F1}");
+            DebugLogUtility.WriteLog($"   🔆 明るい背景: {characteristics.IsBrightBackground}");
+            DebugLogUtility.WriteLog($"   🌙 暗い背景: {characteristics.IsDarkBackground}");
+            DebugLogUtility.WriteLog($"   📝 テキスト密度: {characteristics.TextDensity:F4}");
+            DebugLogUtility.WriteLog($"   🎯 推奨モード: {characteristics.RecommendedMode}");
+            DebugLogUtility.WriteLog($"   🏷️ 画像タイプ: {characteristics.ImageType}");
+            
+            gameProcessed = PPOCRv5Preprocessor.ProcessForPPOCRv5Adaptive(mat);
+            DebugLogUtility.WriteLog($"✅ PP-OCRv5適応的前処理完了");
         }
         else
         {
