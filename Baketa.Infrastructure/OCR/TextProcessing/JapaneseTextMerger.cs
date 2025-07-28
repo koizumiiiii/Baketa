@@ -228,8 +228,9 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
             }
         }
         
-        // デフォルトでは結合する（日本語の文章は改行なしで続くことが多い）
-        return true;
+        // 保守的判定：不確実な場合は改行を保持
+        // 翻訳品質向上のため、確実でない結合は避ける
+        return false;
     }
     
     /// <summary>
