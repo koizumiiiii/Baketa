@@ -31,7 +31,7 @@ public class TranslationFlowEventProcessor :
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
-    private readonly TranslationResultOverlayManager _overlayManager;
+    private readonly IARTranslationOverlayManager _arOverlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
@@ -49,7 +49,7 @@ public class TranslationFlowEventProcessor :
     public TranslationFlowEventProcessor(
         ILogger<TranslationFlowEventProcessor> logger,
         IEventAggregator eventAggregator,
-        TranslationResultOverlayManager overlayManager,
+        IARTranslationOverlayManager arOverlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
@@ -57,7 +57,7 @@ public class TranslationFlowEventProcessor :
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _arOverlayManager = arOverlayManager ?? throw new ArgumentNullException(nameof(arOverlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -264,14 +264,14 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogDebug("翻訳表示切り替え要求を処理中: IsVisible={IsVisible}", eventData.IsVisible);
 
-            // オーバーレイの表示/非表示を切り替え
+            // AR風オーバーレイの表示/非表示を切り替え（新ARシステム使用）
             if (eventData.IsVisible)
             {
-                await _overlayManager.ShowAsync().ConfigureAwait(false);
+                await _arOverlayManager.InitializeAsync().ConfigureAwait(false);
             }
             else
             {
-                await _overlayManager.HideAsync().ConfigureAwait(false);
+                await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
             }
 
             // 表示状態変更イベントを発行
@@ -296,19 +296,9 @@ public class TranslationFlowEventProcessor :
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始");
             _logger.LogInformation("設定変更を適用中");
 
-            // オーバーレイ設定を更新
-            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ透明度設定: {eventData.OverlayOpacity}");
-            _overlayManager.SetOpacity(eventData.OverlayOpacity);
-            
-            // フォントサイズを設定から取得して設定
-            var fontSize = _settingsService.GetValue("UI:FontSize", eventData.FontSize);
-            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] フォントサイズ設定: {fontSize}");
-            _overlayManager.SetFontSize(fontSize);
-            
-            // フォントサイズに基づいて最大幅を調整
-            var maxWidth = fontSize * 25; // フォントサイズの25倍を最大幅とする
-            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] オーバーレイ最大幅設定: {maxWidth}");
-            _overlayManager.SetMaxWidth(maxWidth);
+            // AR風オーバーレイ設定は新ARシステムで自動管理（設定変更は直接適用される）
+            Console.WriteLine($"🔧 [TranslationFlowEventProcessor] AR風オーバーレイ設定更新（ARシステムで自動管理）");
+            Console.WriteLine($"   透明度: {eventData.OverlayOpacity}, フォントサイズ: {eventData.FontSize}");
 
             // 言語設定が変更された場合は翻訳エンジンを再設定
             if (eventData.SourceLanguage != null && eventData.TargetLanguage != null)
@@ -446,57 +436,6 @@ public class TranslationFlowEventProcessor :
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] メソッド終了");
     }
 
-    /// <summary>
-    /// フォールバック翻訳結果を表示（キャプチャ失敗時）
-    /// </summary>
-    private async Task DisplayFallbackTranslationAsync()
-    {
-        Console.WriteLine("💥 フォールバック翻訳結果を表示（マルチウィンドウオーバーレイ使用）");
-        
-        // マルチウィンドウオーバーレイでエラーメッセージを表示
-        var fallbackChunk = new Baketa.Core.Abstractions.Translation.TextChunk
-        {
-            ChunkId = "fallback".GetHashCode(),
-            TextResults = [],
-            CombinedBounds = new System.Drawing.Rectangle(100, 200, 300, 50),
-            CombinedText = "(キャプチャ失敗)",
-            TranslatedText = "ウィンドウキャプチャに失敗しました",
-            SourceWindowHandle = IntPtr.Zero,
-            DetectedLanguage = "ja"
-        };
-
-        // フォールバック表示は削除済み - ARシステムが自動で管理
-        DebugLogUtility.WriteLog("⚠️ フォールバック表示は削除済み - ARシステムで自動管理");
-
-        var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
-        await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// テキスト未検出メッセージを表示
-    /// </summary>
-    private async Task DisplayNoTextFoundMessageAsync()
-    {
-        Console.WriteLine("🔍 テキスト未検出メッセージを表示（マルチウィンドウオーバーレイ使用）");
-        
-        // マルチウィンドウオーバーレイでテキスト未検出メッセージを表示
-        var noTextChunk = new Baketa.Core.Abstractions.Translation.TextChunk
-        {
-            ChunkId = "no-text".GetHashCode(),
-            TextResults = [],
-            CombinedBounds = new System.Drawing.Rectangle(100, 200, 400, 50),
-            CombinedText = "(テキスト未検出)",
-            TranslatedText = "翻訳対象のテキストが見つかりませんでした",
-            SourceWindowHandle = IntPtr.Zero,
-            DetectedLanguage = "ja"
-        };
-
-        // テキスト未検出表示は削除済み - ARシステムが自動で管理
-        DebugLogUtility.WriteLog("⚠️ テキスト未検出表示は削除済み - ARシステムで自動管理");
-
-        var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
-        await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// エラーメッセージを表示

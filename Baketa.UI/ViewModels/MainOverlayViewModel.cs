@@ -2,6 +2,7 @@
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
@@ -37,12 +38,12 @@ public class MainOverlayViewModel : ViewModelBase
         IEventAggregator eventAggregator,
         ILogger<MainOverlayViewModel> logger,
         IWindowManagerAdapter windowManager,
-        TranslationResultOverlayManager overlayManager,
+        IARTranslationOverlayManager arOverlayManager,
         LoadingOverlayManager loadingManager)
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _arOverlayManager = arOverlayManager ?? throw new ArgumentNullException(nameof(arOverlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
@@ -61,7 +62,7 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     private readonly IWindowManagerAdapter _windowManager;
-    private readonly TranslationResultOverlayManager _overlayManager;
+    private readonly IARTranslationOverlayManager _arOverlayManager;
     private readonly LoadingOverlayManager _loadingManager;
 
     #region Properties
@@ -654,7 +655,7 @@ public class MainOverlayViewModel : ViewModelBase
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
             Logger?.LogDebug("🖼️ オーバーレイマネージャーを初期化");
             
-            await _overlayManager.InitializeAsync().ConfigureAwait(false);
+            await _arOverlayManager.InitializeAsync().ConfigureAwait(false);
             overlayInitTimer.Stop();
             DebugLogUtility.WriteLog($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
@@ -662,7 +663,7 @@ public class MainOverlayViewModel : ViewModelBase
             // オーバーレイマネージャーを表示状態に設定
             DebugLogUtility.WriteLog("🖼️ オーバーレイマネージャー表示状態設定開始");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー表示状態設定開始");
-            await _overlayManager.ShowAsync().ConfigureAwait(false);
+            // ARオーバーレイは自動で表示管理（表示はTextChunk個別処理）
             DebugLogUtility.WriteLog("✅ オーバーレイマネージャー表示状態設定完了");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー表示状態設定完了");
 
@@ -795,8 +796,8 @@ public class MainOverlayViewModel : ViewModelBase
         });
 
         // オーバーレイを非表示にしてリセット
-        await _overlayManager.HideAsync().ConfigureAwait(false);
-        await _overlayManager.ResetAsync().ConfigureAwait(false);
+        await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
+        await _arOverlayManager.ResetAsync().ConfigureAwait(false);
 
         var stopTranslationEvent = new StopTranslationRequestEvent();
         await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
@@ -833,13 +834,13 @@ public class MainOverlayViewModel : ViewModelBase
         {
             DebugLogUtility.WriteLog("👁️ オーバーレイ表示");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "👁️ オーバーレイ表示");
-            await _overlayManager.ShowAsync().ConfigureAwait(false);
+            // ARオーバーレイは自動で表示管理（表示はTextChunk個別処理）
         }
         else
         {
             DebugLogUtility.WriteLog("🙈 オーバーレイ非表示");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🙈 オーバーレイ非表示");
-            await _overlayManager.HideAsync().ConfigureAwait(false);
+            await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
         }
         
         var toggleEvent = new ToggleTranslationDisplayRequestEvent(IsTranslationResultVisible);
