@@ -1,4 +1,3 @@
-#pragma warning disable CS0618 // Type or member is obsolete
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,7 +32,6 @@ public class TranslationFlowEventProcessor :
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly TranslationResultOverlayManager _overlayManager;
-    private readonly IMultiWindowOverlayManager _multiWindowOverlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
@@ -52,7 +50,6 @@ public class TranslationFlowEventProcessor :
         ILogger<TranslationFlowEventProcessor> logger,
         IEventAggregator eventAggregator,
         TranslationResultOverlayManager overlayManager,
-        IMultiWindowOverlayManager multiWindowOverlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
@@ -61,7 +58,6 @@ public class TranslationFlowEventProcessor :
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
-        _multiWindowOverlayManager = multiWindowOverlayManager ?? throw new ArgumentNullException(nameof(multiWindowOverlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -220,8 +216,7 @@ public class TranslationFlowEventProcessor :
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
-            // 2. マルチウィンドウオーバーレイを非表示（古いオーバーレイは使用しない）
-            await _multiWindowOverlayManager.HideAllOverlaysAsync().ConfigureAwait(false);
+            // 2. 古いオーバーレイは削除済み（ARシステムが自動で管理）
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
@@ -416,32 +411,8 @@ public class TranslationFlowEventProcessor :
                     var textChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk> { textChunk };
                     DebugLogUtility.WriteLog($"🔍 フォールバックTextChunk作成: '{result.OriginalText}' -> '{result.TranslatedText}'");
 
-                    // 非同期でマルチウィンドウオーバーレイに表示
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await _multiWindowOverlayManager.DisplayTranslationResultsAsync(textChunks).ConfigureAwait(false);
-                            DebugLogUtility.WriteLog("✅ 継続的翻訳結果マルチウィンドウ表示完了");
-                            
-                            // 翻訳結果が表示されたため、進行中のOCRタイムアウト処理をキャンセル
-                            try
-                            {
-                                _ocrEngine.CancelCurrentOcrTimeout();
-                            }
-                            catch (Exception cancelEx)
-                            {
-                                DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル試行中にエラー: {cancelEx.Message}");
-                            }
-                            
-                            _logger.LogDebug("Continuous translation result displayed via multi-window overlay");
-                        }
-                        catch (Exception eventEx)
-                        {
-                            DebugLogUtility.WriteLog($"❌ マルチウィンドウオーバーレイ表示エラー: {eventEx.Message}");
-                            _logger.LogError(eventEx, "Failed to display translation result via multi-window overlay");
-                        }
-                    });
+                    // 従来モードではフォールバック表示は不要（座標ベース翻訳で既にAR表示済み）
+                    DebugLogUtility.WriteLog("⚠️ 従来モードのフォールバック表示は削除済み - ARシステムで表示済み");
                 });
 
             // 3. 継続的翻訳を開始
@@ -494,7 +465,8 @@ public class TranslationFlowEventProcessor :
             DetectedLanguage = "ja"
         };
 
-        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([fallbackChunk]).ConfigureAwait(false);
+        // フォールバック表示は削除済み - ARシステムが自動で管理
+        DebugLogUtility.WriteLog("⚠️ フォールバック表示は削除済み - ARシステムで自動管理");
 
         var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
         await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
@@ -519,7 +491,8 @@ public class TranslationFlowEventProcessor :
             DetectedLanguage = "ja"
         };
 
-        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([noTextChunk]).ConfigureAwait(false);
+        // テキスト未検出表示は削除済み - ARシステムが自動で管理
+        DebugLogUtility.WriteLog("⚠️ テキスト未検出表示は削除済み - ARシステムで自動管理");
 
         var completedEvent = new TranslationStatusChangedEvent(TranslationStatus.Completed);
         await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
@@ -542,7 +515,8 @@ public class TranslationFlowEventProcessor :
             DetectedLanguage = "ja"
         };
 
-        await _multiWindowOverlayManager.DisplayTranslationResultsAsync([errorChunk]).ConfigureAwait(false);
+        // エラー表示は削除済み - ARシステムが自動で管理
+        DebugLogUtility.WriteLog($"⚠️ エラー表示は削除済み - ARシステムで自動管理: {exception.Message}");
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
