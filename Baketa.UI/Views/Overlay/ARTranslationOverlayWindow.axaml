@@ -1,0 +1,42 @@
+<Window x:Class="Baketa.UI.Views.Overlay.ARTranslationOverlayWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Baketa.UI.Views.Overlay"
+        x:DataType="local:ARTranslationOverlayWindow"
+        WindowStartupLocation="Manual"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Window.Styles>
+        <Style Selector="Window">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </Window.Styles>
+
+    <!-- AR風翻訳表示：元テキストを完全に隠して翻訳テキストを重ね表示 -->
+    <Border Name="AROverlayBorder"
+            Background="White"
+            BorderThickness="0"
+            CornerRadius="0"
+            Padding="2">
+
+        <!-- 翻訳テキスト（AR風表示） -->
+        <TextBlock Name="ARTranslatedTextBlock"
+                 Text=""
+                 FontSize="14"
+                 FontFamily="Segoe UI, Meiryo UI, Yu Gothic UI"
+                 Foreground="Black"
+                 TextWrapping="NoWrap"
+                 TextAlignment="Left"
+                 VerticalAlignment="Center"
+                 HorizontalAlignment="Left"
+                 TextTrimming="CharacterEllipsis"/>
+    </Border>
+</Window>

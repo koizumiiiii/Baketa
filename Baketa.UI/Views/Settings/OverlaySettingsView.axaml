@@ -17,8 +17,13 @@
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
                 <TextBlock Text="オーバーレイ設定" FontSize="20" FontWeight="SemiBold"/>
-                <TextBlock Text="翻訳結果をゲーム画面上に表示するオーバーレイの設定" 
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="翻訳結果をゲーム画面上に表示するオーバーレイの設定" 
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    <TextBlock Text="⭐ AR風表示：元テキストと同じ位置に翻訳結果を重ね表示し、Google翻訳カメラのような体験を提供します" 
+                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                               FontWeight="Medium"/>
+                </StackPanel>
             </StackPanel>
 
             <!-- 基本設定 -->
@@ -32,8 +37,10 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
+                <!-- AR風UIでは自動調整されるため非表示化 -->
                 <controls:SettingsItem Title="透明度"
-                                        Description="オーバーレイの透明度（高いほど不透明）">
+                                        Description="オーバーレイの透明度（高いほど不透明）"
+                                        IsVisible="False">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Slider Value="{Binding Opacity}" 
@@ -45,8 +52,10 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
+                <!-- AR風UIでは自動計算されるため非表示化 -->
                 <controls:SettingsItem Title="フォントサイズ"
-                                        Description="オーバーレイに表示されるテキストのフォントサイズ">
+                                        Description="オーバーレイに表示されるテキストのフォントサイズ"
+                                        IsVisible="False">
                     <controls:SettingsItem.SettingContent>
                         <ComboBox ItemsSource="{Binding FontSizeOptions}"
                                   SelectedItem="{Binding FontSize}"
@@ -54,8 +63,10 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
+                <!-- AR風UIでは自動計算されるため非表示化 -->
                 <controls:SettingsItem Title="背景色"
-                                        Description="オーバーレイの背景色">
+                                        Description="オーバーレイの背景色"
+                                        IsVisible="False">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Border Background="{Binding BackgroundColorHex}" 
@@ -66,8 +77,10 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
+                <!-- AR風UIでは自動計算されるため非表示化 -->
                 <controls:SettingsItem Title="テキスト色"
-                                        Description="オーバーレイのテキスト色">
+                                        Description="オーバーレイのテキスト色"
+                                        IsVisible="False">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Border Background="{Binding TextColorHex}" 
@@ -198,8 +211,8 @@
                 </controls:SettingsItem>
             </StackPanel>
 
-            <!-- 外観設定 -->
-            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
+            <!-- 外観設定 - AR風UIでは境界線は使用されないため非表示化 -->
+            <StackPanel Spacing="12" IsVisible="False">
                 <TextBlock Text="外観設定" FontSize="16" FontWeight="SemiBold"/>
                 
                 <controls:SettingsItem Title="境界線表示"

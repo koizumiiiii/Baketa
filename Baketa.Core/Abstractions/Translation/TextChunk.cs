@@ -84,17 +84,17 @@ public sealed class TextChunk
         // 1. テキスト領域の直下（5px余白）
         var positions = new[]
         {
-            new { X = CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 1 },
+            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 1 },
             // 2. テキスト領域の直上（5px余白）
-            new { X = CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 2 },
+            new { CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 2 },
             // 3. テキスト領域の右側（5px余白）
-            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Y, Priority = 3 },
+            new { X = CombinedBounds.Right + 5, CombinedBounds.Y, Priority = 3 },
             // 4. テキスト領域の左側（5px余白）
-            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Y, Priority = 4 },
+            new { X = CombinedBounds.X - overlaySize.Width - 5, CombinedBounds.Y, Priority = 4 },
             // 5. テキスト領域の右下角
             new { X = CombinedBounds.Right - overlaySize.Width, Y = CombinedBounds.Bottom + 5, Priority = 5 },
             // 6. テキスト領域の左下角
-            new { X = CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 6 }
+            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 6 }
         };
 
         // 各候補位置を優先順位順で試行
@@ -136,4 +136,67 @@ public sealed class TextChunk
         var results = string.Join("; ", TextResults.Select(r => r.ToLogString()));
         return $"{ToLogString()} | Details: [{results}]";
     }
+    
+    /// <summary>
+    /// AR表示用の正確な位置を取得
+    /// 元テキストと同じ位置に翻訳テキストを重ね表示するために使用
+    /// </summary>
+    public Point GetARPosition() => new(CombinedBounds.X, CombinedBounds.Y);
+    
+    /// <summary>
+    /// AR表示用のサイズを取得
+    /// 元テキストと同じサイズで翻訳テキストを表示するために使用
+    /// </summary>
+    public Size GetARSize() => new(CombinedBounds.Width, CombinedBounds.Height);
+    
+    /// <summary>
+    /// AR表示用の最適フォントサイズを計算
+    /// OCR領域の高さに基づいて自動的にフォントサイズを決定
+    /// </summary>
+    public int CalculateARFontSize()
+    {
+        // OCR領域の高さの45%をベースフォントサイズとして計算（さらに保守的に）
+        var baseFontSize = (int)(CombinedBounds.Height * 0.45);
+        
+        // 翻訳テキストの長さを考慮して調整
+        if (!string.IsNullOrEmpty(TranslatedText))
+        {
+            // テキストが領域幅に収まるように調整
+            // 日本語文字の幅をより精密に計算
+            var estimatedCharWidth = baseFontSize * 0.6; // 日本語は約半角～全角幅
+            var requiredWidth = TranslatedText.Length * estimatedCharWidth;
+            
+            if (requiredWidth > CombinedBounds.Width)
+            {
+                // テキストが領域幅を超える場合は縮小
+                var scaleFactor = CombinedBounds.Width / requiredWidth;
+                baseFontSize = (int)(baseFontSize * scaleFactor * 0.8); // 80%でさらに余裕を持たせる
+            }
+        }
+        
+        // 最小8px、最大32pxの範囲に制限（さらに小さく）
+        return Math.Max(8, Math.Min(32, baseFontSize));
+    }
+    
+    /// <summary>
+    /// AR表示が可能かどうかを判定
+    /// 有効な座標情報と翻訳テキストが存在するかチェック
+    /// </summary>
+    public bool CanShowAR()
+    {
+        return CombinedBounds.Width > 0 && 
+               CombinedBounds.Height > 0 && 
+               !string.IsNullOrEmpty(TranslatedText) &&
+               CombinedBounds.Width >= 10 &&  // 最小表示幅
+               CombinedBounds.Height >= 8;    // 最小表示高さ
+    }
+    
+    /// <summary>
+    /// AR表示用のログ情報を取得
+    /// デバッグ・トラブルシューティング用
+    /// </summary>
+    public string ToARLogString() => 
+        $"AR Display - ChunkId: {ChunkId} | Position: ({GetARPosition().X},{GetARPosition().Y}) | " +
+        $"Size: ({GetARSize().Width},{GetARSize().Height}) | FontSize: {CalculateARFontSize()} | " +
+        $"CanShow: {CanShowAR()} | TranslatedText: '{TranslatedText}'";
 }

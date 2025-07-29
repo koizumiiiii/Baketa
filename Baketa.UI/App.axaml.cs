@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Type or member is obsolete
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -199,9 +200,41 @@ internal sealed partial class App : Avalonia.Application
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
                     }
                     
-                    // TranslationResultOverlayManagerを初期化（遅延初期化に変更）
+                    // AR風翻訳オーバーレイマネージャーを初期化（優先）
+                    Console.WriteLine("🎯 ARTranslationOverlayManager初期化設定");
+                    try
+                    {
+                        var arOverlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.IARTranslationOverlayManager>();
+                        if (arOverlayManager != null)
+                        {
+                            // UIスレッドデッドロックを避けるため、遅延初期化に変更
+                            Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    Console.WriteLine("🎯 ARTranslationOverlayManager非同期初期化開始");
+                                    await arOverlayManager.InitializeAsync().ConfigureAwait(false);
+                                    Console.WriteLine("✅ ARTranslationOverlayManager初期化完了");
+                                }
+                                catch (Exception asyncEx)
+                                {
+                                    Console.WriteLine($"⚠️ ARTranslationOverlayManager非同期初期化失敗: {asyncEx.Message}");
+                                }
+                            });
+                            Console.WriteLine("✅ ARTranslationOverlayManager遅延初期化設定完了");
+                        }
+                        else
+                        {
+                            Console.WriteLine("⚠️ ARTranslationOverlayManagerが見つかりません");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ ARTranslationOverlayManager初期化設定エラー: {ex.Message}");
+                    }
+
+                    // 従来のTranslationResultOverlayManagerも併用（フォールバック用）
                     Console.WriteLine("🖥️ TranslationResultOverlayManager遅延初期化設定");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayManager遅延初期化設定");
                     try
                     {
                         var overlayManager = serviceProvider.GetRequiredService<Baketa.UI.Services.TranslationResultOverlayManager>();
@@ -212,20 +245,16 @@ internal sealed partial class App : Avalonia.Application
                             try
                             {
                                 Console.WriteLine("🖥️ TranslationResultOverlayManager非同期初期化開始");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayManager非同期初期化開始");
                                 await overlayManager.InitializeAsync().ConfigureAwait(false);
                                 Console.WriteLine("✅ TranslationResultOverlayManager初期化完了");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayManager初期化完了");
                             }
                             catch (Exception asyncEx)
                             {
                                 Console.WriteLine($"⚠️ TranslationResultOverlayManager非同期初期化失敗: {asyncEx.Message}");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ TranslationResultOverlayManager非同期初期化失敗: {asyncEx.Message}");
                             }
                         });
                         
                         Console.WriteLine("✅ TranslationResultOverlayManager遅延初期化設定完了");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayManager遅延初期化設定完了");
                     }
                     catch (Exception overlayEx)
                     {

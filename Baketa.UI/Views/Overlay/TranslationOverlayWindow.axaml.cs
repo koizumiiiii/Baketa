@@ -1,3 +1,4 @@
+#pragma warning disable AVLN5001 // AR風翻訳UIへの移行中のため廃止予定警告を抑制
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,9 @@ namespace Baketa.UI.Views.Overlay;
 /// <summary>
 /// 翻訳結果表示用オーバーレイウィンドウ
 /// Phase 2-C: 座標ベース翻訳表示のための個別ウィンドウコンポーネント
+/// AR風UIに置き換えられたため非推奨
 /// </summary>
+[Obsolete("AR風翻訳UIに置き換えられました。ARTranslationOverlayWindowを使用してください。")]
 public partial class TranslationOverlayWindow : Window, IDisposable
 {
     // データプロパティ

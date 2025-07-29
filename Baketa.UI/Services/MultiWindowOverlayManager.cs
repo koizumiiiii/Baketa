@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Type or member is obsolete
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -18,7 +19,9 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// 複数ウィンドウオーバーレイマネージャーの実装
 /// Phase 2-C: 座標ベース翻訳表示のための複数ウィンドウ管理システム
+/// AR風UIに置き換えられたため非推奨
 /// </summary>
+[Obsolete("AR風翻訳UIに置き換えられました。ARTranslationOverlayManagerを使用してください。")]
 public sealed class MultiWindowOverlayManager : IMultiWindowOverlayManager, IDisposable
 {
     private readonly ILogger<MultiWindowOverlayManager>? _logger;
