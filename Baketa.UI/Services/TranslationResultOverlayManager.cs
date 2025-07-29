@@ -13,7 +13,9 @@ namespace Baketa.UI.Services;
 
 /// <summary>
 /// 翻訳結果オーバーレイの管理サービス
+/// AR風UIに置き換えられたため非推奨
 /// </summary>
+[Obsolete("AR風翻訳UIに置き換えられました。ARTranslationOverlayManagerを使用してください。")]
 public class TranslationResultOverlayManager(
     IEventAggregator eventAggregator,
     ISettingsService settingsService,
@@ -247,9 +249,9 @@ public class TranslationResultOverlayManager(
     }
 
     /// <summary>
-    /// 翻訳結果を表示（非推奨 - マルチウィンドウオーバーレイシステムに移行）
+    /// 翻訳結果を表示（非推奨 - AR風UIに移行）
     /// </summary>
-    [Obsolete("Use MultiWindowOverlayManager instead")]
+    [Obsolete("AR風翻訳UIに置き換えられました。ARTranslationOverlayManagerを使用してください。")]
     public async Task DisplayTranslationResultAsync(string originalText, string translatedText, System.Drawing.Point? position = null)
     {
         // このメソッドは使用されなくなりました - マルチウィンドウオーバーレイシステムを使用してください

@@ -864,11 +864,23 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             DebugLogUtility.WriteLog($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
             
             // 座標ベース翻訳システムが利用可能な場合は座標ベース処理を実行
-            DebugLogUtility.WriteLog($"🎯 座標ベース翻訳条件評価結果: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true && _targetWindowHandle.HasValue && image is IAdvancedImage}");
+            var coordinateAvailable = _coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true;
+            var hasWindowHandle = _targetWindowHandle.HasValue;
+            var isAdvancedImage = image is IAdvancedImage;
+            var overallCondition = coordinateAvailable && hasWindowHandle && isAdvancedImage;
             
-            if (_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true && 
-                _targetWindowHandle.HasValue && 
-                image is IAdvancedImage advancedImage)
+            DebugLogUtility.WriteLog($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
+            DebugLogUtility.WriteLog($"   📋 詳細条件:");
+            DebugLogUtility.WriteLog($"     📦 coordinateAvailable: {coordinateAvailable}");
+            DebugLogUtility.WriteLog($"     🪟 hasWindowHandle: {hasWindowHandle}");
+            DebugLogUtility.WriteLog($"     🖼️ isAdvancedImage: {isAdvancedImage}");
+            
+            Console.WriteLine($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
+            Console.WriteLine($"   📦 coordinateAvailable: {coordinateAvailable}");
+            Console.WriteLine($"   🪟 hasWindowHandle: {hasWindowHandle}");
+            Console.WriteLine($"   🖼️ isAdvancedImage: {isAdvancedImage}");
+            
+            if (overallCondition && image is IAdvancedImage advancedImage)
             {
                 DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
                 _logger?.LogDebug("🎯 座標ベース翻訳処理を実行: ID={TranslationId}", translationId);
@@ -877,9 +889,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
                     DebugLogUtility.WriteLog($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
-                    await _coordinateBasedTranslation.ProcessWithCoordinateBasedTranslationAsync(
+                    await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
                         advancedImage, 
-                        _targetWindowHandle.Value, 
+                        _targetWindowHandle!.Value, 
                         cancellationToken)
                         .ConfigureAwait(false);
                     

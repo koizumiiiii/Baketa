@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Translation;
@@ -22,6 +23,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private readonly IBatchOcrProcessor _batchOcrProcessor;
     private readonly IMultiWindowOverlayManager _overlayManager;
     private readonly ITranslationService _translationService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
     private bool _disposed;
 
@@ -29,11 +31,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         IBatchOcrProcessor batchOcrProcessor,
         IMultiWindowOverlayManager overlayManager,
         ITranslationService translationService,
+        IServiceProvider serviceProvider,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger;
         
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized");
@@ -66,10 +70,34 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             DebugLogUtility.WriteLog($"✅ バッチOCR完了 - チャンク数: {textChunks.Count}");
             
             // チャンクの詳細情報をデバッグ出力
+            DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
+            DebugLogUtility.WriteLog($"   入力画像サイズ: {image.Width}x{image.Height}");
+            DebugLogUtility.WriteLog($"   検出されたテキストチャンク数: {textChunks.Count}");
+            
             for (int i = 0; i < textChunks.Count; i++)
             {
                 var chunk = textChunks[i];
-                System.Console.WriteLine($"📍 チャンク[{i}] ID={chunk.ChunkId}, 位置=({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y}), サイズ=({chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height}), テキスト='{chunk.CombinedText}'");
+                DebugLogUtility.WriteLog($"\n📍 チャンク[{i}] ID={chunk.ChunkId}");
+                DebugLogUtility.WriteLog($"   OCR生座標: X={chunk.CombinedBounds.X}, Y={chunk.CombinedBounds.Y}");
+                DebugLogUtility.WriteLog($"   OCR生サイズ: W={chunk.CombinedBounds.Width}, H={chunk.CombinedBounds.Height}");
+                DebugLogUtility.WriteLog($"   元テキスト: '{chunk.CombinedText}'");
+                DebugLogUtility.WriteLog($"   翻訳テキスト: '{chunk.TranslatedText}'");
+                
+                // 座標変換情報
+                var arPos = chunk.GetARPosition();
+                var arSize = chunk.GetARSize();
+                DebugLogUtility.WriteLog($"   AR位置: ({arPos.X},{arPos.Y}) [元座標と同じ]");
+                DebugLogUtility.WriteLog($"   ARサイズ: ({arSize.Width},{arSize.Height}) [元サイズと同じ]");
+                DebugLogUtility.WriteLog($"   計算フォントサイズ: {chunk.CalculateARFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
+                DebugLogUtility.WriteLog($"   AR表示可能: {chunk.CanShowAR()}");
+                
+                // TextResultsの詳細情報
+                DebugLogUtility.WriteLog($"   構成TextResults数: {chunk.TextResults.Count}");
+                for (int j = 0; j < Math.Min(chunk.TextResults.Count, 3); j++) // 最初の3個だけ表示
+                {
+                    var result = chunk.TextResults[j];
+                    DebugLogUtility.WriteLog($"     [{j}] テキスト: '{result.Text}', 位置: ({result.BoundingBox.X},{result.BoundingBox.Y}), サイズ: ({result.BoundingBox.Width}x{result.BoundingBox.Height})");
+                }
             }
 
             if (textChunks.Count == 0)
@@ -129,26 +157,63 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
                 textChunks.Count, textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText) && !c.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal)));
 
-            // 複数ウィンドウオーバーレイで表示
-            _logger?.LogDebug("🖼️ 複数ウィンドウオーバーレイ表示開始");
-            DebugLogUtility.WriteLog("🖼️ 複数ウィンドウオーバーレイ表示開始");
-            
-            try
+            // AR風オーバーレイ表示を優先的に使用
+            var arOverlayManager = _serviceProvider.GetService<IARTranslationOverlayManager>();
+            if (arOverlayManager != null)
             {
-                DebugLogUtility.WriteLog($"🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直前 - _overlayManager null?: {_overlayManager == null}");
-                if (_overlayManager != null)
+                _logger?.LogInformation("🎯 AR風オーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
+                DebugLogUtility.WriteLog($"🎯 AR風オーバーレイ表示開始 - チャンク数: {textChunks.Count}");
+                
+                try
                 {
-                    await _overlayManager.DisplayTranslationResultsAsync(textChunks, cancellationToken)
-                        .ConfigureAwait(false);
+                    // AR翻訳オーバーレイマネージャーを初期化
+                    await arOverlayManager.InitializeAsync().ConfigureAwait(false);
+                    
+                    // 各テキストチャンクをAR風で表示
+                    DebugLogUtility.WriteLog($"\n🎭 AR表示開始処理:");
+                    foreach (var chunk in textChunks)
+                    {
+                        DebugLogUtility.WriteLog($"\n🔸 チャンク {chunk.ChunkId} AR表示判定:");
+                        DebugLogUtility.WriteLog($"   AR表示可能: {chunk.CanShowAR()}");
+                        DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
+                        DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
+                        
+                        if (chunk.CanShowAR())
+                        {
+                            _logger?.LogDebug("🎭 AR表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
+                                chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
+                                chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
+                            
+                            await arOverlayManager.ShowAROverlayAsync(chunk, cancellationToken)
+                                .ConfigureAwait(false);
+                            
+                            DebugLogUtility.WriteLog($"   ✅ AR表示完了 - チャンク {chunk.ChunkId}");
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("⚠️ AR表示条件を満たしていません - {ARLog}", chunk.ToARLogString());
+                            DebugLogUtility.WriteLog($"   ❌ AR表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                        }
+                    }
+                    
+                    _logger?.LogInformation("✅ AR風オーバーレイ表示完了 - アクティブオーバーレイ数: {Count}", 
+                        arOverlayManager.ActiveOverlayCount);
                 }
-                DebugLogUtility.WriteLog("🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直後");
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "❌ AR風オーバーレイ表示でエラーが発生");
+                    DebugLogUtility.WriteLog($"❌❌❌ AR風オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+                    
+                    // AR風UIでエラーが発生した場合は従来のオーバーレイにフォールバック
+                    _logger?.LogWarning("🔄 従来のオーバーレイ表示にフォールバック");
+                    await FallbackToTraditionalOverlay(textChunks, cancellationToken).ConfigureAwait(false);
+                }
             }
-            catch (Exception ex)
+            else
             {
-                _logger?.LogError(ex, "❌ DisplayTranslationResultsAsync呼び出しでエラー");
-                DebugLogUtility.WriteLog($"❌❌❌ DisplayTranslationResultsAsync呼び出しエラー: {ex.GetType().Name} - {ex.Message}");
-                DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
-                throw;
+                // AR風オーバーレイが利用できない場合は従来のオーバーレイを使用
+                _logger?.LogWarning("⚠️ AR風オーバーレイが利用できません。従来のオーバーレイを使用");
+                await FallbackToTraditionalOverlay(textChunks, cancellationToken).ConfigureAwait(false);
             }
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
@@ -162,6 +227,35 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     }
 
     /// <summary>
+    /// 従来のオーバーレイ表示にフォールバック
+    /// </summary>
+    private async Task FallbackToTraditionalOverlay(
+        IReadOnlyList<TextChunk> textChunks, 
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger?.LogDebug("🖼️ 従来のオーバーレイ表示開始");
+            DebugLogUtility.WriteLog("🖼️ 従来のオーバーレイ表示開始");
+            
+            DebugLogUtility.WriteLog($"🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直前 - _overlayManager null?: {_overlayManager == null}");
+            if (_overlayManager != null)
+            {
+                await _overlayManager.DisplayTranslationResultsAsync(textChunks, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            DebugLogUtility.WriteLog("🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直後");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ 従来のオーバーレイ表示でもエラーが発生");
+            DebugLogUtility.WriteLog($"❌❌❌ 従来のオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+            DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// 座標ベース翻訳システムが利用可能かどうかを確認
     /// </summary>
     public bool IsCoordinateBasedTranslationAvailable()
@@ -170,7 +264,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         
         try
         {
-            var available = _batchOcrProcessor != null && _overlayManager != null;
+            var batchOcrAvailable = _batchOcrProcessor != null;
+            var overlayAvailable = _overlayManager != null;
+            var available = batchOcrAvailable && overlayAvailable;
+            
+            DebugLogUtility.WriteLog($"🔍 [CoordinateBasedTranslationService] 座標ベース翻訳システム可用性チェック:");
+            DebugLogUtility.WriteLog($"   📦 BatchOcrProcessor: {batchOcrAvailable}");
+            DebugLogUtility.WriteLog($"   🖼️ OverlayManager: {overlayAvailable}");
+            DebugLogUtility.WriteLog($"   ✅ 総合判定: {available}");
+            
             _logger?.LogDebug("🔍 座標ベース翻訳システム可用性チェック: {Available}", available);
             return available;
         }

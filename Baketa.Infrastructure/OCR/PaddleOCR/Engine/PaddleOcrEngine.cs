@@ -1770,6 +1770,10 @@ public sealed class PaddleOcrEngine(
                 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
+                    // ⚠️ 警告: この箇所はRegionsプロパティがない場合のフォールバック処理
+                    // 実際の座標が利用できないため、推定座標を使用
+                    DebugLogUtility.WriteLog($"     ⚠️ Regionsプロパティなし - フォールバック処理で推定座標を使用");
+                    
                     // テキストを改行で分割して個別のリージョンとして処理
                     var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     for (int i = 0; i < lines.Length; i++)
@@ -1777,8 +1781,8 @@ public sealed class PaddleOcrEngine(
                         var line = lines[i].Trim();
                         if (!string.IsNullOrWhiteSpace(line))
                         {
-                            // 簡単な座標計算（縦に並べる）
-                            var boundingBox = new Rectangle(10, 10 + i * 25, 200, 20);
+                            // 推定座標（縦に並べる）- 実際の座標が利用できない場合のみ
+                            var boundingBox = new Rectangle(50, 50 + i * 30, 300, 25);
                             
                             textRegions.Add(new OcrTextRegion(
                                 line,
@@ -1787,10 +1791,10 @@ public sealed class PaddleOcrEngine(
                             ));
                             
                             // 詳細なOCR結果ログ出力
-                            DebugLogUtility.WriteLog($"     ✅ テキストリージョン追加: '{line}' at ({boundingBox.X}, {boundingBox.Y})");
-                            Console.WriteLine($"🔍 [OCR検出] テキスト: '{line}'");
-                            Console.WriteLine($"📍 [OCR位置] X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
-                            _logger?.LogInformation("OCR検出結果: テキスト='{Text}', 位置=({X},{Y},{Width},{Height})", 
+                            DebugLogUtility.WriteLog($"     ⚠️ フォールバックテキストリージョン追加: '{line}' at 推定座標({boundingBox.X}, {boundingBox.Y})");
+                            Console.WriteLine($"🔍 [OCR検出-フォールバック] テキスト: '{line}'");
+                            Console.WriteLine($"📍 [OCR位置-推定] X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                            _logger?.LogInformation("OCR検出結果(フォールバック): テキスト='{Text}', 推定位置=({X},{Y},{Width},{Height})", 
                                 line, boundingBox.X, boundingBox.Y, boundingBox.Width, boundingBox.Height);
                         }
                     }
@@ -1845,8 +1849,8 @@ public sealed class PaddleOcrEngine(
                     else if (confValue is double d) confidence = d;
                 }
                 
-                // 境界ボックスの取得を試行
-                var boundingBox = new Rectangle(10, 10 + index * 25, 200, 20); // デフォルト値
+                // 境界ボックスの取得を試行 - RotatedRect対応版
+                var boundingBox = Rectangle.Empty; // 初期値を空に設定
                 var regionProperty = regionType.GetProperty("Region") ?? 
                                    regionType.GetProperty("Rect") ?? 
                                    regionType.GetProperty("Box");
@@ -1856,8 +1860,76 @@ public sealed class PaddleOcrEngine(
                     var regionValue = regionProperty.GetValue(regionItem);
                     DebugLogUtility.WriteLog($"         📍 リージョン値: {regionValue} (型: {regionValue?.GetType().Name ?? "null"})");
                     
-                    // 座標配列として処理
-                    if (regionValue is Array pointArray && pointArray.Length >= 4)
+                    // RotatedRect型として処理
+                    DebugLogUtility.WriteLog($"         🔍 タイプチェック: regionValue != null = {regionValue != null}, 型名 = {regionValue?.GetType().Name ?? "null"}");
+                    if (regionValue != null && regionValue.GetType().Name == "RotatedRect")
+                    {
+                        DebugLogUtility.WriteLog($"         🎯 RotatedRect型を検出、変換開始");
+                        try
+                        {
+                            var regionValueType = regionValue.GetType();
+                            
+                            // 利用可能なすべてのフィールドをデバッグ出力
+                            var allFields = regionValueType.GetFields();
+                            DebugLogUtility.WriteLog($"         🔍 RotatedRectの全フィールド: {string.Join(", ", allFields.Select(f => f.Name))}");
+                            
+                            var centerField = regionValueType.GetField("Center");
+                            var sizeField = regionValueType.GetField("Size");
+                            var angleField = regionValueType.GetField("Angle");
+                            
+                            DebugLogUtility.WriteLog($"         🔍 フィールドチェック: Center={centerField != null}, Size={sizeField != null}, Angle={angleField != null}");
+                            
+                            if (centerField != null && sizeField != null)
+                            {
+                                var center = centerField.GetValue(regionValue);
+                                var size = sizeField.GetValue(regionValue);
+                                
+                                DebugLogUtility.WriteLog($"         🔍 Center・ Size取得: center={center != null}, size={size != null}");
+                                
+                                // Centerから座標を取得
+                                var centerType = center?.GetType();
+                                var centerX = Convert.ToSingle(centerType?.GetField("X")?.GetValue(center) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                                var centerY = Convert.ToSingle(centerType?.GetField("Y")?.GetValue(center) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                                
+                                // Sizeから幅・高さを取得
+                                var sizeType = size?.GetType();
+                                var width = Convert.ToSingle(sizeType?.GetField("Width")?.GetValue(size) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                                var height = Convert.ToSingle(sizeType?.GetField("Height")?.GetValue(size) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                                
+                                // Angleを取得
+                                var angle = Convert.ToSingle(angleField?.GetValue(regionValue) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                                
+                                DebugLogUtility.WriteLog($"         🔍 座標取得結果: centerX={centerX:F1}, centerY={centerY:F1}, width={width:F1}, height={height:F1}, angle={angle:F1}");
+                                
+                                // 回転を考慮したバウンディングボックス計算
+                                var angleRad = angle * Math.PI / 180.0;
+                                var cosA = Math.Abs(Math.Cos(angleRad));
+                                var sinA = Math.Abs(Math.Sin(angleRad));
+                                
+                                var boundingWidth = (int)Math.Ceiling(width * cosA + height * sinA);
+                                var boundingHeight = (int)Math.Ceiling(width * sinA + height * cosA);
+                                
+                                var left = (int)Math.Floor(centerX - boundingWidth / 2.0);
+                                var top = (int)Math.Floor(centerY - boundingHeight / 2.0);
+                                
+                                boundingBox = new Rectangle(left, top, boundingWidth, boundingHeight);
+                                
+                                DebugLogUtility.WriteLog($"         ✅ RotatedRect変換成功: Center=({centerX:F1},{centerY:F1}), Size=({width:F1}x{height:F1})");
+                                DebugLogUtility.WriteLog($"         ✅ 計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                            }
+                            else
+                            {
+                                DebugLogUtility.WriteLog($"         ⚠️ CenterまたはSizeフィールドが見つからない");
+                            }
+                        }
+                        catch (Exception rotEx)
+                        {
+                            DebugLogUtility.WriteLog($"         ❌ RotatedRect変換エラー: {rotEx.GetType().Name}: {rotEx.Message}");
+                            DebugLogUtility.WriteLog($"         ❌ スタックトレース: {rotEx.StackTrace}");
+                        }
+                    }
+                    // 座標配列として処理（フォールバック）
+                    else if (regionValue is Array pointArray && pointArray.Length >= 4)
                     {
                         // 座標を取得して境界ボックスを計算
                         var points = new List<PointF>();
@@ -1887,9 +1959,20 @@ public sealed class PaddleOcrEngine(
                             var maxY = (int)points.Max(p => p.Y);
                             boundingBox = new Rectangle(minX, minY, maxX - minX, maxY - minY);
                             
-                            DebugLogUtility.WriteLog($"         📍 計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                            DebugLogUtility.WriteLog($"         📍 配列から計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                         }
                     }
+                    else
+                    {
+                        DebugLogUtility.WriteLog($"         ⚠️ RotatedRectでも配列でもない - フォールバック座標を使用");
+                    }
+                }
+                
+                // 座標が取得できなかった場合のみフォールバック座標を使用
+                if (boundingBox.IsEmpty)
+                {
+                    boundingBox = new Rectangle(10, 10 + index * 25, 200, 20);
+                    DebugLogUtility.WriteLog($"         ⚠️ 座標取得失敗、フォールバック座標を使用: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                 }
                 
                 textRegions.Add(new OcrTextRegion(

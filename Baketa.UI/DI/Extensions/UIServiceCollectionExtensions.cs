@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Type or member is obsolete
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
