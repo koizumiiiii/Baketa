@@ -233,36 +233,8 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"❌ ARTranslationOverlayManager初期化設定エラー: {ex.Message}");
                     }
 
-                    // 従来のTranslationResultOverlayManagerも併用（フォールバック用）
-                    Console.WriteLine("🖥️ TranslationResultOverlayManager遅延初期化設定");
-                    try
-                    {
-                        var overlayManager = serviceProvider.GetRequiredService<Baketa.UI.Services.TranslationResultOverlayManager>();
-                        
-                        // UIスレッドデッドロックを避けるため、遅延初期化に変更
-                        Task.Run(async () =>
-                        {
-                            try
-                            {
-                                Console.WriteLine("🖥️ TranslationResultOverlayManager非同期初期化開始");
-                                await overlayManager.InitializeAsync().ConfigureAwait(false);
-                                Console.WriteLine("✅ TranslationResultOverlayManager初期化完了");
-                            }
-                            catch (Exception asyncEx)
-                            {
-                                Console.WriteLine($"⚠️ TranslationResultOverlayManager非同期初期化失敗: {asyncEx.Message}");
-                            }
-                        });
-                        
-                        Console.WriteLine("✅ TranslationResultOverlayManager遅延初期化設定完了");
-                    }
-                    catch (Exception overlayEx)
-                    {
-                        Console.WriteLine($"⚠️ TranslationResultOverlayManager設定失敗: {overlayEx.Message}");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ TranslationResultOverlayManager設定失敗: {overlayEx.Message}");
-                        _logger?.LogWarning(overlayEx, "TranslationResultOverlayManager設定失敗");
-                        // オーバーレイ設定失敗は致命的ではないので続行
-                    }
+                    // 旧TranslationResultOverlayManagerは削除済み - ARシステムが自動で管理
+                    Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - ARシステムが自動で管理");
                     
                     // TranslationFlowModuleを使用してイベント購読を設定
                     Console.WriteLine("🔧 TranslationFlowModuleのイベント購読を初期化中");
