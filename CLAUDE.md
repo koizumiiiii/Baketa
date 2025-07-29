@@ -361,6 +361,52 @@ dotnet run --project Baketa.UI
 - Verification Methods: 
 ```
 
+## Mandatory Post-Implementation Process
+
+### Required Steps After Any Code Implementation
+All code implementations **MUST** follow this mandatory verification process:
+
+#### 1. Build Verification (必須)
+```cmd
+cd "E:\dev\Baketa"
+dotnet build Baketa.sln --configuration Debug
+```
+- **If BUILD SUCCEEDS**: Proceed to step 2
+- **If BUILD FAILS**: Fix all compilation errors immediately before proceeding
+
+#### 2. Error Resolution (エラー時必須)
+- **Compilation Errors**: Must be resolved completely
+- **Warning Analysis**: Critical warnings must be addressed
+- **Dependency Issues**: Ensure all NuGet packages and references are correct
+
+#### 3. Gemini Code Review (ビルド成功後必須)
+Once build succeeds with no errors, **MANDATORY** code review using gemini command:
+
+```cmd
+gemini -p "実装完了しました。以下のコードについてレビューをお願いします。
+
+## 実装内容
+[実装した機能の概要]
+
+## 変更ファイル
+[変更されたファイルのリスト]
+
+## 期待効果
+[実装により期待される効果]
+
+技術的な観点から問題点、改善点、潜在的なリスクについてレビューしてください。"
+```
+
+#### 4. Review Response Integration
+- **Gemini指摘事項**: 重大な問題は即座に修正
+- **改善提案**: 必要に応じて追加実装を検討
+- **ベストプラクティス**: 将来の実装に反映
+
+### Process Enforcement
+- **No Exceptions**: この手順はすべての実装に適用
+- **Documentation**: 大きな変更の場合は適切なドキュメント更新も実施
+- **Quality Assurance**: コードレビューは品質保証の必須プロセス
+
 ## Known Issues and Considerations
 
 - OPUS-MT models must be manually downloaded before first run

@@ -21,7 +21,7 @@ namespace Baketa.Application.Services.Translation;
 public sealed class CoordinateBasedTranslationService : IDisposable
 {
     private readonly IBatchOcrProcessor _batchOcrProcessor;
-    private readonly IMultiWindowOverlayManager _overlayManager;
+    private readonly IARTranslationOverlayManager _overlayManager;
     private readonly ITranslationService _translationService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
@@ -29,7 +29,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
     public CoordinateBasedTranslationService(
         IBatchOcrProcessor batchOcrProcessor,
-        IMultiWindowOverlayManager overlayManager,
+        IARTranslationOverlayManager overlayManager,
         ITranslationService translationService,
         IServiceProvider serviceProvider,
         ILogger<CoordinateBasedTranslationService>? logger = null)
@@ -206,14 +206,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     
                     // AR風UIでエラーが発生した場合は従来のオーバーレイにフォールバック
                     _logger?.LogWarning("🔄 従来のオーバーレイ表示にフォールバック");
-                    await FallbackToTraditionalOverlay(textChunks, cancellationToken).ConfigureAwait(false);
+                    await DisplayARTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
                 }
             }
             else
             {
                 // AR風オーバーレイが利用できない場合は従来のオーバーレイを使用
                 _logger?.LogWarning("⚠️ AR風オーバーレイが利用できません。従来のオーバーレイを使用");
-                await FallbackToTraditionalOverlay(textChunks, cancellationToken).ConfigureAwait(false);
+                await DisplayARTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
             }
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
@@ -227,29 +227,33 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     }
 
     /// <summary>
-    /// 従来のオーバーレイ表示にフォールバック
+    /// AR翻訳オーバーレイ表示
     /// </summary>
-    private async Task FallbackToTraditionalOverlay(
+    private async Task DisplayARTranslationOverlay(
         IReadOnlyList<TextChunk> textChunks, 
         CancellationToken cancellationToken)
     {
         try
         {
-            _logger?.LogDebug("🖼️ 従来のオーバーレイ表示開始");
-            DebugLogUtility.WriteLog("🖼️ 従来のオーバーレイ表示開始");
+            _logger?.LogDebug("🖼️ AR翻訳オーバーレイ表示開始");
+            DebugLogUtility.WriteLog("🖼️ AR翻訳オーバーレイ表示開始");
             
-            DebugLogUtility.WriteLog($"🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直前 - _overlayManager null?: {_overlayManager == null}");
+            DebugLogUtility.WriteLog($"🔥🔥🔥 AR翻訳オーバーレイ表示直前 - _overlayManager null?: {_overlayManager == null}");
             if (_overlayManager != null)
             {
-                await _overlayManager.DisplayTranslationResultsAsync(textChunks, cancellationToken)
-                    .ConfigureAwait(false);
+                // 各TextChunkを個別にAR表示
+                foreach (var textChunk in textChunks)
+                {
+                    await _overlayManager.ShowAROverlayAsync(textChunk, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
-            DebugLogUtility.WriteLog("🔥🔥🔥 DisplayTranslationResultsAsync呼び出し直後");
+            DebugLogUtility.WriteLog("🔥🔥🔥 AR翻訳オーバーレイ表示完了");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "❌ 従来のオーバーレイ表示でもエラーが発生");
-            DebugLogUtility.WriteLog($"❌❌❌ 従来のオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogError(ex, "❌ AR翻訳オーバーレイ表示でエラーが発生");
+            DebugLogUtility.WriteLog($"❌❌❌ AR翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
             DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
             throw;
         }
