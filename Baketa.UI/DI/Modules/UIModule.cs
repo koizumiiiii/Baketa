@@ -78,8 +78,8 @@ namespace Baketa.UI.DI.Modules;
             services.AddTransient<LoginViewModel>();
             services.AddTransient<SignupViewModel>();
             
-            // メインウィンドウビューモデル（全依存関係解決後に登録）
-            services.AddSingleton<MainWindowViewModel>();
+            // メインウィンドウビューモデル（MainWindowは使用されていないため無効化）
+            // services.AddSingleton<MainWindowViewModel>();
             
             // 翻訳仕様を同期するサービス
             // 例: services.AddSingleton<IViewModelSynchronizationService, ViewModelSynchronizationService>();

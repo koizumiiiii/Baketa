@@ -11,12 +11,15 @@ using Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.Services.OCR;
 using Microsoft.Extensions.DependencyInjection;
+using Baketa.Core.DI;
+using Baketa.Core.DI.Attributes;
 
 namespace Baketa.Infrastructure.DI;
 
     /// <summary>
     /// OCR処理関連のサービス登録モジュール
     /// </summary>
+    [ModulePriority(ModulePriority.Infrastructure)]
     public class OcrProcessingModule : IServiceModule
     {
         /// <summary>
@@ -55,8 +58,16 @@ namespace Baketa.Infrastructure.DI;
             // フィルター登録
             services.AddTransient<TextRegionDetectionFilter>();
             
-            // OCR前処理サービス - 簡単なスタブ実装
+            // OCR前処理サービス - SimpleOcrPreprocessingServiceを一時的に復元
+            // 注意: Phase 3のGameOptimizedPreprocessingServiceはOpenCvProcessingModuleで上書き登録される
+            services.AddTransient<SimpleOcrPreprocessingService>();
+            
+            // IOcrPreprocessingServiceとして登録（後でOpenCvProcessingModuleで上書きされる）
             services.AddTransient<IOcrPreprocessingService, SimpleOcrPreprocessingService>();
+            
+            // OCR精度向上機能を追加（Phase 1実装）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.ConfidenceBasedReprocessor>();
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.UniversalMisrecognitionCorrector>();
             
             // パイプラインのイベントリスナー
             services.AddTransient<IPipelineEventListener, DefaultPipelineEventListener>();

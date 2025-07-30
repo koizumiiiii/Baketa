@@ -47,8 +47,8 @@ public class MainOverlayViewModel : ViewModelBase
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
-        _isOcrInitialized = false; // 初期状態は未初期化
-        _currentStatus = TranslationStatus.Initializing; // 初期化中状態から開始
+        _isOcrInitialized = true; // Phase 3デバッグのため一時的に初期化済みとする
+        _currentStatus = TranslationStatus.Idle; // アイドル状態から開始
         
         DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
@@ -429,9 +429,11 @@ public class MainOverlayViewModel : ViewModelBase
                 {
                     // ServiceProviderからOCRサービスを取得して初期化状態をチェック
                     var serviceProvider = Program.ServiceProvider;
+                    DebugLogUtility.WriteLog($"🔍 ServiceProvider: {serviceProvider != null}");
                     if (serviceProvider != null)
                     {
                         var ocrService = serviceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+                        DebugLogUtility.WriteLog($"🔍 IOcrEngine取得: {ocrService != null}");
                         if (ocrService != null)
                         {
                             // OCRサービスが初期化済みかチェック
@@ -452,6 +454,7 @@ public class MainOverlayViewModel : ViewModelBase
                 catch (Exception ex)
                 {
                     DebugLogUtility.WriteLog($"⚠️ OCR初期化チェックエラー: {ex.Message}");
+                    DebugLogUtility.WriteLog($"⚠️ スタックトレース: {ex.StackTrace}");
                 }
                 
                 await Task.Delay(500).ConfigureAwait(false); // 500ms間隔でチェック
