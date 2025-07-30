@@ -206,6 +206,14 @@ namespace Baketa.UI;
             var overlayUIModule = new OverlayUIModule();
             overlayUIModule.RegisterServices(services);
             
+            // OCRモジュールの登録（IOcrPreprocessingService提供）
+            var ocrProcessingModule = new Baketa.Infrastructure.DI.OcrProcessingModule();
+            ocrProcessingModule.RegisterServices(services);
+            
+            // Phase 3: OpenCvProcessingModuleの登録（IOcrPreprocessingService上書き）
+            var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
+            openCvProcessingModule.RegisterServices(services);
+            
             // PaddleOcrModuleの登録
             var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
             paddleOcrModule.RegisterServices(services);
@@ -308,6 +316,24 @@ namespace Baketa.UI;
             // AccessibilitySettingsViewModelの登録確認
             var accessibilityVM = services.Where(s => s.ServiceType == typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel));
             System.Console.WriteLine($"AccessibilitySettingsViewModel registrations count: {accessibilityVM.Count()}");
+            
+            // IOcrPreprocessingServiceの登録確認（Phase 3診断）
+            var ocrPreprocessingServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.OCR.IOcrPreprocessingService));
+            System.Console.WriteLine($"IOcrPreprocessingService registrations count: {ocrPreprocessingServices.Count()}");
+            
+            foreach (var service in ocrPreprocessingServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "Factory"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+                
+                // ファクトリ関数がある場合は、実際の実装タイプを推定
+                if (service.ImplementationFactory != null)
+                {
+                    System.Console.WriteLine($"  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)");
+                }
+            }
         }
         
         /// <summary>
@@ -321,8 +347,8 @@ namespace Baketa.UI;
             {
                 typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
                 typeof(Baketa.UI.ViewModels.SettingsViewModel),
-                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel),
-                typeof(Baketa.UI.ViewModels.MainWindowViewModel)
+                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel)
+                // typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindowは使用されていないため無効化
             };
             
             foreach (var vmType in viewModelTypes)

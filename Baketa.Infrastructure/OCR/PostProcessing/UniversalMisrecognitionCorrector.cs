@@ -12,7 +12,7 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// 普遍的誤認識修正辞書システム
 /// OCR精度向上ロードマップ Phase 1 - 高優先度実装
 /// </summary>
-public sealed class UniversalMisrecognitionCorrector
+public sealed partial class UniversalMisrecognitionCorrector
 {
     private readonly ILogger<UniversalMisrecognitionCorrector> _logger;
     private readonly MisrecognitionCorrectionSettings _settings;
@@ -240,16 +240,14 @@ public sealed class UniversalMisrecognitionCorrector
         var corrected = text;
 
         // 数字と文字の混在パターン
-        var numberLetterPattern = new Regex(@"(\d)[Il1](\d)", RegexOptions.Compiled);
-        if (numberLetterPattern.IsMatch(corrected))
+        if (NumberLetterPattern().IsMatch(corrected))
         {
-            corrected = numberLetterPattern.Replace(corrected, "$1$2");
+            corrected = NumberLetterPattern().Replace(corrected, "$1$2");
             correctionCount++;
         }
 
         // 連続する類似文字の修正（例: "lll" → "111" または "III"）
-        var consecutivePattern = new Regex(@"([Il1]){3,}", RegexOptions.Compiled);
-        var matches = consecutivePattern.Matches(corrected);
+        var matches = ConsecutivePattern().Matches(corrected);
         foreach (Match match in matches)
         {
             var replacement = DetermineConsecutiveReplacement(match.Value, text);
@@ -750,6 +748,12 @@ public sealed class UniversalMisrecognitionCorrector
 
         return (basicRules, contextualRules);
     }
+
+    [GeneratedRegex(@"(\d)[Il1](\d)", RegexOptions.Compiled)]
+    private static partial Regex NumberLetterPattern();
+
+    [GeneratedRegex(@"([Il1]){3,}", RegexOptions.Compiled)]
+    private static partial Regex ConsecutivePattern();
 }
 
 /// <summary>

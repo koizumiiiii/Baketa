@@ -96,25 +96,25 @@ internal sealed class AvaloniaNavigationService(
         ThrowIfDisposed();
         try
         {
-            _logNavigating(_logger, "MainWindow", null);
+            _logNavigating(_logger, "MainOverlayView", null);
 
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var mainWindowViewModel = _serviceProvider.GetRequiredService<ViewModels.MainWindowViewModel>();
-                var mainWindow = new MainWindow
+                var mainOverlayViewModel = _serviceProvider.GetRequiredService<ViewModels.MainOverlayViewModel>();
+                var mainOverlayView = new MainOverlayView
                 {
-                    DataContext = mainWindowViewModel
+                    DataContext = mainOverlayViewModel
                 };
 
-                desktop.MainWindow = mainWindow;
-                mainWindow.Show();
+                desktop.MainWindow = mainOverlayView;
+                mainOverlayView.Show();
             }
 
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logNavigationError(_logger, "MainWindow", ex);
+            _logNavigationError(_logger, "MainOverlayView", ex);
         }
     }
 

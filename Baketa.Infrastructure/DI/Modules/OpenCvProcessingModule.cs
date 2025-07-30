@@ -57,11 +57,9 @@ public sealed class OpenCvProcessingModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     private static void RegisterPreprocessingServices(IServiceCollection services)
     {
-        // ゲーム最適化前処理サービスを登録
-        services.AddScoped<GameOptimizedPreprocessingService>();
-        
-        // 既存の前処理サービスをゲーム最適化版で置き換え
-        services.AddScoped<IOcrPreprocessingService>(provider =>
+        // Phase 3: ゲーム最適化前処理サービスをIOcrPreprocessingServiceとして登録
+        // 既存のSimpleOcrPreprocessingServiceを置き換え（ライフタイム統一）
+        services.AddTransient<IOcrPreprocessingService>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<GameOptimizedPreprocessingService>>();
             return new GameOptimizedPreprocessingService(logger);

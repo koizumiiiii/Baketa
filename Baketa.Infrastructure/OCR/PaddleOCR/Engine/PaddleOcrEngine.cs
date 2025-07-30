@@ -43,6 +43,9 @@ public sealed class PaddleOcrEngine(
     private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly object _lockObject = new();
     
+    // 🔍 Phase 3診断: 使用中の前処理サービス
+    private static bool _serviceTypeLogged;
+    
     private PaddleOcrAll? _ocrEngine;
     private QueuedPaddleOcrAll? _queuedEngine;
     private OcrEngineSettings _settings = new();
@@ -255,6 +258,22 @@ public sealed class PaddleOcrEngine(
             {
                 DebugLogUtility.WriteLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
                 textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
+            }
+            
+            // 🔍 Phase 3診断: 使用中の前処理サービスを初回のみログ出力
+            if (!_serviceTypeLogged)
+            {
+                var serviceType = _ocrPreprocessingService.GetType().Name;
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [PHASE3-DIAG] 使用中の前処理サービス: {serviceType}{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Phase 3 診断ログ書き込みエラー: {fileEx.Message}");
+                }
+                _serviceTypeLogged = true;
             }
             
             // 📍 座標ログ出力 (ユーザー要求: 認識したテキストとともに座標位置もログで確認)
@@ -1493,6 +1512,7 @@ public sealed class PaddleOcrEngine(
         DebugLogUtility.WriteLog($"   🧵 マルチスレッド有効: {IsMultiThreadEnabled}");
         DebugLogUtility.WriteLog($"   🔧 QueuedEngineが利用可能: {_queuedEngine != null}");
         DebugLogUtility.WriteLog($"   🔧 OcrEngineが利用可能: {_ocrEngine != null}");
+        DebugLogUtility.WriteLog($"🔍 【DEBUG】Phase 3実装状況: ExecuteOcrAsyncメソッド開始時点");
         
         // Mat画像の詳細情報をログ出力
         DebugLogUtility.WriteLog($"🖼️ Mat画像詳細情報:");
@@ -2038,283 +2058,7 @@ public sealed class PaddleOcrEngine(
             DebugLogUtility.WriteLog($"         ❌ ProcessPaddleRegion エラー: {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// 高度な画像処理パイプラインを使用したOCR前処理
-    /// </summary>
-    /// <param name="mat">処理対象の画像</param>
-    /// <param name="cancellationToken">キャンセレーショントークン</param>
-    /// <returns>前処理済みの画像</returns>
-    private async Task<Mat> PreprocessImageWithPipelineAsync(Mat mat, CancellationToken cancellationToken)
-    {
-        try
-        {
-            DebugLogUtility.WriteLog($"🔧 高度な画像前処理パイプライン開始:");
-            DebugLogUtility.WriteLog($"   📐 元画像サイズ: {mat.Width}x{mat.Height}");
-            DebugLogUtility.WriteLog($"   🎨 元チャンネル数: {mat.Channels()}");
-            
-            // MatをIAdvancedImageに変換
-            var advancedImage = ConvertMatToAdvancedImage(mat);
-            
-            // ゲームUI向けプロファイルを使用してOCR前処理を実行
-            var preprocessingResult = await _ocrPreprocessingService.ProcessImageAsync(
-                advancedImage, 
-                "gameui", // ゲームUI向けの高度な処理パイプライン
-                cancellationToken).ConfigureAwait(false);
-            
-            // 前処理結果をチェック
-            if (preprocessingResult.Error != null)
-            {
-                DebugLogUtility.WriteLog($"   ⚠️ 前処理パイプラインエラー: {preprocessingResult.Error.Message}");
-                DebugLogUtility.WriteLog($"   ⚠️ 基本前処理にフォールバック");
-                return await FallbackPreprocessingAsync(mat).ConfigureAwait(false);
-            }
-            
-            if (preprocessingResult.IsCancelled)
-            {
-                DebugLogUtility.WriteLog($"   ❌ 前処理パイプラインがキャンセルされました");
-                throw new OperationCanceledException("OCR前処理パイプラインがキャンセルされました");
-            }
-            
-            // 検出されたテキスト領域の情報をログ出力
-            DebugLogUtility.WriteLog($"   🎯 検出されたテキスト領域: {preprocessingResult.DetectedRegions.Count}個");
-            foreach (var region in preprocessingResult.DetectedRegions)
-            {
-                DebugLogUtility.WriteLog($"     📍 領域: X={region.Bounds.X}, Y={region.Bounds.Y}, W={region.Bounds.Width}, H={region.Bounds.Height}");
-            }
-            
-            // 処理後の画像をMatに変換
-            var resultMat = ConvertAdvancedImageToMat(preprocessingResult.ProcessedImage);
-            
-            DebugLogUtility.WriteLog($"   ✅ 高度な前処理完了: {resultMat.Width}x{resultMat.Height}");
-            
-            return resultMat;
-        }
-        catch (OperationCanceledException)
-        {
-            DebugLogUtility.WriteLog($"   ❌ 高度な画像前処理がキャンセルされました");
-            throw;
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"   ❌ 高度な画像前処理エラー: {ex.Message}");
-            DebugLogUtility.WriteLog($"   ⚠️ 基本前処理にフォールバック");
-            
-            // エラー時は基本的な前処理にフォールバック
-            return await FallbackPreprocessingAsync(mat).ConfigureAwait(false);
-        }
-    }
     
-    /// <summary>
-    /// 基本的な画像前処理（高速処理優先）
-    /// </summary>
-    /// <param name="mat">処理対象の画像</param>
-    /// <returns>前処理済みの画像</returns>
-    private async Task<Mat> FallbackPreprocessingAsync(Mat mat)
-    {
-        await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドのためのダミー
-        
-        try
-        {
-            DebugLogUtility.WriteLog($"⚡ 基本前処理開始（高速処理優先）:");
-            
-            var processedMat = new Mat();
-            
-            // 1. 基本グレースケール変換のみ（高速処理）
-            if (mat.Channels() == 3)
-            {
-                DebugLogUtility.WriteLog($"   🔄 基本グレースケール変換実行");
-                Cv2.CvtColor(mat, processedMat, ColorConversionCodes.BGR2GRAY);
-            }
-            else
-            {
-                DebugLogUtility.WriteLog($"   ➡️ 既にグレースケール - 変換をスキップ");
-                mat.CopyTo(processedMat);
-            }
-            
-            // 2. 軽量なコントラスト調整のみ（高速処理）
-            DebugLogUtility.WriteLog($"   ⚡ 軽量コントラスト調整実行");
-            using var contrastMat = new Mat();
-            processedMat.ConvertTo(contrastMat, MatType.CV_8UC1, 1.2, 10); // 軽量なコントラスト・明度調整
-            
-            DebugLogUtility.WriteLog($"   ✅ 基本前処理完了: {contrastMat.Width}x{contrastMat.Height}");
-            
-            // 基本前処理された画像を返す
-            var finalMat = new Mat();
-            contrastMat.CopyTo(finalMat);
-            return finalMat;
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"   ❌ 基本画像前処理エラー: {ex.Message}");
-            
-            // エラー時は元の画像をそのまま返す
-            var fallbackMat = new Mat();
-            mat.CopyTo(fallbackMat);
-            return fallbackMat;
-        }
-    }
-    
-    /// <summary>
-    /// MatをIAdvancedImageに変換
-    /// </summary>
-    /// <param name="mat">変換元Mat</param>
-    /// <returns>IAdvancedImage</returns>
-    private AdvancedImage ConvertMatToAdvancedImage(Mat mat)
-    {
-        try
-        {
-            DebugLogUtility.WriteLog($"🔄 MatからIAdvancedImageへの変換開始");
-            DebugLogUtility.WriteLog($"   📐 Matサイズ: {mat.Width}x{mat.Height}");
-            DebugLogUtility.WriteLog($"   🎨 Matチャンネル: {mat.Channels()}");
-            DebugLogUtility.WriteLog($"   🔢 Matタイプ: {mat.Type()}");
-            
-            // Matをバイト配列に変換
-            var bytes = mat.ToBytes();
-            DebugLogUtility.WriteLog($"   💾 バイト配列サイズ: {bytes.Length}");
-            
-            // フォーマットを決定
-            var format = mat.Channels() switch
-            {
-                1 => ImageFormat.Grayscale8,
-                3 => ImageFormat.Rgb24,
-                4 => ImageFormat.Rgba32,
-                _ => throw new NotSupportedException($"サポートされていないチャンネル数: {mat.Channels()}")
-            };
-            
-            DebugLogUtility.WriteLog($"   🎨 フォーマット: {format}");
-            
-            // AdvancedImageを作成
-            var advancedImage = new AdvancedImage(bytes, mat.Width, mat.Height, format);
-            
-            DebugLogUtility.WriteLog($"   ✅ 変換完了: {advancedImage.Width}x{advancedImage.Height}");
-            return advancedImage;
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"   ❌ MatからIAdvancedImage変換エラー: {ex.Message}");
-            throw new InvalidOperationException($"MatからIAdvancedImageへの変換に失敗しました: {ex.Message}", ex);
-        }
-    }
-    
-    /// <summary>
-    /// IAdvancedImageをMatに変換
-    /// </summary>
-    /// <param name="advancedImage">変換元IAdvancedImage</param>
-    /// <returns>Mat</returns>
-    private Mat ConvertAdvancedImageToMat(IAdvancedImage advancedImage)
-    {
-        try
-        {
-            DebugLogUtility.WriteLog($"🔄 IAdvancedImageからMatへの変換開始");
-            DebugLogUtility.WriteLog($"   📐 アドバンストイメージサイズ: {advancedImage.Width}x{advancedImage.Height}");
-            DebugLogUtility.WriteLog($"   🎨 アドバンストイメージフォーマット: {advancedImage.Format}");
-            DebugLogUtility.WriteLog($"   🔢 チャンネル数: {advancedImage.ChannelCount}");
-            
-            // フォーマットに対応するMatタイプを決定
-            var matType = advancedImage.Format switch
-            {
-                ImageFormat.Grayscale8 => MatType.CV_8UC1,
-                ImageFormat.Rgb24 => MatType.CV_8UC3,
-                ImageFormat.Rgba32 => MatType.CV_8UC4,
-                _ => throw new NotSupportedException($"サポートされていないフォーマット: {advancedImage.Format}")
-            };
-            
-            DebugLogUtility.WriteLog($"   🔢 Matタイプ: {matType}");
-            
-            // IAdvancedImageからバイト配列を取得
-            var bytes = advancedImage.ToByteArrayAsync().GetAwaiter().GetResult();
-            DebugLogUtility.WriteLog($"   💾 バイト配列サイズ: {bytes.Length}");
-            
-            // 正しいMatサイズを計算
-            var expectedChannels = advancedImage.ChannelCount;
-            var expectedSize = advancedImage.Width * advancedImage.Height * expectedChannels;
-            
-            DebugLogUtility.WriteLog($"   💾 期待サイズ: {expectedSize} bytes");
-            
-            // バイト配列サイズが期待値と一致しない場合は調整
-            if (bytes.Length != expectedSize)
-            {
-                DebugLogUtility.WriteLog($"   ⚠️ バイト配列サイズ不一致、ピクセル操作にフォールバック: 必要={expectedSize}, 実際={bytes.Length}");
-                
-                // ピクセル単位でMatを作成（確実だが低速）
-                var mat = new Mat(advancedImage.Height, advancedImage.Width, matType);
-                
-                for (int y = 0; y < advancedImage.Height; y++)
-                {
-                    for (int x = 0; x < advancedImage.Width; x++)
-                    {
-                        var color = advancedImage.GetPixel(x, y);
-                        if (advancedImage.Format == ImageFormat.Rgb24)
-                        {
-                            // OpenCVはBGR順序
-                            mat.Set(y, x, new Vec3b(color.B, color.G, color.R));
-                        }
-                        else if (advancedImage.Format == ImageFormat.Grayscale8)
-                        {
-                            mat.Set(y, x, color.R);
-                        }
-                    }
-                }
-                
-                DebugLogUtility.WriteLog($"   ✅ ピクセル操作で変換完了: {mat.Width}x{mat.Height}");
-                return mat;
-            }
-            
-            // Matを作成
-            var mat2 = new Mat(advancedImage.Height, advancedImage.Width, matType);
-            
-            // 安全なピクセル単位でのMat作成（確実な方法）
-            for (int y = 0; y < advancedImage.Height; y++)
-            {
-                for (int x = 0; x < advancedImage.Width; x++)
-                {
-                    try
-                    {
-                        var color = advancedImage.GetPixel(x, y);
-                        if (advancedImage.Format == ImageFormat.Rgb24)
-                        {
-                            // OpenCVはBGR順序
-                            mat2.Set(y, x, new Vec3b(color.B, color.G, color.R));
-                        }
-                        else if (advancedImage.Format == ImageFormat.Grayscale8)
-                        {
-                            mat2.Set(y, x, color.R);
-                        }
-                        else if (advancedImage.Format == ImageFormat.Rgba32)
-                        {
-                            mat2.Set(y, x, new Vec4b(color.B, color.G, color.R, color.A));
-                        }
-                    }
-                    catch (Exception pixelEx)
-                    {
-                        // ピクセル取得エラーが発生した場合は黒ピクセルで埋める
-                        DebugLogUtility.WriteLog($"   ⚠️ ピクセル({x},{y})取得エラー: {pixelEx.Message}");
-                        if (advancedImage.Format == ImageFormat.Rgb24)
-                        {
-                            mat2.Set(y, x, new Vec3b(0, 0, 0));
-                        }
-                        else if (advancedImage.Format == ImageFormat.Grayscale8)
-                        {
-                            mat2.Set(y, x, (byte)0);
-                        }
-                        else if (advancedImage.Format == ImageFormat.Rgba32)
-                        {
-                            mat2.Set(y, x, new Vec4b(0, 0, 0, 255));
-                        }
-                    }
-                }
-            }
-            
-            DebugLogUtility.WriteLog($"   ✅ 変換完了: {mat2.Width}x{mat2.Height}");
-            return mat2;
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"   ❌ IAdvancedImageからMat変換エラー: {ex.Message}");
-            throw new InvalidOperationException($"IAdvancedImageからMatへの変換に失敗しました: {ex.Message}", ex);
-        }
-    }
 
     /// <summary>
     /// ROI使用時の座標補正
