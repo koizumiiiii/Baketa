@@ -5,6 +5,7 @@ using Baketa.Infrastructure.Imaging.Filters;
 using Baketa.Infrastructure.Imaging.Services;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.DI;
+using Baketa.Core.DI.Attributes;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -12,6 +13,7 @@ namespace Baketa.Infrastructure.DI.Modules;
 /// OpenCvSharp画像処理機能のDI登録モジュール
 /// Phase 3: OCR精度向上のためのOpenCV前処理機能を提供
 /// </summary>
+[AutoRegister]
 public sealed class OpenCvProcessingModule : ServiceModuleBase
 {
     /// <summary>
