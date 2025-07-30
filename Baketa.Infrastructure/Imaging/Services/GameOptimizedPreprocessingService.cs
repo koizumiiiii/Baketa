@@ -180,7 +180,7 @@ public sealed class GameOptimizedPreprocessingService(
     private async Task<IAdvancedImage> ApplyGameOptimizedProcessingAsync(
         IAdvancedImage image, 
         GameScreenProfile profile, 
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
         var currentImage = image;
         var requiresDisposal = new List<IAdvancedImage>();

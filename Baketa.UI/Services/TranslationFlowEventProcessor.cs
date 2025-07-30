@@ -468,18 +468,6 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     private async Task DisplayErrorMessageAsync(Exception exception)
     {
-        // マルチウィンドウオーバーレイでエラーメッセージを表示
-        var errorChunk = new Baketa.Core.Abstractions.Translation.TextChunk
-        {
-            ChunkId = "error".GetHashCode(),
-            TextResults = [],
-            CombinedBounds = new System.Drawing.Rectangle(100, 200, 500, 50),
-            CombinedText = "(エラー)",
-            TranslatedText = $"翻訳処理中にエラーが発生しました: {exception.Message}",
-            SourceWindowHandle = IntPtr.Zero,
-            DetectedLanguage = "ja"
-        };
-
         // エラー表示は削除済み - ARシステムが自動で管理
         DebugLogUtility.WriteLog($"⚠️ エラー表示は削除済み - ARシステムで自動管理: {exception.Message}");
 

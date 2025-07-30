@@ -40,7 +40,7 @@ public sealed class UniversalMisrecognitionCorrector
     public IReadOnlyList<TextChunk> CorrectMisrecognitions(IReadOnlyList<TextChunk> textChunks)
     {
         if (textChunks == null || textChunks.Count == 0)
-            return textChunks;
+            return textChunks ?? [];
 
         _logger.LogDebug("誤認識修正開始: {ChunkCount}個のチャンクを処理", textChunks.Count);
         
@@ -134,7 +134,6 @@ public sealed class UniversalMisrecognitionCorrector
         // 4. 言語固有修正
         var finalCorrected = ApplyLanguageSpecificCorrections(currentText, originalChunk.DetectedLanguage, out int languageCount);
         correctionCount += languageCount;
-        currentText = finalCorrected;
 
         // 【Phase 2ログ強化】修正処理の詳細ログ記録
         try
@@ -451,7 +450,7 @@ public sealed class UniversalMisrecognitionCorrector
     /// <summary>
     /// 中国語文脈での修正が適切かどうかを判定
     /// </summary>
-    private static bool ShouldCorrectInChineseContext(string text, string wrong, string correct)
+    private static bool ShouldCorrectInChineseContext(string _, string __, string ___)
     {
         // 簡易的な文脈判定（実際の実装ではより高度な判定が必要）
         return true;
