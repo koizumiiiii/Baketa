@@ -83,7 +83,7 @@ public class CaptureStrategyMockTests
         // Assert
         Assert.True(result.Success, $"キャプチャは成功するべき。エラー: {result.ErrorMessage}");
         Assert.NotNull(result.Images);
-        Assert.Equal(1, result.Images.Count);
+        Assert.Single(result.Images);
         Assert.NotNull(result.Images[0]);
         Assert.Equal(1920, result.Images[0].Width);
         Assert.Equal(1080, result.Images[0].Height);

@@ -38,7 +38,7 @@ public sealed class ConfidenceBasedReprocessor(
         CancellationToken cancellationToken = default)
     {
         if (textChunks == null || textChunks.Count == 0)
-            return textChunks;
+            return textChunks ?? [];
 
         _logger.LogInformation("信頼度ベース再処理開始: {ChunkCount}個のチャンクを分析", textChunks.Count);
         
@@ -87,7 +87,7 @@ public sealed class ConfidenceBasedReprocessor(
                 var averageConfidence = chunk.AverageConfidence;
                 
                 _logger.LogDebug("チャンク#{ChunkId} 信頼度分析: {Confidence:F3} (閾値: {Threshold:F3})", 
-                    chunk.ChunkId, averageConfidence, _settings.ReprocessingThreshold);
+                    chunk.ChunkId, averageConfidence, _settings?.ReprocessingThreshold ?? 0.7);
 
                 // ShouldReprocessの詳細ログ
                 try
@@ -225,7 +225,7 @@ public sealed class ConfidenceBasedReprocessor(
             
             reprocessedChunks.AddRange(reprocessedResults);
 
-            var improvementCount = reprocessedResults.Count(r => r.AverageConfidence > _settings.ReprocessingThreshold);
+            var improvementCount = reprocessedResults.Where(r => r != null).Count(r => r!.AverageConfidence > (_settings?.ReprocessingThreshold ?? 0.7));
             _logger.LogInformation("再処理完了: {TotalCount}個中{ImprovedCount}個が改善", 
                 reprocessedResults.Length, improvementCount);
         }
@@ -234,7 +234,7 @@ public sealed class ConfidenceBasedReprocessor(
             try
             {
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] 再処理対象なし: 全{textChunks.Count}チャンクが閾値{_settings.ReprocessingThreshold:F3}以上の信頼度{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] 再処理対象なし: 全{textChunks.Count}チャンクが閾値{_settings?.ReprocessingThreshold:F3}以上の信頼度{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -606,7 +606,7 @@ public sealed class ConfidenceBasedReprocessor(
     /// <summary>
     /// 画像領域を抽出
     /// </summary>
-    private IAdvancedImage ExtractImageRegion(IAdvancedImage originalImage, System.Drawing.Rectangle bounds)
+    private IAdvancedImage ExtractImageRegion(IAdvancedImage originalImage, System.Drawing.Rectangle _)
     {
         // TODO: 実際の画像切り出し実装
         // 現在は元画像を返す（実装簡略化）
