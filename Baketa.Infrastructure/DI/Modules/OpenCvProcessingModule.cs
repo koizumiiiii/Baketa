@@ -14,6 +14,7 @@ namespace Baketa.Infrastructure.DI.Modules;
 /// Phase 3: OCR精度向上のためのOpenCV前処理機能を提供
 /// </summary>
 [AutoRegister]
+[ModulePriority(ModulePriority.Core)]
 public sealed class OpenCvProcessingModule : ServiceModuleBase
 {
     /// <summary>
