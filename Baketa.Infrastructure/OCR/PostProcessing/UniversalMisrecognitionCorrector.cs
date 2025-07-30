@@ -114,23 +114,29 @@ public sealed class UniversalMisrecognitionCorrector
         if (string.IsNullOrWhiteSpace(originalText))
             return originalChunk;
 
+        var currentText = originalText;
+
         // 1. 基本的な文字レベル修正
-        var basicCorrected = ApplyBasicCorrections(originalText, out int basicCount);
+        var basicCorrected = ApplyBasicCorrections(currentText, out int basicCount);
         correctionCount += basicCount;
+        currentText = basicCorrected;
 
         // 2. 文脈ベース修正
-        var contextCorrected = ApplyContextualCorrections(basicCorrected, out int contextCount);
+        var contextCorrected = ApplyContextualCorrections(currentText, out int contextCount);
         correctionCount += contextCount;
+        currentText = contextCorrected;
 
         // 3. パターンベース修正
-        var patternCorrected = ApplyPatternCorrections(contextCorrected, out int patternCount);
+        var patternCorrected = ApplyPatternCorrections(currentText, out int patternCount);
         correctionCount += patternCount;
+        currentText = patternCorrected;
 
         // 4. 言語固有修正
-        var finalCorrected = ApplyLanguageSpecificCorrections(patternCorrected, originalChunk.DetectedLanguage, out int languageCount);
+        var finalCorrected = ApplyLanguageSpecificCorrections(currentText, originalChunk.DetectedLanguage, out int languageCount);
         correctionCount += languageCount;
+        currentText = finalCorrected;
 
-        // 修正結果をファイルログに記録
+        // 【Phase 2ログ強化】修正処理の詳細ログ記録
         try
         {
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
@@ -140,6 +146,28 @@ public sealed class UniversalMisrecognitionCorrector
             {
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}   └─ 修正ステップ: Basic={basicCount}, Context={contextCount}, Pattern={patternCount}, Language={languageCount}{Environment.NewLine}");
+                
+                // 各段階の変化をログ出力
+                if (basicCount > 0)
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Basic修正: '{originalText}' → '{basicCorrected}'{Environment.NewLine}");
+                }
+                if (contextCount > 0)
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Context修正: '{basicCorrected}' → '{contextCorrected}'{Environment.NewLine}");
+                }
+                if (patternCount > 0)
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Pattern修正: '{contextCorrected}' → '{patternCorrected}'{Environment.NewLine}");
+                }
+                if (languageCount > 0)
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Language修正: '{patternCorrected}' → '{finalCorrected}'{Environment.NewLine}");
+                }
             }
         }
         catch (Exception fileEx)
@@ -465,7 +493,173 @@ public sealed class UniversalMisrecognitionCorrector
             { "5", "S" }, { "S", "5" }, { "6", "G" }, { "G", "6" }, { "8", "B" }, { "B", "8" },
             
             // よくある記号の混同
-            { "rn", "m" }, { "cl", "d" }, { "vv", "w" }
+            { "rn", "m" }, { "cl", "d" }, { "vv", "w" },
+            
+            // 【Phase 2拡充】中国語→日本語文字修正（ゲーム頻出パターン）
+            // 実際のログから確認された誤認識パターン
+            { "开", "開" },     // ひらく - ログ確認済み
+            { "过", "過" },     // すぎる - ログ確認済み  
+            { "个", "個" },     // こ - ログ確認済み
+            { "间", "間" },     // あいだ
+            { "时", "時" },     // とき
+            { "长", "長" },     // ながい
+            { "门", "門" },     // もん
+            { "车", "車" },     // くるま
+            { "马", "馬" },     // うま
+            { "鸟", "鳥" },     // とり
+            { "龙", "龍" },     // りゅう
+            { "岛", "島" },     // しま
+            { "国", "國" },     // くに（旧字体対応）
+            { "东", "東" },     // ひがし
+            { "西", "西" },     // にし（同じ字体）
+            { "南", "南" },     // みなみ（同じ字体）
+            { "北", "北" },     // きた（同じ字体）
+            { "风", "風" },     // かぜ
+            { "雨", "雨" },     // あめ（同じ字体）
+            { "雪", "雪" },     // ゆき（同じ字体）
+            { "山", "山" },     // やま（同じ字体）
+            { "水", "水" },     // みず（同じ字体）
+            { "火", "火" },     // ひ（同じ字体）
+            { "土", "土" },     // つち（同じ字体）
+            { "木", "木" },     // き（同じ字体）
+            { "金", "金" },     // きん（同じ字体）
+            { "银", "銀" },     // ぎん
+            { "铜", "銅" },     // どう
+            { "铁", "鐵" },     // てつ
+            { "钢", "鋼" },     // はがね
+            { "宝", "寶" },     // たから
+            { "书", "書" },     // しょ
+            { "画", "畫" },     // が
+            { "乐", "樂" },     // らく
+            { "药", "藥" },     // やく
+            { "医", "醫" },     // い
+            { "农", "農" },     // のう
+            { "工", "工" },     // こう（同じ字体）
+            { "商", "商" },     // しょう（同じ字体）
+            { "学", "學" },     // がく
+            { "教", "教" },     // きょう（同じ字体）
+            { "师", "師" },     // し
+            { "生", "生" },     // せい（同じ字体）
+            { "死", "死" },     // し（同じ字体）
+            { "活", "活" },     // かつ（同じ字体）
+            { "动", "動" },     // どう
+            { "静", "靜" },     // せい
+            { "快", "快" },     // かい（同じ字体）
+            { "慢", "慢" },     // まん（同じ字体）
+            { "强", "強" },     // きょう
+            { "弱", "弱" },     // じゃく（同じ字体）
+            { "高", "高" },     // こう（同じ字体）
+            { "低", "低" },     // てい（同じ字体）
+            { "大", "大" },     // だい（同じ字体）
+            { "小", "小" },     // しょう（同じ字体）
+            { "多", "多" },     // た（同じ字体）
+            { "少", "少" },     // しょう（同じ字体）
+            { "新", "新" },     // しん（同じ字体）
+            { "旧", "舊" },     // きゅう
+            { "老", "老" },     // ろう（同じ字体）
+            { "年", "年" },     // ねん（同じ字体）
+            { "月", "月" },     // げつ（同じ字体）
+            { "日", "日" },     // にち（同じ字体）
+            { "星", "星" },     // せい（同じ字体）
+            { "天", "天" },     // てん（同じ字体）
+            { "地", "地" },     // ち（同じ字体）
+            { "人", "人" },     // じん（同じ字体）
+            { "男", "男" },     // だん（同じ字体）
+            { "女", "女" },     // じょ（同じ字体）
+            { "子", "子" },     // し（同じ字体）
+            { "父", "父" },     // ふ（同じ字体）
+            { "母", "母" },     // ぼ（同じ字体）
+            { "兄", "兄" },     // けい（同じ字体）
+            { "弟", "弟" },     // てい（同じ字体）
+            { "姐", "姉" },     // し
+            { "妹", "妹" },     // まい（同じ字体）
+            { "友", "友" },     // ゆう（同じ字体）
+            { "敌", "敵" },     // てき
+            { "战", "戰" },     // せん
+            { "胜", "勝" },     // しょう
+            { "败", "敗" },     // はい
+            { "输", "輸" },     // ゆ
+            { "赢", "贏" },     // えい
+            { "买", "買" },     // ばい
+            { "卖", "賣" },     // ばい
+            { "钱", "錢" },     // せん
+            { "富", "富" },     // ふ（同じ字体）
+            { "穷", "窮" },     // きゅう
+            { "饿", "餓" },     // が
+            { "饱", "飽" },     // ほう
+            { "吃", "吃" },     // きつ（同じ字体）
+            { "喝", "喝" },     // かつ（同じ字体）
+            { "睡", "睡" },     // すい（同じ字体）
+            { "醒", "醒" },     // せい（同じ字体）
+            { "走", "走" },     // そう（同じ字体）
+            { "跑", "跑" },     // ほう（同じ字体）
+            { "飞", "飛" },     // ひ
+            { "游", "游" },     // ゆう（同じ字体）
+            { "潜", "潛" },     // せん
+            { "爬", "爬" },     // は（同じ字体）
+            { "跳", "跳" },     // ちょう（同じ字体）
+            { "运", "運" },     // うん
+            { "动作", "動作" }, // どうさ
+            { "动物", "動物" }, // どうぶつ
+            { "植物", "植物" }, // しょくぶつ（同じ字体）
+            { "动画", "動畫" }, // どうが
+            { "电影", "電影" }, // でんえい
+            { "游戏", "遊戯" }, // ゆうぎ
+            { "运动", "運動" }, // うんどう
+            { "体育", "體育" }, // たいいく
+            { "练习", "練習" }, // れんしゅう
+            { "训练", "訓練" }, // くんれん
+            { "准备", "準備" }, // じゅんび
+            { "开始", "開始" }, // かいし
+            { "结束", "結束" }, // けっそく
+            { "完成", "完成" }, // かんせい（同じ字体）
+            { "失败", "失敗" }, // しっぱい
+            { "成功", "成功" }, // せいこう（同じ字体）
+            { "进攻", "進攻" }, // しんこう
+            { "防御", "防禦" }, // ぼうぎょ
+            { "攻击", "攻擊" }, // こうげき
+            { "防守", "防守" }, // ぼうしゅ（同じ字体）
+            { "侵略", "侵略" }, // しんりゃく（同じ字体）
+            { "占领", "占領" }, // せんりょう
+            { "统治", "統治" }, // とうち
+            { "管理", "管理" }, // かんり（同じ字体）
+            { "控制", "控制" }, // こうせい（同じ字体）
+            { "操作", "操作" }, // そうさ（同じ字体）
+            { "选择", "選擇" }, // せんたく
+            { "决定", "決定" }, // けってい
+            { "判断", "判斷" }, // はんだん
+            { "思考", "思考" }, // しこう（同じ字体）  
+            { "计划", "計畫" }, // けいかく
+            { "策略", "策略" }, // さくりゃく（同じ字体）
+            { "战术", "戰術" }, // せんじゅつ
+            { "技术", "技術" }, // ぎじゅつ
+            { "技能", "技能" }, // ぎのう（同じ字体）
+            { "能力", "能力" }, // のうりょく（同じ字体）
+            { "力量", "力量" }, // りきりょう（同じ字体）
+            { "实力", "實力" }, // じつりょく
+            { "潜力", "潛力" }, // せんりょく
+            { "经验", "經驗" }, // けいけん
+            { "知识", "知識" }, // ちしき
+            { "智慧", "智慧" }, // ちえ（同じ字体）
+            { "学习", "學習" }, // がくしゅう
+            // { "练习", "練習" }, // れんしゅう - 重複のため削除（610行で定義済み）
+            { "掌握", "掌握" }, // しょうあく（同じ字体）
+            { "理解", "理解" }, // りかい（同じ字体）
+            { "明白", "明白" }, // めいはく（同じ字体）
+            { "清楚", "清楚" }, // せいそ（同じ字体）
+            { "糊涂", "糊塗" }, // こと
+            { "困惑", "困惑" }, // こんわく（同じ字体）
+            { "迷惑", "迷惑" }, // めいわく（同じ字体）
+            { "烦恼", "煩惱" }, // はんのう
+            { "担心", "擔心" }, // たんしん
+            { "害怕", "害怕" }, // がいは（同じ字体）
+            { "恐惧", "恐懼" }, // きょうく
+            { "勇敢", "勇敢" }, // ゆうかん（同じ字体）
+            { "勇气", "勇氣" }, // ゆうき
+            { "信心", "信心" }, // しんしん（同じ字体）
+            { "信任", "信任" }, // しんにん（同じ字体）
+            { "相信", "相信" }, // そうしん（同じ字体）
+            { "怀疑", "懷疑" }  // かいぎ
         };
 
         foreach (var (wrong, correct) in basicCorrections)
@@ -487,7 +681,58 @@ public sealed class UniversalMisrecognitionCorrector
         {
             new { Pattern = @"\b(\d+)[Il](\d+)\b", Replacement = "$1$2", Description = "Numbers with letter insertion" },
             new { Pattern = @"\b[Il]{2,}\b", Replacement = "II", Description = "Multiple I/l/1 sequence" },
-            new { Pattern = @"([a-z])[0O]([a-z])", Replacement = "$1o$2", Description = "Letter-number-letter pattern" }
+            new { Pattern = @"([a-z])[0O]([a-z])", Replacement = "$1o$2", Description = "Letter-number-letter pattern" },
+            
+            // 【Phase 2拡充】中国語→日本語の文脈ベース修正
+            // 複合語パターンの修正
+            new { Pattern = @"侵略への备", Replacement = "侵略への備え", Description = "Chinese character in Japanese context: 备→備え" },
+            new { Pattern = @"过方", Replacement = "過方", Description = "Chinese to Japanese compound: 过方→過方" },
+            new { Pattern = @"开始", Replacement = "開始", Description = "Chinese to Japanese compound: 开始→開始" },
+            new { Pattern = @"结束", Replacement = "結束", Description = "Chinese to Japanese compound: 结束→結束" },
+            new { Pattern = @"进攻", Replacement = "進攻", Description = "Chinese to Japanese compound: 进攻→進攻" },
+            new { Pattern = @"防御", Replacement = "防禦", Description = "Chinese to Japanese compound: 防御→防禦" },
+            new { Pattern = @"攻击", Replacement = "攻擊", Description = "Chinese to Japanese compound: 攻击→攻擊" },
+            new { Pattern = @"训练", Replacement = "訓練", Description = "Chinese to Japanese compound: 训练→訓練" },
+            new { Pattern = @"练习", Replacement = "練習", Description = "Chinese to Japanese compound: 练习→練習" },
+            new { Pattern = @"准备", Replacement = "準備", Description = "Chinese to Japanese compound: 准备→準備" },
+            new { Pattern = @"选择", Replacement = "選擇", Description = "Chinese to Japanese compound: 选择→選擇" },
+            new { Pattern = @"决定", Replacement = "決定", Description = "Chinese to Japanese compound: 决定→決定" },
+            new { Pattern = @"计划", Replacement = "計畫", Description = "Chinese to Japanese compound: 计划→計畫" },
+            new { Pattern = @"战术", Replacement = "戰術", Description = "Chinese to Japanese compound: 战术→戰術" },
+            new { Pattern = @"技术", Replacement = "技術", Description = "Chinese to Japanese compound: 技术→技術" },
+            new { Pattern = @"经验", Replacement = "經驗", Description = "Chinese to Japanese compound: 经验→經驗" },
+            new { Pattern = @"学习", Replacement = "學習", Description = "Chinese to Japanese compound: 学习→學習" },
+            new { Pattern = @"实力", Replacement = "實力", Description = "Chinese to Japanese compound: 实力→實力" },
+            new { Pattern = @"潜力", Replacement = "潛力", Description = "Chinese to Japanese compound: 潜力→潛力" },
+            new { Pattern = @"动作", Replacement = "動作", Description = "Chinese to Japanese compound: 动作→動作" },
+            new { Pattern = @"运动", Replacement = "運動", Description = "Chinese to Japanese compound: 运动→運動" },
+            new { Pattern = @"体育", Replacement = "體育", Description = "Chinese to Japanese compound: 体育→體育" },
+            new { Pattern = @"动画", Replacement = "動畫", Description = "Chinese to Japanese compound: 动画→動畫" },
+            new { Pattern = @"电影", Replacement = "電影", Description = "Chinese to Japanese compound: 电影→電影" },
+            new { Pattern = @"游戏", Replacement = "遊戯", Description = "Chinese to Japanese compound: 游戏→遊戯" },
+            
+            // 単字の連続パターン修正
+            new { Pattern = @"个个", Replacement = "個個", Description = "Chinese repetition: 个个→個個" },
+            new { Pattern = @"时时", Replacement = "時時", Description = "Chinese repetition: 时时→時時" },
+            new { Pattern = @"处处", Replacement = "處處", Description = "Chinese repetition: 处处→處處" },
+            new { Pattern = @"间间", Replacement = "間間", Description = "Chinese repetition: 间间→間間" },
+            
+            // 数字との組み合わせパターン
+            new { Pattern = @"(\d+)个", Replacement = "$1個", Description = "Number + Chinese counter: 个→個" },
+            new { Pattern = @"(\d+)时", Replacement = "$1時", Description = "Number + Chinese time: 时→時" },
+            new { Pattern = @"(\d+)门", Replacement = "$1門", Description = "Number + Chinese counter: 门→門" },
+            new { Pattern = @"(\d+)间", Replacement = "$1間", Description = "Number + Chinese counter: 间→間" },
+            
+            // ひらがなとの組み合わせパターン
+            new { Pattern = @"([あ-ん])个([あ-ん])", Replacement = "$1個$2", Description = "Hiragana + Chinese character + Hiragana: 个→個" },
+            new { Pattern = @"([あ-ん])时([あ-ん])", Replacement = "$1時$2", Description = "Hiragana + Chinese character + Hiragana: 时→時" },
+            new { Pattern = @"([あ-ん])开([あ-ん])", Replacement = "$1開$2", Description = "Hiragana + Chinese character + Hiragana: 开→開" },
+            new { Pattern = @"([あ-ん])过([あ-ん])", Replacement = "$1過$2", Description = "Hiragana + Chinese character + Hiragana: 过→過" },
+            
+            // カタカナとの組み合わせパターン
+            new { Pattern = @"([ア-ン])个([ア-ン])", Replacement = "$1個$2", Description = "Katakana + Chinese character + Katakana: 个→個" },
+            new { Pattern = @"([ア-ン])开([ア-ン])", Replacement = "$1開$2", Description = "Katakana + Chinese character + Katakana: 开→開" },
+            new { Pattern = @"([ア-ン])过([ア-ン])", Replacement = "$1過$2", Description = "Katakana + Chinese character + Katakana: 过→過" }
         };
 
         foreach (var pattern in contextualPatterns)

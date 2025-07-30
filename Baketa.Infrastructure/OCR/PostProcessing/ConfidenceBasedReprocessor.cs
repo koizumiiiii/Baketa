@@ -293,7 +293,10 @@ public sealed class ConfidenceBasedReprocessor(
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 拡張領域ログ書き込みエラー: {fileEx.Message}");
             }
             
-            // 2. 改善された設定でOCRを再実行
+            // 2. OCRエンジンの初期化状態を確認・保証
+            await EnsureOcrEngineInitializedAsync(cancellationToken).ConfigureAwait(false);
+            
+            // 3. 改善された設定でOCRを再実行
             var enhancedSettings = CreateEnhancedOcrSettings();
             var originalSettings = _ocrEngine.GetSettings();
             
@@ -611,21 +614,54 @@ public sealed class ConfidenceBasedReprocessor(
     }
 
     /// <summary>
-    /// 再処理用の強化されたOCR設定を作成
+    /// 【Phase 2強化】再処理用の強化されたOCR設定を作成
+    /// 日本語文字検出に特化した最適化設定
     /// </summary>
     private OcrEngineSettings CreateEnhancedOcrSettings()
     {
         var currentSettings = _ocrEngine.GetSettings();
         var enhancedSettings = currentSettings.Clone();
 
-        // 信頼度の低いテキスト用に設定を調整
-        enhancedSettings.DetectionThreshold = Math.Max(0.05, currentSettings.DetectionThreshold * 0.7); // 閾値を下げる
+        // 【Phase 2改善】日本語文字検出に特化した設定調整
+        
+        // 1. 検出閾値の最適化 - より低い閾値で微細な文字も捕捉
+        enhancedSettings.DetectionThreshold = Math.Max(0.03, currentSettings.DetectionThreshold * 0.5);
+        
+        // 2. 認識閾値の調整 - 中国語文字も含めて幅広く認識
+        enhancedSettings.RecognitionThreshold = Math.Max(0.1, currentSettings.RecognitionThreshold * 0.6);
+        
+        // 3. 前処理とLanguageModel強制有効化
         enhancedSettings.EnablePreprocessing = true;
-        enhancedSettings.UseLanguageModel = true; // 言語モデルを有効化（文脈ベース誤認識修正）
+        enhancedSettings.UseLanguageModel = true;
+        
+        // 4. 言語設定の最適化 - 日本語に特化
+        enhancedSettings.Language = "jpn";
+        
+        // 5. 最大検出数の増加 - 細かい文字も見逃さない
+        enhancedSettings.MaxDetections = Math.Max(currentSettings.MaxDetections, 300);
+        
+        // 6. 方向分類の有効化 - 回転したテキストにも対応
+        enhancedSettings.UseDirectionClassification = true;
+        
+        // 7. マルチスレッド処理で高速化
+        enhancedSettings.EnableMultiThread = true;
+        enhancedSettings.WorkerCount = Math.Max(2, currentSettings.WorkerCount);
 
+        // 【Phase 2ログ強化】設定変更の詳細ログ
+        _logger.LogDebug("【Phase 2】再処理用設定作成: DetectionThreshold={DetectionThreshold:F3}, RecognitionThreshold={RecognitionThreshold:F3}, 前処理={Preprocessing}, LM={LanguageModel}, 最大検出数={MaxDetections}, 方向分類={DirectionClassification}", 
+            enhancedSettings.DetectionThreshold, enhancedSettings.RecognitionThreshold, enhancedSettings.EnablePreprocessing, enhancedSettings.UseLanguageModel, enhancedSettings.MaxDetections, enhancedSettings.UseDirectionClassification);
 
-        _logger.LogDebug("再処理用設定作成: 閾値={Threshold:F3}, 前処理={Preprocessing}, LM={LanguageModel}", 
-            enhancedSettings.DetectionThreshold, enhancedSettings.EnablePreprocessing, enhancedSettings.UseLanguageModel);
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DIRECT] 【Phase 2】OCR設定最適化: DetectionThreshold={currentSettings.DetectionThreshold:F3}→{enhancedSettings.DetectionThreshold:F3}, RecognitionThreshold={currentSettings.RecognitionThreshold:F3}→{enhancedSettings.RecognitionThreshold:F3}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     └─ 拡張設定: UseLanguageModel={enhancedSettings.UseLanguageModel}, MaxDetections={enhancedSettings.MaxDetections}, UseDirectionClassification={enhancedSettings.UseDirectionClassification}{Environment.NewLine}");
+        }
+        catch (Exception fileEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Phase 2設定ログ書き込みエラー: {fileEx.Message}");
+        }
 
         return enhancedSettings;
     }
@@ -764,6 +800,81 @@ public sealed class ConfidenceBasedReprocessor(
     private static bool ContainsSmallText(TextChunk chunk)
     {
         return chunk.CombinedBounds.Height <= 20 || chunk.CombinedBounds.Width <= 50;
+    }
+
+    /// <summary>
+    /// OCRエンジンが初期化されていることを保証する
+    /// </summary>
+    private async Task EnsureOcrEngineInitializedAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // OCRエンジンの初期化状態を確認（プロパティで確認）
+            var isInitialized = _ocrEngine.IsInitialized;
+            
+            // 初期化ログを記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DIRECT] OCRエンジン初期化状態確認: IsInitialized={isInitialized}{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化状態ログ書き込みエラー: {fileEx.Message}");
+            }
+            
+            if (!isInitialized)
+            {
+                // 初期化が必要な場合は実行
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DIRECT] OCRエンジン初期化開始: InitializeAsync呼び出し{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化開始ログ書き込みエラー: {fileEx.Message}");
+                }
+                
+                var initSuccess = await _ocrEngine.InitializeAsync(settings: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] OCRエンジン初期化完了: Success={initSuccess}{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化完了ログ書き込みエラー: {fileEx.Message}");
+                }
+                
+                if (initSuccess)
+                {
+                    _logger.LogInformation("ConfidenceBasedReprocessor: OCRエンジンを初期化しました");
+                }
+                else
+                {
+                    _logger.LogError("ConfidenceBasedReprocessor: OCRエンジンの初期化に失敗しました");
+                    throw new InvalidOperationException("OCRエンジンの初期化に失敗しました");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // 初期化エラーをログ記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] OCRエンジン初期化エラー: {ex.Message}{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化エラーログ書き込みエラー: {fileEx.Message}");
+            }
+            
+            _logger.LogError(ex, "ConfidenceBasedReprocessor: OCRエンジンの初期化に失敗しました");
+            throw;
+        }
     }
 }
 
