@@ -72,7 +72,7 @@ public class CaptureStrategyMockTests
         mockImage.Setup(x => x.Width).Returns(1920);
         mockImage.Setup(x => x.Height).Returns(1080);
 
-        _mockCapturer.Setup(x => x.CaptureScreenAsync())
+        _mockCapturer.Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ReturnsAsync(mockImage.Object);
 
         var windowHandle = new IntPtr(0x12345);
@@ -81,8 +81,12 @@ public class CaptureStrategyMockTests
         var result = await strategy.ExecuteCaptureAsync(windowHandle, _defaultOptions);
 
         // Assert
-        Assert.True(result.Success, "キャプチャは成功するべき");
-        Assert.Single(result.Images, "キャプチャされた画像は1つであるべき");
+        Assert.True(result.Success, $"キャプチャは成功するべき。エラー: {result.ErrorMessage}");
+        Assert.NotNull(result.Images);
+        Assert.Equal(1, result.Images.Count);
+        Assert.NotNull(result.Images[0]);
+        Assert.Equal(1920, result.Images[0].Width);
+        Assert.Equal(1080, result.Images[0].Height);
         Assert.Equal("DirectFullScreen", result.StrategyName);
         Assert.Equal("HighPerformance", result.Metrics.PerformanceCategory);
         Assert.True(result.Metrics.TotalProcessingTime > TimeSpan.Zero);
@@ -94,7 +98,7 @@ public class CaptureStrategyMockTests
         // Arrange
         var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
         
-        _mockCapturer.Setup(x => x.CaptureScreenAsync())
+        _mockCapturer.Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ThrowsAsync(new InvalidOperationException("キャプチャに失敗しました"));
 
         var windowHandle = new IntPtr(0x12345);
@@ -106,7 +110,8 @@ public class CaptureStrategyMockTests
         Assert.False(result.Success, "キャプチャは失敗するべき");
         Assert.Empty(result.Images);
         Assert.Equal("DirectFullScreen", result.StrategyName);
-        Assert.Contains("キャプチャイメージの取得に失敗", result.ErrorMessage);
+        // エラーメッセージが実際の戦略例外でラップされている
+        Assert.Contains("直接キャプチ", result.ErrorMessage);
     }
 
     [Fact]

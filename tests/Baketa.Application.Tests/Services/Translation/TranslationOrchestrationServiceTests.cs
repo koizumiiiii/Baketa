@@ -37,6 +37,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
+    private readonly CoordinateBasedTranslationService? _coordinateBasedTranslationService;
     
     private readonly TranslationOrchestrationService _service;
     private bool _disposed;
@@ -64,13 +65,16 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // OCR Engine のモック設定
         SetupOcrEngineMocks();
 
+        // CoordinateBasedTranslationService の初期化（テスト用にnull）
+        _coordinateBasedTranslationService = null;
+
         // テスト対象サービスのインスタンス作成
         _service = new TranslationOrchestrationService(
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
             _ocrEngineMock.Object,
             _translationEngineFactoryMock.Object,
-            Mock.Of<CoordinateBasedTranslationService>(), // 座標ベース翻訳サービスのモック
+            _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
             _loggerMock.Object);
     }
 

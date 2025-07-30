@@ -447,7 +447,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
         "HistoryConfidenceThreshold" => 0.5,
         "TemplateUpdateThreshold" => 0.8,
         "MinTemplateSuccessRate" => 0.6,
-        _ => 0
+        _ => 0.0  // doubleリテラルに統一
     };
 
     #endregion

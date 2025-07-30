@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
@@ -202,6 +203,16 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
     private readonly ILogger<BatchOcrProcessor>? _logger = logger;
+    private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor = new(
+        logger as ILogger<CoordinateBasedLineBreakProcessor> ?? 
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<CoordinateBasedLineBreakProcessor>.Instance);
+    private readonly ConfidenceBasedReprocessor _confidenceReprocessor = new(
+        ocrEngine,
+        logger as ILogger<ConfidenceBasedReprocessor> ?? 
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<ConfidenceBasedReprocessor>.Instance);
+    private readonly UniversalMisrecognitionCorrector _misrecognitionCorrector = new(
+        logger as ILogger<UniversalMisrecognitionCorrector> ?? 
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<UniversalMisrecognitionCorrector>.Instance);
     
     private BatchOcrOptions _options = new();
     private readonly ConcurrentQueue<ProcessingMetric> _processingHistory = new();
@@ -256,12 +267,23 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
             
             // 3. テキストチャンクのグルーピング
             System.Console.WriteLine("📦 Phase 6デバッグ: GroupTextIntoChunksAsync開始");
-            var textChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
-            System.Console.WriteLine($"📦 Phase 6デバッグ: チャンクグルーピング完了 - チャンク数={textChunks.Count}");
+            var initialTextChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"📦 Phase 6デバッグ: チャンクグルーピング完了 - チャンク数={initialTextChunks.Count}");
+            
+            // 4. 信頼度ベース再処理
+            System.Console.WriteLine("🔄 Phase 6デバッグ: 信頼度ベース再処理開始");
+            var reprocessedChunks = await _confidenceReprocessor.ReprocessLowConfidenceChunksAsync(
+                initialTextChunks, image, cancellationToken).ConfigureAwait(false);
+            System.Console.WriteLine($"🔄 Phase 6デバッグ: 信頼度ベース再処理完了 - チャンク数={reprocessedChunks.Count}");
+            
+            // 5. 普遍的誤認識修正
+            System.Console.WriteLine("🔧 Phase 6デバッグ: 普遍的誤認識修正開始");
+            var textChunks = _misrecognitionCorrector.CorrectMisrecognitions(reprocessedChunks);
+            System.Console.WriteLine($"🔧 Phase 6デバッグ: 普遍的誤認識修正完了 - 最終チャンク数={textChunks.Count}");
             
             stopwatch.Stop();
             
-            // 4. パフォーマンス統計更新
+            // 6. パフォーマンス統計更新
             UpdatePerformanceMetrics(processingStartTime, stopwatch.Elapsed, textChunks.Count, true);
             
             _logger?.LogInformation("✅ バッチOCR処理完了 - 処理時間: {ElapsedMs}ms, チャンク数: {ChunkCount}", 
@@ -475,7 +497,21 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
 
                 // チャンクのバウンディングボックス計算
                 var combinedBounds = CalculateCombinedBounds(groupedRegions);
-                var combinedText = CombineTextsIntelligently(groupedRegions, ocrResults.LanguageCode);
+                
+                // 座標情報ベースの改行処理を適用
+                var rawCombinedText = CombineTextsIntelligently(groupedRegions, ocrResults.LanguageCode);
+                var positionedTextChunks = positionedResults.Select(r => new TextChunk
+                {
+                    ChunkId = r.ChunkId,
+                    TextResults = [r],
+                    CombinedBounds = r.BoundingBox,
+                    CombinedText = r.Text,
+                    SourceWindowHandle = windowHandle,
+                    DetectedLanguage = r.DetectedLanguage
+                }).ToList();
+                
+                // 座標ベースの改行処理でテキストを最適化
+                var combinedText = _lineBreakProcessor.ProcessLineBreaks(positionedTextChunks);
 
                 var chunk = new TextChunk
                 {

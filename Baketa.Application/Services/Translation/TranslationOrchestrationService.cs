@@ -89,14 +89,13 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ISettingsService settingsService,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         ITranslationEngineFactory translationEngineFactory,
-        CoordinateBasedTranslationService coordinateBasedTranslation,
+        CoordinateBasedTranslationService? coordinateBasedTranslation,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
         ArgumentNullException.ThrowIfNull(translationEngineFactory);
-        ArgumentNullException.ThrowIfNull(coordinateBasedTranslation);
         
         _captureService = captureService;
         _settingsService = settingsService;
@@ -144,13 +143,30 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <inheritdoc />
     public async Task StartAutomaticTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default)
     {
-        DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し");
-        DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
-        DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
-        DebugLogUtility.WriteLog($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString(CultureInfo.InvariantCulture) ?? "null (画面全体)")}");
+        // メソッド呼び出しの絶対最初にファイル直接書き込み（最高優先度）
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 [DIRECT] StartAutomaticTranslationAsync開始 - Hash={this.GetHashCode()}{Environment.NewLine}");
+        }
+        catch (Exception directEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"直接ファイル書き込みエラー: {directEx.Message}");
+        }
         
-        // 翻訳対象ウィンドウハンドルを保存
-        _targetWindowHandle = targetWindowHandle;
+        // 複数の方法でログを記録
+        DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し - this={this.GetType().FullName}@{this.GetHashCode()}");
+        Console.WriteLine($"🎬 StartAutomaticTranslationAsync呼び出し - this={this.GetType().FullName}@{this.GetHashCode()}");
+        
+        try
+        {
+            DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し");
+            DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
+            DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
+            DebugLogUtility.WriteLog($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString(CultureInfo.InvariantCulture) ?? "null (画面全体)")}");
+            
+            // 翻訳対象ウィンドウハンドルを保存
+            _targetWindowHandle = targetWindowHandle;
         
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -175,11 +191,33 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         //     .ConfigureAwait(false);
 
         // バックグラウンドタスクで自動翻訳を実行
-        _automaticTranslationTask = Task.Run(
-            () => ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token),
-            _automaticTranslationCts.Token);
+        DebugLogUtility.WriteLog($"🎬 Task.Run開始前");
+        _automaticTranslationTask = Task.Run(async () =>
+        {
+            DebugLogUtility.WriteLog($"🎬 Task.Run内部開始");
+            try
+            {
+                await ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                DebugLogUtility.WriteLog($"💥 ExecuteAutomaticTranslationLoopAsync例外: {ex.Message}");
+                _logger?.LogError(ex, "自動翻訳ループで予期しないエラーが発生しました");
+                throw;
+            }
+            DebugLogUtility.WriteLog($"🎬 Task.Run内部終了");
+        }, _automaticTranslationCts.Token);
+        DebugLogUtility.WriteLog($"🎬 Task.Run開始後");
 
-        await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"💥 StartAutomaticTranslationAsync例外: {ex.GetType().Name}: {ex.Message}");
+            DebugLogUtility.WriteLog($"💥 スタックトレース: {ex.StackTrace}");
+            _logger?.LogError(ex, "StartAutomaticTranslationAsync実行中にエラーが発生しました");
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -194,6 +232,17 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         }
 
         _logger?.LogInformation("自動翻訳を停止します");
+        
+        // 直接ファイル書き込みで停止処理開始を記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 [DIRECT] TranslationOrchestrationService - 自動翻訳停止開始{Environment.NewLine}");
+        }
+        catch (Exception fileEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"翻訳停止ログ書き込みエラー: {fileEx.Message}");
+        }
 
         try
         {
@@ -235,6 +284,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _automaticTranslationCts = null;
             _automaticTranslationTask = null;
             _isAutomaticTranslationActive = false;
+            
+            // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
+            lock (_lastTranslatedTextLock)
+            {
+                var oldLastText = _lastTranslatedText;
+                _lastTranslatedText = string.Empty;
+                
+                // 直接ファイル書き込みで状態リセットを記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] TranslationOrchestrationService - 状態リセット完了: 前回テキスト='{oldLastText}' → ''、翻訳アクティブ=false{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"状態リセットログ書き込みエラー: {fileEx.Message}");
+                }
+            }
 
             // TODO: モード変更イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(
