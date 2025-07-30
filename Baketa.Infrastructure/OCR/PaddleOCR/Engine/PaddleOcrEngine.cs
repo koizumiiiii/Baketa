@@ -21,6 +21,8 @@ using Baketa.Core.Services.Imaging;
 using Baketa.Infrastructure.OCR.Preprocessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.TextProcessing;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.OCR.Results;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -256,6 +258,17 @@ public sealed class PaddleOcrEngine(
             }
             
             // 📍 座標ログ出力 (ユーザー要求: 認識したテキストとともに座標位置もログで確認)
+            // 直接ファイル書き込みでOCR結果を記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📍 [DIRECT] PaddleOcrEngine - OCR処理完了: 検出領域数={textRegions?.Count ?? 0}{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"PaddleOcrEngine ファイル書き込みエラー: {fileEx.Message}");
+            }
+            
             if (textRegions != null && textRegions.Count > 0)
             {
                 _logger?.LogInformation("📍 OCR座標ログ - 検出されたテキスト領域: {Count}個", textRegions.Count);
@@ -264,6 +277,17 @@ public sealed class PaddleOcrEngine(
                     var region = textRegions[i];
                     _logger?.LogInformation("📍 OCR結果[{Index}]: Text='{Text}' | Bounds=({X},{Y},{Width},{Height}) | Confidence={Confidence:F3}",
                         i, region.Text, region.Bounds.X, region.Bounds.Y, region.Bounds.Width, region.Bounds.Height, region.Confidence);
+                    
+                    // 直接ファイル書き込みでOCR結果の詳細を記録
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📍 [DIRECT] OCR結果[{i}]: Text='{region.Text}' | Bounds=({region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}) | Confidence={region.Confidence:F3}{Environment.NewLine}");
+                    }
+                    catch (Exception fileEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"PaddleOcrEngine 詳細ログ書き込みエラー: {fileEx.Message}");
+                    }
                 }
             }
             else
@@ -277,6 +301,9 @@ public sealed class PaddleOcrEngine(
             UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, true);
             
             progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了"));
+            
+            // TODO: OCR精度向上機能を後で統合予定（DI循環参照問題のため一時的に無効化）
+            // IReadOnlyList<TextChunk> processedTextChunks = [];
             
             // テキスト結合アルゴリズムを適用
             string? mergedText = null;
@@ -1757,16 +1784,24 @@ public sealed class PaddleOcrEngine(
                 var originalText = textProperty?.GetValue(paddleResult) as string ?? string.Empty;
                 DebugLogUtility.WriteLog($"     📖 元全体テキスト: '{originalText}'");
                 
-                // 文字形状類似性に基づく誤認識修正を適用
-                var correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
-                var text = correctedText;
-                
-                if (originalText != correctedText)
+                // 文字形状類似性に基づく誤認識修正を適用（日本語のみ）
+                var correctedText = originalText;
+                if (IsJapaneseLanguage())
                 {
-                    DebugLogUtility.WriteLog($"     🔧 修正後全体テキスト: '{correctedText}'");
-                    var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
-                    DebugLogUtility.WriteLog($"     📊 全体修正信頼度: {correctionConfidence:F2}");
+                    correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
+                    
+                    if (originalText != correctedText)
+                    {
+                        DebugLogUtility.WriteLog($"     🔧 修正後全体テキスト: '{correctedText}'");
+                        var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
+                        DebugLogUtility.WriteLog($"     📊 全体修正信頼度: {correctionConfidence:F2}");
+                    }
                 }
+                else
+                {
+                    DebugLogUtility.WriteLog($"     ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
+                }
+                var text = correctedText;
                 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
@@ -1824,16 +1859,24 @@ public sealed class PaddleOcrEngine(
             var originalText = textProperty?.GetValue(regionItem) as string ?? string.Empty;
             DebugLogUtility.WriteLog($"         📖 元テキスト: '{originalText}'");
             
-            // 文字形状類似性に基づく誤認識修正を適用
-            var correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
-            var text = correctedText;
-            
-            if (originalText != correctedText)
+            // 文字形状類似性に基づく誤認識修正を適用（日本語のみ）
+            var correctedText = originalText;
+            if (IsJapaneseLanguage())
             {
-                DebugLogUtility.WriteLog($"         🔧 修正後テキスト: '{correctedText}'");
-                var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
-                DebugLogUtility.WriteLog($"         📊 修正信頼度: {correctionConfidence:F2}");
+                correctedText = CharacterSimilarityCorrector.CorrectSimilarityErrors(originalText, enableLogging: true);
+                
+                if (originalText != correctedText)
+                {
+                    DebugLogUtility.WriteLog($"         🔧 修正後テキスト: '{correctedText}'");
+                    var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
+                    DebugLogUtility.WriteLog($"         📊 修正信頼度: {correctionConfidence:F2}");
+                }
             }
+            else
+            {
+                DebugLogUtility.WriteLog($"         ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
+            }
+            var text = correctedText;
             
             if (!string.IsNullOrWhiteSpace(text))
             {
@@ -2595,6 +2638,18 @@ public sealed class PaddleOcrEngine(
     // 削除: 言語別実行時最適化関数
     // PaddleOCR v3.0.1では実行時パラメータ変更APIが存在しないため、
     // これらの関数は効果がない。代わりに画像前処理による品質向上を行う。
+
+    /// <summary>
+    /// 現在の設定が日本語言語かどうかを判定
+    /// </summary>
+    /// <returns>日本語の場合true</returns>
+    private bool IsJapaneseLanguage()
+    {
+        return _settings.Language?.Equals("jpn", StringComparison.OrdinalIgnoreCase) == true ||
+               _settings.Language?.Equals("ja", StringComparison.OrdinalIgnoreCase) == true ||
+               _settings.Language?.Equals("japanese", StringComparison.OrdinalIgnoreCase) == true ||
+               _settings.Language?.Equals("日本語", StringComparison.OrdinalIgnoreCase) == true;
+    }
 
     private void ThrowIfDisposed()
     {

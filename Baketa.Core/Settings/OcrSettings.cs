@@ -205,6 +205,13 @@ public sealed class OcrSettings
     public bool SaveProcessedImages { get; set; } = false;
     
     /// <summary>
+    /// 言語モデルを使用するか（PaddleOCR use_lm=True）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "言語モデル使用", 
+        Description = "PaddleOCRの言語モデルを使用してOCR精度を向上させます")]
+    public bool UseLanguageModel { get; set; } = false;
+    
+    /// <summary>
     /// テキスト領域検出設定
     /// </summary>
     public TextDetectionSettings TextDetectionSettings { get; set; } = new();
@@ -245,6 +252,7 @@ public sealed class OcrSettings
             EnableVerboseLogging = EnableVerboseLogging,
             SaveOcrResults = SaveOcrResults,
             SaveProcessedImages = SaveProcessedImages,
+            UseLanguageModel = UseLanguageModel,
             TextDetectionSettings = TextDetectionSettings,
             TextDetectionEnsemble = TextDetectionEnsemble
         };

@@ -327,6 +327,16 @@ public class OcrEngineSettings
     /// マルチスレッド時のワーカー数
     /// </summary>
     public int WorkerCount { get; set; } = 2;
+    
+    /// <summary>
+    /// 言語モデルを使用するか（PaddleOCR use_lm=True）
+    /// </summary>
+    public bool UseLanguageModel { get; set; }
+    
+    /// <summary>
+    /// 前処理を有効にするか
+    /// </summary>
+    public bool EnablePreprocessing { get; set; } = true;
 
     /// <summary>
     /// 設定の妥当性を検証する
@@ -375,7 +385,9 @@ public class OcrEngineSettings
             UseGpu = UseGpu,
             GpuDeviceId = GpuDeviceId,
             EnableMultiThread = EnableMultiThread,
-            WorkerCount = WorkerCount
+            WorkerCount = WorkerCount,
+            UseLanguageModel = UseLanguageModel,
+            EnablePreprocessing = EnablePreprocessing
         };
     }
 }

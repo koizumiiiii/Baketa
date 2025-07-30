@@ -74,6 +74,18 @@ public class TranslationFlowEventProcessor :
     /// </summary>
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
+        // 確実にログを記録するため、ファイル直接書き込みを最優先で実行
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DIRECT] TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
+        }
+        catch (Exception fileEx)
+        {
+            // ファイル書き込みエラーがあってもメソッドは継続
+            System.Diagnostics.Debug.WriteLine($"ファイル書き込みエラー: {fileEx.Message}");
+        }
+        
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
         Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
         Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
@@ -146,10 +158,7 @@ public class TranslationFlowEventProcessor :
             }
 
             // 2. 古いオーバーレイマネージャーは使用しない（マルチウィンドウシステムに移行）
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ2開始 - 古いオーバーレイスキップ");
             _logger.LogDebug("Skipping old overlay manager - using multi-window system");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⏭️ 古いオーバーレイシステムをスキップ - マルチウィンドウシステムを使用");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ2完了");
 
             // 3. 実際の翻訳処理を開始
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ3開始 - 翻訳処理準備");
@@ -412,8 +421,25 @@ public class TranslationFlowEventProcessor :
             DebugLogUtility.WriteLog($"   🔍 サービス状態: {(_translationService != null ? "利用可能" : "null")}");
             
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] _translationService の実際の型: {_translationService?.GetType()?.FullName ?? "null"}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] _translationService のハッシュコード: {_translationService?.GetHashCode() ?? -1}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] _translationService の基底型: {_translationService?.GetType()?.BaseType?.FullName ?? "null"}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] インターフェース実装: {string.Join(", ", _translationService?.GetType()?.GetInterfaces()?.Select(i => i.Name) ?? [])}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] StartAutomaticTranslationAsync呼び出し直前");
-            await _translationService!.StartAutomaticTranslationAsync(targetWindow.Handle).ConfigureAwait(false);
+            
+            // メソッド呼び出しをtry-catchで包み、例外をキャッチ
+            try
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] StartAutomaticTranslationAsync内部try開始");
+                await _translationService!.StartAutomaticTranslationAsync(targetWindow.Handle).ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] StartAutomaticTranslationAsync内部try完了");
+            }
+            catch (Exception ex)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 [ProcessTranslationAsync] StartAutomaticTranslationAsync例外: {ex.GetType().Name}: {ex.Message}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 [ProcessTranslationAsync] スタックトレース: {ex.StackTrace}");
+                throw; // 例外を再スロー
+            }
+            
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] StartAutomaticTranslationAsync呼び出し完了");
             DebugLogUtility.WriteLog("🏁 TranslationService.StartAutomaticTranslationAsync完了");
             DebugLogUtility.WriteLog($"   🔍 自動翻訳アクティブ: {_translationService.IsAutomaticTranslationActive}");

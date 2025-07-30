@@ -211,8 +211,28 @@ namespace Baketa.UI.ViewModels;
                     
                     if (selectedWindow != null)
                     {
-                        // 翻訳開始イベントを発行
+                        // 翻訳開始イベントを発行（ログ追加）
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行開始: {selectedWindow.Title}{Environment.NewLine}");
+                        }
+                        catch (Exception fileEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"HomeViewModel ファイル書き込みエラー: {fileEx.Message}");
+                        }
+                        
                         await PublishEventAsync(new StartTranslationRequestEvent(selectedWindow)).ConfigureAwait(false);
+                        
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行完了: {selectedWindow.Title}{Environment.NewLine}");
+                        }
+                        catch (Exception fileEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"HomeViewModel ファイル書き込みエラー: {fileEx.Message}");
+                        }
                     }
                 }
             }

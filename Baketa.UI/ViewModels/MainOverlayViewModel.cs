@@ -53,6 +53,17 @@ public class MainOverlayViewModel : ViewModelBase
         DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         
+        // 直接ファイル書き込みでも記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel初期化完了{Environment.NewLine}");
+        }
+        catch (Exception fileEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"MainOverlayViewModel初期化 ファイル書き込みエラー: {fileEx.Message}");
+        }
+        
         // OCR初期化状態を監視するタスクを開始
         _ = Task.Run(MonitorOcrInitializationAsync);
         
@@ -674,7 +685,30 @@ public class MainOverlayViewModel : ViewModelBase
             var startTranslationEvent = new StartTranslationRequestEvent(selectedWindow);
             DebugLogUtility.WriteLog($"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
+            
+            // 直接ファイル書き込みでイベント発行を記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel - StartTranslationRequestEvent発行開始: EventID={startTranslationEvent.Id}, Window={selectedWindow.Title}{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"MainOverlayViewModel ファイル書き込みエラー: {fileEx.Message}");
+            }
+            
             await PublishEventAsync(startTranslationEvent).ConfigureAwait(false);
+            
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel - StartTranslationRequestEvent発行完了: EventID={startTranslationEvent.Id}{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"MainOverlayViewModel ファイル書き込みエラー: {fileEx.Message}");
+            }
+            
             eventTimer.Stop();
             DebugLogUtility.WriteLog($"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
