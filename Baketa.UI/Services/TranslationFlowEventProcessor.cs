@@ -277,7 +277,7 @@ public class TranslationFlowEventProcessor :
     }
 
     /// <summary>
-    /// 翻訳表示切り替え要求イベントの処理
+    /// 翻訳表示切り替え要求イベントの処理（高速化版）
     /// </summary>
     public async Task HandleAsync(ToggleTranslationDisplayRequestEvent eventData)
     {
@@ -285,21 +285,14 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogDebug("翻訳表示切り替え要求を処理中: IsVisible={IsVisible}", eventData.IsVisible);
 
-            // インプレースオーバーレイの表示/非表示を切り替え
-            if (eventData.IsVisible)
-            {
-                await _inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
-            }
-            else
-            {
-                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
-            }
+            // 高速化: オーバーレイの削除/再作成ではなく可視性のみを変更
+            await _inPlaceOverlayManager.SetAllOverlaysVisibilityAsync(eventData.IsVisible).ConfigureAwait(false);
 
             // 表示状態変更イベントを発行
             var visibilityEvent = new TranslationDisplayVisibilityChangedEvent(eventData.IsVisible);
             await _eventAggregator.PublishAsync(visibilityEvent).ConfigureAwait(false);
 
-            _logger.LogDebug("翻訳表示切り替えが完了しました");
+            _logger.LogDebug("翻訳表示切り替えが完了しました（高速化版）");
         }
         catch (Exception ex)
         {
