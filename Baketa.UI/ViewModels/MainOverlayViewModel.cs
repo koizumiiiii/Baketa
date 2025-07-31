@@ -866,19 +866,8 @@ public class MainOverlayViewModel : ViewModelBase
         
         IsTranslationResultVisible = newVisibility;
         
-        // オーバーレイマネージャーを使用して表示/非表示を切り替え
-        if (IsTranslationResultVisible)
-        {
-            DebugLogUtility.WriteLog("👁️ オーバーレイ表示");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "👁️ オーバーレイ表示");
-            // ARオーバーレイは自動で表示管理（表示はTextChunk個別処理）
-        }
-        else
-        {
-            DebugLogUtility.WriteLog("🙈 オーバーレイ非表示");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🙈 オーバーレイ非表示");
-            await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
-        }
+        // 重複処理除去: オーバーレイの制御はTranslationFlowEventProcessorで一元管理
+        DebugLogUtility.WriteLog($"👁️ オーバーレイ表示状態変更: {IsTranslationResultVisible} (処理はイベント経由で実行)");
         
         var toggleEvent = new ToggleTranslationDisplayRequestEvent(IsTranslationResultVisible);
         await PublishEventAsync(toggleEvent).ConfigureAwait(false);

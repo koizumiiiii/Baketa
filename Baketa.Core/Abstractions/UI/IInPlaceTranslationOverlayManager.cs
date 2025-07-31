@@ -32,6 +32,14 @@ public interface IInPlaceTranslationOverlayManager
     Task HideAllInPlaceOverlaysAsync();
     
     /// <summary>
+    /// すべてのインプレースオーバーレイの可視性を切り替え（高速化版）
+    /// オーバーレイの削除/再作成ではなく、可視性プロパティのみを変更
+    /// </summary>
+    /// <param name="visible">表示する場合はtrue、非表示にする場合はfalse</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default);
+    
+    /// <summary>
     /// インプレースオーバーレイをリセット（Stop時に呼び出し）
     /// </summary>
     Task ResetAsync();

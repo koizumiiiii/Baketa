@@ -238,6 +238,67 @@ public class InPlaceTranslationOverlayManager(
     }
 
     /// <summary>
+    /// すべてのインプレースオーバーレイの可視性を切り替え（高速化版）
+    /// オーバーレイの削除/再作成ではなく、可視性プロパティのみを変更
+    /// </summary>
+    public async Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"👁️ すべてのインプレースオーバーレイ可視性切り替え開始: {visible}");
+        _logger.LogDebug("オーバーレイ可視性切り替え: {Visible}, 対象数: {Count}", visible, _activeOverlays.Count);
+        
+        if (_activeOverlays.IsEmpty)
+        {
+            Console.WriteLine("⚠️ アクティブなオーバーレイが存在しません - 可視性切り替えをスキップ");
+            _logger.LogDebug("アクティブなオーバーレイが存在しないため可視性切り替えをスキップ");
+            return;
+        }
+
+        // アクティブなオーバーレイをコピー（列挙中の変更を避けるため）
+        var overlaysToToggle = new List<KeyValuePair<int, InPlaceTranslationOverlayWindow>>();
+        foreach (var kvp in _activeOverlays)
+        {
+            overlaysToToggle.Add(kvp);
+        }
+        
+        // すべてのオーバーレイの可視性を並行して切り替え
+        var visibilityTasks = overlaysToToggle.Select(async kvp =>
+        {
+            try
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+                
+                // UIスレッドで可視性を変更
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        kvp.Value.IsVisible = visible;
+                        _logger.LogTrace("オーバーレイ可視性変更: ChunkId={ChunkId}, Visible={Visible}", kvp.Key, visible);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "オーバーレイ可視性変更エラー: ChunkId={ChunkId}", kvp.Key);
+                    }
+                }, DispatcherPriority.Normal, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("オーバーレイ可視性変更がキャンセルされました: ChunkId={ChunkId}", kvp.Key);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "オーバーレイ可視性切り替えエラー - ChunkId: {ChunkId}", kvp.Key);
+            }
+        });
+        
+        await Task.WhenAll(visibilityTasks).ConfigureAwait(false);
+        
+        Console.WriteLine($"✅ すべてのインプレースオーバーレイ可視性切り替え完了: {visible} - 処理済み: {overlaysToToggle.Count}");
+        _logger.LogDebug("オーバーレイ可視性切り替え完了: {Visible}, 処理数: {Count}", visible, overlaysToToggle.Count);
+    }
+
+    /// <summary>
     /// インプレースオーバーレイをリセット（Stop時に呼び出し）
     /// </summary>
     public async Task ResetAsync()
