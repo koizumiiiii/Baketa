@@ -207,7 +207,29 @@ public sealed class PaddleOcrEngine(
     {
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
-        ThrowIfNotInitialized();
+        
+        // 初期化ガード: 未初期化の場合は自動初期化を実行（スレッドセーフ）
+        if (!IsInitialized)
+        {
+            lock (_lockObject)
+            {
+                // ダブルチェックロッキングパターンで競合状態を回避
+                if (!IsInitialized)
+                {
+                    DebugLogUtility.WriteLog("⚠️ OCRエンジンが未初期化のため、自動初期化を実行します");
+                    
+                    // 初期化処理は非同期だが、ここではlockを使用しているため同期的に処理
+                    var initTask = InitializeAsync(_settings, cancellationToken);
+                    var initResult = initTask.GetAwaiter().GetResult();
+                    
+                    if (!initResult)
+                    {
+                        throw new InvalidOperationException("OCRエンジンの自動初期化に失敗しました。システム要件を確認してください。");
+                    }
+                    DebugLogUtility.WriteLog("✅ OCRエンジンの自動初期化が完了しました");
+                }
+            }
+        }
 
         var stopwatch = Stopwatch.StartNew();
         
