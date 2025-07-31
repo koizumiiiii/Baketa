@@ -21,7 +21,7 @@ namespace Baketa.Application.Services.Translation;
 public sealed class CoordinateBasedTranslationService : IDisposable
 {
     private readonly IBatchOcrProcessor _batchOcrProcessor;
-    private readonly IARTranslationOverlayManager _overlayManager;
+    private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ITranslationService _translationService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
@@ -29,7 +29,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
     public CoordinateBasedTranslationService(
         IBatchOcrProcessor batchOcrProcessor,
-        IARTranslationOverlayManager overlayManager,
+        IInPlaceTranslationOverlayManager overlayManager,
         ITranslationService translationService,
         IServiceProvider serviceProvider,
         ILogger<CoordinateBasedTranslationService>? logger = null)
@@ -40,7 +40,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger;
         
-        _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized");
+        _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
+        
+        // 直接書き込みで初期化ログ
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] CoordinateBasedTranslationService作成: Hash={this.GetHashCode()}{Environment.NewLine}");
+        }
+        catch { }
     }
 
     /// <summary>
@@ -52,7 +60,24 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         IntPtr windowHandle,
         CancellationToken cancellationToken = default)
     {
+        // 直接書き込みでメソッド開始をログ
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ProcessWithCoordinateBasedTranslationAsync内部開始（直接書き込み）{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] CoordinateBasedTranslationService状態: _disposed={_disposed}{Environment.NewLine}");
+        }
+        catch { }
+        
         ThrowIfDisposed();
+        
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳処理開始（直接書き込み） - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}{Environment.NewLine}");
+        }
+        catch { }
         
         try
         {
@@ -63,8 +88,23 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             // バッチOCR処理でテキストチャンクを取得
             _logger?.LogDebug("📦 バッチOCR処理開始");
             DebugLogUtility.WriteLog("📦 バッチOCR処理開始");
+            
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 バッチOCR処理呼び出し直前（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
+            
             var textChunks = await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
+                
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 バッチOCR処理完了（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
             
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}", textChunks.Count);
             DebugLogUtility.WriteLog($"✅ バッチOCR完了 - チャンク数: {textChunks.Count}");
@@ -84,12 +124,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 DebugLogUtility.WriteLog($"   翻訳テキスト: '{chunk.TranslatedText}'");
                 
                 // 座標変換情報
-                var arPos = chunk.GetARPosition();
-                var arSize = chunk.GetARSize();
-                DebugLogUtility.WriteLog($"   AR位置: ({arPos.X},{arPos.Y}) [元座標と同じ]");
-                DebugLogUtility.WriteLog($"   ARサイズ: ({arSize.Width},{arSize.Height}) [元サイズと同じ]");
-                DebugLogUtility.WriteLog($"   計算フォントサイズ: {chunk.CalculateARFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
-                DebugLogUtility.WriteLog($"   AR表示可能: {chunk.CanShowAR()}");
+                var overlayPos = chunk.GetOverlayPosition();
+                var overlaySize = chunk.GetOverlaySize();
+                DebugLogUtility.WriteLog($"   インプレース位置: ({overlayPos.X},{overlayPos.Y}) [元座標と同じ]");
+                DebugLogUtility.WriteLog($"   インプレースサイズ: ({overlaySize.Width},{overlaySize.Height}) [元サイズと同じ]");
+                DebugLogUtility.WriteLog($"   計算フォントサイズ: {chunk.CalculateOptimalFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
+                DebugLogUtility.WriteLog($"   インプレース表示可能: {chunk.CanShowInPlace()}");
                 
                 // TextResultsの詳細情報
                 DebugLogUtility.WriteLog($"   構成TextResults数: {chunk.TextResults.Count}");
@@ -157,103 +197,149 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
                 textChunks.Count, textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText) && !c.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal)));
 
-            // AR風オーバーレイ表示を優先的に使用
-            var arOverlayManager = _serviceProvider.GetService<IARTranslationOverlayManager>();
-            if (arOverlayManager != null)
+            // インプレースオーバーレイ表示を優先的に使用
+            var inPlaceOverlayManager = _serviceProvider.GetService<IInPlaceTranslationOverlayManager>();
+            if (inPlaceOverlayManager != null)
             {
-                _logger?.LogInformation("🎯 AR風オーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
-                DebugLogUtility.WriteLog($"🎯 AR風オーバーレイ表示開始 - チャンク数: {textChunks.Count}");
+                _logger?.LogInformation("🎯 インプレースオーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
+                DebugLogUtility.WriteLog($"🎯 インプレースオーバーレイ表示開始 - チャンク数: {textChunks.Count}");
                 
                 try
                 {
-                    // AR翻訳オーバーレイマネージャーを初期化
-                    await arOverlayManager.InitializeAsync().ConfigureAwait(false);
+                    // インプレース翻訳オーバーレイマネージャーを初期化
+                    await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
                     
-                    // 各テキストチャンクをAR風で表示
-                    DebugLogUtility.WriteLog($"\n🎭 AR表示開始処理:");
+                    // 各テキストチャンクをインプレースで表示
+                    DebugLogUtility.WriteLog($"\n🎭 インプレース表示開始処理:");
                     foreach (var chunk in textChunks)
                     {
-                        DebugLogUtility.WriteLog($"\n🔸 チャンク {chunk.ChunkId} AR表示判定:");
-                        DebugLogUtility.WriteLog($"   AR表示可能: {chunk.CanShowAR()}");
+                        DebugLogUtility.WriteLog($"\n🔸 チャンク {chunk.ChunkId} インプレース表示判定:");
+                        DebugLogUtility.WriteLog($"   インプレース表示可能: {chunk.CanShowInPlace()}");
                         DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
                         DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
                         
-                        if (chunk.CanShowAR())
+                        if (chunk.CanShowInPlace())
                         {
-                            _logger?.LogDebug("🎭 AR表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
+                            _logger?.LogDebug("🎭 インプレース表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
                                 chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
                                 chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
                             
-                            await arOverlayManager.ShowAROverlayAsync(chunk, cancellationToken)
+                            await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken)
                                 .ConfigureAwait(false);
                             
-                            DebugLogUtility.WriteLog($"   ✅ AR表示完了 - チャンク {chunk.ChunkId}");
+                            DebugLogUtility.WriteLog($"   ✅ インプレース表示完了 - チャンク {chunk.ChunkId}");
                         }
                         else
                         {
-                            _logger?.LogWarning("⚠️ AR表示条件を満たしていません - {ARLog}", chunk.ToARLogString());
-                            DebugLogUtility.WriteLog($"   ❌ AR表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                            _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
+                            DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
                         }
                     }
                     
-                    _logger?.LogInformation("✅ AR風オーバーレイ表示完了 - アクティブオーバーレイ数: {Count}", 
-                        arOverlayManager.ActiveOverlayCount);
+                    _logger?.LogInformation("✅ インプレースオーバーレイ表示完了 - アクティブオーバーレイ数: {Count}", 
+                        inPlaceOverlayManager!.ActiveOverlayCount);
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "❌ AR風オーバーレイ表示でエラーが発生");
-                    DebugLogUtility.WriteLog($"❌❌❌ AR風オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+                    _logger?.LogError(ex, "❌ インプレースオーバーレイ表示でエラーが発生");
+                    DebugLogUtility.WriteLog($"❌❌❌ インプレースオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
                     
-                    // AR風UIでエラーが発生した場合は従来のオーバーレイにフォールバック
+                    // インプレースUIでエラーが発生した場合は従来のオーバーレイにフォールバック
                     _logger?.LogWarning("🔄 従来のオーバーレイ表示にフォールバック");
-                    await DisplayARTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
+                    await DisplayInPlaceTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
                 }
             }
             else
             {
-                // AR風オーバーレイが利用できない場合は従来のオーバーレイを使用
-                _logger?.LogWarning("⚠️ AR風オーバーレイが利用できません。従来のオーバーレイを使用");
-                await DisplayARTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
+                // インプレースオーバーレイが利用できない場合は従来のオーバーレイを使用
+                _logger?.LogWarning("⚠️ インプレースオーバーレイが利用できません。従来のオーバーレイを使用");
+                await DisplayInPlaceTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
             }
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
             DebugLogUtility.WriteLog("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
+            
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎉 座標ベース翻訳処理完了（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
+        }
+        catch (TaskCanceledException)
+        {
+            // キャンセレーション例外は正常な処理として扱う
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] 座標ベース翻訳処理がキャンセル: 正常終了{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"CoordinateBasedTranslationService キャンセルログ書き込みエラー: {fileEx.Message}");
+            }
+            
+            _logger?.LogDebug("座標ベース翻訳処理がキャンセルされました");
+            return;
         }
         catch (Exception ex)
         {
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 座標ベース翻訳処理エラー（直接書き込み）: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+            }
+            catch { }
+            
             _logger?.LogError(ex, "❌ 座標ベース翻訳処理でエラーが発生しました");
             throw;
         }
     }
 
     /// <summary>
-    /// AR翻訳オーバーレイ表示
+    /// インプレース翻訳オーバーレイ表示
     /// </summary>
-    private async Task DisplayARTranslationOverlay(
+    private async Task DisplayInPlaceTranslationOverlay(
         IReadOnlyList<TextChunk> textChunks, 
         CancellationToken cancellationToken)
     {
         try
         {
-            _logger?.LogDebug("🖼️ AR翻訳オーバーレイ表示開始");
-            DebugLogUtility.WriteLog("🖼️ AR翻訳オーバーレイ表示開始");
+            _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
+            DebugLogUtility.WriteLog("🖼️ インプレース翻訳オーバーレイ表示開始");
             
-            DebugLogUtility.WriteLog($"🔥🔥🔥 AR翻訳オーバーレイ表示直前 - _overlayManager null?: {_overlayManager == null}");
+            DebugLogUtility.WriteLog($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - _overlayManager null?: {_overlayManager == null}");
             if (_overlayManager != null)
             {
-                // 各TextChunkを個別にAR表示
+                // 各TextChunkを個別にインプレース表示
                 foreach (var textChunk in textChunks)
                 {
-                    await _overlayManager.ShowAROverlayAsync(textChunk, cancellationToken)
+                    await _overlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
-            DebugLogUtility.WriteLog("🔥🔥🔥 AR翻訳オーバーレイ表示完了");
+            DebugLogUtility.WriteLog("🔥🔥🔥 インプレース翻訳オーバーレイ表示完了");
+        }
+        catch (TaskCanceledException)
+        {
+            // キャンセレーション例外は正常な処理として扱う
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] インプレース翻訳オーバーレイ表示がキャンセル: 正常終了{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"CoordinateBasedTranslationService オーバーレイキャンセルログ書き込みエラー: {fileEx.Message}");
+            }
+            
+            _logger?.LogDebug("インプレース翻訳オーバーレイ表示がキャンセルされました");
+            return;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "❌ AR翻訳オーバーレイ表示でエラーが発生");
-            DebugLogUtility.WriteLog($"❌❌❌ AR翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogError(ex, "❌ インプレース翻訳オーバーレイ表示でエラーが発生");
+            DebugLogUtility.WriteLog($"❌❌❌ インプレース翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
             DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
             throw;
         }
@@ -311,7 +397,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             }
 
             _disposed = true;
-            _logger?.LogInformation("🧹 CoordinateBasedTranslationService disposed");
+            _logger?.LogInformation("🧹 CoordinateBasedTranslationService disposed - Hash: {Hash}", this.GetHashCode());
+            
+            // 直接書き込みで破棄ログ
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [DEBUG] CoordinateBasedTranslationService破棄: Hash={this.GetHashCode()}{Environment.NewLine}");
+            }
+            catch { }
         }
         catch (Exception ex)
         {

@@ -52,12 +52,18 @@ public sealed class PaddleOcrEngine(
     private bool _disposed;
     private bool _isV4ModelForCreation; // V4モデル検出結果保存用
     
+    // スレッドセーフティ対策：スレッドごとにOCRエンジンを保持
+    private static readonly ThreadLocal<PaddleOcrAll?> _threadLocalOcrEngine = new(() => null);
+    
     // パフォーマンス統計
     private readonly ConcurrentQueue<double> _processingTimes = new();
     
     // 適応的タイムアウト用の統計
     private DateTime _lastOcrTime = DateTime.MinValue;
     private int _consecutiveTimeouts;
+    
+    // PaddlePredictor失敗統計
+    private int _consecutivePaddleFailures;
     
     // 進行中OCRタスクのキャンセレーション管理
     private CancellationTokenSource? _currentOcrCancellation;
@@ -102,6 +108,15 @@ public sealed class PaddleOcrEngine(
 
         try
         {
+            // Gemini推奨：スレッドセーフティ問題解決のため、一時的にCPUモード、シングルスレッドに強制
+            if (true) // デバッグ用：常に適用
+            {
+                settings.UseGpu = false;
+                settings.EnableMultiThread = false;
+                settings.WorkerCount = 1;
+                DebugLogUtility.WriteLog("🔧 [DEBUG] スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
+            }
+            
             _logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
                 settings.Language, settings.UseGpu, settings.EnableMultiThread);
             DebugLogUtility.WriteLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
@@ -693,6 +708,14 @@ public sealed class PaddleOcrEngine(
                         Enable180Classification = true // V5では180度回転認識を有効化して高速化
                     };
                     DebugLogUtility.WriteLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
+                    
+                    // Gemini推奨：初期化パラメータの確認
+                    DebugLogUtility.WriteLog($"🔧 [DEBUG] OCRエンジン初期化パラメータ:");
+                    DebugLogUtility.WriteLog($"   UseGpu: {settings.UseGpu}");
+                    DebugLogUtility.WriteLog($"   EnableMultiThread: {settings.EnableMultiThread}");
+                    DebugLogUtility.WriteLog($"   WorkerCount: {settings.WorkerCount}");
+                    DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine.AllowRotateDetection}");
+                    DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine.Enable180Classification}");
                     var rotateDetection = true;  // PP-OCRv5高速化設定
                     var classification180 = true;  // PP-OCRv5高速化設定
                     DebugLogUtility.WriteLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
@@ -982,9 +1005,10 @@ public sealed class PaddleOcrEngine(
                 // マルチスレッド版は慎重に作成
                 // PP-OCRv5では安定性のためシングルスレッドを推奨
                 var isV4ModelForMultiThread = models.RecognizationModel?.Version == V4;
-                var shouldEnableMultiThread = isV4ModelForMultiThread; // V5ではマルチスレッド無効化
+                // Gemini推奨：スレッドセーフティ問題解決のため、強制的にシングルスレッド
+                var shouldEnableMultiThread = false; // isV4ModelForMultiThread; // V5ではマルチスレッド無効化
                 
-                DebugLogUtility.WriteLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread} (V5は安定性重視でシングルスレッド)");
+                DebugLogUtility.WriteLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread} (スレッドセーフティ検証のため強制無効化)");
                 
                 if (isV4ModelForMultiThread)
                 {
@@ -1501,6 +1525,37 @@ public sealed class PaddleOcrEngine(
     }
 
     /// <summary>
+    /// OpenCvSharp.MatをByteArrayに変換
+    /// </summary>
+    private async Task<byte[]> ConvertMatToByteArrayAsync(Mat mat)
+    {
+        await Task.CompletedTask.ConfigureAwait(false); // 非同期メソッドとして維持
+
+        // OpenCvSharpのMatからbyte[]に直接変換
+        // BGR形式の場合はRGB形式に変換
+        Mat rgbMat = mat.Channels() == 3 ? new Mat() : mat;
+        if (mat.Channels() == 3)
+        {
+            Cv2.CvtColor(mat, rgbMat, ColorConversionCodes.BGR2RGB);
+        }
+
+        try
+        {
+            // Matのピクセルデータを直接byte[]として取得
+            var data = new byte[rgbMat.Total() * rgbMat.ElemSize()];
+            System.Runtime.InteropServices.Marshal.Copy(rgbMat.Data, data, 0, data.Length);
+            return data;
+        }
+        finally
+        {
+            if (rgbMat != mat)
+            {
+                rgbMat?.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
     /// OCR実行の実装
     /// </summary>
     private async Task<IReadOnlyList<OcrTextRegion>> ExecuteOcrAsync(
@@ -1541,60 +1596,189 @@ public sealed class PaddleOcrEngine(
         var isV4Model = _isV4ModelForCreation; // 初期化時に設定された値を使用
         DebugLogUtility.WriteLog($"🔍 V4モデル検出結果: {isV4Model} (初期化時設定値)");
         
-        // PP-OCRv5でも高速前処理を使用 - V4モデル最適化
-        DebugLogUtility.WriteLog($"🔧 V4モデル対応 - 画像最適化実行: {mat.Width}x{mat.Height}");
-        DebugLogUtility.WriteLog($"   📐 元画像サイズ: {mat.Width}x{mat.Height}");
+        // Phase 3: GameOptimizedPreprocessingService を使用した前処理
+        DebugLogUtility.WriteLog($"🎮 [PHASE3] ゲーム最適化前処理サービス開始: {mat.Width}x{mat.Height}");
         
-        // 1. モデル検出とバージョン確認
-        var isV5Model = DetectIfV5Model();
-        DebugLogUtility.WriteLog($"🔍 モデルバージョン検出: {(isV5Model ? "PP-OCRv5" : "V4以前")}");
-        
-        // 2. バージョン別 + 適応的前処理を適用
-        Mat gameProcessed;
-        if (isV5Model)
+        Mat processedMat;
+        try
         {
-            DebugLogUtility.WriteLog($"🚀 PP-OCRv5適応的前処理開始");
+            // OpenCvSharp.Mat を IAdvancedImage に変換
+            var imageData = await ConvertMatToByteArrayAsync(mat).ConfigureAwait(false);
+            using var advancedImage = new Baketa.Core.Services.Imaging.AdvancedImage(
+                imageData, mat.Width, mat.Height, Baketa.Core.Abstractions.Imaging.ImageFormat.Rgb24);
             
-            // 画像特性を分析して適応的前処理を適用
+            // 画像特性に基づいてプロファイルを選択
             var characteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(mat);
-            DebugLogUtility.WriteLog($"📊 画像分析結果:");
+            var profileName = SelectOptimalGameProfile(characteristics);
+            DebugLogUtility.WriteLog($"📊 [PHASE3] 画像分析結果: 推奨プロファイル={profileName}");
             DebugLogUtility.WriteLog($"   💡 平均輝度: {characteristics.AverageBrightness:F1}");
             DebugLogUtility.WriteLog($"   📊 コントラスト: {characteristics.Contrast:F1}");
             DebugLogUtility.WriteLog($"   🔆 明るい背景: {characteristics.IsBrightBackground}");
             DebugLogUtility.WriteLog($"   🌙 暗い背景: {characteristics.IsDarkBackground}");
-            DebugLogUtility.WriteLog($"   📝 テキスト密度: {characteristics.TextDensity:F4}");
-            DebugLogUtility.WriteLog($"   🎯 推奨モード: {characteristics.RecommendedMode}");
-            DebugLogUtility.WriteLog($"   🏷️ 画像タイプ: {characteristics.ImageType}");
             
-            gameProcessed = PPOCRv5Preprocessor.ProcessForPPOCRv5Adaptive(mat);
-            DebugLogUtility.WriteLog($"✅ PP-OCRv5適応的前処理完了");
+            // GameOptimizedPreprocessingService で前処理を実行
+            var preprocessingResult = await _ocrPreprocessingService.ProcessImageAsync(
+                advancedImage, 
+                profileName, 
+                cancellationToken).ConfigureAwait(false);
+                
+            if (preprocessingResult.Error != null)
+            {
+                DebugLogUtility.WriteLog($"⚠️ [PHASE3] 前処理エラー、フォールバック: {preprocessingResult.Error.Message}");
+                _logger?.LogWarning(preprocessingResult.Error, "Phase3前処理でエラー、元画像を使用");
+                processedMat = mat.Clone(); // エラー時は元画像を使用
+            }
+            else
+            {
+                // 処理結果を OpenCvSharp.Mat に変換
+                var resultData = await preprocessingResult.ProcessedImage.ToByteArrayAsync().ConfigureAwait(false);
+                
+                // 🔍 直接書き込みログで前処理結果サイズを確認
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 Phase3前処理結果（直接書き込み）: ProcessedImageサイズ={preprocessingResult.ProcessedImage.Width}x{preprocessingResult.ProcessedImage.Height}, resultDataサイズ={resultData.Length}, Format={preprocessingResult.ProcessedImage.Format}{Environment.NewLine}");
+                }
+                catch { }
+                
+                // 🔍 フォーマット比較デバッグ
+                try
+                {
+                    var actualFormat = preprocessingResult.ProcessedImage.Format;
+                    var rgba32Format = Baketa.Core.Abstractions.Imaging.ImageFormat.Rgba32;
+                    var isRgba32 = (actualFormat == rgba32Format);
+                    var expectedBytes = preprocessingResult.ProcessedImage.Width * preprocessingResult.ProcessedImage.Height * 4;
+                    
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 フォーマット比較（直接書き込み）: actual={actualFormat}, expected={rgba32Format}, isRgba32={isRgba32}, expectedBytes={expectedBytes}, actualBytes={resultData.Length}{Environment.NewLine}");
+                }
+                catch { }
+                
+                // フォーマットに応じた適切なMat変換処理
+                var currentFormat = preprocessingResult.ProcessedImage.Format;
+                var targetFormat = Baketa.Core.Abstractions.Imaging.ImageFormat.Rgb24;
+                var isMatch = (currentFormat == targetFormat);
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 RGB24条件判定（直接書き込み）: actual={currentFormat}({(int)currentFormat}), target={targetFormat}({(int)targetFormat}), isMatch={isMatch}{Environment.NewLine}");
+                }
+                catch { }
+                
+                if (isMatch)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 RGB24フォーマット処理（直接書き込み）: 手動Mat作成開始{Environment.NewLine}");
+                    }
+                    catch { }
+                    
+                    // RGB24データから手動でMatを作成（3チャンネル）
+                    int width = preprocessingResult.ProcessedImage.Width;
+                    int height = preprocessingResult.ProcessedImage.Height;
+                    
+                    try
+                    {
+                        // RGB24データからより安全にMatを作成
+                        // RGB24フォーマット: 3バイト/ピクセル、チャンネル順序: R-G-B
+                        
+                        // 一時的にMat.FromImageDataを使用してRGB24をデコード
+                        processedMat = Mat.FromImageData(resultData, ImreadModes.Color);
+                        
+                        // 失敗した場合のフォールバック: 手動Mat作成
+                        if (processedMat.Empty())
+                        {
+                            try
+                            {
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 Mat.FromImageData失敗、手動作成開始（直接書き込み）{Environment.NewLine}");
+                            }
+                            catch { }
+                            
+                            // 手動でMatを作成（より安全な方法）
+                            processedMat = new Mat(height, width, MatType.CV_8UC3);
+                            
+                            // ピクセル単位でのコピー（メモリ配置を考慮）
+                            unsafe
+                            {
+                                byte* matDataPtr = (byte*)processedMat.DataPointer;
+                                fixed (byte* srcPtr = resultData)
+                                {
+                                    // RGB24の場合、stride計算を考慮してコピー
+                                    int srcStride = width * 3; // RGB24は3バイト/ピクセル
+                                    int dstStride = (int)processedMat.Step();
+                                    
+                                    for (int y = 0; y < height; y++)
+                                    {
+                                        byte* srcRow = srcPtr + (y * srcStride);
+                                        byte* dstRow = matDataPtr + (y * dstStride);
+                                        
+                                        // 行単位でコピー（BGR順序に変換）
+                                        for (int x = 0; x < width; x++)
+                                        {
+                                            // RGB → BGR変換
+                                            dstRow[x * 3 + 0] = srcRow[x * 3 + 2]; // B ← R
+                                            dstRow[x * 3 + 1] = srcRow[x * 3 + 1]; // G ← G  
+                                            dstRow[x * 3 + 2] = srcRow[x * 3 + 0]; // R ← B
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Matが正常に作成されているか詳細チェック
+                        try
+                        {
+                            var matInfo = $"サイズ={processedMat.Width}x{processedMat.Height}, Type={processedMat.Type()}, Channels={processedMat.Channels()}, IsContinuous={processedMat.IsContinuous()}, Step={processedMat.Step()}";
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 RGB24手動Mat作成完了（直接書き込み）: {matInfo}{Environment.NewLine}");
+                        }
+                        catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ RGB24手動Mat作成失敗（直接書き込み）: {ex.Message}{Environment.NewLine}");
+                        }
+                        catch { }
+                        
+                        // 失敗した場合はFromImageDataを試行
+                        processedMat = Mat.FromImageData(resultData, ImreadModes.Color);
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 その他フォーマット処理（直接書き込み）: Mat.FromImageData使用, Format={preprocessingResult.ProcessedImage.Format}{Environment.NewLine}");
+                    }
+                    catch { }
+                    
+                    processedMat = Mat.FromImageData(resultData, ImreadModes.Color);
+                }
+                
+                // 🔍 直接書き込みログでMat変換後サイズを確認
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 Mat変換後（直接書き込み）: processedMatサイズ={processedMat.Width}x{processedMat.Height}, Empty={processedMat.Empty()}{Environment.NewLine}");
+                }
+                catch { }
+                
+                DebugLogUtility.WriteLog($"✅ [PHASE3] ゲーム最適化前処理完了: {processedMat.Width}x{processedMat.Height}");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"🎮 標準ゲーム特化前処理開始");
-            gameProcessed = GameTextPreprocessor.ProcessGameImage(mat);
-            DebugLogUtility.WriteLog($"✅ 標準ゲーム特化前処理完了");
+            DebugLogUtility.WriteLog($"❌ [PHASE3] 前処理例外、フォールバック: {ex.Message}");
+            _logger?.LogError(ex, "Phase3前処理で例外、元画像を使用");
+            processedMat = mat.Clone(); // 例外時は元画像を使用
         }
-        
-        // 3. V4モデル用追加最適化（V5では不要）
-        Mat tempMat;
-        if (!isV5Model)
-        {
-            DebugLogUtility.WriteLog($"   🎯 V4用追加最適化開始...");
-            tempMat = await OptimizeImageForV4Async(gameProcessed).ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"   ✅ V4追加最適化完了: {tempMat.Width}x{tempMat.Height}");
-        }
-        else
-        {
-            DebugLogUtility.WriteLog($"   ⚡ V5モデル: 追加最適化スキップ（V5前処理で完結）");
-            tempMat = gameProcessed.Clone(); // V5では前処理結果をそのまま使用
-            DebugLogUtility.WriteLog($"   ✅ V5最適化済み画像使用: {tempMat.Width}x{tempMat.Height}");
-        }
-        
-        // タイムアウト対策: Matオブジェクトのコピーを作成してバックグラウンド処理を安全に
-        using var processedMat = tempMat.Clone();
-        tempMat?.Dispose(); // 元のMatは即座に破棄
-        gameProcessed?.Dispose(); // 前処理結果も破棄
         
         try
         {
@@ -2399,6 +2583,52 @@ public sealed class PaddleOcrEngine(
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
+    
+    /// <summary>
+    /// PaddleOCRエンジンを再初期化（連続失敗時の回復処理）
+    /// </summary>
+    private async Task ReinitializeEngineAsync()
+    {
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCRエンジン再初期化開始（直接書き込み）{Environment.NewLine}");
+            
+            // 現在のエンジンを安全に廃棄
+            lock (_lockObject)
+            {
+                _queuedEngine?.Dispose();
+                _queuedEngine = null;
+                _ocrEngine = null;
+                IsInitialized = false;
+            }
+            
+            // 短い待機時間でメモリクリーンアップ
+            await Task.Delay(500).ConfigureAwait(false);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            
+            // エンジンを再初期化
+            var success = await InitializeAsync(_settings).ConfigureAwait(false);
+            
+            if (success)
+            {
+                _consecutivePaddleFailures = 0; // 再初期化成功時はカウンタリセット
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ PaddleOCRエンジン再初期化成功（直接書き込み）{Environment.NewLine}");
+            }
+            else
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化失敗（直接書き込み）{Environment.NewLine}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化例外（直接書き込み）: {ex.Message}{Environment.NewLine}");
+        }
+    }
 
     #endregion
 
@@ -2587,51 +2817,6 @@ public sealed class PaddleOcrEngine(
     
     #endregion
 
-    /// <summary>
-    /// V4モデル用画像最適化
-    /// </summary>
-    private async Task<Mat> OptimizeImageForV4Async(Mat mat)
-    {
-        return await Task.Run(() =>
-        {
-            var optimizedMat = new Mat();
-            
-            try
-            {
-                // V4モデルの推奨サイズ（幅800px以下）
-                const int maxWidth = 800;
-                
-                if (mat.Width > maxWidth)
-                {
-                    var scale = (double)maxWidth / mat.Width;
-                    var newSize = new OpenCvSharp.Size((int)(mat.Width * scale), (int)(mat.Height * scale));
-                    DebugLogUtility.WriteLog($"   🔄 V4用リサイズ: {mat.Width}x{mat.Height} → {newSize.Width}x{newSize.Height}");
-                    Cv2.Resize(mat, optimizedMat, newSize, 0, 0, InterpolationFlags.Linear);
-                }
-                else
-                {
-                    mat.CopyTo(optimizedMat);
-                }
-                
-                // V4では前処理を最小限に
-                if (optimizedMat.Channels() == 3)
-                {
-                    DebugLogUtility.WriteLog("   🎨 V4用軽量グレースケール変換");
-                    Cv2.CvtColor(optimizedMat, optimizedMat, ColorConversionCodes.BGR2GRAY);
-                }
-                
-                DebugLogUtility.WriteLog($"   ✅ V4最適化完了: {optimizedMat.Width}x{optimizedMat.Height}");
-                return optimizedMat;
-            }
-            catch (Exception ex)
-            {
-                DebugLogUtility.WriteLog($"   ❌ V4最適化エラー: {ex.Message}");
-                // エラー時は元画像を返す
-                mat.CopyTo(optimizedMat);
-                return optimizedMat;
-            }
-        }).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// 改良されたOCR実行メソッド - 強化ハングアップ対策版
@@ -2653,8 +2838,9 @@ public sealed class PaddleOcrEngine(
         var ocrTask = Task.Run(() =>
         {
             DebugLogUtility.WriteLog("🏃 OCRエンジン実行中 - 新分離タスク");
+            // Gemini推奨：Mat.Clone()でGCライフタイム問題を完全に排除
             using var taskSafeMat = processedMat.Clone();
-            DebugLogUtility.WriteLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}");
+            DebugLogUtility.WriteLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}, IsContinuous={taskSafeMat.IsContinuous()}");
             
             DebugLogUtility.WriteLog("🎯 PaddleOCR.Run()実行開始");
             if (_ocrEngine == null)
@@ -2662,12 +2848,92 @@ public sealed class PaddleOcrEngine(
                 throw new InvalidOperationException("OCRエンジンが初期化されていません");
             }
             
+            // Mat状態の詳細確認
+            try
+            {
+                var matDetailsBeforeRun = $"Size={taskSafeMat.Size()}, Type={taskSafeMat.Type()}, Channels={taskSafeMat.Channels()}, Empty={taskSafeMat.Empty()}, IsContinuous={taskSafeMat.IsContinuous()}, Step={taskSafeMat.Step()}";
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 PaddleOCR.Run()実行前Mat詳細（直接書き込み）: {matDetailsBeforeRun}{Environment.NewLine}");
+            }
+            catch { }
+            
             // 実行時言語ヒント適用（利用可能な場合）
             // 実行時言語ヒントは削除: PaddleOCR v3.0.1では言語設定APIが存在しない
             
-            var result = _ocrEngine.Run(taskSafeMat);
-            DebugLogUtility.WriteLog($"✅ PaddleOCR.Run()完了 - 結果取得完了");
-            return result;
+            try
+            {
+                var result = _ocrEngine.Run(taskSafeMat);
+                DebugLogUtility.WriteLog($"✅ PaddleOCR.Run()完了 - 結果取得完了");
+                
+                // 成功時は連続失敗カウンタをリセット
+                if (_consecutivePaddleFailures > 0)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCR連続失敗リセット（直接書き込み）: {_consecutivePaddleFailures} → 0{Environment.NewLine}");
+                    }
+                    catch { }
+                    _consecutivePaddleFailures = 0;
+                }
+                
+                // 成功時の詳細ログ
+                try
+                {
+                    var resultInfo = result?.GetType().Name ?? "null";
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ PaddleOCR.Run()成功（直接書き込み）: 結果型={resultInfo}{Environment.NewLine}");
+                }
+                catch { }
+                
+                return result;
+            }
+            catch (Exception paddleException)
+            {
+                // PaddleOCR実行失敗時の詳細ログと統計更新
+                _consecutivePaddleFailures++;
+                
+                try
+                {
+                    var exceptionDetails = $"Type={paddleException.GetType().Name}, Message={paddleException.Message}, Stack={paddleException.StackTrace?.Split('\n').FirstOrDefault()}";
+                    
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCR.Run()失敗（直接書き込み）: {exceptionDetails}, 連続失敗数={_consecutivePaddleFailures}{Environment.NewLine}");
+                }
+                catch { }
+                
+                // 連続3回失敗でエンジン再初期化を検討
+                if (_consecutivePaddleFailures >= 3)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCR連続失敗({_consecutivePaddleFailures}回) - エンジン再初期化を実行（直接書き込み）{Environment.NewLine}");
+                        
+                        // エンジン再初期化を別タスクで実行（現在のタスクは例外で終了）
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await Task.Delay(1000).ConfigureAwait(false); // 1秒待機
+                                await ReinitializeEngineAsync().ConfigureAwait(false);
+                            }
+                            catch (Exception reinitException)
+                            {
+                                try
+                                {
+                                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化失敗（直接書き込み）: {reinitException.Message}{Environment.NewLine}");
+                                }
+                                catch { }
+                            }
+                        });
+                    }
+                    catch { }
+                }
+                
+                throw; // 元の例外を再スロー
+            }
         }, combinedCts.Token);
 
         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(adaptiveTimeout), cancellationToken); // 適応的タイムアウト
@@ -2883,5 +3149,34 @@ public sealed class PaddleOcrEngine(
             DebugLogUtility.WriteLog($"   ❌ V5モデル検出エラー: {ex.Message}");
             return false; // エラー時はV4として処理
         }
+    }
+
+    /// <summary>
+    /// 画像特性に基づいて最適なゲームプロファイルを選択
+    /// </summary>
+    /// <param name="characteristics">画像特性</param>
+    /// <returns>最適なプロファイル名</returns>
+    private static string SelectOptimalGameProfile(ImageCharacteristics characteristics)
+    {
+        // 明度とコントラストに基づいてプロファイルを選択
+        if (characteristics.IsDarkBackground)
+        {
+            return "darkbackground";
+        }
+        else if (characteristics.IsBrightBackground)
+        {
+            return "lightbackground";
+        }
+        else if (characteristics.Contrast > 50.0)
+        {
+            return "highcontrast";
+        }
+        else if (characteristics.ImageType.Contains("anime", StringComparison.OrdinalIgnoreCase) || 
+                 characteristics.TextDensity < 0.1)
+        {
+            return "anime";
+        }
+        
+        return "default";
     }
 }

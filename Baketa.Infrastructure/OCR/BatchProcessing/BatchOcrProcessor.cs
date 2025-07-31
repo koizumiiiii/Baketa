@@ -276,10 +276,10 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
                 initialTextChunks, image, cancellationToken).ConfigureAwait(false);
             System.Console.WriteLine($"🔄 Phase 6デバッグ: 信頼度ベース再処理完了 - チャンク数={reprocessedChunks.Count}");
             
-            // 5. 普遍的誤認識修正
-            System.Console.WriteLine("🔧 Phase 6デバッグ: 普遍的誤認識修正開始");
-            var textChunks = _misrecognitionCorrector.CorrectMisrecognitions(reprocessedChunks);
-            System.Console.WriteLine($"🔧 Phase 6デバッグ: 普遍的誤認識修正完了 - 最終チャンク数={textChunks.Count}");
+            // 5. 普遍的誤認識修正 - 一時的に無効化してテスト
+            System.Console.WriteLine("🔧 Phase 6デバッグ: 普遍的誤認識修正を一時無効化");
+            var textChunks = reprocessedChunks; // 誤認識修正をスキップ
+            System.Console.WriteLine($"🔧 Phase 6デバッグ: 誤認識修正スキップ完了 - 最終チャンク数={textChunks.Count}");
             
             stopwatch.Stop();
             
@@ -438,6 +438,15 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
         try
         {
             System.Console.WriteLine("🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync開始");
+            
+            // 🔍 画像サイズを詳細ログ
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCRエンジンRecognizeAsync直前（直接書き込み）: 画像サイズ={image.Width}x{image.Height}, Format={image.Format}{Environment.NewLine}");
+            }
+            catch { }
+            
             var result = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
             System.Console.WriteLine($"🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync完了 - 検出領域数={result.TextRegions.Count}");
             return result;

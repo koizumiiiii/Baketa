@@ -1,0 +1,60 @@
+<Window x:Class="Baketa.UI.Views.Overlay.InPlaceTranslationOverlayWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Baketa.UI.Views.Overlay"
+        x:DataType="local:InPlaceTranslationOverlayWindow"
+        WindowStartupLocation="Manual"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Window.Styles>
+        <Style Selector="Window">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- 角丸無効化の試み（FluentThemeに上書きされる） -->
+        <Style Selector="Border">
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+    </Window.Styles>
+
+    <!-- インプレース翻訳表示：すりガラス風効果で美しく元テキストを隠して翻訳テキストを重ね表示 -->
+    <Border Name="InPlaceOverlayBorder"
+            BorderThickness="0"
+            Padding="4"
+            BoxShadow="0 2 8 #26000000">
+        
+        <Border.Background>
+            <!-- より目立つすりガラス効果 -->
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1" Opacity="0.95">
+                <GradientStop Color="#F0FFFFFF" Offset="0"/>
+                <GradientStop Color="#E0F8F8FF" Offset="0.3"/>
+                <GradientStop Color="#E8FFFFFF" Offset="0.7"/>
+                <GradientStop Color="#F2FFFFFF" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+
+        <!-- 翻訳テキスト（インプレース表示） -->
+        <TextBlock Name="InPlaceTranslatedTextBlock"
+                 Text=""
+                 FontSize="14"
+                 FontFamily="Segoe UI, Meiryo UI, Yu Gothic UI"
+                 Foreground="#FF2D2D2D"
+                 FontWeight="Medium"
+                 TextWrapping="NoWrap"
+                 TextAlignment="Left"
+                 VerticalAlignment="Center"
+                 HorizontalAlignment="Left"
+                 TextTrimming="CharacterEllipsis">
+            <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="4" Color="#40000000"/>
+            </TextBlock.Effect>
+        </TextBlock>
+    </Border>
+</Window>

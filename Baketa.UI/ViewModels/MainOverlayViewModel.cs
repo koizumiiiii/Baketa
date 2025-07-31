@@ -38,12 +38,12 @@ public class MainOverlayViewModel : ViewModelBase
         IEventAggregator eventAggregator,
         ILogger<MainOverlayViewModel> logger,
         IWindowManagerAdapter windowManager,
-        IARTranslationOverlayManager arOverlayManager,
+        IInPlaceTranslationOverlayManager inPlaceOverlayManager,
         LoadingOverlayManager loadingManager)
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        _arOverlayManager = arOverlayManager ?? throw new ArgumentNullException(nameof(arOverlayManager));
+        _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
@@ -73,7 +73,7 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     private readonly IWindowManagerAdapter _windowManager;
-    private readonly IARTranslationOverlayManager _arOverlayManager;
+    private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
     private readonly LoadingOverlayManager _loadingManager;
 
     #region Properties
@@ -669,7 +669,7 @@ public class MainOverlayViewModel : ViewModelBase
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
             Logger?.LogDebug("🖼️ オーバーレイマネージャーを初期化");
             
-            await _arOverlayManager.InitializeAsync().ConfigureAwait(false);
+            await _inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
             overlayInitTimer.Stop();
             DebugLogUtility.WriteLog($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
@@ -833,8 +833,8 @@ public class MainOverlayViewModel : ViewModelBase
         });
 
         // オーバーレイを非表示にしてリセット
-        await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
-        await _arOverlayManager.ResetAsync().ConfigureAwait(false);
+        await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+        await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
 
         var stopTranslationEvent = new StopTranslationRequestEvent();
         await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
@@ -877,7 +877,7 @@ public class MainOverlayViewModel : ViewModelBase
         {
             DebugLogUtility.WriteLog("🙈 オーバーレイ非表示");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🙈 オーバーレイ非表示");
-            await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
+            await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
         }
         
         var toggleEvent = new ToggleTranslationDisplayRequestEvent(IsTranslationResultVisible);
