@@ -157,8 +157,20 @@ public class TranslationFlowEventProcessor :
                 _logger.LogError(ex, "翻訳状態変更イベント発行エラー");
             }
 
-            // 2. 古いオーバーレイマネージャーは使用しない（マルチウィンドウシステムに移行）
-            _logger.LogDebug("Skipping old overlay manager - using multi-window system");
+            // 2. 既存のインプレースオーバーレイをすべて非表示（重なり問題解決）
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ2開始 - 既存オーバーレイクリア");
+            _logger.LogDebug("Clearing existing in-place overlays to prevent overlap");
+            try
+            {
+                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 既存オーバーレイクリア完了");
+                _logger.LogDebug("Successfully cleared existing in-place overlays");
+            }
+            catch (Exception ex)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 既存オーバーレイクリアエラー: {ex.Message}");
+                _logger.LogError(ex, "Failed to clear existing in-place overlays");
+            }
 
             // 3. 実際の翻訳処理を開始
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ3開始 - 翻訳処理準備");
