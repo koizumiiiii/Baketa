@@ -116,23 +116,14 @@ public sealed class OpenCvColorBasedMaskingFilter : ImageFilterBase
 
         try
         {
-            // 色ベース画像強化処理を適用（OpenCV処理の代替として）
-            var options = new ImageEnhancementOptions
-            {
-                OptimizeForTextDetection = true,
-                Contrast = 1.2f,
-                Brightness = 0.1f,
-                Sharpness = 0.2f
-            };
-
-            var resultImage = await inputImage.EnhanceAsync(options).ConfigureAwait(false);
-
+            // 🔧 一時的に元画像を返す（EnhanceAsyncにサイズ問題があるため）
             if (enableDetailedLogging)
             {
-                _logger?.LogInformation("OpenCV色ベースマスキング完了: 色強調処理を適用");
+                _logger?.LogInformation("OpenCV色ベースマスキング完了: 元画像を返す（一時対応）");
             }
 
-            return resultImage;
+            // 元画像のクローンを返して安全性を保つ
+            return (IAdvancedImage)inputImage.Clone();
         }
         catch (Exception ex)
         {

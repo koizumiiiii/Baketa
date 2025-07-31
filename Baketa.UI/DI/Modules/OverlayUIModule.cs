@@ -7,14 +7,14 @@ namespace Baketa.UI.DI.Modules;
 
 /// <summary>
 /// オーバーレイUIモジュール
-/// AR翻訳オーバーレイシステムのDI登録
+/// インプレース翻訳オーバーレイシステムのDI登録
 /// </summary>
 public sealed class OverlayUIModule : ServiceModuleBase
 {
     public override void RegisterServices(IServiceCollection services)
     {
-        // ARTranslationOverlayManager - AR風翻訳オーバーレイ管理サービス
-        services.AddSingleton<IARTranslationOverlayManager, ARTranslationOverlayManager>();
-        services.AddSingleton<ARTranslationOverlayManager>();
+        // InPlaceTranslationOverlayManager - インプレース翻訳オーバーレイ管理サービス
+        services.AddSingleton<IInPlaceTranslationOverlayManager, InPlaceTranslationOverlayManager>();
+        services.AddSingleton<InPlaceTranslationOverlayManager>();
     }
 }

@@ -148,6 +148,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 [DIRECT] StartAutomaticTranslationAsync開始 - Hash={this.GetHashCode()}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 開始前OCRエンジン状態: IsInitialized={_ocrEngine.IsInitialized}{Environment.NewLine}");
         }
         catch (Exception directEx)
         {
@@ -160,6 +162,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         
         try
         {
+            // 緊急デバッグ: 直接ファイル書き込み
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] tryブロック開始{Environment.NewLine}");
+            }
+            catch { }
+            
             DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し");
             DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
             DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
@@ -167,49 +177,179 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             // 翻訳対象ウィンドウハンドルを保存
             _targetWindowHandle = targetWindowHandle;
-        
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_isAutomaticTranslationActive)
-        {
-            DebugLogUtility.WriteLog($"⚠️ 自動翻訳は既に実行中です");
-            _logger?.LogWarning("自動翻訳は既に実行中です");
-            return;
-        }
-
-        DebugLogUtility.WriteLog($"🎬 自動翻訳を開始します");
-        _logger?.LogInformation("自動翻訳を開始します");
-
-        _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken, _disposeCts.Token);
-
-        _isAutomaticTranslationActive = true;
-
-        // TODO: モード変更イベントの発行はViewModelで実行
-        // await _eventAggregator.PublishAsync(
-        //     new TranslationModeChangedEvent(TranslationMode.Automatic, TranslationMode.Manual))
-        //     .ConfigureAwait(false);
-
-        // バックグラウンドタスクで自動翻訳を実行
-        DebugLogUtility.WriteLog($"🎬 Task.Run開始前");
-        _automaticTranslationTask = Task.Run(async () =>
-        {
-            DebugLogUtility.WriteLog($"🎬 Task.Run内部開始");
+            // 緊急デバッグ: Disposedチェック前
             try
             {
-                await ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token).ConfigureAwait(false);
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Disposedチェック前 - _disposed={_disposed}{Environment.NewLine}");
             }
-            catch (Exception ex)
+            catch { }
+            
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            
+            try
             {
-                DebugLogUtility.WriteLog($"💥 ExecuteAutomaticTranslationLoopAsync例外: {ex.Message}");
-                _logger?.LogError(ex, "自動翻訳ループで予期しないエラーが発生しました");
-                throw;
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Disposedチェック後{Environment.NewLine}");
             }
-            DebugLogUtility.WriteLog($"🎬 Task.Run内部終了");
-        }, _automaticTranslationCts.Token);
-        DebugLogUtility.WriteLog($"🎬 Task.Run開始後");
+            catch { }
+
+            // 緊急デバッグ: アクティブチェック前
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] アクティブチェック前 - _isAutomaticTranslationActive={_isAutomaticTranslationActive}{Environment.NewLine}");
+            }
+            catch { }
+            
+            if (_isAutomaticTranslationActive)
+            {
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEBUG] 既にアクティブなためreturn{Environment.NewLine}");
+                }
+                catch { }
+                DebugLogUtility.WriteLog($"⚠️ 自動翻訳は既に実行中です");
+                _logger?.LogWarning("自動翻訳は既に実行中です");
+                return;
+            }
+
+            // 緊急デバッグ: tryブロック終了直前
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] tryブロック終了直前{Environment.NewLine}");
+            }
+            catch { }
+
+            // 緊急デバッグ: この行に到達するかテスト
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 自動翻訳開始直前{Environment.NewLine}");
+            }
+            catch { }
+
+            // 緊急デバッグ: 直接ファイル書き込みで翻訳開始を確認
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 自動翻訳を開始します（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
+            
+            DebugLogUtility.WriteLog($"🎬 自動翻訳を開始します");
+            
+            // 緊急デバッグ: DebugLogUtility.WriteLog後
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] DebugLogUtility.WriteLog後{Environment.NewLine}");
+            }
+            catch { }
+            
+            _logger?.LogInformation("自動翻訳を開始します");
+
+            _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, _disposeCts.Token);
+
+            _isAutomaticTranslationActive = true;
+
+            // TODO: モード変更イベントの発行はViewModelで実行
+            // await _eventAggregator.PublishAsync(
+            //     new TranslationModeChangedEvent(TranslationMode.Automatic, TranslationMode.Manual))
+            //     .ConfigureAwait(false);
+
+            // バックグラウンドタスクで自動翻訳を実行
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始前（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
+            
+            DebugLogUtility.WriteLog($"🎬 Task.Run開始前");
+            _automaticTranslationTask = Task.Run(async () =>
+            {
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部開始（直接書き込み）{Environment.NewLine}");
+                }
+                catch { }
+                
+                DebugLogUtility.WriteLog($"🎬 Task.Run内部開始");
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync呼び出し直前（直接書き込み）{Environment.NewLine}");
+                }
+                catch { }
+                
+                try
+                {
+                    await ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token).ConfigureAwait(false);
+                    
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync正常完了（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
+                }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 ExecuteAutomaticTranslationLoopAsync例外（直接書き込み）: {ex.Message}{Environment.NewLine}");
+                    }
+                    catch { }
+                    
+                    DebugLogUtility.WriteLog($"💥 ExecuteAutomaticTranslationLoopAsync例外: {ex.Message}");
+                    _logger?.LogError(ex, "自動翻訳ループで予期しないエラーが発生しました");
+                    throw;
+                }
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部終了（直接書き込み）{Environment.NewLine}");
+                }
+                catch { }
+                
+                DebugLogUtility.WriteLog($"🎬 Task.Run内部終了");
+            }, _automaticTranslationCts.Token);
+            
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始後（直接書き込み）{Environment.NewLine}");
+            }
+            catch { }
+            
+            DebugLogUtility.WriteLog($"🎬 Task.Run開始後");
+
+            // 緊急デバッグ: tryブロック後の実行確認
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask直前{Environment.NewLine}");
+            }
+            catch { }
 
             await Task.CompletedTask.ConfigureAwait(false);
+            
+            // 緊急デバッグ: Task.CompletedTask後
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask完了{Environment.NewLine}");
+            }
+            catch { }
         }
         catch (Exception ex)
         {
@@ -238,6 +378,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 [DIRECT] TranslationOrchestrationService - 自動翻訳停止開始{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 停止前OCRエンジン状態: IsInitialized={_ocrEngine.IsInitialized}{Environment.NewLine}");
         }
         catch (Exception fileEx)
         {
@@ -521,6 +663,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private async Task ExecuteAutomaticTranslationLoopAsync(CancellationToken cancellationToken)
     {
+        // 緊急デバッグ: メソッド開始確認
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync開始（直接書き込み）{Environment.NewLine}");
+        }
+        catch { }
+        
         Console.WriteLine($"🔄 ExecuteAutomaticTranslationLoopAsync開始");
         Console.WriteLine($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         
@@ -542,6 +692,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                // 緊急デバッグ: ループ実行確認
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 自動翻訳ループ実行中（直接書き込み） - キャンセル: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+                }
+                catch { }
+                
                 Console.WriteLine($"🔄 自動翻訳ループ実行中 - キャンセル: {cancellationToken.IsCancellationRequested}");
                 Console.WriteLine($"   🔒 単発翻訳実行中: {_isSingleTranslationActive}");
                 
@@ -564,7 +722,21 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         break;
 
                     // 自動翻訳を実行
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync開始（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
+                    
                     await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
+                    
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync完了（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
 
                     // 次の実行まで待機
                     try
@@ -613,6 +785,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private async Task ExecuteAutomaticTranslationStepAsync(CancellationToken cancellationToken)
     {
+        // 緊急デバッグ: ExecuteAutomaticTranslationStepAsync開始確認
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 ExecuteAutomaticTranslationStepAsync内部開始（直接書き込み）{Environment.NewLine}");
+        }
+        catch { }
+        
         var translationId = Guid.NewGuid().ToString("N")[..8];
         DebugLogUtility.WriteLog($"🎯 自動翻訳ステップ開始: ID={translationId}");
         DebugLogUtility.WriteLog($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
@@ -631,9 +811,26 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
         {
             var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
+            
+            // 緊急デバッグ: クールダウン中の直接書き込み
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏳ 翻訳完了後のクールダウン中（直接書き込み）: ID={translationId}, 残り{remainingCooldown:F1}秒{Environment.NewLine}");
+            }
+            catch { }
+            
             DebugLogUtility.WriteLog($"⏳ 翻訳完了後のクールダウン中: ID={translationId}, 残り{remainingCooldown:F1}秒");
             return; // クールダウン中はスキップ
         }
+        
+        // 緊急デバッグ: クールダウン通過確認
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ クールダウン通過（直接書き込み）: ID={translationId}{Environment.NewLine}");
+        }
+        catch { }
         
         IImage? currentImage = null;
         try
@@ -730,11 +927,28 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
 
             // 翻訳を実行
+            // 緊急デバッグ: ExecuteTranslationAsync呼び出し前
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+            }
+            catch { }
+            
             DebugLogUtility.WriteLog($"🌍 翻訳処理開始: ID={translationId}");
             try
             {
                 var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
                     .ConfigureAwait(false);
+                
+                // 緊急デバッグ: ExecuteTranslationAsync完了
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理完了（直接書き込み）: ID={translationId}, IsCoordinateBasedMode={result?.IsCoordinateBasedMode}{Environment.NewLine}");
+                }
+                catch { }
+                
                 DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
 
                 // キャンセルチェック
@@ -910,6 +1124,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {
+        // 緊急デバッグ: ExecuteTranslationAsync開始確認
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteTranslationAsync開始（直接書き込み）: ID={translationId}, Mode={mode}{Environment.NewLine}");
+        }
+        catch { }
+        
         DebugLogUtility.WriteLog($"🚀 ExecuteTranslationAsync開始:");
         DebugLogUtility.WriteLog($"   🆔 翻訳ID: {translationId}");
         DebugLogUtility.WriteLog($"   📷 画像: {image?.GetType().Name ?? "null"}");
@@ -936,6 +1158,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             var isAdvancedImage = image is IAdvancedImage;
             var overallCondition = coordinateAvailable && hasWindowHandle && isAdvancedImage;
             
+            // 緊急デバッグ: 座標ベース翻訳条件確認
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳条件確認（直接書き込み）: coordinateAvailable={coordinateAvailable}, hasWindowHandle={hasWindowHandle}, isAdvancedImage={isAdvancedImage}, overallCondition={overallCondition}{Environment.NewLine}");
+            }
+            catch { }
+            
             DebugLogUtility.WriteLog($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
             DebugLogUtility.WriteLog($"   📋 詳細条件:");
             DebugLogUtility.WriteLog($"     📦 coordinateAvailable: {coordinateAvailable}");
@@ -949,18 +1179,40 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             if (overallCondition && image is IAdvancedImage advancedImage)
             {
+                // 緊急デバッグ: 座標ベース翻訳実行開始
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳処理実行開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+                }
+                catch { }
+                
                 DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
                 _logger?.LogDebug("🎯 座標ベース翻訳処理を実行: ID={TranslationId}", translationId);
                 
                 try
                 {
                     // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
+                    
                     DebugLogUtility.WriteLog($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
                     await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
                         advancedImage, 
                         _targetWindowHandle!.Value, 
                         cancellationToken)
                         .ConfigureAwait(false);
+                    
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
                     
                     DebugLogUtility.WriteLog($"✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了");
                     _logger?.LogInformation("✅ 座標ベース翻訳処理完了: ID={TranslationId}", translationId);

@@ -211,23 +211,51 @@ public sealed class ConfidenceBasedReprocessor(
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Task.WhenAllログ書き込みエラー: {fileEx.Message}");
             }
             
-            var reprocessedResults = await Task.WhenAll(reprocessingTasks).ConfigureAwait(false);
-            
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] Task.WhenAll完了: {reprocessedResults.Length}個の結果を取得{Environment.NewLine}");
+                var reprocessedResults = await Task.WhenAll(reprocessingTasks).ConfigureAwait(false);
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] Task.WhenAll完了: {reprocessedResults.Length}個の結果を取得{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Task.WhenAll完了ログ書き込みエラー: {fileEx.Message}");
+                }
+                
+                reprocessedChunks.AddRange(reprocessedResults);
             }
-            catch (Exception fileEx)
+            catch (TaskCanceledException)
             {
-                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Task.WhenAll完了ログ書き込みエラー: {fileEx.Message}");
+                // キャンセレーション発生時は部分的な結果を取得
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] Task.WhenAllキャンセル検出: 完了したタスクの結果を回収{Environment.NewLine}");
+                }
+                catch (Exception fileEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor キャンセル検出ログ書き込みエラー: {fileEx.Message}");
+                }
+                
+                // 完了したタスクの結果を収集
+                foreach (var task in reprocessingTasks)
+                {
+                    if (task.IsCompletedSuccessfully && task.Result != null)
+                    {
+                        reprocessedChunks.Add(task.Result);
+                    }
+                }
+                
+                _logger.LogWarning("再処理タスクがキャンセルされました。完了した{CompletedCount}個のタスクの結果を使用します。", 
+                    reprocessedChunks.Count);
             }
-            
-            reprocessedChunks.AddRange(reprocessedResults);
 
-            var improvementCount = reprocessedResults.Where(r => r != null).Count(r => r!.AverageConfidence > (_settings?.ReprocessingThreshold ?? 0.7));
+            var improvementCount = reprocessedChunks.Where(r => r != null).Count(r => r!.AverageConfidence > (_settings?.ReprocessingThreshold ?? 0.7));
             _logger.LogInformation("再処理完了: {TotalCount}個中{ImprovedCount}個が改善", 
-                reprocessedResults.Length, improvementCount);
+                reprocessedChunks.Count, improvementCount);
         }
         else
         {
@@ -350,8 +378,8 @@ public sealed class ConfidenceBasedReprocessor(
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor OCR再実行結果ログ書き込みエラー: {fileEx.Message}");
                 }
 
-                // 4. 再処理結果を評価
-                var improvedChunk = EvaluateReprocessingResults(originalChunk, reprocessedResults);
+                // 4. 再処理結果を評価（座標補正のため拡張領域情報を渡す）
+                var improvedChunk = EvaluateReprocessingResults(originalChunk, reprocessedResults, expandedBounds);
                 
                 // 結果をログ出力
                 try
@@ -408,6 +436,22 @@ public sealed class ConfidenceBasedReprocessor(
                     _logger.LogWarning(settingsEx, "OCR設定の復元でエラー発生");
                 }
             }
+        }
+        catch (TaskCanceledException)
+        {
+            // キャンセレーション例外は正常な処理として扱う
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] チャンク#{originalChunk.ChunkId}再処理がキャンセル: 元のチャンクを返します{Environment.NewLine}");
+            }
+            catch (Exception fileEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor キャンセルログ書き込みエラー: {fileEx.Message}");
+            }
+            
+            _logger.LogDebug("チャンク#{ChunkId}の再処理がキャンセルされました", originalChunk.ChunkId);
+            return originalChunk;
         }
         catch (Exception ex)
         {
@@ -671,7 +715,8 @@ public sealed class ConfidenceBasedReprocessor(
     /// </summary>
     private TextChunk EvaluateReprocessingResults(
         TextChunk originalChunk,
-        OcrResults reprocessedResults)
+        OcrResults reprocessedResults,
+        System.Drawing.Rectangle expandedBounds)
     {
         if (!reprocessedResults.HasText || reprocessedResults.TextRegions.Count == 0)
         {
@@ -696,11 +741,19 @@ public sealed class ConfidenceBasedReprocessor(
             return originalChunk;
         }
 
+        // 座標を元の画像座標系に変換（拡張領域のオフセットを加算）
+        var correctedBounds = new System.Drawing.Rectangle(
+            bestRegion.Bounds.X + expandedBounds.X,
+            bestRegion.Bounds.Y + expandedBounds.Y,
+            bestRegion.Bounds.Width,
+            bestRegion.Bounds.Height
+        );
+
         // 改善されたチャンクを作成
         var improvedTextResult = new PositionedTextResult
         {
             Text = bestRegion.Text,
-            BoundingBox = bestRegion.Bounds,
+            BoundingBox = correctedBounds, // 座標修正済み
             Confidence = (float)bestRegion.Confidence,
             ChunkId = originalChunk.ChunkId,
             ProcessingTime = reprocessedResults.ProcessingTime,
@@ -711,7 +764,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             ChunkId = originalChunk.ChunkId,
             TextResults = [improvedTextResult],
-            CombinedBounds = bestRegion.Bounds,
+            CombinedBounds = correctedBounds, // 座標修正済み
             CombinedText = bestRegion.Text,
             SourceWindowHandle = originalChunk.SourceWindowHandle,
             DetectedLanguage = reprocessedResults.LanguageCode,

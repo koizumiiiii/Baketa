@@ -199,4 +199,71 @@ public sealed class TextChunk
         $"AR Display - ChunkId: {ChunkId} | Position: ({GetARPosition().X},{GetARPosition().Y}) | " +
         $"Size: ({GetARSize().Width},{GetARSize().Height}) | FontSize: {CalculateARFontSize()} | " +
         $"CanShow: {CanShowAR()} | TranslatedText: '{TranslatedText}'";
+
+    // === InPlace版メソッド（AR技術を使わないため、より適切な名称） ===
+    
+    /// <summary>
+    /// インプレース表示が可能かどうかを判定
+    /// 有効な座標情報と翻訳テキストが存在するかチェック
+    /// </summary>
+    public bool CanShowInPlace()
+    {
+        return CombinedBounds.Width > 0 && 
+               CombinedBounds.Height > 0 && 
+               !string.IsNullOrEmpty(TranslatedText) &&
+               CombinedBounds.Width >= 10 &&  // 最小表示幅
+               CombinedBounds.Height >= 8;    // 最小表示高さ
+    }
+    
+    /// <summary>
+    /// オーバーレイ表示用の位置を取得
+    /// 元テキストと同じ位置に翻訳テキストを重ね表示するために使用
+    /// </summary>
+    public Point GetOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y);
+    
+    /// <summary>
+    /// オーバーレイ表示用のサイズを取得
+    /// 元テキストと同じサイズで翻訳テキストを表示するために使用
+    /// </summary>
+    public Size GetOverlaySize() => new(CombinedBounds.Width, CombinedBounds.Height);
+    
+    /// <summary>
+    /// オーバーレイ表示用の最適フォントサイズを計算
+    /// OCR領域の高さに基づいて自動的にフォントサイズを決定
+    /// </summary>
+    public int CalculateOptimalFontSize()
+    {
+        // OCR領域の高さの45%をベースフォントサイズとして計算（さらに保守的に）
+        var baseFontSize = (int)(CombinedBounds.Height * 0.45);
+        
+        // 翻訳テキストの長さを考慮して調整
+        if (!string.IsNullOrEmpty(TranslatedText))
+        {
+            // テキストが領域幅に収まるように調整
+            // 日本語文字の幅をより精密に計算
+            var estimatedCharWidth = baseFontSize * 0.6; // 日本語は約半角～全角幅
+            var availableWidth = CombinedBounds.Width * 0.9; // 余白を考慮
+            var maxCharsPerLine = (int)(availableWidth / estimatedCharWidth);
+            
+            if (maxCharsPerLine > 0 && TranslatedText.Length > maxCharsPerLine)
+            {
+                // テキストが長い場合はフォントサイズを縮小
+                var lines = Math.Ceiling((double)TranslatedText.Length / maxCharsPerLine);
+                var heightPerLine = CombinedBounds.Height / lines;
+                baseFontSize = (int)(heightPerLine * 0.4); // より小さく調整
+            }
+        }
+        
+        // フォントサイズの範囲制限
+        return Math.Max(8, Math.Min(32, baseFontSize));
+    }
+    
+    /// <summary>
+    /// インプレース表示用のログ情報を取得
+    /// デバッグ・トラブルシューティング用
+    /// </summary>
+    public string ToInPlaceLogString() => 
+        $"InPlace Display - ChunkId: {ChunkId} | Position: ({GetOverlayPosition().X},{GetOverlayPosition().Y}) | " +
+        $"Size: ({GetOverlaySize().Width},{GetOverlaySize().Height}) | FontSize: {CalculateOptimalFontSize()} | " +
+        $"CanShow: {CanShowInPlace()} | TranslatedText: '{TranslatedText}'";
 }

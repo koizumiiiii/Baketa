@@ -31,7 +31,7 @@ public class TranslationFlowEventProcessor :
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
-    private readonly IARTranslationOverlayManager _arOverlayManager;
+    private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
@@ -49,7 +49,7 @@ public class TranslationFlowEventProcessor :
     public TranslationFlowEventProcessor(
         ILogger<TranslationFlowEventProcessor> logger,
         IEventAggregator eventAggregator,
-        IARTranslationOverlayManager arOverlayManager,
+        IInPlaceTranslationOverlayManager inPlaceOverlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
@@ -57,7 +57,7 @@ public class TranslationFlowEventProcessor :
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _arOverlayManager = arOverlayManager ?? throw new ArgumentNullException(nameof(arOverlayManager));
+        _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -273,14 +273,14 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogDebug("翻訳表示切り替え要求を処理中: IsVisible={IsVisible}", eventData.IsVisible);
 
-            // AR風オーバーレイの表示/非表示を切り替え（新ARシステム使用）
+            // インプレースオーバーレイの表示/非表示を切り替え
             if (eventData.IsVisible)
             {
-                await _arOverlayManager.InitializeAsync().ConfigureAwait(false);
+                await _inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
             }
             else
             {
-                await _arOverlayManager.HideAllAROverlaysAsync().ConfigureAwait(false);
+                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
             }
 
             // 表示状態変更イベントを発行

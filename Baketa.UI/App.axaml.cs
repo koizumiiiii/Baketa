@@ -200,41 +200,41 @@ internal sealed partial class App : Avalonia.Application
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
                     }
                     
-                    // AR風翻訳オーバーレイマネージャーを初期化（優先）
-                    Console.WriteLine("🎯 ARTranslationOverlayManager初期化設定");
+                    // インプレース翻訳オーバーレイマネージャーを初期化（優先）
+                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager初期化設定");
                     try
                     {
-                        var arOverlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.IARTranslationOverlayManager>();
-                        if (arOverlayManager != null)
+                        var inPlaceOverlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
+                        if (inPlaceOverlayManager != null)
                         {
                             // UIスレッドデッドロックを避けるため、遅延初期化に変更
                             Task.Run(async () =>
                             {
                                 try
                                 {
-                                    Console.WriteLine("🎯 ARTranslationOverlayManager非同期初期化開始");
-                                    await arOverlayManager.InitializeAsync().ConfigureAwait(false);
-                                    Console.WriteLine("✅ ARTranslationOverlayManager初期化完了");
+                                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager非同期初期化開始");
+                                    await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
+                                    Console.WriteLine("✅ InPlaceTranslationOverlayManager初期化完了");
                                 }
                                 catch (Exception asyncEx)
                                 {
-                                    Console.WriteLine($"⚠️ ARTranslationOverlayManager非同期初期化失敗: {asyncEx.Message}");
+                                    Console.WriteLine($"⚠️ InPlaceTranslationOverlayManager非同期初期化失敗: {asyncEx.Message}");
                                 }
                             });
-                            Console.WriteLine("✅ ARTranslationOverlayManager遅延初期化設定完了");
+                            Console.WriteLine("✅ InPlaceTranslationOverlayManager遅延初期化設定完了");
                         }
                         else
                         {
-                            Console.WriteLine("⚠️ ARTranslationOverlayManagerが見つかりません");
+                            Console.WriteLine("⚠️ InPlaceTranslationOverlayManagerが見つかりません");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ ARTranslationOverlayManager初期化設定エラー: {ex.Message}");
+                        Console.WriteLine($"❌ InPlaceTranslationOverlayManager初期化設定エラー: {ex.Message}");
                     }
 
-                    // 旧TranslationResultOverlayManagerは削除済み - ARシステムが自動で管理
-                    Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - ARシステムが自動で管理");
+                    // 旧TranslationResultOverlayManagerは削除済み - インプレースシステムが自動で管理
+                    Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理");
                     
                     // TranslationFlowModuleを使用してイベント購読を設定
                     Console.WriteLine("🔧 TranslationFlowModuleのイベント購読を初期化中");
