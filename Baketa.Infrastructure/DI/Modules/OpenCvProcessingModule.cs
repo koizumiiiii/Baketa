@@ -62,7 +62,8 @@ public sealed class OpenCvProcessingModule : ServiceModuleBase
         services.AddTransient<IOcrPreprocessingService>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<GameOptimizedPreprocessingService>>();
-            return new GameOptimizedPreprocessingService(logger);
+            var imagePool = provider.GetRequiredService<Baketa.Core.Abstractions.Memory.IAdvancedImagePool>();
+            return new GameOptimizedPreprocessingService(logger, imagePool);
         });
     }
 }

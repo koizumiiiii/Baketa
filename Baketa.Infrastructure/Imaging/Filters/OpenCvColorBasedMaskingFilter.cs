@@ -102,7 +102,7 @@ public sealed class OpenCvColorBasedMaskingFilter : ImageFilterBase
     /// </summary>
     /// <param name="inputImage">入力画像</param>
     /// <returns>フィルター適用後の新しい画像</returns>
-    public override async Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
+    public override Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage)
     {
         ArgumentNullException.ThrowIfNull(inputImage);
 
@@ -123,12 +123,12 @@ public sealed class OpenCvColorBasedMaskingFilter : ImageFilterBase
             }
 
             // 元画像のクローンを返して安全性を保つ
-            return (IAdvancedImage)inputImage.Clone();
+            return Task.FromResult((IAdvancedImage)inputImage.Clone());
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "OpenCV色ベースマスキング中にエラーが発生しました");
-            return inputImage;
+            return Task.FromResult(inputImage);
         }
     }
 

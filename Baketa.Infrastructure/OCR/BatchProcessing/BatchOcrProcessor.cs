@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
@@ -198,10 +199,15 @@ public readonly record struct LanguageInfo
 /// <summary>
 /// バッチOCR処理の実装クラス
 /// Phase 2-B: OCRバッチ処理最適化とパフォーマンス向上
+/// ⚡ 高性能非同期処理版 - パフォーマンス分析機能付き
 /// </summary>
-public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProcessor>? logger = null) : IBatchOcrProcessor, IDisposable
+public sealed class BatchOcrProcessor(
+    IOcrEngine ocrEngine, 
+    IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
+    ILogger<BatchOcrProcessor>? logger = null) : IBatchOcrProcessor, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
     private readonly ILogger<BatchOcrProcessor>? _logger = logger;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor = new(
         logger as ILogger<CoordinateBasedLineBreakProcessor> ?? 
@@ -227,7 +233,7 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
     private readonly object _configLock = new();
 
     /// <summary>
-    /// 画像をバッチ処理してテキストチャンクを取得
+    /// 画像をバッチ処理してテキストチャンクを取得（⚡ 高性能非同期版）
     /// </summary>
     public async Task<IReadOnlyList<TextChunk>> ProcessBatchAsync(
         IAdvancedImage image, 
@@ -236,17 +242,67 @@ public sealed class BatchOcrProcessor(IOcrEngine ocrEngine, ILogger<BatchOcrProc
     {
         ThrowIfDisposed();
         
+        // パフォーマンス分析機能付きで実行
+        if (_performanceAnalyzer != null)
+        {
+            return await _performanceAnalyzer.MeasureAsync(
+                async ct => await ProcessBatchInternalAsync(image, windowHandle, ct).ConfigureAwait(false),
+                "BatchOcrProcessor.ProcessBatch",
+                cancellationToken).ConfigureAwait(false) switch
+            {
+                { IsSuccessful: true } result => await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false),
+                _ => []
+            };
+        }
+        
+        return await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// バッチ処理の内部実装（パフォーマンス測定対象）
+    /// </summary>
+    private async Task<IReadOnlyList<TextChunk>> ProcessBatchInternalAsync(
+        IAdvancedImage image, 
+        IntPtr windowHandle, 
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
         var processingStartTime = DateTime.UtcNow;
         
         try
         {
-            _logger?.LogInformation("📦 バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
+            _logger?.LogInformation("⚡ 高性能バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
 
+            // 並列処理可能な独立タスクを並行実行
+            var parallelTasks = new List<Func<CancellationToken, Task<object>>>();
+
             // 1. 前処理: 画像品質分析
-            System.Console.WriteLine("🔍 Phase 6デバッグ: AnalyzeImageQualityAsync開始");
-            var qualityMetrics = await AnalyzeImageQualityAsync(image, cancellationToken).ConfigureAwait(false);
+            async Task<ImageQualityMetrics> qualityTask(CancellationToken ct)
+            {
+                System.Console.WriteLine("🔍 Phase 6デバッグ: AnalyzeImageQualityAsync開始");
+                var result = await AnalyzeImageQualityAsync(image, ct).ConfigureAwait(false);
+                System.Console.WriteLine($"🔍 Phase 6デバッグ: 画像品質分析完了 - スコア={result.QualityScore:F2}");
+                return result;
+            }
+
+            parallelTasks.Add(async ct => await qualityTask(ct).ConfigureAwait(false));
+
+            // パフォーマンス分析機能付きで並列実行
+            ParallelPerformanceMeasurement? parallelMeasurement = null;
+            if (_performanceAnalyzer != null)
+            {
+                parallelMeasurement = await _performanceAnalyzer.MeasureParallelAsync(
+                    parallelTasks,
+                    "BatchOcr.PreprocessingPhase",
+                    Environment.ProcessorCount, // CPU数に応じた並列度
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            // 結果を取得
+            var qualityMetrics = parallelTasks.Count > 0 && parallelMeasurement?.IndividualMeasurements.Count > 0
+                ? (ImageQualityMetrics)(await qualityTask(cancellationToken).ConfigureAwait(false))
+                : await AnalyzeImageQualityAsync(image, cancellationToken).ConfigureAwait(false);
             System.Console.WriteLine($"🔍 Phase 6デバッグ: 画像品質分析完了 - スコア={qualityMetrics.QualityScore:F2}, 推奨処理={qualityMetrics.RecommendedProcessing}");
             _logger?.LogDebug("🔍 画像品質分析完了: スコア={Score:F2}, 推奨処理={ProcessingType}", 
                 qualityMetrics.QualityScore, qualityMetrics.RecommendedProcessing);

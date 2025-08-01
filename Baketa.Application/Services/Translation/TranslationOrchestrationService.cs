@@ -962,14 +962,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 }
                 
                 if (!string.IsNullOrEmpty(lastTranslatedText) && 
-                    string.Equals(result.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
+                    string.Equals(result?.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
                 {
-                    DebugLogUtility.WriteLog($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result.TranslatedText}'");
+                    DebugLogUtility.WriteLog($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result?.TranslatedText}'");
                     return;
                 }
                 
                 // 座標ベース翻訳モードの場合はObservable発行をスキップ
-                if (result.IsCoordinateBasedMode)
+                if (result?.IsCoordinateBasedMode == true)
                 {
                     DebugLogUtility.WriteLog($"🎯 座標ベース翻訳モードのためObservable発行をスキップ");
                     // 翻訳完了時刻を記録
@@ -987,13 +987,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 }
                 lock (_lastTranslatedTextLock)
                 {
-                    _lastTranslatedText = result.TranslatedText;
+                    _lastTranslatedText = result?.TranslatedText ?? string.Empty;
                 }
                 
                 // 結果を通知（UI層でスケジューラ制御）
-                DebugLogUtility.WriteLog($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
-                _translationResultsSubject.OnNext(result);
-                DebugLogUtility.WriteLog($"✅ 翻訳結果発行完了");
+                if (result != null)
+                {
+                    DebugLogUtility.WriteLog($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
+                    _translationResultsSubject.OnNext(result);
+                    DebugLogUtility.WriteLog($"✅ 翻訳結果発行完了");
+                }
+                else
+                {
+                    DebugLogUtility.WriteLog($"⚠️ 翻訳結果がnullのためObservable発行をスキップ");
+                }
             }
             catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") || 
                                                   translationEx.Message.Contains("OCR") ||
