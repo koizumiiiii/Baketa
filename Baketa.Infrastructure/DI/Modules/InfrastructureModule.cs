@@ -13,6 +13,8 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Measurement;
+using Baketa.Core.Abstractions.Performance;
+using Baketa.Infrastructure.Performance;
 using System;
 using System.Collections.Generic;
 
@@ -31,6 +33,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         public override void RegisterServices(IServiceCollection services)
         {
+            
             // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
             //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
@@ -45,6 +48,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // αテスト向けOPUS-MT翻訳サービス（TranslationServiceExtensionsで登録されるためコメントアウト）
             // RegisterAlphaOpusMTServices(services);
+            
+            // パフォーマンス管理サービス
+            RegisterPerformanceServices(services);
             
             // データ永続化
             RegisterPersistenceServices(services, environment);
@@ -118,6 +124,16 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // TODO: AlphaOpusMT翻訳エンジンをITranslationEngineとして登録
             // 現在は別の箇所でMockTranslationEngineが登録されている
+        }
+        
+        /// <summary>
+        /// パフォーマンス管理サービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterPerformanceServices(IServiceCollection services)
+        {
+            // GPUメモリ管理
+            services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
         }
         
         /// <summary>

@@ -18,6 +18,7 @@ using System.Security;
 using System.Reflection;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging;
+using Baketa.Core.Abstractions.Performance;
 using Baketa.Infrastructure.OCR.Preprocessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.TextProcessing;
@@ -34,12 +35,14 @@ public sealed class PaddleOcrEngine(
     IOcrPreprocessingService ocrPreprocessingService,
     ITextMerger textMerger,
     IOcrPostProcessor ocrPostProcessor,
+    IGpuMemoryManager gpuMemoryManager,
     ILogger<PaddleOcrEngine>? logger = null) : IOcrEngine
 {
     private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
     private readonly IOcrPreprocessingService _ocrPreprocessingService = ocrPreprocessingService ?? throw new ArgumentNullException(nameof(ocrPreprocessingService));
     private readonly ITextMerger _textMerger = textMerger ?? throw new ArgumentNullException(nameof(textMerger));
     private readonly IOcrPostProcessor _ocrPostProcessor = ocrPostProcessor ?? throw new ArgumentNullException(nameof(ocrPostProcessor));
+    private readonly IGpuMemoryManager _gpuMemoryManager = gpuMemoryManager ?? throw new ArgumentNullException(nameof(gpuMemoryManager));
     private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly object _lockObject = new();
     
@@ -490,6 +493,12 @@ public sealed class PaddleOcrEngine(
             
             DisposeEngines();
             await InitializeAsync(_settings, cancellationToken).ConfigureAwait(false);
+        }
+        
+        // GPUメモリ制限チェック（GPU使用時のみ）
+        if (_settings.UseGpu && _settings.EnableGpuMemoryMonitoring)
+        {
+            await CheckGpuMemoryLimitsAsync(_settings, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -2599,6 +2608,79 @@ public sealed class PaddleOcrEngine(
                _settings.Language?.Equals("ja", StringComparison.OrdinalIgnoreCase) == true ||
                _settings.Language?.Equals("japanese", StringComparison.OrdinalIgnoreCase) == true ||
                _settings.Language?.Equals("日本語", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    /// <summary>
+    /// GPUメモリ制限をチェックし、必要に応じて警告やフォールバックを実行
+    /// </summary>
+    private async Task CheckGpuMemoryLimitsAsync(OcrEngineSettings settings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 必要メモリ量の推定（OCR処理用）
+            var estimatedMemoryMB = EstimateRequiredGpuMemory(settings);
+            
+            // メモリ可用性チェック
+            var isAvailable = await _gpuMemoryManager.IsMemoryAvailableAsync(estimatedMemoryMB, cancellationToken).ConfigureAwait(false);
+            
+            if (!isAvailable)
+            {
+                _logger?.LogWarning("⚠️ GPU memory insufficient: Required={RequiredMB}MB, falling back to CPU mode", estimatedMemoryMB);
+                
+                // 自動的にCPUモードにフォールバック
+                settings.UseGpu = false;
+                _settings.UseGpu = false;
+                
+                return;
+            }
+            
+            // GPUメモリ制限を適用
+            var limits = new GpuMemoryLimits
+            {
+                MaxUsageMB = settings.MaxGpuMemoryMB,
+                WarningThreshold = 0.8,
+                EnforceLimit = true,
+                MonitoringIntervalSeconds = 60
+            };
+            
+            await _gpuMemoryManager.ApplyLimitsAsync(limits).ConfigureAwait(false);
+            
+            // 監視開始（まだ開始していない場合）
+            if (!_gpuMemoryManager.IsMonitoringEnabled)
+            {
+                await _gpuMemoryManager.StartMonitoringAsync(limits, cancellationToken).ConfigureAwait(false);
+            }
+            
+            _logger?.LogInformation("💻 GPU memory limits applied: Max={MaxMB}MB, Estimated={EstimatedMB}MB", 
+                settings.MaxGpuMemoryMB, estimatedMemoryMB);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "⚠️ Failed to check GPU memory limits, continuing without restrictions");
+        }
+    }
+    
+    /// <summary>
+    /// OCR処理に必要なGPUメモリ量を推定
+    /// </summary>
+    private static int EstimateRequiredGpuMemory(OcrEngineSettings settings)
+    {
+        // 基本的なOCRモデル用メモリ
+        var baseMemoryMB = 512;
+        
+        // 言語モデル使用時の追加メモリ
+        if (settings.UseLanguageModel)
+        {
+            baseMemoryMB += 256;
+        }
+        
+        // マルチスレッド処理時の追加メモリ
+        if (settings.EnableMultiThread)
+        {
+            baseMemoryMB += settings.WorkerCount * 128;
+        }
+        
+        return baseMemoryMB;
     }
 
     private void ThrowIfDisposed()
