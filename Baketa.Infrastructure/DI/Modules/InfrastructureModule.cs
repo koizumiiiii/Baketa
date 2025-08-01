@@ -157,5 +157,6 @@ namespace Baketa.Infrastructure.DI.Modules;
         public override IEnumerable<Type> GetDependentModules()
         {
             yield return typeof(CoreModule);
+            yield return typeof(ObjectPoolModule);
         }
     }

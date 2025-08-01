@@ -23,11 +23,13 @@ namespace Baketa.UI.Views.Overlay;
 public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
 {
     // Windows API for click-through
+#pragma warning disable SYSLIB1054 // Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
     
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+#pragma warning restore SYSLIB1054
 
     // データプロパティ
     public int ChunkId { get; init; }

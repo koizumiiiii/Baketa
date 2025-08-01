@@ -736,8 +736,8 @@ public sealed class PaddleOcrEngine(
                     DebugLogUtility.WriteLog($"   UseGpu: {settings.UseGpu}");
                     DebugLogUtility.WriteLog($"   EnableMultiThread: {settings.EnableMultiThread}");
                     DebugLogUtility.WriteLog($"   WorkerCount: {settings.WorkerCount}");
-                    DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine.AllowRotateDetection}");
-                    DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine.Enable180Classification}");
+                    DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection ?? false}");
+                    DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification ?? false}");
                     var rotateDetection = true;  // PP-OCRv5高速化設定
                     var classification180 = true;  // PP-OCRv5高速化設定
                     DebugLogUtility.WriteLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
@@ -2965,6 +2965,13 @@ public sealed class PaddleOcrEngine(
         if (completedTask == ocrTask)
         {
             var result = await ocrTask.ConfigureAwait(false);
+            
+            if (result == null)
+            {
+                DebugLogUtility.WriteLog("⚠️ OCR処理結果がnull - エラー状態");
+                throw new InvalidOperationException("OCR processing returned null result");
+            }
+            
             DebugLogUtility.WriteLog("✅ OCR処理正常完了 - Task.WhenAny版");
             
             // 成功時の統計更新とクリーンアップ
@@ -2989,6 +2996,13 @@ public sealed class PaddleOcrEngine(
                 if (ocrTask.IsCompleted && !ocrTask.IsFaulted && !ocrTask.IsCanceled)
                 {
                     var lateResult = await ocrTask.ConfigureAwait(false);
+                    
+                    if (lateResult == null)
+                    {
+                        DebugLogUtility.WriteLog("⚠️ OCR遅延処理結果がnull - エラー状態");
+                        throw new InvalidOperationException("OCR late processing returned null result");
+                    }
+                    
                     DebugLogUtility.WriteLog("✅ OCR処理がタイムアウト後に完了 - 結果を返します");
                     
                     // 遅延完了時の統計更新とクリーンアップ

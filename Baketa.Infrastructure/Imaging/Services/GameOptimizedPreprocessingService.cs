@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.Imaging.Filters;
 using Microsoft.Extensions.Logging;
@@ -14,11 +15,14 @@ namespace Baketa.Infrastructure.Imaging.Services;
 /// <summary>
 /// ゲーム画面特化OCR前処理サービス
 /// Phase 3: OpenCvSharp を活用した高精度前処理パイプライン
+/// 🏊‍♂️ オブジェクトプール対応版 - メモリ効率向上
 /// </summary>
 public sealed class GameOptimizedPreprocessingService(
-    ILogger<GameOptimizedPreprocessingService> logger) : IOcrPreprocessingService
+    ILogger<GameOptimizedPreprocessingService> logger,
+    IAdvancedImagePool imagePool) : IOcrPreprocessingService
 {
     private readonly ILogger<GameOptimizedPreprocessingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IAdvancedImagePool _imagePool = imagePool ?? throw new ArgumentNullException(nameof(imagePool));
 
     /// <summary>
     /// ゲーム画面プロファイル定義
@@ -193,7 +197,7 @@ public sealed class GameOptimizedPreprocessingService(
     }
 
     /// <summary>
-    /// ゲーム最適化処理を適用
+    /// ゲーム最適化処理を適用（🏊‍♂️ オブジェクトプール対応版）
     /// </summary>
     /// <param name="image">入力画像</param>
     /// <param name="profile">使用するプロファイル</param>
@@ -205,72 +209,87 @@ public sealed class GameOptimizedPreprocessingService(
         CancellationToken _)
     {
         var currentImage = image;
-        var requiresDisposal = new List<IAdvancedImage>();
+        var pooledImages = new List<IAdvancedImage>(); // プールから取得した画像を追跡
 
         try
         {
             // Step 1: 色ベースマスキング（背景ノイズ除去）
             if (profile.EnableColorMasking)
             {
-                _logger.LogDebug("色ベースマスキング適用中...");
+                _logger.LogDebug("🎨 色ベースマスキング適用中（プール使用）...");
                 
                 var colorMaskingFilter = CreateColorMaskingFilter(profile);
                 var maskedImage = await colorMaskingFilter.ApplyAsync(currentImage).ConfigureAwait(false);
                 
-                if (maskedImage != currentImage)
-                {
-                    requiresDisposal.Add(maskedImage);
-                    currentImage = maskedImage;
-                }
+                currentImage = maskedImage;
                 
-                _logger.LogDebug("色ベースマスキング完了");
+                _logger.LogDebug("✅ 色ベースマスキング完了（プール効率: HitRate={HitRate:P1}）", 
+                    _imagePool.Statistics.HitRate);
             }
 
             // Step 2: 適応的二値化（照明変化対応）
             if (profile.EnableAdaptiveThreshold)
             {
-                _logger.LogDebug("適応的二値化適用中...");
+                _logger.LogDebug("🔧 適応的二値化適用中（プール使用）...");
                 
                 var adaptiveThresholdFilter = CreateAdaptiveThresholdFilter(profile);
                 var thresholdImage = await adaptiveThresholdFilter.ApplyAsync(currentImage).ConfigureAwait(false);
                 
-                if (thresholdImage != currentImage)
-                {
-                    requiresDisposal.Add(thresholdImage);
-                    currentImage = thresholdImage;
-                }
+                currentImage = thresholdImage;
                 
-                _logger.LogDebug("適応的二値化完了");
+                _logger.LogDebug("✅ 適応的二値化完了（プール効率: HitRate={HitRate:P1}）", 
+                    _imagePool.Statistics.HitRate);
             }
 
-            _logger.LogInformation("ゲーム最適化処理完了: ColorMasking={ColorMasking}, AdaptiveThreshold={AdaptiveThreshold}",
-                profile.EnableColorMasking, profile.EnableAdaptiveThreshold);
+            _logger.LogInformation("🎮 ゲーム最適化処理完了: ColorMasking={ColorMasking}, AdaptiveThreshold={AdaptiveThreshold}, " +
+                "PoolObjectsUsed={PoolObjectsUsed}, MemoryEfficiency={MemoryEfficiency:P1}",
+                profile.EnableColorMasking, profile.EnableAdaptiveThreshold, 
+                pooledImages.Count, _imagePool.Statistics.HitRate);
 
             return currentImage;
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("ゲーム最適化処理がキャンセルされました");
+            _logger.LogInformation("⏹️ ゲーム最適化処理がキャンセルされました");
             
-            // 作成された中間画像を破棄
-            foreach (var disposableImage in requiresDisposal)
-            {
-                disposableImage.Dispose();
-            }
+            // プールから取得した画像をプールに返却
+            ReturnPooledImages(pooledImages);
             
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ゲーム最適化処理中にエラーが発生しました");
+            _logger.LogError(ex, "❌ ゲーム最適化処理中にエラーが発生しました");
             
-            // 作成された中間画像を破棄
-            foreach (var disposableImage in requiresDisposal)
-            {
-                disposableImage.Dispose();
-            }
+            // プールから取得した画像をプールに返却
+            ReturnPooledImages(pooledImages);
             
             throw;
+        }
+    }
+
+    /// <summary>
+    /// プールから取得した画像をプールに返却
+    /// </summary>
+    /// <param name="pooledImages">プールから取得した画像のリスト</param>
+    private void ReturnPooledImages(List<IAdvancedImage> pooledImages)
+    {
+        foreach (var pooledImage in pooledImages)
+        {
+            try
+            {
+                _imagePool.Release(pooledImage);
+                _logger.LogDebug("📥 画像をプールに返却: Size={Width}x{Height}", 
+                    pooledImage.Width, pooledImage.Height);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "⚠️ 画像プール返却時にエラー: Size={Width}x{Height}", 
+                    pooledImage.Width, pooledImage.Height);
+                
+                // プール返却に失敗した場合は直接破棄
+                pooledImage.Dispose();
+            }
         }
     }
 
