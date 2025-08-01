@@ -319,6 +319,16 @@ public class OcrEngineSettings
     public int GpuDeviceId { get; set; }
     
     /// <summary>
+    /// GPU最大メモリ使用量（MB）- ゲーム競合回避用
+    /// </summary>
+    public int MaxGpuMemoryMB { get; set; } = 2048; // デフォルト2GB
+    
+    /// <summary>
+    /// GPUメモリ使用量監視を有効にするか
+    /// </summary>
+    public bool EnableGpuMemoryMonitoring { get; set; } = true;
+    
+    /// <summary>
     /// マルチスレッド処理を有効にするか
     /// </summary>
     public bool EnableMultiThread { get; set; }
@@ -362,6 +372,9 @@ public class OcrEngineSettings
         if (GpuDeviceId < 0)
             return false;
             
+        if (MaxGpuMemoryMB < 128 || MaxGpuMemoryMB > 16384) // 128MB～16GB
+            return false;
+            
         if (WorkerCount < 1 || WorkerCount > 10)
             return false;
             
@@ -384,6 +397,8 @@ public class OcrEngineSettings
             UseDirectionClassification = UseDirectionClassification,
             UseGpu = UseGpu,
             GpuDeviceId = GpuDeviceId,
+            MaxGpuMemoryMB = MaxGpuMemoryMB,
+            EnableGpuMemoryMonitoring = EnableGpuMemoryMonitoring,
             EnableMultiThread = EnableMultiThread,
             WorkerCount = WorkerCount,
             UseLanguageModel = UseLanguageModel,

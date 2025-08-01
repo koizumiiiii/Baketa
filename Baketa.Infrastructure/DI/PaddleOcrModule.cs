@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Performance;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
@@ -290,7 +291,8 @@ public sealed class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
+                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
             }
             
             bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
@@ -307,7 +309,8 @@ public sealed class PaddleOcrModule : IServiceModule
             {
                 Console.WriteLine("✅ 本番環境検出 - PaddleOcrEngineを使用");
                 logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
+                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
             }
         });
         
@@ -331,7 +334,8 @@ public sealed class PaddleOcrModule : IServiceModule
                 var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
                 var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
                 var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, logger);
+                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
             }
         });
         
