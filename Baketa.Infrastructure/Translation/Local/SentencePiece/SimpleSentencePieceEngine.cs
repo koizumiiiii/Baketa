@@ -8,6 +8,8 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
+using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native;
+using Baketa.Infrastructure.Translation.Local.Onnx;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Local.SentencePiece;
@@ -18,7 +20,7 @@ namespace Baketa.Infrastructure.Translation.Local.SentencePiece;
 /// </summary>
 public sealed class SimpleSentencePieceEngine : TranslationEngineBase
 {
-    private readonly RealSentencePieceTokenizer _tokenizer;
+    private readonly ITokenizer _tokenizer;
     private readonly LanguagePair _languagePair;
     private readonly Dictionary<string, string> _simpleTranslations;
     private readonly string _modelPath;
@@ -54,10 +56,14 @@ public sealed class SimpleSentencePieceEngine : TranslationEngineBase
             throw new FileNotFoundException($"SentencePieceモデルファイルが見つかりません: {tokenizerPath}");
         }
 
-        // SentencePieceトークナイザーを初期化
+        // SentencePieceトークナイザーを初期化（Native実装優先）
         var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
-        var tokenizerLogger = loggerFactory.CreateLogger<RealSentencePieceTokenizer>();
-        _tokenizer = new RealSentencePieceTokenizer(tokenizerPath, tokenizerLogger);
+        _tokenizer = SentencePieceTokenizerFactory.Create(
+            tokenizerPath,
+            "Simple SentencePiece Tokenizer",
+            loggerFactory,
+            useTemporary: false,
+            useNative: true);
         
         // 簡単な翻訳辞書を初期化
         _simpleTranslations = InitializeSimpleTranslations();
@@ -93,7 +99,14 @@ public sealed class SimpleSentencePieceEngine : TranslationEngineBase
         try
         {
             // SentencePieceトークナイザーの初期化状態を確認
-            if (!_tokenizer.IsInitialized)
+            var isInitialized = _tokenizer switch
+            {
+                OpusMtNativeTokenizer native => native.IsInitialized,
+                RealSentencePieceTokenizer real => real.IsInitialized,
+                _ => true // その他の実装は常に初期化済みとみなす
+            };
+            
+            if (!isInitialized)
             {
                 return Task.FromResult(false);
             }
@@ -287,7 +300,10 @@ public sealed class SimpleSentencePieceEngine : TranslationEngineBase
     {
         if (disposing)
         {
-            _tokenizer?.Dispose();
+            if (_tokenizer is IDisposable disposableTokenizer)
+            {
+                disposableTokenizer.Dispose();
+            }
         }
         
         base.Dispose(disposing);
