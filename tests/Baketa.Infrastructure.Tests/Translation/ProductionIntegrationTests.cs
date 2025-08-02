@@ -69,7 +69,7 @@ public class ProductionIntegrationTests : IDisposable
             return;
         }
 
-        var logger = _serviceProvider.GetRequiredService<ILogger<OpusMtNativeTokenizer>>();
+        _ = _serviceProvider.GetRequiredService<ILogger<OpusMtNativeTokenizer>>();
         
         // 実際のゲームから抽出されるようなテキストサンプル
         var testTexts = new[]
