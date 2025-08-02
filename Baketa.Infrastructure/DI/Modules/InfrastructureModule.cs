@@ -15,8 +15,10 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Infrastructure.Performance;
+using Baketa.Infrastructure.Translation.Validation;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -46,8 +48,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 翻訳サービス
             RegisterTranslationServices(services);
             
-            // αテスト向けOPUS-MT翻訳サービス（TranslationServiceExtensionsで登録されるためコメントアウト）
-            // RegisterAlphaOpusMTServices(services);
+            // αテスト向けOPUS-MT翻訳サービス
+            RegisterAlphaOpusMTServices(services);
             
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
@@ -109,7 +111,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 return new AlphaOpusMtConfiguration
                 {
                     IsEnabled = true,
-                    ModelsDirectory = "Models/SentencePiece",
+                    ModelsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Models", "SentencePiece"),
                     MaxSequenceLength = 256,
                     MemoryLimitMb = 300,
                     ThreadCount = 2
@@ -122,8 +124,25 @@ namespace Baketa.Infrastructure.DI.Modules;
             // αテスト向けOPUS-MT翻訳サービス
             services.AddSingleton<AlphaOpusMtTranslationService>();
             
-            // TODO: AlphaOpusMT翻訳エンジンをITranslationEngineとして登録
-            // 現在は別の箇所でMockTranslationEngineが登録されている
+            // AlphaOpusMT翻訳エンジンをITranslationEngineとして登録
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
+            {
+                var factory = provider.GetRequiredService<AlphaOpusMtEngineFactory>();
+                var options = new AlphaOpusMtOptions
+                {
+                    MaxSequenceLength = 256,
+                    MemoryLimitMb = 300,
+                    ThreadCount = 2
+                };
+                var engineLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngine>>();
+                var adapterLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngineAdapter>>();
+                
+                // 日英翻訳エンジンを作成（デフォルト）
+                var alphaEngine = factory.CreateJapaneseToEnglishEngine(options, engineLogger);
+                
+                // アダプターでラップして旧インターフェースに適応
+                return new AlphaOpusMtTranslationEngineAdapter(alphaEngine, adapterLogger);
+            });
         }
         
         /// <summary>
@@ -134,6 +153,11 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             // GPUメモリ管理
             services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
+            
+            // 翻訳精度検証システム（デバッグビルドのみ）
+#if DEBUG
+            services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
+#endif
         }
         
         /// <summary>
