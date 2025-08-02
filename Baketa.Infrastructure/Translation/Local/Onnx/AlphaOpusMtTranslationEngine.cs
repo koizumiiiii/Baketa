@@ -486,9 +486,12 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
         // Native Tokenizerの特殊トークンIDを取得
         var nativeTokenizer = _tokenizer as OpusMtNativeTokenizer;
         var bosTokenId = nativeTokenizer?.GetSpecialTokenId("BOS") ?? 0L;
-        var eosTokenId = nativeTokenizer?.GetSpecialTokenId("EOS") ?? 2L;
+        var eosTokenId = nativeTokenizer?.GetSpecialTokenId("EOS") ?? 0L; // Helsinki: BOS=EOS=0
         var unkTokenId = nativeTokenizer?.GetSpecialTokenId("UNK") ?? 1L;
-        var padTokenId = nativeTokenizer?.GetSpecialTokenId("PAD") ?? 3L;
+        var padTokenId = nativeTokenizer?.GetSpecialTokenId("PAD") ?? 60715L; // Helsinki: PAD=60715
+        
+        // HelsinkiモデルのEOSが無効(-1)の場合はBOSと同じ値を使用
+        if (eosTokenId < 0) eosTokenId = bosTokenId;
 
         // エンコーダー入力テンソルの作成
         var encoderInputTensor = new DenseTensor<long>(
