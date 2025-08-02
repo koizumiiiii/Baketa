@@ -36,12 +36,12 @@ public class DebugTrieTests(ITestOutputHelper output)
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
         
         // Debug - 内部状態を確認
-        output.WriteLine($"Tokenizer initialized: {tokenizer != null}");
+        output.WriteLine($"Tokenizer initialized: {tokenizer is not null}");
         
         // 簡単なトークン化テスト
         var testText = "こんにちは";
         var tokens = tokenizer.Tokenize(testText);
-        var decoded = tokenizer.Decode(tokens);
+        var decoded = tokenizer.Decode(tokens) ?? string.Empty;
         
         output.WriteLine($"Input: '{testText}'");
         output.WriteLine($"Tokens: [{string.Join(", ", tokens)}]");

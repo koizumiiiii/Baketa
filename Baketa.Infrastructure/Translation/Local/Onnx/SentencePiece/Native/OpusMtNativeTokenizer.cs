@@ -173,6 +173,35 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
     }
 
     /// <summary>
+    /// 特殊トークンIDを取得
+    /// </summary>
+    /// <param name="tokenType">特殊トークンタイプ ("BOS", "EOS", "UNK", "PAD")</param>
+    /// <returns>特殊トークンのID</returns>
+    public long GetSpecialTokenId(string tokenType)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        
+        if (!_isInitialized)
+            return tokenType switch
+            {
+                "BOS" => 0L,
+                "EOS" => 2L,
+                "UNK" => 1L,
+                "PAD" => 3L,
+                _ => throw new ArgumentException($"Unknown special token type: {tokenType}")
+            };
+
+        return tokenType.ToUpperInvariant() switch
+        {
+            "BOS" => _model.SpecialTokens.BosId,
+            "EOS" => _model.SpecialTokens.EosId,
+            "UNK" => _model.SpecialTokens.UnkId,
+            "PAD" => _model.SpecialTokens.PadId,
+            _ => throw new ArgumentException($"Unknown special token type: {tokenType}")
+        };
+    }
+
+    /// <summary>
     /// BOS/EOSトークンを追加
     /// </summary>
     private int[] AddSpecialTokens(int[] tokens)

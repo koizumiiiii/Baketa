@@ -483,6 +483,13 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             throw new InvalidOperationException("セッションが初期化されていません");
         }
 
+        // Native Tokenizerの特殊トークンIDを取得
+        var nativeTokenizer = _tokenizer as OpusMtNativeTokenizer;
+        var bosTokenId = nativeTokenizer?.GetSpecialTokenId("BOS") ?? 0L;
+        var eosTokenId = nativeTokenizer?.GetSpecialTokenId("EOS") ?? 2L;
+        var unkTokenId = nativeTokenizer?.GetSpecialTokenId("UNK") ?? 1L;
+        var padTokenId = nativeTokenizer?.GetSpecialTokenId("PAD") ?? 3L;
+
         // エンコーダー入力テンソルの作成
         var encoderInputTensor = new DenseTensor<long>(
             inputTokens.Select(t => (long)t).ToArray(),
@@ -495,19 +502,16 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             attentionMask,
             [1, inputTokens.Length]);
 
-        // OPUS-MT (MarianMT) のBOSトークンを使用（0を試行）
-        const long bosTokenId = 0L;
         var decoderInputIds = new List<long> { bosTokenId };
         var outputTokens = new List<int>();
         
         const int maxLength = 100; // 最大生成長
-        const long eosTokenId = 2L; // EOSトークン（PADとは別のID）
 
         // 直接書き込みで推論開始をログ
         try
         {
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [ONNX] Greedy Search開始（直接書き込み） - Encoder: [{string.Join(", ", inputTokens.Take(5))}...], Decoder初期値: [{bosTokenId}]{Environment.NewLine}");
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [ONNX] Greedy Search開始（修正版） - Encoder: [{string.Join(", ", inputTokens.Take(5))}...], BOS: {bosTokenId}, EOS: {eosTokenId}{Environment.NewLine}");
         }
         catch { }
 
@@ -534,26 +538,6 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             // 推論実行
             using var results = _session.Run(inputs);
             
-            // 直接書き込みで推論結果詳細をログ（最初のステップのみ）
-            if (step == 0)
-            {
-                try
-                {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] 推論結果詳細（直接書き込み） - 結果数: {results.Count}{Environment.NewLine}");
-                    
-                    for (int i = 0; i < results.Count; i++)
-                    {
-                        var result = results[i];
-                        var resultName = result?.Name ?? "null";
-                        var resultType = result?.GetType().Name ?? "null";
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] 結果[{i}]（直接書き込み） - Name: '{resultName}', Type: '{resultType}'{Environment.NewLine}");
-                    }
-                }
-                catch { }
-            }
-            
             // 出力の取得（logitsテンソル）
             var outputResult = results.FirstOrDefault(r => r.Name == "output") 
                 ?? throw new InvalidOperationException("'output'という名前の推論結果が見つかりません");
@@ -569,16 +553,33 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 lastTokenLogits[i] = logitsTensor[0, decoderInputIds.Count - 1, i];
             }
 
-            // Greedy Search: 最も確率の高いトークンを選択
+            // Greedy Search: 最も確率の高いトークンを選択（特殊トークンを除外）
             int nextTokenId = 0;
             float maxScore = float.MinValue;
             for (int i = 0; i < lastTokenLogits.Length; i++)
             {
+                // 特殊トークン（BOS, PAD）や無効な範囲のトークンをスキップ
+                if (i == bosTokenId || i == padTokenId || i >= _tokenizer.VocabularySize)
+                    continue;
+                    
                 if (lastTokenLogits[i] > maxScore)
                 {
                     maxScore = lastTokenLogits[i];
                     nextTokenId = i;
                 }
+            }
+
+            // 語彙範囲外のトークンIDを検証・修正
+            if (nextTokenId >= _tokenizer.VocabularySize || nextTokenId < 0)
+            {
+                nextTokenId = (int)unkTokenId; // UNKトークンに置換
+                
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [ONNX] 語彙範囲外トークンをUNKに修正 - 元: {nextTokenId} → UNK: {unkTokenId}{Environment.NewLine}");
+                }
+                catch { }
             }
 
             // EOSトークンが生成されたら終了
@@ -587,7 +588,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 try
                 {
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🏁 [ONNX] EOS検出で生成終了（直接書き込み） - ステップ: {step}, 生成トークン数: {outputTokens.Count}{Environment.NewLine}");
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🏁 [ONNX] EOS検出で生成終了 - ステップ: {step}, 生成トークン数: {outputTokens.Count}{Environment.NewLine}");
                 }
                 catch { }
                 break;
@@ -597,27 +598,30 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             decoderInputIds.Add(nextTokenId);
             outputTokens.Add(nextTokenId);
 
-            // ログ出力（最初の数ステップのみ）
+            // 詳細ログ出力（最初の数ステップのみ）
             if (step < 5)
             {
                 try
                 {
+                    var tokenText = _tokenizer.DecodeToken(nextTokenId);
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [ONNX] ステップ{step}（直接書き込み） - 生成トークン: {nextTokenId}, スコア: {maxScore:F4}{Environment.NewLine}");
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [ONNX] ステップ{step} - トークン: {nextTokenId}('{tokenText}'), スコア: {maxScore:F4}{Environment.NewLine}");
                 }
                 catch { }
             }
         }
 
-        // 結果をログ出力
+        // 結果の検証とクリーニング
+        var validTokens = outputTokens.Where(t => t >= 0 && t < _tokenizer.VocabularySize).ToArray();
+        
         try
         {
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [ONNX] Greedy Search完了（直接書き込み） - 生成トークン数: {outputTokens.Count}, トークン: [{string.Join(", ", outputTokens.Take(10))}...]{Environment.NewLine}");
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [ONNX] Greedy Search完了（修正版） - 生成: {outputTokens.Count}, 有効: {validTokens.Length}, トークン: [{string.Join(", ", validTokens.Take(10))}...]{Environment.NewLine}");
         }
         catch { }
 
-        return Task.FromResult(outputTokens.ToArray());
+        return Task.FromResult(validTokens);
     }
 
     /// <summary>
