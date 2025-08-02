@@ -417,6 +417,22 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 
 ---
 
+## Sub-agent Strategy
+
+This project defines sub-agents responsible for specific areas of expertise to improve development efficiency and quality.
+
+- **`@Architecture-Guardian`**: The Clean Architecture specialist.
+- **`@Native-Bridge`**: The specialist for C# and C++/WinRT native interoperability.
+- **`@UI-Maestro`**: The Avalonia UI and ReactiveUI specialist.
+- **`@Test-Generator`**: The specialist for unit test code generation.
+- **`@Researcher`**: The specialist for technical research and feedback.
+
+The main agent (you) acts as the orchestrator, responsible for invoking these specialists appropriately.
+
+**For detailed workflows and specific instructions on how to utilize these sub-agents, you must refer to `.claude/instructions.md`.**
+
+---
+
 **For detailed development instructions, coding standards, and implementation patterns, refer to `.claude/instructions.md`**
 
 # important-instruction-reminders
