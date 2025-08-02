@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.Tokenizers;
+using Google.Protobuf;
+using Sentencepiece;
 
 namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native;
 
@@ -57,8 +59,8 @@ public sealed class SentencePieceModelParser(ILogger<SentencePieceModelParser> l
     }
 
     /// <summary>
-    /// Microsoft.ML.Tokenizersを使用したSentencePieceモデルの解析
-    /// 既存ライブラリの活用により信頼性を高める実装
+    /// Google.Protobufを使用したSentencePieceモデルの解析
+    /// 実際の.modelファイルから語彙とメタデータを抽出
     /// </summary>
     private async Task<SentencePieceModel> ParseProtobufModelAsync(string modelPath)
     {
@@ -66,66 +68,68 @@ public sealed class SentencePieceModelParser(ILogger<SentencePieceModelParser> l
         {
             _logger.LogInformation("SentencePieceモデルファイルの読み込み開始: {ModelPath}", modelPath);
             
-            // Microsoft.ML.Tokenizersを使用してモデル情報を取得
-            await Task.Run(() =>
+            ModelProto protoModel;
+            
+            // Protobufファイルの読み込み
+            await using var fileStream = File.OpenRead(modelPath);
+            protoModel = ModelProto.Parser.ParseFrom(fileStream);
+            
+            _logger.LogInformation("Protobufモデル解析完了: 語彙数={PieceCount}", protoModel.Pieces.Count);
+            
+            // 特殊トークンIDを実際のモデルから取得
+            var trainerSpec = protoModel.TrainerSpec;
+            var specialTokens = new NativeSpecialTokens
             {
-                // ファイル存在チェック
-                if (!File.Exists(modelPath))
-                {
-                    throw new FileNotFoundException($"SentencePiece model file not found: {modelPath}");
-                }
-            }).ConfigureAwait(false);
+                BosId = trainerSpec?.BosId ?? 0,
+                UnkId = trainerSpec?.UnkId ?? 1,  
+                EosId = trainerSpec?.EosId ?? 2,
+                PadId = trainerSpec?.PadId ?? 3
+            };
             
             var model = new SentencePieceModel
             {
                 Version = "1.0.0",
-                NormalizerType = "nfkc_with_prefix", // SentencePieceの標準
-                SpecialTokens = new NativeSpecialTokens
-                {
-                    BosId = 0,      // <s>
-                    UnkId = 1,      // <unk>  
-                    EosId = 2,      // </s>
-                    PadId = 3       // <pad>
-                }
+                NormalizerType = protoModel.NormalizerSpec?.Name ?? "nfkc_with_prefix",
+                SpecialTokens = specialTokens
             };
             
             _logger.LogDebug("特殊トークンID設定完了: BOS={Bos}, EOS={Eos}, UNK={Unk}, PAD={Pad}",
                 model.SpecialTokens.BosId, model.SpecialTokens.EosId, 
                 model.SpecialTokens.UnkId, model.SpecialTokens.PadId);
             
-            // 基本的な特殊トークンを語彙に追加
-            model.Vocabulary["<s>"] = model.SpecialTokens.BosId;
-            model.Vocabulary["<unk>"] = model.SpecialTokens.UnkId;
-            model.Vocabulary["</s>"] = model.SpecialTokens.EosId;
-            model.Vocabulary["<pad>"] = model.SpecialTokens.PadId;
-            
-            // 逆引き辞書の構築
-            foreach (var (token, id) in model.Vocabulary)
+            // 語彙辞書の構築
+            for (int i = 0; i < protoModel.Pieces.Count; i++)
             {
-                model.ReverseVocabulary[id] = token;
-            }
-            
-            // SentencePiece固有のトークンを追加（プレフィックス用）
-            // OPUS-MTでよく使用されるトークンパターン
-            var commonTokens = new[]
-            {
-                "\u2581", // スペース記号
-                "\u2581the", "\u2581a", "\u2581and", "\u2581to", "\u2581of", "\u2581in", "\u2581is", "\u2581for", "\u2581that", "\u2581on"
-            };
-            
-            int nextId = 4; // 特殊トークン後から開始
-            foreach (var token in commonTokens)
-            {
-                if (!model.Vocabulary.ContainsKey(token))
+                var piece = protoModel.Pieces[i];
+                model.Vocabulary[piece.Piece] = i;
+                model.ReverseVocabulary[i] = piece.Piece;
+                
+                // スコア情報も保存
+                if (piece.HasScore)
                 {
-                    model.Vocabulary[token] = nextId;
-                    model.ReverseVocabulary[nextId] = token;
-                    nextId++;
+                    model.PieceScores[piece.Piece] = piece.Score;
                 }
             }
             
+            _logger.LogInformation("語彙辞書構築完了: 語彙数={VocabularySize}", model.VocabularySize);
+            
+            // 正規化設定の取得
+            if (protoModel.NormalizerSpec != null)
+            {
+                var normalizerSpec = protoModel.NormalizerSpec;
+                _logger.LogDebug("正規化設定: AddDummyPrefix={AddPrefix}, RemoveExtraWhitespaces={RemoveWhitespace}", 
+                    normalizerSpec.AddDummyPrefix, normalizerSpec.RemoveExtraWhitespaces);
+                
+                // 正規化パラメータを保存（将来の実装で使用）
+                model.NormalizationSettings = new Dictionary<string, object>
+                {
+                    ["AddDummyPrefix"] = normalizerSpec.AddDummyPrefix,
+                    ["RemoveExtraWhitespaces"] = normalizerSpec.RemoveExtraWhitespaces,
+                    ["EscapeWhitespaces"] = normalizerSpec.EscapeWhitespaces
+                };
+            }
+            
             _logger.LogInformation("SentencePieceモデル解析完了: 語彙数={VocabularySize}", model.VocabularySize);
-            _logger.LogWarning("暫定実装: 基本的なSentencePieceトークンセットを使用。実際のモデルファイルのProtobuf解析は次フェーズで実装予定");
             
             return model;
         }
