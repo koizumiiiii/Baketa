@@ -50,10 +50,32 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
         TokenizerId = $"opus-mt-native-{Guid.NewGuid():N}";
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OpusMtNativeTokenizer>.Instance;
         
-        // 初期化は別途InitializeAsyncで実行
-        _model = new SentencePieceModel(); // 暫定的な空モデル
-        _bpeTokenizer = new BpeTokenizer(_model, 
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<BpeTokenizer>.Instance);
+        try
+        {
+            _logger.LogInformation("Native SentencePieceトークナイザーの作成開始: {ModelPath}", modelPath);
+            
+            // モデルファイルの解析
+            using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
+            var parserLogger = loggerFactory.CreateLogger<SentencePieceModelParser>();
+            using var parser = new SentencePieceModelParser(parserLogger);
+            _model = parser.ParseModelAsync(modelPath).GetAwaiter().GetResult();
+            
+            // BPEトークナイザーの初期化
+            _bpeTokenizer = new BpeTokenizer(_model, 
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<BpeTokenizer>.Instance);
+            
+            _isInitialized = true;
+            
+            _logger.LogInformation("Native SentencePieceトークナイザーの作成完了: {Name}", Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Native SentencePieceトークナイザーの初期化に失敗しました");
+            _model = new SentencePieceModel(); // フォールバック
+            _bpeTokenizer = new BpeTokenizer(_model, 
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<BpeTokenizer>.Instance);
+            _isInitialized = false;
+        }
     }
 
     /// <summary>

@@ -71,7 +71,7 @@ public sealed class SentencePieceModelParser(ILogger<SentencePieceModelParser> l
             ModelProto protoModel;
             
             // Protobufファイルの読み込み
-            await using var fileStream = File.OpenRead(modelPath).ConfigureAwait(false);
+            await using var fileStream = File.OpenRead(modelPath);
             protoModel = ModelProto.Parser.ParseFrom(fileStream);
             
             _logger.LogInformation("Protobufモデル解析完了: 語彙数={PieceCount}", protoModel.Pieces.Count);
