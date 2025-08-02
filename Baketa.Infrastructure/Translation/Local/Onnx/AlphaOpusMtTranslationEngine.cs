@@ -92,6 +92,13 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             _logger.LogInformation("OPUS-MT αエンジンを初期化中: {ModelPath}", ModelPath);
 
             // SentencePieceトークナイザーは初期化済み（コンストラクタで初期化）
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [ONNX] トークナイザー状態（直接書き込み） - IsInitialized: {_tokenizer.IsInitialized}, Name: '{_tokenizer.Name}', VocabSize: {_tokenizer.VocabularySize}{Environment.NewLine}");
+            }
+            catch { }
+            
             if (!_tokenizer.IsInitialized)
             {
                 _logger.LogError("SentencePieceトークナイザーが正しく初期化されていません");
@@ -111,6 +118,32 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
 
             // セッションを作成
             _session = new InferenceSession(ModelPath, sessionOptions);
+
+            // モデルの入力・出力情報をログに記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [ONNX] モデル情報（直接書き込み）{Environment.NewLine}");
+                
+                // 入力情報
+                var inputMetadata = _session.InputMetadata;
+                foreach (var input in inputMetadata)
+                {
+                    var dimensions = string.Join(", ", input.Value.Dimensions.Select(d => d.ToString()));
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [ONNX] 入力（直接書き込み） - Name: '{input.Key}', Type: {input.Value.ElementType}, Shape: [{dimensions}]{Environment.NewLine}");
+                }
+                
+                // 出力情報
+                var outputMetadata = _session.OutputMetadata;
+                foreach (var output in outputMetadata)
+                {
+                    var dimensions = string.Join(", ", output.Value.Dimensions.Select(d => d.ToString()));
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [ONNX] 出力（直接書き込み） - Name: '{output.Key}', Type: {output.Value.ElementType}, Shape: [{dimensions}]{Environment.NewLine}");
+                }
+            }
+            catch { }
 
             // メモリ使用量の推定
             EstimateMemoryUsage();
@@ -169,13 +202,61 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             
             string translatedText;
             
-            if (System.IO.File.Exists(ModelPath))
+            // デバッグ情報: 実際のパスとファイル存在状況をログ出力
+            var currentDirectory = System.IO.Directory.GetCurrentDirectory();
+            var absoluteModelPath = System.IO.Path.GetFullPath(ModelPath);
+            var fileExists = System.IO.File.Exists(ModelPath);
+            var tokenizerPath = _tokenizer.ModelPath;
+            var tokenizerExists = System.IO.File.Exists(tokenizerPath);
+            
+            _logger.LogInformation("🔍 ONNXモデル存在チェック: CurrentDir='{CurrentDir}', ModelPath='{ModelPath}', AbsolutePath='{AbsolutePath}', Exists={Exists}",
+                currentDirectory, ModelPath, absoluteModelPath, fileExists);
+            _logger.LogInformation("🔍 SentencePieceモデル存在チェック: TokenizerPath='{TokenizerPath}', Exists={TokenizerExists}",
+                tokenizerPath, tokenizerExists);
+                
+            // 直接書き込みでも詳細情報を出力
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] モデルパス詳細（直接書き込み）{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] CurrentDir: '{currentDirectory}'{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] ModelPath: '{ModelPath}'{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] AbsolutePath: '{absoluteModelPath}'{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] ModelExists: {fileExists}{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] TokenizerPath: '{tokenizerPath}'{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] TokenizerExists: {tokenizerExists}{Environment.NewLine}");
+            }
+            catch { }
+            
+            if (fileExists)
             {
                 // 実際のモデルが存在する場合はONNX推論を実行
                 try
                 {
+                    // 直接書き込みで推論開始をログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ONNX] 推論開始（直接書き込み） - テキスト: '{request.SourceText}'{Environment.NewLine}");
+                    }
+                    catch { }
+                    
                     // テキストをトークン化
                     var inputTokens = _tokenizer.Tokenize(request.SourceText);
+                    
+                    // 直接書き込みでトークン化結果をログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [ONNX] トークン化完了（直接書き込み） - トークン数: {inputTokens.Length}, トークン: [{string.Join(", ", inputTokens.Take(10))}...]{Environment.NewLine}");
+                    }
+                    catch { }
                     
                     // 長さ制限の適用
                     if (inputTokens.Length > _options.MaxSequenceLength)
@@ -183,16 +264,57 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                         var truncatedTokens = new int[_options.MaxSequenceLength];
                         Array.Copy(inputTokens, truncatedTokens, _options.MaxSequenceLength);
                         inputTokens = truncatedTokens;
+                        
+                        // 直接書き込みで切り詰めをログ
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✂️ [ONNX] トークン切り詰め（直接書き込み） - {inputTokens.Length} → {_options.MaxSequenceLength}{Environment.NewLine}");
+                        }
+                        catch { }
                     }
 
                     // ONNX推論実行
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚙️ [ONNX] 推論実行開始（直接書き込み）{Environment.NewLine}");
+                    }
+                    catch { }
+                    
                     var outputTokens = await RunInferenceAsync(inputTokens, cancellationToken).ConfigureAwait(false);
+
+                    // 直接書き込みで推論完了をログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [ONNX] 推論完了（直接書き込み） - 出力トークン数: {outputTokens.Length}, トークン: [{string.Join(", ", outputTokens.Take(10))}...]{Environment.NewLine}");
+                    }
+                    catch { }
 
                     // トークンをテキストにデコード
                     translatedText = _tokenizer.Decode(outputTokens);
+                    
+                    // 直接書き込みでデコード完了をログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [ONNX] デコード完了（直接書き込み） - 翻訳結果: '{translatedText}'{Environment.NewLine}");
+                    }
+                    catch { }
                 }
                 catch (Exception inferenceEx)
                 {
+                    // 直接書き込みで推論エラーをログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [ONNX] 推論エラー（直接書き込み）: {inferenceEx.GetType().Name} - {inferenceEx.Message}{Environment.NewLine}");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [ONNX] スタックトレース（直接書き込み）: {inferenceEx.StackTrace}{Environment.NewLine}");
+                    }
+                    catch { }
+                    
                     _logger.LogWarning(inferenceEx, "ONNX推論に失敗しました。フォールバック翻訳を使用します");
                     translatedText = GenerateFallbackTranslation(request.SourceText, request.SourceLanguage, request.TargetLanguage);
                 }
@@ -336,45 +458,154 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
     }
 
     /// <summary>
-    /// ONNX推論を実行
+    /// ONNX推論を実行（Greedy Search）
     /// </summary>
-    private Task<int[]> RunInferenceAsync(int[] inputTokens, CancellationToken _ = default)
+    private Task<int[]> RunInferenceAsync(int[] inputTokens, CancellationToken cancellationToken = default)
     {
         if (_session == null)
         {
             throw new InvalidOperationException("セッションが初期化されていません");
         }
 
-        // 入力テンソルの作成
-        var inputTensor = new DenseTensor<long>(
+        // エンコーダー入力テンソルの作成
+        var encoderInputTensor = new DenseTensor<long>(
             inputTokens.Select(t => (long)t).ToArray(),
             [1, inputTokens.Length]);
 
-        var inputs = new List<NamedOnnxValue>
-        {
-            NamedOnnxValue.CreateFromTensor("input_ids", inputTensor)
-        };
+        // アテンションマスクの作成（全て1で有効なトークンを示す）
+        var attentionMask = new long[inputTokens.Length];
+        Array.Fill(attentionMask, 1L);
+        var attentionMaskTensor = new DenseTensor<long>(
+            attentionMask,
+            [1, inputTokens.Length]);
 
-        // 推論実行
-        using var results = _session.Run(inputs);
+        // OPUS-MT (MarianMT) のBOSトークンを使用（0を試行）
+        const long bosTokenId = 0L;
+        var decoderInputIds = new List<long> { bosTokenId };
+        var outputTokens = new List<int>();
         
-        // 出力の取得
-        var outputTensor = results[0]?.AsTensor<long>() ?? throw new InvalidOperationException("推論結果の取得に失敗しました");
+        const int maxLength = 100; // 最大生成長
+        const long eosTokenId = 2L; // EOSトークン（PADとは別のID）
 
-        // 結果トークンの抽出
-        List<int> outputTokens = [];
-        for (int i = 0; i < outputTensor.Length; i++)
+        // 直接書き込みで推論開始をログ
+        try
         {
-            var token = (int)outputTensor.GetValue(i);
-            
-            // 終了トークンで停止
-            if (token == 0 || token == 2) // EOS or PAD
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [ONNX] Greedy Search開始（直接書き込み） - Encoder: [{string.Join(", ", inputTokens.Take(5))}...], Decoder初期値: [{bosTokenId}]{Environment.NewLine}");
+        }
+        catch { }
+
+        // Greedy Search ループ
+        for (int step = 0; step < maxLength; step++)
+        {
+            if (cancellationToken.IsCancellationRequested)
             {
                 break;
             }
+
+            // デコーダー入力テンソルの作成（現在の生成済みシーケンス）
+            var decoderInputTensor = new DenseTensor<long>(
+                decoderInputIds.ToArray(),
+                [1, decoderInputIds.Count]);
+
+            var inputs = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor("input_ids", encoderInputTensor),
+                NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor),
+                NamedOnnxValue.CreateFromTensor("decoder_input_ids", decoderInputTensor)
+            };
+
+            // 推論実行
+            using var results = _session.Run(inputs);
             
-            outputTokens.Add(token);
+            // 直接書き込みで推論結果詳細をログ（最初のステップのみ）
+            if (step == 0)
+            {
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] 推論結果詳細（直接書き込み） - 結果数: {results.Count}{Environment.NewLine}");
+                    
+                    for (int i = 0; i < results.Count; i++)
+                    {
+                        var result = results[i];
+                        var resultName = result?.Name ?? "null";
+                        var resultType = result?.GetType().Name ?? "null";
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ONNX] 結果[{i}]（直接書き込み） - Name: '{resultName}', Type: '{resultType}'{Environment.NewLine}");
+                    }
+                }
+                catch { }
+            }
+            
+            // 出力の取得（logitsテンソル）
+            var outputResult = results.FirstOrDefault(r => r.Name == "output");
+            if (outputResult == null)
+            {
+                throw new InvalidOperationException("'output'という名前の推論結果が見つかりません");
+            }
+            
+            // logitsをfloat型として取得
+            var logitsTensor = outputResult.AsTensor<float>();
+            if (logitsTensor == null)
+            {
+                throw new InvalidOperationException("推論結果をFloat Tensorに変換できませんでした");
+            }
+
+            // 最後のトークン位置のlogitsを取得
+            var lastTokenLogits = new float[logitsTensor.Dimensions[2]]; // vocab_size
+            for (int i = 0; i < lastTokenLogits.Length; i++)
+            {
+                lastTokenLogits[i] = logitsTensor[0, decoderInputIds.Count - 1, i];
+            }
+
+            // Greedy Search: 最も確率の高いトークンを選択
+            int nextTokenId = 0;
+            float maxScore = float.MinValue;
+            for (int i = 0; i < lastTokenLogits.Length; i++)
+            {
+                if (lastTokenLogits[i] > maxScore)
+                {
+                    maxScore = lastTokenLogits[i];
+                    nextTokenId = i;
+                }
+            }
+
+            // EOSトークンが生成されたら終了
+            if (nextTokenId == eosTokenId)
+            {
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🏁 [ONNX] EOS検出で生成終了（直接書き込み） - ステップ: {step}, 生成トークン数: {outputTokens.Count}{Environment.NewLine}");
+                }
+                catch { }
+                break;
+            }
+
+            // 生成されたトークンを追加
+            decoderInputIds.Add(nextTokenId);
+            outputTokens.Add(nextTokenId);
+
+            // ログ出力（最初の数ステップのみ）
+            if (step < 5)
+            {
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [ONNX] ステップ{step}（直接書き込み） - 生成トークン: {nextTokenId}, スコア: {maxScore:F4}{Environment.NewLine}");
+                }
+                catch { }
+            }
         }
+
+        // 結果をログ出力
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [ONNX] Greedy Search完了（直接書き込み） - 生成トークン数: {outputTokens.Count}, トークン: [{string.Join(", ", outputTokens.Take(10))}...]{Environment.NewLine}");
+        }
+        catch { }
 
         return Task.FromResult(outputTokens.ToArray());
     }
@@ -419,7 +650,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 "設定" => "Settings",
                 "ヘルプ" => "Help",
                 "ゲーム" => "Game",
-                _ => $"[JA→EN] {text}"
+                _ => text
             },
             
             // 英語→日本語
@@ -435,10 +666,10 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 "settings" => "設定",
                 "help" => "ヘルプ",
                 "game" => "ゲーム",
-                _ => $"[EN→JA] {text}"
+                _ => text
             },
             
-            _ => $"[{langPair}] {sourceText}"
+            _ => sourceText
         };
         
         _logger.LogDebug("フォールバック翻訳: {Source} -> {Target} ({LangPair})", sourceText, result, langPair);
