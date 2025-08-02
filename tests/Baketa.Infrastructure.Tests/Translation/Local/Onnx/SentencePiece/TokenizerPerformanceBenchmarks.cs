@@ -19,17 +19,10 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.Onnx.SentencePiece;
 /// Native vs Real Tokenizer パフォーマンス比較ベンチマーク
 /// 統合効果の定量的評価
 /// </summary>
-public class TokenizerPerformanceBenchmarks : IDisposable
+public class TokenizerPerformanceBenchmarks(ITestOutputHelper output) : IDisposable
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _projectRoot;
+    private readonly string _projectRoot = GetProjectRootDirectory();
     private bool _disposed;
-
-    public TokenizerPerformanceBenchmarks(ITestOutputHelper output)
-    {
-        _output = output;
-        _projectRoot = GetProjectRootDirectory();
-    }
 
     [Fact]
     public async Task CompareTokenizers_ProcessingSpeed_NativeShouldBeFaster()
@@ -39,17 +32,17 @@ public class TokenizerPerformanceBenchmarks : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateTestDataset(500); // 500件のテキストでテスト
         
-        _output.WriteLine($"🏁 Tokenizer Performance Benchmark");
-        _output.WriteLine($"📊 Dataset: {testTexts.Count:N0} texts");
-        _output.WriteLine($"📝 Total characters: {testTexts.Sum(t => t.Length):N0}");
-        _output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
-        _output.WriteLine("");
+        output.WriteLine($"🏁 Tokenizer Performance Benchmark");
+        output.WriteLine($"📊 Dataset: {testTexts.Count:N0} texts");
+        output.WriteLine($"📝 Total characters: {testTexts.Sum(t => t.Length):N0}");
+        output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
+        output.WriteLine("");
 
         // Native Tokenizer テスト
         var nativeResults = await BenchmarkNativeTokenizer(modelPath, testTexts);
@@ -73,15 +66,15 @@ public class TokenizerPerformanceBenchmarks : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateTestDataset(100); // メモリテスト用
 
-        _output.WriteLine($"💾 Memory Usage Benchmark");
-        _output.WriteLine($"📊 Dataset: {testTexts.Count:N0} texts");
-        _output.WriteLine("");
+        output.WriteLine($"💾 Memory Usage Benchmark");
+        output.WriteLine($"📊 Dataset: {testTexts.Count:N0} texts");
+        output.WriteLine("");
 
         // メモリ使用量比較
         var nativeMemory = await MeasureMemoryUsage("Native", () => 
@@ -90,10 +83,10 @@ public class TokenizerPerformanceBenchmarks : IDisposable
         var realMemory = await MeasureMemoryUsage("Real", () => 
             BenchmarkRealTokenizerMemory(modelPath, testTexts));
 
-        _output.WriteLine($"📈 Memory Comparison:");
-        _output.WriteLine($"  Native: {nativeMemory:N0} bytes");
-        _output.WriteLine($"  Real:   {realMemory:N0} bytes");
-        _output.WriteLine($"  Ratio:  {(double)nativeMemory / realMemory:F2}x");
+        output.WriteLine($"📈 Memory Comparison:");
+        output.WriteLine($"  Native: {nativeMemory:N0} bytes");
+        output.WriteLine($"  Real:   {realMemory:N0} bytes");
+        output.WriteLine($"  Ratio:  {(double)nativeMemory / realMemory:F2}x");
 
         // Native の方がメモリ効率が良いことを期待
         nativeMemory.Should().BeLessOrEqualTo((long)(realMemory * 1.5), 
@@ -108,7 +101,7 @@ public class TokenizerPerformanceBenchmarks : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
@@ -121,9 +114,9 @@ public class TokenizerPerformanceBenchmarks : IDisposable
             "日本語と英語の翻訳精度確認"
         };
 
-        _output.WriteLine($"🎯 Accuracy Comparison Test");
-        _output.WriteLine($"📊 Test phrases: {testTexts.Length}");
-        _output.WriteLine("");
+        output.WriteLine($"🎯 Accuracy Comparison Test");
+        output.WriteLine($"📊 Test phrases: {testTexts.Length}");
+        output.WriteLine("");
 
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
 
@@ -157,20 +150,20 @@ public class TokenizerPerformanceBenchmarks : IDisposable
             
             results.Add(result);
             
-            _output.WriteLine($"📝 '{text}'");
-            _output.WriteLine($"  Native: {nativeTokens.Length} tokens → '{nativeDecoded}'");
-            _output.WriteLine($"  Real:   {realTokens.Length} tokens → '{realDecoded}'");
-            _output.WriteLine($"  Match:  Tokens={result.TokenCountMatch}, Decoded={result.DecodingMatch}");
-            _output.WriteLine("");
+            output.WriteLine($"📝 '{text}'");
+            output.WriteLine($"  Native: {nativeTokens.Length} tokens → '{nativeDecoded}'");
+            output.WriteLine($"  Real:   {realTokens.Length} tokens → '{realDecoded}'");
+            output.WriteLine($"  Match:  Tokens={result.TokenCountMatch}, Decoded={result.DecodingMatch}");
+            output.WriteLine("");
         }
 
         // 精度サマリー
         var tokenAccuracy = results.Count(r => r.TokenCountMatch) / (double)results.Count;
         var decodingAccuracy = results.Count(r => r.DecodingMatch) / (double)results.Count;
         
-        _output.WriteLine($"📊 Accuracy Summary:");
-        _output.WriteLine($"  Token Count Match: {tokenAccuracy:P1}");
-        _output.WriteLine($"  Decoding Match:    {decodingAccuracy:P1}");
+        output.WriteLine($"📊 Accuracy Summary:");
+        output.WriteLine($"  Token Count Match: {tokenAccuracy:P1}");
+        output.WriteLine($"  Decoding Match:    {decodingAccuracy:P1}");
 
         // 最低限の精度要求
         tokenAccuracy.Should().BeGreaterThan(0.6, "Token count should be reasonably similar");
@@ -178,7 +171,7 @@ public class TokenizerPerformanceBenchmarks : IDisposable
 
     private async Task<BenchmarkResult> BenchmarkNativeTokenizer(string modelPath, List<string> testTexts)
     {
-        _output.WriteLine($"🔥 Benchmarking Native Tokenizer...");
+        output.WriteLine($"🔥 Benchmarking Native Tokenizer...");
         
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
         
@@ -210,10 +203,10 @@ public class TokenizerPerformanceBenchmarks : IDisposable
             TokensPerSecond = totalTokens / (sw.ElapsedMilliseconds / 1000.0)
         };
 
-        _output.WriteLine($"  ⏱️  Total time: {result.TotalTimeMs:N0}ms");
-        _output.WriteLine($"  📊 Avg latency: {result.AverageLatencyMs:F2}ms/text");
-        _output.WriteLine($"  🚀 Throughput: {result.TokensPerSecond:N0} tokens/sec");
-        _output.WriteLine("");
+        output.WriteLine($"  ⏱️  Total time: {result.TotalTimeMs:N0}ms");
+        output.WriteLine($"  📊 Avg latency: {result.AverageLatencyMs:F2}ms/text");
+        output.WriteLine($"  🚀 Throughput: {result.TokensPerSecond:N0} tokens/sec");
+        output.WriteLine("");
 
         return result;
     }
@@ -222,7 +215,7 @@ public class TokenizerPerformanceBenchmarks : IDisposable
     {
         await Task.Yield(); // 非同期メソッドの警告を解消
         
-        _output.WriteLine($"🔥 Benchmarking Real Tokenizer...");
+        output.WriteLine($"🔥 Benchmarking Real Tokenizer...");
         
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger<RealSentencePieceTokenizer>();
@@ -256,10 +249,10 @@ public class TokenizerPerformanceBenchmarks : IDisposable
             TokensPerSecond = totalTokens / (sw.ElapsedMilliseconds / 1000.0)
         };
 
-        _output.WriteLine($"  ⏱️  Total time: {result.TotalTimeMs:N0}ms");
-        _output.WriteLine($"  📊 Avg latency: {result.AverageLatencyMs:F2}ms/text");
-        _output.WriteLine($"  🚀 Throughput: {result.TokensPerSecond:N0} tokens/sec");
-        _output.WriteLine("");
+        output.WriteLine($"  ⏱️  Total time: {result.TotalTimeMs:N0}ms");
+        output.WriteLine($"  📊 Avg latency: {result.AverageLatencyMs:F2}ms/text");
+        output.WriteLine($"  🚀 Throughput: {result.TokensPerSecond:N0} tokens/sec");
+        output.WriteLine("");
 
         return result;
     }
@@ -305,27 +298,27 @@ public class TokenizerPerformanceBenchmarks : IDisposable
 
     private void GeneratePerformanceReport(BenchmarkResult native, BenchmarkResult real)
     {
-        _output.WriteLine($"📊 Performance Comparison Report");
-        _output.WriteLine($"================================");
-        _output.WriteLine("");
+        output.WriteLine($"📊 Performance Comparison Report");
+        output.WriteLine($"================================");
+        output.WriteLine("");
         
-        _output.WriteLine($"⏱️  Processing Time:");
-        _output.WriteLine($"  Native: {native.TotalTimeMs:N0}ms");
-        _output.WriteLine($"  Real:   {real.TotalTimeMs:N0}ms");
-        _output.WriteLine($"  Ratio:  {(double)native.TotalTimeMs / real.TotalTimeMs:F2}x");
-        _output.WriteLine("");
+        output.WriteLine($"⏱️  Processing Time:");
+        output.WriteLine($"  Native: {native.TotalTimeMs:N0}ms");
+        output.WriteLine($"  Real:   {real.TotalTimeMs:N0}ms");
+        output.WriteLine($"  Ratio:  {(double)native.TotalTimeMs / real.TotalTimeMs:F2}x");
+        output.WriteLine("");
         
-        _output.WriteLine($"📊 Average Latency:");
-        _output.WriteLine($"  Native: {native.AverageLatencyMs:F2}ms/text");
-        _output.WriteLine($"  Real:   {real.AverageLatencyMs:F2}ms/text");
-        _output.WriteLine($"  Improvement: {((real.AverageLatencyMs - native.AverageLatencyMs) / real.AverageLatencyMs * 100):F1}%");
-        _output.WriteLine("");
+        output.WriteLine($"📊 Average Latency:");
+        output.WriteLine($"  Native: {native.AverageLatencyMs:F2}ms/text");
+        output.WriteLine($"  Real:   {real.AverageLatencyMs:F2}ms/text");
+        output.WriteLine($"  Improvement: {((real.AverageLatencyMs - native.AverageLatencyMs) / real.AverageLatencyMs * 100):F1}%");
+        output.WriteLine("");
         
-        _output.WriteLine($"🚀 Throughput:");
-        _output.WriteLine($"  Native: {native.TokensPerSecond:N0} tokens/sec");
-        _output.WriteLine($"  Real:   {real.TokensPerSecond:N0} tokens/sec");
-        _output.WriteLine($"  Improvement: {((native.TokensPerSecond - real.TokensPerSecond) / real.TokensPerSecond * 100):F1}%");
-        _output.WriteLine("");
+        output.WriteLine($"🚀 Throughput:");
+        output.WriteLine($"  Native: {native.TokensPerSecond:N0} tokens/sec");
+        output.WriteLine($"  Real:   {real.TokensPerSecond:N0} tokens/sec");
+        output.WriteLine($"  Improvement: {((native.TokensPerSecond - real.TokensPerSecond) / real.TokensPerSecond * 100):F1}%");
+        output.WriteLine("");
 
         // パフォーマンス判定
         var performanceGain = (real.AverageLatencyMs - native.AverageLatencyMs) / real.AverageLatencyMs;
@@ -337,7 +330,7 @@ public class TokenizerPerformanceBenchmarks : IDisposable
             _ => "🔴 Slower"
         };
         
-        _output.WriteLine($"🎯 Performance Status: {status}");
+        output.WriteLine($"🎯 Performance Status: {status}");
     }
 
     private List<string> GenerateTestDataset(int count)
