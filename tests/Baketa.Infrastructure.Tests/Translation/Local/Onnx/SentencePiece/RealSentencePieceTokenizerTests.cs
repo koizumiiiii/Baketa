@@ -196,13 +196,63 @@ public class RealSentencePieceTokenizerTests : IDisposable
     }
 
     [Fact]
-    public void ValidateNormalization_Always_CompletesWithoutException()
+    public void ValidateNormalization_Always_ReturnsTrue()
     {
         // Arrange
         using var tokenizer = new RealSentencePieceTokenizer(_testModelPath, _logger);
 
-        // Act & Assert (例外が発生しないことを確認)
-        tokenizer.ValidateNormalization();
+        // Act
+        var result = tokenizer.ValidateNormalization();
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Theory]
+    [InlineData("hello", "▁hello")]
+    [InlineData("Hello World", "▁Hello▁World")]
+    [InlineData("こんにちは", "▁こんにちは")]
+    [InlineData("ｈｅｌｌｏ", "▁hello")] // 全角英字 -> 半角英字
+    [InlineData("hello\tworld", "▁hello▁world")] // タブ -> 空白
+    public void NormalizeText_VariousInputs_AppliesCorrectNormalization(string input, string expected)
+    {
+        // Arrange
+        using var tokenizer = new RealSentencePieceTokenizer(_testModelPath, _logger);
+
+        // Act
+        var result = tokenizer.NormalizeText(input);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void UnknownTokenId_Always_ReturnsValidId()
+    {
+        // Arrange
+        using var tokenizer = new RealSentencePieceTokenizer(_testModelPath, _logger);
+
+        // Act
+        var unknownId = tokenizer.UnknownTokenId;
+
+        // Assert
+        Assert.True(unknownId >= 0);
+    }
+
+    [Theory]
+    [InlineData("hello", "▁hello")]
+    [InlineData("ｈｅｌｌｏ", "▁hello")]
+    [InlineData("hello\tworld", "▁hello▁world")]
+    public void ValidateNormalization_WithParameters_ValidatesCorrectly(string input, string expected)
+    {
+        // Arrange
+        using var tokenizer = new RealSentencePieceTokenizer(_testModelPath, _logger);
+
+        // Act
+        var result = tokenizer.ValidateNormalization(input, expected);
+
+        // Assert
+        Assert.True(result);
     }
 
     [Fact]
@@ -258,6 +308,7 @@ public class RealSentencePieceTokenizerTests : IDisposable
         Assert.Throws<ObjectDisposedException>(() => tokenizer.Decode([1, 2, 3]));
         Assert.Throws<ObjectDisposedException>(() => tokenizer.DecodeToken(1));
         Assert.Throws<ObjectDisposedException>(() => tokenizer.GetSpecialTokens());
+        Assert.Throws<ObjectDisposedException>(() => tokenizer.NormalizeText("test"));
     }
 
     [Theory]

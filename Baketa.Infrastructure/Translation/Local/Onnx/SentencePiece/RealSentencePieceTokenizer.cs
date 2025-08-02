@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.Services;
 using Microsoft.Extensions.Logging;
 
 #pragma warning disable CA1031 // Do not catch general exception types - 暫定実装のため
@@ -18,6 +19,8 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
     private readonly object? _innerTokenizer;
     private readonly ILogger<RealSentencePieceTokenizer> _logger;
     private readonly string _modelName;
+    private readonly SentencePieceNormalizer _normalizer;
+    private readonly int _maxInputLength;
     private bool _disposed;
 
     /// <inheritdoc/>
@@ -50,6 +53,11 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
     public bool IsRealSentencePieceAvailable => IsRealTokenizerAvailable;
 
     /// <summary>
+    /// 未知トークンのID
+    /// </summary>
+    public int UnknownTokenId => GetSpecialTokens().UnknownId;
+
+    /// <summary>
     /// コンストラクタ
     /// </summary>
     /// <param name="modelPath">SentencePieceモデルファイルのパス</param>
@@ -64,12 +72,18 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
             throw new ArgumentException("Model path cannot be null or empty", nameof(modelPath));
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _maxInputLength = maxInputLength;
         
         ModelPath = modelPath;
         _modelName = Path.GetFileNameWithoutExtension(modelPath);
         
         TokenizerId = $"SentencePiece_{_modelName}";
         Name = $"SentencePiece Tokenizer ({_modelName})";
+        
+        // SentencePiece正規化サービスを初期化
+        using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
+        var normalizerLogger = loggerFactory.CreateLogger<SentencePieceNormalizer>();
+        _normalizer = new SentencePieceNormalizer(normalizerLogger, SentencePieceNormalizationOptions.OpusMt);
         
         try
         {
@@ -134,6 +148,19 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
         if (string.IsNullOrEmpty(text))
             return [];
 
+        // SentencePiece互換正規化を適用
+        string normalizedText;
+        try
+        {
+            normalizedText = _normalizer.Normalize(text);
+            _logger.LogDebug("テキスト正規化完了: '{Original}' -> '{Normalized}'", text, normalizedText);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "テキスト正規化に失敗、元のテキストを使用: '{Text}'", text);
+            normalizedText = text;
+        }
+
         if (_innerTokenizer != null)
         {
             try
@@ -144,7 +171,7 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
                 
                 if (encodeMethod != null)
                 {
-                    var result = encodeMethod.Invoke(_innerTokenizer, [text]);
+                    var result = encodeMethod.Invoke(_innerTokenizer, [normalizedText]);
                     
                     if (result != null)
                     {
@@ -187,7 +214,7 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
 
         // フォールバック実装: より意味のあるトークン化
         _logger.LogDebug("フォールバック実装を使用してトークン化します");
-        return FallbackTokenize(text);
+        return FallbackTokenize(normalizedText);
     }
 
     /// <inheritdoc/>
@@ -212,11 +239,22 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
                     
                     if (result is string decoded)
                     {
-                        _logger.LogDebug(
-                            "SentencePieceTokenizer（0.21.0）でトークンをデコードしました: トークン数={TokenCount}, 出力長={OutputLength}",
-                            tokenIds.Length, decoded.Length);
+                        // プレフィックススペース記号を除去して元の形式に復元
+                        string restoredText;
+                        try
+                        {
+                            restoredText = _normalizer.RemovePrefixSpaceSymbol(decoded);
+                            _logger.LogDebug(
+                                "SentencePieceTokenizer（0.21.0）でトークンをデコードしました: トークン数={TokenCount}, 復元テキスト='{RestoredText}'",
+                                tokenIds.Length, restoredText);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "プレフィックススペース記号の除去に失敗、デコード結果をそのまま使用");
+                            restoredText = decoded;
+                        }
                             
-                        return decoded;
+                        return restoredText;
                     }
                 }
             }
@@ -301,6 +339,8 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
             disposable.Dispose();
         }
 
+        _normalizer?.Dispose();
+
         _disposed = true;
         _logger.LogDebug("SentencePieceトークナイザーを破棄しました: {ModelPath}", ModelPath);
         GC.SuppressFinalize(this);
@@ -337,8 +377,8 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
     /// </summary>
     public bool ValidateNormalization()
     {
-        // 簡単な実装: 常にtrueを返す
-        return true;
+        // 正規化サービスが利用可能かチェック
+        return _normalizer != null;
     }
 
     /// <summary>
@@ -346,7 +386,23 @@ public class RealSentencePieceTokenizer : Baketa.Core.Translation.Models.ITokeni
     /// </summary>
     public bool ValidateNormalization(string input, string expected)
     {
-        // 簡単な実装: 入力と期待値が同じかチェック
-        return string.Equals(input, expected, StringComparison.Ordinal);
+        try
+        {
+            var normalized = _normalizer.Normalize(input);
+            return string.Equals(normalized, expected, StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// テキストを正規化（テスト用メソッド）
+    /// </summary>
+    public string NormalizeText(string input)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(RealSentencePieceTokenizer));
+        return _normalizer.Normalize(input);
     }
 }

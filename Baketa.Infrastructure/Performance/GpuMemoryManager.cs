@@ -13,7 +13,9 @@ namespace Baketa.Infrastructure.Performance;
 public sealed class GpuMemoryManager : IGpuMemoryManager
 {
     private readonly ILogger<GpuMemoryManager> _logger;
+#pragma warning disable CS0649 // フィールドは割り当てられていません、既定値を使用
     private readonly System.Threading.Timer? _monitoringTimer;
+#pragma warning restore CS0649
     private GpuMemoryLimits? _currentLimits;
     private volatile bool _disposed;
     private volatile bool _isMonitoring;
