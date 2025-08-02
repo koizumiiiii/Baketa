@@ -189,6 +189,36 @@ public static class CompleteTranslationServiceExtensions
         // SentencePiece統合（既存）
         services.AddSentencePieceTokenizer(configuration);
         
+        // AlphaOpusMtTranslationEngineの登録
+        services.AddSingleton<AlphaOpusMtTranslationEngine>(serviceProvider =>
+        {
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger<AlphaOpusMtTranslationEngine>();
+            var options = new AlphaOpusMtOptions
+            {
+                MaxSequenceLength = 256,
+                MemoryLimitMb = 300,
+                ThreadCount = 2
+            };
+            
+            // 設定からパスを取得
+            var modelPath = configuration["OpusMt:ModelPath"] ?? "Models/ONNX/opus-mt-ja-en/model.onnx";
+            var tokenizerPath = configuration["OpusMt:TokenizerPath"] ?? "Models/SentencePiece/opus-mt-ja-en.model";
+            
+            var languagePair = new LanguagePair
+            {
+                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
+                TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            };
+            
+            return new AlphaOpusMtTranslationEngine(
+                modelPath,
+                tokenizerPath,
+                languagePair,
+                options,
+                logger);
+        });
+        
         // 中国語翻訳サポート（既存）
         services.AddChineseTranslationSupport(configuration);
         
@@ -304,7 +334,7 @@ public sealed class TranslationEngineFactory(
         {
             return engineType switch
             {
-                var s when s.Equals("OPUS-MT", StringComparison.OrdinalIgnoreCase) || s.Equals("LOCAL", StringComparison.OrdinalIgnoreCase) => _serviceProvider.GetRequiredService<OpusMtOnnxEngine>(),
+                var s when s.Equals("OPUS-MT", StringComparison.OrdinalIgnoreCase) || s.Equals("LOCAL", StringComparison.OrdinalIgnoreCase) => _serviceProvider.GetRequiredService<AlphaOpusMtTranslationEngine>(),
                 var s when s.Equals("GEMINI", StringComparison.OrdinalIgnoreCase) || s.Equals("CLOUD", StringComparison.OrdinalIgnoreCase) => _serviceProvider.GetRequiredService<GeminiTranslationEngine>(),
                 var s when s.Equals("HYBRID", StringComparison.OrdinalIgnoreCase) || s.Equals("FALLBACK", StringComparison.OrdinalIgnoreCase) => _serviceProvider.GetRequiredService<HybridTranslationEngine>(),
                 _ => throw new ArgumentException($"サポートされていないエンジンタイプ: {engineType}", nameof(engineType))

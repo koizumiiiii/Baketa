@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
+using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
@@ -20,7 +21,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
 {
     private readonly ILogger<AlphaOpusMtTranslationEngine> _logger;
     private readonly AlphaOpusMtOptions _options;
-    private readonly RealSentencePieceTokenizer _tokenizer;
+    private readonly ITokenizer _tokenizer;
     private InferenceSession? _session;
     private bool _isInitialized;
     private bool _disposed;
@@ -71,12 +72,14 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
         // CPUデバイスを設定
         Device = ComputeDevice.DefaultCpu;
         
-        // SentencePieceトークナイザーを初期化
+        // SentencePieceトークナイザーを初期化（Native実装優先）
         var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
-        var tokenizerLogger = loggerFactory.CreateLogger<RealSentencePieceTokenizer>();
-        _tokenizer = new RealSentencePieceTokenizer(
+        _tokenizer = SentencePieceTokenizerFactory.Create(
             tokenizerPath,
-            tokenizerLogger);
+            "OPUS-MT Alpha Tokenizer",
+            loggerFactory,
+            useTemporary: false,
+            useNative: true);
     }
 
     /// <inheritdoc/>
@@ -94,16 +97,24 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             // SentencePieceトークナイザーは初期化済み（コンストラクタで初期化）
             try
             {
+                // IsInitializedプロパティが利用可能な場合のみチェック
+                var isInitialized = _tokenizer switch
+                {
+                    OpusMtNativeTokenizer native => native.IsInitialized,
+                    RealSentencePieceTokenizer real => real.IsInitialized,
+                    _ => true // その他の実装は常に初期化済みとみなす
+                };
+                
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [ONNX] トークナイザー状態（直接書き込み） - IsInitialized: {_tokenizer.IsInitialized}, Name: '{_tokenizer.Name}', VocabSize: {_tokenizer.VocabularySize}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [ONNX] トークナイザー状態（直接書き込み） - IsInitialized: {isInitialized}, Name: '{_tokenizer.Name}', VocabSize: {_tokenizer.VocabularySize}{Environment.NewLine}");
+                
+                if (!isInitialized)
+                {
+                    _logger.LogError("SentencePieceトークナイザーが正しく初期化されていません");
+                    return Task.FromResult(false);
+                }
             }
             catch { }
-            
-            if (!_tokenizer.IsInitialized)
-            {
-                _logger.LogError("SentencePieceトークナイザーが正しく初期化されていません");
-                return Task.FromResult(false);
-            }
 
             // ONNX Runtimeセッションオプションの設定
             var sessionOptions = new SessionOptions
@@ -206,7 +217,12 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             var currentDirectory = System.IO.Directory.GetCurrentDirectory();
             var absoluteModelPath = System.IO.Path.GetFullPath(ModelPath);
             var fileExists = System.IO.File.Exists(ModelPath);
-            var tokenizerPath = _tokenizer.ModelPath;
+            var tokenizerPath = _tokenizer switch
+            {
+                OpusMtNativeTokenizer => "Native Implementation",
+                RealSentencePieceTokenizer real => real.ModelPath,
+                _ => "Unknown Implementation"
+            };
             var tokenizerExists = System.IO.File.Exists(tokenizerPath);
             
             _logger.LogInformation("🔍 ONNXモデル存在チェック: CurrentDir='{CurrentDir}', ModelPath='{ModelPath}', AbsolutePath='{AbsolutePath}', Exists={Exists}",
@@ -708,7 +724,10 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
         if (!_disposed && disposing)
         {
             _session?.Dispose();
-            _tokenizer?.Dispose();
+            if (_tokenizer is IDisposable disposableTokenizer)
+            {
+                disposableTokenizer.Dispose();
+            }
             _disposed = true;
         }
     }
