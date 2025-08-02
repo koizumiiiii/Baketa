@@ -36,6 +36,13 @@
 		<!-- SentencePiece トークナイザー -->
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />
 		
+		<!-- Google.Protobuf for SentencePiece model parsing -->
+		<PackageReference Include="Google.Protobuf" Version="3.25.2" />
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.25.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+		</PackageReference>
+		
 		<!-- PaddleOCR パッケージ -->
 		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
 		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />

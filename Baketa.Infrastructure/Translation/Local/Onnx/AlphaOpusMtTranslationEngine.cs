@@ -129,7 +129,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 var inputMetadata = _session.InputMetadata;
                 foreach (var input in inputMetadata)
                 {
-                    var dimensions = string.Join(", ", input.Value.Dimensions.Select(d => d.ToString()));
+                    var dimensions = string.Join(", ", input.Value.Dimensions.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                         $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [ONNX] 入力（直接書き込み） - Name: '{input.Key}', Type: {input.Value.ElementType}, Shape: [{dimensions}]{Environment.NewLine}");
                 }
@@ -138,7 +138,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 var outputMetadata = _session.OutputMetadata;
                 foreach (var output in outputMetadata)
                 {
-                    var dimensions = string.Join(", ", output.Value.Dimensions.Select(d => d.ToString()));
+                    var dimensions = string.Join(", ", output.Value.Dimensions.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                         $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [ONNX] 出力（直接書き込み） - Name: '{output.Key}', Type: {output.Value.ElementType}, Shape: [{dimensions}]{Environment.NewLine}");
                 }
@@ -539,18 +539,12 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             }
             
             // 出力の取得（logitsテンソル）
-            var outputResult = results.FirstOrDefault(r => r.Name == "output");
-            if (outputResult == null)
-            {
-                throw new InvalidOperationException("'output'という名前の推論結果が見つかりません");
-            }
+            var outputResult = results.FirstOrDefault(r => r.Name == "output") 
+                ?? throw new InvalidOperationException("'output'という名前の推論結果が見つかりません");
             
             // logitsをfloat型として取得
-            var logitsTensor = outputResult.AsTensor<float>();
-            if (logitsTensor == null)
-            {
-                throw new InvalidOperationException("推論結果をFloat Tensorに変換できませんでした");
-            }
+            var logitsTensor = outputResult.AsTensor<float>() 
+                ?? throw new InvalidOperationException("推論結果をFloat Tensorに変換できませんでした");
 
             // 最後のトークン位置のlogitsを取得
             var lastTokenLogits = new float[logitsTensor.Dimensions[2]]; // vocab_size

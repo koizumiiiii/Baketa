@@ -15,7 +15,6 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Infrastructure.Performance;
-using Baketa.Infrastructure.Translation.Validation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -155,9 +154,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
             
             // 翻訳精度検証システム（デバッグビルドのみ）
-#if DEBUG
-            services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
-#endif
+            // TODO: 翻訳精度検証システムは将来実装予定
+            // #if DEBUG
+            // services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
+            // #endif
         }
         
         /// <summary>
