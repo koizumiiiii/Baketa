@@ -83,6 +83,7 @@ public class ErrorHandlingTests : IDisposable
         var result = await errorHandler.ExecuteWithFallbackAsync(
             primaryAction: async () =>
             {
+                await Task.Yield(); // 非同期処理を追加
                 primaryCalled = true;
                 _output.WriteLine($"  プライマリ操作実行 → 失敗をシミュレート");
                 throw new InvalidOperationException("Primary operation failed");

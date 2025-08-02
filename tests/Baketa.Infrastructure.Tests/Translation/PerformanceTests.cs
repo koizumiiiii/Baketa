@@ -18,17 +18,10 @@ namespace Baketa.Infrastructure.Tests.Translation;
 /// OPUS-MT Native Tokenizer パフォーマンステスト
 /// 大量テキスト処理での性能測定と最適化ポイント特定
 /// </summary>
-public class PerformanceTests : IDisposable
+public class PerformanceTests(ITestOutputHelper output) : IDisposable
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _projectRoot;
+    private readonly string _projectRoot = GetProjectRootDirectory();
     private bool _disposed;
-
-    public PerformanceTests(ITestOutputHelper output)
-    {
-        _output = output;
-        _projectRoot = GetProjectRootDirectory();
-    }
 
     [Fact]
     public async Task OpusMtNativeTokenizer_BulkProcessing_ShouldMeetPerformanceRequirements()
@@ -38,21 +31,21 @@ public class PerformanceTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         // 大量テキストデータの準備（実際のゲーム環境を模擬）
         var testTexts = GenerateGameTextDataset(1000); // 1000件のテキスト
         
-        _output.WriteLine($"🚀 Bulk processing performance test");
-        _output.WriteLine($"📊 Dataset size: {testTexts.Count:N0} texts");
-        _output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
+        output.WriteLine($"🚀 Bulk processing performance test");
+        output.WriteLine($"📊 Dataset size: {testTexts.Count:N0} texts");
+        output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
 
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
         
         // Warm-up run (JIT最適化)
-        _output.WriteLine($"🔥 Warm-up run...");
+        output.WriteLine($"🔥 Warm-up run...");
         for (int i = 0; i < Math.Min(10, testTexts.Count); i++)
         {
             tokenizer.Tokenize(testTexts[i]);
@@ -90,12 +83,12 @@ public class PerformanceTests : IDisposable
         var totalTokens = results.Sum(r => r.TokenCount);
         var tokensPerSecond = totalTokens / stopwatch.Elapsed.TotalSeconds;
 
-        _output.WriteLine($"\n📈 Performance Results:");
-        _output.WriteLine($"  Total processing time: {totalTime:F2} ms");
-        _output.WriteLine($"  Average time per text: {avgTimePerText:F3} ms");
-        _output.WriteLine($"  Texts per second: {textsPerSecond:F1}");
-        _output.WriteLine($"  Total tokens processed: {totalTokens:N0}");
-        _output.WriteLine($"  Tokens per second: {tokensPerSecond:F0}");
+        output.WriteLine($"\n📈 Performance Results:");
+        output.WriteLine($"  Total processing time: {totalTime:F2} ms");
+        output.WriteLine($"  Average time per text: {avgTimePerText:F3} ms");
+        output.WriteLine($"  Texts per second: {textsPerSecond:F1}");
+        output.WriteLine($"  Total tokens processed: {totalTokens:N0}");
+        output.WriteLine($"  Tokens per second: {tokensPerSecond:F0}");
 
         // Performance requirements
         avgTimePerText.Should().BeLessThan(10.0, "Average processing time should be under 10ms per text");
@@ -118,13 +111,13 @@ public class PerformanceTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateGameTextDataset(textCount);
         
-        _output.WriteLine($"📊 Scalability test: {textCount:N0} texts");
+        output.WriteLine($"📊 Scalability test: {textCount:N0} texts");
 
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
 
@@ -143,9 +136,9 @@ public class PerformanceTests : IDisposable
         var avgTimePerText = totalTime / textCount;
         var textsPerSecond = textCount / stopwatch.Elapsed.TotalSeconds;
 
-        _output.WriteLine($"  Total time: {totalTime:F2} ms");
-        _output.WriteLine($"  Avg per text: {avgTimePerText:F3} ms");
-        _output.WriteLine($"  Texts/sec: {textsPerSecond:F1}");
+        output.WriteLine($"  Total time: {totalTime:F2} ms");
+        output.WriteLine($"  Avg per text: {avgTimePerText:F3} ms");
+        output.WriteLine($"  Texts/sec: {textsPerSecond:F1}");
 
         // Scalability assertions
         avgTimePerText.Should().BeLessThan(5.0, $"Average time should remain low even with {textCount} texts");
@@ -160,13 +153,13 @@ public class PerformanceTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateGameTextDataset(500);
         
-        _output.WriteLine($"🧠 Memory usage stability test");
+        output.WriteLine($"🧠 Memory usage stability test");
 
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
 
@@ -176,7 +169,7 @@ public class PerformanceTests : IDisposable
         GC.Collect();
         
         var initialMemory = GC.GetTotalMemory(false);
-        _output.WriteLine($"  Initial memory: {initialMemory / 1024 / 1024:F2} MB");
+        output.WriteLine($"  Initial memory: {initialMemory / 1024 / 1024:F2} MB");
 
         // Act - Process texts multiple times
         for (int iteration = 0; iteration < 5; iteration++)
@@ -188,7 +181,7 @@ public class PerformanceTests : IDisposable
             }
             
             var currentMemory = GC.GetTotalMemory(false);
-            _output.WriteLine($"  After iteration {iteration + 1}: {currentMemory / 1024 / 1024:F2} MB");
+            output.WriteLine($"  After iteration {iteration + 1}: {currentMemory / 1024 / 1024:F2} MB");
         }
 
         // Force garbage collection and measure final memory
@@ -199,8 +192,8 @@ public class PerformanceTests : IDisposable
         var finalMemory = GC.GetTotalMemory(false);
         var memoryIncrease = finalMemory - initialMemory;
         
-        _output.WriteLine($"  Final memory: {finalMemory / 1024 / 1024:F2} MB");
-        _output.WriteLine($"  Memory increase: {memoryIncrease / 1024 / 1024:F2} MB");
+        output.WriteLine($"  Final memory: {finalMemory / 1024 / 1024:F2} MB");
+        output.WriteLine($"  Memory increase: {memoryIncrease / 1024 / 1024:F2} MB");
 
         // Assert
         memoryIncrease.Should().BeLessThan(50 * 1024 * 1024, "Memory increase should be less than 50MB");
@@ -214,19 +207,21 @@ public class PerformanceTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateGameTextDataset(100);
         
-        _output.WriteLine($"🔄 Concurrent access test");
+        output.WriteLine($"🔄 Concurrent access test");
 
         using var tokenizer = await OpusMtNativeTokenizer.CreateAsync(modelPath);
 
         // Act - Concurrent processing
         var tasks = Enumerable.Range(0, 10).Select(async threadId =>
         {
+            await Task.Yield(); // 非同期処理を追加
+            
             var threadStopwatch = Stopwatch.StartNew();
             var results = new List<int[]>();
             
@@ -256,7 +251,7 @@ public class PerformanceTests : IDisposable
             result.Results.Should().HaveCount(testTexts.Count, $"Thread {result.ThreadId} should process all texts");
             result.ProcessingTime.Should().BeLessThan(5000, $"Thread {result.ThreadId} should complete within 5 seconds");
             
-            _output.WriteLine($"  Thread {result.ThreadId}: {result.ProcessingTime:F2} ms");
+            output.WriteLine($"  Thread {result.ThreadId}: {result.ProcessingTime:F2} ms");
         }
 
         // Verify consistency
@@ -270,7 +265,7 @@ public class PerformanceTests : IDisposable
             }
         }
         
-        _output.WriteLine($"✅ All threads produced consistent results");
+        output.WriteLine($"✅ All threads produced consistent results");
     }
 
     [Fact]
@@ -281,14 +276,14 @@ public class PerformanceTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
         var testTexts = GenerateGameTextDataset(100).Take(50).ToList(); // 小さめのデータセット
         var logger = NullLogger<RealSentencePieceTokenizer>.Instance;
         
-        _output.WriteLine($"⚖️  Performance comparison: Real vs Native");
+        output.WriteLine($"⚖️  Performance comparison: Real vs Native");
 
         using var realTokenizer = new RealSentencePieceTokenizer(modelPath, logger);
 
@@ -303,9 +298,9 @@ public class PerformanceTests : IDisposable
         var realTime = realStopwatch.Elapsed.TotalMilliseconds;
         var realTextsPerSecond = testTexts.Count / realStopwatch.Elapsed.TotalSeconds;
 
-        _output.WriteLine($"  RealSentencePieceTokenizer:");
-        _output.WriteLine($"    Total time: {realTime:F2} ms");
-        _output.WriteLine($"    Texts/sec: {realTextsPerSecond:F1}");
+        output.WriteLine($"  RealSentencePieceTokenizer:");
+        output.WriteLine($"    Total time: {realTime:F2} ms");
+        output.WriteLine($"    Texts/sec: {realTextsPerSecond:F1}");
 
         // Performance should be reasonable even with fallback implementation
         realTime.Should().BeLessThan(1000, "RealSentencePieceTokenizer should complete within 1 second");
@@ -378,29 +373,29 @@ public class PerformanceTests : IDisposable
 
     private void AnalyzePerformanceCharacteristics(List<PerformanceResult> results)
     {
-        _output.WriteLine($"\n🔍 Performance Analysis:");
+        output.WriteLine($"\n🔍 Performance Analysis:");
         
         // Text length vs processing time correlation
         var shortTexts = results.Where(r => r.TextLength <= 10).ToList();
         var mediumTexts = results.Where(r => r.TextLength > 10 && r.TextLength <= 50).ToList();
         var longTexts = results.Where(r => r.TextLength > 50).ToList();
         
-        if (shortTexts.Any())
+        if (shortTexts.Count > 0)
         {
             var avgShortTime = shortTexts.Average(r => r.ProcessingTimeMs);
-            _output.WriteLine($"  Short texts (≤10 chars): {avgShortTime:F3} ms avg");
+            output.WriteLine($"  Short texts (≤10 chars): {avgShortTime:F3} ms avg");
         }
         
-        if (mediumTexts.Any())
+        if (mediumTexts.Count > 0)
         {
             var avgMediumTime = mediumTexts.Average(r => r.ProcessingTimeMs);
-            _output.WriteLine($"  Medium texts (11-50 chars): {avgMediumTime:F3} ms avg");
+            output.WriteLine($"  Medium texts (11-50 chars): {avgMediumTime:F3} ms avg");
         }
         
-        if (longTexts.Any())
+        if (longTexts.Count > 0)
         {
             var avgLongTime = longTexts.Average(r => r.ProcessingTimeMs);
-            _output.WriteLine($"  Long texts (>50 chars): {avgLongTime:F3} ms avg");
+            output.WriteLine($"  Long texts (>50 chars): {avgLongTime:F3} ms avg");
         }
 
         // Token processing rate
@@ -408,19 +403,19 @@ public class PerformanceTests : IDisposable
         var maxTokensPerSecond = results.Max(r => r.TokensPerSecond);
         var minTokensPerSecond = results.Min(r => r.TokensPerSecond);
         
-        _output.WriteLine($"  Token processing rate:");
-        _output.WriteLine($"    Average: {avgTokensPerSecond:F0} tokens/sec");
-        _output.WriteLine($"    Max: {maxTokensPerSecond:F0} tokens/sec");
-        _output.WriteLine($"    Min: {minTokensPerSecond:F0} tokens/sec");
+        output.WriteLine($"  Token processing rate:");
+        output.WriteLine($"    Average: {avgTokensPerSecond:F0} tokens/sec");
+        output.WriteLine($"    Max: {maxTokensPerSecond:F0} tokens/sec");
+        output.WriteLine($"    Min: {minTokensPerSecond:F0} tokens/sec");
 
         // Identify potential bottlenecks
         var slowestTexts = results.OrderByDescending(r => r.ProcessingTimeMs).Take(5).ToList();
-        if (slowestTexts.Any())
+        if (slowestTexts.Count > 0)
         {
-            _output.WriteLine($"  Slowest processing times:");
+            output.WriteLine($"  Slowest processing times:");
             foreach (var slow in slowestTexts)
             {
-                _output.WriteLine($"    {slow.ProcessingTimeMs:F3} ms: \"{slow.Text.Substring(0, Math.Min(50, slow.Text.Length))}...\"");
+                output.WriteLine($"    {slow.ProcessingTimeMs:F3} ms: \"{slow.Text[..Math.Min(50, slow.Text.Length)]}...\"");
             }
         }
     }
@@ -444,7 +439,7 @@ public class PerformanceTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private record PerformanceResult
+    private sealed record PerformanceResult
     {
         public string Text { get; init; } = string.Empty;
         public int TextLength { get; init; }

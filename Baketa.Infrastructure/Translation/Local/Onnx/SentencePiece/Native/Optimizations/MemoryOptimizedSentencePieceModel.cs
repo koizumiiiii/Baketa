@@ -14,9 +14,6 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
 {
     private readonly Dictionary<string, int> _vocabulary;
     private readonly Dictionary<int, string> _reverseVocabulary;
-    private readonly OptimizedTrieNode _searchTrie;
-    private readonly NativeSpecialTokens _specialTokens;
-    private readonly StringInternPool _internPool;
     private bool _disposed;
 
     /// <summary>
@@ -32,12 +29,17 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
     /// <summary>
     /// 特殊トークン
     /// </summary>
-    public NativeSpecialTokens SpecialTokens => _specialTokens;
+    public NativeSpecialTokens SpecialTokens { get; }
     
     /// <summary>
     /// 最適化されたTrie木
     /// </summary>
-    public OptimizedTrieNode SearchTrie => _searchTrie;
+    public OptimizedTrieNode SearchTrie { get; }
+
+    /// <summary>
+    /// 文字列インターンプール
+    /// </summary>
+    public StringInternPool InternPool { get; }
     
     /// <summary>
     /// 語彙サイズ
@@ -53,8 +55,8 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
     {
         ArgumentNullException.ThrowIfNull(originalModel);
         
-        _internPool = new StringInternPool();
-        _specialTokens = originalModel.SpecialTokens;
+        InternPool = new StringInternPool();
+        SpecialTokens = originalModel.SpecialTokens;
         
         // 語彙のインターン化とメモリ効率的な格納
         _vocabulary = new Dictionary<string, int>(originalModel.Vocabulary.Count);
@@ -63,7 +65,7 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         OptimizeVocabulary(originalModel);
         
         // Trie木の最適化構築
-        _searchTrie = new OptimizedTrieNode(_internPool);
+        SearchTrie = new OptimizedTrieNode(InternPool);
         BuildOptimizedTrie(originalModel);
     }
 
@@ -75,7 +77,7 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         foreach (var kvp in originalModel.Vocabulary)
         {
             // 文字列のインターン化でメモリ共有
-            var internedKey = _internPool.Intern(kvp.Key);
+            var internedKey = InternPool.Intern(kvp.Key);
             _vocabulary[internedKey] = kvp.Value;
         }
         
@@ -84,12 +86,12 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
             // 逆引き辞書でも同じインターン化文字列を使用
             if (_vocabulary.ContainsKey(kvp.Value))
             {
-                var internedValue = _internPool.GetInternedString(kvp.Value);
+                var internedValue = InternPool.GetInternedString(kvp.Value);
                 _reverseVocabulary[kvp.Key] = internedValue ?? kvp.Value;
             }
             else
             {
-                _reverseVocabulary[kvp.Key] = _internPool.Intern(kvp.Value);
+                _reverseVocabulary[kvp.Key] = InternPool.Intern(kvp.Value);
             }
         }
     }
@@ -101,15 +103,15 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
     {
         foreach (var kvp in originalModel.Vocabulary)
         {
-            var internedToken = _internPool.GetInternedString(kvp.Key);
+            var internedToken = InternPool.GetInternedString(kvp.Key);
             if (internedToken != null)
             {
-                _searchTrie.AddToken(internedToken, kvp.Value);
+                SearchTrie.AddToken(internedToken, kvp.Value);
             }
         }
         
         // Trie木の圧縮最適化
-        _searchTrie.Optimize();
+        SearchTrie.Optimize();
     }
 
     /// <summary>
@@ -124,10 +126,10 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         usage += _reverseVocabulary.Count * (sizeof(int) + IntPtr.Size);
         
         // インターンプールのメモリ使用量
-        usage += _internPool.EstimatedMemoryUsage;
+        usage += InternPool.EstimatedMemoryUsage;
         
         // Trie木のメモリ使用量
-        usage += _searchTrie.EstimatedMemoryUsage;
+        usage += SearchTrie.EstimatedMemoryUsage;
         
         return usage;
     }
@@ -140,12 +142,12 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         return new MemoryStatistics
         {
             VocabularyMemory = _vocabulary.Count * (sizeof(int) + IntPtr.Size) * 2,
-            TrieMemory = _searchTrie.EstimatedMemoryUsage,
-            InternPoolMemory = _internPool.EstimatedMemoryUsage,
+            TrieMemory = SearchTrie.EstimatedMemoryUsage,
+            InternPoolMemory = InternPool.EstimatedMemoryUsage,
             TotalMemory = EstimatedMemoryUsage,
             VocabularyCount = VocabularySize,
-            InternedStringCount = _internPool.Count,
-            TrieNodeCount = _searchTrie.NodeCount
+            InternedStringCount = InternPool.Count,
+            TrieNodeCount = SearchTrie.NodeCount
         };
     }
 
@@ -157,10 +159,10 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         
         // インターンプールの最適化
-        _internPool.Optimize();
+        InternPool.Optimize();
         
         // Trie木の再最適化
-        _searchTrie.Optimize();
+        SearchTrie.Optimize();
         
         // .NETガベージコレクションの最適化
         GC.Collect(2, GCCollectionMode.Optimized);
@@ -172,8 +174,8 @@ public sealed class MemoryOptimizedSentencePieceModel : IDisposable
         if (_disposed)
             return;
             
-        _searchTrie?.Dispose();
-        _internPool?.Dispose();
+        SearchTrie?.Dispose();
+        InternPool?.Dispose();
         _disposed = true;
     }
 }
@@ -285,10 +287,10 @@ public sealed class StringInternPool : IDisposable
 /// <summary>
 /// メモリ最適化されたTrieノード
 /// </summary>
-public sealed class OptimizedTrieNode : IDisposable
+public sealed class OptimizedTrieNode(StringInternPool internPool) : IDisposable
 {
-    private readonly Dictionary<char, OptimizedTrieNode> _children;
-    private readonly StringInternPool _internPool;
+    private readonly Dictionary<char, OptimizedTrieNode> _children = [];
+    private readonly StringInternPool _internPool = internPool ?? throw new ArgumentNullException(nameof(internPool));
     private string? _token;
     private int? _tokenId;
     private bool _disposed;
@@ -330,12 +332,6 @@ public sealed class OptimizedTrieNode : IDisposable
                 
             return usage;
         }
-    }
-
-    public OptimizedTrieNode(StringInternPool internPool)
-    {
-        _internPool = internPool ?? throw new ArgumentNullException(nameof(internPool));
-        _children = [];
     }
 
     /// <summary>

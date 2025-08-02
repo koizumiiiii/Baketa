@@ -18,7 +18,6 @@ public sealed class MemoryOptimizedOpusMtTokenizer : ITokenizer, IDisposable
     private readonly MemoryOptimizedSentencePieceModel _model;
     private readonly MemoryOptimizedBpeTokenizer _bpeTokenizer;
     private readonly ILogger<MemoryOptimizedOpusMtTokenizer> _logger;
-    private readonly string _tokenizerId;
     
     // バッファプール（メモリ再利用）
     private readonly ArrayPool<int> _tokenPool = ArrayPool<int>.Shared;
@@ -31,7 +30,7 @@ public sealed class MemoryOptimizedOpusMtTokenizer : ITokenizer, IDisposable
     private bool _isInitialized;
 
     /// <inheritdoc/>
-    public string TokenizerId => _tokenizerId;
+    public string TokenizerId { get; }
 
     /// <inheritdoc/>
     public string Name { get; }
@@ -59,7 +58,7 @@ public sealed class MemoryOptimizedOpusMtTokenizer : ITokenizer, IDisposable
     {
         _model = model ?? throw new ArgumentNullException(nameof(model));
         Name = name;
-        _tokenizerId = GenerateOptimizedTokenizerId();
+        TokenizerId = GenerateOptimizedTokenizerId();
         _logger = logger;
         
         _bpeTokenizer = new MemoryOptimizedBpeTokenizer(_model, logger);
@@ -82,20 +81,14 @@ public sealed class MemoryOptimizedOpusMtTokenizer : ITokenizer, IDisposable
         var originalModel = await parser.ParseModelAsync(modelPath).ConfigureAwait(false);
         
         // メモリ最適化モデルの構築
+#pragma warning disable CA2000 // オブジェクトの所有権はMemoryOptimizedOpusMtTokenizerに移譲される
         var optimizedModel = new MemoryOptimizedSentencePieceModel(originalModel);
         
-        try
-        {
-            return new MemoryOptimizedOpusMtTokenizer(
-                optimizedModel, 
-                "OPUS-MT Memory-Optimized Tokenizer", 
-                tokenizerLogger);
-        }
-        catch
-        {
-            optimizedModel.Dispose();
-            throw;
-        }
+        return new MemoryOptimizedOpusMtTokenizer(
+            optimizedModel, 
+            "OPUS-MT Memory-Optimized Tokenizer", 
+            tokenizerLogger);
+#pragma warning restore CA2000
     }
 
     /// <inheritdoc/>
@@ -247,21 +240,15 @@ public sealed class MemoryOptimizedOpusMtTokenizer : ITokenizer, IDisposable
 /// <summary>
 /// メモリ最適化されたBPEトークナイザー
 /// </summary>
-public sealed class MemoryOptimizedBpeTokenizer : IDisposable
+public sealed class MemoryOptimizedBpeTokenizer(MemoryOptimizedSentencePieceModel model, ILogger logger) : IDisposable
 {
-    private readonly MemoryOptimizedSentencePieceModel _model;
-    private readonly ILogger _logger;
+    private readonly MemoryOptimizedSentencePieceModel _model = model ?? throw new ArgumentNullException(nameof(model));
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ArrayPool<int> _tokenPool = ArrayPool<int>.Shared;
     private readonly ArrayPool<char> _charPool = ArrayPool<char>.Shared;
     
     private const char SpaceSymbol = '\u2581';
     private bool _disposed;
-
-    public MemoryOptimizedBpeTokenizer(MemoryOptimizedSentencePieceModel model, ILogger logger)
-    {
-        _model = model ?? throw new ArgumentNullException(nameof(model));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// メモリ最適化されたBPEトークン化

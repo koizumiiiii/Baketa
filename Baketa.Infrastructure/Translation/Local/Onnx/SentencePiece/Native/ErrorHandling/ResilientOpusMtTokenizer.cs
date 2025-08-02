@@ -79,10 +79,12 @@ public sealed class ResilientOpusMtTokenizer : ITokenizer, IDisposable
         try
         {
             // プライマリトークナイザーの作成（リトライ付き）
+#pragma warning disable CA2000 // オブジェクトの所有権はResilientOpusMtTokenizerに移譲される
             var primaryTokenizer = await errorHandler.ExecuteWithRetryAsync(
                 () => OpusMtNativeTokenizer.CreateAsync(modelPath),
                 "CreatePrimaryTokenizer"
             ).ConfigureAwait(false);
+#pragma warning restore CA2000
 
             resilientLogger.LogInformation("プライマリトークナイザー作成成功: {ModelPath}", modelPath);
 
@@ -92,8 +94,10 @@ public sealed class ResilientOpusMtTokenizer : ITokenizer, IDisposable
             {
                 try
                 {
+#pragma warning disable CA2000 // オブジェクトの所有権はResilientOpusMtTokenizerに移譲される
                     fallbackTokenizer = new RealSentencePieceTokenizer(modelPath, fallbackLogger);
                     resilientLogger.LogInformation("フォールバックトークナイザー準備完了");
+#pragma warning restore CA2000
                 }
                 catch (Exception ex)
                 {
@@ -212,9 +216,12 @@ public sealed class ResilientOpusMtTokenizer : ITokenizer, IDisposable
         {
             // 基本的なトークン化テスト
             const string testText = "テスト";
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             
             var result = await _errorHandler.ExecuteWithRetryAsync(async () =>
             {
+                await Task.Yield(); // 実際の非同期処理をシミュレート
+                
                 var tokens = _primaryTokenizer.Tokenize(testText);
                 var decoded = _primaryTokenizer.Decode(tokens);
                 
@@ -225,7 +232,7 @@ public sealed class ResilientOpusMtTokenizer : ITokenizer, IDisposable
                     TestText = testText,
                     TokenCount = tokens.Length,
                     DecodedText = decoded,
-                    ResponseTime = TimeSpan.FromMilliseconds(1), // 実際の測定は省略
+                    ResponseTime = stopwatch.Elapsed,
                     ErrorStatistics = _errorHandler.Statistics
                 };
             }, "HealthCheck").ConfigureAwait(false);
@@ -257,10 +264,12 @@ public sealed class ResilientOpusMtTokenizer : ITokenizer, IDisposable
             _logger.LogInformation("自動回復試行開始");
 
             // 新しいプライマリトークナイザーの再作成を試行
+#pragma warning disable CA2000 // 回復処理のため一時的にオブジェクトを作成
             var newPrimaryTokenizer = await _errorHandler.ExecuteWithRetryAsync(
                 () => OpusMtNativeTokenizer.CreateAsync(_modelPath),
                 "RecoveryCreateTokenizer"
             ).ConfigureAwait(false);
+#pragma warning restore CA2000
 
             // 古いトークナイザーを破棄
             _primaryTokenizer?.Dispose();

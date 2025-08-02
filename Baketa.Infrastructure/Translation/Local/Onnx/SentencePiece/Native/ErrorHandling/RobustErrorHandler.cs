@@ -336,24 +336,21 @@ public sealed class ErrorHandlingPolicy
 public sealed class ErrorStatistics
 {
     private readonly Dictionary<Type, int> _errorCounts = [];
-    private int _totalErrors;
-    private int _recoveries;
-    private int _fallbacks;
-
+    
     /// <summary>
     /// 総エラー数
     /// </summary>
-    public int TotalErrors => _totalErrors;
+    public int TotalErrors { get; private set; }
 
     /// <summary>
     /// 回復成功数
     /// </summary>
-    public int Recoveries => _recoveries;
+    public int Recoveries { get; private set; }
 
     /// <summary>
     /// フォールバック実行数
     /// </summary>
-    public int Fallbacks => _fallbacks;
+    public int Fallbacks { get; private set; }
 
     /// <summary>
     /// エラータイプ別カウント
@@ -367,8 +364,8 @@ public sealed class ErrorStatistics
     {
         get
         {
-            if (_totalErrors == 0) return 1.0;
-            return Math.Max(0.0, 1.0 - (double)_totalErrors / (_totalErrors + _recoveries + 100));
+            if (TotalErrors == 0) return 1.0;
+            return Math.Max(0.0, 1.0 - (double)TotalErrors / (TotalErrors + Recoveries + 100));
         }
     }
 
@@ -378,18 +375,18 @@ public sealed class ErrorStatistics
         {
             _errorCounts.TryGetValue(exceptionType, out var count);
             _errorCounts[exceptionType] = count + 1;
-            _totalErrors++;
+            TotalErrors++;
         }
     }
 
     internal void IncrementRecovery()
     {
-        Interlocked.Increment(ref _recoveries);
+        Recoveries++;
     }
 
     internal void IncrementFallback()
     {
-        Interlocked.Increment(ref _fallbacks);
+        Fallbacks++;
     }
 
     public override string ToString()
