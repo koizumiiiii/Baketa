@@ -29,6 +29,7 @@
 - **Diagnostic Commands**: Read-only commands are auto-approved
 - **File Operations**: Read, list, and analysis operations are auto-approved
 - **AI Research**: Gemini MCP calls are auto-approved for technical problem-solving
+- **Python Execution**: Use PowerShell or `py` launcher commands (see Python Environment Guidelines below)
 
 ### **Autonomous Technical Problem-Solving**
 **PROACTIVE GEMINI EXECUTION FOR ENHANCED RESULTS**
@@ -100,6 +101,31 @@ After all code implementation, fixes, and refactoring, **always execute** the fo
 
 #### **1. Windows Native Environment**
 **IMPORTANT: Windows環境でClaude Codeを使用します。WindowsコマンドプロンプトまたはPowerShellでのdotnetコマンド実行が推奨されます。**
+
+#### **Python Environment Guidelines**
+**⚠️ CRITICAL**: Pythonスクリプトの実行にはGit Bash環境の制限があります。
+
+**問題**: pyenv-winとGit Bashの相性問題
+- Git Bash環境でpython実行時に「No global/local python version has been set yet」エラー
+- pyenvのshim機能とパス変換処理の競合
+- POSIX風パス表記とWindowsパスの変換エラー
+
+**推奨実行方法**:
+```cmd
+# 方法1: PowerShell経由（推奨）
+powershell -Command "python script.py"
+
+# 方法2: コマンドプロンプト経由
+cmd /c "python script.py"
+
+# 方法3: Python Launcher（最も信頼性が高い）
+py script.py
+```
+
+**Claude Code使用時の注意**:
+- Bashツールで`python`コマンドを直接実行しない
+- PowerShell環境またはPython Launcherを使用する
+- Git Bash環境でのPython実行は避ける
 
 #### **2. Code Analysis Alternative Methods**
 ```bash
