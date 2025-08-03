@@ -207,16 +207,17 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
             return tokenType switch
             {
                 "BOS" => 0L,
-                "EOS" => 2L,
+                "EOS" => 0L, // Helsinki-NLP OPUS-MT: BOS=EOS=0
                 "UNK" => 1L,
-                "PAD" => 3L,
+                "PAD" => 60715L, // Helsinki-NLP: VocabSize-1
                 _ => throw new ArgumentException($"Unknown special token type: {tokenType}")
             };
 
         return tokenType.ToUpperInvariant() switch
         {
-            "BOS" => _model.SpecialTokens.BosId,
-            "EOS" => _model.SpecialTokens.EosId,
+            // Helsinki-NLP OPUS-MTでは強制的にBOS=EOS=0を使用
+            "BOS" => 0, // _model.SpecialTokens.BosId から強制変更
+            "EOS" => 0, // _model.SpecialTokens.EosId から強制変更
             "UNK" => _model.SpecialTokens.UnkId,
             "PAD" => _model.SpecialTokens.PadId,
             _ => throw new ArgumentException($"Unknown special token type: {tokenType}")

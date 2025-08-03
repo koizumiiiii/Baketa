@@ -14,17 +14,10 @@ namespace Baketa.Infrastructure.Tests.Translation;
 /// エラーハンドリング強化機能テスト
 /// 堅牢性、回復能力、監視機能の検証
 /// </summary>
-public class ErrorHandlingTests : IDisposable
+public class ErrorHandlingTests(ITestOutputHelper output) : IDisposable
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _projectRoot;
+    private readonly string _projectRoot = GetProjectRootDirectory();
     private bool _disposed;
-
-    public ErrorHandlingTests(ITestOutputHelper output)
-    {
-        _output = output;
-        _projectRoot = GetProjectRootDirectory();
-    }
 
     [Fact]
     public async Task RobustErrorHandler_ShouldRetryOnTransientErrors()
@@ -37,21 +30,21 @@ public class ErrorHandlingTests : IDisposable
         var attemptCount = 0;
         var expectedAttempts = 3;
 
-        _output.WriteLine($"🔄 リトライ機能テスト開始");
+        output.WriteLine($"🔄 リトライ機能テスト開始");
 
         // Act & Assert
         var result = await errorHandler.ExecuteWithRetryAsync(async () =>
         {
             attemptCount++;
-            _output.WriteLine($"  試行 {attemptCount}: ");
+            output.WriteLine($"  試行 {attemptCount}: ");
 
             if (attemptCount < expectedAttempts)
             {
-                _output.WriteLine($"    一時的エラーをシミュレート");
+                output.WriteLine($"    一時的エラーをシミュレート");
                 throw new InvalidOperationException($"Simulated transient error (attempt {attemptCount})");
             }
 
-            _output.WriteLine($"    成功");
+            output.WriteLine($"    成功");
             return await Task.FromResult($"Success on attempt {attemptCount}");
         }, "RetryTest");
 
@@ -63,8 +56,8 @@ public class ErrorHandlingTests : IDisposable
         stats.TotalErrors.Should().Be(expectedAttempts - 1); // 成功した試行以外
         stats.Recoveries.Should().Be(1); // 最終的に成功
 
-        _output.WriteLine($"📊 統計: {stats}");
-        _output.WriteLine($"✅ リトライ機能テスト成功");
+        output.WriteLine($"📊 統計: {stats}");
+        output.WriteLine($"✅ リトライ機能テスト成功");
     }
 
     [Fact]
@@ -77,7 +70,7 @@ public class ErrorHandlingTests : IDisposable
         var primaryCalled = false;
         var fallbackCalled = false;
 
-        _output.WriteLine($"🔀 フォールバック機能テスト開始");
+        output.WriteLine($"🔀 フォールバック機能テスト開始");
 
         // Act
         var result = await errorHandler.ExecuteWithFallbackAsync(
@@ -85,13 +78,13 @@ public class ErrorHandlingTests : IDisposable
             {
                 await Task.Yield(); // 非同期処理を追加
                 primaryCalled = true;
-                _output.WriteLine($"  プライマリ操作実行 → 失敗をシミュレート");
+                output.WriteLine($"  プライマリ操作実行 → 失敗をシミュレート");
                 throw new InvalidOperationException("Primary operation failed");
             },
             fallbackAction: async () =>
             {
                 fallbackCalled = true;
-                _output.WriteLine($"  フォールバック操作実行 → 成功");
+                output.WriteLine($"  フォールバック操作実行 → 成功");
                 return await Task.FromResult("Fallback success");
             },
             "FallbackTest"
@@ -105,8 +98,8 @@ public class ErrorHandlingTests : IDisposable
         var stats = errorHandler.GetCurrentStatistics();
         stats.Fallbacks.Should().Be(1);
 
-        _output.WriteLine($"📊 統計: {stats}");
-        _output.WriteLine($"✅ フォールバック機能テスト成功");
+        output.WriteLine($"📊 統計: {stats}");
+        output.WriteLine($"✅ フォールバック機能テスト成功");
     }
 
     [Fact]
@@ -119,13 +112,13 @@ public class ErrorHandlingTests : IDisposable
 
         var attemptCount = 0;
 
-        _output.WriteLine($"🚫 非リトライ例外テスト開始");
+        output.WriteLine($"🚫 非リトライ例外テスト開始");
 
         // Act & Assert
         var action = () => errorHandler.ExecuteWithRetry<string>(() =>
         {
             attemptCount++;
-            _output.WriteLine($"  試行 {attemptCount}: ArgumentException スロー");
+            output.WriteLine($"  試行 {attemptCount}: ArgumentException スロー");
             throw new ArgumentException("Non-retryable exception");
         }, "NonRetryableTest");
 
@@ -134,7 +127,7 @@ public class ErrorHandlingTests : IDisposable
 
         attemptCount.Should().Be(1, "非リトライ例外は1回だけ実行されるべき");
 
-        _output.WriteLine($"✅ 非リトライ例外テスト成功");
+        output.WriteLine($"✅ 非リトライ例外テスト成功");
     }
 
     [Fact]
@@ -145,12 +138,12 @@ public class ErrorHandlingTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
-        _output.WriteLine($"🛡️ 堅牢なトークナイザー基本操作テスト");
-        _output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
+        output.WriteLine($"🛡️ 堅牢なトークナイザー基本操作テスト");
+        output.WriteLine($"📂 Model: {Path.GetFileName(modelPath)}");
 
         // Act
         using var resilientTokenizer = await ResilientOpusMtTokenizer.CreateResilientAsync(
@@ -163,9 +156,9 @@ public class ErrorHandlingTests : IDisposable
         resilientTokenizer.IsInitialized.Should().BeTrue();
         resilientTokenizer.VocabularySize.Should().BeGreaterThan(0);
 
-        _output.WriteLine($"✅ トークナイザー作成成功");
-        _output.WriteLine($"  TokenizerId: {resilientTokenizer.TokenizerId}");
-        _output.WriteLine($"  VocabularySize: {resilientTokenizer.VocabularySize:N0}");
+        output.WriteLine($"✅ トークナイザー作成成功");
+        output.WriteLine($"  TokenizerId: {resilientTokenizer.TokenizerId}");
+        output.WriteLine($"  VocabularySize: {resilientTokenizer.VocabularySize:N0}");
 
         // 基本的なトークン化テスト
         var testTexts = new[]
@@ -184,11 +177,11 @@ public class ErrorHandlingTests : IDisposable
             tokens.Should().NotBeNull();
             decoded.Should().NotBeNull();
 
-            _output.WriteLine($"  📝 '{text}' → [{string.Join(", ", tokens)}]");
-            _output.WriteLine($"      デコード: '{decoded}'");
+            output.WriteLine($"  📝 '{text}' → [{string.Join(", ", tokens)}]");
+            output.WriteLine($"      デコード: '{decoded}'");
         }
 
-        _output.WriteLine($"✅ 基本操作テスト成功");
+        output.WriteLine($"✅ 基本操作テスト成功");
     }
 
     [Fact]
@@ -199,11 +192,11 @@ public class ErrorHandlingTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
-        _output.WriteLine($"🏥 ヘルスチェック機能テスト");
+        output.WriteLine($"🏥 ヘルスチェック機能テスト");
 
         using var resilientTokenizer = await ResilientOpusMtTokenizer.CreateResilientAsync(
             modelPath, ErrorHandlingPolicy.CreateDefault());
@@ -217,15 +210,15 @@ public class ErrorHandlingTests : IDisposable
         healthResult.Message.Should().NotBeNullOrEmpty();
         healthResult.TokenCount.Should().BeGreaterThan(0);
 
-        _output.WriteLine($"📊 ヘルスチェック結果:");
-        _output.WriteLine($"  健康状態: {(healthResult.IsHealthy ? "正常" : "異常")}");
-        _output.WriteLine($"  メッセージ: {healthResult.Message}");
-        _output.WriteLine($"  テストテキスト: '{healthResult.TestText}'");
-        _output.WriteLine($"  トークン数: {healthResult.TokenCount}");
-        _output.WriteLine($"  デコード結果: '{healthResult.DecodedText}'");
-        _output.WriteLine($"  応答時間: {healthResult.ResponseTime.TotalMilliseconds:F1}ms");
+        output.WriteLine($"📊 ヘルスチェック結果:");
+        output.WriteLine($"  健康状態: {(healthResult.IsHealthy ? "正常" : "異常")}");
+        output.WriteLine($"  メッセージ: {healthResult.Message}");
+        output.WriteLine($"  テストテキスト: '{healthResult.TestText}'");
+        output.WriteLine($"  トークン数: {healthResult.TokenCount}");
+        output.WriteLine($"  デコード結果: '{healthResult.DecodedText}'");
+        output.WriteLine($"  応答時間: {healthResult.ResponseTime.TotalMilliseconds:F1}ms");
 
-        _output.WriteLine($"✅ ヘルスチェック機能テスト成功");
+        output.WriteLine($"✅ ヘルスチェック機能テスト成功");
     }
 
     [Fact]
@@ -236,11 +229,11 @@ public class ErrorHandlingTests : IDisposable
         
         if (!File.Exists(modelPath))
         {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
+            output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
             return;
         }
 
-        _output.WriteLine($"📋 レポート機能テスト");
+        output.WriteLine($"📋 レポート機能テスト");
 
         using var resilientTokenizer = await ResilientOpusMtTokenizer.CreateResilientAsync(
             modelPath, ErrorHandlingPolicy.CreateDefault());
@@ -260,15 +253,15 @@ public class ErrorHandlingTests : IDisposable
         report.VocabularySize.Should().BeGreaterThan(0);
         report.ModelPath.Should().Be(modelPath);
 
-        _output.WriteLine($"📊 トークナイザーレポート:");
-        _output.WriteLine($"  ID: {report.TokenizerId}");
-        _output.WriteLine($"  初期化済み: {report.IsInitialized}");
-        _output.WriteLine($"  語彙サイズ: {report.VocabularySize:N0}");
-        _output.WriteLine($"  フォールバック有効: {report.HasFallback}");
-        _output.WriteLine($"  モデルパス: {report.ModelPath}");
-        _output.WriteLine($"  エラー統計: {report.ErrorStatistics}");
+        output.WriteLine($"📊 トークナイザーレポート:");
+        output.WriteLine($"  ID: {report.TokenizerId}");
+        output.WriteLine($"  初期化済み: {report.IsInitialized}");
+        output.WriteLine($"  語彙サイズ: {report.VocabularySize:N0}");
+        output.WriteLine($"  フォールバック有効: {report.HasFallback}");
+        output.WriteLine($"  モデルパス: {report.ModelPath}");
+        output.WriteLine($"  エラー統計: {report.ErrorStatistics}");
 
-        _output.WriteLine($"✅ レポート機能テスト成功");
+        output.WriteLine($"✅ レポート機能テスト成功");
     }
 
     [Fact]
@@ -289,14 +282,14 @@ public class ErrorHandlingTests : IDisposable
 
         var attemptCount = 0;
 
-        _output.WriteLine($"⚙️ カスタムポリシーテスト開始");
-        _output.WriteLine($"  最大リトライ回数: {customPolicy.MaxRetryAttempts}");
+        output.WriteLine($"⚙️ カスタムポリシーテスト開始");
+        output.WriteLine($"  最大リトライ回数: {customPolicy.MaxRetryAttempts}");
 
         // Act & Assert
         var result = await errorHandler.ExecuteWithRetryAsync(async () =>
         {
             attemptCount++;
-            _output.WriteLine($"  試行 {attemptCount}");
+            output.WriteLine($"  試行 {attemptCount}");
 
             if (attemptCount < 4) // 4回目で成功
             {
@@ -310,7 +303,7 @@ public class ErrorHandlingTests : IDisposable
         result.Should().Be("Custom policy success");
         attemptCount.Should().Be(4);
 
-        _output.WriteLine($"✅ カスタムポリシーテスト成功");
+        output.WriteLine($"✅ カスタムポリシーテスト成功");
     }
 
     private static string GetProjectRootDirectory()

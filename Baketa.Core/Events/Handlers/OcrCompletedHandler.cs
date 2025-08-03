@@ -26,6 +26,11 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProce
     /// <inheritdoc />
     public async Task HandleAsync(OcrCompletedEvent eventData)
         {
+            // デバッグログ: ハンドラー呼び出し確認
+            Console.WriteLine($"🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}{Environment.NewLine}");
+            
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);
 
@@ -50,20 +55,28 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProce
             
             await _eventAggregator.PublishAsync(successNotificationEvent).ConfigureAwait(false);
             
-            // 各テキスト領域に対して翻訳処理を開始
-            // 実際の実装では、ここで翻訳サービスを呼び出すか、翻訳要求イベントを発行
+            // 各テキスト領域に対して翻訳要求イベントを発行
+            Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト{Environment.NewLine}");
+            
             foreach (var result in eventData.Results)
             {
-                // 実際のオーバーレイ表示処理
-                var overlayEvent = new OverlayUpdateEvent(
-                    text: result.Text,
-                    displayArea: result.Bounds,
-                    originalText: result.Text,
-                    sourceLanguage: "auto");
-                    
-                await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);
+                Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行: '{result.Text}'");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行: '{result.Text}'{Environment.NewLine}");
                 
-                // 翻訳処理のためのフローを別途実装
+                // 翻訳要求イベントを発行
+                var translationRequestEvent = new TranslationRequestEvent(
+                    ocrResult: result,
+                    sourceLanguage: "auto", // 自動検出
+                    targetLanguage: "en");  // デフォルトは英語（設定から取得すべき）
+                    
+                await _eventAggregator.PublishAsync(translationRequestEvent).ConfigureAwait(false);
+                
+                Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行完了: '{result.Text}'");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行完了: '{result.Text}'{Environment.NewLine}");
             }
         }
     }

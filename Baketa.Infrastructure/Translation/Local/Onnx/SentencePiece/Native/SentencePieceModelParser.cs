@@ -80,10 +80,11 @@ public sealed class SentencePieceModelParser(ILogger<SentencePieceModelParser> l
             var trainerSpec = protoModel.TrainerSpec;
             var specialTokens = new NativeSpecialTokens
             {
-                BosId = trainerSpec?.BosId ?? 0,
+                // Helsinki-NLP OPUS-MTでは強制的にBOS=EOS=0を使用
+                BosId = 0, // trainerSpec?.BosId ?? 0 から強制変更
                 UnkId = trainerSpec?.UnkId ?? 1,  
-                EosId = trainerSpec?.EosId ?? 2,
-                PadId = trainerSpec?.PadId ?? 3
+                EosId = 0, // trainerSpec?.EosId ?? 0 から強制変更
+                PadId = trainerSpec?.PadId ?? 60715 // Helsinki-NLP: VocabSize-1
             };
             
             var model = new SentencePieceModel

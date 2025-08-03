@@ -31,6 +31,12 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
             Console.WriteLine($"🚀 イベント発行: {typeof(TEvent).Name} (ID: {eventData.Id})");
             _logger?.LogDebug("🚀 イベント発行: {EventType} (ID: {EventId})", typeof(TEvent).Name, eventData.Id);
             
+            // TranslationWithBoundsCompletedEvent特化デバッグ
+            if (typeof(TEvent).Name == "TranslationWithBoundsCompletedEvent")
+            {
+                Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEvent発行: ID={eventData.Id}");
+            }
+            
             var eventType = typeof(TEvent);
             List<object>? eventProcessors = null;
             
@@ -46,6 +52,21 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
             {
                 Console.WriteLine($"⚠️ イベント {eventType.Name} のプロセッサが登録されていません");
                 _logger?.LogWarning("⚠️ イベント {EventType} のプロセッサが登録されていません", eventType.Name);
+                
+                // TranslationWithBoundsCompletedEvent特化デバッグ
+                if (eventType.Name == "TranslationWithBoundsCompletedEvent")
+                {
+                    Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🎯 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
+                    {
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🎯 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
+                    }
+                }
+                
                 return;
             }
             
@@ -237,6 +258,15 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
                     // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count}){Environment.NewLine}");
                     _logger?.LogInformation("✅ プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
                         processor.GetType().Name, eventType.Name);
+                    
+                    // TranslationWithBoundsCompletedEvent特化デバッグ
+                    if (eventType.Name == "TranslationWithBoundsCompletedEvent")
+                    {
+                        Console.WriteLine($"🎯 [登録確認] TranslationWithBoundsCompletedEvent用プロセッサ登録:");
+                        Console.WriteLine($"🎯 [登録確認]   - プロセッサ型: {processor.GetType().FullName}");
+                        Console.WriteLine($"🎯 [登録確認]   - イベント型: {eventType.FullName}");
+                        Console.WriteLine($"🎯 [登録確認]   - プロセッサハッシュ: {processor.GetHashCode()}");
+                    }
                 }
                 else
                 {
