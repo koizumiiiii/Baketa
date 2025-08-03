@@ -43,18 +43,40 @@ public class TranslationRequestHandler(
         {
             _logger.LogInformation("翻訳要求を処理中: '{Text}' ({SourceLang} → {TargetLang})", 
                 eventData.OcrResult.Text, eventData.SourceLanguage, eventData.TargetLanguage);
+            Console.WriteLine($"🎯 [DEBUG] TranslationRequestHandler.HandleAsync開始 - テキスト: '{eventData.OcrResult.Text}'");
+
+            // 翻訳サービスの状態確認
+            Console.WriteLine($"🔍 [DEBUG] 翻訳サービス: {_translationService?.GetType().Name ?? "null"}");
+            
+            // 利用可能なエンジンを確認
+            var availableEngines = _translationService.GetAvailableEngines();
+            Console.WriteLine($"🔍 [DEBUG] 利用可能エンジン数: {availableEngines.Count}");
+            foreach (var engine in availableEngines)
+            {
+                Console.WriteLine($"🔍 [DEBUG] エンジン: {engine.Name} - Ready: {await engine.IsReadyAsync().ConfigureAwait(false)}");
+            }
+            
+            // アクティブエンジンの確認
+            Console.WriteLine($"🔍 [DEBUG] アクティブエンジン: {_translationService.ActiveEngine?.Name ?? "null"}");
 
             // 翻訳実行
             var sourceLanguage = ParseLanguage(eventData.SourceLanguage);
             var targetLanguage = ParseLanguage(eventData.TargetLanguage);
             
+            Console.WriteLine($"🔍 [DEBUG] 翻訳言語ペア: {sourceLanguage} → {targetLanguage}");
+            Console.WriteLine($"🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し開始");
             
             var translationResponse = await _translationService.TranslateAsync(
                 eventData.OcrResult.Text,
                 sourceLanguage,
                 targetLanguage).ConfigureAwait(false);
 
-            var translatedText = translationResponse.TranslatedText ?? string.Empty;
+            Console.WriteLine($"🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し完了");
+            Console.WriteLine($"🔍 [DEBUG] 翻訳結果: {translationResponse?.TranslatedText ?? "null"}");
+            Console.WriteLine($"🔍 [DEBUG] 翻訳成功: {translationResponse?.IsSuccess ?? false}");
+            Console.WriteLine($"🔍 [DEBUG] エラー情報: {translationResponse?.Error?.Message ?? "なし"}");
+
+            var translatedText = translationResponse?.TranslatedText ?? string.Empty;
             
             
             _logger.LogInformation("翻訳完了: '{Original}' → '{Translated}'", 
@@ -70,13 +92,18 @@ public class TranslationRequestHandler(
                 confidence: 1.0f,
                 engineName: "Translation Service");
 
-
+            _logger.LogInformation("🎯 TranslationWithBoundsCompletedEvent発行開始 - ID: {EventId}", completedEvent.Id);
+            Console.WriteLine($"🎯 [DEBUG] TranslationWithBoundsCompletedEvent発行開始 - ID: {completedEvent.Id}");
             await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
+            _logger.LogInformation("🎯 TranslationWithBoundsCompletedEvent発行完了 - ID: {EventId}", completedEvent.Id);
+            Console.WriteLine($"🎯 [DEBUG] TranslationWithBoundsCompletedEvent発行完了 - ID: {completedEvent.Id}");
             
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳要求処理中にエラーが発生: '{Text}'", eventData.OcrResult.Text);
+            Console.WriteLine($"🔥 [ERROR] TranslationRequestHandler例外発生: {ex.GetType().Name} - {ex.Message}");
+            Console.WriteLine($"🔥 [ERROR] スタックトレース: {ex.StackTrace}");
             
             // 翻訳失敗イベントを発行
             var failedEvent = new TranslationFailedEvent(

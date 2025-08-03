@@ -1,3 +1,4 @@
+using System;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
@@ -6,6 +7,7 @@ using Baketa.Core.Services;
 using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Translation.Local.Onnx;
 using Baketa.Infrastructure.Translation;
+using Baketa.Infrastructure.Translation.Complete;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
@@ -93,8 +95,11 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTranslationServices(IServiceCollection services)
         {
-            // αテスト向けのTranslationServiceExtensionsを使用
-            services.AddTranslationServices();
+            // 翻訳エンジンファクトリーを登録
+            services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();
+            
+            // 翻訳サービスを登録
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
         }
         
         /// <summary>
@@ -107,10 +112,17 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<AlphaOpusMtConfiguration>(provider =>
             {
                 // 実際のアプリケーションでは設定サービスから取得
+                // より安全な絶対パス解決：アプリケーションルートディレクトリを特定
+                var appRoot = AppDomain.CurrentDomain.BaseDirectory;
+                
+                // 開発環境と本番環境で適切にModelsディレクトリを見つける
+                var modelsDirectory = FindModelsDirectory(appRoot);
+                var sentencePieceModelsPath = Path.Combine(modelsDirectory, "SentencePiece");
+                
                 return new AlphaOpusMtConfiguration
                 {
                     IsEnabled = true,
-                    ModelsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Models", "SentencePiece"),
+                    ModelsDirectory = sentencePieceModelsPath,
                     MaxSequenceLength = 256,
                     MemoryLimitMb = 300,
                     ThreadCount = 2
@@ -123,7 +135,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             // αテスト向けOPUS-MT翻訳サービス
             services.AddSingleton<AlphaOpusMtTranslationService>();
             
-            // AlphaOpusMT翻訳エンジンをITranslationEngineとして登録
+            // AlphaOpusMT翻訳エンジンをITranslationEngineとして登録（DefaultTranslationServiceで使用される）
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
             {
                 var factory = provider.GetRequiredService<AlphaOpusMtEngineFactory>();
@@ -140,7 +152,9 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var alphaEngine = factory.CreateJapaneseToEnglishEngine(options, engineLogger);
                 
                 // アダプターでラップして旧インターフェースに適応
-                return new AlphaOpusMtTranslationEngineAdapter(alphaEngine, adapterLogger);
+                var adapter = new AlphaOpusMtTranslationEngineAdapter(alphaEngine, adapterLogger);
+                
+                return adapter;
             });
         }
         
@@ -198,5 +212,44 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             yield return typeof(CoreModule);
             yield return typeof(ObjectPoolModule);
+        }
+        
+        /// <summary>
+        /// Modelsディレクトリを確実に見つけるためのヘルパーメソッド
+        /// 開発環境と本番環境の両方で動作する
+        /// </summary>
+        /// <param name="appRoot">アプリケーションのBaseDirectory</param>
+        /// <returns>Modelsディレクトリの絶対パス</returns>
+        private static string FindModelsDirectory(string appRoot)
+        {
+            // 候補パスのリスト（優先順）
+            var candidatePaths = new[]
+            {
+                // 開発環境：プロジェクトルートのModelsディレクトリ
+                Path.Combine(appRoot, "..", "..", "..", "..", "Models"),
+                Path.Combine(appRoot, "..", "..", "..", "Models"),
+                Path.Combine(appRoot, "..", "..", "Models"),
+                Path.Combine(appRoot, "..", "Models"),
+                
+                // 本番環境：アプリケーションと同じディレクトリ
+                Path.Combine(appRoot, "Models"),
+                
+                // フォールバック：現在のディレクトリ
+                Path.Combine(Directory.GetCurrentDirectory(), "Models")
+            };
+            
+            // 最初に見つかったディレクトリを使用
+            foreach (var path in candidatePaths)
+            {
+                var normalizedPath = Path.GetFullPath(path);
+                if (Directory.Exists(normalizedPath))
+                {
+                    return normalizedPath;
+                }
+            }
+            
+            // どこにも見つからない場合はデフォルト（プロジェクトルート想定）
+            var defaultPath = Path.GetFullPath(Path.Combine(appRoot, "..", "..", "..", "..", "Models"));
+            return defaultPath;
         }
     }

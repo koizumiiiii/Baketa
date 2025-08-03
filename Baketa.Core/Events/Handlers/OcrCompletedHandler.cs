@@ -71,8 +71,21 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProce
                     ocrResult: result,
                     sourceLanguage: "auto", // 自動検出
                     targetLanguage: "en");  // デフォルトは英語（設定から取得すべき）
-                    
-                await _eventAggregator.PublishAsync(translationRequestEvent).ConfigureAwait(false);
+                
+                Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前: '{result.Text}'");
+                try
+                {
+                    await _eventAggregator.PublishAsync(translationRequestEvent).ConfigureAwait(false);
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync成功: '{result.Text}'");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🔥 [ERROR] EventAggregator.PublishAsync例外: {ex.GetType().Name} - {ex.Message}");
+                    Console.WriteLine($"🔥 [ERROR] スタックトレース: {ex.StackTrace}");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] EventAggregator.PublishAsync例外: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+                    throw;
+                }
                 
                 Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行完了: '{result.Text}'");
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 

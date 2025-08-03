@@ -16,8 +16,14 @@ using Baketa.Application.Services.Capture;
 using Baketa.Core.Events.Implementation;
 using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
 using Baketa.Core.Abstractions.Capture;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Services;
 using Baketa.Infrastructure.DI.Modules;
+using Baketa.Infrastructure.DI;
 using Baketa.Application.Services.Events;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -83,11 +89,83 @@ namespace Baketa.Application.DI.Modules;
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
             
-            // 座標ベース翻訳サービス（Scoped：再開始時に新しいインスタンスを生成）
-            services.AddScoped<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+            // 座標ベース翻訳サービス（Singleton：TranslationOrchestrationServiceから参照されるため）
+            services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
+            {
+                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始");
+                
+                // 各依存関係を個別にチェック
+                try
+                {
+                    Console.WriteLine("🔍 [DI_DEBUG] IBatchOcrProcessor取得中...");
+                    var batchOcrProcessor = provider.GetRequiredService<IBatchOcrProcessor>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IBatchOcrProcessor取得成功: {batchOcrProcessor.GetType().Name}");
+                    
+                    Console.WriteLine("🔍 [DI_DEBUG] IInPlaceTranslationOverlayManager取得中...");
+                    var overlayManager = provider.GetRequiredService<IInPlaceTranslationOverlayManager>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IInPlaceTranslationOverlayManager取得成功: {overlayManager.GetType().Name}");
+                    
+                    Console.WriteLine("🔍 [DI_DEBUG] ITranslationService取得中...");
+                    var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
+                    Console.WriteLine($"✅ [DI_DEBUG] ITranslationService取得成功: {translationService.GetType().Name}");
+                    
+                    Console.WriteLine("🔍 [DI_DEBUG] IEventAggregator取得中...");
+                    var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IEventAggregator取得成功: {eventAggregator.GetType().Name}");
+                    
+                    Console.WriteLine("🔍 [DI_DEBUG] ILogger取得中...");
+                    var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
+                    Console.WriteLine($"✅ [DI_DEBUG] ILogger取得成功: {logger?.GetType().Name ?? "null"}");
+                    
+                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始");
+                    var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
+                        batchOcrProcessor,
+                        overlayManager,
+                        translationService,
+                        provider,
+                        eventAggregator,
+                        logger);
+                    Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了");
+                    return instance;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] CoordinateBasedTranslationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    throw;
+                }
+            });
             
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
-            services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
+            services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>(provider =>
+            {
+                Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService Factory開始");
+                
+                try
+                {
+                    var captureService = provider.GetRequiredService<ICaptureService>();
+                    var settingsService = provider.GetRequiredService<ISettingsService>();
+                    var ocrEngine = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+                    var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
+                    var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
+                    
+                    Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入");
+                    var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+                    Console.WriteLine($"✅ [DI_DEBUG] CoordinateBasedTranslationService取得成功: {coordinateBasedTranslation.GetType().Name}");
+                    
+                    return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
+                        captureService,
+                        settingsService,
+                        ocrEngine,
+                        translationEngineFactory,
+                        coordinateBasedTranslation,
+                        logger);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] TranslationOrchestrationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    throw;
+                }
+            });
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
             
@@ -228,6 +306,7 @@ namespace Baketa.Application.DI.Modules;
             yield return typeof(CoreModule);
             yield return typeof(PlatformModule);
             yield return typeof(InfrastructureModule);
+            yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
             yield return typeof(CaptureModule); // キャプチャサービス統合
         }
     }

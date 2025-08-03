@@ -131,14 +131,19 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
 
         try
         {
-            _logger.LogDebug("トークン化開始: 入力長={Length}", text.Length);
+            _logger.LogDebug("トークン化開始: 入力長={Length}, 原文='{Text}'", text.Length, text);
             
-            var tokens = _bpeTokenizer.TokenizeBpe(text.AsSpan());
+            // 前処理でテキストを正規化
+            var normalizedText = NormalizeInputText(text);
+            _logger.LogDebug("テキスト正規化後: '{NormalizedText}'", normalizedText);
+            
+            var tokens = _bpeTokenizer.TokenizeBpe(normalizedText.AsSpan());
             
             // BOS/EOSトークンを追加
             var result = AddSpecialTokens(tokens);
             
-            _logger.LogDebug("トークン化完了: 出力トークン数={Count}", result.Length);
+            _logger.LogDebug("トークン化完了: 出力トークン数={Count}, トークン=[{Tokens}]", 
+                result.Length, string.Join(", ", result));
             
             return result;
         }
@@ -167,9 +172,22 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
         {
             _logger.LogDebug("デコード開始: 入力トークン数={Count}", tokens.Length);
             
-            var result = _bpeTokenizer.Decode(tokens);
+            // 特殊トークンをフィルタリング
+            var filteredTokens = FilterSpecialTokens(tokens);
+            _logger.LogDebug("特殊トークンフィルタリング後: 有効トークン数={Count}", filteredTokens.Length);
             
-            _logger.LogDebug("デコード完了: 出力長={Length}", result.Length);
+            if (filteredTokens.Length == 0)
+            {
+                _logger.LogWarning("特殊トークンフィルタリング後、有効なトークンがありません");
+                return string.Empty;
+            }
+            
+            var result = _bpeTokenizer.Decode(filteredTokens);
+            
+            // 後処理でクリーンアップ
+            result = CleanDecodedText(result);
+            
+            _logger.LogDebug("デコード完了: 出力長={Length}, 結果='{Result}'", result.Length, result);
             
             return result;
         }
@@ -234,6 +252,92 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
         Array.Copy(tokens, 0, result, 1, tokens.Length);
         result[^1] = _model.SpecialTokens.EosId;
         return result;
+    }
+
+    /// <summary>
+    /// 入力テキストの正規化
+    /// </summary>
+    private static string NormalizeInputText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        // 省略記号の正規化
+        text = text.Replace("……", "...");
+        text = text.Replace("。。。", "...");
+        
+        // 全角文字の半角への統一（必要に応じて）
+        text = text.Replace("！", "!");
+        text = text.Replace("？", "?");
+        
+        // 前後の空白を除去
+        text = text.Trim();
+        
+        // 連続する空白を単一の空白に変換
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+        
+        return text;
+    }
+
+    /// <summary>
+    /// 特殊トークンをフィルタリング
+    /// </summary>
+    private int[] FilterSpecialTokens(int[] tokens)
+    {
+        if (!_isInitialized)
+            return tokens;
+
+        var bosId = _model.SpecialTokens.BosId;
+        var eosId = _model.SpecialTokens.EosId;
+        var padId = _model.SpecialTokens.PadId;
+        var unkId = _model.SpecialTokens.UnkId;
+
+        var filteredList = new List<int>();
+        
+        foreach (var token in tokens)
+        {
+            // BOS, EOS, PADトークンは除外
+            if (token == bosId || token == eosId || token == padId)
+            {
+                _logger.LogDebug("特殊トークンをスキップ: {TokenId} ({Type})", 
+                    token, 
+                    token == bosId ? "BOS" : token == eosId ? "EOS" : "PAD");
+                continue;
+            }
+            
+            // UNKトークンは警告付きで含める
+            if (token == unkId)
+            {
+                _logger.LogWarning("UNKトークンが含まれています: {TokenId}", token);
+            }
+            
+            filteredList.Add(token);
+        }
+
+        return filteredList.ToArray();
+    }
+
+    /// <summary>
+    /// デコードされたテキストのクリーンアップ
+    /// </summary>
+    private static string CleanDecodedText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        // 不正な特殊トークン文字列を除去
+        text = text.Replace("</s>", "");
+        text = text.Replace("<s>", "");
+        text = text.Replace("<pad>", "");
+        text = text.Replace("<unk>", "");
+        
+        // 前後の空白文字を除去
+        text = text.Trim();
+        
+        // 連続する空白を単一の空白に変換
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+        
+        return text;
     }
 
     /// <summary>
