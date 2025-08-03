@@ -74,6 +74,49 @@ Before running translation features, download required models:
 .\scripts\run_sentencepiece_tests.ps1
 ```
 
+### Python Environment Setup
+This project includes Python scripts for model testing and debugging. Python execution requires specific environment considerations:
+
+#### Python Environment Requirements
+- **Python Version**: 3.10.x or 3.12.x (managed via pyenv-win)
+- **Environment Manager**: pyenv-win is installed and configured
+- **Shell Environment**: PowerShell or Command Prompt recommended for Python execution
+
+#### Python Execution Guidelines
+**⚠️ CRITICAL**: Python execution in Git Bash has known compatibility issues due to pyenv-win and path handling problems.
+
+**Recommended Execution Methods**:
+```cmd
+# Method 1: PowerShell (Recommended)
+powershell -Command "python script.py"
+
+# Method 2: Command Prompt
+cmd /c "python script.py"
+
+# Method 3: Python Launcher (Most Reliable)
+py script.py
+```
+
+**Known Issues**:
+- Git Bash environment: pyenv shim conflicts and path parsing errors
+- Error: "No global/local python version has been set yet"
+- Path separation issues with Windows paths in POSIX environment
+
+**Environment Setup**:
+```cmd
+# Set global Python version (if needed)
+pyenv global 3.10.9
+
+# Verify Python installation
+py --version
+where python
+```
+
+**For Claude Code Users**:
+- Always use PowerShell for Python script execution
+- Avoid `python` commands in Git Bash environment
+- Use `py` launcher for maximum compatibility
+
 ## Architecture Overview
 
 ### 5-Layer Clean Architecture
