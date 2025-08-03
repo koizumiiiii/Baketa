@@ -35,10 +35,6 @@ public class TranslationRequestHandler(
     /// <inheritdoc />
     public async Task HandleAsync(TranslationRequestEvent eventData)
     {
-        // デバッグログ: ハンドラー呼び出し確認
-        Console.WriteLine($"🚀 [DEBUG] TranslationRequestHandler.HandleAsync 呼び出し開始: '{eventData?.OcrResult?.Text}'");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] TranslationRequestHandler.HandleAsync 呼び出し開始: '{eventData?.OcrResult?.Text}'{Environment.NewLine}");
         
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);
@@ -52,9 +48,6 @@ public class TranslationRequestHandler(
             var sourceLanguage = ParseLanguage(eventData.SourceLanguage);
             var targetLanguage = ParseLanguage(eventData.TargetLanguage);
             
-            Console.WriteLine($"🔤 [DEBUG] 翻訳開始: '{eventData.OcrResult.Text}' ({sourceLanguage} → {targetLanguage})");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [DEBUG] 翻訳開始: '{eventData.OcrResult.Text}' ({sourceLanguage} → {targetLanguage}){Environment.NewLine}");
             
             var translationResponse = await _translationService.TranslateAsync(
                 eventData.OcrResult.Text,
@@ -63,9 +56,6 @@ public class TranslationRequestHandler(
 
             var translatedText = translationResponse.TranslatedText ?? string.Empty;
             
-            Console.WriteLine($"🔤 [DEBUG] 翻訳完了: '{eventData.OcrResult.Text}' → '{translatedText}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [DEBUG] 翻訳完了: '{eventData.OcrResult.Text}' → '{translatedText}'{Environment.NewLine}");
             
             _logger.LogInformation("翻訳完了: '{Original}' → '{Translated}'", 
                 eventData.OcrResult.Text, translatedText);
@@ -80,21 +70,9 @@ public class TranslationRequestHandler(
                 confidence: 1.0f,
                 engineName: "Translation Service");
 
-            Console.WriteLine($"🔥 [DEBUG] TranslationWithBoundsCompletedEvent発行: '{eventData.OcrResult.Text}' → '{translatedText}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] TranslationWithBoundsCompletedEvent発行: '{eventData.OcrResult.Text}' → '{translatedText}'{Environment.NewLine}");
-
-            // EventAggregatorインスタンス詳細をログ出力
-            Console.WriteLine($"🎯 [DI確認] EventAggregator型: {_eventAggregator.GetType().FullName}");
-            Console.WriteLine($"🎯 [DI確認] EventAggregatorハッシュ: {_eventAggregator.GetHashCode()}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DI確認] EventAggregator型: {_eventAggregator.GetType().FullName}, ハッシュ: {_eventAggregator.GetHashCode()}{Environment.NewLine}");
 
             await _eventAggregator.PublishAsync(completedEvent).ConfigureAwait(false);
             
-            Console.WriteLine($"🔥 [DEBUG] TranslationWithBoundsCompletedEvent発行完了: '{eventData.OcrResult.Text}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] TranslationWithBoundsCompletedEvent発行完了: '{eventData.OcrResult.Text}'{Environment.NewLine}");
         }
         catch (Exception ex)
         {

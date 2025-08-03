@@ -127,11 +127,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 return;
             }
 
-            // OCR完了イベントを発行
-            Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行直前: チャンク数={textChunks.Count}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行直前: チャンク数={textChunks.Count}{Environment.NewLine}");
-            await PublishOcrCompletedEventAsync(image, textChunks, stopwatch.Elapsed).ConfigureAwait(false);
+            // OCR完了イベントは既に90行目で発行済み（二重発行バグ修正）
             
             // デバッグ用: 翻訳をスキップしてOCRテキストをそのまま表示
             _logger?.LogDebug("🔧 デバッグモード: OCRテキストをそのまま表示");

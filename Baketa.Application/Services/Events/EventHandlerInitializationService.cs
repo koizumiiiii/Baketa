@@ -32,26 +32,14 @@ public sealed class EventHandlerInitializationService(
     /// <returns>初期化タスク</returns>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("🔥 イベントハンドラー初期化を開始します");
-        Console.WriteLine("🔥 [DEBUG] イベントハンドラー初期化を開始します");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] イベントハンドラー初期化を開始します{Environment.NewLine}");
+        _logger.LogInformation("イベントハンドラー初期化を開始します");
 
         try
         {
             // EventAggregatorの取得
             var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
             _logger.LogInformation("EventAggregator取得成功");
-            Console.WriteLine("🔥 [DEBUG] EventAggregator取得成功");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] EventAggregator取得成功{Environment.NewLine}");
-            
-            // EventAggregatorインスタンス詳細をログ出力
-            Console.WriteLine($"🎯 [DI確認] EventHandlerInit EventAggregator型: {eventAggregator.GetType().FullName}");
-            Console.WriteLine($"🎯 [DI確認] EventHandlerInit EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DI確認] EventHandlerInit EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
-
+    
             // OcrCompletedHandlerの登録
             try
             {
