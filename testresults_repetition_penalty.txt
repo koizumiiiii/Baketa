@@ -1,0 +1,118 @@
+2025/08/03 18:45:07 にビルドを開始しました。
+     1>ノード 1 上のプロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (Restore ターゲット)。
+     1>_GetAllRestoreProjectPathItems:
+         復元対象のプロジェクトを決定しています...
+       Restore:
+         X.509 証明書チェーンの検証では、コード署名のために .NET によって選択された既定の信頼ストアが使用されます。
+         X.509 証明書チェーンの検証では、タイムスタンプに .NET によって選択された既定の信頼ストアが使用されます。
+         アセット ファイルは変更されていません。アセット ファイルの書き込みを省略します。パス: E:\dev\Baketa\Baketa.Core\obj\project.assets.json
+         アセット ファイルは変更されていません。アセット ファイルの書き込みを省略します。パス: E:\dev\Baketa\Baketa.Infrastructure\obj\project.assets.json
+         アセット ファイルは変更されていません。アセット ファイルの書き込みを省略します。パス: E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\obj\project.assets.json
+         E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj を復元しました (49 ミリ秒)。
+         E:\dev\Baketa\Baketa.Core\Baketa.Core.csproj を復元しました (48 ミリ秒)。
+         E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj を復元しました (50 ミリ秒)。
+         
+         使用されている NuGet Config ファイル:
+             C:\Users\suke0\AppData\Roaming\NuGet\NuGet.Config
+             C:\Program Files (x86)\NuGet\Config\Microsoft.VisualStudio.FallbackLocation.config
+             C:\Program Files (x86)\NuGet\Config\Microsoft.VisualStudio.Offline.config
+         
+         使用されているフィード:
+             https://api.nuget.org/v3/index.json
+         復元対象のすべてのプロジェクトは最新です。
+     1>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (Restore ターゲット) のビルドが完了しました。
+   1:7>ノード 2 上のプロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (VSTest ターゲット)。
+     1>BuildProject:
+         ビルドが開始されました。しばらくお待ちください...
+   1:7>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (1:7) は、ノード 2 上に "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (1:8) をビルドしています (既定のターゲット)。
+   1:8>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (1:8) は、ノード 2 上に "E:\dev\Baketa\Baketa.Core\Baketa.Core.csproj" (2:7) をビルドしています (既定のターゲット)。
+     2>GenerateTargetFrameworkMonikerAttribute:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateTargetFrameworkMonikerAttribute" を省略します。
+       CoreGenerateAssemblyInfo:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreGenerateAssemblyInfo" を省略します。
+       _GenerateSourceLinkFile:
+         Source Link ファイル 'obj\Debug\net8.0-windows10.0.19041.0\Baketa.Core.sourcelink.json' は最新です。
+       CoreCompile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreCompile" を省略します。
+       GenerateBuildDependencyFile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateBuildDependencyFile" を省略します。
+       CopyFilesToOutputDirectory:
+         Baketa.Core -> E:\dev\Baketa\Baketa.Core\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Core.dll
+     2>プロジェクト "E:\dev\Baketa\Baketa.Core\Baketa.Core.csproj" (既定のターゲット) のビルドが完了しました。
+   1:8>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (1:8) は、ノード 1 上に "E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj" (3:6) をビルドしています (既定のターゲット)。
+     3>CoreResGen:
+         古いリソースは、それらのソース ファイルに対して存在しません。リソース生成を省略します。
+       GenerateTargetFrameworkMonikerAttribute:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateTargetFrameworkMonikerAttribute" を省略します。
+       CoreGenerateAssemblyInfo:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreGenerateAssemblyInfo" を省略します。
+       _GenerateSourceLinkFile:
+         Source Link ファイル 'obj\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.sourcelink.json' は最新です。
+       CoreCompile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreCompile" を省略します。
+       GenerateBuildDependencyFile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateBuildDependencyFile" を省略します。
+       CopyFilesToOutputDirectory:
+         Baketa.Infrastructure -> E:\dev\Baketa\Baketa.Infrastructure\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.dll
+     3>プロジェクト "E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj" (既定のターゲット) のビルドが完了しました。
+     1>GenerateTargetFrameworkMonikerAttribute:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateTargetFrameworkMonikerAttribute" を省略します。
+       CoreGenerateAssemblyInfo:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreGenerateAssemblyInfo" を省略します。
+       _GenerateSourceLinkFile:
+         Source Link ファイル 'obj\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.Tests.sourcelink.json' は最新です。
+       CoreCompile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "CoreCompile" を省略します。
+       _CopyOutOfDateSourceItemsToOutputDirectory:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "_CopyOutOfDateSourceItemsToOutputDirectory" を省略します。
+       _CopyOutOfDateSourceItemsToOutputDirectoryAlways:
+         "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\OCR\PaddleOCR\TestData\paddleocr-test-settings.json" から "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\bin\Debug\net8.0-windows10.0.19041.0\OCR\PaddleOCR\TestData\paddleocr-test-settings.json" へファイルをコピーしています。
+       GenerateBuildDependencyFile:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateBuildDependencyFile" を省略します。
+       GenerateBuildRuntimeConfigurationFiles:
+       すべての出力ファイルが入力ファイルに対して最新なので、ターゲット "GenerateBuildRuntimeConfigurationFiles" を省略します。
+       CopyFilesToOutputDirectory:
+         Baketa.Infrastructure.Tests -> E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.Tests.dll
+     1>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (既定のターゲット) のビルドが完了しました。
+     1>BuildProject:
+         ビルドが完了しました。
+         
+E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.Tests.dll (.NETCoreApp,Version=v8.0) のテスト実行
+VSTest のバージョン 17.14.0 (x64)
+
+テスト実行を開始しています。お待ちください...
+合計 1 個のテスト ファイルが指定されたパターンと一致しました。
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.6+bf9b858c26 (64-bit .NET 8.0.18)
+[xUnit.net 00:00:00.09]   Discovering: Baketa.Infrastructure.Tests
+[xUnit.net 00:00:00.26]   Discovered:  Baketa.Infrastructure.Tests
+[xUnit.net 00:00:00.27]   Starting:    Baketa.Infrastructure.Tests
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.OpusMtNativeTokenizer[0]
+      Native SentencePiece�g�[�N�i�C�U�[�̍쐬�J�n: E:\dev\Baketa\Models\SentencePiece\opus-mt-ja-en.model
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      SentencePiece���f���t�@�C���̉�͊J�n: E:\dev\Baketa\Models\SentencePiece\opus-mt-ja-en.model
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      SentencePiece���f���t�@�C���̓ǂݍ��݊J�n: E:\dev\Baketa\Models\SentencePiece\opus-mt-ja-en.model
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      Protobuf���f����͊���: ��b��=32000
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      ��b�����\�z����: ��b��=32000
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      SentencePiece���f����͊���: ��b��=32000
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.SentencePieceModelParser[0]
+      SentencePiece���f����͊���: ��b��=32000
+info: Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native.OpusMtNativeTokenizer[0]
+      Native SentencePiece�g�[�N�i�C�U�[�̍쐬����: OPUS-MT Alpha Tokenizer
+[xUnit.net 00:00:02.09]   Finished:    Baketa.Infrastructure.Tests
+  成功 Baketa.Infrastructure.Tests.Translation.SimpleTranslationDebugTest.DebugSimpleTranslation [1 s]
+
+テストの実行に成功しました。
+テストの合計数: 1
+     成功: 1
+合計時間: 2.5537 秒
+     1>プロジェクト "E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj" (VSTest ターゲット) のビルドが完了しました。
+
+ビルドに成功しました。
+    0 個の警告
+    0 エラー
+
+経過時間 00:00:04.91

@@ -37,6 +37,12 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
                 Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEvent発行: ID={eventData.Id}");
             }
             
+            // TranslationRequestEvent特化デバッグ
+            if (typeof(TEvent).Name == "TranslationRequestEvent")
+            {
+                Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEvent発行: ID={eventData.Id}");
+            }
+            
             var eventType = typeof(TEvent);
             List<object>? eventProcessors = null;
             
@@ -63,6 +69,20 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
                         foreach (var kvp in _processors)
                         {
                             Console.WriteLine($"🎯 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
+                    }
+                }
+                
+                // TranslationRequestEvent特化デバッグ
+                if (eventType.Name == "TranslationRequestEvent")
+                {
+                    Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🔥 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
+                    {
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🔥 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
                         }
                     }
                 }

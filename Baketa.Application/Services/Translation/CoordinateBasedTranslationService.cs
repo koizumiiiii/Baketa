@@ -46,6 +46,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger;
         
+        // EventAggregator DI注入詳細デバッグ
+        Console.WriteLine($"🔥 [DI_DEBUG] CoordinateBasedTranslationService初期化");
+        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
+        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
+        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator参照: {eventAggregator}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] CoordinateBasedTranslationService初期化 - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
+        
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
     }
 
@@ -129,20 +137,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
             // OCR完了イベントは既に90行目で発行済み（二重発行バグ修正）
             
-            // デバッグ用: 翻訳をスキップしてOCRテキストをそのまま表示
-            _logger?.LogDebug("🔧 デバッグモード: OCRテキストをそのまま表示");
-            DebugLogUtility.WriteLog($"🔧 デバッグモード: OCRテキストをそのまま表示 - チャンク数: {textChunks.Count}");
+            // 実際の翻訳処理を実行
+            _logger?.LogInformation("🌐 翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
+            DebugLogUtility.WriteLog($"🌐 翻訳処理開始 - チャンク数: {textChunks.Count}");
             
-            foreach (var chunk in textChunks)
-            {
-                // OCRテキストをそのまま翻訳結果として設定（デバッグ用）
-                chunk.TranslatedText = chunk.CombinedText;
-                
-                _logger?.LogDebug("📝 OCRテキスト表示 - ChunkId: {ChunkId}, テキスト: '{Text}'", 
-                    chunk.ChunkId, chunk.CombinedText);
-            }
-            
-            /* 翻訳処理は一時的にコメントアウト
             foreach (var chunk in textChunks)
             {
                 try
@@ -154,6 +152,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         continue;
                     }
                     
+                    // 翻訳サービスの詳細情報をログ出力
+                    var serviceType = _translationService.GetType().Name;
+                    DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
+                    
                     // 実際の翻訳サービスで翻訳実行
                     var translationResult = await _translationService.TranslateAsync(
                         chunk.CombinedText, 
@@ -161,20 +163,24 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         Language.English, 
                         null,
                         cancellationToken).ConfigureAwait(false);
+                    
+                    // 翻訳結果の詳細をログ出力
+                    var engineName = translationResult.EngineName ?? "Unknown";
+                    DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}");
                         
                     chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
                     
                     _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
                         chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
+                    DebugLogUtility.WriteLog($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
                 }
                 catch (Exception ex)
                 {
                     // 翻訳エラー時はフォールバック
                     _logger?.LogWarning(ex, "⚠️ 翻訳エラー - ChunkId: {ChunkId}, フォールバック表示", chunk.ChunkId);
-                    chunk.TranslatedText = $"[翻詳エラー] {chunk.CombinedText}";
+                    chunk.TranslatedText = $"[翻訳エラー] {chunk.CombinedText}";
                 }
             }
-            */
             
             _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
                 textChunks.Count, textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText) && !c.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal)));
@@ -305,24 +311,55 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         
         try
         {
-            var positionedResults = textChunks.SelectMany(chunk => chunk.TextResults);
-            if (positionedResults.Any())
+            Console.WriteLine($"🔥 [DEBUG] SelectMany実行開始 - textChunks.Count={textChunks.Count}");
+            var positionedResults = textChunks.SelectMany(chunk => chunk.TextResults).ToList();
+            Console.WriteLine($"🔥 [DEBUG] SelectMany実行完了 - positionedResults作成成功");
+            Console.WriteLine($"🔥 [DEBUG] TextResults検証: チャンク数={textChunks.Count}, positionedResults数={positionedResults.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] TextResults検証: チャンク数={textChunks.Count}, positionedResults数={positionedResults.Count}{Environment.NewLine}");
+            
+            Console.WriteLine($"🔥 [DEBUG] 条件判定: positionedResults.Count={positionedResults.Count}, 条件結果={positionedResults.Count > 0}");
+            if (positionedResults.Count > 0)
             {
+                Console.WriteLine($"🔥 [DEBUG] OcrResult作成開始 - positionedResults数: {positionedResults.Count}");
+                
                 var ocrResults = positionedResults.Select(posResult => new OcrResult(
                     text: posResult.Text,
                     bounds: posResult.BoundingBox,
                     confidence: posResult.Confidence)).ToList();
                     
+                Console.WriteLine($"🔥 [DEBUG] OcrResult作成完了 - ocrResults数: {ocrResults.Count}");
+                
                 var ocrCompletedEvent = new OcrCompletedEvent(
                     sourceImage: image,
                     results: ocrResults,
                     processingTime: processingTime);
                     
+                Console.WriteLine($"🔥 [DEBUG] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
+                    
                 _logger?.LogDebug("🔥 OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}");
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}{Environment.NewLine}");
-                await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                
+                try
+                {
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前");
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregator型: {_eventAggregator.GetType().FullName}");
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregatorハッシュ: {_eventAggregator.GetHashCode()}");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {_eventAggregator.GetType().FullName}, ハッシュ: {_eventAggregator.GetHashCode()}{Environment.NewLine}");
+                    await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し完了");
+                }
+                catch (Exception publishEx)
+                {
+                    Console.WriteLine($"🔥 [ERROR] EventAggregator.PublishAsync例外: {publishEx.GetType().Name} - {publishEx.Message}");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] EventAggregator.PublishAsync例外: {publishEx.GetType().Name} - {publishEx.Message}{Environment.NewLine}");
+                    throw;
+                }
+                
                 _logger?.LogDebug("🔥 OCR完了イベント発行完了 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}");
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
@@ -331,11 +368,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             else
             {
                 _logger?.LogInformation("📝 OCR結果が0件のため、OCR完了イベントの発行をスキップ");
+                Console.WriteLine($"🔥 [DEBUG] OCR結果が0件のため、OCR完了イベントの発行をスキップ");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR結果が0件のため、OCR完了イベントの発行をスキップ{Environment.NewLine}");
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "OCR完了イベントの発行に失敗しました");
+            Console.WriteLine($"🔥 [ERROR] PublishOcrCompletedEventAsync例外: {ex.GetType().Name} - {ex.Message}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] PublishOcrCompletedEventAsync例外: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
         }
     }
 

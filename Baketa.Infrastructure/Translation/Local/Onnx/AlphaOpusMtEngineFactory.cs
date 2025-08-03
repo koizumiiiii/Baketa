@@ -90,7 +90,7 @@ public class AlphaOpusMtEngineFactory(
         var engineLogger = _loggerFactory.CreateLogger<AlphaOpusMtTranslationEngine>();
         var engine = new AlphaOpusMtTranslationEngine(
             modelPath,
-            tokenizerPath,
+            tokenizerPath, // ソーストークナイザーパス
             languagePair,
             options,
             engineLogger);
@@ -120,12 +120,14 @@ public class AlphaOpusMtEngineFactory(
         var modelPath = GetModelPath(languagePair);
         var tokenizerPath = GetTokenizerPath(languagePair);
 
-        return new AlphaOpusMtTranslationEngine(
+        var engine = new AlphaOpusMtTranslationEngine(
             modelPath,
-            tokenizerPath,
+            tokenizerPath, // ソーストークナイザーパス
             languagePair,
             options,
             logger);
+        
+        return engine;
     }
 
     /// <summary>
@@ -148,7 +150,7 @@ public class AlphaOpusMtEngineFactory(
 
         return new AlphaOpusMtTranslationEngine(
             modelPath,
-            tokenizerPath,
+            tokenizerPath, // ソーストークナイザーパス
             languagePair,
             options,
             logger);
@@ -204,7 +206,9 @@ public class AlphaOpusMtEngineFactory(
     private string GetModelPath(LanguagePair languagePair)
     {
         var modelName = GetModelName(languagePair);
-        return Path.Combine(_configuration.ModelsDirectory, $"{modelName}.onnx");
+        // ONNXファイルはONNXディレクトリに、SentencePieceファイルはSentencePieceディレクトリに分離
+        var onnxDirectory = Path.Combine(Path.GetDirectoryName(_configuration.ModelsDirectory) ?? "", "ONNX");
+        return Path.Combine(onnxDirectory, $"{modelName}.onnx");
     }
 
     /// <summary>
@@ -213,6 +217,7 @@ public class AlphaOpusMtEngineFactory(
     private string GetTokenizerPath(LanguagePair languagePair)
     {
         var modelName = GetModelName(languagePair);
+        // SentencePieceファイルは設定ディレクトリ（SentencePieceディレクトリ）を使用
         return Path.Combine(_configuration.ModelsDirectory, $"{modelName}.model");
     }
 

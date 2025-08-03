@@ -1,3 +1,4 @@
+using Baketa.Core.Events;
 using Baketa.Core.Models.OCR;
 using System;
 

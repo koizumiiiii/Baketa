@@ -32,7 +32,8 @@ public class TranslationWithBoundsCompletedHandler(
     public async Task HandleAsync(TranslationWithBoundsCompletedEvent eventData)
     {
         // デバッグログ: ハンドラー呼び出し確認
-        Console.WriteLine($"🎯 [DEBUG] TranslationWithBoundsCompletedHandler.HandleAsync 呼び出し開始");
+        _logger.LogInformation("🎯 TranslationWithBoundsCompletedHandler.HandleAsync 呼び出し開始 - ID: {EventId}", eventData?.Id);
+        Console.WriteLine($"🎯 [DEBUG] TranslationWithBoundsCompletedHandler.HandleAsync 呼び出し開始 - ID: {eventData?.Id}");
         Console.WriteLine($"🎯 [DEBUG] SourceText: '{eventData?.SourceText}'");
         Console.WriteLine($"🎯 [DEBUG] TranslatedText: '{eventData?.TranslatedText}'");
         Console.WriteLine($"🎯 [DEBUG] Bounds: {eventData?.Bounds}");

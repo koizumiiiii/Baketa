@@ -39,6 +39,14 @@ public sealed class EventHandlerInitializationService(
             // EventAggregatorの取得
             var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
             _logger.LogInformation("EventAggregator取得成功");
+            
+            // EventAggregator DI取得詳細デバッグ
+            Console.WriteLine($"🔥 [DI_DEBUG] EventHandlerInitializationService - EventAggregator取得");
+            Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
+            Console.WriteLine($"🔥 [DI_DEBUG] EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
+            Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator参照: {eventAggregator}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] EventHandlerInitializationService - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
     
             // OcrCompletedHandlerの登録
             try
