@@ -139,6 +139,24 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
                         _logger?.LogInformation("✅ IEventAggregator取得成功: {AggregatorType}", _eventAggregator.GetType().Name);
+                        
+                        // EventHandlerInitializationServiceを取得して実行
+                        Console.WriteLine("🔥 EventHandlerInitializationService実行開始");
+                        var eventHandlerInitService = serviceProvider.GetRequiredService<Baketa.Application.Services.Events.EventHandlerInitializationService>();
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await eventHandlerInitService.InitializeAsync().ConfigureAwait(false);
+                                Console.WriteLine("🔥 EventHandlerInitializationService実行完了");
+                            }
+                            catch (Exception initEx)
+                            {
+                                Console.WriteLine($"🔥 [ERROR] EventHandlerInitializationService実行エラー: {initEx.Message}");
+                                _logger?.LogError(initEx, "EventHandlerInitializationService実行エラー");
+                            }
+                        });
+                        Console.WriteLine("🔥 EventHandlerInitializationService非同期実行開始");
                     }
                     catch (Exception eventAggregatorEx)
                     {

@@ -17,6 +17,7 @@ using Baketa.Core.Events.Implementation;
 using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Infrastructure.DI.Modules;
+using Baketa.Application.Services.Events;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -110,6 +111,9 @@ namespace Baketa.Application.DI.Modules;
             // イベント集約機構の登録
             RegisterEventAggregator(services);
             
+            // イベントハンドラー初期化サービス
+            services.AddSingleton<EventHandlerInitializationService>();
+            
             // キャプチャサービスの登録
             RegisterCaptureServices(services);
             
@@ -137,11 +141,9 @@ namespace Baketa.Application.DI.Modules;
         private static void RegisterEventAggregator(IServiceCollection services)
         {
             // メインのイベント集約機構を登録
-            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, EventAggregatorImpl>();
+            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, Baketa.Core.Events.Implementation.EventAggregator>();
                 
-            // イベントプロセッサー自動登録サービス
-            services.AddSingleton<Baketa.Application.Services.Events.EventProcessorRegistrationService>();
-            services.AddHostedService<Baketa.Application.Services.Events.EventProcessorRegistrationService>();
+            // 既存の自動登録サービスは削除して手動初期化に変更
         }
         
         /// <summary>
@@ -173,6 +175,23 @@ namespace Baketa.Application.DI.Modules;
         {
             // 翻訳モード変更イベントプロセッサー
             services.AddSingleton<Baketa.Application.Events.Processors.TranslationModeChangedEventProcessor>();
+            
+            // OCR完了イベントハンドラー
+            services.AddSingleton<Baketa.Core.Events.Handlers.OcrCompletedHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.OcrCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.OcrCompletedHandler>());
+            
+            // 翻訳要求イベントハンドラー
+            services.AddSingleton<Baketa.Core.Events.Handlers.TranslationRequestHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationRequestEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.TranslationRequestHandler>());
+            
+            // 座標情報付き翻訳完了イベントハンドラー
+            services.AddSingleton<Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler>());
+            
+            // 手動イベントプロセッサー登録サービスは削除（EventHandlerInitializationServiceに置き換え）
             
             // 他のイベントハンドラーの登録
             // 例: services.AddSingleton<CaptureCompletedEventHandler>();

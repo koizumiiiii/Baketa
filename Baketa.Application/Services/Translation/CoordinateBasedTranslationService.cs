@@ -8,8 +8,11 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 
 namespace Baketa.Application.Services.Translation;
@@ -24,6 +27,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ITranslationService _translationService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
     private bool _disposed;
 
@@ -32,23 +36,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         IInPlaceTranslationOverlayManager overlayManager,
         ITranslationService translationService,
         IServiceProvider serviceProvider,
+        IEventAggregator eventAggregator,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger;
         
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
-        
-        // 直接書き込みで初期化ログ
-        try
-        {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] CoordinateBasedTranslationService作成: Hash={this.GetHashCode()}{Environment.NewLine}");
-        }
-        catch { }
     }
 
     /// <summary>
@@ -60,54 +58,36 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         IntPtr windowHandle,
         CancellationToken cancellationToken = default)
     {
-        // 直接書き込みでメソッド開始をログ
-        try
-        {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ProcessWithCoordinateBasedTranslationAsync内部開始（直接書き込み）{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] CoordinateBasedTranslationService状態: _disposed={_disposed}{Environment.NewLine}");
-        }
-        catch { }
-        
         ThrowIfDisposed();
-        
-        try
-        {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳処理開始（直接書き込み） - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}{Environment.NewLine}");
-        }
-        catch { }
         
         try
         {
             _logger?.LogInformation("🎯 座標ベース翻訳処理開始 - 画像: {Width}x{Height}, ウィンドウ: 0x{Handle:X}", 
                 image.Width, image.Height, windowHandle.ToInt64());
             DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理開始 - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}");
+            Console.WriteLine($"🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}{Environment.NewLine}");
 
-            // バッチOCR処理でテキストチャンクを取得
+            // バッチOCR処理でテキストチャンクを取得（処理時間を測定）
             _logger?.LogDebug("📦 バッチOCR処理開始");
             DebugLogUtility.WriteLog("📦 バッチOCR処理開始");
+            Console.WriteLine("📦 [DEBUG] バッチOCR処理開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 [DEBUG] バッチOCR処理開始{Environment.NewLine}");
             
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 バッチOCR処理呼び出し直前（直接書き込み）{Environment.NewLine}");
-            }
-            catch { }
-            
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var textChunks = await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
-                
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 バッチOCR処理完了（直接書き込み）{Environment.NewLine}");
-            }
-            catch { }
+            stopwatch.Stop();
+            var ocrProcessingTime = stopwatch.Elapsed;
             
-            _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}", textChunks.Count);
-            DebugLogUtility.WriteLog($"✅ バッチOCR完了 - チャンク数: {textChunks.Count}");
+            _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
+                textChunks.Count, ocrProcessingTime.TotalMilliseconds);
+            DebugLogUtility.WriteLog($"✅ バッチOCR完了 - チャンク数: {textChunks.Count}, 処理時間: {ocrProcessingTime.TotalMilliseconds}ms");
+            
+            // OCR完了イベントを発行
+            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
@@ -147,6 +127,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 return;
             }
 
+            // OCR完了イベントを発行
+            Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行直前: チャンク数={textChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行直前: チャンク数={textChunks.Count}{Environment.NewLine}");
+            await PublishOcrCompletedEventAsync(image, textChunks, stopwatch.Elapsed).ConfigureAwait(false);
+            
             // デバッグ用: 翻訳をスキップしてOCRテキストをそのまま表示
             _logger?.LogDebug("🔧 デバッグモード: OCRテキストをそのまま表示");
             DebugLogUtility.WriteLog($"🔧 デバッグモード: OCRテキストをそのまま表示 - チャンク数: {textChunks.Count}");
@@ -258,39 +244,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
             DebugLogUtility.WriteLog("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
-            
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎉 座標ベース翻訳処理完了（直接書き込み）{Environment.NewLine}");
-            }
-            catch { }
         }
         catch (TaskCanceledException)
         {
-            // キャンセレーション例外は正常な処理として扱う
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] 座標ベース翻訳処理がキャンセル: 正常終了{Environment.NewLine}");
-            }
-            catch (Exception fileEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"CoordinateBasedTranslationService キャンセルログ書き込みエラー: {fileEx.Message}");
-            }
-            
             _logger?.LogDebug("座標ベース翻訳処理がキャンセルされました");
             return;
         }
         catch (Exception ex)
         {
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 座標ベース翻訳処理エラー（直接書き込み）: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
-            }
-            catch { }
-            
             _logger?.LogError(ex, "❌ 座標ベース翻訳処理でエラーが発生しました");
             throw;
         }
@@ -322,17 +283,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
         catch (TaskCanceledException)
         {
-            // キャンセレーション例外は正常な処理として扱う
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] インプレース翻訳オーバーレイ表示がキャンセル: 正常終了{Environment.NewLine}");
-            }
-            catch (Exception fileEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"CoordinateBasedTranslationService オーバーレイキャンセルログ書き込みエラー: {fileEx.Message}");
-            }
-            
             _logger?.LogDebug("インプレース翻訳オーバーレイ表示がキャンセルされました");
             return;
         }
@@ -342,6 +292,54 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             DebugLogUtility.WriteLog($"❌❌❌ インプレース翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
             DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// OCR完了イベントを発行する
+    /// </summary>
+    /// <param name="image">OCR処理元画像</param>
+    /// <param name="textChunks">OCR結果のテキストチャンク</param>
+    /// <param name="processingTime">OCR処理時間</param>
+    private async Task PublishOcrCompletedEventAsync(IAdvancedImage image, IReadOnlyList<TextChunk> textChunks, TimeSpan processingTime)
+    {
+        Console.WriteLine($"🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={textChunks.Count}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={textChunks.Count}{Environment.NewLine}");
+        
+        try
+        {
+            var positionedResults = textChunks.SelectMany(chunk => chunk.TextResults);
+            if (positionedResults.Any())
+            {
+                var ocrResults = positionedResults.Select(posResult => new OcrResult(
+                    text: posResult.Text,
+                    bounds: posResult.BoundingBox,
+                    confidence: posResult.Confidence)).ToList();
+                    
+                var ocrCompletedEvent = new OcrCompletedEvent(
+                    sourceImage: image,
+                    results: ocrResults,
+                    processingTime: processingTime);
+                    
+                _logger?.LogDebug("🔥 OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
+                Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}{Environment.NewLine}");
+                await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                _logger?.LogDebug("🔥 OCR完了イベント発行完了 - Results: {ResultCount}", ocrResults.Count);
+                Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}{Environment.NewLine}");
+            }
+            else
+            {
+                _logger?.LogInformation("📝 OCR結果が0件のため、OCR完了イベントの発行をスキップ");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "OCR完了イベントの発行に失敗しました");
         }
     }
 
@@ -398,14 +396,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
             _disposed = true;
             _logger?.LogInformation("🧹 CoordinateBasedTranslationService disposed - Hash: {Hash}", this.GetHashCode());
-            
-            // 直接書き込みで破棄ログ
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [DEBUG] CoordinateBasedTranslationService破棄: Hash={this.GetHashCode()}{Environment.NewLine}");
-            }
-            catch { }
         }
         catch (Exception ex)
         {
