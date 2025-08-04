@@ -29,6 +29,15 @@ namespace Baketa.Infrastructure.Translation;
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
+            
+            Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
+            _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
+            
+            foreach (var engine in _availableEngines)
+            {
+                Console.WriteLine($"🔧 [DEBUG] 登録エンジン: {engine.Name} ({engine.GetType().Name})");
+                _logger.LogInformation("登録エンジン: {Name} ({Type})", engine.Name, engine.GetType().Name);
+            }
 
             if (_availableEngines.Count == 0)
             {
@@ -37,6 +46,8 @@ namespace Baketa.Infrastructure.Translation;
 
             // 最初のエンジンをデフォルトのアクティブエンジンとして設定
             ActiveEngine = _availableEngines[0];
+            Console.WriteLine($"🔧 [DEBUG] アクティブエンジン設定: {ActiveEngine.Name} ({ActiveEngine.GetType().Name})");
+            _logger.LogInformation("アクティブエンジン設定: {Name} ({Type})", ActiveEngine.Name, ActiveEngine.GetType().Name);
         }
 
         /// <summary>
@@ -104,9 +115,18 @@ namespace Baketa.Infrastructure.Translation;
             string? context = null,
             CancellationToken cancellationToken = default)
         {
+            Console.WriteLine($"🚀 [DEBUG] DefaultTranslationService.TranslateAsync メソッド開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] DefaultTranslationService.TranslateAsync メソッド開始{Environment.NewLine}");
+            
             ArgumentNullException.ThrowIfNull(text, nameof(text));
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
+
+            Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService.TranslateAsync - テキスト: '{text}', アクティブエンジン: {ActiveEngine.Name}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DEBUG] DefaultTranslationService.TranslateAsync - テキスト: '{text}', アクティブエンジン: {ActiveEngine.Name}{Environment.NewLine}");
+            _logger.LogInformation("翻訳開始 - テキスト: '{Text}', エンジン: {Engine}", text, ActiveEngine.Name);
 
             // TransModelsをそのまま使用
             var request = new TransModels.TranslationRequest
@@ -117,8 +137,19 @@ namespace Baketa.Infrastructure.Translation;
                 Context = context != null ? new TransModels.TranslationContext { DialogueId = context } : null
             };
 
+            Console.WriteLine($"🔧 [DEBUG] ActiveEngine.TranslateAsync呼び出し開始 - エンジン: {ActiveEngine.GetType().Name}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DEBUG] ActiveEngine.TranslateAsync呼び出し開始 - エンジン: {ActiveEngine.GetType().Name}{Environment.NewLine}");
             // 翻訳実行
-            return await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"🔧 [DEBUG] ActiveEngine.TranslateAsync呼び出し完了 - 結果: {result?.TranslatedText ?? "null"}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DEBUG] ActiveEngine.TranslateAsync呼び出し完了 - 結果: {result?.TranslatedText ?? "null"}{Environment.NewLine}");
+            
+            Console.WriteLine($"🚀 [DEBUG] DefaultTranslationService.TranslateAsync メソッド終了");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] DefaultTranslationService.TranslateAsync メソッド終了{Environment.NewLine}");
+            return result;
         }
 
         /// <summary>
