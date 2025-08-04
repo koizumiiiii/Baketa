@@ -35,6 +35,9 @@ public class TranslationRequestHandler(
     /// <inheritdoc />
     public async Task HandleAsync(TranslationRequestEvent eventData)
     {
+        Console.WriteLine($"🎯 [DEBUG] ★★★ TranslationRequestHandler.HandleAsync 呼び出された！ ★★★");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ★★★ TranslationRequestHandler.HandleAsync 呼び出された！ ★★★{Environment.NewLine}");
         
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);
@@ -44,27 +47,111 @@ public class TranslationRequestHandler(
             _logger.LogInformation("翻訳要求を処理中: '{Text}' ({SourceLang} → {TargetLang})", 
                 eventData.OcrResult.Text, eventData.SourceLanguage, eventData.TargetLanguage);
             Console.WriteLine($"🎯 [DEBUG] TranslationRequestHandler.HandleAsync開始 - テキスト: '{eventData.OcrResult.Text}'");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] TranslationRequestHandler.HandleAsync開始 - テキスト: '{eventData.OcrResult.Text}'{Environment.NewLine}");
 
             // 翻訳サービスの状態確認
             Console.WriteLine($"🔍 [DEBUG] 翻訳サービス: {_translationService?.GetType().Name ?? "null"}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 翻訳サービス: {_translationService?.GetType().Name ?? "null"}{Environment.NewLine}");
             
-            // 利用可能なエンジンを確認
-            var availableEngines = _translationService.GetAvailableEngines();
-            Console.WriteLine($"🔍 [DEBUG] 利用可能エンジン数: {availableEngines.Count}");
-            foreach (var engine in availableEngines)
+            if (_translationService == null)
             {
-                Console.WriteLine($"🔍 [DEBUG] エンジン: {engine.Name} - Ready: {await engine.IsReadyAsync().ConfigureAwait(false)}");
+                Console.WriteLine($"🔥 [ERROR] 翻訳サービスがnullです！");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] 翻訳サービスがnullです！{Environment.NewLine}");
+                return;
             }
             
+            // 利用可能なエンジンを確認
+            Console.WriteLine($"🔍 [DEBUG] GetAvailableEngines()呼び出し直前");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] GetAvailableEngines()呼び出し直前{Environment.NewLine}");
+            
+            IReadOnlyList<ITranslationEngine> availableEngines;
+            try
+            {
+                Console.WriteLine($"🔍 [DEBUG] GetAvailableEngines() - 実際の呼び出し開始");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] GetAvailableEngines() - 実際の呼び出し開始{Environment.NewLine}");
+                
+                availableEngines = _translationService.GetAvailableEngines();
+                
+                Console.WriteLine($"🔍 [DEBUG] GetAvailableEngines() - 呼び出し完了: エンジン数={availableEngines.Count}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] GetAvailableEngines() - 呼び出し完了: エンジン数={availableEngines.Count}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🔥 [ERROR] GetAvailableEngines()でエラー: {ex.GetType().Name} - {ex.Message}");
+                Console.WriteLine($"🔥 [ERROR] スタックトレース: {ex.StackTrace}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] GetAvailableEngines()でエラー: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] スタックトレース: {ex.StackTrace}{Environment.NewLine}");
+                throw;
+            }
+            Console.WriteLine($"🔍 [DEBUG] foreach文開始 - エンジン数: {availableEngines.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] foreach文開始 - エンジン数: {availableEngines.Count}{Environment.NewLine}");
+            
+            for (int i = 0; i < availableEngines.Count; i++)
+            {
+                var engine = availableEngines[i];
+                Console.WriteLine($"🔍 [DEBUG] エンジン[{i}]処理開始: {engine?.GetType().Name ?? "null"}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] エンジン[{i}]処理開始: {engine?.GetType().Name ?? "null"}{Environment.NewLine}");
+                
+                try
+                {
+                    Console.WriteLine($"🔍 [DEBUG] エンジン[{i}].IsReadyAsync()呼び出し前");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] エンジン[{i}].IsReadyAsync()呼び出し前{Environment.NewLine}");
+                    
+                    var isReady = await engine.IsReadyAsync().ConfigureAwait(false);
+                    
+                    Console.WriteLine($"🔍 [DEBUG] エンジン[{i}]: {engine.Name} - Ready: {isReady}");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] エンジン[{i}]: {engine.Name} - Ready: {isReady}{Environment.NewLine}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🔥 [ERROR] エンジン[{i}].IsReadyAsync()でエラー: {ex.GetType().Name} - {ex.Message}");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] エンジン[{i}].IsReadyAsync()でエラー: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+                }
+            }
+            
+            Console.WriteLine($"🔍 [DEBUG] foreach文完了");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] foreach文完了{Environment.NewLine}");
+            
             // アクティブエンジンの確認
-            Console.WriteLine($"🔍 [DEBUG] アクティブエンジン: {_translationService.ActiveEngine?.Name ?? "null"}");
+            Console.WriteLine($"🔍 [DEBUG] ActiveEngineアクセス開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] ActiveEngineアクセス開始{Environment.NewLine}");
+            
+            var activeEngine = _translationService.ActiveEngine;
+            
+            Console.WriteLine($"🔍 [DEBUG] ActiveEngineアクセス完了");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] ActiveEngineアクセス完了{Environment.NewLine}");
+            
+            Console.WriteLine($"🔍 [DEBUG] アクティブエンジン: {activeEngine?.Name ?? "null"}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] アクティブエンジン: {activeEngine?.Name ?? "null"}{Environment.NewLine}");
 
             // 翻訳実行
             var sourceLanguage = ParseLanguage(eventData.SourceLanguage);
             var targetLanguage = ParseLanguage(eventData.TargetLanguage);
             
             Console.WriteLine($"🔍 [DEBUG] 翻訳言語ペア: {sourceLanguage} → {targetLanguage}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 翻訳言語ペア: {sourceLanguage} → {targetLanguage}{Environment.NewLine}");
+            
             Console.WriteLine($"🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し開始{Environment.NewLine}");
             
             var translationResponse = await _translationService.TranslateAsync(
                 eventData.OcrResult.Text,
@@ -72,6 +159,8 @@ public class TranslationRequestHandler(
                 targetLanguage).ConfigureAwait(false);
 
             Console.WriteLine($"🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し完了");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 翻訳サービス.TranslateAsync呼び出し完了{Environment.NewLine}");
             Console.WriteLine($"🔍 [DEBUG] 翻訳結果: {translationResponse?.TranslatedText ?? "null"}");
             Console.WriteLine($"🔍 [DEBUG] 翻訳成功: {translationResponse?.IsSuccess ?? false}");
             Console.WriteLine($"🔍 [DEBUG] エラー情報: {translationResponse?.Error?.Message ?? "なし"}");
@@ -125,10 +214,15 @@ public class TranslationRequestHandler(
     /// <returns>Language型</returns>
     private static Language ParseLanguage(string languageString)
     {
-        return languageString?.ToLowerInvariant() switch
+        if (string.IsNullOrEmpty(languageString))
+            return Language.English;
+            
+        var normalizedLang = languageString.ToLowerInvariant();
+        
+        return normalizedLang switch
         {
-            "ja" or "japanese" => Language.Japanese,
-            "en" or "english" => Language.English,
+            "ja" or "japanese" or "ja-jp" => Language.Japanese,
+            "en" or "english" or "en-us" => Language.English,
             "auto" => Language.Japanese, // autoの場合はデフォルトで日本語を想定
             _ => Language.English // デフォルトは英語
         };

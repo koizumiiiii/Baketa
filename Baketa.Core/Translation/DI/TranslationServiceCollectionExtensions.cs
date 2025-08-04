@@ -168,8 +168,8 @@ namespace Baketa.Core.Translation.DI;
             // 基本的なイベント型の登録
             if (options.EnableEvents)
             {
-                // イベントアグリゲーターを登録
-                services.AddSingleton<IEventAggregator, DefaultEventAggregator>();
+                // メインのEventAggregator（Baketa.Core.Events.Implementation.EventAggregator）を使用
+                // 重複するDefaultEventAggregatorの登録は削除して統一
 
                 // イベントハンドラーを登録
                 services.AddTransient<ITranslationEventHandler<TranslationStartedEvent>, LoggingTranslationEventHandler>();
