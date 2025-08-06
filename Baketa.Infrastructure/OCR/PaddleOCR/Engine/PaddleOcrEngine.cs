@@ -636,8 +636,7 @@ public sealed class PaddleOcrEngine(
             
             // 実行中のプロセス名による検出
             var isTestProcess = processName.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
-                               processName.Contains("vstest", StringComparison.OrdinalIgnoreCase) ||
-                               processName.Contains("dotnet", StringComparison.OrdinalIgnoreCase);
+                               processName.Contains("vstest", StringComparison.OrdinalIgnoreCase);
             
             // スタックトレースによるテスト検出（より確実）
             var stackTrace = Environment.StackTrace;
