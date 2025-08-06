@@ -1274,8 +1274,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 var ocrSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 公式推奨値で精度と速度のバランスを取る
-                    RecognitionThreshold = 0.1f // 公式推奨値で誤認識を減らす
+                    DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
+                    RecognitionThreshold = 0.6f // 高信頼度のテキストのみ採用し、ノイズを削減
                 };
                 
                 try
@@ -1297,8 +1297,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 var updatedSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 公式推奨値で精度と速度のバランスを取る
-                    RecognitionThreshold = 0.1f // 公式推奨値で誤認識を減らす
+                    DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
+                    RecognitionThreshold = 0.6f // 高信頼度のテキストのみ採用し、ノイズを削減
                 };
                 
                 try
