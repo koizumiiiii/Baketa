@@ -6,6 +6,7 @@ using Baketa.Core.DI.Modules;
 using Baketa.Core.Services;
 using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Translation.Local.Onnx;
+using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Complete;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,11 +47,11 @@ namespace Baketa.Infrastructure.DI.Modules;
             // OCR関連サービス
             RegisterOcrServices(services);
             
-            // 翻訳サービス
-            RegisterTranslationServices(services);
+            // HuggingFace Transformers OPUS-MT翻訳サービス（高品質版）を先に登録
+            RegisterTransformersOpusMTServices(services);
             
-            // αテスト向けOPUS-MT翻訳サービス
-            RegisterAlphaOpusMTServices(services);
+            // 翻訳サービス（エンジン登録後）
+            RegisterTranslationServices(services);
             
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
@@ -103,59 +104,27 @@ namespace Baketa.Infrastructure.DI.Modules;
         }
         
         /// <summary>
-        /// αテスト向けOPUS-MT翻訳サービスを登録します。
+        /// HuggingFace Transformers OPUS-MT翻訳サービスを登録します。
+        /// 語彙サイズ不整合問題を完全解決した高品質版です。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        private static void RegisterAlphaOpusMTServices(IServiceCollection services)
+        private static void RegisterTransformersOpusMTServices(IServiceCollection services)
         {
-            // αテスト向けOPUS-MT設定
-            services.AddSingleton<AlphaOpusMtConfiguration>(provider =>
+            // 既存のITranslationEngine登録を全て削除して、TransformersOpusMtEngineのみを登録
+            var existingTranslationEngines = services
+                .Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine))
+                .ToList();
+            
+            foreach (var service in existingTranslationEngines)
             {
-                // 実際のアプリケーションでは設定サービスから取得
-                // より安全な絶対パス解決：アプリケーションルートディレクトリを特定
-                var appRoot = AppDomain.CurrentDomain.BaseDirectory;
-                
-                // 開発環境と本番環境で適切にModelsディレクトリを見つける
-                var modelsDirectory = FindModelsDirectory(appRoot);
-                var sentencePieceModelsPath = Path.Combine(modelsDirectory, "SentencePiece");
-                
-                return new AlphaOpusMtConfiguration
-                {
-                    IsEnabled = true,
-                    ModelsDirectory = sentencePieceModelsPath,
-                    MaxSequenceLength = 256,
-                    MemoryLimitMb = 300,
-                    ThreadCount = 2
-                };
-            });
+                services.Remove(service);
+            }
             
-            // αテスト向けOPUS-MT翻訳エンジンファクトリー
-            services.AddSingleton<AlphaOpusMtEngineFactory>();
+            // ⚡ Phase 1.1: TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, TransformersOpusMtEngine>();
             
-            // αテスト向けOPUS-MT翻訳サービス
-            services.AddSingleton<AlphaOpusMtTranslationService>();
-            
-            // AlphaOpusMT翻訳エンジンをITranslationEngineとして登録（DefaultTranslationServiceで使用される）
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
-            {
-                var factory = provider.GetRequiredService<AlphaOpusMtEngineFactory>();
-                var options = new AlphaOpusMtOptions
-                {
-                    MaxSequenceLength = 256,
-                    MemoryLimitMb = 300,
-                    ThreadCount = 2
-                };
-                var engineLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngine>>();
-                var adapterLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngineAdapter>>();
-                
-                // 日英翻訳エンジンを作成（デフォルト）
-                var alphaEngine = factory.CreateJapaneseToEnglishEngine(options, engineLogger);
-                
-                // アダプターでラップして旧インターフェースに適応
-                var adapter = new AlphaOpusMtTranslationEngineAdapter(alphaEngine, adapterLogger);
-                
-                return adapter;
-            });
+            Console.WriteLine($"🔧 TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
+            Console.WriteLine("⚡ Phase 1.1: LRU翻訳キャッシュ（1000エントリ）が組み込まれています");
         }
         
         /// <summary>
@@ -166,6 +135,9 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             // GPUメモリ管理
             services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
+            
+            // パフォーマンス分析サービス
+            services.AddSingleton<IAsyncPerformanceAnalyzer, AsyncPerformanceAnalyzer>();
             
             // 翻訳精度検証システム（デバッグビルドのみ）
             // TODO: 翻訳精度検証システムは将来実装予定

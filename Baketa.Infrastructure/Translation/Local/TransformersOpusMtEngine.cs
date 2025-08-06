@@ -223,7 +223,23 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: '{request.SourceText}'{Environment.NewLine}");
 
+            // 🚨 超詳細境界調査 - コンソール出力とファイル出力を分離
+            Console.WriteLine($"⚡ [BOUNDARY-1] Console.WriteLine実行完了");
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [BOUNDARY-2] File.AppendAllText実行完了{Environment.NewLine}");
+                
+            Console.WriteLine($"⚡ [BOUNDARY-3] TranslateWithPersistentServerAsync呼び出し直前");
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [BOUNDARY-4] メソッド呼び出し直前の最終ログ{Environment.NewLine}");
+
+            // 🚨 メソッド呼び出し境界
             var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, timeoutCts.Token).ConfigureAwait(false);
+
+            Console.WriteLine($"⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了{Environment.NewLine}");
 
             var elapsedTime = DateTime.Now - startTime;
             Console.WriteLine($"⚡ [TRANSLATE_DEBUG] 常駐サーバー結果取得 - Result: {pythonResult != null}, Success: {pythonResult?.Success}, Translation: '{pythonResult?.Translation}', 実行時間: {elapsedTime.TotalMilliseconds:F0}ms");
@@ -322,11 +338,22 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         {
             await _serverLock.WaitAsync().ConfigureAwait(false);
             
+            // 🚨 既存のPythonサーバープロセスを強制終了
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [SERVER_CLEANUP] 既存Pythonプロセス終了開始{Environment.NewLine}");
+            
+            await KillExistingServerProcessesAsync().ConfigureAwait(false);
+            
             // 既にサーバーが実行中かチェック
             if (_serverProcess != null && !_serverProcess.HasExited)
             {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [SERVER_CHECK] 既存サーバープロセス確認中{Environment.NewLine}");
+                
                 if (await CheckServerHealthAsync().ConfigureAwait(false))
                 {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [SERVER_EXISTING] 既存サーバー使用{Environment.NewLine}");
                     _logger.LogInformation("常駐サーバーは既に実行中です");
                     return true;
                 }
@@ -403,45 +430,114 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     {
         try
         {
+            // 🚨 ログ1: メソッド開始
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_1] CheckServerHealthAsyncメソッド開始{Environment.NewLine}");
+            
             Console.WriteLine($"🔍 [HEALTH_CHECK] サーバー接続試行 - {ServerHost}:{ServerPort}");
             
+            // 🚨 ログ2: TcpClient作成前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_2] TcpClient作成前{Environment.NewLine}");
+            
             using var client = new TcpClient();
+            
+            // 🚨 ログ3: ConnectAsync呼び出し前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_3] ConnectAsync呼び出し前{Environment.NewLine}");
+            
             var connectTask = client.ConnectAsync(ServerHost, ServerPort);
             var timeoutTask = Task.Delay(ConnectionTimeoutMs);
             
+            // 🚨 ログ4: Task.WhenAny呼び出し前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_4] Task.WhenAny呼び出し前{Environment.NewLine}");
+            
             if (await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false) == timeoutTask)
             {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏰ [HEALTH_TIMEOUT] 接続タイムアウト発生{Environment.NewLine}");
                 Console.WriteLine($"⏰ [HEALTH_CHECK] 接続タイムアウト（{ConnectionTimeoutMs}ms）");
                 return false; // タイムアウト
             }
             
+            // 🚨 ログ5: WhenAny完了、接続確認前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_5] Task.WhenAny完了、接続状態確認中{Environment.NewLine}");
+            
             if (!client.Connected)
             {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [HEALTH_FAILED] TCP接続失敗{Environment.NewLine}");
                 Console.WriteLine($"❌ [HEALTH_CHECK] 接続失敗 - client.Connected = false");
                 return false;
             }
+            
+            // 🚨 ログ6: TCP接続成功、ストリーム取得前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_6] TCP接続成功、ストリーム取得前{Environment.NewLine}");
             
             Console.WriteLine($"🔗 [HEALTH_CHECK] TCP接続成功 - PING送信中");
             
             var stream = client.GetStream();
             var pingRequest = Encoding.UTF8.GetBytes("PING\n");
+            
+            // 🚨 ログ7: WriteAsync呼び出し前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_7] WriteAsync呼び出し前{Environment.NewLine}");
+            
             await stream.WriteAsync(pingRequest, 0, pingRequest.Length).ConfigureAwait(false);
+            
+            // 🚨 ログ8: WriteAsync完了、ReadAsync準備前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_8] WriteAsync完了、ReadAsync準備中{Environment.NewLine}");
             
             // ⚡ CRITICAL FIX: ReadAsyncにタイムアウトを追加
             var buffer = new byte[1024];
             using var readTimeout = new CancellationTokenSource(ConnectionTimeoutMs);
+            
+            // 🚨 ログ9: ReadAsync呼び出し前 - ⚠️ 最も疑わしい箇所
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨🚨🚨 [HEALTH_9] ReadAsync呼び出し前 - HANG発生箇所の可能性大 🚨🚨🚨{Environment.NewLine}");
+            
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, readTimeout.Token).ConfigureAwait(false);
+            
+            // 🚨 ログ10: ReadAsync完了
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [HEALTH_10] ReadAsync完了 - bytesRead={bytesRead}{Environment.NewLine}");
+            
             var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            
+            // 🔍 レスポンス内容の詳細ログ
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📨 [HEALTH_RESPONSE] 受信内容({bytesRead}バイト): '{response}'{Environment.NewLine}");
+            
+            // 🔍 レスポンス内容をバイト単位で確認
+            var responseBytes = Encoding.UTF8.GetBytes(response);
+            var hexString = Convert.ToHexString(responseBytes);
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [HEALTH_HEX] バイト表現: {hexString}{Environment.NewLine}");
             
             Console.WriteLine($"📨 [HEALTH_CHECK] サーバーレスポンス: '{response.Trim()}'");
             
-            var isAlive = response.Contains("\"status\":\"alive\"");
+            var isAlive = response.Contains("\"status\": \"alive\"") || response.Contains("\"status\":\"alive\"");
+            
+            // 🔍 判定処理の詳細ログ
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [HEALTH_CHECK] Contains('\"status\":\"alive\"'): {isAlive}{Environment.NewLine}");
+            
             Console.WriteLine($"💓 [HEALTH_CHECK] サーバー状態: {(isAlive ? "生存" : "異常")}");
+            
+            // 🚨 ログ11: メソッド正常終了
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [HEALTH_11] CheckServerHealthAsync正常終了 - isAlive={isAlive}{Environment.NewLine}");
             
             return isAlive;
         }
         catch (Exception ex)
         {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [HEALTH_EXCEPTION] ヘルスチェック例外: {ex.Message}{Environment.NewLine}");
             Console.WriteLine($"💥 [HEALTH_CHECK] ヘルスチェック例外: {ex.Message}");
             return false;
         }
@@ -452,18 +548,59 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// </summary>
     private async Task<PersistentTranslationResult?> TranslateWithPersistentServerAsync(string text, CancellationToken cancellationToken = default)
     {
+        // 🚨 最優先ログ - メソッド進入確認
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [METHOD_ENTRY] TranslateWithPersistentServerAsyncメソッドに入りました！🔥🔥🔥{Environment.NewLine}");
+        Console.WriteLine($"🔥🔥🔥 [METHOD_ENTRY] TranslateWithPersistentServerAsyncメソッドに入りました！🔥🔥🔥");
+        
         Console.WriteLine($"⚡ [SERVER_TRANSLATE] 常駐サーバー翻訳開始: '{text}'");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [SERVER_TRANSLATE] 常駐サーバー翻訳開始: '{text}'{Environment.NewLine}");
+        
+        // 🚨 ログ出力前後の境界確認
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [LOGGER_BEFORE] _logger.LogInformation呼び出し直前{Environment.NewLine}");
+        
         _logger.LogInformation("常駐サーバーで翻訳開始: '{Text}'", text);
+        
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [LOGGER_AFTER] _logger.LogInformation呼び出し完了{Environment.NewLine}");
+        
+        // 🚨 DateTime.Now境界確認
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DATETIME_BEFORE] DateTime.Now代入直前{Environment.NewLine}");
         
         var startTime = DateTime.Now;
         
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DATETIME_AFTER] DateTime.Now代入完了{Environment.NewLine}");
+        
         try
         {
+            // 🚨 tryブロック進入確認
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [TRY_ENTRY] tryブロック内に進入しました！{Environment.NewLine}");
+            
             Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-1: キャンセレーション確認");
+            
+            // 🚨 キャンセレーション確認前後のログ
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CANCEL_BEFORE] ThrowIfCancellationRequested呼び出し直前{Environment.NewLine}");
+            
             // キャンセレーション確認
             cancellationToken.ThrowIfCancellationRequested();
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CANCEL_AFTER] ThrowIfCancellationRequested呼び出し完了{Environment.NewLine}");
+            
+            // 🚨 Console.WriteLineの代わりにファイル出力でテスト
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認開始{Environment.NewLine}");
+            
+            // 🚨 CheckServerHealthAsync呼び出し前
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [HEALTH_BEFORE] CheckServerHealthAsync呼び出し直前{Environment.NewLine}");
+            
             // サーバーの健全性確認
             if (!await CheckServerHealthAsync().ConfigureAwait(false))
             {
@@ -838,6 +975,47 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         base.Dispose(disposing);
     }
 
+    /// <summary>
+    /// 既存のPythonサーバープロセスを強制終了
+    /// 🚨 多重起動防止のための堅牢なプロセス管理
+    /// </summary>
+    private async Task KillExistingServerProcessesAsync()
+    {
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [CLEANUP_START] Pythonプロセス終了処理開始{Environment.NewLine}");
+            
+            // PowerShellでPythonプロセスを全て終了
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-Command \"Get-Process -Name 'python' -ErrorAction SilentlyContinue | Stop-Process -Force\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            
+            using var process = new Process { StartInfo = processInfo };
+            process.Start();
+            
+            await process.WaitForExitAsync().ConfigureAwait(false);
+            
+            // 2秒待機してプロセス終了を確実にする
+            await Task.Delay(2000).ConfigureAwait(false);
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [CLEANUP_COMPLETE] Pythonプロセス終了処理完了{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [CLEANUP_ERROR] Pythonプロセス終了エラー: {ex.Message}{Environment.NewLine}");
+            _logger.LogWarning(ex, "既存Pythonプロセス終了中にエラーが発生しました");
+        }
+    }
+    
     /// <summary>
     /// キャッシュキー生成
     /// ⚡ Phase 1.1: 翻訳要求に基づく一意キーの生成
