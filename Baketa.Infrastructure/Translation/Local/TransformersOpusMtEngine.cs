@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -28,6 +29,12 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     private bool _isInitialized;
     private bool _disposed;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
+    
+    // ⚡ Phase 1.1: LRU翻訳キャッシュ（シンプル実装）
+    private readonly ConcurrentDictionary<string, CacheEntry> _translationCache = new();
+    private readonly int _maxCacheSize = 1000;
+    private long _cacheHitCount;
+    private long _cacheMissCount;
     
     // 常駐サーバー設定
     private const string ServerHost = "127.0.0.1";
@@ -177,6 +184,31 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             throw new ArgumentException("このエンジンは日英翻訳のみサポートしています");
         }
 
+        // ⚡ Phase 1.1: キャッシュチェック
+        var cacheKey = GenerateCacheKey(request.SourceText, request.SourceLanguage, request.TargetLanguage);
+        if (TryGetFromCache(cacheKey, out var cachedResponse))
+        {
+            Interlocked.Increment(ref _cacheHitCount);
+            Console.WriteLine($"💨 [CACHE_HIT] キャッシュヒット - テキスト: '{request.SourceText}', 翻訳: '{cachedResponse.TranslatedText}'");
+            _logger.LogInformation("キャッシュヒット - テキスト: '{Text}'", request.SourceText);
+            
+            // RequestIdを新しいリクエスト用に更新
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                TranslatedText = cachedResponse.TranslatedText,
+                SourceText = cachedResponse.SourceText,
+                SourceLanguage = cachedResponse.SourceLanguage,
+                TargetLanguage = cachedResponse.TargetLanguage,
+                ConfidenceScore = cachedResponse.ConfidenceScore,
+                EngineName = cachedResponse.EngineName,
+                IsSuccess = cachedResponse.IsSuccess
+            };
+        }
+        
+        Interlocked.Increment(ref _cacheMissCount);
+        Console.WriteLine($"🔍 [CACHE_MISS] キャッシュミス - 新規翻訳実行: '{request.SourceText}'");
+
         // ⚡ Phase 0 緊急対応: 3秒タイムアウト実装
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(3)); // 3秒でタイムアウト
@@ -213,6 +245,11 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 Console.WriteLine($"⚡ [TRANSLATE_DEBUG] 高速翻訳成功 - TranslatedText: '{response.TranslatedText}' (処理時間: {pythonResult.ProcessingTime:F3}秒)");
                 _logger.LogInformation("高速翻訳成功 - RequestId: {RequestId}, TranslatedText: '{TranslatedText}', ProcessingTime: {ProcessingTime}秒", 
                     response.RequestId, response.TranslatedText, pythonResult.ProcessingTime);
+                
+                // ⚡ Phase 1.1: 成功した翻訳をキャッシュに保存
+                AddToCache(cacheKey, response);
+                Console.WriteLine($"💾 [CACHE_STORE] 翻訳結果をキャッシュに保存 - テキスト: '{request.SourceText}'");
+                
                 return response;
             }
 
@@ -390,8 +427,10 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             var pingRequest = Encoding.UTF8.GetBytes("PING\n");
             await stream.WriteAsync(pingRequest, 0, pingRequest.Length).ConfigureAwait(false);
             
+            // ⚡ CRITICAL FIX: ReadAsyncにタイムアウトを追加
             var buffer = new byte[1024];
-            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            using var readTimeout = new CancellationTokenSource(ConnectionTimeoutMs);
+            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, readTimeout.Token).ConfigureAwait(false);
             var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             
             Console.WriteLine($"📨 [HEALTH_CHECK] サーバーレスポンス: '{response.Trim()}'");
@@ -420,44 +459,67 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         
         try
         {
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-1: キャンセレーション確認");
             // キャンセレーション確認
             cancellationToken.ThrowIfCancellationRequested();
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認開始");
             // サーバーの健全性確認
             if (!await CheckServerHealthAsync().ConfigureAwait(false))
             {
-                Console.WriteLine($"🔄 [SERVER_TRANSLATE] サーバー接続失敗 - 再起動試行");
+                Console.WriteLine($"🔄 [SERVER_TRANSLATE] STEP-3: サーバー接続失敗 - 再起動試行");
                 _logger.LogWarning("サーバーに接続できません。再起動を試行します");
                 
+                Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-4: サーバー再起動実行開始");
                 if (!await StartPersistentServerAsync().ConfigureAwait(false))
                 {
-                    Console.WriteLine($"💥 [SERVER_TRANSLATE] サーバー再起動失敗");
+                    Console.WriteLine($"💥 [SERVER_TRANSLATE] STEP-4: サーバー再起動失敗");
                     return new PersistentTranslationResult { Success = false, Error = "サーバー接続に失敗しました" };
                 }
+                Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-4: サーバー再起動成功");
+            }
+            else
+            {
+                Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認成功");
             }
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-5: TCP接続開始");
             using var client = new TcpClient();
             await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-5: TCP接続成功");
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-6: キャンセレーション再確認");
             // キャンセレーション再確認
             cancellationToken.ThrowIfCancellationRequested();
+            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-6: キャンセレーション確認OK");
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-7: Streamオブジェクト取得");
             var stream = client.GetStream();
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-8: 翻訳リクエスト準備");
             // 翻訳リクエスト送信
             var request = new { text = text };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
+            Console.WriteLine($"📤 [SERVER_TRANSLATE] STEP-8: 送信データ準備完了 - サイズ: {requestBytes.Length} bytes");
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-9: 翻訳リクエスト送信開始");
             await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
+            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-9: 翻訳リクエスト送信完了");
             
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-10: レスポンス受信開始（タイムアウト: {TranslationTimeoutMs}ms）");
             // レスポンス受信（タイムアウト付き）
             using var cts = new CancellationTokenSource(TranslationTimeoutMs);
             var buffer = new byte[4096];
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-10: レスポンス受信完了 - サイズ: {bytesRead} bytes");
+            
+            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-11: JSONデシリアライゼーション開始");
             var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
             
             var response = JsonSerializer.Deserialize<PersistentTranslationResult>(responseJson);
+            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-11: JSONデシリアライゼーション完了");
             
             var processingTime = DateTime.Now - startTime;
             Console.WriteLine($"⚡ [SERVER_TRANSLATE] 翻訳完了 - 処理時間: {processingTime.TotalSeconds:F3}秒, 翻訳: '{response?.Translation}'");
@@ -746,6 +808,9 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         {
             _disposed = true;
             
+            // ⚡ Phase 1.1: 最終キャッシュ統計の表示
+            LogCacheStatistics();
+            
             // 常駐サーバーを停止
             try
             {
@@ -771,6 +836,122 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             _logger.LogInformation("OPUS-MT Transformers翻訳エンジンが破棄されました");
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// キャッシュキー生成
+    /// ⚡ Phase 1.1: 翻訳要求に基づく一意キーの生成
+    /// </summary>
+    private static string GenerateCacheKey(string sourceText, Language sourceLanguage, Language targetLanguage)
+    {
+        // ソーステキストを正規化（空白や改行の違いによる重複を防ぐ）
+        var normalizedText = sourceText.Trim().Replace("\r\n", "\n").Replace("\r", "\n");
+        return $"{sourceLanguage.Code}>{targetLanguage.Code}:{normalizedText}";
+    }
+    
+    /// <summary>
+    /// キャッシュから翻訳結果を取得
+    /// ⚡ Phase 1.1: LRU アクセス時刻更新付き取得
+    /// </summary>
+    private bool TryGetFromCache(string cacheKey, out TranslationResponse response)
+    {
+        if (_translationCache.TryGetValue(cacheKey, out var entry))
+        {
+            // LRU: 最終アクセス時刻を更新
+            entry.LastAccessedAt = DateTime.UtcNow;
+            response = entry.Response;
+            return true;
+        }
+        
+        response = null!;
+        return false;
+    }
+    
+    /// <summary>
+    /// キャッシュに翻訳結果を追加
+    /// ⚡ Phase 1.1: LRU 最大容量管理付き追加
+    /// </summary>
+    private void AddToCache(string cacheKey, TranslationResponse response)
+    {
+        var entry = new CacheEntry(response);
+        _translationCache.TryAdd(cacheKey, entry);
+        
+        // 最大容量を超えた場合、LRU（最も古いアクセス）エントリを削除
+        if (_translationCache.Count > _maxCacheSize)
+        {
+            EvictLeastRecentlyUsed();
+        }
+    }
+    
+    /// <summary>
+    /// LRU エビクション: 最も古いアクセスのエントリを削除
+    /// ⚡ Phase 1.1: メモリ効率維持のための自動削除
+    /// </summary>
+    private void EvictLeastRecentlyUsed()
+    {
+        try
+        {
+            // 最も古いアクセス時刻のエントリを見つける
+            var oldestEntry = _translationCache.Values
+                .OrderBy(entry => entry.LastAccessedAt)
+                .FirstOrDefault();
+            
+            if (oldestEntry != null)
+            {
+                // キーを特定して削除
+                var keyToRemove = _translationCache
+                    .Where(kvp => ReferenceEquals(kvp.Value, oldestEntry))
+                    .Select(kvp => kvp.Key)
+                    .FirstOrDefault();
+                
+                if (keyToRemove != null && _translationCache.TryRemove(keyToRemove, out _))
+                {
+                    Console.WriteLine($"🗑️ [CACHE_EVICT] LRU削除実行 - キー: '{keyToRemove}', 残り: {_translationCache.Count}件");
+                    _logger.LogInformation("LRUキャッシュエビクション - 削除キー: '{Key}', 残りエントリ数: {Count}", 
+                        keyToRemove, _translationCache.Count);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // エビクション失敗は致命的でないため、ログのみ
+            Console.WriteLine($"⚠️ [CACHE_EVICT] LRU削除失敗: {ex.Message}");
+            _logger.LogWarning(ex, "LRUキャッシュエビクション中にエラーが発生しました");
+        }
+    }
+    
+    /// <summary>
+    /// キャッシュ統計情報の表示
+    /// ⚡ Phase 1.1: パフォーマンス分析用統計
+    /// </summary>
+    private void LogCacheStatistics()
+    {
+        var hitCount = _cacheHitCount;
+        var missCount = _cacheMissCount;
+        var totalRequests = hitCount + missCount;
+        var hitRate = totalRequests > 0 ? (double)hitCount / totalRequests * 100 : 0;
+        
+        Console.WriteLine($"📊 [CACHE_STATS] ヒット率: {hitRate:F1}% ({hitCount}/{totalRequests}), エントリ数: {_translationCache.Count}/{_maxCacheSize}");
+        _logger.LogInformation("キャッシュ統計 - ヒット率: {HitRate:F1}% ({HitCount}/{TotalRequests}), エントリ数: {EntryCount}/{MaxSize}",
+            hitRate, hitCount, totalRequests, _translationCache.Count, _maxCacheSize);
+    }
+
+    /// <summary>
+    /// キャッシュエントリ
+    /// ⚡ Phase 1.1: 翻訳結果キャッシュのための軽量実装
+    /// </summary>
+    private sealed class CacheEntry
+    {
+        public TranslationResponse Response { get; }
+        public DateTime CreatedAt { get; }
+        public DateTime LastAccessedAt { get; set; }
+        
+        public CacheEntry(TranslationResponse response)
+        {
+            Response = response;
+            CreatedAt = DateTime.UtcNow;
+            LastAccessedAt = DateTime.UtcNow;
+        }
     }
 
     private class PersistentTranslationResult

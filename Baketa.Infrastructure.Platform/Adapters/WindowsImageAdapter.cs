@@ -375,6 +375,9 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             var nativeImage = _windowsImage.GetNativeImage();
             
             return await Task.Run(() => {
+                var extractTimer = System.Diagnostics.Stopwatch.StartNew();
+                Console.WriteLine($"🔥 [EXTRACT] 画像領域抽出開始 - 座標: ({rectangle.X},{rectangle.Y}), サイズ: {rectangle.Width}x{rectangle.Height}");
+                
                 using var cropBitmap = new Bitmap(rectangle.Width, rectangle.Height);
                 using var g = Graphics.FromImage(cropBitmap);
 
@@ -383,8 +386,19 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                     sysRect, GraphicsUnit.Pixel);
 
                 // 結果画像を作成（クローンを作成して所有権を移転）
-                using Bitmap clonedBitmap = (Bitmap)cropBitmap.Clone();
+                // ⚡ CRITICAL FIX: usingを削除してクローンビットマップの所有権をWindowsImageに移す
+                Bitmap clonedBitmap = (Bitmap)cropBitmap.Clone();
                 var resultWindowsImage = new WindowsImage(clonedBitmap);
+                
+                extractTimer.Stop();
+                Console.WriteLine($"🔥 [EXTRACT] 画像領域抽出完了 - 実行時間: {extractTimer.ElapsedMilliseconds}ms");
+                
+                // ⚠️ 異常な遅延を検出
+                if (extractTimer.ElapsedMilliseconds > 500) // 0.5秒を超える場合は異常
+                {
+                    Console.WriteLine($"🚨 [EXTRACT] 異常な遅延検出！ ExtractRegionAsync(Graphics処理)実行時間: {extractTimer.ElapsedMilliseconds}ms");
+                }
+                
                 return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
             }).ConfigureAwait(false);
         }
