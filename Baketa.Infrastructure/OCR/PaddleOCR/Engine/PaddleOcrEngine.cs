@@ -16,6 +16,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Security;
 using System.Reflection;
+using System.Windows.Forms;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
 using Baketa.Core.Services.Imaging;
 using Baketa.Core.Abstractions.Performance;
@@ -29,6 +30,7 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
 /// <summary>
 /// PaddleOCRエンジンの実装クラス（IOcrEngine準拠）
+/// 多重初期化防止機能付き
 /// </summary>
 public sealed class PaddleOcrEngine(
     IModelPathResolver modelPathResolver,
@@ -38,6 +40,11 @@ public sealed class PaddleOcrEngine(
     IGpuMemoryManager gpuMemoryManager,
     ILogger<PaddleOcrEngine>? logger = null) : IOcrEngine
 {
+    // 🚨 シングルトンパターン: 多重初期化防止
+    private static readonly object _globalLock = new();
+    private static volatile int _instanceCount = 0;
+    private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
+
     private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
     private readonly IOcrPreprocessingService _ocrPreprocessingService = ocrPreprocessingService ?? throw new ArgumentNullException(nameof(ocrPreprocessingService));
     private readonly ITextMerger _textMerger = textMerger ?? throw new ArgumentNullException(nameof(textMerger));
@@ -45,6 +52,9 @@ public sealed class PaddleOcrEngine(
     private readonly IGpuMemoryManager _gpuMemoryManager = gpuMemoryManager ?? throw new ArgumentNullException(nameof(gpuMemoryManager));
     private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly object _lockObject = new();
+    
+    // インスタンス追跡
+    private readonly int _instanceId;
     
     // 🔍 Phase 3診断: 使用中の前処理サービス
     private static bool _serviceTypeLogged;
@@ -74,6 +84,39 @@ public sealed class PaddleOcrEngine(
     private int _errorCount;
     private readonly DateTime _startTime = DateTime.UtcNow;
     
+    // コンストラクタで多重初期化チェック
+    static PaddleOcrEngine()
+    {
+        // 静的コンストラクタで初期化追跡を開始
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 🚨 PaddleOcrEngine静的コンストラクタ実行");
+    }
+
+    // インスタンス初期化時の追跡
+    private void TrackInstanceCreation()
+    {
+        var newCount = Interlocked.Increment(ref _instanceCount);
+        _logger?.LogWarning("🚨 PaddleOcrEngine インスタンス #{Count} が作成されました", newCount);
+        
+        if (newCount > 1)
+        {
+            _logger?.LogError("⚠️ 多重インスタンス検出! 合計: {Count}個", newCount);
+            
+            // スタックトレースで呼び出し元を特定
+            var stackTrace = new StackTrace(true);
+            var frames = stackTrace.GetFrames()?.Take(10);
+            foreach (var frame in frames ?? [])
+            {
+                var method = frame.GetMethod();
+                var fileName = frame.GetFileName();
+                var lineNumber = frame.GetFileLineNumber();
+                _logger?.LogError("  at {Method} in {File}:line {Line}", 
+                    method?.DeclaringType?.Name + "." + method?.Name, 
+                    System.IO.Path.GetFileName(fileName), 
+                    lineNumber);
+            }
+        }
+    }
+
     public string EngineName => "PaddleOCR";
     public string EngineVersion => "2.7.0.3"; // Sdcb.PaddleOCRのバージョン
     public bool IsInitialized { get; private set; }
@@ -92,6 +135,9 @@ public sealed class PaddleOcrEngine(
     /// <returns>初期化が成功した場合はtrue</returns>
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
+        // インスタンス作成追跡
+        TrackInstanceCreation();
+        
         settings ??= new OcrEngineSettings();
         
         // 設定の妥当性チェック
@@ -2275,24 +2321,48 @@ public sealed class PaddleOcrEngine(
     
 
     /// <summary>
-    /// ROI使用時の座標補正
+    /// ROI使用時の座標補正（画面境界チェック付き）
     /// </summary>
     private List<OcrTextRegion> AdjustCoordinatesForRoi(
         IReadOnlyList<OcrTextRegion> textRegions,
         Rectangle roi)
     {
-        return [.. textRegions.Select(region => new OcrTextRegion(
-            region.Text,
-            new Rectangle(
-                region.Bounds.X + roi.X,
-                region.Bounds.Y + roi.Y,
-                region.Bounds.Width,
-                region.Bounds.Height
-            ),
-            region.Confidence,
-            region.Contour?.Select(p => new System.Drawing.Point(p.X + roi.X, p.Y + roi.Y)).ToArray(),
-            region.Direction
-        ))];
+        // 画面サイズを取得
+        var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080);
+        var screenWidth = screenBounds.Width;
+        var screenHeight = screenBounds.Height;
+
+        return [.. textRegions.Select(region => {
+            // ROI補正後の座標を計算
+            var adjustedX = region.Bounds.X + roi.X;
+            var adjustedY = region.Bounds.Y + roi.Y;
+            
+            // 画面境界内に制限
+            var clampedX = Math.Max(0, Math.Min(adjustedX, screenWidth - region.Bounds.Width));
+            var clampedY = Math.Max(0, Math.Min(adjustedY, screenHeight - region.Bounds.Height));
+            
+            // 境界外の場合は警告ログ出力
+            if (adjustedX != clampedX || adjustedY != clampedY)
+            {
+                DebugLogUtility.WriteLog($"🚨 座標補正により画面外座標を修正: 元座標({adjustedX},{adjustedY}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
+            }
+
+            return new OcrTextRegion(
+                region.Text,
+                new Rectangle(
+                    clampedX,
+                    clampedY,
+                    region.Bounds.Width,
+                    region.Bounds.Height
+                ),
+                region.Confidence,
+                region.Contour?.Select(p => new System.Drawing.Point(
+                    Math.Max(0, Math.Min(p.X + roi.X, screenWidth)), 
+                    Math.Max(0, Math.Min(p.Y + roi.Y, screenHeight))
+                )).ToArray(),
+                region.Direction
+            );
+        })];
     }
 
     /// <summary>

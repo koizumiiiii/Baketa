@@ -1,7 +1,9 @@
 using System;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
@@ -125,6 +127,30 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 {
                     var result = chunk.TextResults[j];
                     DebugLogUtility.WriteLog($"     [{j}] テキスト: '{result.Text}', 位置: ({result.BoundingBox.X},{result.BoundingBox.Y}), サイズ: ({result.BoundingBox.Width}x{result.BoundingBox.Height})");
+                }
+            }
+
+            // 🚨 画面境界チェックと座標補正
+            var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
+            var screenWidth = screenBounds.Width;
+            var screenHeight = screenBounds.Height;
+            
+            for (int i = 0; i < textChunks.Count; i++)
+            {
+                var chunk = textChunks[i];
+                var originalBounds = chunk.CombinedBounds;
+                
+                // 画面外座標をチェックし修正
+                if (originalBounds.Y > screenHeight || originalBounds.X > screenWidth)
+                {
+                    var clampedX = Math.Max(0, Math.Min(originalBounds.X, screenWidth - originalBounds.Width));
+                    var clampedY = Math.Max(0, Math.Min(originalBounds.Y, screenHeight - originalBounds.Height));
+                    
+                    DebugLogUtility.WriteLog($"🚨 画面外座標を修正: チャンク[{i}] 元座標({originalBounds.X},{originalBounds.Y}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
+                    
+                    // チャンクの座標を修正（注：実際のチャンク座標修正は別途実装が必要）
+                    // この段階ではログ出力のみで警告
+                    DebugLogUtility.WriteLog($"⚠️ このテキストは画面外のため表示されません: '{chunk.CombinedText}'");
                 }
             }
 

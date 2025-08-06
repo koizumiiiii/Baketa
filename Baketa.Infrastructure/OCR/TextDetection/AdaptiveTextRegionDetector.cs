@@ -263,7 +263,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 var region = new Rectangle(x, y, gridSize, gridSize);
                 var confidence = CalculateEdgeConfidence(image, region, threshold);
                 
-                if (confidence > 0.3) // 閾値以上のエッジ密度
+                if (confidence > 0.2) // 閾値を下げて文字列領域をより広く検出
                 {
                     regions.Add(new OCRTextRegion
                     {
@@ -299,7 +299,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 var luminanceVariance = CalculateLuminanceVariance(image, region);
                 var confidence = Math.Min(1.0, luminanceVariance / 50.0); // 正規化
                 
-                if (confidence > 0.4)
+                if (confidence > 0.25)
                 {
                     regions.Add(new OCRTextRegion
                     {
@@ -428,25 +428,25 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
 
     private void InitializeDefaultParameters()
     {
-        _parameters["AdaptiveSensitivity"] = 0.7;
-        _parameters["AdaptiveMinArea"] = 100;
-        _parameters["MaxRegionsPerImage"] = 50;
-        _parameters["OverlapThreshold"] = 0.3;
-        _parameters["HistoryConfidenceThreshold"] = 0.5;
-        _parameters["TemplateUpdateThreshold"] = 0.8;
-        _parameters["MinTemplateSuccessRate"] = 0.6;
+        _parameters["AdaptiveSensitivity"] = 0.5;
+        _parameters["AdaptiveMinArea"] = 50;
+        _parameters["MaxRegionsPerImage"] = 80;
+        _parameters["OverlapThreshold"] = 0.25;
+        _parameters["HistoryConfidenceThreshold"] = 0.3;
+        _parameters["TemplateUpdateThreshold"] = 0.6;
+        _parameters["MinTemplateSuccessRate"] = 0.4;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Method returns different value types based on parameter")]
     private object GetDefaultParameter(string parameterName) => parameterName switch
     {
-        "AdaptiveSensitivity" => 0.7,
-        "AdaptiveMinArea" => 100,
-        "MaxRegionsPerImage" => 50,
-        "OverlapThreshold" => 0.3,
-        "HistoryConfidenceThreshold" => 0.5,
-        "TemplateUpdateThreshold" => 0.8,
-        "MinTemplateSuccessRate" => 0.6,
+        "AdaptiveSensitivity" => 0.5,
+        "AdaptiveMinArea" => 50,
+        "MaxRegionsPerImage" => 80,
+        "OverlapThreshold" => 0.25,
+        "HistoryConfidenceThreshold" => 0.3,
+        "TemplateUpdateThreshold" => 0.6,
+        "MinTemplateSuccessRate" => 0.4,
         _ => 0.0  // doubleリテラルに統一
     };
 
