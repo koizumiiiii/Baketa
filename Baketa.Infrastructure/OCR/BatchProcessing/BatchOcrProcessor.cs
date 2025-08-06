@@ -314,18 +314,26 @@ public sealed class BatchOcrProcessor(
         try
         {
             var overallTimer = Stopwatch.StartNew();
+            var stageTimer = Stopwatch.StartNew();
+            
+            Console.WriteLine($"🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: {image.Width}x{image.Height}");
             _logger?.LogInformation("⚡ 高性能バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
 
             // ⚡ Phase 0: 新しい並列化アプローチ
-            Console.WriteLine($"🗨️ [PARALLEL-OCR] 並列OCR開始 - 画像サイズ: {image.Width}x{image.Height}");
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-1] 並列OCR開始 - 画像サイズ: {image.Width}x{image.Height}");
             
             // 画像を最適サイズのタイルに分割
             const int optimalTileSize = 512; // GPU処理に最適なサイズ
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-2] タイル分割開始 - 目標サイズ: {optimalTileSize}x{optimalTileSize}");
             var tiles = await SplitImageIntoOptimalTilesAsync(image, optimalTileSize).ConfigureAwait(false);
-            Console.WriteLine($"🗨️ [PARALLEL-OCR] 画像を{tiles.Count}個のタイルに分割");
+            Console.WriteLine($"🔥 [STAGE-2] タイル分割完了 - {stageTimer.ElapsedMilliseconds}ms, {tiles.Count}個のタイル");
             
             // 並列度制御付きOCR実行
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-3] 並列OCR実行開始 - タイル数: {tiles.Count}, 並列度: {Environment.ProcessorCount}");
             using var semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
             var parallelOcrTimer = Stopwatch.StartNew();
             
@@ -375,17 +383,20 @@ public sealed class BatchOcrProcessor(
             }).ToArray();
             
             // 全タイルのOCR完了を待機
+            Console.WriteLine($"🔥 [STAGE-3] 並列OCRタスク待機開始");
             var tileResults = await Task.WhenAll(ocrTasks).ConfigureAwait(false);
             parallelOcrTimer.Stop();
             
-            Console.WriteLine($"🗨️ [PARALLEL-OCR] 並列OCR完了 - 全体時間: {parallelOcrTimer.ElapsedMilliseconds}ms, タイル数: {tileResults.Length}");
+            Console.WriteLine($"🔥 [STAGE-3] 並列OCR完了 - {stageTimer.ElapsedMilliseconds}ms全体時間, タイル数: {tileResults.Length}");
             
             // タイル結果をマージ
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-4] タイル結果マージ開始");
             var mergeTimer = Stopwatch.StartNew();
             var mergedOcrResults = MergeTileResults(tileResults, image.Width, image.Height);
             mergeTimer.Stop();
             
-            Console.WriteLine($"🗨️ [PARALLEL-OCR] マージ完了 - {mergeTimer.ElapsedMilliseconds}ms, 結果領域数: {mergedOcrResults.TextRegions.Count}");
+            Console.WriteLine($"🔥 [STAGE-4] マージ完了 - {stageTimer.ElapsedMilliseconds}ms, 結果領域数: {mergedOcrResults.TextRegions.Count}");
             
             // 段階別タイマー
             var phaseTimers = new Dictionary<string, Stopwatch>
@@ -408,32 +419,37 @@ public sealed class BatchOcrProcessor(
             }
             
             // 3. テキストチャンクのグルーピング
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-5] テキストチャンクのグルーピング開始");
             var groupingTimer = Stopwatch.StartNew();
-            System.Console.WriteLine($"⏱️  [PERF] チャンクグルーピング開始 - {DateTime.Now:HH:mm:ss.fff}");
             var initialTextChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
             groupingTimer.Stop();
             phaseTimers["TextGrouping"] = groupingTimer;
-            System.Console.WriteLine($"⏱️  [PERF] チャンクグルーピング完了 - 時間: {groupingTimer.ElapsedMilliseconds}ms, チャンク数: {initialTextChunks.Count}");
+            Console.WriteLine($"🔥 [STAGE-5] チャンクグルーピング完了 - {stageTimer.ElapsedMilliseconds}ms, チャンク数: {initialTextChunks.Count}");
             
             // 4. 信頼度ベース再処理
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-6] 信頼度ベース再処理開始");
             var reprocessTimer = Stopwatch.StartNew();
-            System.Console.WriteLine($"⏱️  [PERF] 信頼度ベース再処理開始 - {DateTime.Now:HH:mm:ss.fff}");
             var reprocessedChunks = await _confidenceReprocessor.ReprocessLowConfidenceChunksAsync(
                 initialTextChunks, image, cancellationToken).ConfigureAwait(false);
             reprocessTimer.Stop();
             phaseTimers["ConfidenceReprocessing"] = reprocessTimer;
-            System.Console.WriteLine($"⏱️  [PERF] 信頼度ベース再処理完了 - 時間: {reprocessTimer.ElapsedMilliseconds}ms, チャンク数: {reprocessedChunks.Count}");
+            Console.WriteLine($"🔥 [STAGE-6] 信頼度ベース再処理完了 - {stageTimer.ElapsedMilliseconds}ms, チャンク数: {reprocessedChunks.Count}");
             
             // 5. 普遍的誤認識修正 - 一時的に無効化してテスト
+            stageTimer.Restart();
+            Console.WriteLine($"🔥 [STAGE-7] 誤認識修正処理開始（スキップモード）");
             var correctionTimer = Stopwatch.StartNew();
-            System.Console.WriteLine($"⏱️  [PERF] 誤認識修正処理開始 - {DateTime.Now:HH:mm:ss.fff}");
             var textChunks = reprocessedChunks; // 誤認識修正をスキップ
             correctionTimer.Stop();
             phaseTimers["MisrecognitionCorrection"] = correctionTimer;
-            System.Console.WriteLine($"⏱️  [PERF] 誤認識修正処理完了 - 時間: {correctionTimer.ElapsedMilliseconds}ms (スキップ), 最終チャンク数: {textChunks.Count}");
+            Console.WriteLine($"🔥 [STAGE-7] 誤認識修正処理完了 - {stageTimer.ElapsedMilliseconds}ms (スキップ), 最終チャンク数: {textChunks.Count}");
             
             overallTimer.Stop();
             stopwatch.Stop();
+            
+            Console.WriteLine($"🔥 [STAGE-FINAL] ProcessBatchInternalAsync完了 - 総実行時間: {overallTimer.ElapsedMilliseconds}ms");
             
             // パフォーマンスサマリー出力
             System.Console.WriteLine($"\n📊 [PERF-SUMMARY] OCR処理完了 - 全体時間: {overallTimer.ElapsedMilliseconds}ms");
@@ -1553,11 +1569,21 @@ public sealed class BatchOcrProcessor(
                 var width = Math.Min(optimalTileSize, image.Width - startX);
                 var height = Math.Min(optimalTileSize, image.Height - startY);
 
-                // ⚡ 重要修正: ExtractRegionAsyncを使って実際に画像を切り出し
+                // ⚡ 重要修正: タイムアウト監視付きExtractRegionAsync
                 var tileRectangle = new Rectangle(startX, startY, width, height);
-                var croppedImage = await image.ExtractRegionAsync(tileRectangle).ConfigureAwait(false);
+                var extractTimer = Stopwatch.StartNew();
+                Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し開始 - 位置: ({startX},{startY}), サイズ: {width}x{height}");
 
-                Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し完了 - 位置: ({startX},{startY}), サイズ: {width}x{height}");
+                var croppedImage = await image.ExtractRegionAsync(tileRectangle).ConfigureAwait(false);
+                extractTimer.Stop();
+                
+                Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し完了 - 実行時間: {extractTimer.ElapsedMilliseconds}ms");
+                
+                // ⚠️ 異常な遅延を検出してログに記録
+                if (extractTimer.ElapsedMilliseconds > 1000) // 1秒を超える場合は異常
+                {
+                    Console.WriteLine($"🚨 [TILE-{tileIndex}] 異常な遅延検出！ ExtractRegionAsync実行時間: {extractTimer.ElapsedMilliseconds}ms");
+                }
 
                 tiles.Add(new ImageTile
                 {
