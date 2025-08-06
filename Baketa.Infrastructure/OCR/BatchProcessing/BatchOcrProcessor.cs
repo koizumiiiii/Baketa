@@ -242,17 +242,58 @@ public sealed class BatchOcrProcessor(
     {
         ThrowIfDisposed();
         
+        // デバッグ: PerformanceAnalyzerの状態確認（Console + File）
+        var debugMessage1 = $"🔍 [BATCH-DEBUG] _performanceAnalyzer != null: {_performanceAnalyzer != null}";
+        var debugMessage2 = $"🔍 [BATCH-DEBUG] _performanceAnalyzer型: {_performanceAnalyzer?.GetType().Name ?? "null"}";
+        var debugMessage3 = $"🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - {DateTime.Now:HH:mm:ss.fff}";
+        
+        System.Console.WriteLine(debugMessage1);
+        System.Console.WriteLine(debugMessage2);
+        System.Console.WriteLine(debugMessage3);
+        
+        // ファイル出力で確実にログを記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {debugMessage1}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {debugMessage2}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {debugMessage3}{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"🚨 [BATCH-DEBUG] ファイル出力エラー: {ex.Message}");
+        }
+        
         // パフォーマンス分析機能付きで実行
         if (_performanceAnalyzer != null)
         {
-            return await _performanceAnalyzer.MeasureAsync(
-                async ct => await ProcessBatchInternalAsync(image, windowHandle, ct).ConfigureAwait(false),
+            IReadOnlyList<TextChunk> batchResult = [];
+            var measurement = await _performanceAnalyzer.MeasureAsync(
+                async ct => {
+                    batchResult = await ProcessBatchInternalAsync(image, windowHandle, ct).ConfigureAwait(false);
+                    return batchResult;
+                },
                 "BatchOcrProcessor.ProcessBatch",
-                cancellationToken).ConfigureAwait(false) switch
+                cancellationToken).ConfigureAwait(false);
+            
+            var perfMessage = $"📊 BatchOcr パフォーマンス測定完了 - 実行時間: {measurement.ExecutionTime.TotalMilliseconds}ms, 成功: {measurement.IsSuccessful}";
+            _logger?.LogInformation(perfMessage);
+            System.Console.WriteLine($"📊 [BATCH-PERF] {perfMessage}");
+            
+            // ファイル出力でパフォーマンス結果を確実に記録
+            try
             {
-                { IsSuccessful: true } result => await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false),
-                _ => []
-            };
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {perfMessage}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"🚨 [BATCH-PERF] ファイル出力エラー: {ex.Message}");
+            }
+            
+            return measurement.IsSuccessful ? batchResult : [];
         }
         
         return await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
@@ -260,6 +301,7 @@ public sealed class BatchOcrProcessor(
 
     /// <summary>
     /// バッチ処理の内部実装（パフォーマンス測定対象）
+    /// ⚡ Phase 0: OCR真の並列化実装
     /// </summary>
     private async Task<IReadOnlyList<TextChunk>> ProcessBatchInternalAsync(
         IAdvancedImage image, 
@@ -271,46 +313,90 @@ public sealed class BatchOcrProcessor(
         
         try
         {
+            var overallTimer = Stopwatch.StartNew();
             _logger?.LogInformation("⚡ 高性能バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
 
-            // 並列処理可能な独立タスクを並行実行
-            var parallelTasks = new List<Func<CancellationToken, Task<object>>>();
-
-            // 1. 前処理: 画像品質分析
-            async Task<ImageQualityMetrics> qualityTask(CancellationToken ct)
+            // ⚡ Phase 0: 新しい並列化アプローチ
+            Console.WriteLine($"🗨️ [PARALLEL-OCR] 並列OCR開始 - 画像サイズ: {image.Width}x{image.Height}");
+            
+            // 画像を最適サイズのタイルに分割
+            const int optimalTileSize = 512; // GPU処理に最適なサイズ
+            var tiles = await SplitImageIntoOptimalTilesAsync(image, optimalTileSize).ConfigureAwait(false);
+            Console.WriteLine($"🗨️ [PARALLEL-OCR] 画像を{tiles.Count}個のタイルに分割");
+            
+            // 並列度制御付きOCR実行
+            using var semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
+            var parallelOcrTimer = Stopwatch.StartNew();
+            
+            var ocrTasks = tiles.Select(async (tile, index) =>
             {
-                System.Console.WriteLine("🔍 Phase 6デバッグ: AnalyzeImageQualityAsync開始");
-                var result = await AnalyzeImageQualityAsync(image, ct).ConfigureAwait(false);
-                System.Console.WriteLine($"🔍 Phase 6デバッグ: 画像品質分析完了 - スコア={result.QualityScore:F2}");
-                return result;
-            }
-
-            parallelTasks.Add(async ct => await qualityTask(ct).ConfigureAwait(false));
-
-            // パフォーマンス分析機能付きで並列実行
-            ParallelPerformanceMeasurement? parallelMeasurement = null;
-            if (_performanceAnalyzer != null)
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    var tileTimer = Stopwatch.StartNew();
+                    Console.WriteLine($"🔥 [TILE-{index}] OCR開始 - 実際のタイルサイズ: {tile.Image.Width}x{tile.Image.Height}");
+                    
+                    // 各タイルでOCR実行
+                    var result = await _ocrEngine.RecognizeAsync(tile.Image, null, cancellationToken).ConfigureAwait(false);
+                    
+                    tileTimer.Stop();
+                    Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms, 検出領域数: {result.TextRegions?.Count ?? 0}");
+                    
+                    return new TileOcrResult
+                    {
+                        TileIndex = index,
+                        TileOffset = tile.Offset,
+                        Result = result,
+                        ProcessingTime = tileTimer.Elapsed
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "🚨 タイルOCR処理に失敗 - Tile Index: {TileIndex}, Offset: ({X},{Y})", index, tile.Offset.X, tile.Offset.Y);
+                    Console.WriteLine($"🚨 [TILE-{index}] OCR失敗 - エラー: {ex.Message}");
+                    
+                    // エラー時は空の結果を返すことで処理を継続
+                    var dummyImage = new SimpleImageWrapper(tile.Width, tile.Height);
+                    return new TileOcrResult
+                    {
+                        TileIndex = index,
+                        TileOffset = tile.Offset,
+                        Result = new OcrResults([], dummyImage, TimeSpan.Zero, "jpn"),
+                        ProcessingTime = TimeSpan.Zero
+                    };
+                }
+                finally
+                {
+                    semaphore.Release();
+                    // タイル画像のリソース解放
+                    tile.Image?.Dispose();
+                }
+            }).ToArray();
+            
+            // 全タイルのOCR完了を待機
+            var tileResults = await Task.WhenAll(ocrTasks).ConfigureAwait(false);
+            parallelOcrTimer.Stop();
+            
+            Console.WriteLine($"🗨️ [PARALLEL-OCR] 並列OCR完了 - 全体時間: {parallelOcrTimer.ElapsedMilliseconds}ms, タイル数: {tileResults.Length}");
+            
+            // タイル結果をマージ
+            var mergeTimer = Stopwatch.StartNew();
+            var mergedOcrResults = MergeTileResults(tileResults, image.Width, image.Height);
+            mergeTimer.Stop();
+            
+            Console.WriteLine($"🗨️ [PARALLEL-OCR] マージ完了 - {mergeTimer.ElapsedMilliseconds}ms, 結果領域数: {mergedOcrResults.TextRegions.Count}");
+            
+            // 段階別タイマー
+            var phaseTimers = new Dictionary<string, Stopwatch>
             {
-                parallelMeasurement = await _performanceAnalyzer.MeasureParallelAsync(
-                    parallelTasks,
-                    "BatchOcr.PreprocessingPhase",
-                    Environment.ProcessorCount, // CPU数に応じた並列度
-                    cancellationToken).ConfigureAwait(false);
-            }
+                ["ParallelOCR"] = parallelOcrTimer,
+                ["ResultMerge"] = mergeTimer
+            };
 
-            // 結果を取得
-            var qualityMetrics = parallelTasks.Count > 0 && parallelMeasurement?.IndividualMeasurements.Count > 0
-                ? (ImageQualityMetrics)(await qualityTask(cancellationToken).ConfigureAwait(false))
-                : await AnalyzeImageQualityAsync(image, cancellationToken).ConfigureAwait(false);
-            System.Console.WriteLine($"🔍 Phase 6デバッグ: 画像品質分析完了 - スコア={qualityMetrics.QualityScore:F2}, 推奨処理={qualityMetrics.RecommendedProcessing}");
-            _logger?.LogDebug("🔍 画像品質分析完了: スコア={Score:F2}, 推奨処理={ProcessingType}", 
-                qualityMetrics.QualityScore, qualityMetrics.RecommendedProcessing);
-
-            // 2. OCR実行
-            System.Console.WriteLine("🚀 Phase 6デバッグ: ExecuteOcrWithOptimizationsAsync開始");
-            var ocrResults = await ExecuteOcrWithOptimizationsAsync(image, qualityMetrics, cancellationToken).ConfigureAwait(false);
-            System.Console.WriteLine($"🚀 Phase 6デバッグ: OCR実行完了 - 検出領域数={ocrResults.TextRegions.Count}");
+            // ⚡ 旧い逐次処理を並列OCRに置き換え
+            // var ocrResults = await ExecuteOcrWithOptimizationsAsync(image, qualityMetrics, cancellationToken).ConfigureAwait(false);
+            var ocrResults = mergedOcrResults; // 並列OCRの結果を使用
             
             // メモリ解放を促進（連続OCR実行対策）
             if (_totalProcessedCount % 10 == 0) // 10回ごとにGC実行
@@ -322,22 +408,42 @@ public sealed class BatchOcrProcessor(
             }
             
             // 3. テキストチャンクのグルーピング
-            System.Console.WriteLine("📦 Phase 6デバッグ: GroupTextIntoChunksAsync開始");
+            var groupingTimer = Stopwatch.StartNew();
+            System.Console.WriteLine($"⏱️  [PERF] チャンクグルーピング開始 - {DateTime.Now:HH:mm:ss.fff}");
             var initialTextChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
-            System.Console.WriteLine($"📦 Phase 6デバッグ: チャンクグルーピング完了 - チャンク数={initialTextChunks.Count}");
+            groupingTimer.Stop();
+            phaseTimers["TextGrouping"] = groupingTimer;
+            System.Console.WriteLine($"⏱️  [PERF] チャンクグルーピング完了 - 時間: {groupingTimer.ElapsedMilliseconds}ms, チャンク数: {initialTextChunks.Count}");
             
             // 4. 信頼度ベース再処理
-            System.Console.WriteLine("🔄 Phase 6デバッグ: 信頼度ベース再処理開始");
+            var reprocessTimer = Stopwatch.StartNew();
+            System.Console.WriteLine($"⏱️  [PERF] 信頼度ベース再処理開始 - {DateTime.Now:HH:mm:ss.fff}");
             var reprocessedChunks = await _confidenceReprocessor.ReprocessLowConfidenceChunksAsync(
                 initialTextChunks, image, cancellationToken).ConfigureAwait(false);
-            System.Console.WriteLine($"🔄 Phase 6デバッグ: 信頼度ベース再処理完了 - チャンク数={reprocessedChunks.Count}");
+            reprocessTimer.Stop();
+            phaseTimers["ConfidenceReprocessing"] = reprocessTimer;
+            System.Console.WriteLine($"⏱️  [PERF] 信頼度ベース再処理完了 - 時間: {reprocessTimer.ElapsedMilliseconds}ms, チャンク数: {reprocessedChunks.Count}");
             
             // 5. 普遍的誤認識修正 - 一時的に無効化してテスト
-            System.Console.WriteLine("🔧 Phase 6デバッグ: 普遍的誤認識修正を一時無効化");
+            var correctionTimer = Stopwatch.StartNew();
+            System.Console.WriteLine($"⏱️  [PERF] 誤認識修正処理開始 - {DateTime.Now:HH:mm:ss.fff}");
             var textChunks = reprocessedChunks; // 誤認識修正をスキップ
-            System.Console.WriteLine($"🔧 Phase 6デバッグ: 誤認識修正スキップ完了 - 最終チャンク数={textChunks.Count}");
+            correctionTimer.Stop();
+            phaseTimers["MisrecognitionCorrection"] = correctionTimer;
+            System.Console.WriteLine($"⏱️  [PERF] 誤認識修正処理完了 - 時間: {correctionTimer.ElapsedMilliseconds}ms (スキップ), 最終チャンク数: {textChunks.Count}");
             
+            overallTimer.Stop();
             stopwatch.Stop();
+            
+            // パフォーマンスサマリー出力
+            System.Console.WriteLine($"\n📊 [PERF-SUMMARY] OCR処理完了 - 全体時間: {overallTimer.ElapsedMilliseconds}ms");
+            System.Console.WriteLine("🔍 [PERF-BREAKDOWN] 段階別処理時間:");
+            foreach (var phase in phaseTimers)
+            {
+                var percentage = phaseTimers.Values.Count > 0 ? (double)phase.Value.ElapsedMilliseconds / overallTimer.ElapsedMilliseconds * 100 : 0;
+                System.Console.WriteLine($"  • {phase.Key}: {phase.Value.ElapsedMilliseconds}ms ({percentage:F1}%)");
+            }
+            System.Console.WriteLine($"📈 [PERF-SUMMARY] 最終結果: {textChunks.Count}個のテキストチャンク\n");
             
             // 6. パフォーマンス統計更新
             UpdatePerformanceMetrics(processingStartTime, stopwatch.Elapsed, textChunks.Count, true);
@@ -1410,6 +1516,119 @@ public sealed class BatchOcrProcessor(
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
+    /// <summary>
+    /// 画像を最適なタイルサイズに分割
+    /// ⚡ Phase 0: OCR並列化のためのタイル分割ロジック
+    /// </summary>
+    private static async Task<List<ImageTile>> SplitImageIntoOptimalTilesAsync(IAdvancedImage image, int optimalTileSize)
+    {
+        var tiles = new List<ImageTile>();
+        var tileIndex = 0;
+
+        // 画像サイズがタイルサイズより小さい場合はそのまま使用
+        if (image.Width <= optimalTileSize && image.Height <= optimalTileSize)
+        {
+            return [new ImageTile
+            {
+                Image = image,
+                Offset = Point.Empty,
+                Width = image.Width,
+                Height = image.Height,
+                TileIndex = 0
+            }];
+        }
+
+        // X方向とY方向のタイル数を計算
+        var tilesX = (int)Math.Ceiling((double)image.Width / optimalTileSize);
+        var tilesY = (int)Math.Ceiling((double)image.Height / optimalTileSize);
+
+        Console.WriteLine($"🔥 [TILE-SPLIT] 実際の画像分割開始 - 元画像: {image.Width}x{image.Height}, タイル: {tilesX}x{tilesY} = {tilesX * tilesY}個");
+
+        for (var y = 0; y < tilesY; y++)
+        {
+            for (var x = 0; x < tilesX; x++)
+            {
+                var startX = x * optimalTileSize;
+                var startY = y * optimalTileSize;
+                var width = Math.Min(optimalTileSize, image.Width - startX);
+                var height = Math.Min(optimalTileSize, image.Height - startY);
+
+                // ⚡ 重要修正: ExtractRegionAsyncを使って実際に画像を切り出し
+                var tileRectangle = new Rectangle(startX, startY, width, height);
+                var croppedImage = await image.ExtractRegionAsync(tileRectangle).ConfigureAwait(false);
+
+                Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し完了 - 位置: ({startX},{startY}), サイズ: {width}x{height}");
+
+                tiles.Add(new ImageTile
+                {
+                    Image = croppedImage, // 実際に切り出された画像
+                    Offset = new Point(startX, startY),
+                    Width = width,
+                    Height = height,
+                    TileIndex = tileIndex++
+                });
+            }
+        }
+
+        Console.WriteLine($"🔥 [TILE-SPLIT] 画像分割完了 - {tiles.Count}個のタイルを作成");
+        return tiles;
+    }
+
+    /// <summary>
+    /// タイル結果をマージして単一のOCR結果に統合
+    /// ⚡ Phase 0: 並列OCR結果の統合ロジック
+    /// </summary>
+    private static OcrResults MergeTileResults(TileOcrResult[] tileResults, int originalWidth, int originalHeight)
+    {
+        var allTextRegions = new List<OcrTextRegion>();
+        var totalProcessingTime = TimeSpan.Zero;
+        var allConfidences = new List<double>();
+
+        foreach (var tileResult in tileResults.OrderBy(t => t.TileIndex))
+        {
+            totalProcessingTime += tileResult.ProcessingTime;
+
+            // OcrResultsからOcrTextRegionを取得
+            if (tileResult.Result?.TextRegions != null)
+            {
+                foreach (var region in tileResult.Result.TextRegions)
+                {
+                    // タイルオフセットを考慮してテキスト領域の座標を調整
+                    var adjustedRegion = new OcrTextRegion(
+                        region.Text,
+                        new Rectangle(
+                            region.Bounds.X + tileResult.TileOffset.X,
+                            region.Bounds.Y + tileResult.TileOffset.Y,
+                            region.Bounds.Width,
+                            region.Bounds.Height
+                        ),
+                        region.Confidence,
+                        region.Contour,
+                        region.Direction
+                    );
+                    allTextRegions.Add(adjustedRegion);
+
+                    // 信頼度情報を収集
+                    allConfidences.Add(region.Confidence);
+                }
+            }
+        }
+
+        // 統合されたOCR結果を作成
+        // 仮のIImageオブジェクト作成（実装では適切な画像オブジェクトを使用）
+        var dummyImage = new SimpleImageWrapper(originalWidth, originalHeight);
+        
+        return new OcrResults(
+            allTextRegions,
+            dummyImage,
+            totalProcessingTime,
+            "jpn", // 日本語固定
+            null, // regionOfInterest
+            null  // mergedText
+        );
+    }
+
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -1446,4 +1665,64 @@ internal sealed record ProcessingMetric
     public int TextCount { get; init; }
     public bool Success { get; init; }
     public double AverageConfidence { get; init; }
+}
+
+/// <summary>
+/// 画像タイル情報
+/// </summary>
+internal sealed class ImageTile
+{
+    public required IAdvancedImage Image { get; init; }
+    public required Point Offset { get; init; }
+    public required int Width { get; init; }
+    public required int Height { get; init; }
+    public required int TileIndex { get; init; }
+}
+
+/// <summary>
+/// タイルOCR結果
+/// </summary>
+internal sealed class TileOcrResult
+{
+    public required int TileIndex { get; init; }
+    public required Point TileOffset { get; init; }
+    public required OcrResults Result { get; init; }
+    public required TimeSpan ProcessingTime { get; init; }
+}
+
+/// <summary>
+/// 簡易画像ラッパー（OCR結果作成用）
+/// </summary>
+internal sealed class SimpleImageWrapper : IImage
+{
+    public int Width { get; }
+    public int Height { get; }
+    public ImageFormat Format => ImageFormat.Rgba32;
+    
+    public SimpleImageWrapper(int width, int height)
+    {
+        Width = width;
+        Height = height;
+    }
+
+    public IImage Clone()
+    {
+        return new SimpleImageWrapper(Width, Height);
+    }
+
+    public Task<IImage> ResizeAsync(int width, int height)
+    {
+        return Task.FromResult<IImage>(new SimpleImageWrapper(width, height));
+    }
+
+    public Task<byte[]> ToByteArrayAsync()
+    {
+        // 空のバイト配列を返す（実際のOCR処理では使用されない）
+        return Task.FromResult(new byte[Width * Height * 4]); // BGRA32形式
+    }
+
+    public void Dispose()
+    {
+        // 何もしない
+    }
 }
