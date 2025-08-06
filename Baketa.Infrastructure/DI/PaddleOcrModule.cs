@@ -280,11 +280,11 @@ public sealed class PaddleOcrModule : IServiceModule
             string? envValue = Environment.GetEnvironmentVariable("BAKETA_FORCE_PRODUCTION_OCR");
             bool forceProduction = envValue == "true";
             
-            // デバッグ用：環境変数が設定されていない場合は一時的に強制する
+            // 🚨 緊急OCRハング対策：環境変数が設定されていない場合はSafeエンジンを使用
             if (string.IsNullOrEmpty(envValue))
             {
-                Console.WriteLine("⚠️ デバッグ用：環境変数が設定されていないため、一時的に本番OCRエンジンを強制使用");
-                forceProduction = true; // デバッグ用：強制的に本番エンジンを使用
+                Console.WriteLine("🔄 緊急OCRハング対策：環境変数が設定されていないため、SafePaddleOcrEngineを使用");
+                forceProduction = false; // 🚨 緊急対策：ハング防止のため安全エンジンを使用
             }
             Console.WriteLine($"📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '{envValue}' (強制本番モード: {forceProduction})");
             if (forceProduction)
@@ -314,29 +314,24 @@ public sealed class PaddleOcrModule : IServiceModule
             }
         });
         
-        // 後方互換性のため、PaddleOcrEngineも直接登録
+        // 🚀 シングルトン統一: PaddleOcrEngineは常にIOcrEngineと同じインスタンスを返す
         services.AddSingleton<PaddleOcrEngine>(serviceProvider =>
         {
             // IOcrEngineとして登録されているインスタンスを取得
             var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
             
-            // PaddleOcrEngineの場合はそのまま返却、SafeTestPaddleOcrEngineの場合は新規作成
+            // PaddleOcrEngineの場合はそのまま返却（シングルトン保証）
             if (ocrEngine is PaddleOcrEngine paddleEngine)
             {
+                Console.WriteLine("🔗 PaddleOcrEngine: IOcrEngineと同じインスタンスを再利用（多重初期化防止）");
                 return paddleEngine;
             }
-            else
-            {
-                // SafePaddleOcrEngineが使用されている場合は、PaddleOcrEngineの直接取得要求には
-                // 開発環境であることを前提として、元のPaddleOcrEngineではなくSafePaddleOcrEngineを返す
-                var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
-                var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
-                var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
-                var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
-                var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
-            }
+            
+            // SafePaddleOcrEngineが使用されている場合はnullを返す（型安全性を保つ）
+            Console.WriteLine("⚠️ PaddleOcrEngine要求: SafePaddleOcrEngineが使用中のため、PaddleOcrEngineインスタンスは利用不可");
+            // 実際にはSafePaddleOcrEngineなので、PaddleOcrEngineとしてキャストするのは型安全性に問題がある
+            // 代わりに適切なエラーハンドリングまたはnull返却を推奨
+            throw new InvalidOperationException("現在SafePaddleOcrEngineが使用されているため、PaddleOcrEngineインスタンスは利用できません。");
         });
         
         // HttpClient設定（HttpClientFactoryが利用可能な場合）
@@ -378,7 +373,8 @@ public sealed class PaddleOcrModule : IServiceModule
             bool isVisualStudio = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("VSAPPIDDIR"));
             
             // 6. 現在のディレクトリがソース管理下にあるかチェック（開発環境の可能性）
-            bool isSourceControlled = IsUnderSourceControl();
+            // bool isSourceControlled = IsUnderSourceControl(); // 🚨 無効化: ソース管理下でも本番OCRを使用可能に
+            bool isSourceControlled = false; // 🚨 緊急修正: ソース管理環境判定を無効化
             
             bool shouldUseSafeEngine = debuggerAttached || isWslEnvironment || isAlphaTest || 
                                      isDevelopmentAspNet || isDevelopmentDotNet || isVisualStudio || 
