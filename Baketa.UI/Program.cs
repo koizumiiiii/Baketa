@@ -194,6 +194,18 @@ namespace Baketa.UI;
             var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
             applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
             
+            // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール登録
+            Console.WriteLine("🔍 [DEBUG] StagedOcrStrategyModule登録開始...");
+            var stagedOcrModule = new Baketa.Application.DI.Modules.StagedOcrStrategyModule();
+            stagedOcrModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [DEBUG] StagedOcrStrategyModule登録完了！");
+            
+            // 🎯 Gemini推奨Step3: 高度キャッシング戦略モジュール登録
+            Console.WriteLine("🔍 [DEBUG] AdvancedCachingModule登録開始...");
+            var advancedCachingModule = new Baketa.Application.DI.Modules.AdvancedCachingModule();
+            advancedCachingModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [DEBUG] AdvancedCachingModule登録完了！");
+            
             // UIモジュールの登録
             var uiModule = new UIModule();
             uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);

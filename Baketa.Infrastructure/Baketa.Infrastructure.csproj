@@ -18,9 +18,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Protobuf Include="Translation\Local\Onnx\SentencePiece\Proto\sentencepiece_model.proto" 
-				  GrpcServices="None" 
-				  Access="Internal" />
+		<Protobuf Include="Translation\Local\Onnx\SentencePiece\Proto\sentencepiece_model.proto" GrpcServices="None" Access="Internal" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -29,6 +27,7 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
 		
 		<!-- OpenCV Sharp パッケージ - 重要: PaddleOCRで使用 -->
