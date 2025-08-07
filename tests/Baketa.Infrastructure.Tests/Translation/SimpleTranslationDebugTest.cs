@@ -89,9 +89,9 @@ public class SimpleTranslationDebugTest
                 && !response.TranslatedText.Contains("っ たち");
             
             _output.WriteLine($"正常な翻訳かどうか: {isProperTranslation}");
-            _output.WriteLine($"結果の長さ: {response.TranslatedText.Length}");
+            _output.WriteLine($"結果の長さ: {response.TranslatedText?.Length ?? 0}");
             
-            if (response.TranslatedText.Contains("っ たち"))
+            if (response.TranslatedText?.Contains("っ たち") == true)
             {
                 _output.WriteLine("⚠️ 語彙混同による意味不明な出力が検出されました");
             }
@@ -144,7 +144,7 @@ public class TestOutputLogger<T> : ILogger<T>
         _output = output;
     }
 
-    public IDisposable BeginScope<TState>(TState state) => new NoOpDisposable();
+    IDisposable ILogger.BeginScope<TState>(TState state) => new NoOpDisposable();
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
@@ -157,7 +157,7 @@ public class TestOutputLogger<T> : ILogger<T>
         }
     }
 
-    private class NoOpDisposable : IDisposable
+    private sealed class NoOpDisposable : IDisposable
     {
         public void Dispose() { }
     }

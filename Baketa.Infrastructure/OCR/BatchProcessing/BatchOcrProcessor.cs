@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Performance;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -316,6 +317,9 @@ public sealed class BatchOcrProcessor(
             var overallTimer = Stopwatch.StartNew();
             var stageTimer = Stopwatch.StartNew();
             
+            // パフォーマンス測定用の辞書を初期化
+            var phaseTimers = new Dictionary<string, Stopwatch>();
+            
             Console.WriteLine($"🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: {image.Width}x{image.Height}");
             _logger?.LogInformation("⚡ 高性能バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
@@ -328,8 +332,23 @@ public sealed class BatchOcrProcessor(
             const int optimalTileSize = 512; // GPU処理に最適なサイズ
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-2] タイル分割開始 - 目標サイズ: {optimalTileSize}x{optimalTileSize}");
+            
+            using var tileGenerationMeasurement = new Core.Performance.PerformanceMeasurement(
+                Core.Performance.MeasurementType.ImageTileGeneration, 
+                $"タイル分割処理 - 画像:{image.Width}x{image.Height}, 目標サイズ:{optimalTileSize}");
+                
             var tiles = await SplitImageIntoOptimalTilesAsync(image, optimalTileSize).ConfigureAwait(false);
-            Console.WriteLine($"🔥 [STAGE-2] タイル分割完了 - {stageTimer.ElapsedMilliseconds}ms, {tiles.Count}個のタイル");
+            
+            var tileResult = tileGenerationMeasurement.Complete();
+            Console.WriteLine($"🔥 [STAGE-2] タイル分割完了 - {tileResult.Duration.TotalMilliseconds:F1}ms, {tiles.Count}個のタイル");
+            
+            // タイル分割時間を記録
+            var tileStopwatch = new Stopwatch();
+            tileStopwatch.Start();
+            tileStopwatch.Stop();
+            // Elapsedプロパティは読み取り専用なので、ダミータイマーを作成して経過時間を設定
+            var tileElapsedMs = (long)tileResult.Duration.TotalMilliseconds;
+            phaseTimers["タイル分割"] = stageTimer;
             
             // 並列度制御付きOCR実行
             stageTimer.Restart();
@@ -345,11 +364,16 @@ public sealed class BatchOcrProcessor(
                     var tileTimer = Stopwatch.StartNew();
                     Console.WriteLine($"🔥 [TILE-{index}] OCR開始 - 実際のタイルサイズ: {tile.Image.Width}x{tile.Image.Height}");
                     
-                    // 各タイルでOCR実行
+                    // 各タイルでOCR実行（詳細時間測定）
+                    using var ocrEngineExecution = new Core.Performance.PerformanceMeasurement(
+                        Core.Performance.MeasurementType.OcrEngineExecution, 
+                        $"PaddleOCR実行 - Tile{index}, サイズ:{tile.Image.Width}x{tile.Image.Height}");
+                        
                     var result = await _ocrEngine.RecognizeAsync(tile.Image, null, cancellationToken).ConfigureAwait(false);
                     
+                    var ocrEngineResult = ocrEngineExecution.Complete();
                     tileTimer.Stop();
-                    Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms, 検出領域数: {result.TextRegions?.Count ?? 0}");
+                    Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms (エンジン:{ocrEngineResult.Duration.TotalMilliseconds:F1}ms), 検出領域数: {result.TextRegions?.Count ?? 0}");
                     
                     return new TileOcrResult
                     {
@@ -392,18 +416,21 @@ public sealed class BatchOcrProcessor(
             // タイル結果をマージ
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-4] タイル結果マージ開始");
+            
+            using var mergeResultsMeasurement = new Core.Performance.PerformanceMeasurement(
+                Core.Performance.MeasurementType.OcrPostProcessing, 
+                $"タイル結果マージ - タイル数:{tileResults.Length}, 画像:{image.Width}x{image.Height}");
+                
             var mergeTimer = Stopwatch.StartNew();
             var mergedOcrResults = MergeTileResults(tileResults, image.Width, image.Height);
             mergeTimer.Stop();
             
-            Console.WriteLine($"🔥 [STAGE-4] マージ完了 - {stageTimer.ElapsedMilliseconds}ms, 結果領域数: {mergedOcrResults.TextRegions.Count}");
+            var mergeResult = mergeResultsMeasurement.Complete();
+            Console.WriteLine($"🔥 [STAGE-4] マージ完了 - {stageTimer.ElapsedMilliseconds}ms (詳細:{mergeResult.Duration.TotalMilliseconds:F1}ms), 結果領域数: {mergedOcrResults.TextRegions.Count}");
             
-            // 段階別タイマー
-            var phaseTimers = new Dictionary<string, Stopwatch>
-            {
-                ["ParallelOCR"] = parallelOcrTimer,
-                ["ResultMerge"] = mergeTimer
-            };
+            // パフォーマンス測定結果をphaseTimersに追加
+            phaseTimers["ParallelOCR"] = parallelOcrTimer;
+            phaseTimers["ResultMerge"] = mergeTimer;
 
             // ⚡ 旧い逐次処理を並列OCRに置き換え
             // var ocrResults = await ExecuteOcrWithOptimizationsAsync(image, qualityMetrics, cancellationToken).ConfigureAwait(false);

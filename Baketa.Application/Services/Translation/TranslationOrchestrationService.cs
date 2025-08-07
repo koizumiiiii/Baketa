@@ -19,6 +19,7 @@ using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using Baketa.Core.Utilities;
+using Baketa.Core.Performance;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
@@ -1131,20 +1132,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {
-        // 緊急デバッグ: ExecuteTranslationAsync開始確認
-        try
-        {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 ExecuteTranslationAsync開始（直接書き込み）: ID={translationId}, Mode={mode}{Environment.NewLine}");
-        }
-        catch { }
-        
-        DebugLogUtility.WriteLog($"🚀 ExecuteTranslationAsync開始:");
-        DebugLogUtility.WriteLog($"   🆔 翻訳ID: {translationId}");
-        DebugLogUtility.WriteLog($"   📷 画像: {image?.GetType().Name ?? "null"}");
-        DebugLogUtility.WriteLog($"   🎯 モード: {mode}");
-        DebugLogUtility.WriteLog($"   ⏱️ キャンセル要求: {cancellationToken.IsCancellationRequested}");
-        
+        using var overallMeasurement = new PerformanceMeasurement(
+            MeasurementType.OverallProcessing, 
+            $"翻訳実行全体 - ID:{translationId}, Mode:{mode}")
+            .WithAdditionalInfo($"ImageType:{image?.GetType().Name}");
+
         var startTime = DateTime.UtcNow;
         string originalText = string.Empty;
         double ocrConfidence = 0.0;

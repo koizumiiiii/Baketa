@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Extensions;
 using Baketa.Core.Utilities;
+using Baketa.Core.Performance;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;

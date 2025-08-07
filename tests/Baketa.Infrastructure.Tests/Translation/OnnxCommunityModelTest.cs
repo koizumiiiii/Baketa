@@ -136,7 +136,7 @@ public class OnnxCommunityModelTest
                     var hasProblematicPattern = false;
                     foreach (var pattern in problematicPatterns)
                     {
-                        if (translatedText.ToLowerInvariant().Contains(pattern))
+                        if (translatedText?.Contains(pattern, StringComparison.OrdinalIgnoreCase) == true)
                         {
                             _output.WriteLine($"⚠️ 問題のあるパターン検出: '{pattern}'");
                             hasProblematicPattern = true;

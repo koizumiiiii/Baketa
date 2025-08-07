@@ -110,7 +110,7 @@ public class VocabSizeFixValidationTest
             var hasProblematicPattern = false;
             foreach (var pattern in problematicPatterns)
             {
-                if (result.TranslatedText.ToLowerInvariant().Contains(pattern))
+                if (result.TranslatedText?.Contains(pattern, StringComparison.OrdinalIgnoreCase) == true)
                 {
                     _output.WriteLine($"  ❌ 問題パターン検出: '{pattern}'");
                     hasProblematicPattern = true;
@@ -120,8 +120,7 @@ public class VocabSizeFixValidationTest
 
             // 期待されるキーワードの存在確認
             var containsExpectedKeyword = result.TranslatedText
-                .ToLowerInvariant()
-                .Contains(expectedKeyword.ToLowerInvariant());
+                ?.Contains(expectedKeyword, StringComparison.OrdinalIgnoreCase) == true;
 
             if (!hasProblematicPattern && containsExpectedKeyword)
             {
