@@ -164,55 +164,95 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
             // OCR完了イベントは既に90行目で発行済み（二重発行バグ修正）
             
-            // 実際の翻訳処理を実行
-            _logger?.LogInformation("🌐 翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
-            DebugLogUtility.WriteLog($"🌐 翻訳処理開始 - チャンク数: {textChunks.Count}");
+            // 実際の翻訳処理を実行（バッチ処理で高速化）
+            _logger?.LogInformation("🌐 バッチ翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
+            DebugLogUtility.WriteLog($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
             
-            foreach (var chunk in textChunks)
+            // 翻訳サービスの詳細情報をログ出力
+            var serviceType = _translationService.GetType().Name;
+            DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
+            
+            // 🚀 Phase 2: バッチ翻訳の実装
+            // 空でないテキストチャンクを抽出
+            var nonEmptyChunks = textChunks.Where(c => !string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
+            var emptyChunks = textChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
+            
+            // 空のチャンクは翻訳をスキップ
+            foreach (var emptyChunk in emptyChunks)
             {
+                emptyChunk.TranslatedText = "";
+            }
+            
+            if (nonEmptyChunks.Count > 0)
+            {
+                using var batchTranslationMeasurement = new PerformanceMeasurement(
+                    MeasurementType.TranslationProcessing, 
+                    $"バッチ翻訳処理 - {nonEmptyChunks.Count}チャンク")
+                    .WithAdditionalInfo($"Service:{serviceType}");
+                
+                // バッチ翻訳リクエストを作成
+                var batchTexts = nonEmptyChunks.Select(c => c.CombinedText).ToList();
+                
                 try
                 {
-                    // 空のテキストはスキップ
-                    if (string.IsNullOrWhiteSpace(chunk.CombinedText))
-                    {
-                        chunk.TranslatedText = "";
-                        continue;
-                    }
-                    
-                    // 翻訳サービスの詳細情報をログ出力
-                    var serviceType = _translationService.GetType().Name;
-                    DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
-                    
-                    // 実際の翻訳サービスで翻訳実行（詳細時間測定）
-                    using var chunkTranslationMeasurement = new PerformanceMeasurement(
-                        MeasurementType.TranslationProcessing, 
-                        $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
-                        .WithAdditionalInfo($"Service:{serviceType}");
-                        
-                    var translationResult = await _translationService.TranslateAsync(
-                        chunk.CombinedText, 
-                        Language.Japanese, 
-                        Language.English, 
-                        null,
+                    // バッチ翻訳を試行（未実装の場合は個別処理にフォールバック）
+                    var batchResults = await TranslateBatchAsync(
+                        batchTexts,
+                        Language.Japanese,
+                        Language.English,
                         cancellationToken).ConfigureAwait(false);
                     
-                    var chunkResult = chunkTranslationMeasurement.Complete();
+                    // 結果をチャンクに反映
+                    for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
+                    {
+                        nonEmptyChunks[i].TranslatedText = batchResults[i];
+                        DebugLogUtility.WriteLog($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
+                    }
                     
-                    // 翻訳結果の詳細をログ出力
-                    var engineName = translationResult.EngineName ?? "Unknown";
-                    DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
-                        
-                    chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
-                    
-                    _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
-                        chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
-                    DebugLogUtility.WriteLog($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
+                    var batchResult = batchTranslationMeasurement.Complete();
+                    _logger?.LogInformation("✅ バッチ翻訳完了: {Count}チャンク, {Duration}ms", 
+                        nonEmptyChunks.Count, batchResult.Duration.TotalMilliseconds);
                 }
-                catch (Exception ex)
+                catch (NotImplementedException)
                 {
-                    // 翻訳エラー時はフォールバック
-                    _logger?.LogWarning(ex, "⚠️ 翻訳エラー - ChunkId: {ChunkId}, フォールバック表示", chunk.ChunkId);
-                    chunk.TranslatedText = $"[翻訳エラー] {chunk.CombinedText}";
+                    // バッチ翻訳が未実装の場合は個別処理にフォールバック
+                    _logger?.LogWarning("⚠️ バッチ翻訳未実装のため個別処理にフォールバック");
+                    
+                    foreach (var chunk in nonEmptyChunks)
+                    {
+                        try
+                        {
+                            using var chunkTranslationMeasurement = new PerformanceMeasurement(
+                                MeasurementType.TranslationProcessing, 
+                                $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
+                                .WithAdditionalInfo($"Service:{serviceType}");
+                                
+                            var translationResult = await _translationService.TranslateAsync(
+                                chunk.CombinedText, 
+                                Language.Japanese, 
+                                Language.English, 
+                                null,
+                                cancellationToken).ConfigureAwait(false);
+                            
+                            var chunkResult = chunkTranslationMeasurement.Complete();
+                            
+                            // 翻訳結果の詳細をログ出力
+                            var engineName = translationResult.EngineName ?? "Unknown";
+                            DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
+                                
+                            chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
+                            
+                            _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
+                                chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
+                            DebugLogUtility.WriteLog($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
+                        }
+                        catch (Exception ex)
+                        {
+                            // 翻訳エラー時はフォールバック
+                            _logger?.LogWarning(ex, "⚠️ 翻訳エラー - ChunkId: {ChunkId}, フォールバック表示", chunk.ChunkId);
+                            chunk.TranslatedText = $"[翻訳エラー] {chunk.CombinedText}";
+                        }
+                    }
                 }
             }
             
@@ -300,6 +340,47 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
     }
 
+    /// <summary>
+    /// バッチ翻訳を実行
+    /// </summary>
+    private async Task<List<string>> TranslateBatchAsync(
+        List<string> texts,
+        Language sourceLanguage,
+        Language targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        // まず、ITranslationServiceがバッチ翻訳をサポートしているか確認
+        if (_translationService is ITranslationServiceWithBatch batchService)
+        {
+            // バッチ翻訳をサポートしている場合は直接実行
+            return await batchService.TranslateBatchAsync(
+                texts, sourceLanguage, targetLanguage, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        
+        // バッチ翻訳をサポートしていない場合は個別処理（並列処理はタイムアウトの原因）
+        var results = new List<string>();
+        foreach (var text in texts)
+        {
+            try
+            {
+                var result = await _translationService.TranslateAsync(
+                    text, sourceLanguage, targetLanguage, null, cancellationToken)
+                    .ConfigureAwait(false);
+                results.Add(result.TranslatedText ?? string.Empty);
+            }
+            catch (TaskCanceledException)
+            {
+                results.Add("[Translation Timeout]");
+            }
+            catch (Exception)
+            {
+                results.Add("[Translation Error]");
+            }
+        }
+        return results;
+    }
+    
     /// <summary>
     /// インプレース翻訳オーバーレイ表示
     /// </summary>
