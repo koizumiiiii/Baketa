@@ -13,6 +13,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
+using Baketa.Core.Performance;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
@@ -79,25 +80,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}{Environment.NewLine}");
 
-            // バッチOCR処理でテキストチャンクを取得（処理時間を測定）
-            _logger?.LogDebug("📦 バッチOCR処理開始");
-            DebugLogUtility.WriteLog("📦 バッチOCR処理開始");
-            Console.WriteLine("📦 [DEBUG] バッチOCR処理開始");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 [DEBUG] バッチOCR処理開始{Environment.NewLine}");
+            // バッチOCR処理でテキストチャンクを取得（詳細時間測定）
+            var ocrMeasurement = new PerformanceMeasurement(
+                MeasurementType.BatchOcrProcessing, 
+                $"バッチOCR処理 - 画像:{image.Width}x{image.Height}")
+                .WithAdditionalInfo($"WindowHandle:0x{windowHandle.ToInt64():X}");
             
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var textChunks = await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
-            stopwatch.Stop();
-            var ocrProcessingTime = stopwatch.Elapsed;
+            
+            var ocrResult = ocrMeasurement.Complete();
+            var ocrProcessingTime = ocrResult.Duration;
             
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
-            DebugLogUtility.WriteLog($"✅ バッチOCR完了 - チャンク数: {textChunks.Count}, 処理時間: {ocrProcessingTime.TotalMilliseconds}ms");
             
             // OCR完了イベントを発行
-            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            // 🚀 パフォーマンス最適化: EventAggregatorによる65秒の遅延を回避するため一時的に無効化
+            // TODO: Phase 2でバッチ処理実装後に再検討
+            // await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
@@ -182,7 +183,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     var serviceType = _translationService.GetType().Name;
                     DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
                     
-                    // 実際の翻訳サービスで翻訳実行
+                    // 実際の翻訳サービスで翻訳実行（詳細時間測定）
+                    using var chunkTranslationMeasurement = new PerformanceMeasurement(
+                        MeasurementType.TranslationProcessing, 
+                        $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
+                        .WithAdditionalInfo($"Service:{serviceType}");
+                        
                     var translationResult = await _translationService.TranslateAsync(
                         chunk.CombinedText, 
                         Language.Japanese, 
@@ -190,9 +196,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         null,
                         cancellationToken).ConfigureAwait(false);
                     
+                    var chunkResult = chunkTranslationMeasurement.Complete();
+                    
                     // 翻訳結果の詳細をログ出力
                     var engineName = translationResult.EngineName ?? "Unknown";
-                    DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}");
+                    DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
                         
                     chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
                     
@@ -238,10 +246,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
                                 chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
                             
+                            using var overlayMeasurement = new PerformanceMeasurement(
+                                MeasurementType.OverlayRendering, 
+                                $"インプレース表示 - ChunkId:{chunk.ChunkId}, 位置:({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})")
+                                .WithAdditionalInfo($"Text:'{chunk.TranslatedText}'");
+                            
                             await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken)
                                 .ConfigureAwait(false);
+                                
+                            var overlayResult = overlayMeasurement.Complete();
                             
-                            DebugLogUtility.WriteLog($"   ✅ インプレース表示完了 - チャンク {chunk.ChunkId}");
+                            DebugLogUtility.WriteLog($"   ✅ インプレース表示完了 - チャンク {chunk.ChunkId}, 時間: {overlayResult.Duration.TotalMilliseconds:F1}ms");
                         }
                         else
                         {

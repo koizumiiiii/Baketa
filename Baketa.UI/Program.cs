@@ -8,6 +8,7 @@ using Avalonia.ReactiveUI;
 using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
+using Baketa.Core.Performance;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.Platform.DI;
 using Baketa.UI.DI.Modules;
@@ -33,22 +34,17 @@ namespace Baketa.UI;
         [STAThread]
         public static void Main(string[] args)
         {
-            // ファイル出力で確実にログを残す（絶対パスで保存）
-            try
-            {
-                var startupLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_startup.txt");
-                File.WriteAllText(startupLogPath, $"🚀 Baketa.UI.exe 起動開始 - {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n");
-                File.AppendAllText(startupLogPath, $"📁 BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}\n");
-                File.AppendAllText(startupLogPath, $"📁 CurrentDirectory: {Environment.CurrentDirectory}\n");
-                Console.WriteLine($"📝 起動ログ作成: {startupLogPath}");
-            }
-            catch (Exception fileEx) 
-            { 
-                Console.WriteLine($"❌ 起動ログ作成失敗: {fileEx.Message}");
-            }
+            // 統一パフォーマンス測定システムを初期化
+            PerformanceLogger.Initialize();
+            PerformanceLogger.LogSystemInfo();
             
-            Console.WriteLine("🚀 Baketa.UI.exe 起動開始");
-            System.Diagnostics.Debug.WriteLine("🚀 Baketa.UI.exe 起動開始");
+            using var appStartMeasurement = new PerformanceMeasurement(
+                MeasurementType.OverallProcessing, "アプリケーション起動全体");
+            
+            PerformanceLogger.LogPerformance("🚀 Baketa.UI.exe 起動開始");
+            
+            // 重要な初期化タイミングをログ
+            appStartMeasurement.LogCheckpoint("統一ログシステム初期化完了");
             
             // 未処理例外の強制ログ出力
             AppDomain.CurrentDomain.UnhandledException += (sender, e) => 
@@ -90,13 +86,21 @@ namespace Baketa.UI;
                 System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
                 _ = Task.Run(PreInitializeOcrEngineAsync);
                 
-                Console.WriteLine("🎯 Avalonia アプリケーション開始");
-                System.Diagnostics.Debug.WriteLine("🎯 Avalonia アプリケーション開始");
+                appStartMeasurement.LogCheckpoint("Avalonia アプリケーション開始準備完了");
+                PerformanceLogger.LogPerformance("🎯 Avalonia アプリケーション開始");
                 
                 BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                
+                // アプリケーション終了時の最終サマリー
+                var startupResult = appStartMeasurement.Complete();
+                PerformanceLogger.LogPerformance($"✅ アプリケーション起動完了 - 総時間: {startupResult.Duration.TotalSeconds:F2}秒");
+                PerformanceLogger.Finalize();
             }
             catch (Exception ex)
             {
+                PerformanceLogger.LogPerformance($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                PerformanceLogger.Finalize();
+                
                 Console.WriteLine($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 Console.WriteLine($"💥 MAIN STACK: {ex.StackTrace}");
                 System.Diagnostics.Debug.WriteLine($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");

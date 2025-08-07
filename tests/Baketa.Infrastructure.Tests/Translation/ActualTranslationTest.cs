@@ -126,7 +126,7 @@ public class ActualTranslationTest
             var containsProblematicPattern = false;
             foreach (var pattern in problematicPatterns)
             {
-                if (translatedText.ToLowerInvariant().Contains(pattern))
+                if (translatedText?.Contains(pattern, StringComparison.OrdinalIgnoreCase) == true)
                 {
                     _output.WriteLine($"⚠️ 問題のあるパターン検出: '{pattern}'");
                     containsProblematicPattern = true;
@@ -139,7 +139,7 @@ public class ActualTranslationTest
             
             foreach (var keyword in expectedKeywords)
             {
-                if (translatedText.ToLowerInvariant().Contains(keyword))
+                if (translatedText?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true)
                 {
                     _output.WriteLine($"✅ 期待されるキーワード検出: '{keyword}'");
                     containsExpectedKeyword = true;

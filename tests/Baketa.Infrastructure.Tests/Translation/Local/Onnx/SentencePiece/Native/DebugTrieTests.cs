@@ -40,8 +40,8 @@ public class DebugTrieTests(ITestOutputHelper output)
         
         // 簡単なトークン化テスト
         var testText = "こんにちは";
-        var tokens = tokenizer.Tokenize(testText);
-        var decoded = tokenizer.Decode(tokens) ?? string.Empty;
+        var tokens = tokenizer?.Tokenize(testText) ?? [];
+        var decoded = tokenizer?.Decode(tokens) ?? string.Empty;
         
         output.WriteLine($"Input: '{testText}'");
         output.WriteLine($"Tokens: [{string.Join(", ", tokens)}]");

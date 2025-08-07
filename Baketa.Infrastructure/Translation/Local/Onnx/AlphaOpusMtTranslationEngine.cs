@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Abstractions;
+using Baketa.Core.Performance;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece;
 using Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native;
 using Microsoft.Extensions.Logging;
@@ -225,6 +226,11 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 $"言語ペアがサポートされていません: {request.SourceLanguage.Code} -> {request.TargetLanguage.Code}");
         }
 
+        using var translationMeasurement = new PerformanceMeasurement(
+            MeasurementType.TranslationEngineExecution, 
+            $"OPUS-MT翻訳処理 - テキスト:'{request.SourceText}' ({request.SourceText.Length}文字)")
+            .WithAdditionalInfo($"Model:{System.IO.Path.GetFileName(ModelPath)}");
+
         try
         {
             // αテスト向けの簡易翻訳実装
@@ -243,9 +249,15 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
             try
             {
                 // テキストをトークン化（ソーストークナイザー使用）
+                using var tokenizationMeasurement = new PerformanceMeasurement(
+                    MeasurementType.SentencePieceTokenization, 
+                    $"SentencePiece トークン化 - テキスト:'{request.SourceText}'");
+                    
                 var inputTokens = _sourceTokenizer.Tokenize(request.SourceText);
-                _logger.LogDebug("入力テキスト '{SourceText}' をソーストークナイザーでトークン化: [{Tokens}]", 
-                    request.SourceText, string.Join(", ", inputTokens));
+                var tokenizerResult = tokenizationMeasurement.Complete();
+                
+                _logger.LogDebug("入力テキスト '{SourceText}' をソーストークナイザーでトークン化: [{Tokens}] ({Duration}ms)", 
+                    request.SourceText, string.Join(", ", inputTokens), tokenizerResult.Duration.TotalMilliseconds);
                 
                 // 長さ制限の適用
                 if (inputTokens.Length > _options.MaxSequenceLength)
@@ -257,16 +269,30 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 }
 
                 // ONNX推論実行
+                using var inferenceMeasurement = new PerformanceMeasurement(
+                    MeasurementType.OnnxInference, 
+                    $"ONNX推論実行 - トークン数:{inputTokens.Length}");
+                    
                 var outputTokens = await RunInferenceAsync(inputTokens, cancellationToken).ConfigureAwait(false);
-                _logger.LogDebug("ONNX推論出力トークン: [{OutputTokens}]", 
-                    string.Join(", ", outputTokens));
+                var inferenceResult = inferenceMeasurement.Complete();
+                
+                _logger.LogDebug("ONNX推論出力トークン: [{OutputTokens}] ({Duration}ms)", 
+                    string.Join(", ", outputTokens), inferenceResult.Duration.TotalMilliseconds);
 
                 // トークンをテキストにデコード（ターゲットトークナイザー使用）
+                using var decodingMeasurement = new PerformanceMeasurement(
+                    MeasurementType.SentencePieceTokenization, 
+                    $"SentencePiece デコード - トークン数:{outputTokens.Length}");
+                    
                 translatedText = _targetTokenizer.Decode(outputTokens);
-                _logger.LogDebug("出力トークン [{OutputTokens}] をターゲットトークナイザーでデコード: '{TranslatedText}'", 
-                    string.Join(", ", outputTokens), translatedText);
+                var decodingResult = decodingMeasurement.Complete();
                 
-                _logger.LogInformation("ONNX推論による翻訳完了: '{SourceText}' -> '{TranslatedText}'", request.SourceText, translatedText);
+                _logger.LogDebug("出力トークン [{OutputTokens}] をターゲットトークナイザーでデコード: '{TranslatedText}' ({Duration}ms)", 
+                    string.Join(", ", outputTokens), translatedText, decodingResult.Duration.TotalMilliseconds);
+                
+                var totalResult = translationMeasurement.Complete();
+                _logger.LogInformation("ONNX推論による翻訳完了: '{SourceText}' -> '{TranslatedText}' (総時間:{Duration}ms)", 
+                    request.SourceText, translatedText, totalResult.Duration.TotalMilliseconds);
             }
             catch (Exception inferenceEx)
             {

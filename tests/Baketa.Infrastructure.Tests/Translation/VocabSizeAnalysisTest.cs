@@ -173,7 +173,7 @@ public class VocabSizeAnalysisTest
         }
     }
 
-    private record AnalysisResult
+    private sealed record AnalysisResult
     {
         public bool Success { get; init; }
         public int VocabSize { get; init; }

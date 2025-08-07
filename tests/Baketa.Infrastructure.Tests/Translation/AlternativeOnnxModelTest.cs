@@ -124,7 +124,7 @@ public class AlternativeOnnxModelTest
                 _output.WriteLine($"処理時間: {result.ProcessingTimeMs:F1}ms");
 
                 // 翻訳品質の評価
-                var translatedText = result.TranslatedText.ToLowerInvariant();
+                var translatedText = result.TranslatedText;
                 var problematicPatterns = new[]
                 {
                     "excuse", "lost", "while", "look", "over", 
@@ -134,7 +134,7 @@ public class AlternativeOnnxModelTest
                 var hasProblems = false;
                 foreach (var pattern in problematicPatterns)
                 {
-                    if (translatedText.Contains(pattern))
+                    if (translatedText?.Contains(pattern) == true)
                     {
                         _output.WriteLine($"⚠️ 問題パターン検出: '{pattern}'");
                         hasProblems = true;
@@ -151,7 +151,7 @@ public class AlternativeOnnxModelTest
                 var hasMeaningfulContent = false;
                 foreach (var keyword in meaningfulKeywords)
                 {
-                    if (translatedText.Contains(keyword))
+                    if (translatedText?.Contains(keyword) == true)
                     {
                         _output.WriteLine($"✅ 意味のあるキーワード検出: '{keyword}'");
                         hasMeaningfulContent = true;
@@ -214,7 +214,7 @@ public class AlternativeOnnxModelTest
             };
 
             var result = await engine.TranslateAsync(request, CancellationToken.None);
-            var contains = result.TranslatedText.ToLowerInvariant().Contains(expectedPattern);
+            var contains = result.TranslatedText?.Contains(expectedPattern, StringComparison.OrdinalIgnoreCase) == true;
             
             output.WriteLine($"{input} → {result.TranslatedText} {(contains ? "✅" : "❌")}");
         }
