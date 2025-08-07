@@ -32,7 +32,7 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 /// PaddleOCRエンジンの実装クラス（IOcrEngine準拠）
 /// 多重初期化防止機能付き
 /// </summary>
-public sealed class PaddleOcrEngine(
+public class PaddleOcrEngine(
     IModelPathResolver modelPathResolver,
     IOcrPreprocessingService ocrPreprocessingService,
     ITextMerger textMerger,
@@ -91,8 +91,8 @@ public sealed class PaddleOcrEngine(
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 🚨 PaddleOcrEngine静的コンストラクタ実行");
     }
 
-    // インスタンス初期化時の追跡
-    private void TrackInstanceCreation()
+    // インスタンス初期化時の追跡（継承クラスでオーバーライド可能）
+    protected virtual void TrackInstanceCreation()
     {
         var newCount = Interlocked.Increment(ref _instanceCount);
         _logger?.LogWarning("🚨 PaddleOcrEngine インスタンス #{Count} が作成されました", newCount);
@@ -135,17 +135,27 @@ public sealed class PaddleOcrEngine(
     /// <returns>初期化が成功した場合はtrue</returns>
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
+        // 🚨 Gemini推奨：詳細ボトルネック分析開始
+        var totalSw = System.Diagnostics.Stopwatch.StartNew();
+        var stepSw = System.Diagnostics.Stopwatch.StartNew();
+        
+        _logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis started.");
+
         // インスタンス作成追跡
+        stepSw.Restart();
         TrackInstanceCreation();
+        _logger?.LogInformation("🔍 Step 1: Instance tracking finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
         
         settings ??= new OcrEngineSettings();
         
         // 設定の妥当性チェック
+        stepSw.Restart();
         if (!settings.IsValid())
         {
             _logger?.LogError("無効な設定でOCRエンジンの初期化が試行されました");
             return false;
         }
+        _logger?.LogInformation("🔍 Step 2: Settings validation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
         ThrowIfDisposed();
         
@@ -158,6 +168,7 @@ public sealed class PaddleOcrEngine(
         try
         {
             // Gemini推奨：スレッドセーフティ問題解決のため、一時的にCPUモード、シングルスレッドに強制
+            stepSw.Restart();
             if (true) // デバッグ用：常に適用
             {
                 settings.UseGpu = false;
@@ -169,32 +180,45 @@ public sealed class PaddleOcrEngine(
             _logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
                 settings.Language, settings.UseGpu, settings.EnableMultiThread);
             DebugLogUtility.WriteLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
+            _logger?.LogInformation("🔍 Step 3: Settings preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
             // ネイティブライブラリの事前チェック
+            stepSw.Restart();
             if (!CheckNativeLibraries())
             {
                 _logger?.LogError("必要なネイティブライブラリが見つかりません");
                 return false;
             }
+            _logger?.LogInformation("🔍 Step 4: Native library check finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
-            // モデル設定の準備
+            // モデル設定の準備 - 🚨 このステップが17秒の主犯と予想
+            stepSw.Restart();
             var models = await PrepareModelsAsync(settings.Language, cancellationToken).ConfigureAwait(false);
+            _logger?.LogInformation("🔍 Step 5: Model preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             if (models == null)
             {
                 _logger?.LogError("モデルの準備に失敗しました");
                 return false;
             }
 
-            // 安全な初期化処理
+            // 安全な初期化処理 - 🚨 またはこのステップが犯人
+            stepSw.Restart();
             var success = await InitializeEnginesSafelyAsync(models, settings, cancellationToken).ConfigureAwait(false);
+            _logger?.LogInformation("🔍 Step 6: Engine initialization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             
             if (success)
             {
+                stepSw.Restart();
                 _settings = settings.Clone();
                 CurrentLanguage = settings.Language;
                 IsInitialized = true;
                 _logger?.LogInformation("PaddleOCRエンジンの初期化完了");
+                _logger?.LogInformation("🔍 Step 7: Finalization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             }
+            
+            totalSw.Stop();
+            _logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis completed. Total time: {ElapsedMilliseconds}ms.", totalSw.ElapsedMilliseconds);
+            DebugLogUtility.WriteLog($"🔍 【ボトルネック分析完了】Total: {totalSw.ElapsedMilliseconds}ms");
             
             return success;
         }

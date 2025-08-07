@@ -2,6 +2,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Application.DI.Extensions;
+using Baketa.Application.DI.Modules;
 using Baketa.UI.DI.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +36,12 @@ namespace Baketa.UI.DI;
             // InfrastructureModuleを直接登録（OCR、翻訳、永続化サービス）
             var infrastructureModule = new InfrastructureModule();
             infrastructureModule.RegisterServices(services);
+            
+            // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール直接登録
+            Console.WriteLine("🔍 [DEBUG] StagedOcrStrategyModule登録開始...");
+            var stagedOcrModule = new StagedOcrStrategyModule();
+            stagedOcrModule.RegisterServices(services);
+            Console.WriteLine("✅ [DEBUG] StagedOcrStrategyModule登録完了！");
             
             // Baketaのその他のサービスモジュールを追加
             services.AddBaketaServices(environment: environment);

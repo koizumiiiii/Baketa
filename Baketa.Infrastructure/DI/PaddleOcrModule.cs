@@ -16,6 +16,10 @@ using Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 using Baketa.Infrastructure.OCR.Ensemble;
 using Baketa.Infrastructure.OCR.Ensemble.Strategies;
 using System.IO;
+using Microsoft.Extensions.ObjectPool;
+using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
+using Baketa.Infrastructure.OCR.PaddleOCR.Pool;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using System.Net.Http;
 using System.Diagnostics;
 
@@ -334,6 +338,9 @@ public sealed class PaddleOcrModule : IServiceModule
             throw new InvalidOperationException("現在SafePaddleOcrEngineが使用されているため、PaddleOcrEngineインスタンスは利用できません。");
         });
         
+        // 🚀 Step 1: OCRエンジンプール化実装（Gemini推奨アプローチ）
+        RegisterOcrEnginePooling(services);
+        
         // HttpClient設定（HttpClientFactoryが利用可能な場合）
         if (services.Any(s => s.ServiceType == typeof(IHttpClientFactory)))
         {
@@ -454,5 +461,54 @@ public sealed class PaddleOcrModule : IServiceModule
             // エラーが発生した場合は false を返す
             return false;
         }
+    }
+
+    /// <summary>
+    /// OCRエンジンプール化システムを登録（Step 1実装）
+    /// 14秒→5-8秒への性能向上を目標とした根本的解決策
+    /// </summary>
+    private static void RegisterOcrEnginePooling(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Step 1: OCRエンジンプール化システム登録開始");
+        
+        // 1. OCRエンジンファクトリー登録
+        services.AddSingleton<IPaddleOcrEngineFactory, PaddleOcrEngineFactory>();
+        Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了");
+        
+        // 2. プールポリシー登録
+        services.AddSingleton<PaddleOcrEnginePoolPolicy>();
+        Console.WriteLine("✅ PaddleOcrEnginePoolPolicy登録完了");
+        
+        // 3. ObjectPoolの設定
+        services.AddSingleton<ObjectPool<IOcrEngine>>(serviceProvider =>
+        {
+            var policy = serviceProvider.GetRequiredService<PaddleOcrEnginePoolPolicy>();
+            var provider = serviceProvider.GetRequiredService<ObjectPoolProvider>();
+            
+            // プール設定：最大プールサイズ、並列度に基づいて調整
+            var pool = provider.Create(policy);
+            
+            Console.WriteLine("🏊 ObjectPool<IOcrEngine>初期化完了 - プール化OCRシステム開始");
+            return pool;
+        });
+        
+        // 4. プール化OCRサービス登録（既存IOcrEngineを置き換え）
+        // 既存のシングルトン登録を削除し、プール化サービスで置き換え
+        var existingOcrEngineDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IOcrEngine));
+        if (existingOcrEngineDescriptor != null)
+        {
+            services.Remove(existingOcrEngineDescriptor);
+            Console.WriteLine("🔄 既存IOcrEngineシングルトン登録を削除");
+        }
+        
+        services.AddSingleton<IOcrEngine, PooledOcrService>();
+        Console.WriteLine("✅ PooledOcrService登録完了 - IOcrEngineをプール化実装に置き換え");
+        
+        // 5. ObjectPoolProviderを登録（Microsoft.Extensions.ObjectPoolのデフォルト実装）
+        services.AddSingleton<ObjectPoolProvider, DefaultObjectPoolProvider>();
+        Console.WriteLine("✅ DefaultObjectPoolProvider登録完了");
+        
+        Console.WriteLine("🎉 Step 1: OCRエンジンプール化システム登録完了");
+        Console.WriteLine("📊 予想効果: 14-18秒 → 5-8秒（並列競合解消）");
     }
 }
