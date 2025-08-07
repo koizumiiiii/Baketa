@@ -226,6 +226,23 @@
       "description": "Comprehensive test suite with 1,300+ test cases",
       "coverage": "Core 85%+, Infrastructure 80%+, UI 70%+",
       "types": ["Unit tests", "Integration tests", "Performance tests", "UI tests"]
+    },
+    "serena_mcp_integration": {
+      "description": "Serena MCP integration for enhanced code analysis and development efficiency",
+      "status": "Active and configured in E:\\dev\\Baketa\\.mcp.json",
+      "primary_functions": [
+        "/mcp__serena__get_symbols_overview - Project structure analysis",
+        "/mcp__serena__search_for_pattern - Semantic code search",
+        "/mcp__serena__find_referencing_symbols - Dependency analysis",
+        "/mcp__serena__find_symbol - Detailed symbol investigation"
+      ],
+      "workflow_integration": "MCP-First Strategy with sub-agent collaboration",
+      "expected_benefits": {
+        "token_reduction": "90% reduction in large-scale search tasks",
+        "search_accuracy": "Semantic search precision improvement",
+        "development_speed": "Rapid problem identification and resolution",
+        "code_quality": "Comprehensive analysis for early issue detection"
+      }
     }
   }
 }

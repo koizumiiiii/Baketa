@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "serena": {
+      "type": "stdio",
+      "command": "C:\\Users\\suke0\\.local\\bin\\uvx.exe",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena-mcp-server.exe",
+        "--project",
+        "E:\\dev\\Baketa",
+        "--context",
+        "ide-assistant"
+      ],
+      "env": {}
+    }
+  }
+}
