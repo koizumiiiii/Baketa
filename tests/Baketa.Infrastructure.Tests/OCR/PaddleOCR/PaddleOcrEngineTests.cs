@@ -350,8 +350,8 @@ public class OcrEngineSettingsTests
 
         // Assert
         Assert.Equal("jpn", settings.Language);
-        Assert.Equal(0.15, settings.DetectionThreshold);
-        Assert.Equal(0.25, settings.RecognitionThreshold);
+        Assert.Equal(0.09, settings.DetectionThreshold);
+        Assert.Equal(0.16, settings.RecognitionThreshold);
         Assert.Equal("standard", settings.ModelName);
         Assert.Equal(200, settings.MaxDetections);
         Assert.False(settings.UseDirectionClassification);

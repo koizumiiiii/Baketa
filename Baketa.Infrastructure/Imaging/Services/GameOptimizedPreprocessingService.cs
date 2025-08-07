@@ -34,18 +34,18 @@ public sealed class GameOptimizedPreprocessingService(
             Name = "標準",
             EnableAdaptiveThreshold = true,
             EnableColorMasking = true,
-            AdaptiveBlockSize = 15,
-            AdaptiveC = 8.0,
-            ColorMaskingStrength = 0.8f
+            AdaptiveBlockSize = 19,        // より大きなブロックで文字の連続性を保持
+            AdaptiveC = 6.0,               // より緩い閾値で文字の細部保持
+            ColorMaskingStrength = 0.7f
         },
         ["darkbackground"] = new GameScreenProfile
         {
             Name = "暗い背景",
             EnableAdaptiveThreshold = true,
             EnableColorMasking = true,
-            AdaptiveBlockSize = 11,  // より小さなブロックで細かな適応
-            AdaptiveC = 12.0,        // より強い閾値調整
-            ColorMaskingStrength = 0.9f,
+            AdaptiveBlockSize = 17,  // より大きなブロックで文字の連続性向上
+            AdaptiveC = 9.0,         // 適度な閾値調整で文字結合促進
+            ColorMaskingStrength = 0.85f,
             PreBlurEnabled = true,
             PreBlurKernelSize = 3
         },
@@ -65,24 +65,24 @@ public sealed class GameOptimizedPreprocessingService(
             Name = "高コントラスト",
             EnableAdaptiveThreshold = true,
             EnableColorMasking = false,
-            AdaptiveBlockSize = 17,
-            AdaptiveC = 6.0,
+            AdaptiveBlockSize = 21,      // より大きなブロックで長いフレーズ対応
+            AdaptiveC = 4.5,             // より緩い閾値でテキスト連続性確保
             ColorMaskingStrength = 0.6f,
             PostMorphEnabled = true,
             MorphKernelSize = 1,
-            MorphIterations = 2
+            MorphIterations = 1          // モルフォロジー処理を軽減
         },
         ["anime"] = new GameScreenProfile
         {
             Name = "アニメ調",
             EnableAdaptiveThreshold = true,
             EnableColorMasking = true,
-            AdaptiveBlockSize = 13,
-            AdaptiveC = 10.0,
-            ColorMaskingStrength = 0.95f,  // アニメ調は色抽出が効果的
+            AdaptiveBlockSize = 15,        // 中程度のブロックサイズで文字結合
+            AdaptiveC = 8.0,               // バランスの取れた閾値
+            ColorMaskingStrength = 0.85f,  // アニメ調色抽出を適度に
             PreBlurEnabled = false,        // アニメ調は鮮明さを保持
             PostMorphEnabled = true,
-            MorphKernelSize = 2,
+            MorphKernelSize = 1,           // より軽いモルフォロジー処理
             MorphIterations = 1
         }
     };
