@@ -1,4 +1,4 @@
-2025-08-08 01:01:05.787 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-08 01:01:05.788 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-08 01:01:05.789 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 01:01:05.787
-2025-08-08 01:01:23.139 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 17347.0186ms, 成功: True
+2025-08-08 08:44:43.805 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-08 08:44:43.807 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-08 08:44:43.809 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 08:44:43.805
+2025-08-08 08:45:01.821 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 18009.9146ms, 成功: True

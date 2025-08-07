@@ -206,9 +206,10 @@ public class AlphaOpusMtEngineFactory(
     private string GetModelPath(LanguagePair languagePair)
     {
         var modelName = GetModelName(languagePair);
-        // ONNXファイルはONNXディレクトリに、SentencePieceファイルはSentencePieceディレクトリに分離
-        var onnxDirectory = Path.Combine(Path.GetDirectoryName(_configuration.ModelsDirectory) ?? "", "ONNX");
-        return Path.Combine(onnxDirectory, $"{modelName}.onnx");
+        // HuggingFaceモデルからONNXファイルを使用（今はTensorFlowモデルのみ存在）
+        // 一時的にフォールバック用のダミーパスを返す
+        var modelDirectory = Path.Combine(Path.GetDirectoryName(_configuration.ModelsDirectory) ?? "", modelName);
+        return Path.Combine(modelDirectory, "model.onnx"); // 存在しないがフォールバック処理で対応
     }
 
     /// <summary>
@@ -217,8 +218,9 @@ public class AlphaOpusMtEngineFactory(
     private string GetTokenizerPath(LanguagePair languagePair)
     {
         var modelName = GetModelName(languagePair);
-        // SentencePieceファイルは設定ディレクトリ（SentencePieceディレクトリ）を使用
-        return Path.Combine(_configuration.ModelsDirectory, $"{modelName}.model");
+        // HuggingFaceモデルのSentencePieceファイルを使用
+        var modelDirectory = Path.Combine(Path.GetDirectoryName(_configuration.ModelsDirectory) ?? "", modelName);
+        return Path.Combine(modelDirectory, "source.spm"); // source.spmファイルを使用
     }
 
     /// <summary>
@@ -244,9 +246,9 @@ public class AlphaOpusMtEngineFactory(
 public class AlphaOpusMtConfiguration
 {
     /// <summary>
-    /// モデルディレクトリのパス
+    /// モデルディレクトリのパス（SentencePieceモデル用）
     /// </summary>
-    public string ModelsDirectory { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "OpusMT");
+    public string ModelsDirectory { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models");
 
     /// <summary>
     /// 最大シーケンス長

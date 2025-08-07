@@ -72,54 +72,15 @@ namespace Baketa.Infrastructure.Translation;
                 }
                 catch (Exception ex)
                 {
-                    // AlphaOpusMtTranslationEngineの初期化に失敗した場合、SimpleSentencePieceEngineを試行
-                    engineLogger.LogWarning(ex, "AlphaOpusMtTranslationEngineの初期化に失敗しました。SimpleSentencePieceEngineを試行します。");
+                    // AlphaOpusMtTranslationEngineの初期化に失敗した場合
+                    engineLogger.LogError(ex, "AlphaOpusMtTranslationEngineの初期化に失敗しました。OPUS-MTモデルファイルを確認してください。");
                     
-                    try
-                    {
-                        var configuration = provider.GetRequiredService<AlphaOpusMtConfiguration>();
-                        var settingsService = provider.GetRequiredService<Baketa.Core.Services.ISettingsService>();
-                        
-                        // 設定から言語ペアを取得
-                        var sourceLanguage = settingsService.GetValue("Translation:Languages:DefaultSourceLanguage", "ja");
-                        var targetLanguage = settingsService.GetValue("Translation:Languages:DefaultTargetLanguage", "en");
-                        
-                        // 言語ペアに応じたモデルファイルを選択
-                        var modelFileName = GetModelFileNameForLanguagePair(sourceLanguage, targetLanguage);
-                        var tokenizerPath = Path.Combine(configuration.ModelsDirectory, modelFileName);
-                        
-                        simpleSentencePieceLogger.LogInformation("設定された言語ペア: {SourceLanguage} → {TargetLanguage}", sourceLanguage, targetLanguage);
-                        simpleSentencePieceLogger.LogInformation("使用するモデルファイル: {ModelFile}", modelFileName);
-                        
-                        if (File.Exists(tokenizerPath))
-                        {
-                            simpleSentencePieceLogger.LogInformation("SimpleSentencePieceEngineの初期化を開始します");
-                            
-                            var languagePair = new LanguagePair
-                            {
-                                SourceLanguage = new Language { Code = sourceLanguage, DisplayName = GetLanguageDisplayName(sourceLanguage) },
-                                TargetLanguage = new Language { Code = targetLanguage, DisplayName = GetLanguageDisplayName(targetLanguage) }
-                            };
-                            
-                            var simpleSentencePieceEngine = new SimpleSentencePieceEngine(tokenizerPath, languagePair, simpleSentencePieceLogger);
-                            
-                            simpleSentencePieceLogger.LogInformation("SimpleSentencePieceEngineの作成が完了しました");
-                            
-                            return simpleSentencePieceEngine;
-                        }
-                        else
-                        {
-                            simpleSentencePieceLogger.LogWarning("SentencePieceモデルファイルが見つかりません: {TokenizerPath}", tokenizerPath);
-                        }
-                    }
-                    catch (Exception simpleSentencePieceEx)
-                    {
-                        simpleSentencePieceLogger.LogWarning(simpleSentencePieceEx, "SimpleSentencePieceEngineの初期化に失敗しました。MockTranslationEngineを使用します。");
-                    }
-                    
-                    // 最後のフォールバックとしてMockTranslationEngineを使用
-                    mockLogger.LogWarning("MockTranslationEngineを使用します（最終フォールバック）");
-                    return new MockTranslationEngine(mockLogger);
+                    // MockTranslationEngineは実際の翻訳ができないため、使用しない
+                    // エラーをそのまま再スローして、問題を明確にする
+                    throw new InvalidOperationException(
+                        "OPUS-MT翻訳エンジンの初期化に失敗しました。" +
+                        "models/opus-mt/ ディレクトリにOPUS-MTモデルファイルが配置されているか確認してください。" +
+                        "モデルファイルは scripts/download_opus_mt_models.ps1 でダウンロードできます。", ex);
                 }
             });
 
