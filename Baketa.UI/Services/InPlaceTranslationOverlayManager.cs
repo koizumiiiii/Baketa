@@ -85,10 +85,16 @@ public class InPlaceTranslationOverlayManager(
     {
         ArgumentNullException.ThrowIfNull(textChunk);
         
+        // STOP押下後の表示を防ぐためのキャンセレーションチェック
+        cancellationToken.ThrowIfCancellationRequested();
+        
         if (!_isInitialized || _disposed)
         {
             await InitializeAsync().ConfigureAwait(false);
         }
+
+        // 初期化後にもう一度キャンセレーションチェック
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!textChunk.CanShowInPlace())
         {
@@ -98,6 +104,9 @@ public class InPlaceTranslationOverlayManager(
 
         try
         {
+            // オーバーレイ処理直前のキャンセレーションチェック
+            cancellationToken.ThrowIfCancellationRequested();
+            
             // 既存のオーバーレイをチェック
             if (_activeOverlays.TryGetValue(textChunk.ChunkId, out var existingOverlay))
             {
@@ -123,6 +132,9 @@ public class InPlaceTranslationOverlayManager(
     /// </summary>
     private async Task CreateAndShowNewInPlaceOverlayAsync(TextChunk textChunk, CancellationToken cancellationToken)
     {
+        // オーバーレイ作成前のキャンセレーションチェック
+        cancellationToken.ThrowIfCancellationRequested();
+        
         InPlaceTranslationOverlayWindow? newOverlay = null;
         
         try
@@ -147,6 +159,9 @@ public class InPlaceTranslationOverlayManager(
 
             if (newOverlay != null)
             {
+                // オーバーレイ表示直前のキャンセレーションチェック
+                cancellationToken.ThrowIfCancellationRequested();
+                
                 // オーバーレイをコレクションに追加
                 _activeOverlays[textChunk.ChunkId] = newOverlay;
                 

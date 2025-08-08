@@ -123,6 +123,96 @@ namespace Baketa.Infrastructure.Translation;
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
 
+            // 🔧 改行文字を含む場合は分割処理
+            if (text.Contains('\n'))
+            {
+                Console.WriteLine($"📄 [DEFAULT_NEWLINE_DETECT] 改行文字を含むテキストを検出 - 分割処理開始: '{text}'");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📄 [DEFAULT_NEWLINE_DETECT] 改行文字を含むテキストを検出: '{text}'{Environment.NewLine}");
+                _logger.LogDebug("📄 [DEFAULT_NEWLINE_DETECT] 改行文字を含むテキストを検出 - 分割処理開始: '{SourceText}'", text);
+                
+                // 改行で分割し、空行を除去
+                var textLines = text.Split('\n')
+                    .Select(line => line.Trim())
+                    .Where(line => !string.IsNullOrEmpty(line))
+                    .ToList();
+                
+                if (textLines.Count > 1)
+                {
+                    Console.WriteLine($"🔀 [DEFAULT_NEWLINE_BATCH] 複数行検出({textLines.Count}行) - バッチ翻訳実行");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔀 [DEFAULT_NEWLINE_BATCH] 複数行検出({textLines.Count}行){Environment.NewLine}");
+                    _logger.LogDebug("🔀 [DEFAULT_NEWLINE_BATCH] 複数行検出({Count}行) - バッチ翻訳実行", textLines.Count);
+                    
+                    // 複数行の場合はバッチ翻訳
+                    var batchResults = await TranslateBatchAsync(textLines, sourceLang, targetLang, context, cancellationToken).ConfigureAwait(false);
+                    
+                    // 成功した翻訳を結合
+                    var successfulTranslations = batchResults.Where(r => r.IsSuccess).Select(r => r.TranslatedText).ToList();
+                    
+                    if (successfulTranslations.Count > 0)
+                    {
+                        var combinedTranslation = string.Join("\n", successfulTranslations);
+                        Console.WriteLine($"✅ [DEFAULT_NEWLINE_SUCCESS] 改行付きテキスト翻訳完了: '{text}' -> '{combinedTranslation}'");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DEFAULT_NEWLINE_SUCCESS] 改行付きテキスト翻訳完了: '{combinedTranslation}'{Environment.NewLine}");
+                        _logger.LogInformation("✅ [DEFAULT_NEWLINE_SUCCESS] 改行付きテキスト翻訳完了: '{SourceText}' -> '{TranslatedText}'", 
+                            text, combinedTranslation);
+                        
+                        return new TransModels.TranslationResponse
+                        {
+                            RequestId = Guid.NewGuid(),
+                            SourceText = text,
+                            TranslatedText = combinedTranslation,
+                            SourceLanguage = sourceLang,
+                            TargetLanguage = targetLang,
+                            EngineName = ActiveEngine.Name,
+                            IsSuccess = true
+                        };
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ [DEFAULT_NEWLINE_FAIL] バッチ翻訳で全て失敗");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEFAULT_NEWLINE_FAIL] バッチ翻訳で全て失敗{Environment.NewLine}");
+                        _logger.LogWarning("⚠️ [DEFAULT_NEWLINE_FAIL] バッチ翻訳で全て失敗");
+                    }
+                }
+                else if (textLines.Count == 1)
+                {
+                    // 実際は1行だった場合は通常翻訳
+                    Console.WriteLine("📝 [DEFAULT_NEWLINE_SINGLE] 実質1行のため通常翻訳処理");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 [DEFAULT_NEWLINE_SINGLE] 実質1行のため通常翻訳処理{Environment.NewLine}");
+                    _logger.LogDebug("📝 [DEFAULT_NEWLINE_SINGLE] 実質1行のため通常翻訳処理");
+                    text = textLines[0];
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ [DEFAULT_NEWLINE_EMPTY] 改行分割後に有効なテキストが見つかりません");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEFAULT_NEWLINE_EMPTY] 改行分割後に有効なテキストなし{Environment.NewLine}");
+                    _logger.LogWarning("⚠️ [DEFAULT_NEWLINE_EMPTY] 改行分割後に有効なテキストが見つかりません");
+                    
+                    return new TransModels.TranslationResponse
+                    {
+                        RequestId = Guid.NewGuid(),
+                        SourceText = text,
+                        TranslatedText = string.Empty,
+                        SourceLanguage = sourceLang,
+                        TargetLanguage = targetLang,
+                        EngineName = ActiveEngine.Name,
+                        IsSuccess = false,
+                        Error = new TransModels.TranslationError
+                        {
+                            ErrorCode = "EMPTY_AFTER_SPLIT",
+                            ErrorType = TransModels.TranslationErrorType.ProcessingError,
+                            Message = "改行分割後に有効なテキストがありません"
+                        }
+                    };
+                }
+            }
+
             Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService.TranslateAsync - テキスト: '{text}', アクティブエンジン: {ActiveEngine.Name}");
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DEBUG] DefaultTranslationService.TranslateAsync - テキスト: '{text}', アクティブエンジン: {ActiveEngine.Name}{Environment.NewLine}");

@@ -649,32 +649,46 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 
 **このワークフローは、バグ修正、機能追加など、すべてのタスクにおいて必ず遵守してください。**
 
-#### **フェーズ1: Serena MCP主導の初期調査（担当: あなた自身 + Serena MCP）**
+#### **フェーズ1: 標準ツール主導の初期調査（担当: あなた自身）**
 
-**🎯 Serena MCP優先アプローチ**: 大規模コードベース（1,300+テストケース）での効率化のため、まずSerena MCPで包括的な分析を実施します。
+**⚠️ 重要: Serena MCP制限事項**: Windowsパス処理エラー（`\\.\nul` junction point）により、Serena MCPのファイルスキャン系ツールは現在動作不能です。
 
-**1. Serena MCP活用段階:**
-1.  **プロジェクト構造把握:** `/mcp__serena__get_symbols_overview .` でプロジェクト全体を理解
-2.  **意味的検索:** `/mcp__serena__search_for_pattern` で問題関連コードを特定
-3.  **依存関係分析:** `/mcp__serena__find_referencing_symbols` で影響範囲を把握
-4.  **シンボル詳細分析:** `/mcp__serena__find_symbol` で具体的な実装を調査
+**🚫 使用不可能なSerena MCPツール:**
+- ❌ `/mcp__serena__get_symbols_overview` - プロジェクト構造分析
+- ❌ `/mcp__serena__search_for_pattern` - 意味的検索
+- ❌ `/mcp__serena__find_referencing_symbols` - 依存関係分析  
+- ❌ `/mcp__serena__find_symbol` - シンボル詳細分析
+- ❌ `/mcp__serena__list_dir` - ディレクトリ一覧
+- ❌ `/mcp__serena__find_file` - ファイル検索
 
-**2. 従来手法との併用:**
-- Serena MCPで見つからない場合のみ`rg`等を使用
-- エラーログ・スタックトレースなどの直接的情報収集
-- ユーザーからの要求の詳細分析
+**✅ 使用可能なSerena MCPツール（メモリ系のみ）:**
+- ✅ `/mcp__serena__write_memory` - 調査結果のメモリ保存
+- ✅ `/mcp__serena__read_memory` - 既存メモリの読み込み
+- ✅ `/mcp__serena__list_memories` - メモリ一覧表示
 
-**3. 専門分野仮説立案:** Serena MCPの分析結果を基に専門領域を特定
-- *例: Serena MCPでP/Invoke関連コード発見 → `@Native-Bridge` の領域*
-- *例: ReactiveUI ViewModelで問題検出 → `@UI-Maestro` の領域*
-- *例: クリーンアーキテクチャ層違反発見 → `@Architecture-Guardian` の領域*
-- *例: テストケース不足を特定 → `@Test-Generator` の領域*
+**1. 標準ツール活用段階（Serena MCP代替）:**
+1.  **プロジェクト構造把握:** `Glob "**/*.cs"` でプロジェクト全体を理解
+2.  **意味的検索:** `Grep pattern` で問題関連コードを特定
+3.  **依存関係分析:** `Grep "using|import"` で影響範囲を把握
+4.  **シンボル詳細分析:** `Read file_path` で具体的な実装を調査
+
+**2. 効率化手法:**
+- `Grep`ツールでの正規表現パターン検索を活用
+- `Glob`パターンで対象ファイルを絞り込み
+- 複数ツールの並列実行でパフォーマンス向上
+- 調査結果を`/mcp__serena__write_memory`で記録・活用
+
+**3. 専門分野仮説立案:** 標準ツールの分析結果を基に専門領域を特定
+- *例: `Grep "P/Invoke|DllImport"` でP/Invoke関連コード発見 → `@Native-Bridge` の領域*
+- *例: `Grep "ReactiveUI|ViewModel"` でReactiveUI問題検出 → `@UI-Maestro` の領域*
+- *例: `Grep "using.*Core.*Application"` でアーキテクチャ層違反発見 → `@Architecture-Guardian` の領域*
+- *例: `Glob "**/*Tests.cs"` でテストケース不足を特定 → `@Test-Generator` の領域*
 - *例: 新技術・ライブラリ調査が必要 → `@Researcher` の領域*
 
-**期待効果:**
-- **トークン消費90%削減**: 大規模検索での効率化
-- **検索精度向上**: 意味的検索による的確な問題特定
-- **作業時間短縮**: 包括的分析による迅速な課題把握
+**現実的効果（Serena MCP無効下）:**
+- **標準レベルのトークン消費**: MCP効率化は期待できない
+- **ripgrepベースの高精度検索**: Grepツールによる確実な検索
+- **並列処理による時間短縮**: 複数ツールの同時実行活用
 
 #### **フェーズ2: 専門家（サブエージェント）への委任**
 仮説に基づき、��も適したサブエージェントを **`@` でメンションして**、具体的かつ明確な指示と共にタスクを委任します。

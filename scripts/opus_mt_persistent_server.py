@@ -225,7 +225,38 @@ class PersistentOpusMtServer:
                         if not japanese_text:
                             response = {"success": False, "error": "Empty text"}
                         else:
-                            response = self.translate(japanese_text)
+                            # 改行文字を含む場合はバッチ処理で対応
+                            if "\n" in japanese_text:
+                                # 改行で分割し、空行を除去
+                                text_lines = [line.strip() for line in japanese_text.split("\n") if line.strip()]
+                                
+                                if not text_lines:
+                                    response = {"success": False, "error": "Empty text after splitting"}
+                                elif len(text_lines) == 1:
+                                    # 実際は1行だった場合は通常翻訳
+                                    response = self.translate(text_lines[0])
+                                else:
+                                    # 複数行の場合はバッチ翻訳して結合
+                                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] Multi-line text detected - splitting into {len(text_lines)} lines", 
+                                          file=sys.stderr, flush=True)
+                                    batch_result = self.translate_batch(text_lines)
+                                    
+                                    if batch_result["success"]:
+                                        # バッチ結果を改行で結合
+                                        combined_translation = "\n".join(batch_result["translations"])
+                                        response = {
+                                            "success": True,
+                                            "translation": combined_translation,
+                                            "source": japanese_text,
+                                            "processing_time": batch_result["processing_time"],
+                                            "translation_count": batch_result["translation_count"],
+                                            "split_lines": len(text_lines)  # デバッグ用
+                                        }
+                                    else:
+                                        response = batch_result
+                            else:
+                                # 改行なしの通常翻訳
+                                response = self.translate(japanese_text)
                     
                     # レスポンス送信
                     response_json = json.dumps(response, ensure_ascii=False) + "\n"

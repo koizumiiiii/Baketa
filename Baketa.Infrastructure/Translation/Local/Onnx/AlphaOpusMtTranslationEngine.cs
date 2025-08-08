@@ -227,6 +227,78 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
                 $"言語ペアがサポートされていません: {request.SourceLanguage.Code} -> {request.TargetLanguage.Code}");
         }
 
+        // 🔧 改行文字を含む場合は分割処理
+        if (request.SourceText.Contains('\n'))
+        {
+            _logger.LogDebug("📄 [ALPHA_NEWLINE_DETECT] 改行文字を含むテキストを検出 - 分割処理開始: '{SourceText}'", request.SourceText);
+            
+            // 改行で分割し、空行を除去
+            var textLines = request.SourceText.Split('\n')
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrEmpty(line))
+                .ToList();
+            
+            if (textLines.Count > 1)
+            {
+                _logger.LogDebug("🔀 [ALPHA_NEWLINE_BATCH] 複数行検出({Count}行) - バッチ翻訳実行", textLines.Count);
+                
+                // 複数行の場合はバッチ翻訳
+                var batchRequests = textLines.Select(line => new TranslationRequest
+                {
+                    SourceText = line,
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
+                    Context = request.Context
+                }).ToList();
+                
+                var batchResults = await TranslateBatchAsync(batchRequests, cancellationToken).ConfigureAwait(false);
+                
+                // 成功した翻訳を結合
+                var successfulTranslations = batchResults.Where(r => r.IsSuccess).Select(r => r.TranslatedText).ToList();
+                
+                if (successfulTranslations.Count > 0)
+                {
+                    var combinedTranslation = string.Join("\n", successfulTranslations);
+                    _logger.LogInformation("✅ [ALPHA_NEWLINE_SUCCESS] 改行付きテキスト翻訳完了: '{SourceText}' -> '{TranslatedText}'", 
+                        request.SourceText, combinedTranslation);
+                    
+                    return new TranslationResponse
+                    {
+                        RequestId = request.RequestId,
+                        SourceText = request.SourceText,
+                        TranslatedText = combinedTranslation,
+                        SourceLanguage = request.SourceLanguage,
+                        TargetLanguage = request.TargetLanguage,
+                        EngineName = Name,
+                        IsSuccess = true
+                    };
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ [ALPHA_NEWLINE_FAIL] バッチ翻訳で全て失敗");
+                    return CreateErrorResponse(request, "バッチ翻訳処理に失敗しました");
+                }
+            }
+            else if (textLines.Count == 1)
+            {
+                // 実際は1行だった場合は通常翻訳
+                _logger.LogDebug("📝 [ALPHA_NEWLINE_SINGLE] 実質1行のため通常翻訳処理");
+                request = new TranslationRequest
+                {
+                    SourceText = textLines[0],
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
+                    Context = request.Context,
+                    PreferredEngine = request.PreferredEngine
+                };
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ [ALPHA_NEWLINE_EMPTY] 改行分割後に有効なテキストが見つかりません");
+                return CreateErrorResponse(request, "改行分割後に有効なテキストがありません");
+            }
+        }
+
         using var translationMeasurement = new PerformanceMeasurement(
             MeasurementType.TranslationEngineExecution, 
             $"OPUS-MT翻訳処理 - テキスト:'{request.SourceText}' ({request.SourceText.Length}文字)")

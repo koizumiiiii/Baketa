@@ -702,119 +702,126 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     }
 
     /// <summary>
-    /// 常駐サーバーを使った高速翻訳
+    /// 常駐サーバーを使った高速翻訳（改行文字対応版）
     /// </summary>
     private async Task<PersistentTranslationResult?> TranslateWithPersistentServerAsync(string text, CancellationToken cancellationToken = default)
     {
-        // 🚨 最優先ログ - メソッド進入確認
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [METHOD_ENTRY] TranslateWithPersistentServerAsyncメソッドに入りました！🔥🔥🔥{Environment.NewLine}");
-        Console.WriteLine($"🔥🔥🔥 [METHOD_ENTRY] TranslateWithPersistentServerAsyncメソッドに入りました！🔥🔥🔥");
-        
+        Console.WriteLine($"🔥🔥🔥 [NEWLINE_DEBUG] TransformersOpusMtEngine.TranslateWithPersistentServerAsync 実行中！🔥🔥🔥");
         Console.WriteLine($"⚡ [SERVER_TRANSLATE] 常駐サーバー翻訳開始: '{text}'");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [SERVER_TRANSLATE] 常駐サーバー翻訳開始: '{text}'{Environment.NewLine}");
-        
-        // 🚨 ログ出力前後の境界確認
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [LOGGER_BEFORE] _logger.LogInformation呼び出し直前{Environment.NewLine}");
-        
-        _logger.LogInformation("常駐サーバーで翻訳開始: '{Text}'", text);
-        
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [LOGGER_AFTER] _logger.LogInformation呼び出し完了{Environment.NewLine}");
-        
-        // 🚨 DateTime.Now境界確認
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DATETIME_BEFORE] DateTime.Now代入直前{Environment.NewLine}");
+        _logger.LogInformation("🔥🔥🔥 [NEWLINE_DEBUG] TransformersOpusMtEngine 改行文字処理版が実行されています！ テキスト: '{Text}'", text);
         
         var startTime = DateTime.Now;
         
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DATETIME_AFTER] DateTime.Now代入完了{Environment.NewLine}");
-        
         try
         {
-            // 🚨 tryブロック進入確認
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [TRY_ENTRY] tryブロック内に進入しました！{Environment.NewLine}");
-            
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-1: キャンセレーション確認");
-            
-            // 🚨 キャンセレーション確認前後のログ
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CANCEL_BEFORE] ThrowIfCancellationRequested呼び出し直前{Environment.NewLine}");
-            
             // キャンセレーション確認
             cancellationToken.ThrowIfCancellationRequested();
             
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CANCEL_AFTER] ThrowIfCancellationRequested呼び出し完了{Environment.NewLine}");
+            // 🔧 改行文字を含む場合は分割処理
+            if (text.Contains('\n'))
+            {
+                Console.WriteLine($"📄 [NEWLINE_DETECT] 改行文字を含むテキストを検出 - 分割処理開始");
+                _logger.LogInformation("改行文字を含むテキストを検出 - 分割処理実行: '{Text}'", text);
+                
+                // 改行で分割し、空行を除去
+                var textLines = text.Split('\n')
+                    .Select(line => line.Trim())
+                    .Where(line => !string.IsNullOrEmpty(line))
+                    .ToList();
+                
+                if (!textLines.Any())
+                {
+                    return new PersistentTranslationResult 
+                    { 
+                        Success = false, 
+                        Error = "Empty text after splitting",
+                        Source = text
+                    };
+                }
+                
+                if (textLines.Count == 1)
+                {
+                    // 実際は1行だった場合は通常翻訳
+                    Console.WriteLine($"📄 [SINGLE_LINE] 分割結果が1行のため通常翻訳実行");
+                    text = textLines[0]; // 単一行として処理継続
+                }
+                else
+                {
+                    // 複数行の場合はバッチ翻訳
+                    Console.WriteLine($"📦 [MULTI_LINE] 複数行検出({textLines.Count}行) - バッチ翻訳実行");
+                    var batchResult = await TranslateBatchWithPersistentServerAsync(textLines, cancellationToken).ConfigureAwait(false);
+                    
+                    if (batchResult?.Success == true && batchResult.Translations != null)
+                    {
+                        // バッチ結果を改行で結合
+                        var combinedTranslation = string.Join("\n", batchResult.Translations);
+                        var batchProcessingTime = DateTime.Now - startTime;
+                        
+                        Console.WriteLine($"✅ [MULTI_LINE] バッチ翻訳成功 - 結合結果: '{combinedTranslation}'");
+                        _logger.LogInformation("複数行バッチ翻訳成功 - 行数: {LineCount}, 結果: '{Translation}'", 
+                            textLines.Count, combinedTranslation);
+                        
+                        return new PersistentTranslationResult
+                        {
+                            Success = true,
+                            Translation = combinedTranslation,
+                            Source = text,
+                            ProcessingTime = batchProcessingTime.TotalSeconds
+                        };
+                    }
+                    else
+                    {
+                        Console.WriteLine($"❌ [MULTI_LINE] バッチ翻訳失敗 - Error: {batchResult?.Error}");
+                        return new PersistentTranslationResult 
+                        { 
+                            Success = false, 
+                            Error = batchResult?.Error ?? "Batch translation failed",
+                            Source = text
+                        };
+                    }
+                }
+            }
             
-            // 🚨 Console.WriteLineの代わりにファイル出力でテスト
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認開始{Environment.NewLine}");
-            
-            // 🚨 CheckServerHealthAsync呼び出し前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [HEALTH_BEFORE] CheckServerHealthAsync呼び出し直前{Environment.NewLine}");
+            // 単一行の通常翻訳処理
+            Console.WriteLine($"⚡ [SINGLE_TRANSLATE] 単一行翻訳実行: '{text}'");
             
             // サーバーの健全性確認
             if (!await CheckServerHealthAsync().ConfigureAwait(false))
             {
-                Console.WriteLine($"🔄 [SERVER_TRANSLATE] STEP-3: サーバー接続失敗 - 再起動試行");
+                Console.WriteLine($"🔄 [SERVER_TRANSLATE] サーバー接続失敗 - 再起動試行");
                 _logger.LogWarning("サーバーに接続できません。再起動を試行します");
                 
-                Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-4: サーバー再起動実行開始");
                 if (!await StartPersistentServerAsync().ConfigureAwait(false))
                 {
-                    Console.WriteLine($"💥 [SERVER_TRANSLATE] STEP-4: サーバー再起動失敗");
+                    Console.WriteLine($"💥 [SERVER_TRANSLATE] サーバー再起動失敗");
                     return new PersistentTranslationResult { Success = false, Error = "サーバー接続に失敗しました" };
                 }
-                Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-4: サーバー再起動成功");
-            }
-            else
-            {
-                Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-2: サーバー健全性確認成功");
             }
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-5: TCP接続開始");
             using var client = new TcpClient();
             await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
-            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-5: TCP接続成功");
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-6: キャンセレーション再確認");
             // キャンセレーション再確認
             cancellationToken.ThrowIfCancellationRequested();
-            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-6: キャンセレーション確認OK");
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-7: Streamオブジェクト取得");
             var stream = client.GetStream();
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-8: 翻訳リクエスト準備");
             // 翻訳リクエスト送信
             var request = new { text = text };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
-            Console.WriteLine($"📤 [SERVER_TRANSLATE] STEP-8: 送信データ準備完了 - サイズ: {requestBytes.Length} bytes");
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-9: 翻訳リクエスト送信開始");
             await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
-            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-9: 翻訳リクエスト送信完了");
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-10: レスポンス受信開始（タイムアウト: {TranslationTimeoutMs}ms）");
             // レスポンス受信（タイムアウト付き）
             using var cts = new CancellationTokenSource(TranslationTimeoutMs);
             var buffer = new byte[4096];
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
-            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-10: レスポンス受信完了 - サイズ: {bytesRead} bytes");
             
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] STEP-11: JSONデシリアライゼーション開始");
             var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
             
             var response = JsonSerializer.Deserialize<PersistentTranslationResult>(responseJson);
-            Console.WriteLine($"✅ [SERVER_TRANSLATE] STEP-11: JSONデシリアライゼーション完了");
             
             var processingTime = DateTime.Now - startTime;
             Console.WriteLine($"⚡ [SERVER_TRANSLATE] 翻訳完了 - 処理時間: {processingTime.TotalSeconds:F3}秒, 翻訳: '{response?.Translation}'");
