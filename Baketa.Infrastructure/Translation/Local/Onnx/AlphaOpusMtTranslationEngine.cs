@@ -26,6 +26,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
     private readonly ITokenizer _sourceTokenizer;
     private readonly ITokenizer _targetTokenizer;
     private InferenceSession? _session;
+    private readonly SemaphoreSlim _sessionLock = new(1, 1);
     private bool _isInitialized;
     private bool _disposed;
 
@@ -443,12 +444,30 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
     /// <summary>
     /// ONNX推論を実行（Greedy Search）
     /// </summary>
-    private Task<int[]> RunInferenceAsync(int[] inputTokens, CancellationToken cancellationToken = default)
+    private async Task<int[]> RunInferenceAsync(int[] inputTokens, CancellationToken cancellationToken = default)
     {
         if (_session == null)
         {
             throw new InvalidOperationException("セッションが初期化されていません");
         }
+        
+        // InferenceSessionへのアクセスをシリアライズして、スレッドセーフを保証
+        await _sessionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await RunInferenceInternalAsync(inputTokens, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sessionLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// ONNX推論の内部実装（ロック内で実行）
+    /// </summary>
+    private Task<int[]> RunInferenceInternalAsync(int[] inputTokens, CancellationToken cancellationToken = default)
+    {
 
         // Native Tokenizerの特殊トークンIDを取得（ソーストークナイザーから）
         var nativeSourceTokenizer = _sourceTokenizer as OpusMtNativeTokenizer;
@@ -712,6 +731,7 @@ public class AlphaOpusMtTranslationEngine : ILocalTranslationEngine
     {
         if (!_disposed && disposing)
         {
+            _sessionLock?.Dispose();
             _session?.Dispose();
             if (_sourceTokenizer is IDisposable disposableSourceTokenizer)
             {
