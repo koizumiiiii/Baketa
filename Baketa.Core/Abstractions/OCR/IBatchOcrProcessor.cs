@@ -77,6 +77,9 @@ public sealed class BatchOcrOptions
     
     /// <summary>タイムアウト時間（ミリ秒）</summary>
     public int TimeoutMs { get; init; } = 30000;
+    
+    /// <summary>OCR処理時のタイルサイズ（ピクセル）</summary>
+    public int TileSize { get; init; } = 1024;
 }
 
 /// <summary>

@@ -169,6 +169,92 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         }
     }
 
+    /// <summary>
+    /// バッチ翻訳処理 - 複数テキストを一度のリクエストで処理
+    /// </summary>
+    public async Task<IList<TranslationResponse>> TranslateBatchAsync(
+        IList<TranslationRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        if (requests == null || !requests.Any())
+        {
+            return new List<TranslationResponse>();
+        }
+
+        _logger?.LogInformation("🚀 [BATCH] バッチ翻訳開始 - テキスト数: {Count}", requests.Count);
+
+        try
+        {
+            // 全てのリクエストから翻訳対象テキストを抽出
+            var sourceTexts = requests.Select(r => r.SourceText).ToList();
+            
+            // バッチ翻訳実行
+            var batchResult = await TranslateBatchWithPersistentServerAsync(sourceTexts, cancellationToken).ConfigureAwait(false);
+            
+            if (batchResult?.Success == true && batchResult.Translations != null)
+            {
+                // バッチ結果を個別のTranslationResponseに変換
+                var responses = new List<TranslationResponse>();
+                
+                for (int i = 0; i < requests.Count; i++)
+                {
+                    var translation = i < batchResult.Translations.Count ? batchResult.Translations[i] : "[Batch Error]";
+                    
+                    responses.Add(new TranslationResponse
+                    {
+                        RequestId = requests[i].RequestId,
+                        TranslatedText = translation,
+                        SourceText = requests[i].SourceText,
+                        SourceLanguage = requests[i].SourceLanguage,
+                        TargetLanguage = requests[i].TargetLanguage,
+                        ConfidenceScore = 0.95f,
+                        EngineName = Name,
+                        IsSuccess = true
+                    });
+                }
+                
+                _logger?.LogInformation("✅ [BATCH] バッチ翻訳成功 - 処理時間: {ProcessingTime:F3}秒", batchResult.ProcessingTime);
+                return responses;
+            }
+            else
+            {
+                // バッチ翻訳失敗時は個別処理にフォールバック
+                _logger?.LogWarning("⚠️ [BATCH] バッチ翻訳失敗、個別処理にフォールバック");
+                var responses = new List<TranslationResponse>();
+                
+                foreach (var request in requests)
+                {
+                    var response = await TranslateInternalAsync(request, cancellationToken).ConfigureAwait(false);
+                    responses.Add(response);
+                }
+                
+                return responses;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "💥 [BATCH] バッチ翻訳エラー");
+            
+            // エラー時は個別処理にフォールバック
+            var responses = new List<TranslationResponse>();
+            foreach (var request in requests)
+            {
+                responses.Add(new TranslationResponse
+                {
+                    RequestId = request.RequestId,
+                    TranslatedText = $"[Batch Error] {request.SourceText}",
+                    SourceText = request.SourceText,
+                    SourceLanguage = request.SourceLanguage,
+                    TargetLanguage = request.TargetLanguage,
+                    ConfidenceScore = 0.0f,
+                    EngineName = Name,
+                    IsSuccess = false
+                });
+            }
+            return responses;
+        }
+    }
+
     /// <inheritdoc/>
     protected override async Task<TranslationResponse> TranslateInternalAsync(
         TranslationRequest request,
@@ -543,6 +629,78 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         }
     }
     
+    /// <summary>
+    /// バッチ翻訳用常駐サーバー通信
+    /// </summary>
+    private async Task<BatchTranslationResult?> TranslateBatchWithPersistentServerAsync(
+        IList<string> texts, 
+        CancellationToken cancellationToken = default)
+    {
+        _logger?.LogInformation("📦 [BATCH_SERVER] バッチ翻訳サーバー通信開始 - テキスト数: {Count}", texts.Count);
+        var startTime = DateTime.Now;
+
+        try
+        {
+            // キャンセレーション確認
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // サーバーの健全性確認
+            if (!await CheckServerHealthAsync().ConfigureAwait(false))
+            {
+                _logger?.LogWarning("サーバーに接続できません。再起動を試行します");
+                
+                if (!await StartPersistentServerAsync().ConfigureAwait(false))
+                {
+                    return new BatchTranslationResult { Success = false, Error = "サーバー接続に失敗しました" };
+                }
+            }
+            
+            using var client = new TcpClient();
+            await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+            
+            // キャンセレーション再確認
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            var stream = client.GetStream();
+            
+            // バッチリクエスト送信
+            var request = new { batch_texts = texts };
+            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
+            var requestBytes = Encoding.UTF8.GetBytes(requestJson);
+            
+            _logger?.LogInformation("📤 [BATCH_SERVER] バッチリクエスト送信 - サイズ: {Size} bytes", requestBytes.Length);
+            
+            await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
+            
+            // バッチレスポンス受信（長めのタイムアウト）
+            var batchTimeout = Math.Max(TranslationTimeoutMs, texts.Count * 1000); // テキスト数に応じて動的調整
+            using var cts = new CancellationTokenSource(batchTimeout);
+            var buffer = new byte[8192]; // バッファサイズを増加
+            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+            
+            _logger?.LogInformation("📨 [BATCH_SERVER] バッチレスポンス受信 - サイズ: {Size} bytes", bytesRead);
+            
+            var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            var response = JsonSerializer.Deserialize<BatchTranslationResult>(responseJson);
+            
+            var processingTime = DateTime.Now - startTime;
+            _logger?.LogInformation("✅ [BATCH_SERVER] バッチ翻訳完了 - 処理時間: {ProcessingTime:F3}秒", processingTime.TotalSeconds);
+            
+            if (response != null)
+            {
+                response.ProcessingTime = processingTime.TotalSeconds;
+            }
+            
+            return response;
+        }
+        catch (Exception ex)
+        {
+            var processingTime = DateTime.Now - startTime;
+            _logger?.LogError(ex, "💥 [BATCH_SERVER] バッチ翻訳エラー - 処理時間: {ProcessingTime:F3}秒", processingTime.TotalSeconds);
+            return new BatchTranslationResult { Success = false, Error = ex.Message };
+        }
+    }
+
     /// <summary>
     /// 常駐サーバーを使った高速翻訳
     /// </summary>
@@ -1142,6 +1300,27 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         
         [JsonPropertyName("source")]
         public string Source { get; set; } = string.Empty;
+        
+        [JsonPropertyName("error")]
+        public string Error { get; set; } = string.Empty;
+        
+        [JsonPropertyName("processing_time")]
+        public double ProcessingTime { get; set; }
+        
+        [JsonPropertyName("translation_count")]
+        public int TranslationCount { get; set; }
+    }
+
+    private class BatchTranslationResult
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+        
+        [JsonPropertyName("translations")]
+        public List<string> Translations { get; set; } = new();
+        
+        [JsonPropertyName("sources")]
+        public List<string> Sources { get; set; } = new();
         
         [JsonPropertyName("error")]
         public string Error { get; set; } = string.Empty;

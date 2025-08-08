@@ -205,6 +205,25 @@ public sealed class OcrSettings
     public bool SaveProcessedImages { get; set; } = false;
     
     /// <summary>
+    /// ゲーム特化前処理の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ゲーム特化前処理", 
+        Description = "ゲーム画面に最適化された前処理パイプラインを使用します")]
+    public bool EnableGameSpecificPreprocessing { get; set; } = true;
+    
+    /// <summary>
+    /// デフォルトゲームテキストプロファイル
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "デフォルトゲームプロファイル", 
+        Description = "使用するデフォルトのゲームテキストプロファイル")]
+    public string DefaultGameTextProfile { get; set; } = "Auto";
+    
+    /// <summary>
+    /// カスタムゲーム前処理パラメータ
+    /// </summary>
+    public GamePreprocessingSettings GamePreprocessingSettings { get; set; } = new();
+    
+    /// <summary>
     /// 言語モデルを使用するか（PaddleOCR use_lm=True）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "言語モデル使用", 
@@ -254,7 +273,10 @@ public sealed class OcrSettings
             SaveProcessedImages = SaveProcessedImages,
             UseLanguageModel = UseLanguageModel,
             TextDetectionSettings = TextDetectionSettings,
-            TextDetectionEnsemble = TextDetectionEnsemble
+            TextDetectionEnsemble = TextDetectionEnsemble,
+            EnableGameSpecificPreprocessing = EnableGameSpecificPreprocessing,
+            DefaultGameTextProfile = DefaultGameTextProfile,
+            GamePreprocessingSettings = GamePreprocessingSettings.Clone()
         };
     }
 }
@@ -315,4 +337,132 @@ public enum OcrEngine
     /// Windows標準OCR
     /// </summary>
     WindowsOCR
+}
+
+/// <summary>
+/// ゲーム特化前処理設定
+/// </summary>
+public class GamePreprocessingSettings
+{
+    /// <summary>
+    /// DarkBackgroundプロファイルパラメータ
+    /// </summary>
+    public GameProfileParameters DarkBackground { get; set; } = new()
+    {
+        BlockSize = 7,
+        C = 1.2,
+        CLAHEClipLimit = 4.0,
+        BilateralSigmaColor = 80.0,
+        GaussianSigma = 0.3
+    };
+    
+    /// <summary>
+    /// LightBackgroundプロファイルパラメータ
+    /// </summary>
+    public GameProfileParameters LightBackground { get; set; } = new()
+    {
+        BlockSize = 9,
+        C = 2.0,
+        CLAHEClipLimit = 2.5,
+        BilateralSigmaColor = 60.0,
+        GaussianSigma = 0.7
+    };
+    
+    /// <summary>
+    /// LowContrastプロファイルパラメータ
+    /// </summary>
+    public GameProfileParameters LowContrast { get; set; } = new()
+    {
+        BlockSize = 5,
+        C = 1.0,
+        CLAHEClipLimit = 5.0,
+        BilateralSigmaColor = 100.0,
+        GaussianSigma = 0.2
+    };
+    
+    /// <summary>
+    /// MultiFontプロファイルパラメータ
+    /// </summary>
+    public GameProfileParameters MultiFont { get; set; } = new()
+    {
+        BlockSize = 11,
+        C = 1.8,
+        EnableDynamicBlockSize = true,
+        CLAHEClipLimit = 3.5,
+        BilateralSigmaColor = 70.0,
+        GaussianSigma = 0.4
+    };
+    
+    /// <summary>
+    /// UIOverlayプロファイルパラメータ
+    /// </summary>
+    public GameProfileParameters UIOverlay { get; set; } = new()
+    {
+        BlockSize = 13,
+        C = 2.5,
+        CLAHEClipLimit = 4.5,
+        BilateralSigmaColor = 90.0,
+        GaussianSigma = 0.8
+    };
+    
+    /// <summary>
+    /// A/Bテストの有効化
+    /// </summary>
+    public bool EnableAbTesting { get; set; } = false;
+    
+    /// <summary>
+    /// 設定のクローンを作成
+    /// </summary>
+    public GamePreprocessingSettings Clone()
+    {
+        return new GamePreprocessingSettings
+        {
+            DarkBackground = DarkBackground.Clone(),
+            LightBackground = LightBackground.Clone(),
+            LowContrast = LowContrast.Clone(),
+            MultiFont = MultiFont.Clone(),
+            UIOverlay = UIOverlay.Clone(),
+            EnableAbTesting = EnableAbTesting
+        };
+    }
+}
+
+/// <summary>
+/// ゲームプロファイルパラメータ
+/// </summary>
+public class GameProfileParameters
+{
+    /// <summary>AdaptiveThreshold blockSize (奇数のみ)</summary>
+    public int BlockSize { get; set; } = 7;
+    
+    /// <summary>AdaptiveThreshold c パラメータ</summary>
+    public double C { get; set; } = 1.5;
+    
+    /// <summary>動的blockSize調整の有効化</summary>
+    public bool EnableDynamicBlockSize { get; set; } = true;
+    
+    /// <summary>CLAHEクリップリミット</summary>
+    public double CLAHEClipLimit { get; set; } = 3.0;
+    
+    /// <summary>バイラテラルフィルタのsigmaColor</summary>
+    public double BilateralSigmaColor { get; set; } = 75.0;
+    
+    /// <summary>ガウシアンブラーのsigma</summary>
+    public double GaussianSigma { get; set; } = 0.5;
+    
+    /// <summary>
+    /// パラメータのクローンを作成
+    /// </summary>
+    public GameProfileParameters Clone()
+    {
+        return new GameProfileParameters
+        {
+            BlockSize = BlockSize,
+            C = C,
+            EnableDynamicBlockSize = EnableDynamicBlockSize,
+            CLAHEClipLimit = CLAHEClipLimit,
+            BilateralSigmaColor = BilateralSigmaColor,
+            GaussianSigma = GaussianSigma
+        };
+    }
 }

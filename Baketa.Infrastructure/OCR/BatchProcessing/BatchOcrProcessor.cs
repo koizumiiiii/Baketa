@@ -12,6 +12,7 @@ using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Performance;
+using Baketa.Core.Logging;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -294,6 +295,27 @@ public sealed class BatchOcrProcessor(
                 System.Console.WriteLine($"🚨 [BATCH-PERF] ファイル出力エラー: {ex.Message}");
             }
             
+            // 🔍 [BATCH-DEBUG] 結果詳細ログ追加
+            try
+            {
+                var debugResultMessage = $"🔍 [BATCH-DEBUG] measurement.IsSuccessful={measurement.IsSuccessful}, batchResult.Count={batchResult.Count}";
+                System.Console.WriteLine(debugResultMessage);
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {debugResultMessage}{Environment.NewLine}");
+                    
+                if (measurement.IsSuccessful && batchResult.Count == 0)
+                {
+                    var emptyResultMessage = "⚠️ [BATCH-DEBUG] ProcessBatchInternalAsyncは成功したが、結果が0個";
+                    System.Console.WriteLine(emptyResultMessage);
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {emptyResultMessage}{Environment.NewLine}");
+                }
+            }
+            catch (Exception debugEx)
+            {
+                System.Console.WriteLine($"🚨 [BATCH-DEBUG] デバッグログエラー: {debugEx.Message}");
+            }
+            
             return measurement.IsSuccessful ? batchResult : [];
         }
         
@@ -321,6 +343,18 @@ public sealed class BatchOcrProcessor(
             var phaseTimers = new Dictionary<string, Stopwatch>();
             
             Console.WriteLine($"🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: {image.Width}x{image.Height}");
+            
+            // 🔍 [BATCH-DEBUG] ProcessBatchInternalAsync開始ログをファイルに出力
+            try
+            {
+                var stageStartMessage = $"🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: {image.Width}x{image.Height}";
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {stageStartMessage}{Environment.NewLine}");
+            }
+            catch (Exception debugEx)
+            {
+                System.Console.WriteLine($"🚨 [STAGE-0-DEBUG] ファイル出力エラー: {debugEx.Message}");
+            }
             _logger?.LogInformation("⚡ 高性能バッチOCR処理開始 - 画像: {Width}x{Height}, ウィンドウ: {Handle}", 
                 image.Width, image.Height, windowHandle.ToString("X", CultureInfo.InvariantCulture));
 
@@ -329,7 +363,7 @@ public sealed class BatchOcrProcessor(
             Console.WriteLine($"🔥 [STAGE-1] 並列OCR開始 - 画像サイズ: {image.Width}x{image.Height}");
             
             // 画像を最適サイズのタイルに分割
-            const int optimalTileSize = 512; // GPU処理に最適なサイズ
+            var optimalTileSize = _options.TileSize; // 設定可能なタイルサイズ
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-2] タイル分割開始 - 目標サイズ: {optimalTileSize}x{optimalTileSize}");
             
@@ -490,6 +524,42 @@ public sealed class BatchOcrProcessor(
             
             // 6. パフォーマンス統計更新
             UpdatePerformanceMetrics(processingStartTime, stopwatch.Elapsed, textChunks.Count, true);
+            
+            // 7. BaketaLogManagerでOCR結果を構造化ログに記録
+            try
+            {
+                var operationId = Guid.NewGuid().ToString("N")[..8];
+                var averageConfidence = textChunks.Count > 0 
+                    ? textChunks.Average(chunk => (double)chunk.AverageConfidence) 
+                    : 0.0;
+                var recognizedTexts = textChunks.Select(chunk => chunk.CombinedText).ToList();
+                
+                // パフォーマンス内訳を構築
+                var performanceBreakdown = new Dictionary<string, double>();
+                foreach (var phase in phaseTimers)
+                {
+                    performanceBreakdown[phase.Key] = phase.Value.ElapsedMilliseconds;
+                }
+                
+                var ocrLogEntry = new OcrResultLogEntry
+                {
+                    OperationId = operationId,
+                    Stage = "batch_processing_complete",
+                    ImageSize = new Size(image.Width, image.Height),
+                    TextRegionsFound = textChunks.Count,
+                    AverageConfidence = averageConfidence,
+                    ProcessingTimeMs = overallTimer.ElapsedMilliseconds,
+                    PerformanceBreakdown = performanceBreakdown,
+                    RecognizedTexts = recognizedTexts,
+                    Engine = _ocrEngine.GetType().Name
+                };
+                
+                BaketaLogManager.LogOcrResult(ocrLogEntry);
+            }
+            catch (Exception logEx)
+            {
+                _logger?.LogWarning(logEx, "OCR結果の構造化ログ記録に失敗");
+            }
             
             _logger?.LogInformation("✅ バッチOCR処理完了 - 処理時間: {ElapsedMs}ms, チャンク数: {ChunkCount}", 
                 stopwatch.ElapsedMilliseconds, textChunks.Count);
