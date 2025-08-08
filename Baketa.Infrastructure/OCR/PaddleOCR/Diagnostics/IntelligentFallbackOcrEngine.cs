@@ -80,6 +80,31 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
             availableCount, _strategies.Count);
         return true;
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("IntelligentFallbackOcrEngineウォームアップ開始");
+        
+        // 初期化済みのエンジンのみウォームアップ
+        foreach (var strategy in _strategies.Where(s => s.IsAvailable))
+        {
+            try
+            {
+                var result = await strategy.Engine.WarmupAsync(cancellationToken).ConfigureAwait(false);
+                if (result)
+                {
+                    _logger.LogInformation("エンジン {EngineName} のウォームアップ成功", strategy.Name);
+                    return true; // 最初に成功したエンジンで完了
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "エンジン {EngineName} のウォームアップ失敗", strategy.Name);
+            }
+        }
+        
+        return false;
+    }
 
     public async Task<OcrResults> RecognizeAsync(IImage image, CancellationToken cancellationToken = default)
     {

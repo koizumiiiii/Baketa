@@ -126,6 +126,27 @@ public sealed class OcrEngineInitializerService : IHostedService
         
         _logger.LogInformation("✅ Stage 2完了（モデル読み込み含む）: {ElapsedMs}ms", stageWatch.ElapsedMilliseconds);
         
+        // 🔥 Stage 2.5: ウォームアップ実行
+        stageWatch.Restart();
+        _logger.LogInformation("🔥 Stage 2.5: OCRエンジンのウォームアップ開始");
+        
+        try
+        {
+            var warmupResult = await engine.WarmupAsync(cancellationToken);
+            if (warmupResult)
+            {
+                _logger.LogInformation("✅ Stage 2.5完了（ウォームアップ成功）: {ElapsedMs}ms", stageWatch.ElapsedMilliseconds);
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ Stage 2.5: ウォームアップ失敗（処理は継続）: {ElapsedMs}ms", stageWatch.ElapsedMilliseconds);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ Stage 2.5: ウォームアップ中にエラー（処理は継続）");
+        }
+        
         // Stage 3: 言語別認識モデルの遅延読み込み準備
         stageWatch.Restart();
         _logger.LogInformation("🔄 Stage 3: 認識モデル準備完了");

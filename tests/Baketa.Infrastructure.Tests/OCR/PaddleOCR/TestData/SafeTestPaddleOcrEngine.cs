@@ -84,6 +84,34 @@ public class SafeTestPaddleOcrEngine(
     }
 
     /// <summary>
+    /// ウォームアップを実行します（テスト用）
+    /// </summary>
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogInformation("SafeTestPaddleOcrEngineウォームアップ開始");
+            
+            if (_skipRealInitialization)
+            {
+                // テストモードではダミーのウォームアップ
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                _logger?.LogInformation("SafeTestPaddleOcrEngineウォームアップ完了（テスト用）");
+                return true;
+            }
+            
+            // 実際のウォームアップはスキップ（内部エンジンがnullの場合）
+            _logger?.LogWarning("SafeTestPaddleOcrEngineウォームアップスキップ（実エンジン未実装）");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "SafeTestPaddleOcrEngineウォームアップ中にエラーが発生");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 画像からテキストを認識します
     /// </summary>
     public async Task<OcrResults> RecognizeAsync(

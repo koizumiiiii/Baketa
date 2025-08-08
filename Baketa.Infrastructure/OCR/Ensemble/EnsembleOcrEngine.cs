@@ -197,6 +197,42 @@ public class EnsembleOcrEngine(
         }
     }
 
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("アンサンブルエンジンウォームアップ開始");
+        
+        var warmupTasks = _engines.Where(e => e.IsEnabled).Select(async engineInfo =>
+        {
+            try
+            {
+                var result = await engineInfo.Engine.WarmupAsync(cancellationToken).ConfigureAwait(false);
+                if (result)
+                {
+                    logger.LogDebug("エンジン {EngineName} のウォームアップ成功", engineInfo.EngineName);
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "エンジン {EngineName} のウォームアップ失敗", engineInfo.EngineName);
+                return false;
+            }
+        });
+        
+        var results = await Task.WhenAll(warmupTasks).ConfigureAwait(false);
+        var successCount = results.Count(r => r);
+        
+        if (successCount > 0)
+        {
+            logger.LogInformation("アンサンブルエンジンウォームアップ完了: {Success}/{Total}エンジン成功",
+                successCount, _engines.Count(e => e.IsEnabled));
+            return true;
+        }
+        
+        logger.LogWarning("すべてのエンジンのウォームアップに失敗");
+        return false;
+    }
+
     public async Task<OcrResults> RecognizeAsync(IImage image, IProgress<OcrProgress>? progressCallback = null, CancellationToken cancellationToken = default)
     {
         var ensembleResults = await RecognizeWithDetailsAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);

@@ -65,6 +65,33 @@ public sealed class CompositeOcrEngine : IOcrEngine
         
         return fastInitialized; // 高速エンジンが利用可能なら初期化成功
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("🔥 CompositeOcrEngineウォームアップ開始");
+        
+        // 高精度エンジンが初期化済みの場合のみウォームアップ
+        var heavyEngine = _heavyEngineService.GetInitializedEngine();
+        if (heavyEngine != null)
+        {
+            try
+            {
+                var result = await heavyEngine.WarmupAsync(cancellationToken);
+                _logger.LogInformation($"✅ 高精度OCRエンジンウォームアップ結果: {result}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "⚠️ 高精度OCRエンジンウォームアップ中にエラー");
+                return false;
+            }
+        }
+        else
+        {
+            _logger.LogInformation("⏳ 高精度OCRエンジンは未初期化のためウォームアップをスキップ");
+            return false;
+        }
+    }
 
     /// <summary>
     /// Gemini推奨の段階的OCR処理（ROI指定）

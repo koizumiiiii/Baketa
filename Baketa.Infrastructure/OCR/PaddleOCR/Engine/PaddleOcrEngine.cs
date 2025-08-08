@@ -251,6 +251,53 @@ public class PaddleOcrEngine(
     }
 
     /// <summary>
+    /// エンジンのウォームアップを実行（初回実行時の遅延を解消）
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ウォームアップが成功したか</returns>
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogInformation("🔥 PaddleOCRウォームアップ開始");
+            var stopwatch = Stopwatch.StartNew();
+            
+            // 小さなダミー画像を作成（512x512の白い画像）
+            var dummyImageData = new byte[512 * 512 * 3];
+            for (int i = 0; i < dummyImageData.Length; i++)
+            {
+                dummyImageData[i] = 255; // 白で埋める
+            }
+            
+            // ダミー画像オブジェクトを作成
+            var dummyImage = new Core.Services.Imaging.AdvancedImage(
+                dummyImageData, 
+                512, 
+                512, 
+                Core.Abstractions.Imaging.ImageFormat.Rgb24);
+            
+            // PaddleOCR実行（モデルをメモリにロード）
+            _logger?.LogInformation("📝 ダミー画像でOCR実行中...");
+            
+            // 実際のOCR処理を小さい画像で実行してモデルをロード
+            var result = await RecognizeAsync(dummyImage, progressCallback: null, cancellationToken).ConfigureAwait(false);
+            
+            stopwatch.Stop();
+            _logger?.LogInformation("✅ PaddleOCRウォームアップ完了: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            // 結果を簡単にログ出力
+            _logger?.LogInformation("🔍 ウォームアップOCR結果: 検出領域数={Count}", result.TextRegions.Count);
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ PaddleOCRウォームアップ中にエラーが発生");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 画像からテキストを認識します
     /// </summary>
     /// <param name="image">画像</param>

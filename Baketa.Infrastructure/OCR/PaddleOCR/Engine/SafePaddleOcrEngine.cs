@@ -85,6 +85,31 @@ public class SafePaddleOcrEngine(
         // 実際のPaddleOcrEngineは使用しない（開発・テスト環境では危険）
         throw new NotSupportedException("実際のPaddleOCRエンジンの初期化は開発・テスト環境では無効化されています");
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogInformation("SafePaddleOcrEngineウォームアップ開始");
+            
+            if (_skipRealInitialization)
+            {
+                // モックモードではダミーのウォームアップ
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                _logger?.LogInformation("SafePaddleOcrEngineウォームアップ完了（モック）");
+                return true;
+            }
+            
+            // 実際のウォームアップはスキップ（内部エンジンがnullの場合）
+            _logger?.LogWarning("SafePaddleOcrEngineウォームアップスキップ（実エンジン未実装）");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "SafePaddleOcrEngineウォームアップ中にエラーが発生");
+            return false;
+        }
+    }
 
     /// <summary>
     /// 画像からテキストを認識します

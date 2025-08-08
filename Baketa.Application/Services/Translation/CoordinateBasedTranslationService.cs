@@ -358,71 +358,41 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 .ConfigureAwait(false);
         }
         
-        // 🚀 Geminiフィードバックに基づく最適化：Parallel.ForEachAsyncによる制御された並列処理
-        var results = new string[texts.Count];
+        // 🔧 一時的に並列処理を無効化（TransformersOpusMtEngineのIOException問題調査のため）
+        var results = new List<string>();
         
-        // 最適な並列度：CPUコア数の50%（ONNX Runtimeとの相性を考慮）
-        var maxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2);
-        _logger?.LogInformation("🚀 並列翻訳開始 - チャンク数: {Count}, 最大並列度: {MaxParallel}", 
-            texts.Count, maxDegreeOfParallelism);
+        _logger?.LogInformation("🔄 順次翻訳開始 - チャンク数: {Count}", texts.Count);
         
-        var parallelOptions = new ParallelOptions
+        foreach (var text in texts)
         {
-            CancellationToken = cancellationToken,
-            MaxDegreeOfParallelism = maxDegreeOfParallelism
-        };
-        
-        try
-        {
-            await Parallel.ForEachAsync(
-                texts.Select((text, index) => new { Text = text, Index = index }),
-                parallelOptions,
-                async (item, ct) =>
-                {
-                    try
-                    {
-                        // 個別タイムアウト設定（30秒）
-                        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
-                        
-                        var result = await _translationService.TranslateAsync(
-                            item.Text, sourceLanguage, targetLanguage, null, timeoutCts.Token)
-                            .ConfigureAwait(false);
-                        
-                        results[item.Index] = result.TranslatedText ?? "[Translation Failed]";
-                        
-                        _logger?.LogDebug("✅ チャンク{Index}翻訳完了: {Text} → {Result}", 
-                            item.Index, 
-                            item.Text.Length > 20 ? item.Text.Substring(0, 20) + "..." : item.Text,
-                            results[item.Index].Length > 20 ? results[item.Index].Substring(0, 20) + "..." : results[item.Index]);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        results[item.Index] = "[Translation Timeout]";
-                        _logger?.LogWarning("⚠️ チャンク{Index}タイムアウト", item.Index);
-                    }
-                    catch (Exception ex)
-                    {
-                        results[item.Index] = $"[Error: {ex.GetType().Name}]";
-                        _logger?.LogError(ex, "❌ チャンク{Index}エラー", item.Index);
-                    }
-                }).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger?.LogWarning("⚠️ 並列翻訳処理がキャンセルされました");
-            // 部分的な結果を返す
-            for (int i = 0; i < results.Length; i++)
+            try
             {
-                results[i] ??= "[Cancelled]";
+                var result = await _translationService.TranslateAsync(
+                    text, sourceLanguage, targetLanguage, null, cancellationToken)
+                    .ConfigureAwait(false);
+                results.Add(result.TranslatedText ?? "[Translation Failed]");
+                
+                _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}", 
+                    text.Length > 20 ? text.Substring(0, 20) + "..." : text,
+                    (result.TranslatedText ?? "[Translation Failed]").Length > 20 ? 
+                        result.TranslatedText.Substring(0, 20) + "..." : result.TranslatedText ?? "[Translation Failed]");
+            }
+            catch (TaskCanceledException)
+            {
+                results.Add("[Translation Timeout]");
+                _logger?.LogWarning("⚠️ 翻訳タイムアウト: {Text}", text.Length > 20 ? text.Substring(0, 20) + "..." : text);
+            }
+            catch (Exception ex)
+            {
+                results.Add("[Translation Failed]");
+                _logger?.LogError(ex, "❌ 翻訳エラー: {Text}", text.Length > 20 ? text.Substring(0, 20) + "..." : text);
             }
         }
         
-        _logger?.LogInformation("✅ 並列翻訳完了 - 成功: {Success}/{Total}", 
-            results.Count(r => r != null && !r.StartsWith("[", StringComparison.Ordinal)), 
-            results.Length);
+        _logger?.LogInformation("🏁 順次翻訳完了 - 成功: {Success}/{Total}", 
+            results.Count(r => !r.StartsWith("[", StringComparison.Ordinal)), results.Count);
         
-        return results.ToList();
+        return results;
     }
     
     /// <summary>

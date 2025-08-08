@@ -45,6 +45,32 @@ public sealed class PooledOcrService : IOcrEngine
         
         return await Task.FromResult(true);
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        
+        _logger.LogInformation("🔥 PooledOcrServiceウォームアップ開始");
+        
+        // プールから最初のエンジンを取得してウォームアップ
+        var engine = _enginePool.Get();
+        if (engine == null)
+        {
+            _logger.LogError("❌ PooledOcrService: ウォームアップ用エンジンを取得できませんでした");
+            return false;
+        }
+        
+        try
+        {
+            var result = await engine.WarmupAsync(cancellationToken);
+            _logger.LogInformation($"✅ PooledOcrServiceウォームアップ結果: {result}");
+            return result;
+        }
+        finally
+        {
+            _enginePool.Return(engine);
+        }
+    }
 
     public async Task<OcrResults> RecognizeAsync(
         IImage image,

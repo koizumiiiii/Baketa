@@ -455,6 +455,13 @@ public interface IOcrEngine : IDisposable
     Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default);
     
     /// <summary>
+    /// エンジンのウォームアップを実行（初回実行時の遅延を解消）
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ウォームアップが成功した場合はtrue</returns>
+    Task<bool> WarmupAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
     /// 画像からテキストを認識します
     /// </summary>
     /// <param name="image">画像</param>

@@ -43,6 +43,11 @@ public class AdaptiveOcrEngine(
         
         return result;
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        return await baseOcrEngine.WarmupAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// 適応的前処理を適用してOCR認識を実行

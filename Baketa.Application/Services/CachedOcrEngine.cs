@@ -55,6 +55,16 @@ public sealed class CachedOcrEngine : IOcrEngine
         _logger.LogInformation("⚡ CachedOcrEngine初期化完了 - 時間: {ElapsedMs}ms, 結果: {Result}", stopwatch.ElapsedMilliseconds, result);
         return result;
     }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("🔥 CachedOcrEngine: ウォームアップ処理を内部エンジンに委譲");
+        var stopwatch = Stopwatch.StartNew();
+        var result = await _baseEngine.WarmupAsync(cancellationToken).ConfigureAwait(false);
+        stopwatch.Stop();
+        _logger.LogInformation("✅ CachedOcrEngineウォームアップ完了 - 時間: {ElapsedMs}ms, 結果: {Result}", stopwatch.ElapsedMilliseconds, result);
+        return result;
+    }
 
     public async Task<OcrResults> RecognizeAsync(
         IImage image,
