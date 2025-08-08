@@ -492,11 +492,11 @@ public sealed class ConfidenceBasedReprocessor(
             try
             {
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] 信頼度チェック不合格: {averageConfidence:F3} >= {_settings.ReprocessingThreshold:F3}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] 再処理不要（信頼度十分）: {averageConfidence:F3} >= {_settings.ReprocessingThreshold:F3}{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
-                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 信頼度チェック不合格ログ書き込みエラー: {fileEx.Message}");
+                System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 再処理不要ログ書き込みエラー: {fileEx.Message}");
             }
             return false;
         }

@@ -1267,7 +1267,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     Language = "jpn", // 日本語
                     DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
-                    RecognitionThreshold = 0.6f // 高信頼度のテキストのみ採用し、ノイズを削減
+                    RecognitionThreshold = 0.3f // より多くのテキストを採用（0.6→0.3に緩和）
                 };
                 
                 try
@@ -1290,7 +1290,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     Language = "jpn", // 日本語
                     DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
-                    RecognitionThreshold = 0.6f // 高信頼度のテキストのみ採用し、ノイズを削減
+                    RecognitionThreshold = 0.3f // より多くのテキストを採用（0.6→0.3に緩和）
                 };
                 
                 try
