@@ -14,9 +14,11 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
+using Baketa.Core.Logging;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
+using Baketa.Infrastructure.Translation.Local;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -195,6 +197,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 
                 try
                 {
+                    _logger?.LogInformation("🚀 [BATCH_PROCESSING] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
+                    
                     // バッチ翻訳を試行（未実装の場合は個別処理にフォールバック）
                     var batchResults = await TranslateBatchAsync(
                         batchTexts,
@@ -327,6 +331,45 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
             DebugLogUtility.WriteLog("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
+            
+            // BaketaLogManagerで座標ベース翻訳フローのパフォーマンスログを記録
+            try
+            {
+                var operationId = Guid.NewGuid().ToString("N")[..8];
+                var processingEndTime = DateTime.Now;
+                var processingStartTime = processingEndTime.Subtract(ocrProcessingTime);
+                var totalProcessingTime = (processingEndTime - processingStartTime).TotalMilliseconds;
+                
+                var performanceLogEntry = new PerformanceLogEntry
+                {
+                    OperationId = operationId,
+                    OperationName = "CoordinateBasedTranslation",
+                    DurationMs = totalProcessingTime,
+                    MemoryUsageBytes = GC.GetTotalMemory(false),
+                    BottleneckAnalysis = new Dictionary<string, object>
+                    {
+                        ["ocrProcessingTimeMs"] = ocrProcessingTime.TotalMilliseconds,
+                        ["textChunksProcessed"] = textChunks.Count,
+                        ["imageSize"] = $"{image.Width}x{image.Height}",
+                        ["windowHandle"] = $"0x{windowHandle.ToInt64():X}"
+                    },
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["mode"] = "coordinate_based_translation",
+                        ["hasOverlay"] = true,
+                        ["chunksTranslated"] = textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText))
+                    },
+                    Level = totalProcessingTime > 5000 ? PerformanceLevel.Critical 
+                          : totalProcessingTime > 2000 ? PerformanceLevel.Warning 
+                          : PerformanceLevel.Normal
+                };
+                
+                BaketaLogManager.LogPerformance(performanceLogEntry);
+            }
+            catch (Exception logEx)
+            {
+                _logger?.LogWarning(logEx, "座標ベース翻訳のパフォーマンスログ記録に失敗");
+            }
         }
         catch (TaskCanceledException)
         {
@@ -341,7 +384,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     }
 
     /// <summary>
-    /// バッチ翻訳を実行（Parallel.ForEachAsyncによる最適化）
+    /// バッチ翻訳を実行（TransformersOpusMtEngineバッチ処理による最適化）
     /// </summary>
     private async Task<List<string>> TranslateBatchAsync(
         List<string> texts,
@@ -349,6 +392,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         Language targetLanguage,
         CancellationToken cancellationToken)
     {
+        _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
         // まず、ITranslationServiceがバッチ翻訳をサポートしているか確認
         if (_translationService is ITranslationServiceWithBatch batchService)
         {
@@ -356,6 +400,35 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             return await batchService.TranslateBatchAsync(
                 texts, sourceLanguage, targetLanguage, cancellationToken)
                 .ConfigureAwait(false);
+        }
+
+        // TranslationServiceからTransformersOpusMtEngineを取得してバッチ処理を試行
+        if (TryGetTransformersOpusMtEngine(out var transformersEngine))
+        {
+            _logger?.LogInformation("🚀 [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理を使用");
+            
+            try
+            {
+                // バッチ翻訳リクエストを作成
+                var requests = texts.Select(text => new TranslationRequest
+                {
+                    SourceText = text,
+                    SourceLanguage = sourceLanguage,
+                    TargetLanguage = targetLanguage
+                }).ToList();
+
+                var responses = await transformersEngine.TranslateBatchAsync(requests, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var batchResults = responses.Select(r => r.TranslatedText ?? "[Batch Translation Failed]").ToList();
+                
+                _logger?.LogInformation("✅ [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理成功 - 処理数: {Count}", batchResults.Count);
+                return batchResults;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "⚠️ [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理失敗、個別処理にフォールバック");
+            }
         }
         
         // 🔧 一時的に並列処理を無効化（TransformersOpusMtEngineのIOException問題調査のため）
@@ -393,6 +466,95 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             results.Count(r => !r.StartsWith("[", StringComparison.Ordinal)), results.Count);
         
         return results;
+    }
+
+    /// <summary>
+    /// TransformersOpusMtEngineの取得を試行
+    /// </summary>
+    private bool TryGetTransformersOpusMtEngine(out TransformersOpusMtEngine? engine)
+    {
+        engine = null;
+        
+        try
+        {
+            _logger?.LogInformation("🔍 [BATCH_DEBUG] TryGetTransformersOpusMtEngine開始 - _translationService型: {ServiceType}", _translationService.GetType().Name);
+            
+            // 直接TransformersOpusMtEngineのインスタンスかチェック
+            if (_translationService is TransformersOpusMtEngine directEngine)
+            {
+                _logger?.LogInformation("✅ [BATCH_DEBUG] 直接キャストで取得成功");
+                engine = directEngine;
+                return true;
+            }
+            _logger?.LogInformation("❌ [BATCH_DEBUG] 直接キャスト失敗");
+
+            // TranslationServiceから依存関係注入でTransformersOpusMtEngineを取得
+            var transformersEngine = _serviceProvider.GetService<TransformersOpusMtEngine>();
+            if (transformersEngine != null)
+            {
+                _logger?.LogInformation("✅ [BATCH_DEBUG] ServiceProvider経由で取得成功: {EngineType}", transformersEngine.GetType().Name);
+                engine = transformersEngine;
+                return true;
+            }
+            _logger?.LogInformation("❌ [BATCH_DEBUG] ServiceProvider経由での取得失敗");
+
+            // リフレクションを使ってDefaultTranslationServiceから探索
+            var serviceType = _translationService.GetType();
+            _logger?.LogInformation("🔍 [BATCH_DEBUG] リフレクション探索開始 - 対象型: {ServiceType}", serviceType.Name);
+            
+            // DefaultTranslationServiceの_availableEnginesフィールドを確認
+            var availableEnginesField = serviceType.GetField("_availableEngines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (availableEnginesField != null)
+            {
+                _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesフィールド発見");
+                if (availableEnginesField.GetValue(_translationService) is IEnumerable<object> availableEngines)
+                {
+                    _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesの中身を探索中...");
+                    var engineList = availableEngines.ToList();
+                    _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesエンジン数: {Count}", engineList.Count);
+                    
+                    for (int i = 0; i < engineList.Count; i++)
+                    {
+                        var eng = engineList[i];
+                        _logger?.LogInformation("🔍 [BATCH_DEBUG] エンジン[{Index}]: {EngineType}", i, eng?.GetType().Name);
+                    }
+                    
+                    var transformersEngineFromList = engineList.OfType<TransformersOpusMtEngine>().FirstOrDefault();
+                    if (transformersEngineFromList != null)
+                    {
+                        _logger?.LogInformation("✅ [BATCH_DEBUG] リフレクション経由で取得成功: {EngineType}", transformersEngineFromList.GetType().Name);
+                        engine = transformersEngineFromList;
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                _logger?.LogInformation("❌ [BATCH_DEBUG] _availableEnginesフィールドが見つかりません");
+            }
+            
+            // 従来の_enginesフィールドも確認（CompositeTranslationService用）
+            var enginesField = serviceType.GetField("_engines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (enginesField?.GetValue(_translationService) is IEnumerable<object> engines)
+            {
+                _logger?.LogInformation("🔍 [BATCH_DEBUG] _enginesフィールドから探索成功");
+                var transformersEngineFromList = engines.OfType<TransformersOpusMtEngine>().FirstOrDefault();
+                if (transformersEngineFromList != null)
+                {
+                    _logger?.LogInformation("✅ [BATCH_DEBUG] _enginesフィールドから取得成功");
+                    engine = transformersEngineFromList;
+                    return true;
+                }
+            }
+
+            _logger?.LogWarning("❌ [BATCH_DEBUG] TransformersOpusMtEngineが見つかりませんでした - サービス型: {ServiceType}", serviceType.Name);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "💥 [BATCH_DEBUG] TransformersOpusMtEngine取得中にエラー");
+            return false;
+        }
     }
     
     /// <summary>

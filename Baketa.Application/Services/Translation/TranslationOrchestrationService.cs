@@ -20,6 +20,7 @@ using Baketa.Core.Settings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
+using Baketa.Core.Logging;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
@@ -1266,8 +1267,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 var ocrSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
-                    RecognitionThreshold = 0.3f // より多くのテキストを採用（0.6→0.3に緩和）
+                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
+                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
                 };
                 
                 try
@@ -1289,8 +1290,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 var updatedSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.3f, // テキスト認識精度を向上（断片化とのバランス調整）
-                    RecognitionThreshold = 0.3f // より多くのテキストを採用（0.6→0.3に緩和）
+                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
+                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
                 };
                 
                 try
@@ -1535,6 +1536,30 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             PublishProgress(translationId, TranslationStatus.Completed, 1.0f, "翻訳完了");
 
             var processingTime = DateTime.UtcNow - startTime;
+
+            // BaketaLogManagerで翻訳結果を構造化ログに記録
+            try
+            {
+                var translationLogEntry = new TranslationResultLogEntry
+                {
+                    OperationId = translationId,
+                    Engine = "OrchestrationService", // 実際の翻訳エンジン名を使用することも可能
+                    LanguagePair = $"{settings.DefaultSourceLanguage ?? "ja"}-{settings.DefaultTargetLanguage ?? "en"}",
+                    InputText = originalText,
+                    OutputText = translatedText,
+                    Confidence = ocrConfidence,
+                    ProcessingTimeMs = processingTime.TotalMilliseconds,
+                    InputTokenCount = originalText.Length,
+                    OutputTokenCount = translatedText.Length,
+                    CacheHit = false // 現在はキャッシュ機能未実装
+                };
+                
+                BaketaLogManager.LogTranslationResult(translationLogEntry);
+            }
+            catch (Exception logEx)
+            {
+                _logger?.LogWarning(logEx, "翻訳結果の構造化ログ記録に失敗");
+            }
 
             return new TranslationResult
             {

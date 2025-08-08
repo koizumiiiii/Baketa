@@ -116,6 +116,68 @@ class PersistentOpusMtServer:
                 "source": japanese_text,
                 "processing_time": processing_time
             }
+
+    def translate_batch(self, japanese_texts):
+        """
+        バッチ翻訳：複数の日本語テキストを一度に処理（効率化）
+        """
+        if not self.initialized:
+            return {"success": False, "error": "Service not initialized"}
+        
+        start_time = time.time()
+        translations = []
+        sources = []
+        
+        try:
+            print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] Batch translation started - {len(japanese_texts)} texts", 
+                  file=sys.stderr, flush=True)
+            
+            # バッチ処理：複数テキストを一度にエンコード
+            inputs = self.tokenizer(japanese_texts, return_tensors="pt", padding=True, truncation=True)
+            
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_length=128,
+                    num_beams=3,
+                    length_penalty=1.0,
+                    early_stopping=True
+                )
+            
+            # 各出力をデコード
+            for i, output in enumerate(outputs):
+                translation = self.tokenizer.decode(output, skip_special_tokens=True)
+                translations.append(translation)
+                sources.append(japanese_texts[i] if i < len(japanese_texts) else "")
+                
+                self.translation_count += 1
+                
+                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] Batch item #{i+1}: '{japanese_texts[i] if i < len(japanese_texts) else ''}' → '{translation}'", 
+                      file=sys.stderr, flush=True)
+            
+            processing_time = time.time() - start_time
+            
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Batch translation completed in {processing_time:.3f}s - {len(translations)} translations", 
+                  file=sys.stderr, flush=True)
+            
+            return {
+                "success": True,
+                "translations": translations,
+                "sources": sources,
+                "processing_time": processing_time,
+                "translation_count": len(translations)
+            }
+            
+        except Exception as e:
+            processing_time = time.time() - start_time
+            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] Batch translation failed after {processing_time:.3f}s: {e}", 
+                  file=sys.stderr, flush=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "sources": japanese_texts,
+                "processing_time": processing_time
+            }
     
     def handle_client(self, client_socket, client_address):
         """
@@ -146,12 +208,24 @@ class PersistentOpusMtServer:
                 # 翻訳リクエスト処理
                 try:
                     request = json.loads(data)
-                    japanese_text = request.get("text", "")
                     
-                    if not japanese_text:
-                        response = {"success": False, "error": "Empty text"}
+                    # バッチ翻訳リクエストかチェック
+                    if "batch_texts" in request:
+                        japanese_texts = request.get("batch_texts", [])
+                        
+                        if not japanese_texts or not any(text.strip() for text in japanese_texts):
+                            response = {"success": False, "error": "Empty batch texts"}
+                        else:
+                            response = self.translate_batch(japanese_texts)
+                    
+                    # 単一翻訳リクエスト
                     else:
-                        response = self.translate(japanese_text)
+                        japanese_text = request.get("text", "")
+                        
+                        if not japanese_text:
+                            response = {"success": False, "error": "Empty text"}
+                        else:
+                            response = self.translate(japanese_text)
                     
                     # レスポンス送信
                     response_json = json.dumps(response, ensure_ascii=False) + "\n"
