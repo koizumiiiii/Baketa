@@ -1,5 +1,8 @@
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Settings;
+using Baketa.Core.Models;
+using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,9 +16,11 @@ namespace Baketa.Core.Events.Handlers;
 /// コンストラクタ
 /// </remarks>
 /// <param name="eventAggregator">イベント集約インスタンス</param>
-public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProcessor<OcrCompletedEvent>
+/// <param name="appSettingsOptions">アプリケーション設定</param>
+public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppSettings> appSettingsOptions) : IEventProcessor<OcrCompletedEvent>
     {
         private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        private readonly AppSettings _appSettings = appSettingsOptions?.Value ?? throw new ArgumentNullException(nameof(appSettingsOptions));
         
         /// <inheritdoc />
         public int Priority => 0;
@@ -66,11 +71,28 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator) : IEventProce
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行: '{result.Text}'{Environment.NewLine}");
                 
+                // 翻訳設定から言語情報を取得
+                Console.WriteLine($"🔍 [SETTINGS_DEBUG] _appSettings != null: {_appSettings != null}");
+                Console.WriteLine($"🔍 [SETTINGS_DEBUG] _appSettings.Translation != null: {_appSettings?.Translation != null}");
+                Console.WriteLine($"🔍 [SETTINGS_DEBUG] AutoDetectSourceLanguage値: {_appSettings?.Translation?.AutoDetectSourceLanguage}");
+                Console.WriteLine($"🔍 [SETTINGS_DEBUG] DefaultSourceLanguage値: '{_appSettings?.Translation?.DefaultSourceLanguage}'");
+                Console.WriteLine($"🔍 [SETTINGS_DEBUG] DefaultTargetLanguage値: '{_appSettings?.Translation?.DefaultTargetLanguage}'");
+                
+                var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
+                    ? "auto" 
+                    : _appSettings.Translation.DefaultSourceLanguage;
+                
+                var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
+
+                Console.WriteLine($"🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage})");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage}){Environment.NewLine}");
+
                 // 翻訳要求イベントを発行
                 var translationRequestEvent = new TranslationRequestEvent(
                     ocrResult: result,
-                    sourceLanguage: "auto", // 自動検出
-                    targetLanguage: "en");  // デフォルトは英語（設定から取得すべき）
+                    sourceLanguage: sourceLanguageCode,
+                    targetLanguage: targetLanguageCode);
                 
                 Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前: '{result.Text}'");
                 try

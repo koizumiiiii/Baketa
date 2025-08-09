@@ -205,10 +205,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
             
-            // OCR完了イベントを発行
-            // 🚀 パフォーマンス最適化: EventAggregatorによる65秒の遅延を回避するため一時的に無効化
-            // TODO: Phase 2でバッチ処理実装後に再検討
-            // await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            // OCR完了イベントを発行（双方向翻訳機能のため再有効化）
+            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");

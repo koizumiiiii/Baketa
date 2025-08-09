@@ -23,6 +23,7 @@ namespace Baketa.UI.ViewModels;
     public sealed class MainWindowViewModel : Framework.ViewModelBase
     {
         private readonly INavigationService _navigationService;
+        private readonly Baketa.Application.Services.Translation.TranslationOrchestrationService? _translationOrchestrationService;
         // 選択中のタブインデックス
         private int _selectedTabIndex;
         public int SelectedTabIndex
@@ -138,13 +139,18 @@ namespace Baketa.UI.ViewModels;
             set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _errorMessage, value);
         }
         
+        // 翻訳状態監視プロパティ
+        public bool IsTranslationInProgress => _translationOrchestrationService?.IsAnyTranslationActive ?? false;
+        public bool CanOpenSettings => !IsTranslationInProgress;
+        public string SettingsLockedMessage => "翻訳処理中は設定画面を開けません";
+        
         // 各タブのビューモデル
         public HomeViewModel HomeViewModel { get; }
         public CaptureViewModel CaptureViewModel { get; }
         public TranslationViewModel TranslationViewModel { get; }
         public OverlayViewModel OverlayViewModel { get; }
         public HistoryViewModel HistoryViewModel { get; }
-        public SettingsViewModel SettingsViewModel { get; }
+        public SimpleSettingsViewModel SimpleSettingsViewModel { get; }
         public AccessibilitySettingsViewModel AccessibilitySettingsViewModel { get; }
         
         // コマンド
@@ -172,6 +178,7 @@ namespace Baketa.UI.ViewModels;
         /// <param name="settingsViewModel">設定ビューモデル</param>
         /// <param name="accessibilityViewModel">アクセシビリティ設定ビューモデル</param>
         /// <param name="navigationService">ナビゲーションサービス</param>
+        /// <param name="translationOrchestrationService">翻訳オーケストレーションサービス（オプション）</param>
         /// <param name="logger">ロガー</param>
         public MainWindowViewModel(
             IEventAggregator eventAggregator,
@@ -180,13 +187,15 @@ namespace Baketa.UI.ViewModels;
             TranslationViewModel translationViewModel,
             OverlayViewModel overlayViewModel,
             HistoryViewModel historyViewModel,
-            SettingsViewModel settingsViewModel,
+            SimpleSettingsViewModel simpleSettingsViewModel,
             AccessibilitySettingsViewModel accessibilityViewModel,
             INavigationService navigationService,
+            Baketa.Application.Services.Translation.TranslationOrchestrationService? translationOrchestrationService = null,
             ILogger? logger = null)
             : base(eventAggregator, logger)
         {
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+            _translationOrchestrationService = translationOrchestrationService;
             
             // 各タブのビューモデルを初期化
             HomeViewModel = homeViewModel;
@@ -194,7 +203,7 @@ namespace Baketa.UI.ViewModels;
             TranslationViewModel = translationViewModel;
             OverlayViewModel = overlayViewModel;
             HistoryViewModel = historyViewModel;
-            SettingsViewModel = settingsViewModel;
+            SimpleSettingsViewModel = simpleSettingsViewModel;
             AccessibilitySettingsViewModel = accessibilityViewModel;
             
             // コマンドの実行可否条件
@@ -205,9 +214,13 @@ namespace Baketa.UI.ViewModels;
             var canStopCapture = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
                 x => x.IsCapturing,
                 isCapturing => isCapturing);
+                
+            var canOpenSettings = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
+                x => x.IsTranslationInProgress,
+                isTranslating => !isTranslating);
             
             // コマンドの初期化
-            OpenSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync);
+            OpenSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync, canOpenSettings);
             ExitCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteExitAsync);
             StartCaptureCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteStartCaptureAsync, canStartCapture);
             StopCaptureCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteStopCaptureAsync, canStopCapture);
@@ -218,6 +231,9 @@ namespace Baketa.UI.ViewModels;
             OpenAboutCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenAboutAsync);
             MinimizeToTrayCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteMinimizeToTrayAsync);
             TestTranslationCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteTestTranslationAsync);
+            
+            // 翻訳状態監視の初期化
+            InitializeTranslationStateMonitoring();
             
             // ナビゲーションイベントの購読
             SubscribeToNavigationEvents();
@@ -253,6 +269,43 @@ namespace Baketa.UI.ViewModels;
             
             // OpenAccessibilitySettingsRequestedEvent
             SubscribeToOpenAccessibilitySettings();
+            
+            // CloseSettingsRequestedEvent
+            SubscribeToCloseSettings();
+        }
+
+        
+        /// <summary>
+        /// 翻訳状態監視を初期化します
+        /// </summary>
+        private void InitializeTranslationStateMonitoring()
+        {
+            Console.WriteLine($"🔧 [INIT_TRANSLATION_MONITORING] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}");
+            
+            if (_translationOrchestrationService == null) 
+            {
+                Console.WriteLine("⚠️ [INIT_TRANSLATION_MONITORING] TranslationOrchestrationServiceがnullです - 翻訳状態監視を無効化");
+                return;
+            }
+            
+            Console.WriteLine("🔧 [INIT_TRANSLATION_MONITORING] 翻訳状態監視を開始");
+            
+            // TranslationOrchestrationServiceのIsAnyTranslationActive変更を監視
+            _translationOrchestrationService.WhenAnyValue(x => x.IsAnyTranslationActive)
+                .Subscribe(isActive =>
+                {
+                    this.RaisePropertyChanged(nameof(IsTranslationInProgress));
+                    this.RaisePropertyChanged(nameof(CanOpenSettings));
+                    Console.WriteLine($"🔒 [MAIN_TRANSLATION_STATE] 翻訳状態変更: IsActive={isActive}, CanOpenSettings={CanOpenSettings}");
+                    
+                    // 詳細デバッグログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔒 [MAIN_TRANSLATION_STATE] IsActive={isActive}, CanOpenSettings={CanOpenSettings}, IsTranslationInProgress={IsTranslationInProgress}{Environment.NewLine}");
+                    }
+                    catch { }
+                });
         }
         
         // 以下、イベント登録用ヘルパーメソッド
@@ -296,6 +349,31 @@ namespace Baketa.UI.ViewModels;
             {
                 // アクセシビリティ設定タブに切り替え
                 SelectedTabIndex = 6; // AccessibilitySettingsViewModelタブ
+                await Task.CompletedTask.ConfigureAwait(false);
+            });
+        }
+
+        
+        private void SubscribeToCloseSettings()
+        {
+            // 設定画面を閉じるイベント
+            SubscribeToEvent<UIEvents.CloseSettingsRequestedEvent>(async _ => 
+            {
+                try
+                {
+                    // 設定画面を閉じる（ナビゲーションサービスを使用）
+                    // TODO: 実際の設定画面クローズ処理を実装
+                    Console.WriteLine("🔧 [CLOSE_SETTINGS] 設定画面を閉じる要求を受信");
+                    
+                    // 通知表示
+                    ShowNotification("設定を保存しました", TimeSpan.FromSeconds(2));
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "設定画面のクローズ中にエラーが発生しました");
+                    ShowNotification("設定画面のクローズに失敗しました", TimeSpan.FromSeconds(3));
+                }
+                
                 await Task.CompletedTask.ConfigureAwait(false);
             });
         }

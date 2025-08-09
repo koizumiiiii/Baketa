@@ -129,7 +129,23 @@ internal sealed class AvaloniaNavigationService(
             _logNavigating(_logger, "Settings", null);
 
             // αテスト向けSimpleSettings画面を表示
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始");
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始{Environment.NewLine}");
+            }
+            catch { }
+            
             var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
+            
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}{Environment.NewLine}");
+            }
+            catch { }
             var settingsWindow = new SimpleSettingsView
             {
                 DataContext = settingsViewModel

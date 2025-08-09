@@ -5,6 +5,9 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Abstractions.Imaging;
+using System.Drawing;
 
 namespace Baketa.Application.Services.Capture;
 
@@ -307,11 +310,21 @@ public class AdaptiveCaptureService(
             // 具体的なイベントクラスは既存のアーキテクチャに合わせて実装
             _logger.LogDebug("キャプチャ完了イベント発行準備");
             
-            // TODO: 適切なCaptureCompletedEventを実装して発行
-            await Task.CompletedTask.ConfigureAwait(false);
-            
-            // Note: result は将来のイベント発行で使用予定
-            _ = result; // 未使用警告を抑制
+            // CaptureCompletedEventを発行して、OCR・翻訳パイプラインをトリガー
+            if (result.Success && result.CapturedImages.Count > 0)
+            {
+                var primaryImage = result.CapturedImages[0];
+                var captureRegion = new Rectangle(0, 0, primaryImage.Width, primaryImage.Height);
+                var captureCompletedEvent = new CaptureCompletedEvent(
+                    primaryImage as IImage, 
+                    captureRegion, 
+                    result.ProcessingTime);
+                
+                await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
+                
+                _logger.LogInformation("🎯 CaptureCompletedEvent発行完了: {Width}x{Height}", 
+                    primaryImage.Width, primaryImage.Height);
+            }
         }
         catch (Exception ex)
         {

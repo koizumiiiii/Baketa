@@ -50,9 +50,10 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             new TranslationViewModel(mockEventAggregator),
             new OverlayViewModel(mockEventAggregator),
             new HistoryViewModel(mockEventAggregator),
-            CreateStubSettingsViewModel(mockEventAggregator), // テスト簡素化のためStubSettingsViewModel作成
+            CreateStubSimpleSettingsViewModel(mockEventAggregator), // テスト簡素化のためStubSimpleSettingsViewModel作成
             new AccessibilitySettingsViewModel(mockEventAggregator, Mock.Of<Core.Services.ISettingsService>()),
             Mock.Of<INavigationService>(), // 追加されたINavigationServiceパラメータ
+            null, // TranslationOrchestrationServiceパラメータ（オプション）
             Mock.Of<ILogger>());
         
         SetupMocks();
@@ -81,12 +82,12 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             Mock.Of<ILogger<SignupViewModel>>()));
     }
 
-    private SettingsViewModel CreateStubSettingsViewModel(Core.Abstractions.Events.IEventAggregator eventAggregator)
+    private SimpleSettingsViewModel CreateStubSimpleSettingsViewModel(Core.Abstractions.Events.IEventAggregator eventAggregator)
     {
-        return RunOnUIThread(() => new SettingsViewModel(
+        return RunOnUIThread(() => new SimpleSettingsViewModel(
             eventAggregator,
-            new AccessibilitySettingsViewModel(eventAggregator, Mock.Of<Core.Services.ISettingsService>()),
-            new LanguagePairsViewModel(eventAggregator, Mock.Of<ILogger>()))); // sealedクラスのため実インスタンス作成
+            Mock.Of<ILogger<SimpleSettingsViewModel>>(),
+            null)); // TranslationOrchestrationServiceは任意
     }
 
     /// <summary>

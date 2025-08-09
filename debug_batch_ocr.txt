@@ -1,12 +1,16 @@
-2025-08-08 16:26:53.787 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-08 16:26:53.789 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-08 16:26:53.789 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 16:26:53.787
-2025-08-08 16:26:53.794 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
-2025-08-08 16:27:01.483 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 7691.5606ms, 成功: True
-2025-08-08 16:27:01.485 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=27
-2025-08-08 16:27:21.686 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-08 16:27:21.687 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-08 16:27:21.687 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 16:27:21.686
-2025-08-08 16:27:21.688 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
-2025-08-08 16:27:26.141 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 4452.1032ms, 成功: True
-2025-08-08 16:27:26.143 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=25
+2025-08-10 02:09:20.384 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-10 02:09:20.385 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-10 02:09:20.386 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:20.384
+2025-08-10 02:09:20.391 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-10 02:09:26.499 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 6110.5119ms, 成功: True
+2025-08-10 02:09:26.501 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=18
+2025-08-10 02:09:40.442 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-10 02:09:40.443 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-10 02:09:40.444 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:40.442
+2025-08-10 02:09:40.445 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-10 02:09:45.435 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 4990.0246ms, 成功: True
+2025-08-10 02:09:45.437 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=19
+2025-08-10 02:09:55.601 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-10 02:09:55.601 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-10 02:09:55.602 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:55.601
+2025-08-10 02:09:55.603 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
