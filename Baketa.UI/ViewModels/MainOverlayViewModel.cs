@@ -9,6 +9,7 @@ using Baketa.UI.Framework.Events;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.Views;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
@@ -39,12 +40,14 @@ public class MainOverlayViewModel : ViewModelBase
         ILogger<MainOverlayViewModel> logger,
         IWindowManagerAdapter windowManager,
         IInPlaceTranslationOverlayManager inPlaceOverlayManager,
-        LoadingOverlayManager loadingManager)
+        LoadingOverlayManager loadingManager,
+        IServiceProvider serviceProvider)
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = true; // Phase 3デバッグのため一時的に初期化済みとする
@@ -75,6 +78,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IWindowManagerAdapter _windowManager;
     private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
     private readonly LoadingOverlayManager _loadingManager;
+    private readonly IServiceProvider _serviceProvider;
 
     #region Properties
 
@@ -221,7 +225,7 @@ public class MainOverlayViewModel : ViewModelBase
 
     // UI状態の計算プロパティ
     public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
-    public bool SettingsEnabled => !IsLoading; // ローディング中のみ無効（翻訳中でも設定可能）
+    public bool SettingsEnabled => !IsLoading && !IsTranslationActive; // ローディング中または翻訳実行中は無効
     public bool IsSelectWindowEnabled => IsOcrInitialized && !IsLoading; // OCR初期化完了かつローディング中以外
     public bool IsStartStopEnabled 
     { 
@@ -229,6 +233,15 @@ public class MainOverlayViewModel : ViewModelBase
         {
             var enabled = !IsLoading && IsWindowSelected; // ローディング中以外かつウィンドウ選択済み
             DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, 結果={enabled}");
+            
+            // デバッグ用に実際の状態をファイルログにも出力
+            try
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", 
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}");
+            }
+            catch { }
+            
             return enabled;
         }
     }
@@ -344,7 +357,7 @@ public class MainOverlayViewModel : ViewModelBase
                 this.WhenAnyValue(x => x.IsTranslationActive).ObserveOn(RxApp.MainThreadScheduler), // 翻訳中のみ有効
                 outputScheduler: RxApp.MainThreadScheduler);
             var settingsCmd = ReactiveCommand.Create(ExecuteSettings,
-                this.WhenAnyValue(x => x.IsLoading).Select(x => !x).ObserveOn(RxApp.MainThreadScheduler),
+                this.WhenAnyValue(x => x.IsLoading, x => x.IsTranslationActive, (isLoading, isTranslationActive) => !isLoading && !isTranslationActive).ObserveOn(RxApp.MainThreadScheduler),
                 outputScheduler: RxApp.MainThreadScheduler);
             
             // SettingsCommandの実行をトラッキング
@@ -377,6 +390,25 @@ public class MainOverlayViewModel : ViewModelBase
 
     private void InitializePropertyChangeHandlers()
     {
+        // 初期状態をログ出力 - 直接ファイル書き込みで確実に出力
+        var initMessage1 = $"🎯 [INIT_STATE] IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}";
+        var initMessage2 = $"🎯 [INIT_STATE] IsStartStopEnabled={IsStartStopEnabled}, StartStopText='{StartStopText}'";
+        
+        DebugLogUtility.WriteLog(initMessage1);
+        DebugLogUtility.WriteLog(initMessage2);
+        
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {initMessage1}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {initMessage2}{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"InitializePropertyChangeHandlers ファイル書き込みエラー: {ex.Message}");
+        }
+        
         // IsLoadingプロパティの変更を監視して依存プロパティの変更通知を発行
         this.WhenAnyValue(x => x.IsLoading)
             .Subscribe(isLoading =>
@@ -908,10 +940,8 @@ public class MainOverlayViewModel : ViewModelBase
             
             DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成開始");
 
-            // SimpleSettingsViewModelを作成
-            var settingsViewModel = new SimpleSettingsViewModel(EventAggregator, 
-                Microsoft.Extensions.Logging.LoggerFactoryExtensions.CreateLogger<SimpleSettingsViewModel>(
-                    Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance));
+            // DIコンテナ経由でSimpleSettingsViewModelを取得
+            var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
             var vmHash = settingsViewModel.GetHashCode();
             DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成: {vmHash}");
 
