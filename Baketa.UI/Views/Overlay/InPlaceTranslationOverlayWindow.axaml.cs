@@ -42,6 +42,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     private readonly ILogger<InPlaceTranslationOverlayWindow>? _logger;
     #pragma warning restore CS0649
     private bool _disposed;
+    
+    // フォントサイズ設定（デフォルト値）
+    private static int _globalFontSize = 14;
 
     public InPlaceTranslationOverlayWindow()
     {
@@ -119,8 +122,10 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 Width = overlaySize.Width;
                 Height = overlaySize.Height;
                 
-                // インプレース表示スタイルを適用
-                ApplyInPlaceStyle(optimalFontSize, textChunk.TranslatedText);
+                // インプレース表示スタイルを適用（設定画面のフォントサイズを使用）
+                var configuredFontSize = GetConfiguredFontSize();
+                var finalFontSize = configuredFontSize > 0 ? configuredFontSize : optimalFontSize;
+                ApplyInPlaceStyle(finalFontSize, textChunk.TranslatedText);
                 
                 // ウィンドウを表示
                 Show();
@@ -172,6 +177,25 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     /// すりガラス風インプレース表示スタイルを適用
     /// 自動計算されたフォントサイズとすりガラス風背景で元テキストを美しく隠す
     /// </summary>
+    /// <summary>
+    /// 設定画面で設定されたフォントサイズを取得
+    /// </summary>
+    private static int GetConfiguredFontSize()
+    {
+        return _globalFontSize;
+    }
+    
+    /// <summary>
+    /// 全オーバーレイウィンドウのフォントサイズを更新（静的メソッド）
+    /// </summary>
+    public static void SetGlobalFontSize(int fontSize)
+    {
+        if (fontSize > 0 && fontSize <= 72) // 有効範囲チェック
+        {
+            _globalFontSize = fontSize;
+        }
+    }
+
     private void ApplyInPlaceStyle(int fontSize, string translatedText)
     {
         try

@@ -26,8 +26,7 @@ public class TranslationFlowEventProcessor :
     IEventProcessor<StartTranslationRequestEvent>,
     IEventProcessor<StopTranslationRequestEvent>,
     IEventProcessor<ToggleTranslationDisplayRequestEvent>,
-    IEventProcessor<SettingsChangedEvent>,
-    IEventProcessor<LanguageSettingsChangedEvent>
+    IEventProcessor<SettingsChangedEvent>
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
@@ -308,11 +307,20 @@ public class TranslationFlowEventProcessor :
         try
         {
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始{Environment.NewLine}");
             _logger.LogInformation("設定変更を適用中");
 
             // AR風オーバーレイ設定は新ARシステムで自動管理（設定変更は直接適用される）
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] AR風オーバーレイ設定更新（ARシステムで自動管理）");
             Console.WriteLine($"   透明度: {eventData.OverlayOpacity}, フォントサイズ: {eventData.FontSize}");
+            
+            // フォントサイズを全オーバーレイウィンドウに適用
+            if (eventData.FontSize > 0)
+            {
+                Views.Overlay.InPlaceTranslationOverlayWindow.SetGlobalFontSize(eventData.FontSize);
+                Console.WriteLine($"✅ [TranslationFlowEventProcessor] フォントサイズ設定完了: {eventData.FontSize}");
+            }
 
             // 言語設定が変更された場合は翻訳エンジンを再設定
             if (eventData.SourceLanguage != null && eventData.TargetLanguage != null)
@@ -480,59 +488,5 @@ public class TranslationFlowEventProcessor :
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// 言語設定変更イベントの処理
-    /// </summary>
-    public async Task HandleAsync(LanguageSettingsChangedEvent eventData)
-    {
-        ArgumentNullException.ThrowIfNull(eventData);
-
-        try
-        {
-            _logger.LogInformation("言語設定変更イベントを処理します: {TranslationLanguage}", eventData.TranslationLanguage);
-
-            // 翻訳言語ペアを設定サービスに保存
-            if (!string.IsNullOrEmpty(eventData.TranslationLanguage))
-            {
-                var parts = eventData.TranslationLanguage.Split('→');
-                if (parts.Length == 2)
-                {
-                    var sourceLanguage = parts[0].Trim();
-                    var targetLanguage = parts[1].Trim();
-                    
-                    // 言語コードに変換（表示名から言語コードへ）
-                    var sourceCode = ConvertDisplayNameToLanguageCode(sourceLanguage);
-                    var targetCode = ConvertDisplayNameToLanguageCode(targetLanguage);
-                    
-                    _logger.LogInformation("言語設定を保存: {Source} → {Target}", sourceCode, targetCode);
-                    
-                    // 設定サービスに保存
-                    _settingsService.SetValue("Translation:Languages:DefaultSourceLanguage", sourceCode);
-                    _settingsService.SetValue("Translation:Languages:DefaultTargetLanguage", targetCode);
-                    
-                    _logger.LogInformation("言語設定の保存が完了しました");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "言語設定変更イベントの処理中にエラーが発生しました");
-        }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// 表示名から言語コードに変換
-    /// </summary>
-    private static string ConvertDisplayNameToLanguageCode(string displayName)
-    {
-        return displayName switch
-        {
-            "日本語" or "Japanese" => "ja",
-            "英語" or "English" => "en",
-            "中国語" or "Chinese" => "zh",
-            _ => "en" // デフォルト
-        };
-    }
+    // LanguageSettingsChangedEvent処理は削除済み - SettingsViewModel削除に伴い不要
 }
