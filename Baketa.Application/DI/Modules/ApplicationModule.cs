@@ -113,20 +113,20 @@ namespace Baketa.Application.DI.Modules;
                     var eventAggregator = provider.GetRequiredService<IEventAggregator>();
                     Console.WriteLine($"✅ [DI_DEBUG] IEventAggregator取得成功: {eventAggregator.GetType().Name}");
                     
-                    Console.WriteLine("🔍 [DI_DEBUG] ILogger取得中...");
-                    var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
-                    Console.WriteLine($"✅ [DI_DEBUG] ILogger取得成功: {logger?.GetType().Name ?? "null"}");
+                    Console.WriteLine("🔍 [DI_DEBUG] IBaketaLogger取得中...");
+                    var baketaLogger = provider.GetService<Baketa.Core.Abstractions.Logging.IBaketaLogger>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IBaketaLogger取得成功: {baketaLogger?.GetType().Name ?? "null"}");
                     
                     Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始");
-                    var appSettingsOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AppSettings>>();
+                    var settingsService = provider.GetRequiredService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                         batchOcrProcessor,
                         overlayManager,
                         translationService,
                         provider,
                         eventAggregator,
-                        appSettingsOptions,
-                        logger);
+                        settingsService,
+                        baketaLogger);
                     Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了");
                     return instance;
                 }
