@@ -5,7 +5,9 @@ using System.Reactive;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
+using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Utils;
@@ -22,6 +24,7 @@ public class SimpleSettingsViewModel : ViewModelBase
 {
     private readonly Baketa.Application.Services.Translation.TranslationOrchestrationService? _translationOrchestrationService;
     private readonly ISettingsService? _settingsService;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
     
     private bool _useLocalEngine = true;
     private string _sourceLanguage = "Japanese";
@@ -51,15 +54,29 @@ public class SimpleSettingsViewModel : ViewModelBase
         public int FontSize { get; set; } = 14;
     }
 
+    // ITranslationSettingsの実装クラス
+    private class SimpleTranslationSettings : ITranslationSettings
+    {
+        public bool AutoDetectSourceLanguage { get; set; }
+        public string DefaultSourceLanguage { get; set; } = "";
+        public string DefaultTargetLanguage { get; set; } = "";
+        public string DefaultEngine { get; set; } = "";
+        public bool UseLocalEngine { get; set; }
+        public double ConfidenceThreshold { get; set; }
+        public int TimeoutMs { get; set; }
+    }
+
     public SimpleSettingsViewModel(
         IEventAggregator eventAggregator,
         ILogger<SimpleSettingsViewModel> logger,
         Baketa.Application.Services.Translation.TranslationOrchestrationService? translationOrchestrationService = null,
-        ISettingsService? settingsService = null)
+        ISettingsService? settingsService = null,
+        IUnifiedSettingsService? unifiedSettingsService = null)
         : base(eventAggregator, logger)
     {
         _translationOrchestrationService = translationOrchestrationService;
         _settingsService = settingsService;
+        _unifiedSettingsService = unifiedSettingsService;
         
         var vmHash = GetHashCode();
         DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] コンストラクタ開始");
@@ -669,14 +686,33 @@ public class SimpleSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 設定ファイルから読み込み
+    /// 設定ファイルから読み込み - 統一設定サービス経由
     /// </summary>
     private async Task<SimpleSettingsData> LoadSettingsFromFileAsync()
     {
         try
         {
             var vmHash = GetHashCode();
-            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] LoadSettingsFromFileAsync開始 - ファイルパス: {SettingsFilePath}");
+            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] LoadSettingsFromFileAsync開始 - 統一設定サービス使用: {_unifiedSettingsService != null}");
+            
+            if (_unifiedSettingsService != null)
+            {
+                // 統一設定サービスから読み込み
+                var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+                var unifiedResult = new SimpleSettingsData
+                {
+                    UseLocalEngine = true, // SimpleSettingsでは常にローカルエンジン
+                    SourceLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultSourceLanguage),
+                    TargetLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultTargetLanguage),
+                    FontSize = 14 // デフォルトフォントサイズ（統一設定にフォント設定はないため）
+                };
+                
+                DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスから読み込み完了: UseLocalEngine={unifiedResult.UseLocalEngine}, SourceLanguage={unifiedResult.SourceLanguage}, TargetLanguage={unifiedResult.TargetLanguage}, FontSize={unifiedResult.FontSize}");
+                return unifiedResult;
+            }
+            
+            // フォールバック：直接ファイル読み込み
+            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスが利用できません - 直接ファイル読み込み: {SettingsFilePath}");
             
             if (!File.Exists(SettingsFilePath))
             {
@@ -705,14 +741,36 @@ public class SimpleSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 設定ファイルに保存
+    /// 設定ファイルに保存 - 統一設定サービス経由
     /// </summary>
     private async Task SaveSettingsToFileAsync(SimpleSettingsData settings)
     {
         try
         {
             var vmHash = GetHashCode();
-            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] SaveSettingsToFileAsync開始 - ファイルパス: {SettingsFilePath}");
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] SaveSettingsToFileAsync開始 - 統一設定サービス使用: {_unifiedSettingsService != null}");
+            
+            if (_unifiedSettingsService != null)
+            {
+                // 統一設定サービス経由で保存
+                var translationSettings = new SimpleTranslationSettings
+                {
+                    AutoDetectSourceLanguage = false,
+                    DefaultSourceLanguage = LanguageCodeConverter.ToLanguageCode(settings.SourceLanguage),
+                    DefaultTargetLanguage = LanguageCodeConverter.ToLanguageCode(settings.TargetLanguage),
+                    DefaultEngine = settings.UseLocalEngine ? "OPUS-MT" : "Gemini",
+                    UseLocalEngine = settings.UseLocalEngine,
+                    ConfidenceThreshold = 0.7,
+                    TimeoutMs = 30000
+                };
+                
+                await _unifiedSettingsService.UpdateTranslationSettingsAsync(translationSettings).ConfigureAwait(false);
+                Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービス経由での保存完了: {settings.SourceLanguage} → {settings.TargetLanguage}");
+                return;
+            }
+            
+            // フォールバック：直接ファイル保存
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスが利用できません - 直接ファイル保存: {SettingsFilePath}");
             
             var directory = Path.GetDirectoryName(SettingsFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))

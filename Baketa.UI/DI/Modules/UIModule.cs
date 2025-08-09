@@ -110,7 +110,20 @@ namespace Baketa.UI.DI.Modules;
                     settingsService = null;
                 }
                 
-                return new SimpleSettingsViewModel(eventAggregator, logger, translationOrchestrationService, settingsService);
+                // IUnifiedSettingsServiceを取得
+                Baketa.Core.Abstractions.Settings.IUnifiedSettingsService? unifiedSettingsService = null;
+                try
+                {
+                    unifiedSettingsService = provider.GetRequiredService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
+                    Console.WriteLine($"🔧 [DI_DEBUG] SimpleSettingsViewModel作成 - IUnifiedSettingsService: {unifiedSettingsService.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] SimpleSettingsViewModel作成 - IUnifiedSettingsService取得失敗: {ex.Message}");
+                    unifiedSettingsService = null;
+                }
+                
+                return new SimpleSettingsViewModel(eventAggregator, logger, translationOrchestrationService, settingsService, unifiedSettingsService);
             });
             
             // 認証ビューモデル
