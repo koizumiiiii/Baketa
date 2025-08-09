@@ -12,6 +12,9 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Utilities;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
@@ -37,7 +40,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
-    private readonly AppSettings _appSettings;
+    private readonly IUnifiedSettingsService _settingsService;
+    private readonly IBaketaLogger _baketaLogger;
     private bool _disposed;
 
     public CoordinateBasedTranslationService(
@@ -46,7 +50,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
         IServiceProvider serviceProvider,
         IEventAggregator eventAggregator,
-        IOptions<AppSettings> appSettingsOptions,
+        IUnifiedSettingsService settingsService,
+        IBaketaLogger baketaLogger,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
@@ -54,25 +59,33 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _appSettings = appSettingsOptions?.Value ?? throw new ArgumentNullException(nameof(appSettingsOptions));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _baketaLogger = baketaLogger ?? throw new ArgumentNullException(nameof(baketaLogger));
         _logger = logger;
         
-        // EventAggregator DI注入詳細デバッグ
-        Console.WriteLine($"🔥 [DI_DEBUG] CoordinateBasedTranslationService初期化");
-        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
-        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
-        Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator参照: {eventAggregator}");
+        // 統一ログを使用（重複したConsole.WriteLineを統合）
+        _baketaLogger.LogDebug("CoordinateBasedTranslationService", "サービス初期化完了", new
+        {
+            EventAggregatorType = eventAggregator.GetType().Name,
+            EventAggregatorHash = eventAggregator.GetHashCode(),
+            EventAggregatorReference = eventAggregator.ToString()
+        });
         
-        // AppSettings注入時の設定値確認
-        Console.WriteLine($"🎯 [INIT_SETTINGS] AppSettings注入完了");
-        Console.WriteLine($"🎯 [INIT_SETTINGS] AutoDetectSourceLanguage = {_appSettings.Translation.AutoDetectSourceLanguage}");
-        Console.WriteLine($"🎯 [INIT_SETTINGS] DefaultSourceLanguage = '{_appSettings.Translation.DefaultSourceLanguage}'");
-        Console.WriteLine($"🎯 [INIT_SETTINGS] DefaultTargetLanguage = '{_appSettings.Translation.DefaultTargetLanguage}'");
-        
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] CoordinateBasedTranslationService初期化 - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [INIT_SETTINGS] AutoDetect={_appSettings.Translation.AutoDetectSourceLanguage}, Source='{_appSettings.Translation.DefaultSourceLanguage}', Target='{_appSettings.Translation.DefaultTargetLanguage}'{Environment.NewLine}");
+        // 統一設定サービス注入時の設定値確認
+        try
+        {
+            var translationSettings = _settingsService.GetTranslationSettings();
+            _baketaLogger.LogInformation("CoordinateBasedTranslationService", "統一設定サービス注入完了", new
+            {
+                AutoDetectSourceLanguage = translationSettings.AutoDetectSourceLanguage,
+                DefaultSourceLanguage = translationSettings.DefaultSourceLanguage,
+                DefaultTargetLanguage = translationSettings.DefaultTargetLanguage
+            });
+        }
+        catch (Exception ex)
+        {
+            _baketaLogger.LogError("CoordinateBasedTranslationService", "設定値の取得に失敗", ex);
+        }
         
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
     }
@@ -84,72 +97,21 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     {
         try
         {
-            // ユーザー設定ファイルから直接読み取り
-            var userSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
-                ".baketa", "settings", "translation-settings.json");
+            // 統一設定サービスから翻訳設定を取得
+            var translationSettings = _settingsService.GetTranslationSettings();
             
-            string sourceLanguageCode;
-            string targetLanguageCode;
+            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
+                ? "auto" 
+                : translationSettings.DefaultSourceLanguage;
+            var targetLanguageCode = translationSettings.DefaultTargetLanguage;
             
-            if (File.Exists(userSettingsPath))
-            {
-                try
-                {
-                    var jsonContent = File.ReadAllText(userSettingsPath);
-                    var userSettings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent);
-                    
-                    if (userSettings != null && userSettings.ContainsKey("sourceLanguage") && userSettings.ContainsKey("targetLanguage"))
-                    {
-                        var sourceLanguageName = userSettings["sourceLanguage"].ToString();
-                        var targetLanguageName = userSettings["targetLanguage"].ToString();
-                        
-                        sourceLanguageCode = sourceLanguageName switch
-                        {
-                            "English" => "en",
-                            "Japanese" => "ja",
-                            _ => _appSettings.Translation.DefaultSourceLanguage
-                        };
-                        
-                        targetLanguageCode = targetLanguageName switch
-                        {
-                            "English" => "en", 
-                            "Japanese" => "ja",
-                            _ => _appSettings.Translation.DefaultTargetLanguage
-                        };
-                        
-                        Console.WriteLine($"🎯 [USER_SETTINGS] ユーザー設定使用: {sourceLanguageName} → {targetLanguageName}");
-                        Console.WriteLine($"🎯 [USER_SETTINGS] 変換後: {sourceLanguageCode} → {targetLanguageCode}");
-                    }
-                    else
-                    {
-                        throw new Exception("User settings missing required keys");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"🔥 [USER_SETTINGS_ERROR] ユーザー設定読み込みエラー: {ex.Message}");
-                    // エラー時はappsettings.jsonにフォールバック
-                    sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
-                        ? "auto" 
-                        : _appSettings.Translation.DefaultSourceLanguage;
-                    targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
-                    
-                    Console.WriteLine($"🎯 [FALLBACK_SETTINGS] appsettings.json使用: {sourceLanguageCode} → {targetLanguageCode}");
-                }
-            }
-            else
-            {
-                // ユーザー設定ファイルが存在しない場合はappsettings.jsonを使用
-                sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
-                    ? "auto" 
-                    : _appSettings.Translation.DefaultSourceLanguage;
-                targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
-                
-                Console.WriteLine($"🎯 [FALLBACK_SETTINGS] ユーザー設定なし、appsettings.json使用: {sourceLanguageCode} → {targetLanguageCode}");
-            }
+            Console.WriteLine($"🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'{Environment.NewLine}");
 
-            var sourceLanguage = Language.FromCode(sourceLanguageCode);
-            var targetLanguage = Language.FromCode(targetLanguageCode);
+            // Language enumに変換（統一ユーティリティ使用）
+            var sourceLanguage = LanguageCodeConverter.ToLanguageEnum(sourceLanguageCode, Language.English);
+            var targetLanguage = LanguageCodeConverter.ToLanguageEnum(targetLanguageCode, Language.Japanese);
 
             Console.WriteLine($"🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}");
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
@@ -159,14 +121,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"🔥 [SETTINGS_ERROR] 設定取得エラー: {ex.Message}");
-            // エラー時はappsettings.jsonフォールバック
-            var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
-                ? "auto" 
-                : _appSettings.Translation.DefaultSourceLanguage;
-            var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
-            
-            return (Language.FromCode(sourceLanguageCode), Language.FromCode(targetLanguageCode));
+            _baketaLogger.LogError("CoordinateBasedTranslationService", "設定取得エラー、デフォルト値を使用", ex);
+            // エラー時はデフォルト値を使用
+            return (Language.Japanese, Language.English);
         }
     }
 

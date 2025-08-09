@@ -1,26 +1,30 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Performance;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Services;
-using Baketa.Infrastructure.Services;
-using Baketa.Infrastructure.Translation.Local.Onnx;
-using Baketa.Infrastructure.Translation.Local;
-using Baketa.Infrastructure.Translation;
-using Baketa.Infrastructure.Translation.Complete;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
-using Baketa.Core.Abstractions.OCR;
+using Baketa.Infrastructure.Logging;
 using Baketa.Infrastructure.OCR.Measurement;
-using Baketa.Core.Abstractions.Performance;
 using Baketa.Infrastructure.Performance;
-using System;
-using System.Collections.Generic;
-using System.IO;
+using Baketa.Infrastructure.Services;
+using Baketa.Infrastructure.Services.Settings;
+using Baketa.Infrastructure.Translation;
+using Baketa.Infrastructure.Translation.Complete;
+using Baketa.Infrastructure.Translation.Local;
+using Baketa.Infrastructure.Translation.Local.Onnx;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -174,8 +178,34 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // バックグラウンド同期
             // 例: _1.AddSingleton<IBackgroundSyncService, BackgroundSyncService>();
+            
+            // 統一設定管理サービス
+            RegisterUnifiedSettings(_1);
+            
+            // 統一ログサービス
+            RegisterLoggingServices(_1);
         }
         
+        /// <summary>
+        /// 統一設定管理サービスを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterUnifiedSettings(IServiceCollection services)
+        {
+            // 統一設定管理サービス（Singleton: アプリケーション全体で共有）
+            services.AddSingleton<IUnifiedSettingsService, UnifiedSettingsService>();
+        }
+        
+        /// <summary>
+        /// 統一ログサービスを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterLoggingServices(IServiceCollection services)
+        {
+            // 統一ログサービス（Singleton: アプリケーション全体で共有）
+            services.AddSingleton<IBaketaLogger, BaketaLogger>();
+        }
+
         /// <summary>
         /// このモジュールが依存する他のモジュールの型を取得します。
         /// </summary>
