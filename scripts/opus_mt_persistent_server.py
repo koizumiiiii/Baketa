@@ -24,7 +24,11 @@ import torch
 # transformersのログレベルを下げる
 logging.set_verbosity_error()
 
-MODEL_ID = "Helsinki-NLP/opus-mt-ja-en"
+# 🔄 動的モデル選択: 言語方向に応じてモデルIDを決定
+MODELS = {
+    "ja-en": "Helsinki-NLP/opus-mt-ja-en",  # 日→英
+    "en-ja": "Helsinki-NLP/opus-mt-en-jap"  # 英→日（正式名称: "jap"）
+}
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 29876  # Baketa専用ポート
 
@@ -37,52 +41,67 @@ class PersistentOpusMtServer:
     """
     
     def __init__(self):
-        self.tokenizer = None
-        self.model = None
+        # 🔄 複数モデル同時サポート: 日→英、英→日の両方向
+        self.tokenizers = {}  # {"ja-en": tokenizer, "en-ja": tokenizer}
+        self.models = {}      # {"ja-en": model, "en-ja": model}
         self.initialized = False
         self.server_socket = None
         self.running = False
         self.translation_count = 0
         self.start_time = datetime.now()
         
-    def initialize_model(self):
+    def initialize_models(self):
         """
-        HuggingFace Transformersでモデル初期化（1回のみ実行）
+        🔄 複数モデル同時初期化: 日→英、英→日の両方向サポート
         """
         try:
-            print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Loading tokenizer for {MODEL_ID}...", 
-                  file=sys.stderr, flush=True)
-            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, local_files_only=False)
+            for direction, model_id in MODELS.items():
+                print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Loading tokenizer for {direction} ({model_id})...", 
+                      file=sys.stderr, flush=True)
+                self.tokenizers[direction] = AutoTokenizer.from_pretrained(model_id, local_files_only=False)
+                
+                print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Loading model for {direction} ({model_id})...", 
+                      file=sys.stderr, flush=True)
+                self.models[direction] = AutoModelForSeq2SeqLM.from_pretrained(model_id, local_files_only=False)
+                
+                print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Model {direction} loaded successfully!", 
+                      file=sys.stderr, flush=True)
             
-            print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Loading model for {MODEL_ID}...", 
-                  file=sys.stderr, flush=True)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, local_files_only=False)
-            
-            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Model initialization complete! Ready for high-speed translation.", 
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] All models initialization complete! Ready for bidirectional translation.", 
                   file=sys.stderr, flush=True)
             self.initialized = True
             return True
         except Exception as e:
-            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] Model initialization failed: {e}", 
+            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] Models initialization failed: {e}", 
                   file=sys.stderr, flush=True)
             print(f"📄 Traceback:\n{traceback.format_exc()}", file=sys.stderr, flush=True)
             return False
     
-    def translate(self, japanese_text):
+    def translate(self, text, direction="ja-en"):
         """
-        日本語→英語翻訳（高速実行：0.1-0.5秒目標）
+        🔄 双方向翻訳（高速実行：0.1-0.5秒目標）
+        Args:
+            text: 翻訳するテキスト
+            direction: 翻訳方向 ("ja-en" or "en-ja")
         """
         if not self.initialized:
             return {"success": False, "error": "Service not initialized"}
         
+        if direction not in self.models:
+            return {"success": False, "error": f"Unsupported direction: {direction}"}
+        
         start_time = time.time()
         
         try:
+            # 指定された言語方向のモデルを使用
+            tokenizer = self.tokenizers[direction]
+            model = self.models[direction]
+            
             # HuggingFace Transformers標準処理
-            inputs = self.tokenizer(japanese_text, return_tensors="pt")
+            inputs = tokenizer(text, return_tensors="pt")
             
             with torch.no_grad():
-                outputs = self.model.generate(
+                outputs = model.generate(
                     **inputs,
                     max_length=128,
                     num_beams=3,
@@ -90,18 +109,19 @@ class PersistentOpusMtServer:
                     early_stopping=True
                 )
             
-            translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
             processing_time = time.time() - start_time
             self.translation_count += 1
             
-            print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] Translation #{self.translation_count} completed in {processing_time:.3f}s: '{japanese_text}' → '{translation}'", 
+            print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] Translation #{self.translation_count} [{direction}] completed in {processing_time:.3f}s: '{text}' → '{translation}'", 
                   file=sys.stderr, flush=True)
             
             return {
                 "success": True,
                 "translation": translation,
-                "source": japanese_text,
+                "source": text,
+                "direction": direction,
                 "processing_time": processing_time,
                 "translation_count": self.translation_count
             }
@@ -113,30 +133,40 @@ class PersistentOpusMtServer:
             return {
                 "success": False,
                 "error": str(e),
-                "source": japanese_text,
+                "source": text,
                 "processing_time": processing_time
             }
 
-    def translate_batch(self, japanese_texts):
+    def translate_batch(self, texts, direction="ja-en"):
         """
-        バッチ翻訳：複数の日本語テキストを一度に処理（効率化）
+        🔄 双方向バッチ翻訳：複数テキストを一度に処理（効率化）
+        Args:
+            texts: 翻訳するテキストのリスト
+            direction: 翻訳方向 ("ja-en" or "en-ja")
         """
         if not self.initialized:
             return {"success": False, "error": "Service not initialized"}
+        
+        if direction not in self.models:
+            return {"success": False, "error": f"Unsupported direction: {direction}"}
         
         start_time = time.time()
         translations = []
         sources = []
         
         try:
-            print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] Batch translation started - {len(japanese_texts)} texts", 
+            print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] Batch translation [{direction}] started - {len(texts)} texts", 
                   file=sys.stderr, flush=True)
             
+            # 指定された言語方向のモデルを使用
+            tokenizer = self.tokenizers[direction]
+            model = self.models[direction]
+            
             # バッチ処理：複数テキストを一度にエンコード
-            inputs = self.tokenizer(japanese_texts, return_tensors="pt", padding=True, truncation=True)
+            inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
             
             with torch.no_grad():
-                outputs = self.model.generate(
+                outputs = model.generate(
                     **inputs,
                     max_length=128,
                     num_beams=3,
@@ -146,13 +176,13 @@ class PersistentOpusMtServer:
             
             # 各出力をデコード
             for i, output in enumerate(outputs):
-                translation = self.tokenizer.decode(output, skip_special_tokens=True)
+                translation = tokenizer.decode(output, skip_special_tokens=True)
                 translations.append(translation)
-                sources.append(japanese_texts[i] if i < len(japanese_texts) else "")
+                sources.append(texts[i] if i < len(texts) else "")
                 
                 self.translation_count += 1
                 
-                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] Batch item #{i+1}: '{japanese_texts[i] if i < len(japanese_texts) else ''}' → '{translation}'", 
+                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] Batch item #{i+1} [{direction}]: '{texts[i] if i < len(texts) else ''}' → '{translation}'", 
                       file=sys.stderr, flush=True)
             
             processing_time = time.time() - start_time
@@ -164,6 +194,7 @@ class PersistentOpusMtServer:
                 "success": True,
                 "translations": translations,
                 "sources": sources,
+                "direction": direction,
                 "processing_time": processing_time,
                 "translation_count": len(translations)
             }
@@ -175,7 +206,7 @@ class PersistentOpusMtServer:
             return {
                 "success": False,
                 "error": str(e),
-                "sources": japanese_texts,
+                "sources": texts,
                 "processing_time": processing_time
             }
     
@@ -211,35 +242,37 @@ class PersistentOpusMtServer:
                     
                     # バッチ翻訳リクエストかチェック
                     if "batch_texts" in request:
-                        japanese_texts = request.get("batch_texts", [])
+                        texts = request.get("batch_texts", [])
+                        direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
                         
-                        if not japanese_texts or not any(text.strip() for text in japanese_texts):
+                        if not texts or not any(text.strip() for text in texts):
                             response = {"success": False, "error": "Empty batch texts"}
                         else:
-                            response = self.translate_batch(japanese_texts)
+                            response = self.translate_batch(texts, direction)
                     
                     # 単一翻訳リクエスト
                     else:
-                        japanese_text = request.get("text", "")
+                        text = request.get("text", "")
+                        direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
                         
-                        if not japanese_text:
+                        if not text:
                             response = {"success": False, "error": "Empty text"}
                         else:
                             # 改行文字を含む場合はバッチ処理で対応
-                            if "\n" in japanese_text:
+                            if "\n" in text:
                                 # 改行で分割し、空行を除去
-                                text_lines = [line.strip() for line in japanese_text.split("\n") if line.strip()]
+                                text_lines = [line.strip() for line in text.split("\n") if line.strip()]
                                 
                                 if not text_lines:
                                     response = {"success": False, "error": "Empty text after splitting"}
                                 elif len(text_lines) == 1:
                                     # 実際は1行だった場合は通常翻訳
-                                    response = self.translate(text_lines[0])
+                                    response = self.translate(text_lines[0], direction)
                                 else:
                                     # 複数行の場合はバッチ翻訳して結合
                                     print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] Multi-line text detected - splitting into {len(text_lines)} lines", 
                                           file=sys.stderr, flush=True)
-                                    batch_result = self.translate_batch(text_lines)
+                                    batch_result = self.translate_batch(text_lines, direction)
                                     
                                     if batch_result["success"]:
                                         # バッチ結果を改行で結合
@@ -247,7 +280,7 @@ class PersistentOpusMtServer:
                                         response = {
                                             "success": True,
                                             "translation": combined_translation,
-                                            "source": japanese_text,
+                                            "source": text,
                                             "processing_time": batch_result["processing_time"],
                                             "translation_count": batch_result["translation_count"],
                                             "split_lines": len(text_lines)  # デバッグ用
@@ -256,7 +289,7 @@ class PersistentOpusMtServer:
                                         response = batch_result
                             else:
                                 # 改行なしの通常翻訳
-                                response = self.translate(japanese_text)
+                                response = self.translate(text, direction)
                     
                     # レスポンス送信
                     response_json = json.dumps(response, ensure_ascii=False) + "\n"
@@ -338,7 +371,7 @@ def main():
     server = PersistentOpusMtServer()
     
     # モデル初期化
-    if not server.initialize_model():
+    if not server.initialize_models():
         print(f"💥 [{datetime.now().strftime('%H:%M:%S')}] Failed to initialize model. Exiting.", 
               file=sys.stderr, flush=True)
         sys.exit(1)

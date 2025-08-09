@@ -188,8 +188,14 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             // 全てのリクエストから翻訳対象テキストを抽出
             var sourceTexts = requests.Select(r => r.SourceText).ToList();
             
-            // バッチ翻訳実行
-            var batchResult = await TranslateBatchWithPersistentServerAsync(sourceTexts, cancellationToken).ConfigureAwait(false);
+            // 🌍 バッチ翻訳の言語方向判定（最初のリクエストから判定）
+            var direction = GetTranslationDirection(requests[0].SourceLanguage, requests[0].TargetLanguage);
+            Console.WriteLine($"📦 [BATCH_DIRECTION] バッチ翻訳方向判定: {requests[0].SourceLanguage.Code} → {requests[0].TargetLanguage.Code} = {direction}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 [BATCH_DIRECTION] バッチ翻訳方向判定: {requests[0].SourceLanguage.Code} → {requests[0].TargetLanguage.Code} = {direction}{Environment.NewLine}");
+            
+            // バッチ翻訳実行（言語方向情報付き）
+            var batchResult = await TranslateBatchWithPersistentServerAsync(sourceTexts, direction, cancellationToken).ConfigureAwait(false);
             
             if (batchResult?.Success == true && batchResult.Translations != null)
             {
@@ -264,11 +270,14 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
             $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync 呼び出し - テキスト: '{request.SourceText}'{Environment.NewLine}");
         
-        if (!request.SourceLanguage.Equals(Language.Japanese) || 
-            !request.TargetLanguage.Equals(Language.English))
-        {
-            throw new ArgumentException("このエンジンは日英翻訳のみサポートしています");
-        }
+        // ✅ 言語制限削除: 英→日と日→英の両方向翻訳をサポート
+        // モデルファイル(opus-mt-ja-en.model, opus-mt-en-ja.model)が存在するため両方向対応可能
+        
+        // 🔄 言語方向判定: リクエストから適切な翻訳方向を決定
+        var direction = GetTranslationDirection(request.SourceLanguage, request.TargetLanguage);
+        Console.WriteLine($"🌍 [DIRECTION] 翻訳方向判定: {request.SourceLanguage.Code} → {request.TargetLanguage.Code} = {direction}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [DIRECTION] 翻訳方向判定: {request.SourceLanguage.Code} → {request.TargetLanguage.Code} = {direction}{Environment.NewLine}");
 
         // ⚡ Phase 1.1: キャッシュチェック
         var cacheKey = GenerateCacheKey(request.SourceText, request.SourceLanguage, request.TargetLanguage);
@@ -321,7 +330,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [BOUNDARY-4] メソッド呼び出し直前の最終ログ{Environment.NewLine}");
 
             // 🚨 メソッド呼び出し境界
-            var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, timeoutCts.Token).ConfigureAwait(false);
+            var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, direction, timeoutCts.Token).ConfigureAwait(false);
 
             Console.WriteLine($"⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
@@ -634,6 +643,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// </summary>
     private async Task<BatchTranslationResult?> TranslateBatchWithPersistentServerAsync(
         IList<string> texts, 
+        string direction,
         CancellationToken cancellationToken = default)
     {
         _logger?.LogInformation("📦 [BATCH_SERVER] バッチ翻訳サーバー通信開始 - テキスト数: {Count}", texts.Count);
@@ -655,32 +665,45 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 }
             }
             
+            _logger?.LogInformation("🔗 [BATCH_DETAIL_1] TcpClient作成前");
             using var client = new TcpClient();
+            
+            _logger?.LogInformation("🔗 [BATCH_DETAIL_2] ConnectAsync呼び出し前");
             await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
             
+            _logger?.LogInformation("🔗 [BATCH_DETAIL_3] 接続完了、ストリーム取得前");
             // キャンセレーション再確認
             cancellationToken.ThrowIfCancellationRequested();
             
             var stream = client.GetStream();
             
-            // バッチリクエスト送信
-            var request = new { batch_texts = texts };
+            // バッチリクエスト送信（言語方向情報付き）
+            var request = new { batch_texts = texts, direction = direction };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
             
             _logger?.LogInformation("📤 [BATCH_SERVER] バッチリクエスト送信 - サイズ: {Size} bytes", requestBytes.Length);
             
+            _logger?.LogInformation("📤 [BATCH_DETAIL_4] WriteAsync呼び出し前");
             await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
+            _logger?.LogInformation("📤 [BATCH_DETAIL_5] WriteAsync完了");
             
             // バッチレスポンス受信（長めのタイムアウト）
             var batchTimeout = Math.Max(TranslationTimeoutMs, texts.Count * 1000); // テキスト数に応じて動的調整
+            _logger?.LogInformation("⏰ [BATCH_DETAIL_6] ReadAsync準備 - タイムアウト設定: {Timeout}ms", batchTimeout);
+            
             using var cts = new CancellationTokenSource(batchTimeout);
             var buffer = new byte[8192]; // バッファサイズを増加
+            
+            _logger?.LogInformation("🚨🚨🚨 [BATCH_DETAIL_7] ReadAsync呼び出し前 - HANG発生の可能性大 🚨🚨🚨");
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+            _logger?.LogInformation("✅ [BATCH_DETAIL_8] ReadAsync完了 - bytesRead={BytesRead}", bytesRead);
             
             _logger?.LogInformation("📨 [BATCH_SERVER] バッチレスポンス受信 - サイズ: {Size} bytes", bytesRead);
             
             var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            _logger?.LogInformation("📨 [BATCH_DETAIL_9] レスポンス内容: {ResponseJson}", responseJson);
+            
             var response = JsonSerializer.Deserialize<BatchTranslationResult>(responseJson);
             
             var processingTime = DateTime.Now - startTime;
@@ -704,7 +727,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <summary>
     /// 常駐サーバーを使った高速翻訳（改行文字対応版）
     /// </summary>
-    private async Task<PersistentTranslationResult?> TranslateWithPersistentServerAsync(string text, CancellationToken cancellationToken = default)
+    private async Task<PersistentTranslationResult?> TranslateWithPersistentServerAsync(string text, string direction, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🔥🔥🔥 [NEWLINE_DEBUG] TransformersOpusMtEngine.TranslateWithPersistentServerAsync 実行中！🔥🔥🔥");
         Console.WriteLine($"⚡ [SERVER_TRANSLATE] 常駐サーバー翻訳開始: '{text}'");
@@ -749,7 +772,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 {
                     // 複数行の場合はバッチ翻訳
                     Console.WriteLine($"📦 [MULTI_LINE] 複数行検出({textLines.Count}行) - バッチ翻訳実行");
-                    var batchResult = await TranslateBatchWithPersistentServerAsync(textLines, cancellationToken).ConfigureAwait(false);
+                    var batchResult = await TranslateBatchWithPersistentServerAsync(textLines, direction, cancellationToken).ConfigureAwait(false);
                     
                     if (batchResult?.Success == true && batchResult.Translations != null)
                     {
@@ -806,8 +829,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             var stream = client.GetStream();
             
-            // 翻訳リクエスト送信
-            var request = new { text = text };
+            // 翻訳リクエスト送信（言語方向情報付き）
+            var request = new { text = text, direction = direction };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
             
@@ -1090,17 +1113,45 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <inheritdoc/>
     public override async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
     {
+        // ✅ 両方向翻訳サポート: 日→英、英→日の両方に対応
         return new[]
         {
-            new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.English }
+            new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.English },
+            new LanguagePair { SourceLanguage = Language.English, TargetLanguage = Language.Japanese }
         };
     }
 
     /// <inheritdoc/>
     public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
     {
-        return languagePair.SourceLanguage.Equals(Language.Japanese) && 
-               languagePair.TargetLanguage.Equals(Language.English);
+        // ✅ 両方向翻訳サポート: 日→英、英→日の両方をサポート
+        return (languagePair.SourceLanguage.Equals(Language.Japanese) && 
+                languagePair.TargetLanguage.Equals(Language.English)) ||
+               (languagePair.SourceLanguage.Equals(Language.English) && 
+                languagePair.TargetLanguage.Equals(Language.Japanese));
+    }
+    
+    /// <summary>
+    /// 🌍 言語ペアから適切な翻訳方向を判定
+    /// </summary>
+    /// <param name="sourceLanguage">ソース言語</param>
+    /// <param name="targetLanguage">ターゲット言語</param>
+    /// <returns>翻訳方向 ("ja-en" または "en-ja")</returns>
+    private static string GetTranslationDirection(Language sourceLanguage, Language targetLanguage)
+    {
+        if (sourceLanguage.Equals(Language.Japanese) && targetLanguage.Equals(Language.English))
+        {
+            return "ja-en";
+        }
+        else if (sourceLanguage.Equals(Language.English) && targetLanguage.Equals(Language.Japanese))
+        {
+            return "en-ja";
+        }
+        else
+        {
+            // デフォルト: 日→英（既存の動作を維持）
+            return "ja-en";
+        }
     }
 
     /// <inheritdoc/>
