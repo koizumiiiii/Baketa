@@ -89,44 +89,34 @@ namespace Baketa.Application.DI.Modules;
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
             
+            // ファサードパターン: 依存関係注入の複雑さを軽減
+            services.AddSingleton<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade, 
+                Baketa.Application.Services.Processing.TranslationProcessingFacade>();
+            services.AddSingleton<Baketa.Core.Abstractions.Configuration.IConfigurationFacade,
+                Baketa.Application.Services.Configuration.ConfigurationFacade>();
+            
             // 座標ベース翻訳サービス（Singleton：TranslationOrchestrationServiceから参照されるため）
             services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
             {
-                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始");
+                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (ファサード使用)");
                 
-                // 各依存関係を個別にチェック
                 try
                 {
-                    Console.WriteLine("🔍 [DI_DEBUG] IBatchOcrProcessor取得中...");
-                    var batchOcrProcessor = provider.GetRequiredService<IBatchOcrProcessor>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IBatchOcrProcessor取得成功: {batchOcrProcessor.GetType().Name}");
+                    Console.WriteLine("🔍 [DI_DEBUG] ITranslationProcessingFacade取得中...");
+                    var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
+                    Console.WriteLine($"✅ [DI_DEBUG] ITranslationProcessingFacade取得成功: {processingFacade.GetType().Name}");
                     
-                    Console.WriteLine("🔍 [DI_DEBUG] IInPlaceTranslationOverlayManager取得中...");
-                    var overlayManager = provider.GetRequiredService<IInPlaceTranslationOverlayManager>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IInPlaceTranslationOverlayManager取得成功: {overlayManager.GetType().Name}");
+                    Console.WriteLine("🔍 [DI_DEBUG] IConfigurationFacade取得中...");
+                    var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
                     
-                    Console.WriteLine("🔍 [DI_DEBUG] ITranslationService取得中...");
-                    var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
-                    Console.WriteLine($"✅ [DI_DEBUG] ITranslationService取得成功: {translationService.GetType().Name}");
-                    
-                    Console.WriteLine("🔍 [DI_DEBUG] IEventAggregator取得中...");
-                    var eventAggregator = provider.GetRequiredService<IEventAggregator>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IEventAggregator取得成功: {eventAggregator.GetType().Name}");
-                    
-                    Console.WriteLine("🔍 [DI_DEBUG] IBaketaLogger取得中...");
-                    var baketaLogger = provider.GetService<Baketa.Core.Abstractions.Logging.IBaketaLogger>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IBaketaLogger取得成功: {baketaLogger?.GetType().Name ?? "null"}");
-                    
-                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始");
-                    var settingsService = provider.GetRequiredService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
+                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始 (3パラメータ)");
+                    var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
-                        batchOcrProcessor,
-                        overlayManager,
-                        translationService,
+                        processingFacade,
+                        configurationFacade,
                         provider,
-                        eventAggregator,
-                        settingsService,
-                        baketaLogger);
+                        logger);
                     Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了");
                     return instance;
                 }

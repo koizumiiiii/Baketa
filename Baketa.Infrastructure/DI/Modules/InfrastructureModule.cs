@@ -127,6 +127,11 @@ namespace Baketa.Infrastructure.DI.Modules;
             // ⚡ Phase 1.1: TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, TransformersOpusMtEngine>();
             
+            // 🔧 ファサード実装バッチ処理ハング問題の修正: 具象型でも登録してServiceProviderからの直接取得を可能にする
+            services.AddSingleton<TransformersOpusMtEngine>(provider => 
+                provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationEngine>() as TransformersOpusMtEngine 
+                ?? throw new InvalidOperationException("TransformersOpusMtEngine の取得に失敗しました"));
+            
             Console.WriteLine($"🔧 TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
             Console.WriteLine("⚡ Phase 1.1: LRU翻訳キャッシュ（1000エントリ）が組み込まれています");
         }

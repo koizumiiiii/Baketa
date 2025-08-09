@@ -2,6 +2,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Settings;
 using Baketa.Core.Models;
+using Baketa.Core.Utilities;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
