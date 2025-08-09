@@ -144,10 +144,19 @@ class PersistentOpusMtServer:
             texts: 翻訳するテキストのリスト
             direction: 翻訳方向 ("ja-en" or "en-ja")
         """
+        print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] translate_batch method called", 
+              file=sys.stderr, flush=True)
+        print(f"📋 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Parameters: texts={len(texts) if texts else 0}, direction={direction}", 
+              file=sys.stderr, flush=True)
+        
         if not self.initialized:
+            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Service not initialized", 
+                  file=sys.stderr, flush=True)
             return {"success": False, "error": "Service not initialized"}
         
         if direction not in self.models:
+            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Unsupported direction: {direction}", 
+                  file=sys.stderr, flush=True)
             return {"success": False, "error": f"Unsupported direction: {direction}"}
         
         start_time = time.time()
@@ -155,15 +164,37 @@ class PersistentOpusMtServer:
         sources = []
         
         try:
-            print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] Batch translation [{direction}] started - {len(texts)} texts", 
+            print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Batch translation [{direction}] started - {len(texts)} texts", 
                   file=sys.stderr, flush=True)
             
+            # テキスト一覧をログ出力
+            for i, text in enumerate(texts[:5]):  # 最初の5個まで
+                print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Text[{i}]: '{text[:50]}{'...' if len(text) > 50 else ''}'", 
+                      file=sys.stderr, flush=True)
+            
             # 指定された言語方向のモデルを使用
+            print(f"🔧 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Getting tokenizer and model for direction: {direction}", 
+                  file=sys.stderr, flush=True)
+            
             tokenizer = self.tokenizers[direction]
             model = self.models[direction]
             
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Tokenizer and model obtained successfully", 
+                  file=sys.stderr, flush=True)
+            
             # バッチ処理：複数テキストを一度にエンコード
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Starting tokenizer encoding...", 
+                  file=sys.stderr, flush=True)
+            
             inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+            
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Tokenizer encoding completed", 
+                  file=sys.stderr, flush=True)
+            print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Input tensor shape: {inputs.input_ids.shape if hasattr(inputs, 'input_ids') else 'N/A'}", 
+                  file=sys.stderr, flush=True)
+            
+            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Starting model generation (this might hang)...", 
+                  file=sys.stderr, flush=True)
             
             with torch.no_grad():
                 outputs = model.generate(
@@ -174,8 +205,19 @@ class PersistentOpusMtServer:
                     early_stopping=True
                 )
             
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Model generation completed!", 
+                  file=sys.stderr, flush=True)
+            print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Output tensor shape: {outputs.shape if hasattr(outputs, 'shape') else 'N/A'}", 
+                  file=sys.stderr, flush=True)
+            
             # 各出力をデコード
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Starting output decoding...", 
+                  file=sys.stderr, flush=True)
+            
             for i, output in enumerate(outputs):
+                print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] [BATCH_VERIFICATION] Decoding output #{i+1}...", 
+                      file=sys.stderr, flush=True)
+                
                 translation = tokenizer.decode(output, skip_special_tokens=True)
                 translations.append(translation)
                 sources.append(texts[i] if i < len(texts) else "")
@@ -220,17 +262,32 @@ class PersistentOpusMtServer:
         try:
             while self.running:
                 # リクエスト受信（改行区切りJSON）
+                print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Waiting for client data...", 
+                      file=sys.stderr, flush=True)
+                
                 data = client_socket.recv(4096).decode('utf-8').strip()
+                
+                print(f"📨 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Received data: length={len(data)} bytes", 
+                      file=sys.stderr, flush=True)
+                print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Data preview: {data[:200]}...", 
+                      file=sys.stderr, flush=True)
+                
                 if not data:
+                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Empty data received - client disconnected", 
+                          file=sys.stderr, flush=True)
                     break
                 
                 # 特殊コマンド処理
                 if data == "PING":
+                    print(f"🏓 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] PING command received", 
+                          file=sys.stderr, flush=True)
                     response = {"status": "alive", "uptime_seconds": (datetime.now() - self.start_time).total_seconds(), 
                                "translation_count": self.translation_count}
                     client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
                     continue
                 elif data == "SHUTDOWN":
+                    print(f"🛑 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] SHUTDOWN command received", 
+                          file=sys.stderr, flush=True)
                     self.running = False
                     response = {"status": "shutting_down"}
                     client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
@@ -238,17 +295,34 @@ class PersistentOpusMtServer:
                 
                 # 翻訳リクエスト処理
                 try:
+                    print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Attempting JSON parse...", 
+                          file=sys.stderr, flush=True)
+                    
                     request = json.loads(data)
+                    
+                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] JSON parse successful: {type(request)}", 
+                          file=sys.stderr, flush=True)
+                    print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Request keys: {list(request.keys())}", 
+                          file=sys.stderr, flush=True)
                     
                     # バッチ翻訳リクエストかチェック
                     if "batch_texts" in request:
                         texts = request.get("batch_texts", [])
                         direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
                         
+                        print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Batch request detected: {len(texts)} texts, direction={direction}", 
+                              file=sys.stderr, flush=True)
+                        
                         if not texts or not any(text.strip() for text in texts):
+                            print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Empty batch texts detected", 
+                                  file=sys.stderr, flush=True)
                             response = {"success": False, "error": "Empty batch texts"}
                         else:
+                            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Starting batch translation...", 
+                                  file=sys.stderr, flush=True)
                             response = self.translate_batch(texts, direction)
+                            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Batch translation completed: success={response.get('success', False)}", 
+                                  file=sys.stderr, flush=True)
                     
                     # 単一翻訳リクエスト
                     else:
@@ -292,12 +366,37 @@ class PersistentOpusMtServer:
                                 response = self.translate(text, direction)
                     
                     # レスポンス送信
+                    print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Preparing response...", 
+                          file=sys.stderr, flush=True)
+                    
                     response_json = json.dumps(response, ensure_ascii=False) + "\n"
-                    client_socket.send(response_json.encode('utf-8'))
+                    response_bytes = response_json.encode('utf-8')
+                    
+                    print(f"📏 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response size: {len(response_bytes)} bytes", 
+                          file=sys.stderr, flush=True)
+                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response preview: {response_json[:200]}...", 
+                          file=sys.stderr, flush=True)
+                    
+                    print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Sending response...", 
+                          file=sys.stderr, flush=True)
+                    
+                    client_socket.send(response_bytes)
+                    
+                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response sent successfully", 
+                          file=sys.stderr, flush=True)
                     
                 except json.JSONDecodeError as e:
+                    print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] JSON decode error: {str(e)}", 
+                          file=sys.stderr, flush=True)
+                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Problem data: {data}", 
+                          file=sys.stderr, flush=True)
+                    
                     error_response = {"success": False, "error": f"Invalid JSON: {str(e)}"}
-                    client_socket.send((json.dumps(error_response, ensure_ascii=False) + "\n").encode('utf-8'))
+                    error_json = json.dumps(error_response, ensure_ascii=False) + "\n"
+                    client_socket.send(error_json.encode('utf-8'))
+                    
+                    print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Error response sent", 
+                          file=sys.stderr, flush=True)
                 
         except Exception as e:
             print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] Client handling error: {e}", 

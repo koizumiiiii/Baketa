@@ -9,15 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.UI;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Settings;
-using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Configuration;
 using Baketa.Core.Utilities;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Settings;
-using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Logging;
@@ -34,48 +30,36 @@ namespace Baketa.Application.Services.Translation;
 /// </summary>
 public sealed class CoordinateBasedTranslationService : IDisposable
 {
-    private readonly IBatchOcrProcessor _batchOcrProcessor;
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
-    private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
+    private readonly ITranslationProcessingFacade _processingFacade;
+    private readonly IConfigurationFacade _configurationFacade;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
-    private readonly IUnifiedSettingsService _settingsService;
-    private readonly IBaketaLogger _baketaLogger;
     private bool _disposed;
 
     public CoordinateBasedTranslationService(
-        IBatchOcrProcessor batchOcrProcessor,
-        IInPlaceTranslationOverlayManager overlayManager,
-        Baketa.Core.Abstractions.Translation.ITranslationService translationService,
+        ITranslationProcessingFacade processingFacade,
+        IConfigurationFacade configurationFacade,
         IServiceProvider serviceProvider,
-        IEventAggregator eventAggregator,
-        IUnifiedSettingsService settingsService,
-        IBaketaLogger baketaLogger,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
-        _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
-        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
-        _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
+        _configurationFacade = configurationFacade ?? throw new ArgumentNullException(nameof(configurationFacade));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        _baketaLogger = baketaLogger ?? throw new ArgumentNullException(nameof(baketaLogger));
         _logger = logger;
         
         // 統一ログを使用（重複したConsole.WriteLineを統合）
-        _baketaLogger.LogDebug("CoordinateBasedTranslationService", "サービス初期化完了", new
+        _configurationFacade.Logger?.LogDebug("CoordinateBasedTranslationService", "サービス初期化完了", new
         {
-            EventAggregatorType = eventAggregator.GetType().Name,
-            EventAggregatorHash = eventAggregator.GetHashCode(),
-            EventAggregatorReference = eventAggregator.ToString()
+            EventAggregatorType = _configurationFacade.EventAggregator.GetType().Name,
+            EventAggregatorHash = _configurationFacade.EventAggregator.GetHashCode(),
+            EventAggregatorReference = _configurationFacade.EventAggregator.ToString()
         });
         
         // 統一設定サービス注入時の設定値確認
         try
         {
-            var translationSettings = _settingsService.GetTranslationSettings();
-            _baketaLogger.LogInformation("CoordinateBasedTranslationService", "統一設定サービス注入完了", new
+            var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
+            _configurationFacade.Logger?.LogInformation("CoordinateBasedTranslationService", "統一設定サービス注入完了", new
             {
                 AutoDetectSourceLanguage = translationSettings.AutoDetectSourceLanguage,
                 DefaultSourceLanguage = translationSettings.DefaultSourceLanguage,
@@ -84,7 +68,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
         catch (Exception ex)
         {
-            _baketaLogger.LogError("CoordinateBasedTranslationService", "設定値の取得に失敗", ex);
+            _configurationFacade.Logger?.LogError("CoordinateBasedTranslationService", "設定値の取得に失敗", ex);
         }
         
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
@@ -98,7 +82,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         try
         {
             // 統一設定サービスから翻訳設定を取得
-            var translationSettings = _settingsService.GetTranslationSettings();
+            var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
             
             var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
                 ? "auto" 
@@ -121,7 +105,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
         catch (Exception ex)
         {
-            _baketaLogger.LogError("CoordinateBasedTranslationService", "設定取得エラー、デフォルト値を使用", ex);
+            _configurationFacade.Logger?.LogError("CoordinateBasedTranslationService", "設定取得エラー、デフォルト値を使用", ex);
             // エラー時はデフォルト値を使用
             return (Language.Japanese, Language.English);
         }
@@ -153,8 +137,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 $"バッチOCR処理 - 画像:{image.Width}x{image.Height}")
                 .WithAdditionalInfo($"WindowHandle:0x{windowHandle.ToInt64():X}");
             
-            var textChunks = await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
+            // 🚨 [CRITICAL_FIX] OCR処理直前ログ
+            Console.WriteLine($"🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            
+            var textChunks = await _processingFacade.OcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
+            
+            // 🚨 [CRITICAL_FIX] OCR処理完了直後ログ
+            Console.WriteLine($"🚨 [CRITICAL_FIX] バッチOCR処理完了直後 - ChunkCount: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチOCR処理完了直後 - ChunkCount: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
             
             var ocrResult = ocrMeasurement.Complete();
             var ocrProcessingTime = ocrResult.Duration;
@@ -162,8 +156,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
             
-            // OCR完了イベントを発行（双方向翻訳機能のため再有効化）
-            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            // 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行を無効化してバッチ翻訳を直接実行
+            Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止{Environment.NewLine}");
+                
+            // await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            
+            Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行{Environment.NewLine}");
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
@@ -230,17 +232,38 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             // OCR完了イベントは既に90行目で発行済み（二重発行バグ修正）
             
             // 実際の翻訳処理を実行（バッチ処理で高速化）
+            Console.WriteLine($"🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            
             _logger?.LogInformation("🌐 バッチ翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
             DebugLogUtility.WriteLog($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
             
             // 翻訳サービスの詳細情報をログ出力
-            var serviceType = _translationService.GetType().Name;
+            var serviceType = _processingFacade.TranslationService.GetType().Name;
             DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
             
             // 🚀 Phase 2: バッチ翻訳の実装
+            Console.WriteLine($"🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}{Environment.NewLine}");
+            
             // 空でないテキストチャンクを抽出
             var nonEmptyChunks = textChunks.Where(c => !string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
             var emptyChunks = textChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
+            
+            Console.WriteLine($"🔍 [CHUNK_DEBUG] NonEmpty chunks: {nonEmptyChunks.Count}, Empty chunks: {emptyChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] NonEmpty chunks: {nonEmptyChunks.Count}, Empty chunks: {emptyChunks.Count}{Environment.NewLine}");
+                
+            // チャンク詳細をダンプ
+            for (int i = 0; i < Math.Min(textChunks.Count, 3); i++)
+            {
+                var chunk = textChunks[i];
+                Console.WriteLine($"🔍 [CHUNK_DEBUG] Chunk[{i}]: Text='{chunk.CombinedText}', IsEmpty={string.IsNullOrWhiteSpace(chunk.CombinedText)}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] Chunk[{i}]: Text='{chunk.CombinedText}', IsEmpty={string.IsNullOrWhiteSpace(chunk.CombinedText)}{Environment.NewLine}");
+            }
             
             // 空のチャンクは翻訳をスキップ
             foreach (var emptyChunk in emptyChunks)
@@ -296,7 +319,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 .WithAdditionalInfo($"Service:{serviceType}");
                                 
                             var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
-                            var translationResult = await _translationService.TranslateAsync(
+                            var translationResult = await _processingFacade.TranslationService.TranslateAsync(
                                 chunk.CombinedText, 
                                 sourceLanguage, 
                                 targetLanguage, 
@@ -324,12 +347,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     }
                 }
             }
+            else
+            {
+                Console.WriteLine($"❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.{Environment.NewLine}");
+            }
             
             _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
                 textChunks.Count, textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText) && !c.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal)));
 
             // インプレースオーバーレイ表示を優先的に使用
-            var inPlaceOverlayManager = _serviceProvider.GetService<IInPlaceTranslationOverlayManager>();
+            var inPlaceOverlayManager = _processingFacade.OverlayManager;
             if (inPlaceOverlayManager != null)
             {
                 _logger?.LogInformation("🎯 インプレースオーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
@@ -436,9 +465,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 _logger?.LogWarning(logEx, "座標ベース翻訳のパフォーマンスログ記録に失敗");
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
-            _logger?.LogDebug("座標ベース翻訳処理がキャンセルされました");
+            // 🚨 [CRITICAL_FIX] TaskCanceledException詳細をERRORレベルでログ出力
+            _logger?.LogError(ex, "🚨 座標ベース翻訳処理がキャンセル/タイムアウトしました - これがバッチ翻訳実行されない根本原因");
+            
+            Console.WriteLine($"🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}");
+            Console.WriteLine($"🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}");
+            Console.WriteLine($"🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace}");
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace?.Replace(Environment.NewLine, " | ")}{Environment.NewLine}");
+            
             return;
         }
         catch (Exception ex)
@@ -458,43 +500,117 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         CancellationToken cancellationToken)
     {
         _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
-        // まず、ITranslationServiceがバッチ翻訳をサポートしているか確認
-        if (_translationService is ITranslationServiceWithBatch batchService)
+        Console.WriteLine($"🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}{Environment.NewLine}");
+        
+        // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
+        var transformersEngine = _serviceProvider.GetService<TransformersOpusMtEngine>();
+        if (transformersEngine != null)
         {
-            // バッチ翻訳をサポートしている場合は直接実行
-            return await batchService.TranslateBatchAsync(
-                texts, sourceLanguage, targetLanguage, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        // TranslationServiceからTransformersOpusMtEngineを取得してバッチ処理を試行
-        if (TryGetTransformersOpusMtEngine(out var transformersEngine))
-        {
-            _logger?.LogInformation("🚀 [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理を使用");
+            Console.WriteLine($"🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始{Environment.NewLine}");
+                
+            // Step 1: リクエストサイズの実測
+            var direction = $"{sourceLanguage.Code}-{targetLanguage.Code}";
+            var request = new { batch_texts = texts, direction = direction };
+            var requestJson = System.Text.Json.JsonSerializer.Serialize(request) + "\n";
+            var requestBytes = System.Text.Encoding.UTF8.GetBytes(requestJson);
             
+            Console.WriteLine($"📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes");
+            Console.WriteLine($"📄 [VERIFICATION] リクエストJSON preview: {requestJson.Substring(0, Math.Min(200, requestJson.Length))}...");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes{Environment.NewLine}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📄 [VERIFICATION] リクエストJSON preview: {requestJson.Substring(0, Math.Min(200, requestJson.Length))}...{Environment.NewLine}");
+            
+            // Step 2: タイムアウト付きバッチ翻訳実行
             try
             {
-                // バッチ翻訳リクエストを作成
-                var requests = texts.Select(text => new TranslationRequest
-                {
-                    SourceText = text,
-                    SourceLanguage = sourceLanguage,
-                    TargetLanguage = targetLanguage
-                }).ToList();
-
-                var responses = await transformersEngine.TranslateBatchAsync(requests, cancellationToken)
-                    .ConfigureAwait(false);
-
-                var batchResults = responses.Select(r => r.TranslatedText ?? "[Batch Translation Failed]").ToList();
+                var method = transformersEngine.GetType().GetMethod("TranslateBatchWithPersistentServerAsync", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 
-                _logger?.LogInformation("✅ [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理成功 - 処理数: {Count}", batchResults.Count);
-                return batchResults;
+                if (method != null)
+                {
+                    Console.WriteLine($"🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始{Environment.NewLine}");
+                    
+                    // 10秒タイムアウトを設定
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    
+                    var startTime = DateTime.Now;
+                    var taskResult = method.Invoke(transformersEngine, new object[] { texts, direction, combinedCts.Token });
+                    
+                    if (taskResult is Task task)
+                    {
+                        Console.WriteLine($"⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}{Environment.NewLine}");
+                        
+                        await task.ConfigureAwait(false);
+                        
+                        var endTime = DateTime.Now;
+                        var duration = endTime - startTime;
+                        var batchResult = task.GetType().GetProperty("Result")?.GetValue(task);
+                        
+                        Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms{Environment.NewLine}");
+                        
+                        // 結果を詳細分析
+                        if (batchResult != null)
+                        {
+                            var successProperty = batchResult.GetType().GetProperty("Success");
+                            var translationsProperty = batchResult.GetType().GetProperty("Translations");
+                            var errorProperty = batchResult.GetType().GetProperty("Error");
+                            
+                            var isSuccess = successProperty?.GetValue(batchResult) as bool? ?? false;
+                            var translations = translationsProperty?.GetValue(batchResult) as IList<string>;
+                            var error = errorProperty?.GetValue(batchResult)?.ToString();
+                            
+                            Console.WriteLine($"🔍 [VERIFICATION] 結果分析: Success={isSuccess}, TranslationCount={translations?.Count ?? 0}, Error={error ?? "None"}");
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [VERIFICATION] 結果分析: Success={isSuccess}, TranslationCount={translations?.Count ?? 0}, Error={error ?? "None"}{Environment.NewLine}");
+                            
+                            if (isSuccess && translations != null)
+                            {
+                                Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します{Environment.NewLine}");
+                                return translations.ToList();
+                            }
+                            else
+                            {
+                                Console.WriteLine($"❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック");
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック{Environment.NewLine}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+            {
+                Console.WriteLine($"⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠{Environment.NewLine}");
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "⚠️ [BATCH_PROCESSING] TransformersOpusMtEngineバッチ処理失敗、個別処理にフォールバック");
+                Console.WriteLine($"💥 [VERIFICATION] バッチ翻訳で例外発生: {ex.GetType().Name}: {ex.Message}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [VERIFICATION] バッチ翻訳で例外発生: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
             }
         }
+
+        // 個別翻訳にフォールバック
+        Console.WriteLine($"🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック{Environment.NewLine}");
+        
         
         // 🔧 一時的に並列処理を無効化（TransformersOpusMtEngineのIOException問題調査のため）
         var results = new List<string>();
@@ -505,9 +621,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         {
             try
             {
-                var result = await _translationService.TranslateAsync(
+                Console.WriteLine($"🌍 [FACADE_DEBUG] Individual translate call for: '{text.Substring(0, Math.Min(20, text.Length))}...'");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [FACADE_DEBUG] Individual translate call for: '{text.Substring(0, Math.Min(20, text.Length))}...'{Environment.NewLine}");
+                    
+                var result = await _processingFacade.TranslationService.TranslateAsync(
                     text, sourceLanguage, targetLanguage, null, cancellationToken)
                     .ConfigureAwait(false);
+                    
+                Console.WriteLine($"🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null"}...'");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null"}...'{Environment.NewLine}");
                 results.Add(result.TranslatedText ?? "[Translation Failed]");
                 
                 _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}", 
@@ -542,10 +666,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         
         try
         {
-            _logger?.LogInformation("🔍 [BATCH_DEBUG] TryGetTransformersOpusMtEngine開始 - _translationService型: {ServiceType}", _translationService.GetType().Name);
+            _logger?.LogInformation("🔍 [BATCH_DEBUG] TryGetTransformersOpusMtEngine開始 - _translationService型: {ServiceType}", _processingFacade.TranslationService.GetType().Name);
             
             // 直接TransformersOpusMtEngineのインスタンスかチェック
-            if (_translationService is TransformersOpusMtEngine directEngine)
+            if (_processingFacade.TranslationService is TransformersOpusMtEngine directEngine)
             {
                 _logger?.LogInformation("✅ [BATCH_DEBUG] 直接キャストで取得成功");
                 engine = directEngine;
@@ -564,7 +688,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("❌ [BATCH_DEBUG] ServiceProvider経由での取得失敗");
 
             // リフレクションを使ってDefaultTranslationServiceから探索
-            var serviceType = _translationService.GetType();
+            var serviceType = _processingFacade.TranslationService.GetType();
             _logger?.LogInformation("🔍 [BATCH_DEBUG] リフレクション探索開始 - 対象型: {ServiceType}", serviceType.Name);
             
             // DefaultTranslationServiceの_availableEnginesフィールドを確認
@@ -572,7 +696,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             if (availableEnginesField != null)
             {
                 _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesフィールド発見");
-                if (availableEnginesField.GetValue(_translationService) is IEnumerable<object> availableEngines)
+                if (availableEnginesField.GetValue(_processingFacade.TranslationService) is IEnumerable<object> availableEngines)
                 {
                     _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesの中身を探索中...");
                     var engineList = availableEngines.ToList();
@@ -600,7 +724,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             // 従来の_enginesフィールドも確認（CompositeTranslationService用）
             var enginesField = serviceType.GetField("_engines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (enginesField?.GetValue(_translationService) is IEnumerable<object> engines)
+            if (enginesField?.GetValue(_processingFacade.TranslationService) is IEnumerable<object> engines)
             {
                 _logger?.LogInformation("🔍 [BATCH_DEBUG] _enginesフィールドから探索成功");
                 var transformersEngineFromList = engines.OfType<TransformersOpusMtEngine>().FirstOrDefault();
@@ -634,13 +758,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
             DebugLogUtility.WriteLog("🖼️ インプレース翻訳オーバーレイ表示開始");
             
-            DebugLogUtility.WriteLog($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - _overlayManager null?: {_overlayManager == null}");
-            if (_overlayManager != null)
+            DebugLogUtility.WriteLog($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - overlayManager null?: {_processingFacade.OverlayManager == null}");
+            if (_processingFacade.OverlayManager != null)
             {
                 // 各TextChunkを個別にインプレース表示
                 foreach (var textChunk in textChunks)
                 {
-                    await _overlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
+                    await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
@@ -708,11 +832,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 try
                 {
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前");
-                    Console.WriteLine($"🔥 [DEBUG] EventAggregator型: {_eventAggregator.GetType().FullName}");
-                    Console.WriteLine($"🔥 [DEBUG] EventAggregatorハッシュ: {_eventAggregator.GetHashCode()}");
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregator型: {_configurationFacade.EventAggregator.GetType().FullName}");
+                    Console.WriteLine($"🔥 [DEBUG] EventAggregatorハッシュ: {_configurationFacade.EventAggregator.GetHashCode()}");
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {_eventAggregator.GetType().FullName}, ハッシュ: {_eventAggregator.GetHashCode()}{Environment.NewLine}");
-                    await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {_configurationFacade.EventAggregator.GetType().FullName}, ハッシュ: {_configurationFacade.EventAggregator.GetHashCode()}{Environment.NewLine}");
+                    await _configurationFacade.EventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し完了");
                 }
                 catch (Exception publishEx)
@@ -754,8 +878,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         
         try
         {
-            var batchOcrAvailable = _batchOcrProcessor != null;
-            var overlayAvailable = _overlayManager != null;
+            var batchOcrAvailable = _processingFacade.OcrProcessor != null;
+            var overlayAvailable = _processingFacade.OverlayManager != null;
             var available = batchOcrAvailable && overlayAvailable;
             
             DebugLogUtility.WriteLog($"🔍 [CoordinateBasedTranslationService] 座標ベース翻訳システム可用性チェック:");
@@ -785,13 +909,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         try
         {
             // MultiWindowOverlayManagerのクリーンアップ
-            if (_overlayManager is IDisposable disposableOverlayManager)
+            if (_processingFacade.OverlayManager is IDisposable disposableOverlayManager)
             {
                 disposableOverlayManager.Dispose();
             }
 
             // BatchOcrProcessorのクリーンアップ
-            if (_batchOcrProcessor is IDisposable disposableBatchProcessor)
+            if (_processingFacade.OcrProcessor is IDisposable disposableBatchProcessor)
             {
                 disposableBatchProcessor.Dispose();
             }
