@@ -147,6 +147,7 @@ namespace Baketa.UI;
             services.AddSingleton<IConfiguration>(configuration);
             
             // appsettings.jsonから設定を読み込み
+            services.Configure<Baketa.Core.Settings.AppSettings>(configuration);
             services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
                 configuration.GetSection("TranslationEngineStatus"));
             
@@ -362,7 +363,6 @@ namespace Baketa.UI;
             var viewModelTypes = new[]
             {
                 typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
-                typeof(Baketa.UI.ViewModels.SettingsViewModel),
                 typeof(Baketa.UI.ViewModels.LanguagePairsViewModel)
                 // typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindowは使用されていないため無効化
             };

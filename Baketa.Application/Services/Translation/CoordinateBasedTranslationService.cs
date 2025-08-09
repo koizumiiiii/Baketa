@@ -1,19 +1,22 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Logging;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
@@ -30,18 +33,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 {
     private readonly IBatchOcrProcessor _batchOcrProcessor;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
-    private readonly ITranslationService _translationService;
+    private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
+    private readonly AppSettings _appSettings;
     private bool _disposed;
 
     public CoordinateBasedTranslationService(
         IBatchOcrProcessor batchOcrProcessor,
         IInPlaceTranslationOverlayManager overlayManager,
-        ITranslationService translationService,
+        Baketa.Core.Abstractions.Translation.ITranslationService translationService,
         IServiceProvider serviceProvider,
         IEventAggregator eventAggregator,
+        IOptions<AppSettings> appSettingsOptions,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
@@ -49,6 +54,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _appSettings = appSettingsOptions?.Value ?? throw new ArgumentNullException(nameof(appSettingsOptions));
         _logger = logger;
         
         // EventAggregator DI注入詳細デバッグ
@@ -56,10 +62,112 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
         Console.WriteLine($"🔥 [DI_DEBUG] EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
         Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator参照: {eventAggregator}");
+        
+        // AppSettings注入時の設定値確認
+        Console.WriteLine($"🎯 [INIT_SETTINGS] AppSettings注入完了");
+        Console.WriteLine($"🎯 [INIT_SETTINGS] AutoDetectSourceLanguage = {_appSettings.Translation.AutoDetectSourceLanguage}");
+        Console.WriteLine($"🎯 [INIT_SETTINGS] DefaultSourceLanguage = '{_appSettings.Translation.DefaultSourceLanguage}'");
+        Console.WriteLine($"🎯 [INIT_SETTINGS] DefaultTargetLanguage = '{_appSettings.Translation.DefaultTargetLanguage}'");
+        
         System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
             $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] CoordinateBasedTranslationService初期化 - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [INIT_SETTINGS] AutoDetect={_appSettings.Translation.AutoDetectSourceLanguage}, Source='{_appSettings.Translation.DefaultSourceLanguage}', Target='{_appSettings.Translation.DefaultTargetLanguage}'{Environment.NewLine}");
         
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
+    }
+
+    /// <summary>
+    /// 設定から言語ペアを取得（ユーザー設定を優先）
+    /// </summary>
+    private (Language sourceLanguage, Language targetLanguage) GetLanguagesFromSettings()
+    {
+        try
+        {
+            // ユーザー設定ファイルから直接読み取り
+            var userSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
+                ".baketa", "settings", "translation-settings.json");
+            
+            string sourceLanguageCode;
+            string targetLanguageCode;
+            
+            if (File.Exists(userSettingsPath))
+            {
+                try
+                {
+                    var jsonContent = File.ReadAllText(userSettingsPath);
+                    var userSettings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent);
+                    
+                    if (userSettings != null && userSettings.ContainsKey("sourceLanguage") && userSettings.ContainsKey("targetLanguage"))
+                    {
+                        var sourceLanguageName = userSettings["sourceLanguage"].ToString();
+                        var targetLanguageName = userSettings["targetLanguage"].ToString();
+                        
+                        sourceLanguageCode = sourceLanguageName switch
+                        {
+                            "English" => "en",
+                            "Japanese" => "ja",
+                            _ => _appSettings.Translation.DefaultSourceLanguage
+                        };
+                        
+                        targetLanguageCode = targetLanguageName switch
+                        {
+                            "English" => "en", 
+                            "Japanese" => "ja",
+                            _ => _appSettings.Translation.DefaultTargetLanguage
+                        };
+                        
+                        Console.WriteLine($"🎯 [USER_SETTINGS] ユーザー設定使用: {sourceLanguageName} → {targetLanguageName}");
+                        Console.WriteLine($"🎯 [USER_SETTINGS] 変換後: {sourceLanguageCode} → {targetLanguageCode}");
+                    }
+                    else
+                    {
+                        throw new Exception("User settings missing required keys");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🔥 [USER_SETTINGS_ERROR] ユーザー設定読み込みエラー: {ex.Message}");
+                    // エラー時はappsettings.jsonにフォールバック
+                    sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
+                        ? "auto" 
+                        : _appSettings.Translation.DefaultSourceLanguage;
+                    targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
+                    
+                    Console.WriteLine($"🎯 [FALLBACK_SETTINGS] appsettings.json使用: {sourceLanguageCode} → {targetLanguageCode}");
+                }
+            }
+            else
+            {
+                // ユーザー設定ファイルが存在しない場合はappsettings.jsonを使用
+                sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
+                    ? "auto" 
+                    : _appSettings.Translation.DefaultSourceLanguage;
+                targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
+                
+                Console.WriteLine($"🎯 [FALLBACK_SETTINGS] ユーザー設定なし、appsettings.json使用: {sourceLanguageCode} → {targetLanguageCode}");
+            }
+
+            var sourceLanguage = Language.FromCode(sourceLanguageCode);
+            var targetLanguage = Language.FromCode(targetLanguageCode);
+
+            Console.WriteLine($"🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}{Environment.NewLine}");
+
+            return (sourceLanguage, targetLanguage);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🔥 [SETTINGS_ERROR] 設定取得エラー: {ex.Message}");
+            // エラー時はappsettings.jsonフォールバック
+            var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
+                ? "auto" 
+                : _appSettings.Translation.DefaultSourceLanguage;
+            var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
+            
+            return (Language.FromCode(sourceLanguageCode), Language.FromCode(targetLanguageCode));
+        }
     }
 
     /// <summary>
@@ -199,11 +307,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 {
                     _logger?.LogInformation("🚀 [BATCH_PROCESSING] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
                     
-                    // バッチ翻訳を試行（未実装の場合は個別処理にフォールバック）
+                    // バッチ翻訳を試行（設定から言語を取得）
+                    var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
                     var batchResults = await TranslateBatchAsync(
                         batchTexts,
-                        Language.Japanese,
-                        Language.English,
+                        sourceLanguage,
+                        targetLanguage,
                         cancellationToken).ConfigureAwait(false);
                     
                     // 結果をチャンクに反映
@@ -231,10 +340,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
                                 .WithAdditionalInfo($"Service:{serviceType}");
                                 
+                            var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
                             var translationResult = await _translationService.TranslateAsync(
                                 chunk.CombinedText, 
-                                Language.Japanese, 
-                                Language.English, 
+                                sourceLanguage, 
+                                targetLanguage, 
                                 null,
                                 cancellationToken).ConfigureAwait(false);
                             

@@ -118,12 +118,14 @@ namespace Baketa.Application.DI.Modules;
                     Console.WriteLine($"✅ [DI_DEBUG] ILogger取得成功: {logger?.GetType().Name ?? "null"}");
                     
                     Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始");
+                    var appSettingsOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AppSettings>>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                         batchOcrProcessor,
                         overlayManager,
                         translationService,
                         provider,
                         eventAggregator,
+                        appSettingsOptions,
                         logger);
                     Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了");
                     return instance;

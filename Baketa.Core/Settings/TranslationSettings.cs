@@ -26,7 +26,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "言語自動検出", 
         Description = "翻訳元言語を自動的に検出します")]
-    public bool AutoDetectSourceLanguage { get; set; } = true;
+    public bool AutoDetectSourceLanguage { get; set; } = false;
     
     /// <summary>
     /// デフォルトソース言語
@@ -34,7 +34,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultSourceLanguage { get; set; } = "ja";
+    public string DefaultSourceLanguage { get; set; } = "en";
     
     /// <summary>
     /// デフォルトターゲット言語
@@ -42,7 +42,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultTargetLanguage { get; set; } = "en";
+    public string DefaultTargetLanguage { get; set; } = "ja";
     
     /// <summary>
     /// 翻訳遅延時間（ミリ秒）
