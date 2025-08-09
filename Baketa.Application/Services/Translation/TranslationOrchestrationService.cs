@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Models;
@@ -23,6 +24,7 @@ using Baketa.Core.Performance;
 using Baketa.Core.Logging;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
 
 namespace Baketa.Application.Services.Translation;
@@ -31,7 +33,7 @@ namespace Baketa.Application.Services.Translation;
 /// 翻訳オーケストレーションサービス実装
 /// キャプチャ、翻訳、UI表示の統合管理を担当
 /// </summary>
-public sealed class TranslationOrchestrationService : ITranslationOrchestrationService, IDisposable
+public sealed class TranslationOrchestrationService : ITranslationOrchestrationService, INotifyPropertyChanged, IDisposable
 {
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
@@ -137,6 +139,17 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     /// <inheritdoc />
     public TranslationMode CurrentMode => _isAutomaticTranslationActive ? TranslationMode.Automatic : TranslationMode.Manual;
+
+    #endregion
+
+    #region INotifyPropertyChanged Implementation
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     #endregion
 
@@ -258,6 +271,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 cancellationToken, _disposeCts.Token);
 
             _isAutomaticTranslationActive = true;
+            OnPropertyChanged(nameof(IsAnyTranslationActive));
 
             // TODO: モード変更イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(
@@ -428,6 +442,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _automaticTranslationCts = null;
             _automaticTranslationTask = null;
             _isAutomaticTranslationActive = false;
+            OnPropertyChanged(nameof(IsAnyTranslationActive));
             
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
             lock (_lastTranslatedTextLock)
@@ -479,6 +494,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
 
             _isSingleTranslationActive = true;
+            OnPropertyChanged(nameof(IsAnyTranslationActive));
 
             _logger?.LogInformation("単発翻訳を実行します");
 
@@ -492,6 +508,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         finally
         {
             _isSingleTranslationActive = false;
+            OnPropertyChanged(nameof(IsAnyTranslationActive));
             _singleTranslationSemaphore.Release();
         }
     }
@@ -623,15 +640,73 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private CoreTranslationSettings GetTranslationSettings()
     {
-        // 実際の設定サービスから設定を取得
-        var sourceLanguage = _settingsService.GetValue("Translation:Languages:DefaultSourceLanguage", "ja");
-        var targetLanguage = _settingsService.GetValue("Translation:Languages:DefaultTargetLanguage", "en");
+        // 🚨 CRITICAL FIX: translation-settings.jsonから直接読み取り
+        var sourceLanguageFromFile = "English"; // デフォルト値
+        var targetLanguageFromFile = "Japanese"; // デフォルト値
+        
+        try
+        {
+            // translation-settings.jsonから直接読み取り
+            var translationSettingsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".baketa", "settings", "translation-settings.json");
+                
+            if (File.Exists(translationSettingsPath))
+            {
+                var json = File.ReadAllText(translationSettingsPath);
+                using var doc = JsonDocument.Parse(json);
+                
+                if (doc.RootElement.TryGetProperty("sourceLanguage", out var sourceLangElement))
+                {
+                    sourceLanguageFromFile = sourceLangElement.GetString() ?? "English";
+                }
+                
+                // 🔧 FIX: targetLanguageも読み取るように修正
+                if (doc.RootElement.TryGetProperty("targetLanguage", out var targetLangElement))
+                {
+                    targetLanguageFromFile = targetLangElement.GetString() ?? "Japanese";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ [TRANSLATION_SETTINGS_DEBUG] JSON読み取り失敗: {ex.Message}");
+        }
+        
+        // 言語コード変換
+        var sourceLanguageCode = GetLanguageCode(sourceLanguageFromFile);
+        var targetLanguageCode = GetLanguageCode(targetLanguageFromFile);
+        
+        // 緊急デバッグ: 設定取得状況を詳細ログ
+        Console.WriteLine($"🔍 [TRANSLATION_SETTINGS_DEBUG] 取得した設定:");
+        Console.WriteLine($"   - sourceLanguageFromFile: '{sourceLanguageFromFile}' → '{sourceLanguageCode}'");
+        Console.WriteLine($"   - targetLanguageFromFile: '{targetLanguageFromFile}' → '{targetLanguageCode}'");
+        Console.WriteLine($"   - _settingsService type: {_settingsService?.GetType()?.Name ?? "null"}");
+        
+        // ファイルログに記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TRANSLATION_SETTINGS_DEBUG] Source='{sourceLanguageFromFile}'→'{sourceLanguageCode}', Target='{targetLanguageFromFile}'→'{targetLanguageCode}'{Environment.NewLine}");
+        }
+        catch { }
+        
+        Console.WriteLine($"🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode})");
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode}){Environment.NewLine}");
+        }
+        catch { }
+        
+        _logger?.LogDebug("🌍 翻訳言語設定取得: {SourceDisplay}→{TargetDisplay} ({SourceCode}→{TargetCode})", 
+            sourceLanguageFromFile, targetLanguageFromFile, sourceLanguageCode, targetLanguageCode);
         
         return new CoreTranslationSettings
         {
-            // 実際の言語設定を使用
-            DefaultSourceLanguage = sourceLanguage,
-            DefaultTargetLanguage = targetLanguage,
+            // 設定ファイルから読み取った言語設定を使用
+            DefaultSourceLanguage = sourceLanguageCode,
+            DefaultTargetLanguage = targetLanguageCode,
             // テスト環境では短い間隔を使用して高速化
             TranslationDelayMs = 100 // 100ms間隔でテストを高速化
         };
@@ -657,6 +732,31 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             "pt" => "Portuguese",
             "ru" => "Russian",
             _ => languageCode.ToUpperInvariant()
+        };
+    }
+
+    /// <summary>
+    /// 日本語表示名を言語コードに変換します
+    /// </summary>
+    /// <param name="displayName">日本語表示名（例：「英語」「簡体字中国語」）</param>
+    /// <returns>言語コード（例：「en」「zh-cn」）</returns>
+    private static string GetLanguageCode(string displayName)
+    {
+        return displayName switch
+        {
+            "日本語" => "ja",
+            "英語" => "en",
+            "English" => "en",  // 🔧 FIX: 英語表示名追加
+            "Japanese" => "ja", // 🔧 FIX: 日本語表示名追加
+            "簡体字中国語" => "zh-cn",
+            "繁体字中国語" => "zh-tw",
+            "韓国語" => "ko",
+            "フランス語" => "fr",
+            "ドイツ語" => "de",
+            "スペイン語" => "es",
+            "ポルトガル語" => "pt",
+            "ロシア語" => "ru",
+            _ => displayName.ToLowerInvariant() // 不明な場合はそのまま小文字で返す
         };
     }
 
@@ -1079,6 +1179,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     {
         var translationId = Guid.NewGuid().ToString("N")[..8];
         
+        // 🚨 CRITICAL DEBUG: ExecuteSingleTranslationAsync呼び出し確認
+        try
+        {
+            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}{Environment.NewLine}");
+            Console.WriteLine($"🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}");
+        }
+        catch { }
+        
         try
         {
             // 進行状況を通知
@@ -1133,10 +1242,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         TranslationMode mode, 
         CancellationToken cancellationToken)
     {
+        // 🚨 CRITICAL DEBUG: ExecuteTranslationAsync呼び出し確認
+        try
+        {
+            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}{Environment.NewLine}");
+            Console.WriteLine($"🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}");
+        }
+        catch { }
+        
+        // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成前
+        try
+        {
+            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成開始{Environment.NewLine}");
+        }
+        catch { }
+        
         using var overallMeasurement = new PerformanceMeasurement(
             MeasurementType.OverallProcessing, 
             $"翻訳実行全体 - ID:{translationId}, Mode:{mode}")
             .WithAdditionalInfo($"ImageType:{image?.GetType().Name}");
+
+        // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成完了
+        try
+        {
+            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成完了{Environment.NewLine}");
+        }
+        catch { }
 
         var startTime = DateTime.UtcNow;
         string originalText = string.Empty;
@@ -1144,12 +1278,50 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
         try
         {
+            // 🚨 CRITICAL DEBUG: try文開始直後
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] try文開始直後{Environment.NewLine}");
+            }
+            catch { }
+            
+            // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し直前
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し直前{Environment.NewLine}");
+            }
+            catch { }
+            
+            // 🚨 CRITICAL DEBUG: 座標ベース翻訳チェック（直接ファイル書き込み）
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] 座標ベース翻訳チェック開始{Environment.NewLine}");
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}{Environment.NewLine}");
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}{Environment.NewLine}");
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}{Environment.NewLine}");
+            }
+            catch { }
+            
             // 座標ベース翻訳システムの利用可能性をチェック
             DebugLogUtility.WriteLog($"🔍 座標ベース翻訳チェック:");
             DebugLogUtility.WriteLog($"   📦 _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}");
             DebugLogUtility.WriteLog($"   ✅ IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}");
             DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}");
             DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle: {_targetWindowHandle?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}");
+            
+            // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し完了
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し完了{Environment.NewLine}");
+            }
+            catch { }
             DebugLogUtility.WriteLog($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
             
             // 座標ベース翻訳システムが利用可能な場合は座標ベース処理を実行
@@ -1227,7 +1399,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         OriginalText = "",
                         TranslatedText = "",
                         DetectedLanguage = "ja",
-                        TargetLanguage = "en",
+                        TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                         Confidence = 1.0f,
                         ProcessingTime = DateTime.UtcNow - startTime,
                         IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ
@@ -1485,6 +1657,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 翻訳設定を取得
             var settings = GetTranslationSettings();
             
+            // 🚨 CRITICAL DEBUG: originalTextの内容を確認
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [OCR_RESULT] originalText='{originalText}', Length={originalText?.Length ?? -1}, IsNullOrWhiteSpace={string.IsNullOrWhiteSpace(originalText)}{Environment.NewLine}");
+            }
+            catch { }
+            
             string translatedText;
             if (!string.IsNullOrWhiteSpace(originalText))
             {
@@ -1615,7 +1795,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 Mode = mode,
                 OriginalText = string.Empty,
                 TranslatedText = $"翻訳エラー: {ex.Message}",
-                TargetLanguage = "en",
+                TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                 Confidence = 0.0f,
                 ProcessingTime = processingTime
             };
