@@ -258,6 +258,10 @@ namespace Baketa.Infrastructure.Translation;
             string? context = null,
             CancellationToken cancellationToken = default)
         {
+            Console.WriteLine($"🚨 [BATCH_DEBUG] DefaultTranslationService.TranslateBatchAsync呼び出し - テキスト数: {texts?.Count ?? 0}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BATCH_DEBUG] DefaultTranslationService.TranslateBatchAsync呼び出し - テキスト数: {texts?.Count ?? 0}{Environment.NewLine}");
+                
             ArgumentNullException.ThrowIfNull(texts, nameof(texts));
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
@@ -266,6 +270,10 @@ namespace Baketa.Infrastructure.Translation;
             {
                 throw new ArgumentException("テキストのコレクションが空です。", nameof(texts));
             }
+            
+            Console.WriteLine($"🚨 [BATCH_DEBUG] バリデーション完了 - ActiveEngine: {ActiveEngine?.Name ?? "null"}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BATCH_DEBUG] バリデーション完了 - ActiveEngine: {ActiveEngine?.Name ?? "null"}{Environment.NewLine}");
 
             // リクエスト作成
             var transRequests = new List<TransModels.TranslationRequest>();
@@ -281,7 +289,17 @@ namespace Baketa.Infrastructure.Translation;
             }
 
             // 翻訳実行
-            return await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
+            Console.WriteLine($"🚨 [BATCH_DEBUG] ActiveEngine.TranslateBatchAsync呼び出し直前 - リクエスト数: {transRequests.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BATCH_DEBUG] ActiveEngine.TranslateBatchAsync呼び出し直前 - リクエスト数: {transRequests.Count}{Environment.NewLine}");
+                
+            var result = await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
                 .ConfigureAwait(false);
+                
+            Console.WriteLine($"🚨 [BATCH_DEBUG] ActiveEngine.TranslateBatchAsync呼び出し完了 - 結果数: {result?.Count ?? 0}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BATCH_DEBUG] ActiveEngine.TranslateBatchAsync呼び出し完了 - 結果数: {result?.Count ?? 0}{Environment.NewLine}");
+                
+            return result;
         }
     }

@@ -153,6 +153,10 @@ namespace Baketa.UI.DI.Modules;
             // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
             services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
             
+            // OPUS-MT事前起動サービス（バックグラウンドサーバー初期化）
+            // IOpusMtPrewarmServiceはApplicationModuleで登録済み
+            
+            
             // オーバーレイ関連サービス
             services.AddTransient<Baketa.UI.Overlay.AvaloniaOverlayWindowAdapter>();
             

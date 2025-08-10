@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Extensions;
 using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
+using Baketa.Core.Abstractions.Logging;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;
@@ -33,25 +35,46 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 /// PaddleOCRエンジンの実装クラス（IOcrEngine準拠）
 /// 多重初期化防止機能付き
 /// </summary>
-public class PaddleOcrEngine(
-    IModelPathResolver modelPathResolver,
-    IOcrPreprocessingService ocrPreprocessingService,
-    ITextMerger textMerger,
-    IOcrPostProcessor ocrPostProcessor,
-    IGpuMemoryManager gpuMemoryManager,
-    ILogger<PaddleOcrEngine>? logger = null) : IOcrEngine
+public class PaddleOcrEngine : IOcrEngine
 {
     // 🚨 シングルトンパターン: 多重初期化防止
     private static readonly object _globalLock = new();
     private static volatile int _instanceCount = 0;
     private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
 
-    private readonly IModelPathResolver _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
-    private readonly IOcrPreprocessingService _ocrPreprocessingService = ocrPreprocessingService ?? throw new ArgumentNullException(nameof(ocrPreprocessingService));
-    private readonly ITextMerger _textMerger = textMerger ?? throw new ArgumentNullException(nameof(textMerger));
-    private readonly IOcrPostProcessor _ocrPostProcessor = ocrPostProcessor ?? throw new ArgumentNullException(nameof(ocrPostProcessor));
-    private readonly IGpuMemoryManager _gpuMemoryManager = gpuMemoryManager ?? throw new ArgumentNullException(nameof(gpuMemoryManager));
-    private readonly ILogger<PaddleOcrEngine>? _logger = logger;
+    // Dependencies
+    private readonly IModelPathResolver __modelPathResolver;
+    private readonly IOcrPreprocessingService __ocrPreprocessingService;
+    private readonly ITextMerger __textMerger;
+    private readonly IOcrPostProcessor __ocrPostProcessor;
+    private readonly IGpuMemoryManager __gpuMemoryManager;
+    private readonly IUnifiedSettingsService __unifiedSettingsService;
+    private readonly IUnifiedLoggingService? _unifiedLoggingService;
+    private readonly ILogger<PaddleOcrEngine>? __logger;
+
+    public PaddleOcrEngine(
+        IModelPathResolver _modelPathResolver,
+        IOcrPreprocessingService _ocrPreprocessingService,
+        ITextMerger _textMerger,
+        IOcrPostProcessor _ocrPostProcessor,
+        IGpuMemoryManager _gpuMemoryManager,
+        IUnifiedSettingsService _unifiedSettingsService,
+        IUnifiedLoggingService? unifiedLoggingService = null,
+        ILogger<PaddleOcrEngine>? _logger = null)
+    {
+        __modelPathResolver = _modelPathResolver ?? throw new ArgumentNullException(nameof(_modelPathResolver));
+        __ocrPreprocessingService = _ocrPreprocessingService ?? throw new ArgumentNullException(nameof(_ocrPreprocessingService));
+        __textMerger = _textMerger ?? throw new ArgumentNullException(nameof(_textMerger));
+        __ocrPostProcessor = _ocrPostProcessor ?? throw new ArgumentNullException(nameof(_ocrPostProcessor));
+        __gpuMemoryManager = _gpuMemoryManager ?? throw new ArgumentNullException(nameof(_gpuMemoryManager));
+        __unifiedSettingsService = _unifiedSettingsService ?? throw new ArgumentNullException(nameof(_unifiedSettingsService));
+        _unifiedLoggingService = unifiedLoggingService;
+        __logger = _logger;
+        
+        // インスタンス作成追跡
+        TrackInstanceCreation();
+    }
+
     private readonly object _lockObject = new();
     
     // インスタンス追跡
@@ -96,11 +119,11 @@ public class PaddleOcrEngine(
     protected virtual void TrackInstanceCreation()
     {
         var newCount = Interlocked.Increment(ref _instanceCount);
-        _logger?.LogWarning("🚨 PaddleOcrEngine インスタンス #{Count} が作成されました", newCount);
+        __logger?.LogWarning("🚨 PaddleOcrEngine インスタンス #{Count} が作成されました", newCount);
         
         if (newCount > 1)
         {
-            _logger?.LogError("⚠️ 多重インスタンス検出! 合計: {Count}個", newCount);
+            __logger?.LogError("⚠️ 多重インスタンス検出! 合計: {Count}個", newCount);
             
             // スタックトレースで呼び出し元を特定
             var stackTrace = new StackTrace(true);
@@ -110,7 +133,7 @@ public class PaddleOcrEngine(
                 var method = frame.GetMethod();
                 var fileName = frame.GetFileName();
                 var lineNumber = frame.GetFileLineNumber();
-                _logger?.LogError("  at {Method} in {File}:line {Line}", 
+                __logger?.LogError("  at {Method} in {File}:line {Line}", 
                     method?.DeclaringType?.Name + "." + method?.Name, 
                     System.IO.Path.GetFileName(fileName), 
                     lineNumber);
@@ -140,12 +163,12 @@ public class PaddleOcrEngine(
         var totalSw = System.Diagnostics.Stopwatch.StartNew();
         var stepSw = System.Diagnostics.Stopwatch.StartNew();
         
-        _logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis started.");
+        __logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis started.");
 
         // インスタンス作成追跡
         stepSw.Restart();
         TrackInstanceCreation();
-        _logger?.LogInformation("🔍 Step 1: Instance tracking finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+        __logger?.LogInformation("🔍 Step 1: Instance tracking finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
         
         settings ??= new OcrEngineSettings();
         
@@ -153,16 +176,16 @@ public class PaddleOcrEngine(
         stepSw.Restart();
         if (!settings.IsValid())
         {
-            _logger?.LogError("無効な設定でOCRエンジンの初期化が試行されました");
+            __logger?.LogError("無効な設定でOCRエンジンの初期化が試行されました");
             return false;
         }
-        _logger?.LogInformation("🔍 Step 2: Settings validation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+        __logger?.LogInformation("🔍 Step 2: Settings validation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
         ThrowIfDisposed();
         
         if (IsInitialized)
         {
-            _logger?.LogDebug("PaddleOCRエンジンは既に初期化されています");
+            __logger?.LogDebug("PaddleOCRエンジンは既に初期化されています");
             return true;
         }
 
@@ -175,37 +198,37 @@ public class PaddleOcrEngine(
                 settings.UseGpu = false;
                 settings.EnableMultiThread = false;
                 settings.WorkerCount = 1;
-                DebugLogUtility.WriteLog("🔧 [DEBUG] スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 [DEBUG] スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
             }
             
-            _logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
+            __logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
                 settings.Language, settings.UseGpu, settings.EnableMultiThread);
-            DebugLogUtility.WriteLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
-            _logger?.LogInformation("🔍 Step 3: Settings preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
+            __logger?.LogInformation("🔍 Step 3: Settings preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
             // ネイティブライブラリの事前チェック
             stepSw.Restart();
             if (!CheckNativeLibraries())
             {
-                _logger?.LogError("必要なネイティブライブラリが見つかりません");
+                __logger?.LogError("必要なネイティブライブラリが見つかりません");
                 return false;
             }
-            _logger?.LogInformation("🔍 Step 4: Native library check finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            __logger?.LogInformation("🔍 Step 4: Native library check finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
             // モデル設定の準備 - 🚨 このステップが17秒の主犯と予想
             stepSw.Restart();
             var models = await PrepareModelsAsync(settings.Language, cancellationToken).ConfigureAwait(false);
-            _logger?.LogInformation("🔍 Step 5: Model preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            __logger?.LogInformation("🔍 Step 5: Model preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             if (models == null)
             {
-                _logger?.LogError("モデルの準備に失敗しました");
+                __logger?.LogError("モデルの準備に失敗しました");
                 return false;
             }
 
             // 安全な初期化処理 - 🚨 またはこのステップが犯人
             stepSw.Restart();
             var success = await InitializeEnginesSafelyAsync(models, settings, cancellationToken).ConfigureAwait(false);
-            _logger?.LogInformation("🔍 Step 6: Engine initialization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            __logger?.LogInformation("🔍 Step 6: Engine initialization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             
             if (success)
             {
@@ -213,39 +236,39 @@ public class PaddleOcrEngine(
                 _settings = settings.Clone();
                 CurrentLanguage = settings.Language;
                 IsInitialized = true;
-                _logger?.LogInformation("PaddleOCRエンジンの初期化完了");
-                _logger?.LogInformation("🔍 Step 7: Finalization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+                __logger?.LogInformation("PaddleOCRエンジンの初期化完了");
+                __logger?.LogInformation("🔍 Step 7: Finalization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             }
             
             totalSw.Stop();
-            _logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis completed. Total time: {ElapsedMilliseconds}ms.", totalSw.ElapsedMilliseconds);
-            DebugLogUtility.WriteLog($"🔍 【ボトルネック分析完了】Total: {totalSw.ElapsedMilliseconds}ms");
+            __logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis completed. Total time: {ElapsedMilliseconds}ms.", totalSw.ElapsedMilliseconds);
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 【ボトルネック分析完了】Total: {totalSw.ElapsedMilliseconds}ms");
             
             return success;
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogInformation("OCRエンジンの初期化がキャンセルされました");
+            __logger?.LogInformation("OCRエンジンの初期化がキャンセルされました");
             throw;
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "OCRエンジン初期化で操作エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCRエンジン初期化で操作エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "OCRエンジン初期化で引数エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCRエンジン初期化で引数エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (TypeInitializationException ex)
         {
-            _logger?.LogError(ex, "OCRエンジン初期化で型初期化エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCRエンジン初期化で型初期化エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (OutOfMemoryException ex)
         {
-            _logger?.LogError(ex, "OCRエンジン初期化でメモリ不足: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCRエンジン初期化でメモリ不足: {ExceptionType}", ex.GetType().Name);
             return false;
         }
     }
@@ -259,7 +282,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            _logger?.LogInformation("🔥 PaddleOCRウォームアップ開始");
+            __logger?.LogInformation("🔥 PaddleOCRウォームアップ開始");
             var stopwatch = Stopwatch.StartNew();
             
             // 小さなダミー画像を作成（512x512の白い画像）
@@ -277,22 +300,22 @@ public class PaddleOcrEngine(
                 Core.Abstractions.Imaging.ImageFormat.Rgb24);
             
             // PaddleOCR実行（モデルをメモリにロード）
-            _logger?.LogInformation("📝 ダミー画像でOCR実行中...");
+            __logger?.LogInformation("📝 ダミー画像でOCR実行中...");
             
             // 実際のOCR処理を小さい画像で実行してモデルをロード
             var result = await RecognizeAsync(dummyImage, progressCallback: null, cancellationToken).ConfigureAwait(false);
             
             stopwatch.Stop();
-            _logger?.LogInformation("✅ PaddleOCRウォームアップ完了: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            __logger?.LogInformation("✅ PaddleOCRウォームアップ完了: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
             // 結果を簡単にログ出力
-            _logger?.LogInformation("🔍 ウォームアップOCR結果: 検出領域数={Count}", result.TextRegions.Count);
+            __logger?.LogInformation("🔍 ウォームアップOCR結果: 検出領域数={Count}", result.TextRegions.Count);
             
             return true;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "❌ PaddleOCRウォームアップ中にエラーが発生");
+            __logger?.LogError(ex, "❌ PaddleOCRウォームアップ中にエラーが発生");
             return false;
         }
     }
@@ -337,7 +360,7 @@ public class PaddleOcrEngine(
                 // ダブルチェックロッキングパターンで競合状態を回避
                 if (!IsInitialized)
                 {
-                    DebugLogUtility.WriteLog("⚠️ OCRエンジンが未初期化のため、自動初期化を実行します");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("⚠️ OCRエンジンが未初期化のため、自動初期化を実行します");
                     
                     // 初期化処理は非同期だが、ここではlockを使用しているため同期的に処理
                     var initTask = InitializeAsync(_settings, cancellationToken);
@@ -347,28 +370,28 @@ public class PaddleOcrEngine(
                     {
                         throw new InvalidOperationException("OCRエンジンの自動初期化に失敗しました。システム要件を確認してください。");
                     }
-                    DebugLogUtility.WriteLog("✅ OCRエンジンの自動初期化が完了しました");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ OCRエンジンの自動初期化が完了しました");
                 }
             }
         }
 
         var stopwatch = Stopwatch.StartNew();
         
-        DebugLogUtility.WriteLog($"🔍 PaddleOcrEngine.RecognizeAsync開始:");
-        DebugLogUtility.WriteLog($"   ✅ 初期化状態: {IsInitialized}");
-        DebugLogUtility.WriteLog($"   🌐 現在の言語: {CurrentLanguage} (認識精度向上のため言語ヒント適用)");
-        DebugLogUtility.WriteLog($"   📏 画像サイズ: {image.Width}x{image.Height}");
-        DebugLogUtility.WriteLog($"   🎯 ROI: {regionOfInterest?.ToString() ?? "なし（全体）"}");
-        DebugLogUtility.WriteLog($"   📊 認識設定: 検出閾値={_settings.DetectionThreshold}, 認識閾値={_settings.RecognitionThreshold}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PaddleOcrEngine.RecognizeAsync開始:");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ 初期化状態: {IsInitialized}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌐 現在の言語: {CurrentLanguage} (認識精度向上のため言語ヒント適用)");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📏 画像サイズ: {image.Width}x{image.Height}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 ROI: {regionOfInterest?.ToString() ?? "なし（全体）"}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📊 認識設定: 検出閾値={_settings.DetectionThreshold}, 認識閾値={_settings.RecognitionThreshold}");
         
         // テスト環境ではダミー結果を返す
         var isTestEnv = IsTestEnvironment();
-        DebugLogUtility.WriteLog($"   🧪 テスト環境判定: {isTestEnv}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 テスト環境判定: {isTestEnv}");
         
         if (isTestEnv)
         {
-            DebugLogUtility.WriteLog("🧪 テスト環境: ダミーOCR結果を返却");
-            _logger?.LogDebug("テスト環境: ダミーOCR結果を返却");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🧪 テスト環境: ダミーOCR結果を返却");
+            __logger?.LogDebug("テスト環境: ダミーOCR結果を返却");
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
             
             var dummyTextRegions = new List<OcrTextRegion>
@@ -388,40 +411,40 @@ public class PaddleOcrEngine(
 
         try
         {
-            DebugLogUtility.WriteLog("🎬 実際のOCR処理を開始");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🎬 実際のOCR処理を開始");
             progressCallback?.Report(new OcrProgress(0.1, "OCR処理を開始"));
             
             // IImageからMatに変換
-            DebugLogUtility.WriteLog("🔄 IImageからMatに変換中...");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 IImageからMatに変換中...");
             using var mat = await ConvertToMatAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
             
-            DebugLogUtility.WriteLog($"🖼️ Mat変換完了: Empty={mat.Empty()}, Size={mat.Width}x{mat.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🖼️ Mat変換完了: Empty={mat.Empty()}, Size={mat.Width}x{mat.Height}");
             
             if (mat.Empty())
             {
-                DebugLogUtility.WriteLog("❌ 変換後の画像が空です");
-                _logger?.LogWarning("変換後の画像が空です");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("❌ 変換後の画像が空です");
+                __logger?.LogWarning("変換後の画像が空です");
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
 
             progressCallback?.Report(new OcrProgress(0.3, "OCR処理実行中"));
 
             // OCR実行
-            DebugLogUtility.WriteLog("🚀 ExecuteOcrAsync呼び出し開始");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🚀 ExecuteOcrAsync呼び出し開始");
             var textRegions = await ExecuteOcrAsync(mat, progressCallback, cancellationToken).ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"🚀 ExecuteOcrAsync完了: 検出されたリージョン数={textRegions?.Count ?? 0}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🚀 ExecuteOcrAsync完了: 検出されたリージョン数={textRegions?.Count ?? 0}");
             
             // ROI座標の補正
             if (regionOfInterest.HasValue && textRegions != null)
             {
-                DebugLogUtility.WriteLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
                 textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
             }
             
             // 🔍 Phase 3診断: 使用中の前処理サービスを初回のみログ出力
             if (!_serviceTypeLogged)
             {
-                var serviceType = _ocrPreprocessingService.GetType().Name;
+                var serviceType = __ocrPreprocessingService.GetType().Name;
                 try
                 {
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
@@ -448,11 +471,11 @@ public class PaddleOcrEngine(
             
             if (textRegions != null && textRegions.Count > 0)
             {
-                _logger?.LogInformation("📍 OCR座標ログ - 検出されたテキスト領域: {Count}個", textRegions.Count);
+                __logger?.LogInformation("📍 OCR座標ログ - 検出されたテキスト領域: {Count}個", textRegions.Count);
                 for (int i = 0; i < textRegions.Count; i++)
                 {
                     var region = textRegions[i];
-                    _logger?.LogInformation("📍 OCR結果[{Index}]: Text='{Text}' | Bounds=({X},{Y},{Width},{Height}) | Confidence={Confidence:F3}",
+                    __logger?.LogInformation("📍 OCR結果[{Index}]: Text='{Text}' | Bounds=({X},{Y},{Width},{Height}) | Confidence={Confidence:F3}",
                         i, region.Text, region.Bounds.X, region.Bounds.Y, region.Bounds.Width, region.Bounds.Height, region.Confidence);
                     
                     // 直接ファイル書き込みでOCR結果の詳細を記録
@@ -469,7 +492,7 @@ public class PaddleOcrEngine(
             }
             else
             {
-                _logger?.LogInformation("📍 OCR座標ログ - テキスト領域が検出されませんでした");
+                __logger?.LogInformation("📍 OCR座標ログ - テキスト領域が検出されませんでした");
             }
             
             stopwatch.Stop();
@@ -488,15 +511,15 @@ public class PaddleOcrEngine(
             {
                 try
                 {
-                    DebugLogUtility.WriteLog("🔗 テキスト結合アルゴリズム適用開始");
-                    mergedText = _textMerger.MergeTextRegions(textRegions);
-                    DebugLogUtility.WriteLog($"🔗 テキスト結合完了: 結果文字数={mergedText.Length}");
-                    _logger?.LogDebug("テキスト結合アルゴリズム適用完了: 結果文字数={Length}", mergedText.Length);
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔗 テキスト結合アルゴリズム適用開始");
+                    mergedText = __textMerger.MergeTextRegions(textRegions);
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔗 テキスト結合完了: 結果文字数={mergedText.Length}");
+                    __logger?.LogDebug("テキスト結合アルゴリズム適用完了: 結果文字数={Length}", mergedText.Length);
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"❌ テキスト結合エラー: {ex.Message}");
-                    _logger?.LogWarning(ex, "テキスト結合中にエラーが発生しました。元のテキストを使用します");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ テキスト結合エラー: {ex.Message}");
+                    __logger?.LogWarning(ex, "テキスト結合中にエラーが発生しました。元のテキストを使用します");
                     mergedText = null; // フォールバック
                 }
             }
@@ -507,16 +530,16 @@ public class PaddleOcrEngine(
             {
                 try
                 {
-                    DebugLogUtility.WriteLog("🔧 OCR後処理（誤認識修正）開始");
-                    postProcessedText = await _ocrPostProcessor.ProcessAsync(mergedText, 0.8f).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog($"🔧 OCR後処理完了: 修正前='{mergedText}' → 修正後='{postProcessedText}'");
-                    _logger?.LogDebug("OCR後処理完了: 修正前長={Before}, 修正後長={After}", 
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 OCR後処理（誤認識修正）開始");
+                    postProcessedText = await __ocrPostProcessor.ProcessAsync(mergedText, 0.8f).ConfigureAwait(false);
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 OCR後処理完了: 修正前='{mergedText}' → 修正後='{postProcessedText}'");
+                    __logger?.LogDebug("OCR後処理完了: 修正前長={Before}, 修正後長={After}", 
                         mergedText.Length, postProcessedText.Length);
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"❌ OCR後処理エラー: {ex.Message}");
-                    _logger?.LogWarning(ex, "OCR後処理中にエラーが発生しました。修正前のテキストを使用します");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ OCR後処理エラー: {ex.Message}");
+                    __logger?.LogWarning(ex, "OCR後処理中にエラーが発生しました。修正前のテキストを使用します");
                     postProcessedText = mergedText; // フォールバック
                 }
             }
@@ -530,22 +553,22 @@ public class PaddleOcrEngine(
                 postProcessedText
             );
             
-            DebugLogUtility.WriteLog($"✅ OCR処理完了: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms");
-            _logger?.LogDebug("OCR処理完了 - 検出されたテキスト数: {Count}, 処理時間: {ElapsedMs}ms", 
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ OCR処理完了: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms");
+            __logger?.LogDebug("OCR処理完了 - 検出されたテキスト数: {Count}, 処理時間: {ElapsedMs}ms", 
                 result.TextRegions.Count, stopwatch.ElapsedMilliseconds);
             
             return result;
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogDebug("OCR処理がキャンセルされました");
+            __logger?.LogDebug("OCR処理がキャンセルされました");
             throw;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, false);
-            _logger?.LogError(ex, "OCR処理中にエラーが発生: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCR処理中にエラーが発生: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"OCR処理中にエラーが発生しました: {ex.Message}", ex);
         }
     }
@@ -601,13 +624,13 @@ public class PaddleOcrEngine(
                                         
         _settings = settings.Clone();
         
-        _logger?.LogInformation("OCRエンジン設定を更新: 言語={Language}, モデル={Model}",
+        __logger?.LogInformation("OCRエンジン設定を更新: 言語={Language}, モデル={Model}",
             _settings.Language, _settings.ModelName);
             
         // 重要なパラメータが変更された場合は再初期化が必要
         if (requiresReinitialization)
         {
-            _logger?.LogInformation("設定変更により再初期化を実行");
+            __logger?.LogInformation("設定変更により再初期化を実行");
             
             DisposeEngines();
             await InitializeAsync(_settings, cancellationToken).ConfigureAwait(false);
@@ -658,8 +681,8 @@ public class PaddleOcrEngine(
         await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
             
         // モデルファイルの存在確認
-        var modelPath = _modelPathResolver.GetRecognitionModelPath(languageCode, _settings.ModelName);
-        return _modelPathResolver.FileExists(modelPath);
+        var modelPath = __modelPathResolver.GetRecognitionModelPath(languageCode, _settings.ModelName);
+        return __modelPathResolver.FileExists(modelPath);
     }
 
     /// <summary>
@@ -701,7 +724,7 @@ public class PaddleOcrEngine(
             // テスト環境での安全性チェックを強化
             if (IsTestEnvironment())
             {
-                _logger?.LogDebug("テスト環境でのネイティブライブラリチェックをスキップ");
+                __logger?.LogDebug("テスト環境でのネイティブライブラリチェックをスキップ");
                 return false; // テスト環境では安全のため初期化を失敗させる
             }
 
@@ -712,32 +735,32 @@ public class PaddleOcrEngine(
             var width = testMat.Width;
             var height = testMat.Height;
             
-            _logger?.LogDebug("ネイティブライブラリのチェック成功 - OpenCvSharp4 v4.10+ (Size: {Width}x{Height})", width, height);
+            __logger?.LogDebug("ネイティブライブラリのチェック成功 - OpenCvSharp4 v4.10+ (Size: {Width}x{Height})", width, height);
             return true;
         }
         catch (TypeInitializationException ex)
         {
-            _logger?.LogError(ex, "ネイティブライブラリ初期化エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "ネイティブライブラリ初期化エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (DllNotFoundException ex)
         {
-            _logger?.LogError(ex, "ネイティブライブラリが見つかりません: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "ネイティブライブラリが見つかりません: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (FileNotFoundException ex)
         {
-            _logger?.LogError(ex, "必要なファイルが見つかりません: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "必要なファイルが見つかりません: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (BadImageFormatException ex)
         {
-            _logger?.LogError(ex, "ネイティブライブラリ形式エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "ネイティブライブラリ形式エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "ネイティブライブラリ操作エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "ネイティブライブラリ操作エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
     }
@@ -814,7 +837,7 @@ public class PaddleOcrEngine(
         // テスト環境では安全のため初期化をスキップ（モデルのnullチェック無視）
         if (IsTestEnvironment())
         {
-            _logger?.LogInformation("テスト環境でのPaddleOCRエンジン初期化をスキップ - モック初期化を実行");
+            __logger?.LogInformation("テスト環境でのPaddleOCRエンジン初期化をスキップ - モック初期化を実行");
             
             // テスト用のモック初期化（モデルがnullでも成功）
             IsMultiThreadEnabled = settings.EnableMultiThread;
@@ -824,7 +847,7 @@ public class PaddleOcrEngine(
         // 本番環境ではモデルが必須
         if (models == null)
         {
-            _logger?.LogError("モデルが無効です。初期化に失敗しました。");
+            __logger?.LogError("モデルが無効です。初期化に失敗しました。");
             return false;
         }
         
@@ -833,11 +856,11 @@ public class PaddleOcrEngine(
             try
             {
                 // シンプルなシングルスレッド版から開始
-                _logger?.LogDebug("シングルスレッドOCRエンジン作成試行");
-                DebugLogUtility.WriteLog($"🔧 PaddleOcrAll作成開始 - モデル: {models?.GetType()?.Name ?? "null"}");
+                __logger?.LogDebug("シングルスレッドOCRエンジン作成試行");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 PaddleOcrAll作成開始 - モデル: {models?.GetType()?.Name ?? "null"}");
                 
                 // V4モデルハングアップ調査: 段階的作成でデバッグ
-                DebugLogUtility.WriteLog($"🎯 PaddleOcrAll作成中...");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🎯 PaddleOcrAll作成中...");
                 try
                 {
                     // V4モデル専用設定: モデルバージョンによる正確な検出（ファクトリーパターン対応）
@@ -845,9 +868,9 @@ public class PaddleOcrEngine(
                     var isV4ModelForCreation = models.RecognizationModel != null && models.RecognizationModel.Version == V4;
 #pragma warning restore CS8602
                     _isV4ModelForCreation = isV4ModelForCreation; // 実行時に使用するため保存
-                    DebugLogUtility.WriteLog($"🔍 V4モデル検出 (バージョン検出): {isV4ModelForCreation}");
-                    DebugLogUtility.WriteLog($"   📋 認識モデルタイプ: {models.RecognizationModel?.GetType()?.Name ?? "null"}");
-                    DebugLogUtility.WriteLog($"   📋 認識モデルバージョン: {models.RecognizationModel?.Version.ToString() ?? "null"}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 V4モデル検出 (バージョン検出): {isV4ModelForCreation}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 認識モデルタイプ: {models.RecognizationModel?.GetType()?.Name ?? "null"}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 認識モデルバージョン: {models.RecognizationModel?.Version.ToString() ?? "null"}");
                     
                     _ocrEngine = new PaddleOcrAll(models)
                     {
@@ -855,22 +878,22 @@ public class PaddleOcrEngine(
                         AllowRotateDetection = true,   // V5では回転検出を有効化して高速化
                         Enable180Classification = true // V5では180度回転認識を有効化して高速化
                     };
-                    DebugLogUtility.WriteLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
                     
                     // Gemini推奨：初期化パラメータの確認
-                    DebugLogUtility.WriteLog($"🔧 [DEBUG] OCRエンジン初期化パラメータ:");
-                    DebugLogUtility.WriteLog($"   UseGpu: {settings.UseGpu}");
-                    DebugLogUtility.WriteLog($"   EnableMultiThread: {settings.EnableMultiThread}");
-                    DebugLogUtility.WriteLog($"   WorkerCount: {settings.WorkerCount}");
-                    DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection ?? false}");
-                    DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification ?? false}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 [DEBUG] OCRエンジン初期化パラメータ:");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   UseGpu: {settings.UseGpu}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   EnableMultiThread: {settings.EnableMultiThread}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   WorkerCount: {settings.WorkerCount}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection ?? false}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification ?? false}");
                     var rotateDetection = true;  // PP-OCRv5高速化設定
                     var classification180 = true;  // PP-OCRv5高速化設定
-                    DebugLogUtility.WriteLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
                 }
                 catch (Exception createEx)
                 {
-                    DebugLogUtility.WriteLog($"❌ PaddleOcrAll作成エラー: {createEx.Message}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ PaddleOcrAll作成エラー: {createEx.Message}");
                     throw;
                 }
                 
@@ -884,7 +907,7 @@ public class PaddleOcrEngine(
                     // V4モデル専用の安定化設定
                     if (isV4ModelForSettings && ocrType != null)
                     {
-                        DebugLogUtility.WriteLog($"🔧 V4モデル専用設定を適用中...");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 V4モデル専用設定を適用中...");
                         
                         // V4モデル用の保守的閾値設定（ハングアップ防止）
                         var detThresholdProp = ocrType.GetProperty("DetectionThreshold") ?? 
@@ -893,7 +916,7 @@ public class PaddleOcrEngine(
                         if (detThresholdProp != null && detThresholdProp.CanWrite)
                         {
                             detThresholdProp.SetValue(_ocrEngine, 0.5f); // V4用保守的値
-                            DebugLogUtility.WriteLog($"   🎯 V4専用検出閾値設定: 0.5（安定性重視）");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 V4専用検出閾値設定: 0.5（安定性重視）");
                         }
                         
                         var boxThresholdProp = ocrType.GetProperty("BoxThreshold") ?? 
@@ -902,7 +925,7 @@ public class PaddleOcrEngine(
                         if (boxThresholdProp != null && boxThresholdProp.CanWrite)
                         {
                             boxThresholdProp.SetValue(_ocrEngine, 0.3f); // V4用保守的値
-                            DebugLogUtility.WriteLog($"   📦 V4専用ボックス閾値設定: 0.3（安定性重視）");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📦 V4専用ボックス閾値設定: 0.3（安定性重視）");
                         }
                     }
                     
@@ -915,7 +938,7 @@ public class PaddleOcrEngine(
                         if (unclipRatioProp != null && unclipRatioProp.CanWrite)
                         {
                             unclipRatioProp.SetValue(_ocrEngine, 3.0f); // 公式推奨値で日本語文字の検出を改善
-                            DebugLogUtility.WriteLog($"   📏 PP-OCRv5相当テキスト領域拡張比率設定成功: 3.0（公式推奨値）");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📏 PP-OCRv5相当テキスト領域拡張比率設定成功: 3.0（公式推奨値）");
                         }
                         
                         // PP-OCRv5の改良されたテキスト認識閾値（公式推奨値）
@@ -925,7 +948,7 @@ public class PaddleOcrEngine(
                         if (textThresholdProp != null && textThresholdProp.CanWrite)
                         {
                             textThresholdProp.SetValue(_ocrEngine, 0.1f); // 公式推奨値で誤認識を減らす
-                            DebugLogUtility.WriteLog($"   📝 PP-OCRv5相当テキスト認識閾値設定成功: 0.1（公式推奨値）");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 PP-OCRv5相当テキスト認識閾値設定成功: 0.1（公式推奨値）");
                         }
                         
                         // 言語設定強化：翻訳設定連携で言語を決定
@@ -934,14 +957,14 @@ public class PaddleOcrEngine(
                         if (langProp != null && langProp.CanWrite)
                         {
                             langProp.SetValue(_ocrEngine, targetLanguage);
-                            DebugLogUtility.WriteLog($"   🌐 言語認識最適化設定（翻訳設定連携）: {targetLanguage}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌐 言語認識最適化設定（翻訳設定連携）: {targetLanguage}");
                         }
                         
                         // 言語固有の最適化パラメータ設定
                         if (targetLanguage == "jpn")
                         {
                             // 日本語専用最適化
-                            DebugLogUtility.WriteLog($"   🇯🇵 日本語専用認識強化パラメータ適用");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🇯🇵 日本語専用認識強化パラメータ適用");
                             if (_ocrEngine != null)
                             {
                                 ApplyJapaneseOptimizations(ocrType, _ocrEngine);
@@ -950,7 +973,7 @@ public class PaddleOcrEngine(
                         else if (targetLanguage == "eng")
                         {
                             // 英語専用最適化
-                            DebugLogUtility.WriteLog($"   🇺🇸 英語専用認識強化パラメータ適用");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🇺🇸 英語専用認識強化パラメータ適用");
                             if (_ocrEngine != null)
                             {
                                 ApplyEnglishOptimizations(ocrType, _ocrEngine);
@@ -980,7 +1003,7 @@ public class PaddleOcrEngine(
                                             if (recProp.PropertyType == typeof(float))
                                             {
                                                 recProp.SetValue(recognizer, 0.01f); // より感度を高めて誤認識を防ぐ
-                                                DebugLogUtility.WriteLog($"   🎯 認識器{recProp.Name}を日本語用に最適化: 0.01（高精度）");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 認識器{recProp.Name}を日本語用に最適化: 0.01（高精度）");
                                             }
                                         }
                                         
@@ -990,13 +1013,13 @@ public class PaddleOcrEngine(
                                             if (recProp.PropertyType == typeof(string))
                                             {
                                                 recProp.SetValue(recognizer, "jpn");
-                                                DebugLogUtility.WriteLog($"   🇯🇵 認識器{recProp.Name}を日本語に設定: jpn");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🇯🇵 認識器{recProp.Name}を日本語に設定: jpn");
                                             }
                                         }
                                     }
                                     catch (Exception ex)
                                     {
-                                        DebugLogUtility.WriteLog($"   ⚠️ 認識器プロパティ{recProp.Name}設定エラー: {ex.Message}");
+                                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 認識器プロパティ{recProp.Name}設定エラー: {ex.Message}");
                                     }
                                 }
                             }
@@ -1026,7 +1049,7 @@ public class PaddleOcrEngine(
                                             if (detProp.PropertyType == typeof(float))
                                             {
                                                 detProp.SetValue(detector, 0.01f);
-                                                DebugLogUtility.WriteLog($"   🎯 検出器{detProp.Name}を日本語用に最適化: 0.01");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 検出器{detProp.Name}を日本語用に最適化: 0.01");
                                             }
                                         }
                                         
@@ -1036,13 +1059,13 @@ public class PaddleOcrEngine(
                                             if (detProp.PropertyType == typeof(bool))
                                             {
                                                 detProp.SetValue(detector, true);
-                                                DebugLogUtility.WriteLog($"   🔄 検出器{detProp.Name}を日本語用に有効化: true");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 検出器{detProp.Name}を日本語用に有効化: true");
                                             }
                                         }
                                     }
                                     catch (Exception ex)
                                     {
-                                        DebugLogUtility.WriteLog($"   ⚠️ 検出器プロパティ{detProp.Name}設定エラー: {ex.Message}");
+                                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 検出器プロパティ{detProp.Name}設定エラー: {ex.Message}");
                                     }
                                 }
                             }
@@ -1072,7 +1095,7 @@ public class PaddleOcrEngine(
                                             if (classProp.PropertyType == typeof(float))
                                             {
                                                 classProp.SetValue(classifier, 0.02f);
-                                                DebugLogUtility.WriteLog($"   🎯 分類器{classProp.Name}を日本語用に最適化: 0.02");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 分類器{classProp.Name}を日本語用に最適化: 0.02");
                                             }
                                         }
                                         
@@ -1082,13 +1105,13 @@ public class PaddleOcrEngine(
                                             if (classProp.PropertyType == typeof(bool))
                                             {
                                                 classProp.SetValue(classifier, true);
-                                                DebugLogUtility.WriteLog($"   🔄 分類器{classProp.Name}を日本語用に有効化: true");
+                                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 分類器{classProp.Name}を日本語用に有効化: true");
                                             }
                                         }
                                     }
                                     catch (Exception ex)
                                     {
-                                        DebugLogUtility.WriteLog($"   ⚠️ 分類器プロパティ{classProp.Name}設定エラー: {ex.Message}");
+                                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 分類器プロパティ{classProp.Name}設定エラー: {ex.Message}");
                                     }
                                 }
                             }
@@ -1102,7 +1125,7 @@ public class PaddleOcrEngine(
                     if (multiLangProp != null && multiLangProp.CanWrite)
                     {
                         multiLangProp.SetValue(_ocrEngine, true);
-                        DebugLogUtility.WriteLog($"   🌍 PP-OCRv5相当多言語サポート設定成功: true");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌍 PP-OCRv5相当多言語サポート設定成功: true");
                     }
                     
                     // PP-OCRv5の精度向上機能を有効化
@@ -1112,7 +1135,7 @@ public class PaddleOcrEngine(
                     if (precisionProp != null && precisionProp.CanWrite)
                     {
                         precisionProp.SetValue(_ocrEngine, true);
-                        DebugLogUtility.WriteLog($"   🎯 PP-OCRv5相当高精度設定成功: true");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 PP-OCRv5相当高精度設定成功: true");
                     }
                     
                     // PP-OCRv5の追加パラメータ（研究成果反映）
@@ -1122,17 +1145,17 @@ public class PaddleOcrEngine(
                     if (adaptiveProp != null && adaptiveProp.CanWrite)
                     {
                         adaptiveProp.SetValue(_ocrEngine, true);
-                        DebugLogUtility.WriteLog($"   🔄 PP-OCRv5相当適応的閾値設定成功: true");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 PP-OCRv5相当適応的閾値設定成功: true");
                     }
                     
                     // 利用可能な全プロパティをログ出力
-                    DebugLogUtility.WriteLog($"🔍 PaddleOcrAllの利用可能プロパティ:");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PaddleOcrAllの利用可能プロパティ:");
                     foreach (var prop in ocrType.GetProperties().Where(p => p.CanRead))
                     {
                         try
                         {
                             var value = prop.GetValue(_ocrEngine);
-                            DebugLogUtility.WriteLog($"   {prop.Name}: {value} (Type: {prop.PropertyType.Name})");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   {prop.Name}: {value} (Type: {prop.PropertyType.Name})");
                         }
                         catch { /* プロパティ取得エラーは無視 */ }
                     }
@@ -1140,15 +1163,15 @@ public class PaddleOcrEngine(
                     }
                 catch (Exception propEx)
                 {
-                    DebugLogUtility.WriteLog($"   ⚠️ プロパティ設定エラー: {propEx.Message}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ プロパティ設定エラー: {propEx.Message}");
                 }
                 
-                DebugLogUtility.WriteLog($"🎯 PP-OCRv5最適化設定でPaddleOCR初期化:");
-                DebugLogUtility.WriteLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection}");
-                DebugLogUtility.WriteLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification}");
-                DebugLogUtility.WriteLog($"   PP-OCRv5相当パラメータ適用完了");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🎯 PP-OCRv5最適化設定でPaddleOCR初期化:");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   AllowRotateDetection: {_ocrEngine?.AllowRotateDetection}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   Enable180Classification: {_ocrEngine?.Enable180Classification}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   PP-OCRv5相当パラメータ適用完了");
                 
-                _logger?.LogInformation("シングルスレッドOCRエンジン作成成功");
+                __logger?.LogInformation("シングルスレッドOCRエンジン作成成功");
 
                 // マルチスレッド版は慎重に作成
                 // PP-OCRv5では安定性のためシングルスレッドを推奨
@@ -1156,11 +1179,11 @@ public class PaddleOcrEngine(
                 // Gemini推奨：スレッドセーフティ問題解決のため、強制的にシングルスレッド
                 var shouldEnableMultiThread = false; // isV4ModelForMultiThread; // V5ではマルチスレッド無効化
                 
-                DebugLogUtility.WriteLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread} (スレッドセーフティ検証のため強制無効化)");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 マルチスレッド設定: V4モデル={isV4ModelForMultiThread}, 有効={shouldEnableMultiThread} (スレッドセーフティ検証のため強制無効化)");
                 
                 if (isV4ModelForMultiThread)
                 {
-                    DebugLogUtility.WriteLog($"✅ V4モデル最適化設定: 高度機能有効化、マルチスレッド対応");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ V4モデル最適化設定: 高度機能有効化、マルチスレッド対応");
                 }
                 
                 if (shouldEnableMultiThread)
@@ -1177,26 +1200,26 @@ public class PaddleOcrEngine(
                             consumerCount: Math.Max(1, Math.Min(settings.WorkerCount, Environment.ProcessorCount))
                         );
                         IsMultiThreadEnabled = true;
-                        _logger?.LogInformation("マルチスレッドOCRエンジン作成成功");
+                        __logger?.LogInformation("マルチスレッドOCRエンジン作成成功");
                     }
                     catch (TypeInitializationException ex)
                     {
-                        _logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（初期化エラー）、シングルスレッドのみ使用");
+                        __logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（初期化エラー）、シングルスレッドのみ使用");
                         IsMultiThreadEnabled = false;
                     }
                     catch (InvalidOperationException ex)
                     {
-                        _logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（操作エラー）、シングルスレッドのみ使用");
+                        __logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（操作エラー）、シングルスレッドのみ使用");
                         IsMultiThreadEnabled = false;
                     }
                     catch (ArgumentException ex)
                     {
-                        _logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（引数エラー）、シングルスレッドのみ使用");
+                        __logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（引数エラー）、シングルスレッドのみ使用");
                         IsMultiThreadEnabled = false;
                     }
                     catch (OutOfMemoryException ex)
                     {
-                        _logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（メモリ不足）、シングルスレッドのみ使用");
+                        __logger?.LogWarning(ex, "マルチスレッドエンジン作成失敗（メモリ不足）、シングルスレッドのみ使用");
                         IsMultiThreadEnabled = false;
                     }
                 }
@@ -1205,22 +1228,22 @@ public class PaddleOcrEngine(
             }
             catch (TypeInitializationException ex)
             {
-                _logger?.LogError(ex, "OCRエンジン初期化失敗: {ExceptionType}", ex.GetType().Name);
+                __logger?.LogError(ex, "OCRエンジン初期化失敗: {ExceptionType}", ex.GetType().Name);
                 return false;
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "OCRエンジン操作エラー: {ExceptionType}", ex.GetType().Name);
+                __logger?.LogError(ex, "OCRエンジン操作エラー: {ExceptionType}", ex.GetType().Name);
                 return false;
             }
             catch (ArgumentException ex)
             {
-                _logger?.LogError(ex, "OCRエンジン引数エラー: {ExceptionType}", ex.GetType().Name);
+                __logger?.LogError(ex, "OCRエンジン引数エラー: {ExceptionType}", ex.GetType().Name);
                 return false;
             }
             catch (OutOfMemoryException ex)
             {
-                _logger?.LogError(ex, "OCRエンジンメモリ不足: {ExceptionType}", ex.GetType().Name);
+                __logger?.LogError(ex, "OCRエンジンメモリ不足: {ExceptionType}", ex.GetType().Name);
                 return false;
             }
         }
@@ -1234,7 +1257,7 @@ public class PaddleOcrEngine(
         // テスト環境ではモデル準備を完全にスキップ
         if (IsTestEnvironment())
         {
-            _logger?.LogDebug("テスト環境: モデル準備を完全にスキップ（ネットワークアクセス回避）");
+            __logger?.LogDebug("テスト環境: モデル準備を完全にスキップ（ネットワークアクセス回避）");
             await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのためのダミー
             return null; // テスト環境では安全のためnullを返す
         }
@@ -1245,27 +1268,27 @@ public class PaddleOcrEngine(
             var ppocrv5Model = await TryCreatePPOCRv5ModelAsync(language, cancellationToken).ConfigureAwait(false);
             if (ppocrv5Model != null)
             {
-                _logger?.LogInformation("PP-OCRv5モデルを使用します - 言語: {Language}", language);
+                __logger?.LogInformation("PP-OCRv5モデルを使用します - 言語: {Language}", language);
                 return ppocrv5Model;
             }
 
             // フォールバック: 標準モデルを使用
-            _logger?.LogWarning("PP-OCRv5モデルが利用できません。標準モデルにフォールバック");
+            __logger?.LogWarning("PP-OCRv5モデルが利用できません。標準モデルにフォールバック");
             
             // 検出モデルの設定
-            var detectionModelPath = _modelPathResolver.GetDetectionModelPath("det_db_standard");
-            if (!_modelPathResolver.FileExists(detectionModelPath))
+            var detectionModelPath = __modelPathResolver.GetDetectionModelPath("det_db_standard");
+            if (!__modelPathResolver.FileExists(detectionModelPath))
             {
-                _logger?.LogWarning("検出モデルが見つかりません。V4デフォルトモデルを使用: {Path}", detectionModelPath);
+                __logger?.LogWarning("検出モデルが見つかりません。V4デフォルトモデルを使用: {Path}", detectionModelPath);
                 // V4ローカルモデルにフォールバック
                 return await Task.FromResult(LocalFullModels.EnglishV4).ConfigureAwait(false);
             }
 
             // 認識モデルの設定
-            var recognitionModelPath = _modelPathResolver.GetRecognitionModelPath(language, GetRecognitionModelName(language));
-            if (!_modelPathResolver.FileExists(recognitionModelPath))
+            var recognitionModelPath = __modelPathResolver.GetRecognitionModelPath(language, GetRecognitionModelName(language));
+            if (!__modelPathResolver.FileExists(recognitionModelPath))
             {
-                _logger?.LogWarning("認識モデルが見つかりません。デフォルトモデルを使用: {Path}", recognitionModelPath);
+                __logger?.LogWarning("認識モデルが見つかりません。デフォルトモデルを使用: {Path}", recognitionModelPath);
                 // 言語に応じたローカルモデルを選択
                 return await Task.FromResult(GetDefaultLocalModel(language)).ConfigureAwait(false);
             }
@@ -1276,22 +1299,22 @@ public class PaddleOcrEngine(
         }
         catch (FileNotFoundException ex)
         {
-            _logger?.LogError(ex, "モデルファイルが見つかりません: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "モデルファイルが見つかりません: {ExceptionType}", ex.GetType().Name);
             return null;
         }
         catch (DirectoryNotFoundException ex)
         {
-            _logger?.LogError(ex, "モデルディレクトリが見つかりません: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "モデルディレクトリが見つかりません: {ExceptionType}", ex.GetType().Name);
             return null;
         }
         catch (UnauthorizedAccessException ex)
         {
-            _logger?.LogError(ex, "モデルファイルへのアクセスが拒否されました: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "モデルファイルへのアクセスが拒否されました: {ExceptionType}", ex.GetType().Name);
             return null;
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "モデルパスの引数エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "モデルパスの引数エラー: {ExceptionType}", ex.GetType().Name);
             return null;
         }
     }
@@ -1305,37 +1328,37 @@ public class PaddleOcrEngine(
 
         try
         {
-            DebugLogUtility.WriteLog("🔍 PP-OCRv5モデル作成開始");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔍 PP-OCRv5モデル作成開始");
             
             // PP-OCRv5モデルが利用可能かチェック
             var isAvailable = Models.PPOCRv5ModelProvider.IsAvailable();
-            DebugLogUtility.WriteLog($"🔍 PPOCRv5ModelProvider.IsAvailable() = {isAvailable}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PPOCRv5ModelProvider.IsAvailable() = {isAvailable}");
             
             if (!isAvailable)
             {
-                DebugLogUtility.WriteLog("❌ PP-OCRv5モデルが利用できません");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("❌ PP-OCRv5モデルが利用できません");
                 return null;
             }
             
             // PP-OCRv5多言語モデルを取得
-            DebugLogUtility.WriteLog("🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel()呼び出し");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel()呼び出し");
             var ppocrv5Model = Models.PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel();
-            DebugLogUtility.WriteLog($"🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel() = {ppocrv5Model != null}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel() = {ppocrv5Model != null}");
             
             if (ppocrv5Model != null)
             {
-                DebugLogUtility.WriteLog("✅ PP-OCRv5多言語モデルを使用します");
-                _logger?.LogInformation("PP-OCRv5多言語モデルを使用 - 言語: {Language}", language);
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ PP-OCRv5多言語モデルを使用します");
+                __logger?.LogInformation("PP-OCRv5多言語モデルを使用 - 言語: {Language}", language);
                 return ppocrv5Model;
             }
             
-            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデル作成失敗 - GetPPOCRv5MultilingualModel()がnullを返しました");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル作成失敗 - GetPPOCRv5MultilingualModel()がnullを返しました");
             return null;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデル作成エラー: {ex.Message}");
-            _logger?.LogWarning(ex, "PP-OCRv5モデルの作成に失敗しました");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル作成エラー: {ex.Message}");
+            __logger?.LogWarning(ex, "PP-OCRv5モデルの作成に失敗しました");
             return null;
         }
     }
@@ -1353,7 +1376,7 @@ public class PaddleOcrEngine(
 
         try
         {
-            DebugLogUtility.WriteLog($"🔨 PP-OCRv5カスタムモデル作成開始");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔨 PP-OCRv5カスタムモデル作成開始");
             
             // PP-OCRv5検出モデルのディレクトリパス
             var detectionModelDir = Path.GetDirectoryName(detectionModelPath);
@@ -1361,13 +1384,13 @@ public class PaddleOcrEngine(
             // PP-OCRv5認識モデルのディレクトリパス
             var recognitionModelDir = Path.GetDirectoryName(recognitionModelPath);
             
-            DebugLogUtility.WriteLog($"   📁 検出モデルディレクトリ: {detectionModelDir}");
-            DebugLogUtility.WriteLog($"   📁 認識モデルディレクトリ: {recognitionModelDir}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📁 検出モデルディレクトリ: {detectionModelDir}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📁 認識モデルディレクトリ: {recognitionModelDir}");
             
             // PP-OCRv5の実際のカスタムモデルファイルを使用
             if (string.IsNullOrEmpty(detectionModelDir) || string.IsNullOrEmpty(recognitionModelDir))
             {
-                DebugLogUtility.WriteLog($"   ❌ モデルディレクトリが無効です");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ モデルディレクトリが無効です");
                 return null;
             }
             
@@ -1380,7 +1403,7 @@ public class PaddleOcrEngine(
                 _ => Path.Combine(Path.GetDirectoryName(recognitionModelDir)!, "korean_rec")
             };
             
-            DebugLogUtility.WriteLog($"   🌍 PP-OCRv5統合モデルディレクトリ: {actualRecognitionModelDir}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌍 PP-OCRv5統合モデルディレクトリ: {actualRecognitionModelDir}");
             
             // 文字辞書ファイルのパスを設定（PP-OCRv5の5言語統合用）
             var dictPath = language switch
@@ -1393,7 +1416,7 @@ public class PaddleOcrEngine(
             // 辞書ファイルが存在しない場合はデフォルトを使用
             if (!File.Exists(dictPath))
             {
-                DebugLogUtility.WriteLog($"   ⚠️ 専用辞書ファイルが見つかりません: {dictPath}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 専用辞書ファイルが見つかりません: {dictPath}");
                 dictPath = null; // デフォルト辞書を使用
             }
             
@@ -1401,34 +1424,34 @@ public class PaddleOcrEngine(
             // PP-OCRv5モデルファイルが存在することを確認したが、一旦は改良された事前定義モデルを使用
             // TODO: 将来的にAPI改善があった際にPP-OCRv5の実際のモデルファイルを使用
             
-            DebugLogUtility.WriteLog($"   ⚠️ Sdcb.PaddleOCR 3.0.1 API制限により、PP-OCRv5ファイルの直接読み込みを一時的にスキップ");
-            DebugLogUtility.WriteLog($"   🔄 改良された事前定義モデルを使用（より高精度なV4ベース）");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ Sdcb.PaddleOCR 3.0.1 API制限により、PP-OCRv5ファイルの直接読み込みを一時的にスキップ");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 改良された事前定義モデルを使用（より高精度なV4ベース）");
             
             // V4モデルハングアップ原因調査: 段階的初期化でデバッグ
-            DebugLogUtility.WriteLog($"   🔬 V4モデル初期化テスト開始 - 言語: {language}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔬 V4モデル初期化テスト開始 - 言語: {language}");
             
             FullOcrModel? improvedModel = null;
             try
             {
-                DebugLogUtility.WriteLog($"   🎯 V4モデル取得中...");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 V4モデル取得中...");
                 improvedModel = language switch
                 {
                     "jpn" => LocalFullModels.JapanV4, // V4モデル再テスト
                     "eng" => LocalFullModels.EnglishV4,
                     _ => LocalFullModels.JapanV4
                 };
-                DebugLogUtility.WriteLog($"   ✅ V4モデル取得成功: {improvedModel?.GetType()?.Name ?? "null"}");
-                DebugLogUtility.WriteLog($"   🔍 V4モデル完全型名: {improvedModel?.GetType()?.FullName ?? "null"}");
-                DebugLogUtility.WriteLog($"   🔍 V4モデル基底型: {improvedModel?.GetType()?.BaseType?.Name ?? "null"}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ V4モデル取得成功: {improvedModel?.GetType()?.Name ?? "null"}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル完全型名: {improvedModel?.GetType()?.FullName ?? "null"}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル基底型: {improvedModel?.GetType()?.BaseType?.Name ?? "null"}");
                 
                 // モデルの基本プロパティ確認
                 if (improvedModel != null)
                 {
-                    DebugLogUtility.WriteLog($"   🔍 V4モデル詳細確認中...");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル詳細確認中...");
                     // LocalFullModels.JapanV4の実際の型情報をログ出力
                     var japanV4Type = LocalFullModels.JapanV4?.GetType();
-                    DebugLogUtility.WriteLog($"   📋 LocalFullModels.JapanV4型名: {japanV4Type?.Name ?? "null"}");
-                    DebugLogUtility.WriteLog($"   📋 LocalFullModels.JapanV4完全型: {japanV4Type?.FullName ?? "null"}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 LocalFullModels.JapanV4型名: {japanV4Type?.Name ?? "null"}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 LocalFullModels.JapanV4完全型: {japanV4Type?.FullName ?? "null"}");
                     
                     // 型の比較をテスト
                     var isV4Test1 = improvedModel?.RecognizationModel?.Version == V4;
@@ -1436,16 +1459,16 @@ public class PaddleOcrEngine(
                     var isV4Test3 = improvedModel?.DetectionModel?.Version == V4;
                     var isV4TestFinal = isV4Test1 || isV4Test2 || isV4Test3;
                     
-                    DebugLogUtility.WriteLog($"   🧪 V4検出テスト1 (認識モデルV4): {isV4Test1}");
-                    DebugLogUtility.WriteLog($"   🧪 V4検出テスト2 (認識モデルバージョンV4): {isV4Test2}");
-                    DebugLogUtility.WriteLog($"   🧪 V4検出テスト3 (検出モデルV4): {isV4Test3}");
-                    DebugLogUtility.WriteLog($"   🧪 V4検出最終結果: {isV4TestFinal}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト1 (認識モデルV4): {isV4Test1}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト2 (認識モデルバージョンV4): {isV4Test2}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト3 (検出モデルV4): {isV4Test3}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出最終結果: {isV4TestFinal}");
                 }
             }
             catch (Exception modelEx)
             {
-                DebugLogUtility.WriteLog($"   ❌ V4モデル初期化エラー: {modelEx.Message}");
-                DebugLogUtility.WriteLog($"   🔄 V5フォールバックに切り替え");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ V4モデル初期化エラー: {modelEx.Message}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 V5フォールバックに切り替え");
                 improvedModel = language switch
                 {
                     "jpn" => LocalFullModels.ChineseV5, // 日本語はV5多言語モデルを使用
@@ -1461,21 +1484,21 @@ public class PaddleOcrEngine(
                 V5 => "V5多言語モデル",
                 _ => "フォールバックモデル"
             };
-            DebugLogUtility.WriteLog($"   🎯 改良モデル選択成功: {selectedModelInfo}");
-            DebugLogUtility.WriteLog($"   🌍 使用モデル: {improvedModel?.GetType()?.Name ?? "null"} ({language})");
-            DebugLogUtility.WriteLog($"   📝 PP-OCRv5モデルファイル確認済み: {detectionModelDir}");
-            DebugLogUtility.WriteLog($"   📝 PP-OCRv5認識モデル確認済み: {actualRecognitionModelDir}");
-            DebugLogUtility.WriteLog($"   📚 今後のAPI改善時に実装予定");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 改良モデル選択成功: {selectedModelInfo}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌍 使用モデル: {improvedModel?.GetType()?.Name ?? "null"} ({language})");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 PP-OCRv5モデルファイル確認済み: {detectionModelDir}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 PP-OCRv5認識モデル確認済み: {actualRecognitionModelDir}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📚 今後のAPI改善時に実装予定");
             
             return improvedModel;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5カスタムモデル作成エラー: {ex.Message}");
-            _logger?.LogError(ex, "PP-OCRv5カスタムモデルの作成に失敗しました");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5カスタムモデル作成エラー: {ex.Message}");
+            __logger?.LogError(ex, "PP-OCRv5カスタムモデルの作成に失敗しました");
             
             // カスタムモデル作成に失敗した場合は標準モデルにフォールバック
-            DebugLogUtility.WriteLog($"   🔄 標準モデルにフォールバック");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 標準モデルにフォールバック");
             var fallbackModel = language switch
             {
                 "jpn" => LocalFullModels.ChineseV5, // V5多言語モデルを使用
@@ -1508,7 +1531,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"🔍 GetPPOCRv5Model呼び出し - 言語: {language}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 GetPPOCRv5Model呼び出し - 言語: {language}");
             
             // PP-OCRv5多言語モデルを使用
             var model = language switch
@@ -1518,13 +1541,13 @@ public class PaddleOcrEngine(
                 _ => LocalFullModels.ChineseV5 // デフォルト
             };
             
-            DebugLogUtility.WriteLog($"🔍 PP-OCRv5ベースモデル選択: {model?.GetType()?.Name ?? "null"}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PP-OCRv5ベースモデル選択: {model?.GetType()?.Name ?? "null"}");
             
             return model;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ PP-OCRv5モデル取得エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル取得エラー: {ex.Message}");
             return null;
         }
     }
@@ -1534,7 +1557,7 @@ public class PaddleOcrEngine(
     /// </summary>
     private static FullOcrModel? GetDefaultLocalModel(string language)
     {
-        DebugLogUtility.WriteLog($"🔍 GetDefaultLocalModel呼び出し - 言語: {language}");
+        // Note: ログ出力は統一ログサービス導入により、静的メソッドでは利用不可
         
         var model = language switch
         {
@@ -1543,7 +1566,7 @@ public class PaddleOcrEngine(
             _ => LocalFullModels.EnglishV4
         };
         
-        DebugLogUtility.WriteLog($"🔍 選択されたモデル: {model?.GetType()?.Name ?? "null"}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 選択されたモデル: {model?.GetType()?.Name ?? "null"}");
         
         // モデルの詳細情報をログ出力
         if (model != null)
@@ -1551,20 +1574,20 @@ public class PaddleOcrEngine(
             try
             {
                 var modelType = model.GetType();
-                DebugLogUtility.WriteLog($"🔍 モデル詳細:");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 モデル詳細:");
                 foreach (var prop in modelType.GetProperties().Where(p => p.CanRead))
                 {
                     try
                     {
                         var value = prop.GetValue(model);
-                        DebugLogUtility.WriteLog($"   {prop.Name}: {value}");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   {prop.Name}: {value}");
                     }
                     catch { /* プロパティ取得エラーは無視 */ }
                 }
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"   ⚠️ モデル詳細取得エラー: {ex.Message}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ モデル詳細取得エラー: {ex.Message}");
             }
         }
         
@@ -1591,7 +1614,7 @@ public class PaddleOcrEngine(
             // テスト環境ではOpenCvSharpの使用を回避
             if (IsTestEnvironment())
             {
-                _logger?.LogDebug("テスト環境: ダミーMatを作成");
+                __logger?.LogDebug("テスト環境: ダミーMatを作成");
                 return CreateDummyMat();
             }
 
@@ -1620,22 +1643,22 @@ public class PaddleOcrEngine(
         }
         catch (ArgumentException ex)
         {
-            _logger?.LogError(ex, "画像変換の引数エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "画像変換の引数エラー: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"画像変換の引数エラー: {ex.Message}", ex);
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogError(ex, "画像変換の操作エラー: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "画像変換の操作エラー: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"画像変換の操作エラー: {ex.Message}", ex);
         }
         catch (OutOfMemoryException ex)
         {
-            _logger?.LogError(ex, "画像変換でメモリ不足: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "画像変換でメモリ不足: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"画像変換でメモリ不足: {ex.Message}", ex);
         }
         catch (NotSupportedException ex)
         {
-            _logger?.LogError(ex, "サポートされていない画像形式: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "サポートされていない画像形式: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"サポートされていない画像形式: {ex.Message}", ex);
         }
     }
@@ -1711,29 +1734,29 @@ public class PaddleOcrEngine(
         IProgress<OcrProgress>? progressCallback,
         CancellationToken cancellationToken)
     {
-        DebugLogUtility.WriteLog($"⚙️ ExecuteOcrAsync開始:");
-        DebugLogUtility.WriteLog($"   🧵 マルチスレッド有効: {IsMultiThreadEnabled}");
-        DebugLogUtility.WriteLog($"   🔧 QueuedEngineが利用可能: {_queuedEngine != null}");
-        DebugLogUtility.WriteLog($"   🔧 OcrEngineが利用可能: {_ocrEngine != null}");
-        DebugLogUtility.WriteLog($"🔍 【DEBUG】Phase 3実装状況: ExecuteOcrAsyncメソッド開始時点");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚙️ ExecuteOcrAsync開始:");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧵 マルチスレッド有効: {IsMultiThreadEnabled}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔧 QueuedEngineが利用可能: {_queuedEngine != null}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔧 OcrEngineが利用可能: {_ocrEngine != null}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 【DEBUG】Phase 3実装状況: ExecuteOcrAsyncメソッド開始時点");
         
         // Mat画像の詳細情報をログ出力
-        DebugLogUtility.WriteLog($"🖼️ Mat画像詳細情報:");
-        DebugLogUtility.WriteLog($"   📐 サイズ: {mat.Width}x{mat.Height}");
-        DebugLogUtility.WriteLog($"   🎨 チャンネル数: {mat.Channels()}");
-        DebugLogUtility.WriteLog($"   📊 深度: {mat.Depth()}");
-        DebugLogUtility.WriteLog($"   🔢 型: {mat.Type()}");
-        DebugLogUtility.WriteLog($"   📏 ステップ: {mat.Step()}");
-        DebugLogUtility.WriteLog($"   🟢 空画像: {mat.Empty()}");
-        DebugLogUtility.WriteLog($"   🔄 連続メモリ: {mat.IsContinuous()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🖼️ Mat画像詳細情報:");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📐 サイズ: {mat.Width}x{mat.Height}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎨 チャンネル数: {mat.Channels()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📊 深度: {mat.Depth()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔢 型: {mat.Type()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📏 ステップ: {mat.Step()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🟢 空画像: {mat.Empty()}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 連続メモリ: {mat.IsContinuous()}");
         
         // OCR設定の詳細情報をログ出力
-        DebugLogUtility.WriteLog($"⚙️ OCR設定詳細:");
-        DebugLogUtility.WriteLog($"   🌐 言語: {CurrentLanguage}");
-        DebugLogUtility.WriteLog($"   🎯 検出閾値: {_settings.DetectionThreshold}");
-        DebugLogUtility.WriteLog($"   📝 認識閾値: {_settings.RecognitionThreshold}");
-        DebugLogUtility.WriteLog($"   🔧 GPU使用: {_settings.UseGpu}");
-        DebugLogUtility.WriteLog($"   🧵 マルチスレッド: {_settings.EnableMultiThread}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚙️ OCR設定詳細:");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌐 言語: {CurrentLanguage}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 検出閾値: {_settings.DetectionThreshold}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 認識閾値: {_settings.RecognitionThreshold}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔧 GPU使用: {_settings.UseGpu}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧵 マルチスレッド: {_settings.EnableMultiThread}");
         
         progressCallback?.Report(new OcrProgress(0.4, "テキスト検出"));
         
@@ -1742,10 +1765,10 @@ public class PaddleOcrEngine(
         
         // V4モデル対応: 初期化時と同じ検出ロジックを使用
         var isV4Model = _isV4ModelForCreation; // 初期化時に設定された値を使用
-        DebugLogUtility.WriteLog($"🔍 V4モデル検出結果: {isV4Model} (初期化時設定値)");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 V4モデル検出結果: {isV4Model} (初期化時設定値)");
         
         // Phase 3: GameOptimizedPreprocessingService を使用した前処理
-        DebugLogUtility.WriteLog($"🎮 [PHASE3] ゲーム最適化前処理サービス開始: {mat.Width}x{mat.Height}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🎮 [PHASE3] ゲーム最適化前処理サービス開始: {mat.Width}x{mat.Height}");
         
         Mat processedMat;
         try
@@ -1758,22 +1781,22 @@ public class PaddleOcrEngine(
             // 画像特性に基づいてプロファイルを選択
             var characteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(mat);
             var profileName = SelectOptimalGameProfile(characteristics);
-            DebugLogUtility.WriteLog($"📊 [PHASE3] 画像分析結果: 推奨プロファイル={profileName}");
-            DebugLogUtility.WriteLog($"   💡 平均輝度: {characteristics.AverageBrightness:F1}");
-            DebugLogUtility.WriteLog($"   📊 コントラスト: {characteristics.Contrast:F1}");
-            DebugLogUtility.WriteLog($"   🔆 明るい背景: {characteristics.IsBrightBackground}");
-            DebugLogUtility.WriteLog($"   🌙 暗い背景: {characteristics.IsDarkBackground}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📊 [PHASE3] 画像分析結果: 推奨プロファイル={profileName}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   💡 平均輝度: {characteristics.AverageBrightness:F1}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📊 コントラスト: {characteristics.Contrast:F1}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔆 明るい背景: {characteristics.IsBrightBackground}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌙 暗い背景: {characteristics.IsDarkBackground}");
             
             // GameOptimizedPreprocessingService で前処理を実行
-            var preprocessingResult = await _ocrPreprocessingService.ProcessImageAsync(
+            var preprocessingResult = await __ocrPreprocessingService.ProcessImageAsync(
                 advancedImage, 
                 profileName, 
                 cancellationToken).ConfigureAwait(false);
                 
             if (preprocessingResult.Error != null)
             {
-                DebugLogUtility.WriteLog($"⚠️ [PHASE3] 前処理エラー、フォールバック: {preprocessingResult.Error.Message}");
-                _logger?.LogWarning(preprocessingResult.Error, "Phase3前処理でエラー、元画像を使用");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ [PHASE3] 前処理エラー、フォールバック: {preprocessingResult.Error.Message}");
+                __logger?.LogWarning(preprocessingResult.Error, "Phase3前処理でエラー、元画像を使用");
                 processedMat = mat.Clone(); // エラー時は元画像を使用
             }
             else
@@ -1918,13 +1941,13 @@ public class PaddleOcrEngine(
                 }
                 catch { }
                 
-                DebugLogUtility.WriteLog($"✅ [PHASE3] ゲーム最適化前処理完了: {processedMat.Width}x{processedMat.Height}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ [PHASE3] ゲーム最適化前処理完了: {processedMat.Width}x{processedMat.Height}");
             }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ [PHASE3] 前処理例外、フォールバック: {ex.Message}");
-            _logger?.LogError(ex, "Phase3前処理で例外、元画像を使用");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ [PHASE3] 前処理例外、フォールバック: {ex.Message}");
+            __logger?.LogError(ex, "Phase3前処理で例外、元画像を使用");
             processedMat = mat.Clone(); // 例外時は元画像を使用
         }
         
@@ -1932,23 +1955,23 @@ public class PaddleOcrEngine(
         {
             if (IsMultiThreadEnabled && _queuedEngine != null)
             {
-                DebugLogUtility.WriteLog("🧵 マルチスレッドOCRエンジンで処理実行");
-                _logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🧵 マルチスレッドOCRエンジンで処理実行");
+                __logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
                 result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
             }
             else if (_ocrEngine != null)
             {
-                DebugLogUtility.WriteLog("🔧 シングルスレッドOCRエンジンで処理実行");
-                _logger?.LogDebug("シングルスレッドOCRエンジンで処理実行");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 シングルスレッドOCRエンジンで処理実行");
+                __logger?.LogDebug("シングルスレッドOCRエンジンで処理実行");
                 
-                DebugLogUtility.WriteLog("📊 PaddleOCR.Run()呼び出し開始");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("📊 PaddleOCR.Run()呼び出し開始");
                 var ocrStartTime = System.Diagnostics.Stopwatch.StartNew();
                 
                 // V4モデル安定化: Task.Run分離でハングアップ対策
                 result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
                 
                 ocrStartTime.Stop();
-                DebugLogUtility.WriteLog($"⏱️ OCR実行完了: {ocrStartTime.ElapsedMilliseconds}ms");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⏱️ OCR実行完了: {ocrStartTime.ElapsedMilliseconds}ms");
             }
             else
             {
@@ -1957,8 +1980,8 @@ public class PaddleOcrEngine(
         }
         catch (Exception ex) when (ex.Message.Contains("PaddlePredictor") || ex.Message.Contains("run failed"))
         {
-            DebugLogUtility.WriteLog($"⚠️ PaddleOCRエンジンエラー検出: {ex.Message}");
-            _logger?.LogWarning(ex, "PaddleOCRエンジンでエラーが発生しました。リソースをクリアして再試行します");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ PaddleOCRエンジンエラー検出: {ex.Message}");
+            __logger?.LogWarning(ex, "PaddleOCRエンジンでエラーが発生しました。リソースをクリアして再試行します");
             
             // メモリを明示的に解放
             GC.Collect();
@@ -1971,12 +1994,12 @@ public class PaddleOcrEngine(
             // 再試行
             if (IsMultiThreadEnabled && _queuedEngine != null)
             {
-                DebugLogUtility.WriteLog("🔄 マルチスレッドOCRエンジンで再試行");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 マルチスレッドOCRエンジンで再試行");
                 result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
             }
             else if (_ocrEngine != null)
             {
-                DebugLogUtility.WriteLog("🔄 シングルスレッドOCRエンジンで再試行");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 シングルスレッドOCRエンジンで再試行");
                 result = await ExecuteOcrInSeparateTask(processedMat, cancellationToken).ConfigureAwait(false);
             }
             else
@@ -2000,18 +2023,18 @@ public class PaddleOcrEngine(
         
         try
         {
-            DebugLogUtility.WriteLog($"🔍 PaddleOCR結果の詳細デバッグ:");
-            DebugLogUtility.WriteLog($"   🔢 result == null: {result == null}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PaddleOCR結果の詳細デバッグ:");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔢 result == null: {result == null}");
             
             if (result != null)
             {
-                DebugLogUtility.WriteLog($"   📝 result型: {result.GetType().FullName}");
-                DebugLogUtility.WriteLog($"   📄 result値: {result}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 result型: {result.GetType().FullName}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📄 result値: {result}");
                 
                 // PaddleOCRの結果を処理 - 配列または単一オブジェクト
                 if (result is PaddleOcrResult[] paddleResults)
                 {
-                    DebugLogUtility.WriteLog($"   ✅ PaddleOcrResult[]として認識: 件数={paddleResults.Length}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ PaddleOcrResult[]として認識: 件数={paddleResults.Length}");
                     
                     for (int i = 0; i < paddleResults.Length; i++)
                     {
@@ -2020,48 +2043,48 @@ public class PaddleOcrEngine(
                 }
                 else if (result is PaddleOcrResult singleResult)
                 {
-                    DebugLogUtility.WriteLog($"   ✅ 単一PaddleOcrResultとして認識");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ 単一PaddleOcrResultとして認識");
                     ProcessSinglePaddleResult(singleResult, 1, textRegions);
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog($"   ❌ 予期しない結果型: {result.GetType().FullName}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ 予期しない結果型: {result.GetType().FullName}");
                     
                     // PaddleOcrResultかどうか判定してフォールバック処理
                     if (result.GetType().Name == "PaddleOcrResult")
                     {
-                        DebugLogUtility.WriteLog($"   🔧 型名によるフォールバック処理を実行");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔧 型名によるフォールバック処理を実行");
                         ProcessSinglePaddleResult(result, 1, textRegions);
                     }
                 }
             }
             else
             {
-                DebugLogUtility.WriteLog($"   ❌ PaddleOCR結果がnull");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PaddleOCR結果がnull");
             }
         }
         catch (ArgumentNullException ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ ArgumentNullException: {ex.Message}");
-            _logger?.LogWarning(ex, "PaddleOCR結果がnullです");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ ArgumentNullException: {ex.Message}");
+            __logger?.LogWarning(ex, "PaddleOCR結果がnullです");
         }
         catch (InvalidOperationException ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ InvalidOperationException: {ex.Message}");
-            _logger?.LogWarning(ex, "PaddleOCR結果の変換で操作エラーが発生");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ InvalidOperationException: {ex.Message}");
+            __logger?.LogWarning(ex, "PaddleOCR結果の変換で操作エラーが発生");
         }
         catch (InvalidCastException ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ InvalidCastException: {ex.Message}");
-            _logger?.LogWarning(ex, "PaddleOCR結果の型変換エラーが発生");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ InvalidCastException: {ex.Message}");
+            __logger?.LogWarning(ex, "PaddleOCR結果の型変換エラーが発生");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ 予期しない例外: {ex.GetType().Name} - {ex.Message}");
-            _logger?.LogError(ex, "PaddleOCR結果の変換で予期しない例外が発生");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ 予期しない例外: {ex.GetType().Name} - {ex.Message}");
+            __logger?.LogError(ex, "PaddleOCR結果の変換で予期しない例外が発生");
         }
         
-        DebugLogUtility.WriteLog($"   🔢 最終的なtextRegions数: {textRegions.Count}");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔢 最終的なtextRegions数: {textRegions.Count}");
         
         // OCR結果のサマリーログ出力
         Console.WriteLine($"📊 [OCRサマリー] 検出されたテキストリージョン数: {textRegions.Count}");
@@ -2079,7 +2102,7 @@ public class PaddleOcrEngine(
             Console.WriteLine($"⚠️ [OCRサマリー] テキストが検出されませんでした");
         }
         
-        _logger?.LogInformation("OCR処理完了: 検出テキスト数={Count}", textRegions.Count);
+        __logger?.LogInformation("OCR処理完了: 検出テキスト数={Count}", textRegions.Count);
         return textRegions;
     }
 
@@ -2090,11 +2113,11 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"   リザルト {index}:");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   リザルト {index}:");
             
             // PaddleOcrResultの実際のプロパティをリフレクションで調査
             var type = paddleResult.GetType();
-            DebugLogUtility.WriteLog($"     🔍 型: {type.FullName}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔍 型: {type.FullName}");
             
             var properties = type.GetProperties();
             foreach (var prop in properties)
@@ -2102,11 +2125,11 @@ public class PaddleOcrEngine(
                 try
                 {
                     var value = prop.GetValue(paddleResult);
-                    DebugLogUtility.WriteLog($"     🔧 {prop.Name}: {value ?? "(null)"} (型: {prop.PropertyType.Name})");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔧 {prop.Name}: {value ?? "(null)"} (型: {prop.PropertyType.Name})");
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"     ❌ {prop.Name}: エラー - {ex.Message}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ {prop.Name}: エラー - {ex.Message}");
                 }
             }
             
@@ -2117,7 +2140,7 @@ public class PaddleOcrEngine(
                 var regionsValue = regionsProperty.GetValue(paddleResult);
                 if (regionsValue is Array regionsArray)
                 {
-                    DebugLogUtility.WriteLog($"     📍 Regionsプロパティ発見: 件数={regionsArray.Length}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     📍 Regionsプロパティ発見: 件数={regionsArray.Length}");
                     
                     for (int i = 0; i < regionsArray.Length; i++)
                     {
@@ -2134,7 +2157,7 @@ public class PaddleOcrEngine(
                 // Regionsプロパティがない場合、結果全体からテキストを抽出
                 var textProperty = type.GetProperty("Text");
                 var originalText = textProperty?.GetValue(paddleResult) as string ?? string.Empty;
-                DebugLogUtility.WriteLog($"     📖 元全体テキスト: '{originalText}'");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     📖 元全体テキスト: '{originalText}'");
                 
                 // 文字形状類似性に基づく誤認識修正を適用（日本語のみ）
                 var correctedText = originalText;
@@ -2144,14 +2167,14 @@ public class PaddleOcrEngine(
                     
                     if (originalText != correctedText)
                     {
-                        DebugLogUtility.WriteLog($"     🔧 修正後全体テキスト: '{correctedText}'");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔧 修正後全体テキスト: '{correctedText}'");
                         var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
-                        DebugLogUtility.WriteLog($"     📊 全体修正信頼度: {correctionConfidence:F2}");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     📊 全体修正信頼度: {correctionConfidence:F2}");
                     }
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog($"     ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
                 }
                 var text = correctedText;
                 
@@ -2159,7 +2182,7 @@ public class PaddleOcrEngine(
                 {
                     // ⚠️ 警告: この箇所はRegionsプロパティがない場合のフォールバック処理
                     // 実際の座標が利用できないため、推定座標を使用
-                    DebugLogUtility.WriteLog($"     ⚠️ Regionsプロパティなし - フォールバック処理で推定座標を使用");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ⚠️ Regionsプロパティなし - フォールバック処理で推定座標を使用");
                     
                     // テキストを改行で分割して個別のリージョンとして処理
                     var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -2178,10 +2201,10 @@ public class PaddleOcrEngine(
                             ));
                             
                             // 詳細なOCR結果ログ出力
-                            DebugLogUtility.WriteLog($"     ⚠️ フォールバックテキストリージョン追加: '{line}' at 推定座標({boundingBox.X}, {boundingBox.Y})");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ⚠️ フォールバックテキストリージョン追加: '{line}' at 推定座標({boundingBox.X}, {boundingBox.Y})");
                             Console.WriteLine($"🔍 [OCR検出-フォールバック] テキスト: '{line}'");
                             Console.WriteLine($"📍 [OCR位置-推定] X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
-                            _logger?.LogInformation("OCR検出結果(フォールバック): テキスト='{Text}', 推定位置=({X},{Y},{Width},{Height})", 
+                            __logger?.LogInformation("OCR検出結果(フォールバック): テキスト='{Text}', 推定位置=({X},{Y},{Width},{Height})", 
                                 line, boundingBox.X, boundingBox.Y, boundingBox.Width, boundingBox.Height);
                         }
                     }
@@ -2190,7 +2213,7 @@ public class PaddleOcrEngine(
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ ProcessSinglePaddleResult エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ ProcessSinglePaddleResult エラー: {ex.Message}");
         }
     }
 
@@ -2201,15 +2224,15 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"       リージョン {index}:");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"       リージョン {index}:");
             
             var regionType = regionItem.GetType();
-            DebugLogUtility.WriteLog($"         🔍 リージョン型: {regionType.FullName}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 リージョン型: {regionType.FullName}");
             
             // テキストプロパティを取得
             var textProperty = regionType.GetProperty("Text");
             var originalText = textProperty?.GetValue(regionItem) as string ?? string.Empty;
-            DebugLogUtility.WriteLog($"         📖 元テキスト: '{originalText}'");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         📖 元テキスト: '{originalText}'");
             
             // 文字形状類似性に基づく誤認識修正を適用（日本語のみ）
             var correctedText = originalText;
@@ -2219,14 +2242,14 @@ public class PaddleOcrEngine(
                 
                 if (originalText != correctedText)
                 {
-                    DebugLogUtility.WriteLog($"         🔧 修正後テキスト: '{correctedText}'");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔧 修正後テキスト: '{correctedText}'");
                     var correctionConfidence = CharacterSimilarityCorrector.EvaluateCorrectionConfidence(originalText, correctedText);
-                    DebugLogUtility.WriteLog($"         📊 修正信頼度: {correctionConfidence:F2}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         📊 修正信頼度: {correctionConfidence:F2}");
                 }
             }
             else
             {
-                DebugLogUtility.WriteLog($"         ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ⏭️ 非日本語のため文字形状修正をスキップ: 言語={_settings.Language}");
             }
             var text = correctedText;
             
@@ -2253,33 +2276,33 @@ public class PaddleOcrEngine(
                 if (regionProperty != null)
                 {
                     var regionValue = regionProperty.GetValue(regionItem);
-                    DebugLogUtility.WriteLog($"         📍 リージョン値: {regionValue} (型: {regionValue?.GetType().Name ?? "null"})");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         📍 リージョン値: {regionValue} (型: {regionValue?.GetType().Name ?? "null"})");
                     
                     // RotatedRect型として処理
-                    DebugLogUtility.WriteLog($"         🔍 タイプチェック: regionValue != null = {regionValue != null}, 型名 = {regionValue?.GetType().Name ?? "null"}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 タイプチェック: regionValue != null = {regionValue != null}, 型名 = {regionValue?.GetType().Name ?? "null"}");
                     if (regionValue != null && regionValue.GetType().Name == "RotatedRect")
                     {
-                        DebugLogUtility.WriteLog($"         🎯 RotatedRect型を検出、変換開始");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🎯 RotatedRect型を検出、変換開始");
                         try
                         {
                             var regionValueType = regionValue.GetType();
                             
                             // 利用可能なすべてのフィールドをデバッグ出力
                             var allFields = regionValueType.GetFields();
-                            DebugLogUtility.WriteLog($"         🔍 RotatedRectの全フィールド: {string.Join(", ", allFields.Select(f => f.Name))}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 RotatedRectの全フィールド: {string.Join(", ", allFields.Select(f => f.Name))}");
                             
                             var centerField = regionValueType.GetField("Center");
                             var sizeField = regionValueType.GetField("Size");
                             var angleField = regionValueType.GetField("Angle");
                             
-                            DebugLogUtility.WriteLog($"         🔍 フィールドチェック: Center={centerField != null}, Size={sizeField != null}, Angle={angleField != null}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 フィールドチェック: Center={centerField != null}, Size={sizeField != null}, Angle={angleField != null}");
                             
                             if (centerField != null && sizeField != null)
                             {
                                 var center = centerField.GetValue(regionValue);
                                 var size = sizeField.GetValue(regionValue);
                                 
-                                DebugLogUtility.WriteLog($"         🔍 Center・ Size取得: center={center != null}, size={size != null}");
+                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 Center・ Size取得: center={center != null}, size={size != null}");
                                 
                                 // Centerから座標を取得
                                 var centerType = center?.GetType();
@@ -2294,7 +2317,7 @@ public class PaddleOcrEngine(
                                 // Angleを取得
                                 var angle = Convert.ToSingle(angleField?.GetValue(regionValue) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
                                 
-                                DebugLogUtility.WriteLog($"         🔍 座標取得結果: centerX={centerX:F1}, centerY={centerY:F1}, width={width:F1}, height={height:F1}, angle={angle:F1}");
+                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         🔍 座標取得結果: centerX={centerX:F1}, centerY={centerY:F1}, width={width:F1}, height={height:F1}, angle={angle:F1}");
                                 
                                 // 回転を考慮したバウンディングボックス計算
                                 var angleRad = angle * Math.PI / 180.0;
@@ -2309,18 +2332,18 @@ public class PaddleOcrEngine(
                                 
                                 boundingBox = new Rectangle(left, top, boundingWidth, boundingHeight);
                                 
-                                DebugLogUtility.WriteLog($"         ✅ RotatedRect変換成功: Center=({centerX:F1},{centerY:F1}), Size=({width:F1}x{height:F1})");
-                                DebugLogUtility.WriteLog($"         ✅ 計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ✅ RotatedRect変換成功: Center=({centerX:F1},{centerY:F1}), Size=({width:F1}x{height:F1})");
+                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ✅ 計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                             }
                             else
                             {
-                                DebugLogUtility.WriteLog($"         ⚠️ CenterまたはSizeフィールドが見つからない");
+                                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ⚠️ CenterまたはSizeフィールドが見つからない");
                             }
                         }
                         catch (Exception rotEx)
                         {
-                            DebugLogUtility.WriteLog($"         ❌ RotatedRect変換エラー: {rotEx.GetType().Name}: {rotEx.Message}");
-                            DebugLogUtility.WriteLog($"         ❌ スタックトレース: {rotEx.StackTrace}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ❌ RotatedRect変換エラー: {rotEx.GetType().Name}: {rotEx.Message}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ❌ スタックトレース: {rotEx.StackTrace}");
                         }
                     }
                     // 座標配列として処理（フォールバック）
@@ -2354,12 +2377,12 @@ public class PaddleOcrEngine(
                             var maxY = (int)points.Max(p => p.Y);
                             boundingBox = new Rectangle(minX, minY, maxX - minX, maxY - minY);
                             
-                            DebugLogUtility.WriteLog($"         📍 配列から計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         📍 配列から計算された座標: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                         }
                     }
                     else
                     {
-                        DebugLogUtility.WriteLog($"         ⚠️ RotatedRectでも配列でもない - フォールバック座標を使用");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ⚠️ RotatedRectでも配列でもない - フォールバック座標を使用");
                     }
                 }
                 
@@ -2367,7 +2390,7 @@ public class PaddleOcrEngine(
                 if (boundingBox.IsEmpty)
                 {
                     boundingBox = new Rectangle(10, 10 + index * 25, 200, 20);
-                    DebugLogUtility.WriteLog($"         ⚠️ 座標取得失敗、フォールバック座標を使用: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ⚠️ 座標取得失敗、フォールバック座標を使用: X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                 }
                 
                 textRegions.Add(new OcrTextRegion(
@@ -2377,17 +2400,17 @@ public class PaddleOcrEngine(
                 ));
                 
                 // 詳細なOCR結果ログ出力
-                DebugLogUtility.WriteLog($"         ✅ OcrTextRegion追加: '{text.Trim()}' (confidence: {confidence})");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ✅ OcrTextRegion追加: '{text.Trim()}' (confidence: {confidence})");
                 Console.WriteLine($"🔍 [OCR検出] テキスト: '{text.Trim()}'");
                 Console.WriteLine($"📍 [OCR位置] X={boundingBox.X}, Y={boundingBox.Y}, W={boundingBox.Width}, H={boundingBox.Height}");
                 Console.WriteLine($"💯 [OCR信頼度] {confidence:F3} ({confidence * 100:F1}%)");
-                _logger?.LogInformation("OCR検出結果: テキスト='{Text}', 位置=({X},{Y},{Width},{Height}), 信頼度={Confidence:F3}", 
+                __logger?.LogInformation("OCR検出結果: テキスト='{Text}', 位置=({X},{Y},{Width},{Height}), 信頼度={Confidence:F3}", 
                     text.Trim(), boundingBox.X, boundingBox.Y, boundingBox.Width, boundingBox.Height, confidence);
             }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"         ❌ ProcessPaddleRegion エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"         ❌ ProcessPaddleRegion エラー: {ex.Message}");
         }
     }
     
@@ -2416,7 +2439,7 @@ public class PaddleOcrEngine(
             // 境界外の場合は警告ログ出力
             if (adjustedX != clampedX || adjustedY != clampedY)
             {
-                DebugLogUtility.WriteLog($"🚨 座標補正により画面外座標を修正: 元座標({adjustedX},{adjustedY}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🚨 座標補正により画面外座標を修正: 元座標({adjustedX},{adjustedY}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
             }
 
             return new OcrTextRegion(
@@ -2514,7 +2537,7 @@ public class PaddleOcrEngine(
     {
         // PaddleOCR v3.0.1では言語別の詳細設定プロパティが存在しないため
         // 代わりに実在するプロパティのみを使用
-        DebugLogUtility.WriteLog($"     📝 日本語最適化: 実在するプロパティのみ使用");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     📝 日本語最適化: 実在するプロパティのみ使用");
         
         // 実在するプロパティで日本語テキストに有効な設定
         try
@@ -2524,12 +2547,12 @@ public class PaddleOcrEngine(
             if (rotationProp != null && rotationProp.CanWrite)
             {
                 rotationProp.SetValue(ocrEngine, true);
-                DebugLogUtility.WriteLog($"     🔄 日本語縦書き対応: 回転検出有効");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔄 日本語縦書き対応: 回転検出有効");
             }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 日本語最適化設定エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 日本語最適化設定エラー: {ex.Message}");
         }
     }
 
@@ -2541,7 +2564,7 @@ public class PaddleOcrEngine(
     {
         // PaddleOCR v3.0.1では言語別の詳細設定プロパティが存在しないため
         // 代わりに実在するプロパティのみを使用
-        DebugLogUtility.WriteLog($"     📝 英語最適化: 実在するプロパティのみ使用");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     📝 英語最適化: 実在するプロパティのみ使用");
         
         // 実在するプロパティで英語テキストに有効な設定
         try
@@ -2551,12 +2574,12 @@ public class PaddleOcrEngine(
             if (classificationProp != null && classificationProp.CanWrite)
             {
                 classificationProp.SetValue(ocrEngine, true);
-                DebugLogUtility.WriteLog($"     🔄 英語テキスト向き対応: 180度分類有効");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔄 英語テキスト向き対応: 180度分類有効");
             }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 英語最適化設定エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 英語最適化設定エラー: {ex.Message}");
         }
     }
 
@@ -2573,7 +2596,7 @@ public class PaddleOcrEngine(
             if (!string.IsNullOrWhiteSpace(settings.Language) && settings.Language != "jpn")
             {
                 var mappedLanguage = MapDisplayNameToLanguageCode(settings.Language);
-                DebugLogUtility.WriteLog($"🎯 OCR設定から言語決定: '{settings.Language}' → '{mappedLanguage}'");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🎯 OCR設定から言語決定: '{settings.Language}' → '{mappedLanguage}'");
                 return mappedLanguage;
             }
             
@@ -2582,54 +2605,47 @@ public class PaddleOcrEngine(
             if (!string.IsNullOrWhiteSpace(translationSourceLanguage))
             {
                 var mappedLanguage = MapDisplayNameToLanguageCode(translationSourceLanguage);
-                DebugLogUtility.WriteLog($"🌐 翻訳設定から言語決定: '{translationSourceLanguage}' → '{mappedLanguage}'");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🌐 翻訳設定から言語決定: '{translationSourceLanguage}' → '{mappedLanguage}'");
                 return mappedLanguage;
             }
             
             // 3. デフォルト言語（日本語）
-            DebugLogUtility.WriteLog("📋 設定が見つからないため、デフォルト言語 'jpn' を使用");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("📋 設定が見つからないため、デフォルト言語 'jpn' を使用");
             return "jpn";
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 言語決定処理でエラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ 言語決定処理でエラー: {ex.Message}");
             return "jpn"; // フォールバック
         }
     }
     
     /// <summary>
-    /// 設定ファイルから翻訳元言語を取得
+    /// 設定サービスから翻訳元言語を取得
     /// </summary>
     /// <returns>翻訳元言語の表示名</returns>
     private string? GetTranslationSourceLanguageFromConfig()
     {
         try
         {
-            // 設定ファイルの一般的な場所を確認
-            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var settingsPath = Path.Combine(appDataPath, "Baketa", "settings.json");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("📁 設定サービスからSourceLanguage取得試行...");
             
-            if (File.Exists(settingsPath))
+            // UnifiedSettingsServiceを使用して設定取得
+            var translationSettings = __unifiedSettingsService.GetTranslationSettings();
+            var sourceLanguage = translationSettings?.DefaultSourceLanguage;
+            
+            if (!string.IsNullOrWhiteSpace(sourceLanguage))
             {
-                var settingsJson = File.ReadAllText(settingsPath);
-                if (!string.IsNullOrWhiteSpace(settingsJson))
-                {
-                    // JSON解析でSourceLanguageを取得
-                    var sourceLanguage = ExtractSourceLanguageFromJson(settingsJson);
-                    if (!string.IsNullOrWhiteSpace(sourceLanguage))
-                    {
-                        DebugLogUtility.WriteLog($"📁 設定ファイルから翻訳元言語取得: '{sourceLanguage}'");
-                        return sourceLanguage;
-                    }
-                }
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📁 設定サービスから翻訳元言語取得: '{sourceLanguage}'");
+                return sourceLanguage;
             }
             
-            DebugLogUtility.WriteLog($"📁 設定ファイルが見つからないか、SourceLanguageが未設定: {settingsPath}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("📁 設定サービスからSourceLanguageが取得できませんでした");
             return null;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"📁 設定ファイル読み取りエラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ 設定サービス取得エラー: {ex.Message}");
             return null;
         }
     }
@@ -2657,17 +2673,17 @@ public class PaddleOcrEngine(
                 if (match.Success && match.Groups.Count > 1)
                 {
                     var sourceLanguage = match.Groups[1].Value;
-                    DebugLogUtility.WriteLog($"📋 JSON解析成功 ({pattern}): '{sourceLanguage}'");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📋 JSON解析成功 ({pattern}): '{sourceLanguage}'");
                     return sourceLanguage;
                 }
             }
             
-            DebugLogUtility.WriteLog("📋 JSONからSourceLanguageパターンが見つかりません");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("📋 JSONからSourceLanguageパターンが見つかりません");
             return null;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"📋 JSON解析エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📋 JSON解析エラー: {ex.Message}");
             return null;
         }
     }
@@ -2723,7 +2739,7 @@ public class PaddleOcrEngine(
             return languageCode;
         }
         
-        DebugLogUtility.WriteLog($"⚠️ 未知の言語表示名 '{displayName}'、デフォルト 'jpn' を使用");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ 未知の言語表示名 '{displayName}'、デフォルト 'jpn' を使用");
         return "jpn";
     }
 
@@ -2762,11 +2778,11 @@ public class PaddleOcrEngine(
             var estimatedMemoryMB = EstimateRequiredGpuMemory(settings);
             
             // メモリ可用性チェック
-            var isAvailable = await _gpuMemoryManager.IsMemoryAvailableAsync(estimatedMemoryMB, cancellationToken).ConfigureAwait(false);
+            var isAvailable = await __gpuMemoryManager.IsMemoryAvailableAsync(estimatedMemoryMB, cancellationToken).ConfigureAwait(false);
             
             if (!isAvailable)
             {
-                _logger?.LogWarning("⚠️ GPU memory insufficient: Required={RequiredMB}MB, falling back to CPU mode", estimatedMemoryMB);
+                __logger?.LogWarning("⚠️ GPU memory insufficient: Required={RequiredMB}MB, falling back to CPU mode", estimatedMemoryMB);
                 
                 // 自動的にCPUモードにフォールバック
                 settings.UseGpu = false;
@@ -2784,20 +2800,20 @@ public class PaddleOcrEngine(
                 MonitoringIntervalSeconds = 60
             };
             
-            await _gpuMemoryManager.ApplyLimitsAsync(limits).ConfigureAwait(false);
+            await __gpuMemoryManager.ApplyLimitsAsync(limits).ConfigureAwait(false);
             
             // 監視開始（まだ開始していない場合）
-            if (!_gpuMemoryManager.IsMonitoringEnabled)
+            if (!__gpuMemoryManager.IsMonitoringEnabled)
             {
-                await _gpuMemoryManager.StartMonitoringAsync(limits, cancellationToken).ConfigureAwait(false);
+                await __gpuMemoryManager.StartMonitoringAsync(limits, cancellationToken).ConfigureAwait(false);
             }
             
-            _logger?.LogInformation("💻 GPU memory limits applied: Max={MaxMB}MB, Estimated={EstimatedMB}MB", 
+            __logger?.LogInformation("💻 GPU memory limits applied: Max={MaxMB}MB, Estimated={EstimatedMB}MB", 
                 settings.MaxGpuMemoryMB, estimatedMemoryMB);
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "⚠️ Failed to check GPU memory limits, continuing without restrictions");
+            __logger?.LogWarning(ex, "⚠️ Failed to check GPU memory limits, continuing without restrictions");
         }
     }
     
@@ -2895,7 +2911,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"     🔆 局所的明度・コントラスト調整: {input.Width}x{input.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔆 局所的明度・コントラスト調整: {input.Width}x{input.Height}");
             
             // ガウシアンブラーで背景推定
             using var background = new Mat();
@@ -2908,11 +2924,11 @@ public class PaddleOcrEngine(
             // 結果を正規化
             Cv2.Normalize(temp, output, 0, 255, NormTypes.MinMax);
             
-            DebugLogUtility.WriteLog($"     ✅ 局所的明度・コントラスト調整完了");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 局所的明度・コントラスト調整完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 局所的明度・コントラスト調整エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 局所的明度・コントラスト調整エラー: {ex.Message}");
             input.CopyTo(output);
         }
     }
@@ -2924,7 +2940,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"     🔪 高度Un-sharp Masking: {input.Width}x{input.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔪 高度Un-sharp Masking: {input.Width}x{input.Height}");
             
             // 複数のガウシアンブラーで多段階シャープ化
             using var blur1 = new Mat();
@@ -2949,11 +2965,11 @@ public class PaddleOcrEngine(
             Cv2.AddWeighted(sharp1, 0.5, sharp2, 0.3, 0, combined);
             Cv2.AddWeighted(combined, 0.8, sharp3, 0.2, 0, output);
             
-            DebugLogUtility.WriteLog($"     ✅ 高度Un-sharp Masking完了");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 高度Un-sharp Masking完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 高度Un-sharp Maskingエラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 高度Un-sharp Maskingエラー: {ex.Message}");
             input.CopyTo(output);
         }
     }
@@ -2965,7 +2981,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"     🔲 日本語特化適応的二値化: {input.Width}x{input.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔲 日本語特化適応的二値化: {input.Width}x{input.Height}");
             
             // 日本語文字に最適化されたパラメータ
             using var adaptive1 = new Mat();
@@ -2982,11 +2998,11 @@ public class PaddleOcrEngine(
             Cv2.BitwiseAnd(adaptive1, adaptive2, combined);
             Cv2.BitwiseOr(combined, otsu, output);
             
-            DebugLogUtility.WriteLog($"     ✅ 日本語特化適応的二値化完了");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 日本語特化適応的二値化完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 日本語特化適応的二値化エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 日本語特化適応的二値化エラー: {ex.Message}");
             input.CopyTo(output);
         }
     }
@@ -2998,7 +3014,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"     🔧 日本語最適化モルフォロジー変換: {input.Width}x{input.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     🔧 日本語最適化モルフォロジー変換: {input.Width}x{input.Height}");
             
             // 日本語文字に最適化されたカーネル
             var kernel1 = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(2, 1)); // 横方向結合
@@ -3017,11 +3033,11 @@ public class PaddleOcrEngine(
             // 最終的な文字形状最適化
             Cv2.MorphologyEx(temp3, output, MorphTypes.Close, kernel3);
             
-            DebugLogUtility.WriteLog($"     ✅ 日本語最適化モルフォロジー変換完了");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 日本語最適化モルフォロジー変換完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 日本語最適化モルフォロジー変換エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 日本語最適化モルフォロジー変換エラー: {ex.Message}");
             input.CopyTo(output);
         }
     }
@@ -3033,7 +3049,7 @@ public class PaddleOcrEngine(
     {
         try
         {
-            DebugLogUtility.WriteLog($"     ✨ 最終品質向上処理: {input.Width}x{input.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✨ 最終品質向上処理: {input.Width}x{input.Height}");
             
             // 最終的な品質向上処理
             using var temp = new Mat();
@@ -3051,11 +3067,11 @@ public class PaddleOcrEngine(
             // 結果を統合
             Cv2.BitwiseOr(dilated, eroded, output);
             
-            DebugLogUtility.WriteLog($"     ✅ 最終品質向上処理完了");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 最終品質向上処理完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"     ❌ 最終品質向上処理エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 最終品質向上処理エラー: {ex.Message}");
             input.CopyTo(output);
         }
     }
@@ -3068,12 +3084,12 @@ public class PaddleOcrEngine(
     /// </summary>
     private async Task<object> ExecuteOcrInSeparateTask(Mat processedMat, CancellationToken cancellationToken)
     {
-        DebugLogUtility.WriteLog("🚀 強化OCR実行開始 - Task.WhenAny版");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🚀 強化OCR実行開始 - Task.WhenAny版");
         
         // 適応的タイムアウト設定 - 解像度とモデルに応じた最適化
         var baseTimeout = CalculateBaseTimeout(processedMat);  // 動的タイムアウト計算
         var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
-        DebugLogUtility.WriteLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
         
         // 現在のOCRキャンセレーション管理
         _currentOcrCancellation?.Dispose();
@@ -3082,12 +3098,12 @@ public class PaddleOcrEngine(
         
         var ocrTask = Task.Run(() =>
         {
-            DebugLogUtility.WriteLog("🏃 OCRエンジン実行中 - 新分離タスク");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🏃 OCRエンジン実行中 - 新分離タスク");
             // Gemini推奨：Mat.Clone()でGCライフタイム問題を完全に排除
             using var taskSafeMat = processedMat.Clone();
-            DebugLogUtility.WriteLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}, IsContinuous={taskSafeMat.IsContinuous()}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}, IsContinuous={taskSafeMat.IsContinuous()}");
             
-            DebugLogUtility.WriteLog("🎯 PaddleOCR.Run()実行開始");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🎯 PaddleOCR.Run()実行開始");
             if (_ocrEngine == null)
             {
                 throw new InvalidOperationException("OCRエンジンが初期化されていません");
@@ -3108,7 +3124,7 @@ public class PaddleOcrEngine(
             try
             {
                 var result = _ocrEngine.Run(taskSafeMat);
-                DebugLogUtility.WriteLog($"✅ PaddleOCR.Run()完了 - 結果取得完了");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ PaddleOCR.Run()完了 - 結果取得完了");
                 
                 // 成功時は連続失敗カウンタをリセット
                 if (_consecutivePaddleFailures > 0)
@@ -3191,11 +3207,11 @@ public class PaddleOcrEngine(
             
             if (result == null)
             {
-                DebugLogUtility.WriteLog("⚠️ OCR処理結果がnull - エラー状態");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("⚠️ OCR処理結果がnull - エラー状態");
                 throw new InvalidOperationException("OCR processing returned null result");
             }
             
-            DebugLogUtility.WriteLog("✅ OCR処理正常完了 - Task.WhenAny版");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ OCR処理正常完了 - Task.WhenAny版");
             
             // 成功時の統計更新とクリーンアップ
             _lastOcrTime = DateTime.UtcNow;
@@ -3207,7 +3223,7 @@ public class PaddleOcrEngine(
         else
         {
             var modelVersion = _isV4ModelForCreation ? "V4" : "V5";
-            DebugLogUtility.WriteLog($"⏰ {modelVersion}モデルOCR処理{adaptiveTimeout}秒タイムアウト");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⏰ {modelVersion}モデルOCR処理{adaptiveTimeout}秒タイムアウト");
             
             // バックグラウンドタスクのキャンセルを要求
             combinedCts.Cancel();
@@ -3222,11 +3238,11 @@ public class PaddleOcrEngine(
                     
                     if (lateResult == null)
                     {
-                        DebugLogUtility.WriteLog("⚠️ OCR遅延処理結果がnull - エラー状態");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("⚠️ OCR遅延処理結果がnull - エラー状態");
                         throw new InvalidOperationException("OCR late processing returned null result");
                     }
                     
-                    DebugLogUtility.WriteLog("✅ OCR処理がタイムアウト後に完了 - 結果を返します");
+                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ OCR処理がタイムアウト後に完了 - 結果を返します");
                     
                     // 遅延完了時の統計更新とクリーンアップ
                     _lastOcrTime = DateTime.UtcNow;
@@ -3258,14 +3274,14 @@ public class PaddleOcrEngine(
         {
             if (_currentOcrCancellation?.Token.CanBeCanceled == true && !_currentOcrCancellation.Token.IsCancellationRequested)
             {
-                DebugLogUtility.WriteLog("🛑 翻訳結果表示により進行中OCRタイムアウトをキャンセル");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🛑 翻訳結果表示により進行中OCRタイムアウトをキャンセル");
                 _currentOcrCancellation.Cancel();
                 _currentOcrCancellation = null;
             }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"⚠️ OCRタイムアウトキャンセル中にエラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ OCRタイムアウトキャンセル中にエラー: {ex.Message}");
         }
     }
 
@@ -3296,7 +3312,7 @@ public class PaddleOcrEngine(
             baseTimeout = isV4Model ? 30 : 35; // V5を延長
         }
         
-        DebugLogUtility.WriteLog($"🖼️ 解像度ベースタイムアウト: {mat.Width}x{mat.Height}({pixelCount:N0}px) → {baseTimeout}秒 (V4={isV4Model})");
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🖼️ 解像度ベースタイムアウト: {mat.Width}x{mat.Height}({pixelCount:N0}px) → {baseTimeout}秒 (V4={isV4Model})");
         return baseTimeout;
     }
 
@@ -3314,14 +3330,14 @@ public class PaddleOcrEngine(
         if (timeSinceLastOcr.TotalSeconds < 10)
         {
             adaptiveTimeout = (int)(baseTimeout * 1.5);
-            DebugLogUtility.WriteLog($"🔄 連続処理検出: 前回から{timeSinceLastOcr.TotalSeconds:F1}秒, タイムアウト延長");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔄 連続処理検出: 前回から{timeSinceLastOcr.TotalSeconds:F1}秒, タイムアウト延長");
         }
         
         // 連続タイムアウトの場合、さらに延長
         if (_consecutiveTimeouts > 0)
         {
             adaptiveTimeout = (int)(adaptiveTimeout * (1 + 0.3 * _consecutiveTimeouts));
-            DebugLogUtility.WriteLog($"⚠️ 連続タイムアウト={_consecutiveTimeouts}回, タイムアウト追加延長");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ 連続タイムアウト={_consecutiveTimeouts}回, タイムアウト追加延長");
         }
         
         // 最大値制限
@@ -3338,7 +3354,7 @@ public class PaddleOcrEngine(
 
         if (disposing)
         {
-            _logger?.LogDebug("PaddleOcrEngineのリソースを解放中");
+            __logger?.LogDebug("PaddleOcrEngineのリソースを解放中");
             _currentOcrCancellation?.Dispose();
             _currentOcrCancellation = null;
             DisposeEngines();
@@ -3357,7 +3373,7 @@ public class PaddleOcrEngine(
             // 1. 明示的なV5フラグをチェック
             if (!_isV4ModelForCreation)
             {
-                DebugLogUtility.WriteLog($"   📝 初期化時V5フラグ検出: true");
+                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 初期化時V5フラグ検出: true");
                 return true;
             }
 
@@ -3377,7 +3393,7 @@ public class PaddleOcrEngine(
                         var modelTypeName = model.GetType().Name;
                         if (modelTypeName.Contains("V5") || modelTypeName.Contains("Chinese"))
                         {
-                            DebugLogUtility.WriteLog($"   📝 モデル名からV5検出: {modelTypeName}");
+                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 モデル名からV5検出: {modelTypeName}");
                             return true;
                         }
                     }
@@ -3394,18 +3410,18 @@ public class PaddleOcrEngine(
                     var version = versionProp.GetValue(_ocrEngine)?.ToString();
                     if (version != null && (version.Contains("v5") || version.Contains("V5")))
                     {
-                        DebugLogUtility.WriteLog($"   📝 エンジンバージョンからV5検出: {version}");
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 エンジンバージョンからV5検出: {version}");
                         return true;
                     }
                 }
             }
 
-            DebugLogUtility.WriteLog($"   📝 V4以前のモデルと判定");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 V4以前のモデルと判定");
             return false;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5モデル検出エラー: {ex.Message}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ V5モデル検出エラー: {ex.Message}");
             return false; // エラー時はV4として処理
         }
     }
