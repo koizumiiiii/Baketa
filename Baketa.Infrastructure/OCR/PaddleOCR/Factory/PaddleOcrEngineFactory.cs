@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Performance;
+using Baketa.Core.Abstractions.Logging;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
@@ -57,12 +59,16 @@ public sealed class PaddleOcrEngineFactory : IPaddleOcrEngineFactory
                 _logger.LogDebug("⚡ 実際のPaddleOCRエンジン作成（プール化対応）");
                 
                 // 🔥 重要: シングルトンパターンを無効化するため、直接インスタンス作成
+                var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
                     ocrPreprocessingService, 
                     textMerger, 
                     ocrPostProcessor, 
-                    gpuMemoryManager, 
+                    gpuMemoryManager,
+                    unifiedSettingsService,
+                    unifiedLoggingService,
                     engineLogger);
             }
             else
@@ -155,8 +161,10 @@ internal sealed class NonSingletonPaddleOcrEngine : PaddleOcrEngine
         ITextMerger textMerger,
         IOcrPostProcessor ocrPostProcessor,
         IGpuMemoryManager gpuMemoryManager,
+        IUnifiedSettingsService unifiedSettingsService,
+        IUnifiedLoggingService? unifiedLoggingService = null,
         ILogger<PaddleOcrEngine>? logger = null)
-        : base(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger)
+        : base(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger)
     {
         // 🚨 重要: 親クラスのシングルトンチェックを意図的にバイパス
         // プール環境では複数インスタンスが必要

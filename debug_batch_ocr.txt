@@ -1,16 +1,6 @@
-2025-08-10 02:09:20.384 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-10 02:09:20.385 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-10 02:09:20.386 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:20.384
-2025-08-10 02:09:20.391 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
-2025-08-10 02:09:26.499 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 6110.5119ms, 成功: True
-2025-08-10 02:09:26.501 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=18
-2025-08-10 02:09:40.442 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-10 02:09:40.443 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-10 02:09:40.444 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:40.442
-2025-08-10 02:09:40.445 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
-2025-08-10 02:09:45.435 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 4990.0246ms, 成功: True
-2025-08-10 02:09:45.437 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=19
-2025-08-10 02:09:55.601 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-10 02:09:55.601 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-10 02:09:55.602 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 02:09:55.601
-2025-08-10 02:09:55.603 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-10 21:26:22.209 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-10 21:26:22.210 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-10 21:26:22.211 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 21:26:22.209
+2025-08-10 21:26:22.216 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-10 21:26:30.007 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 7793.3911ms, 成功: True
+2025-08-10 21:26:30.008 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=21

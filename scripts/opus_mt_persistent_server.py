@@ -30,7 +30,7 @@ MODELS = {
     "en-ja": "Helsinki-NLP/opus-mt-en-jap"  # 英→日（正式名称: "jap"）
 }
 SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 29876  # Baketa専用ポート
+SERVER_PORT = 7860  # Baketa専用ポート（C#側と統一）
 
 class PersistentOpusMtServer:
     """

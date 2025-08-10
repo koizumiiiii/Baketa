@@ -10,6 +10,7 @@ using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Performance;
 using Baketa.Infrastructure.DI.Modules;
+using Baketa.Infrastructure.DI;
 using Baketa.Infrastructure.Platform.DI;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
@@ -239,6 +240,10 @@ namespace Baketa.UI;
             // PaddleOcrModuleの登録
             var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
             paddleOcrModule.RegisterServices(services);
+            
+            // 統一ログサービスの登録
+            var loggingModule = new LoggingModule();
+            loggingModule.RegisterServices(services);
             
             // アダプターサービスの登録
             services.AddAdapterServices();

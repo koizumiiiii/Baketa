@@ -172,6 +172,11 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<TranslationAbstractions.IOpusMtPrewarmService, OpusMtPrewarmService>();
             Console.WriteLine("✅ [DI_DEBUG] OpusMtPrewarmService登録完了");
             
+            // 🔥 [STREAMING] ストリーミング翻訳サービス: 段階的結果表示による12.7秒→数秒体感速度向上
+            Console.WriteLine("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
+            services.AddScoped<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
+            Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
+            
             // 翻訳カスタマイズ（将来拡張）
             // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
             // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();

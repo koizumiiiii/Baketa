@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Dependency;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
+using Baketa.Core.Abstractions.Logging;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
@@ -296,7 +298,9 @@ public sealed class PaddleOcrModule : IServiceModule
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
                 var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
+                var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger);
             }
             
             bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
@@ -314,7 +318,9 @@ public sealed class PaddleOcrModule : IServiceModule
                 Console.WriteLine("✅ 本番環境検出 - PaddleOcrEngineを使用");
                 logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
                 var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, logger);
+                var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger);
             }
         });
         

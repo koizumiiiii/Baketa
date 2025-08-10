@@ -161,10 +161,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // メソッド呼び出しの絶対最初にファイル直接書き込み（最高優先度）
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 [DIRECT] StartAutomaticTranslationAsync開始 - Hash={this.GetHashCode()}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 開始前OCRエンジン状態: IsInitialized={_ocrEngine.IsInitialized}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_1] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🎬 [DIRECT] StartAutomaticTranslationAsync開始 - Hash={Hash}", this.GetHashCode());
+            // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_2] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔍 [DEBUG] 開始前OCRエンジン状態: IsInitialized={IsInitialized}", _ocrEngine.IsInitialized);
         }
         catch (Exception directEx)
         {
@@ -180,8 +180,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: 直接ファイル書き込み
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] tryブロック開始{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_3] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] tryブロック開始");
             }
             catch { }
             
@@ -196,8 +196,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: Disposedチェック前
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Disposedチェック前 - _disposed={_disposed}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_4] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] Disposedチェック前 - _disposed={Disposed}", _disposed);
             }
             catch { }
             
@@ -205,16 +205,16 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Disposedチェック後{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_5] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] Disposedチェック後");
             }
             catch { }
 
             // 緊急デバッグ: アクティブチェック前
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] アクティブチェック前 - _isAutomaticTranslationActive={_isAutomaticTranslationActive}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_6] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] アクティブチェック前 - IsActive={IsActive}", _isAutomaticTranslationActive);
             }
             catch { }
             
@@ -222,8 +222,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEBUG] 既にアクティブなためreturn{Environment.NewLine}");
+                    // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_7] ファイルアクセス競合回避のためILogger使用
+                    _logger?.LogDebug("⚠️ [DEBUG] 既にアクティブなためreturn");
                 }
                 catch { }
                 DebugLogUtility.WriteLog($"⚠️ 自動翻訳は既に実行中です");
@@ -234,24 +234,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: tryブロック終了直前
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] tryブロック終了直前{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_8] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] tryブロック終了直前");
             }
             catch { }
 
             // 緊急デバッグ: この行に到達するかテスト
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 自動翻訳開始直前{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_9] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] 自動翻訳開始直前");
             }
             catch { }
 
             // 緊急デバッグ: 直接ファイル書き込みで翻訳開始を確認
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 自動翻訳を開始します（直接書き込み）{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_10] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🎬 自動翻訳を開始します（直接書き込み）");
             }
             catch { }
             
@@ -260,8 +260,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: DebugLogUtility.WriteLog後
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] DebugLogUtility.WriteLog後{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_11] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [DEBUG] DebugLogUtility.WriteLog後");
             }
             catch { }
             
