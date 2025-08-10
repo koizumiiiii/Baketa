@@ -12,6 +12,7 @@ using System.Linq;
 using Baketa.Core.Abstractions.Services;
 using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.Translation;
+using Baketa.Infrastructure.Translation.Services;
 using Baketa.Application.Services.Capture;
 using Baketa.Core.Events.Implementation;
 using EventAggregatorImpl = Baketa.Core.Events.Implementation.EventAggregator;
@@ -165,6 +166,11 @@ namespace Baketa.Application.DI.Modules;
             // 例: services.AddSingleton<ITranslationService, TranslationService>();
             // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
             // 例: services.AddSingleton<ILanguageService, LanguageService>();
+            
+            // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップサービス: 60秒→0秒削減
+            Console.WriteLine("🔍 [DI_DEBUG] OpusMtPrewarmService登録開始");
+            services.AddSingleton<TranslationAbstractions.IOpusMtPrewarmService, OpusMtPrewarmService>();
+            Console.WriteLine("✅ [DI_DEBUG] OpusMtPrewarmService登録完了");
             
             // 翻訳カスタマイズ（将来拡張）
             // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
