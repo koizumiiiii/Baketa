@@ -315,8 +315,8 @@ internal sealed partial class App : Avalonia.Application
                         _logger?.LogWarning(prewarmEx, "⚠️ OpusMtPrewarmService取得エラー: {Error}", prewarmEx.Message);
                     }
                     
-                    // アプリケーション起動完了イベントをパブリッシュ
-                    _eventAggregator?.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
+                    // アプリケーション起動完了イベントをパブリッシュ（非ブロッキング）
+                    _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                     
                     if (_logger != null)
                     {
@@ -388,8 +388,8 @@ internal sealed partial class App : Avalonia.Application
                 // ネイティブライブラリの強制終了を設定
                 NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
                 
-                // シャットダウンイベントをパブリッシュ
-                _eventAggregator?.PublishAsync(new ApplicationShutdownEvent()).GetAwaiter().GetResult();
+                // シャットダウンイベントをパブリッシュ（非ブロッキング）
+                _ = _eventAggregator?.PublishAsync(new ApplicationShutdownEvent());
                 
                 if (_logger != null)
                 {

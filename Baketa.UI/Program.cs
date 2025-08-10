@@ -12,6 +12,7 @@ using Baketa.Core.Performance;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.DI;
 using Baketa.Infrastructure.Platform.DI;
+using Baketa.UI.DI.Services;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -175,78 +176,15 @@ namespace Baketa.UI;
                 }
             });
             
-            // Baketaの標準モジュールを登録
-            // Coreモジュールの登録
-            var coreModule = new CoreModule();
-            var registeredModules = new HashSet<Type>();
-            var moduleStack = new Stack<Type>();
-            coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            // 🚀 Phase 2-1: 段階的DI簡素化 - ステップ1: 基盤モジュール群の統合
+            Console.WriteLine("🔧 Phase 2-1: 基盤モジュール群登録開始");
+            RegisterFoundationModules(services);
+            Console.WriteLine("✅ Phase 2-1: 基盤モジュール群登録完了");
             
-            // 設定システムを登録（ISettingsServiceを提供）
-            services.AddSettingsSystem();
-            
-            // InfrastructureModuleの登録
-            var infrastructureModule = new InfrastructureModule();
-            infrastructureModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // PlatformModuleの登録
-            var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
-            platformModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // AdaptiveCaptureModuleの登録（ApplicationModuleのAdaptiveCaptureServiceに必要な依存関係を提供）
-            var adaptiveCaptureModule = new Baketa.Infrastructure.Platform.DI.Modules.AdaptiveCaptureModule();
-            adaptiveCaptureModule.RegisterServices(services);
-            
-            // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
-            var authModule = new AuthModule();
-            authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // ApplicationModuleの明示的登録
-            var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
-            applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール登録
-            Console.WriteLine("🔍 [DEBUG] StagedOcrStrategyModule登録開始...");
-            var stagedOcrModule = new Baketa.Application.DI.Modules.StagedOcrStrategyModule();
-            stagedOcrModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            Console.WriteLine("✅ [DEBUG] StagedOcrStrategyModule登録完了！");
-            
-            // 🎯 Gemini推奨Step3: 高度キャッシング戦略モジュール登録
-            Console.WriteLine("🔍 [DEBUG] AdvancedCachingModule登録開始...");
-            var advancedCachingModule = new Baketa.Application.DI.Modules.AdvancedCachingModule();
-            advancedCachingModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            Console.WriteLine("✅ [DEBUG] AdvancedCachingModule登録完了！");
-            
-            // UIモジュールの登録
-            var uiModule = new UIModule();
-            uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // Phase 2-B: バッチOCRモジュールの登録
-            var batchOcrModule = new Baketa.Infrastructure.DI.BatchOcrModule();
-            batchOcrModule.RegisterServices(services);
-            
-            // Phase 2-C: オーバーレイUIモジュールの登録
-            var overlayUIModule = new OverlayUIModule();
-            overlayUIModule.RegisterServices(services);
-            
-            // OCRモジュールの登録（IOcrPreprocessingService提供）
-            var ocrProcessingModule = new Baketa.Infrastructure.DI.OcrProcessingModule();
-            ocrProcessingModule.RegisterServices(services);
-            
-            // Phase 3: OpenCvProcessingModuleの登録（IOcrPreprocessingService上書き）
-            var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
-            openCvProcessingModule.RegisterServices(services);
-            
-            // PaddleOcrModuleの登録
-            var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
-            paddleOcrModule.RegisterServices(services);
-            
-            // 統一ログサービスの登録
-            var loggingModule = new LoggingModule();
-            loggingModule.RegisterServices(services);
-            
-            // アダプターサービスの登録
-            services.AddAdapterServices();
+            // 🚀 Phase 2-2: 段階的DI簡素化 - ステップ2: アプリケーション・特殊機能モジュール群の統合
+            Console.WriteLine("🔧 Phase 2-2: アプリケーション・特殊機能モジュール群登録開始");
+            RegisterApplicationAndSpecializedModules(services);
+            Console.WriteLine("✅ Phase 2-2: アプリケーション・特殊機能モジュール群登録完了");
             
             // DI登録デバッグ
             DebugServiceRegistration(services);
@@ -495,5 +433,159 @@ namespace Baketa.UI;
                 Console.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// 基盤モジュール群（Core, Infrastructure, Platform）を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterFoundationModules(IServiceCollection services)
+        {
+            // 依存関係トラッキング用の共通変数
+            var registeredModules = new HashSet<Type>();
+            var moduleStack = new Stack<Type>();
+            
+            // Coreモジュールの登録
+            Console.WriteLine("🏗️ Core基盤モジュール登録開始");
+            var coreModule = new CoreModule();
+            coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Core基盤モジュール登録完了");
+            
+            // 設定システムを登録（ISettingsServiceを提供）
+            Console.WriteLine("⚙️ 設定システム登録開始");
+            services.AddSettingsSystem();
+            Console.WriteLine("✅ 設定システム登録完了");
+            
+            // InfrastructureModuleの登録
+            Console.WriteLine("🔧 Infrastructure基盤モジュール登録開始");
+            var infrastructureModule = new InfrastructureModule();
+            infrastructureModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Infrastructure基盤モジュール登録完了");
+            
+            // PlatformModuleの登録
+            Console.WriteLine("🖥️ Platform基盤モジュール登録開始");
+            var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
+            platformModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Platform基盤モジュール登録完了");
+            
+            // AdaptiveCaptureModuleの登録（ApplicationModuleのAdaptiveCaptureServiceに必要な依存関係を提供）
+            Console.WriteLine("📷 AdaptiveCapture基盤モジュール登録開始");
+            var adaptiveCaptureModule = new Baketa.Infrastructure.Platform.DI.Modules.AdaptiveCaptureModule();
+            adaptiveCaptureModule.RegisterServices(services);
+            Console.WriteLine("✅ AdaptiveCapture基盤モジュール登録完了");
+            
+            // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
+            Console.WriteLine("🔐 Auth基盤モジュール登録開始");
+            var authModule = new AuthModule();
+            authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Auth基盤モジュール登録完了");
+            
+            Console.WriteLine($"📊 基盤モジュール登録済み数: {registeredModules.Count}");
+        }
+        
+        /// <summary>
+        /// アプリケーション・特殊機能モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterApplicationAndSpecializedModules(IServiceCollection services)
+        {
+            // 依存関係トラッキング用の共通変数
+            var registeredModules = new HashSet<Type>();
+            var moduleStack = new Stack<Type>();
+            
+            // ApplicationModuleの明示的登録
+            Console.WriteLine("🚀 ApplicationModule登録開始");
+            var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
+            applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ ApplicationModule登録完了");
+            
+            // Gemini推奨モジュール群
+            RegisterGeminiRecommendedModules(services, registeredModules, moduleStack);
+            
+            // UIモジュール群
+            RegisterUIModules(services, registeredModules, moduleStack);
+            
+            // OCR最適化モジュール群
+            RegisterOcrOptimizationModules(services);
+            
+            // アダプターサービスの登録
+            Console.WriteLine("🔗 アダプターサービス登録開始");
+            services.AddAdapterServices();
+            Console.WriteLine("✅ アダプターサービス登録完了");
+            
+            Console.WriteLine($"📊 アプリケーション・特殊機能モジュール登録済み数: {registeredModules.Count}");
+        }
+        
+        /// <summary>
+        /// Gemini推奨モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="registeredModules">登録済みモジュール</param>
+        /// <param name="moduleStack">モジュールスタック</param>
+        private static void RegisterGeminiRecommendedModules(IServiceCollection services, HashSet<Type> registeredModules, Stack<Type> moduleStack)
+        {
+            // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール登録
+            Console.WriteLine("🔍 [GEMINI] StagedOcrStrategyModule登録開始...");
+            var stagedOcrModule = new Baketa.Application.DI.Modules.StagedOcrStrategyModule();
+            stagedOcrModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [GEMINI] StagedOcrStrategyModule登録完了！");
+            
+            // 🎯 Gemini推奨Step3: 高度キャッシング戦略モジュール登録
+            Console.WriteLine("🔍 [GEMINI] AdvancedCachingModule登録開始...");
+            var advancedCachingModule = new Baketa.Application.DI.Modules.AdvancedCachingModule();
+            advancedCachingModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [GEMINI] AdvancedCachingModule登録完了！");
+        }
+        
+        /// <summary>
+        /// UIモジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="registeredModules">登録済みモジュール</param>
+        /// <param name="moduleStack">モジュールスタック</param>
+        private static void RegisterUIModules(IServiceCollection services, HashSet<Type> registeredModules, Stack<Type> moduleStack)
+        {
+            // UIモジュールの登録
+            Console.WriteLine("🎨 UIModule登録開始");
+            var uiModule = new UIModule();
+            uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ UIModule登録完了");
+            
+            // オーバーレイUIモジュールの登録
+            Console.WriteLine("🖼️ OverlayUIModule登録開始");
+            var overlayUIModule = new OverlayUIModule();
+            overlayUIModule.RegisterServices(services);
+            Console.WriteLine("✅ OverlayUIModule登録完了");
+        }
+        
+        /// <summary>
+        /// OCR最適化モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterOcrOptimizationModules(IServiceCollection services)
+        {
+            // バッチOCRモジュールの登録
+            Console.WriteLine("📦 BatchOcrModule登録開始");
+            var batchOcrModule = new Baketa.Infrastructure.DI.BatchOcrModule();
+            batchOcrModule.RegisterServices(services);
+            Console.WriteLine("✅ BatchOcrModule登録完了");
+            
+            // OCRモジュールの登録（IOcrPreprocessingService提供）
+            Console.WriteLine("🔍 OcrProcessingModule登録開始");
+            var ocrProcessingModule = new Baketa.Infrastructure.DI.OcrProcessingModule();
+            ocrProcessingModule.RegisterServices(services);
+            Console.WriteLine("✅ OcrProcessingModule登録完了");
+            
+            // OpenCvProcessingModuleの登録（IOcrPreprocessingService上書き）
+            Console.WriteLine("🎯 OpenCvProcessingModule登録開始");
+            var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
+            openCvProcessingModule.RegisterServices(services);
+            Console.WriteLine("✅ OpenCvProcessingModule登録完了");
+            
+            // PaddleOCRモジュールの登録
+            Console.WriteLine("🚀 PaddleOcrModule登録開始");
+            var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
+            paddleOcrModule.RegisterServices(services);
+            Console.WriteLine("✅ PaddleOcrModule登録完了");
         }
     }
