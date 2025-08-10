@@ -21,6 +21,7 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Baketa.Infrastructure.Translation.Local;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -34,6 +35,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private readonly IConfigurationFacade _configurationFacade;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
+    private readonly IEventAggregator? _eventAggregator;
+    private readonly IStreamingTranslationService? _streamingTranslationService;
     private bool _disposed;
 
     public CoordinateBasedTranslationService(
@@ -46,6 +49,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         _configurationFacade = configurationFacade ?? throw new ArgumentNullException(nameof(configurationFacade));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger;
+        
+        // 🔥 [STREAMING] ストリーミング翻訳サービスとイベントアグリゲータを取得
+        _streamingTranslationService = _serviceProvider.GetService<IStreamingTranslationService>();
+        _eventAggregator = _serviceProvider.GetService<IEventAggregator>();
+        
+        if (_streamingTranslationService != null)
+        {
+            Console.WriteLine("🔥 [STREAMING] ストリーミング翻訳サービスが利用可能");
+        }
         
         // 統一ログを使用（重複したConsole.WriteLineを統合）
         _configurationFacade.Logger?.LogDebug("CoordinateBasedTranslationService", "サービス初期化完了", new
@@ -90,16 +102,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var targetLanguageCode = translationSettings.DefaultTargetLanguage;
             
             Console.WriteLine($"🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_1] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🎯 [UNIFIED_SETTINGS] AutoDetect={AutoDetect}, Source='{Source}', Target='{Target}'", 
+                translationSettings.AutoDetectSourceLanguage, sourceLanguageCode, targetLanguageCode);
 
             // Language enumに変換（統一ユーティリティ使用）
             var sourceLanguage = LanguageCodeConverter.ToLanguageEnum(sourceLanguageCode, Language.English);
             var targetLanguage = LanguageCodeConverter.ToLanguageEnum(targetLanguageCode, Language.Japanese);
 
             Console.WriteLine($"🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_2] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🌍 [COORDINATE_SETTINGS] 最終言語設定: {Source} → {Target}", sourceLanguageCode, targetLanguageCode);
 
             return (sourceLanguage, targetLanguage);
         }
@@ -128,8 +141,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 image.Width, image.Height, windowHandle.ToInt64());
             DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理開始 - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}");
             Console.WriteLine($"🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_3] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {Width}x{Height}", image.Width, image.Height);
 
             // バッチOCR処理でテキストチャンクを取得（詳細時間測定）
             var ocrMeasurement = new PerformanceMeasurement(
@@ -139,16 +152,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             // 🚨 [CRITICAL_FIX] OCR処理直前ログ
             Console.WriteLine($"🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_4] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {IsCancellationRequested}", 
+                cancellationToken.IsCancellationRequested);
             
             var textChunks = await _processingFacade.OcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
             
             // 🚨 [CRITICAL_FIX] OCR処理完了直後ログ
             Console.WriteLine($"🚨 [CRITICAL_FIX] バッチOCR処理完了直後 - ChunkCount: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチOCR処理完了直後 - ChunkCount: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_5] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチOCR処理完了直後 - ChunkCount: {ChunkCount}, IsCancellationRequested: {IsCancellationRequested}", 
+                textChunks.Count, cancellationToken.IsCancellationRequested);
+            
+            // 🚀 [FIX] OCR完了後はキャンセル無視でバッチ翻訳を実行（並列チャンク処理実現のため）
+            if (textChunks.Count > 0 && cancellationToken.IsCancellationRequested)
+            {
+                Console.WriteLine("🚀 [PARALLEL_CHUNKS_FIX] OCR完了後のキャンセル要求を無視してバッチ翻訳を実行");
+                // 🔥 [FILE_CONFLICT_FIX_6] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🚀 [PARALLEL_CHUNKS_FIX] OCR完了後のキャンセル要求を無視してバッチ翻訳を実行");
+            }
             
             var ocrResult = ocrMeasurement.Complete();
             var ocrProcessingTime = ocrResult.Duration;
@@ -158,14 +181,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             // 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行を無効化してバッチ翻訳を直接実行
             Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_7] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止");
                 
             // await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
             
             Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_8] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行");
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
@@ -233,8 +256,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             // 実際の翻訳処理を実行（バッチ処理で高速化）
             Console.WriteLine($"🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_9] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {ChunkCount}, IsCancellationRequested: {IsCancellationRequested}", 
+                textChunks.Count, cancellationToken.IsCancellationRequested);
             
             _logger?.LogInformation("🌐 バッチ翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
             DebugLogUtility.WriteLog($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
@@ -245,24 +269,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             // 🚀 Phase 2: バッチ翻訳の実装
             Console.WriteLine($"🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_10] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔍 [CHUNK_DEBUG] Total textChunks received: {Count}", textChunks.Count);
             
             // 空でないテキストチャンクを抽出
             var nonEmptyChunks = textChunks.Where(c => !string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
             var emptyChunks = textChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
             
             Console.WriteLine($"🔍 [CHUNK_DEBUG] NonEmpty chunks: {nonEmptyChunks.Count}, Empty chunks: {emptyChunks.Count}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] NonEmpty chunks: {nonEmptyChunks.Count}, Empty chunks: {emptyChunks.Count}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_11] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔍 [CHUNK_DEBUG] NonEmpty chunks: {NonEmpty}, Empty chunks: {Empty}", 
+                nonEmptyChunks.Count, emptyChunks.Count);
                 
             // チャンク詳細をダンプ
             for (int i = 0; i < Math.Min(textChunks.Count, 3); i++)
             {
                 var chunk = textChunks[i];
                 Console.WriteLine($"🔍 [CHUNK_DEBUG] Chunk[{i}]: Text='{chunk.CombinedText}', IsEmpty={string.IsNullOrWhiteSpace(chunk.CombinedText)}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [CHUNK_DEBUG] Chunk[{i}]: Text='{chunk.CombinedText}', IsEmpty={string.IsNullOrWhiteSpace(chunk.CombinedText)}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_12] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [CHUNK_DEBUG] Chunk[{Index}]: Text='{Text}', IsEmpty={IsEmpty}", 
+                    i, chunk.CombinedText, string.IsNullOrWhiteSpace(chunk.CombinedText));
             }
             
             // 空のチャンクは翻訳をスキップ
@@ -285,13 +311,87 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 {
                     _logger?.LogInformation("🚀 [BATCH_PROCESSING] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
                     
-                    // バッチ翻訳を試行（設定から言語を取得）
+                    // 🔥 [STREAMING] ストリーミング翻訳を試行（段階的結果表示）
                     var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
-                    var batchResults = await TranslateBatchAsync(
-                        batchTexts,
-                        sourceLanguage,
-                        targetLanguage,
-                        cancellationToken).ConfigureAwait(false);
+                    
+                    List<string> batchResults;
+                    if (_streamingTranslationService != null)
+                    {
+                        Console.WriteLine("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
+                        // 🔥 [FILE_CONFLICT_FIX_13] ファイルアクセス競合回避のためILogger使用
+                        _logger?.LogDebug("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
+                        
+                        // 段階的結果表示のコールバック関数を定義
+                        void OnChunkCompleted(int index, string translatedText)
+                        {
+                            if (index < nonEmptyChunks.Count)
+                            {
+                                var chunk = nonEmptyChunks[index];
+                                chunk.TranslatedText = translatedText;
+                                
+                                Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
+                                                $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText.Substring(0, 30) + "..." : chunk.CombinedText)}'");
+                                
+                                // 🔥 [STREAMING] 即座にオーバーレイ表示を更新（Stop時は確実に中断）
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        // Task内での再度のキャンセル確認（確実な停止のため）
+                                        if (cancellationToken.IsCancellationRequested)
+                                        {
+                                            Console.WriteLine($"🛑 [STOP_PROTECTION] Stop要求のためオーバーレイ表示をスキップ - チャンク {chunk.ChunkId}");
+                                            return;
+                                        }
+                                        
+                                        if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
+                                        {
+                                            // キャンセレーショントークンを確実に渡す
+                                            await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken);
+                                            Console.WriteLine($"🎯 [STREAMING] 即座オーバーレイ更新完了 - チャンク {chunk.ChunkId}");
+                                        }
+                                    }
+                                    catch (OperationCanceledException)
+                                    {
+                                        Console.WriteLine($"🛑 [STOP_SUCCESS] オーバーレイ表示が正常にキャンセルされました - チャンク {chunk.ChunkId}");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"⚠️ [STREAMING] オーバーレイ更新エラー - チャンク {chunk.ChunkId}: {ex.Message}");
+                                    }
+                                }, cancellationToken); // ← CancellationTokenを渡す
+                            }
+                        }
+                        
+                        // 🛑 [STOP_FIX] キャンセル要求を適切に処理（無視しない）
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            _logger?.LogInformation("🛑 [STOP_FIX] Stop要求により翻訳処理を中断します");
+                            Console.WriteLine("🛑 [STOP_FIX] Stop要求により翻訳処理を中断 - オーバーレイ表示をスキップ");
+                            return; // 確実に処理を中断
+                        }
+                        
+                        // キャンセル要求を無視せず、適切に伝播
+                        var translationToken = cancellationToken;
+                        
+                        batchResults = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
+                            batchTexts,
+                            sourceLanguage,
+                            targetLanguage,
+                            OnChunkCompleted,
+                            translationToken).ConfigureAwait(false);
+                        
+                        Console.WriteLine($"✅ [STREAMING] ストリーミング翻訳完了 - 結果数: {batchResults.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ [STREAMING] ストリーミング翻訳サービス無効 - 従来バッチ翻訳使用");
+                        batchResults = await TranslateBatchAsync(
+                            batchTexts,
+                            sourceLanguage,
+                            targetLanguage,
+                            cancellationToken).ConfigureAwait(false);
+                    }
                     
                     // 結果をチャンクに反映
                     for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
@@ -350,8 +450,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             else
             {
                 Console.WriteLine($"❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_14] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.");
             }
             
             _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
@@ -474,12 +574,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             Console.WriteLine($"🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}");
             Console.WriteLine($"🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace}");
             
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace?.Replace(Environment.NewLine, " | ")}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_15] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogError("🚨 [CRITICAL_FIX] TaskCanceledException発生: {Message}", ex.Message);
+            // 🔥 [FILE_CONFLICT_FIX_16] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogError("🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {IsCancellationRequested}", 
+                ex.CancellationToken.IsCancellationRequested);
+            // 🔥 [FILE_CONFLICT_FIX_17] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogError("🚨 [CRITICAL_FIX] スタックトレース: {StackTrace}", 
+                ex.StackTrace?.Replace(Environment.NewLine, " | "));
             
             return;
         }
@@ -501,16 +603,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     {
         _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}{Environment.NewLine}");
+        // 🔥 [FILE_CONFLICT_FIX_18] ファイルアクセス競合回避のためILogger使用
+        _logger?.LogDebug("🚀 [FACADE_DEBUG] TranslationService via Facade: {ServiceType}", 
+            _processingFacade.TranslationService?.GetType().Name);
         
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
         var transformersEngine = _serviceProvider.GetService<TransformersOpusMtEngine>();
         if (transformersEngine != null)
         {
             Console.WriteLine($"🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_19] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
                 
             // Step 1: リクエストサイズの実測
             var direction = $"{sourceLanguage.Code}-{targetLanguage.Code}";
@@ -520,10 +623,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             
             Console.WriteLine($"📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes");
             Console.WriteLine($"📄 [VERIFICATION] リクエストJSON preview: {requestJson.Substring(0, Math.Min(200, requestJson.Length))}...");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📄 [VERIFICATION] リクエストJSON preview: {requestJson.Substring(0, Math.Min(200, requestJson.Length))}...{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_20] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("📏 [VERIFICATION] 実際のバッチリクエストサイズ: {RequestSize} bytes", requestBytes.Length);
+            // 🔥 [FILE_CONFLICT_FIX_21] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("📄 [VERIFICATION] リクエストJSON preview: {JsonPreview}...", 
+                requestJson.Substring(0, Math.Min(200, requestJson.Length)));
             
             // Step 2: タイムアウト付きバッチ翻訳実行
             try
@@ -534,8 +638,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 if (method != null)
                 {
                     Console.WriteLine($"🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始{Environment.NewLine}");
+                    // 🔥 [FILE_CONFLICT_FIX_22] ファイルアクセス競合回避のためILogger使用
+                    _logger?.LogDebug("🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始");
                     
                     // 10秒タイムアウトを設定
                     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -547,8 +651,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     if (taskResult is Task task)
                     {
                         Console.WriteLine($"⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}");
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}{Environment.NewLine}");
+                        // 🔥 [FILE_CONFLICT_FIX_23] ファイルアクセス競合回避のためILogger使用
+                        _logger?.LogDebug("⏱️ [VERIFICATION] Task実行中 - 開始時刻: {StartTime}", startTime.ToString("HH:mm:ss.fff"));
                         
                         await task.ConfigureAwait(false);
                         
@@ -557,8 +661,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         var batchResult = task.GetType().GetProperty("Result")?.GetValue(task);
                         
                         Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms{Environment.NewLine}");
+                        // 🔥 [FILE_CONFLICT_FIX_24] ファイルアクセス競合回避のためILogger使用
+                        _logger?.LogDebug("✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {Duration:F0}ms", duration.TotalMilliseconds);
                         
                         // 結果を詳細分析
                         if (batchResult != null)
@@ -572,21 +676,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                             var error = errorProperty?.GetValue(batchResult)?.ToString();
                             
                             Console.WriteLine($"🔍 [VERIFICATION] 結果分析: Success={isSuccess}, TranslationCount={translations?.Count ?? 0}, Error={error ?? "None"}");
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [VERIFICATION] 結果分析: Success={isSuccess}, TranslationCount={translations?.Count ?? 0}, Error={error ?? "None"}{Environment.NewLine}");
+                            // 🔥 [FILE_CONFLICT_FIX_25] ファイルアクセス競合回避のためILogger使用
+                            _logger?.LogDebug("🔍 [VERIFICATION] 結果分析: Success={Success}, TranslationCount={Count}, Error={Error}", 
+                                isSuccess, translations?.Count ?? 0, error ?? "None");
                             
                             if (isSuccess && translations != null)
                             {
                                 Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
-                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します{Environment.NewLine}");
+                                // 🔥 [FILE_CONFLICT_FIX_26] ファイルアクセス競合回避のためILogger使用
+                                _logger?.LogDebug("🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
                                 return translations.ToList();
                             }
                             else
                             {
                                 Console.WriteLine($"❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック");
-                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック{Environment.NewLine}");
+                                // 🔥 [FILE_CONFLICT_FIX_27] ファイルアクセス競合回避のためILogger使用
+                                _logger?.LogDebug("❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック");
                             }
                         }
                     }
@@ -595,21 +700,21 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
             {
                 Console.WriteLine($"⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_28] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogWarning("⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"💥 [VERIFICATION] バッチ翻訳で例外発生: {ex.GetType().Name}: {ex.Message}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [VERIFICATION] バッチ翻訳で例外発生: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_29] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogError(ex, "💫 [VERIFICATION] バッチ翻訳で例外発生: {ExceptionType}", ex.GetType().Name);
             }
         }
 
         // 個別翻訳にフォールバック
         Console.WriteLine($"🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック{Environment.NewLine}");
+        // 🔥 [FILE_CONFLICT_FIX_30] ファイルアクセス競合回避のためILogger使用
+        _logger?.LogDebug("🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック");
         
         
         // 🔧 一時的に並列処理を無効化（TransformersOpusMtEngineのIOException問題調査のため）
@@ -622,16 +727,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             try
             {
                 Console.WriteLine($"🌍 [FACADE_DEBUG] Individual translate call for: '{text.Substring(0, Math.Min(20, text.Length))}...'");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [FACADE_DEBUG] Individual translate call for: '{text.Substring(0, Math.Min(20, text.Length))}...'{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_31] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🌍 [FACADE_DEBUG] Individual translate call for: '{TextPreview}...'", 
+                    text.Substring(0, Math.Min(20, text.Length)));
                     
                 var result = await _processingFacade.TranslationService.TranslateAsync(
                     text, sourceLanguage, targetLanguage, null, cancellationToken)
                     .ConfigureAwait(false);
                     
                 Console.WriteLine($"🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null"}...'");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null"}...'{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_32] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔍 [FACADE_DEBUG] Translation result: IsSuccess={IsSuccess}, Text='{TextPreview}...'", 
+                    result?.IsSuccess, result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null");
                 results.Add(result.TranslatedText ?? "[Translation Failed]");
                 
                 _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}", 
@@ -793,8 +900,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private async Task PublishOcrCompletedEventAsync(IAdvancedImage image, IReadOnlyList<TextChunk> textChunks, TimeSpan processingTime)
     {
         Console.WriteLine($"🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={textChunks.Count}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={textChunks.Count}{Environment.NewLine}");
+        // 🔥 [FILE_CONFLICT_FIX_33] ファイルアクセス競合回避のためILogger使用
+        _logger?.LogDebug("🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={ChunkCount}", textChunks.Count);
         
         try
         {
@@ -802,8 +909,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var positionedResults = textChunks.SelectMany(chunk => chunk.TextResults).ToList();
             Console.WriteLine($"🔥 [DEBUG] SelectMany実行完了 - positionedResults作成成功");
             Console.WriteLine($"🔥 [DEBUG] TextResults検証: チャンク数={textChunks.Count}, positionedResults数={positionedResults.Count}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] TextResults検証: チャンク数={textChunks.Count}, positionedResults数={positionedResults.Count}{Environment.NewLine}");
+            // 🔥 [FILE_CONFLICT_FIX_34] ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [DEBUG] TextResults検証: チャンク数={ChunkCount}, positionedResults数={ResultsCount}", 
+                textChunks.Count, positionedResults.Count);
             
             Console.WriteLine($"🔥 [DEBUG] 条件判定: positionedResults.Count={positionedResults.Count}, 条件結果={positionedResults.Count > 0}");
             if (positionedResults.Count > 0)
@@ -826,38 +934,39 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     
                 _logger?.LogDebug("🔥 OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_35] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
                 
                 try
                 {
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前");
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator型: {_configurationFacade.EventAggregator.GetType().FullName}");
                     Console.WriteLine($"🔥 [DEBUG] EventAggregatorハッシュ: {_configurationFacade.EventAggregator.GetHashCode()}");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {_configurationFacade.EventAggregator.GetType().FullName}, ハッシュ: {_configurationFacade.EventAggregator.GetHashCode()}{Environment.NewLine}");
+                    // 🔥 [FILE_CONFLICT_FIX_36] ファイルアクセス競合回避のためILogger使用
+                    _logger?.LogDebug("🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {EventAggregatorType}, ハッシュ: {HashCode}", 
+                        _configurationFacade.EventAggregator.GetType().FullName, _configurationFacade.EventAggregator.GetHashCode());
                     await _configurationFacade.EventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し完了");
                 }
                 catch (Exception publishEx)
                 {
                     Console.WriteLine($"🔥 [ERROR] EventAggregator.PublishAsync例外: {publishEx.GetType().Name} - {publishEx.Message}");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] EventAggregator.PublishAsync例外: {publishEx.GetType().Name} - {publishEx.Message}{Environment.NewLine}");
+                    // 🔥 [FILE_CONFLICT_FIX_37] ファイルアクセス競合回避のためILogger使用
+                    _logger?.LogError(publishEx, "🔥 [ERROR] EventAggregator.PublishAsync例外: {ExceptionType}", publishEx.GetType().Name);
                     throw;
                 }
                 
                 _logger?.LogDebug("🔥 OCR完了イベント発行完了 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_38] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ResultCount}", ocrResults.Count);
             }
             else
             {
                 _logger?.LogInformation("📝 OCR結果が0件のため、OCR完了イベントの発行をスキップ");
                 Console.WriteLine($"🔥 [DEBUG] OCR結果が0件のため、OCR完了イベントの発行をスキップ");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OCR結果が0件のため、OCR完了イベントの発行をスキップ{Environment.NewLine}");
+                // 🔥 [FILE_CONFLICT_FIX_39] ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("🔥 [DEBUG] OCR結果が0件のため、OCR完了イベントの発行をスキップ");
             }
         }
         catch (Exception ex)

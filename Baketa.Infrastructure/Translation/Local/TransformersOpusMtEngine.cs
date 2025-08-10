@@ -38,9 +38,9 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     
     // 常駐サーバー設定
     private const string ServerHost = "127.0.0.1";
-    private const int ServerPort = 29876;
-    private const int ConnectionTimeoutMs = 3000;
-    private const int TranslationTimeoutMs = 5000;
+    private const int ServerPort = 7860;  // 🔥【CRITICAL FIX】Python server (opus_mt_persistent_server.py) と統一
+    private const int ConnectionTimeoutMs = 15000; // 🔧 [TCP_STABILIZATION] 3→15秒に延長
+    private const int TranslationTimeoutMs = 10000; // 🔧 [TCP_STABILIZATION] 5→10秒に延長
 
     /// <inheritdoc/>
     public override string Name => "OPUS-MT Transformers";
@@ -172,8 +172,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <summary>
     /// バッチ翻訳処理 - 複数テキストを一度のリクエストで処理
     /// </summary>
-    public async Task<IList<TranslationResponse>> TranslateBatchAsync(
-        IList<TranslationRequest> requests,
+    public override async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+        IReadOnlyList<TranslationRequest> requests,
         CancellationToken cancellationToken = default)
     {
         if (requests == null || !requests.Any())
@@ -181,30 +181,28 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             return new List<TranslationResponse>();
         }
 
-        _logger?.LogInformation("🚀 [BATCH] バッチ翻訳開始 - テキスト数: {Count}", requests.Count);
+        _logger?.LogInformation("🚀 [BATCH_PARALLEL] 並列バッチ翻訳開始 - テキスト数: {Count}", requests.Count);
+        Console.WriteLine($"🚀 [BATCH_PARALLEL] 並列バッチ翻訳開始 - テキスト数: {requests.Count}");
+        _logger?.LogDebug("🚀 [BATCH_PARALLEL] 並列バッチ翻訳開始 - テキスト数: {Count}", requests.Count);
 
         try
         {
-            // 全てのリクエストから翻訳対象テキストを抽出
-            var sourceTexts = requests.Select(r => r.SourceText).ToList();
-            
             // 🌍 バッチ翻訳の言語方向判定（最初のリクエストから判定）
             var direction = GetTranslationDirection(requests[0].SourceLanguage, requests[0].TargetLanguage);
             Console.WriteLine($"📦 [BATCH_DIRECTION] バッチ翻訳方向判定: {requests[0].SourceLanguage.Code} → {requests[0].TargetLanguage.Code} = {direction}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📦 [BATCH_DIRECTION] バッチ翻訳方向判定: {requests[0].SourceLanguage.Code} → {requests[0].TargetLanguage.Code} = {direction}{Environment.NewLine}");
+            _logger?.LogDebug("📦 [BATCH_DIRECTION] バッチ翻訳方向判定: {Source} → {Target} = {Direction}", requests[0].SourceLanguage.Code, requests[0].TargetLanguage.Code, direction);
             
-            // バッチ翻訳実行（言語方向情報付き）
-            var batchResult = await TranslateBatchWithPersistentServerAsync(sourceTexts, direction, cancellationToken).ConfigureAwait(false);
+            // 🔥 [PARALLEL_CHUNKS] 並列チャンク処理で高速化
+            var parallelResult = await TranslateBatchWithParallelChunksAsync(requests, direction, cancellationToken).ConfigureAwait(false);
             
-            if (batchResult?.Success == true && batchResult.Translations != null)
+            if (parallelResult?.Success == true && parallelResult.Translations != null)
             {
                 // バッチ結果を個別のTranslationResponseに変換
                 var responses = new List<TranslationResponse>();
                 
                 for (int i = 0; i < requests.Count; i++)
                 {
-                    var translation = i < batchResult.Translations.Count ? batchResult.Translations[i] : "[Batch Error]";
+                    var translation = i < parallelResult.Translations.Count ? parallelResult.Translations[i] : "[Batch Error]";
                     
                     responses.Add(new TranslationResponse
                     {
@@ -219,7 +217,19 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                     });
                 }
                 
-                _logger?.LogInformation("✅ [BATCH] バッチ翻訳成功 - 処理時間: {ProcessingTime:F3}秒", batchResult.ProcessingTime);
+                _logger?.LogInformation("✅ [BATCH_PARALLEL] 並列バッチ翻訳成功 - 処理時間: {ProcessingTime:F3}秒", parallelResult.ProcessingTime);
+                
+                // 🔍 [TRANSLATION_RESULTS] 翻訳結果の詳細ログ出力
+                Console.WriteLine($"🔍 [TRANSLATION_RESULTS] バッチ翻訳結果詳細:");
+                for (int i = 0; i < Math.Min(responses.Count, 5); i++) // 最初の5個を表示
+                {
+                    var response = responses[i];
+                    Console.WriteLine($"  [{i}] 原文: '{response.SourceText?.Substring(0, Math.Min(50, response.SourceText?.Length ?? 0))}...'");
+                    Console.WriteLine($"  [{i}] 訳文: '{response.TranslatedText?.Substring(0, Math.Min(50, response.TranslatedText?.Length ?? 0))}...'");
+                    Console.WriteLine($"  [{i}] 成功: {response.IsSuccess}");
+                }
+                _logger?.LogInformation("🔍 [TRANSLATION_RESULTS] バッチ翻訳結果: {Count}個の翻訳完了", responses.Count);
+                
                 return responses;
             }
             else
@@ -267,8 +277,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🚀 [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync 呼び出し - テキスト: '{request.SourceText}'");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync 呼び出し - テキスト: '{request.SourceText}'{Environment.NewLine}");
+        _logger?.LogDebug("🚀 [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync 呼び出し - テキスト: {Text}", request.SourceText);
         
         // ✅ 言語制限削除: 英→日と日→英の両方向翻訳をサポート
         // モデルファイル(opus-mt-ja-en.model, opus-mt-en-ja.model)が存在するため両方向対応可能
@@ -276,8 +285,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         // 🔄 言語方向判定: リクエストから適切な翻訳方向を決定
         var direction = GetTranslationDirection(request.SourceLanguage, request.TargetLanguage);
         Console.WriteLine($"🌍 [DIRECTION] 翻訳方向判定: {request.SourceLanguage.Code} → {request.TargetLanguage.Code} = {direction}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [DIRECTION] 翻訳方向判定: {request.SourceLanguage.Code} → {request.TargetLanguage.Code} = {direction}{Environment.NewLine}");
+        _logger?.LogDebug("🌍 [DIRECTION] 翻訳方向判定: {Source} → {Target} = {Direction}", request.SourceLanguage.Code, request.TargetLanguage.Code, direction);
 
         // ⚡ Phase 1.1: キャッシュチェック
         var cacheKey = GenerateCacheKey(request.SourceText, request.SourceLanguage, request.TargetLanguage);
@@ -306,35 +314,31 @@ public class TransformersOpusMtEngine : TranslationEngineBase
 
         // ⚡ Phase 0 緊急対応: 3秒タイムアウト実装
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(3)); // 3秒でタイムアウト
+        timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(TranslationTimeoutMs)); // 🔥【CRITICAL FIX】3秒→10秒に延長
         
         var startTime = DateTime.Now;
-        Console.WriteLine($"⚡ [TIMEOUT] タイムアウト付き翻訳開始 - テキスト: '{request.SourceText}' (制限: 3秒)");
+        Console.WriteLine($"⚡ [TIMEOUT] タイムアウト付き翻訳開始 - テキスト: '{request.SourceText}' (制限: {TranslationTimeoutMs}ms)");
         
         try
         {
             // 常駐サーバーでの翻訳を試行（タイムアウト付き）
             Console.WriteLine($"⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: '{request.SourceText}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: '{request.SourceText}'{Environment.NewLine}");
+            _logger?.LogDebug("⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: {Text}", request.SourceText);
 
             // 🚨 超詳細境界調査 - コンソール出力とファイル出力を分離
             Console.WriteLine($"⚡ [BOUNDARY-1] Console.WriteLine実行完了");
             
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [BOUNDARY-2] File.AppendAllText実行完了{Environment.NewLine}");
+            _logger?.LogDebug("⚡ [BOUNDARY-2] File.AppendAllText実行完了");
                 
             Console.WriteLine($"⚡ [BOUNDARY-3] TranslateWithPersistentServerAsync呼び出し直前");
             
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [BOUNDARY-4] メソッド呼び出し直前の最終ログ{Environment.NewLine}");
+            _logger?.LogDebug("⚡ [BOUNDARY-4] メソッド呼び出し直前の最終ログ");
 
             // 🚨 メソッド呼び出し境界
             var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, direction, timeoutCts.Token).ConfigureAwait(false);
 
             Console.WriteLine($"⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了{Environment.NewLine}");
+            _logger?.LogDebug("⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
 
             var elapsedTime = DateTime.Now - startTime;
             Console.WriteLine($"⚡ [TRANSLATE_DEBUG] 常駐サーバー結果取得 - Result: {pythonResult != null}, Success: {pythonResult?.Success}, Translation: '{pythonResult?.Translation}', 実行時間: {elapsedTime.TotalMilliseconds:F0}ms");
@@ -434,21 +438,18 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             await _serverLock.WaitAsync().ConfigureAwait(false);
             
             // 🚨 既存のPythonサーバープロセスを強制終了
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [SERVER_CLEANUP] 既存Pythonプロセス終了開始{Environment.NewLine}");
+            _logger?.LogDebug("🧹 [SERVER_CLEANUP] 既存Pythonプロセス終了開始");
             
             await KillExistingServerProcessesAsync().ConfigureAwait(false);
             
             // 既にサーバーが実行中かチェック
             if (_serverProcess != null && !_serverProcess.HasExited)
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [SERVER_CHECK] 既存サーバープロセス確認中{Environment.NewLine}");
+                _logger?.LogDebug("🔍 [SERVER_CHECK] 既存サーバープロセス確認中");
                 
                 if (await CheckServerHealthAsync().ConfigureAwait(false))
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [SERVER_EXISTING] 既存サーバー使用{Environment.NewLine}");
+                    _logger?.LogDebug("✅ [SERVER_EXISTING] 既存サーバー使用");
                     _logger.LogInformation("常駐サーバーは既に実行中です");
                     return true;
                 }
@@ -457,10 +458,11 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             Console.WriteLine($"🚀 [SERVER_DEBUG] 常駐Pythonサーバー起動開始");
             _logger.LogInformation("常駐Pythonサーバーを起動中...");
             
+            // 🔧 [PYTHON_FIX] PowerShell経由でPython実行（pyenv-win問題回避）
             var processInfo = new ProcessStartInfo
             {
-                FileName = _pythonPath,
-                Arguments = $"\"{_serverScriptPath}\"",
+                FileName = "powershell.exe",
+                Arguments = $"-Command \"python '{_serverScriptPath}'\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -483,7 +485,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             while (DateTime.Now - startTime < maxWaitTime)
             {
-                await Task.Delay(2000).ConfigureAwait(false); // 待機間隔を2秒に延長
+                await Task.Delay(5000).ConfigureAwait(false); // 🔧 [TCP_STABILIZATION] 2→5秒に延長
                 
                 var elapsedTime = DateTime.Now - startTime;
                 Console.WriteLine($"⏱️ [SERVER_DEBUG] サーバー接続試行中... 経過時間: {elapsedTime.TotalSeconds:F1}秒");
@@ -519,58 +521,118 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     }
     
     /// <summary>
-    /// サーバーの生存確認
+    /// サーバーの生存確認（リトライ機構付き）
+    /// 🔧 [TCP_STABILIZATION] 3回リトライでTCP接続安定化
     /// </summary>
     private async Task<bool> CheckServerHealthAsync()
+    {
+        // 🔧 [TCP_STABILIZATION] 3回リトライ機構
+        const int maxRetries = 3;
+        const int retryDelayMs = 1000; // 1秒間隔でリトライ
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                _logger?.LogDebug("🔄 [HEALTH_RETRY] ヘルスチェック試行 {Attempt}/{MaxRetries}", attempt, maxRetries);
+                    
+                Console.WriteLine($"🔍 [HEALTH_CHECK] 試行 {attempt}/{maxRetries} - サーバー接続確認中...");
+                
+                var result = await CheckServerHealthInternalAsync().ConfigureAwait(false);
+                
+                if (result)
+                {
+                    _logger?.LogDebug("✅ [HEALTH_SUCCESS] 試行{Attempt}で接続成功", attempt);
+                    Console.WriteLine($"✅ [HEALTH_CHECK] 試行{attempt}で接続成功");
+                    return true;
+                }
+                
+                // 失敗時は次のリトライまで待機（最後の試行は除く）
+                if (attempt < maxRetries)
+                {
+                    _logger?.LogDebug("⏱️ [HEALTH_RETRY_WAIT] 試行{Attempt}失敗、{DelayMs}ms後にリトライ", attempt, retryDelayMs);
+                    Console.WriteLine($"⏱️ [HEALTH_CHECK] 試行{attempt}失敗、{retryDelayMs}ms後にリトライ");
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError("❌ [HEALTH_EXCEPTION] 試行{Attempt}例外: {Message}", attempt, ex.Message);
+                Console.WriteLine($"❌ [HEALTH_CHECK] 試行{attempt}例外: {ex.Message}");
+                
+                if (attempt == maxRetries)
+                {
+                    _logger?.LogError("💥 [HEALTH_FINAL_FAIL] 最終試行も失敗");
+                    return false;
+                }
+                
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
+        }
+        
+        Console.WriteLine($"💥 [HEALTH_CHECK] 全リトライ失敗 - サーバー接続不可");
+        return false;
+    }
+    
+    /// <summary>
+    /// サーバーの生存確認（内部実装）
+    /// 🔧 [TCP_STABILIZATION] リトライ対応の分離実装
+    /// </summary>
+    private async Task<bool> CheckServerHealthInternalAsync()
     {
         try
         {
             // 🚨 ログ1: メソッド開始
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_1] CheckServerHealthAsyncメソッド開始{Environment.NewLine}");
+            // 🔥 [HEALTH_1] CheckServerHealthAsyncメソッド開始 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_1] CheckServerHealthAsyncメソッド開始");
             
             Console.WriteLine($"🔍 [HEALTH_CHECK] サーバー接続試行 - {ServerHost}:{ServerPort}");
             
             // 🚨 ログ2: TcpClient作成前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_2] TcpClient作成前{Environment.NewLine}");
+            // 🔥 [HEALTH_2] TcpClient作成前 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_2] TcpClient作成前");
             
             using var client = new TcpClient();
             
+            // 🔥 [GEMINI_PHASE1] Keep-Alive設定でアイドル切断防止
+            ConfigureKeepAlive(client);
+            
             // 🚨 ログ3: ConnectAsync呼び出し前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_3] ConnectAsync呼び出し前{Environment.NewLine}");
+            // 🔥 [HEALTH_3] ConnectAsync呼び出し前 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_3] ConnectAsync呼び出し前");
             
             var connectTask = client.ConnectAsync(ServerHost, ServerPort);
             var timeoutTask = Task.Delay(ConnectionTimeoutMs);
             
             // 🚨 ログ4: Task.WhenAny呼び出し前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_4] Task.WhenAny呼び出し前{Environment.NewLine}");
+            // 🔥 [HEALTH_4] Task.WhenAny呼び出し前 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_4] Task.WhenAny呼び出し前");
             
             if (await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false) == timeoutTask)
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏰ [HEALTH_TIMEOUT] 接続タイムアウト発生{Environment.NewLine}");
+                _logger?.LogWarning("⏰ [HEALTH_TIMEOUT] 接続タイムアウト発生");
                 Console.WriteLine($"⏰ [HEALTH_CHECK] 接続タイムアウト（{ConnectionTimeoutMs}ms）");
                 return false; // タイムアウト
             }
             
             // 🚨 ログ5: WhenAny完了、接続確認前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_5] Task.WhenAny完了、接続状態確認中{Environment.NewLine}");
+            // 🔥 [HEALTH_5] Task.WhenAny完了、接続状態確認中 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_5] Task.WhenAny完了、接続状態確認中");
             
             if (!client.Connected)
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [HEALTH_FAILED] TCP接続失敗{Environment.NewLine}");
+                // ❌ [HEALTH_FAILED] TCP接続失敗 - ファイルアクセス競合回避のためILogger使用
+                _logger?.LogDebug("❌ [HEALTH_FAILED] TCP接続失敗");
                 Console.WriteLine($"❌ [HEALTH_CHECK] 接続失敗 - client.Connected = false");
                 return false;
             }
             
             // 🚨 ログ6: TCP接続成功、ストリーム取得前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_6] TCP接続成功、ストリーム取得前{Environment.NewLine}");
+            // 🔥 [HEALTH_6] TCP接続成功、ストリーム取得前 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_6] TCP接続成功、ストリーム取得前");
             
             Console.WriteLine($"🔗 [HEALTH_CHECK] TCP接続成功 - PING送信中");
             
@@ -578,61 +640,59 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             var pingRequest = Encoding.UTF8.GetBytes("PING\n");
             
             // 🚨 ログ7: WriteAsync呼び出し前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_7] WriteAsync呼び出し前{Environment.NewLine}");
+            // 🔥 [HEALTH_7] WriteAsync呼び出し前 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_7] WriteAsync呼び出し前");
             
             await stream.WriteAsync(pingRequest, 0, pingRequest.Length).ConfigureAwait(false);
             
             // 🚨 ログ8: WriteAsync完了、ReadAsync準備前
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [HEALTH_8] WriteAsync完了、ReadAsync準備中{Environment.NewLine}");
+            // 🔥 [HEALTH_8] WriteAsync完了、ReadAsync準備中 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔥 [HEALTH_8] WriteAsync完了、ReadAsync準備中");
             
-            // ⚡ CRITICAL FIX: ReadAsyncにタイムアウトを追加
+            // 🔥 [GEMINI_PHASE1] 統一タイムアウト戦略でReadAsync実行
             var buffer = new byte[1024];
-            using var readTimeout = new CancellationTokenSource(ConnectionTimeoutMs);
+            using var readTimeout = CreateUnifiedReadTimeout("HealthCheck");
             
             // 🚨 ログ9: ReadAsync呼び出し前 - ⚠️ 最も疑わしい箇所
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨🚨🚨 [HEALTH_9] ReadAsync呼び出し前 - HANG発生箇所の可能性大 🚨🚨🚨{Environment.NewLine}");
+            // 🚨🚨🚨 [HEALTH_9] ReadAsync呼び出し前 - HANG発生箇所の可能性大 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🚨 [HEALTH_9] ReadAsync呼び出し前 - HANG発生箇所の可能性大");
             
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, readTimeout.Token).ConfigureAwait(false);
             
             // 🚨 ログ10: ReadAsync完了
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [HEALTH_10] ReadAsync完了 - bytesRead={bytesRead}{Environment.NewLine}");
+            // ✅ [HEALTH_10] ReadAsync完了 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("✅ [HEALTH_10] ReadAsync完了 - bytesRead={BytesRead}", bytesRead);
             
             var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             
             // 🔍 レスポンス内容の詳細ログ
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📨 [HEALTH_RESPONSE] 受信内容({bytesRead}バイト): '{response}'{Environment.NewLine}");
+            // 📨 [HEALTH_RESPONSE] 受信内容 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("📨 [HEALTH_RESPONSE] 受信内容({BytesRead}バイト): {Response}", bytesRead, response);
             
             // 🔍 レスポンス内容をバイト単位で確認
             var responseBytes = Encoding.UTF8.GetBytes(response);
             var hexString = Convert.ToHexString(responseBytes);
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [HEALTH_HEX] バイト表現: {hexString}{Environment.NewLine}");
+            // 🔍 [HEALTH_HEX] バイト表現 - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔍 [HEALTH_HEX] バイト表現: {HexString}", hexString);
             
             Console.WriteLine($"📨 [HEALTH_CHECK] サーバーレスポンス: '{response.Trim()}'");
             
             var isAlive = response.Contains("\"status\": \"alive\"") || response.Contains("\"status\":\"alive\"");
             
             // 🔍 判定処理の詳細ログ
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [HEALTH_CHECK] Contains('\"status\":\"alive\"'): {isAlive}{Environment.NewLine}");
+            // 🔍 [HEALTH_CHECK] Contains - ファイルアクセス競合回避のためILogger使用
+            _logger?.LogDebug("🔍 [HEALTH_CHECK] Contains('status:alive'): {IsAlive}", isAlive);
             
             Console.WriteLine($"💓 [HEALTH_CHECK] サーバー状態: {(isAlive ? "生存" : "異常")}");
             
             // 🚨 ログ11: メソッド正常終了
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [HEALTH_11] CheckServerHealthAsync正常終了 - isAlive={isAlive}{Environment.NewLine}");
+            _logger?.LogDebug("✅ [HEALTH_11] CheckServerHealthAsync正常終了 - isAlive={IsAlive}", isAlive);
             
             return isAlive;
         }
         catch (Exception ex)
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [HEALTH_EXCEPTION] ヘルスチェック例外: {ex.Message}{Environment.NewLine}");
+            _logger?.LogError(ex, "💥 [HEALTH_EXCEPTION] ヘルスチェック例外: {Message}", ex.Message);
             Console.WriteLine($"💥 [HEALTH_CHECK] ヘルスチェック例外: {ex.Message}");
             return false;
         }
@@ -668,6 +728,9 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             _logger?.LogInformation("🔗 [BATCH_DETAIL_1] TcpClient作成前");
             using var client = new TcpClient();
             
+            // 🔥 [GEMINI_PHASE1] Keep-Alive設定でアイドル切断防止
+            ConfigureKeepAlive(client);
+            
             _logger?.LogInformation("🔗 [BATCH_DETAIL_2] ConnectAsync呼び出し前");
             await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
             
@@ -677,10 +740,19 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             var stream = client.GetStream();
             
-            // バッチリクエスト送信（言語方向情報付き）
-            var request = new { batch_texts = texts, direction = direction };
-            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
+            // 🔥 [GEMINI_PHASE1] バッチ翻訳プロトコル修正: 改行文字の適切な前処理
+            var sanitizedTexts = texts.Select(text => SanitizeTextForBatchTranslation(text)).ToList();
+            
+            var request = new { batch_texts = sanitizedTexts, direction = direction };
+            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions 
+            { 
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                WriteIndented = false // プロトコル安定化のため改行なし
+            }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
+            
+            Console.WriteLine($"🔥 [BATCH_PROTOCOL] 修正版バッチリクエスト送信 - オリジナル: {texts.Count}件, サニタイズ済み: {sanitizedTexts.Count}件");
+            _logger?.LogInformation("バッチ翻訳プロトコル修正版でリクエスト送信 - テキスト数: {Count}", sanitizedTexts.Count);
             
             _logger?.LogInformation("📤 [BATCH_SERVER] バッチリクエスト送信 - サイズ: {Size} bytes", requestBytes.Length);
             
@@ -688,23 +760,63 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
             _logger?.LogInformation("📤 [BATCH_DETAIL_5] WriteAsync完了");
             
-            // バッチレスポンス受信（長めのタイムアウト）
-            var batchTimeout = Math.Max(TranslationTimeoutMs, texts.Count * 1000); // テキスト数に応じて動的調整
-            _logger?.LogInformation("⏰ [BATCH_DETAIL_6] ReadAsync準備 - タイムアウト設定: {Timeout}ms", batchTimeout);
+            // 🔥 [GEMINI_PHASE1] 統一タイムアウト戦略でReadAsync実行（バッチ用延長）
+            var extraTimeoutForBatch = texts.Count * 1000; // テキスト数に応じて動的追加
+            _logger?.LogInformation("⏰ [BATCH_DETAIL_6] ReadAsync準備 - 動的追加タイムアウト: {ExtraTimeout}ms", extraTimeoutForBatch);
             
-            using var cts = new CancellationTokenSource(batchTimeout);
-            var buffer = new byte[8192]; // バッファサイズを増加
+            using var cts = CreateUnifiedReadTimeout("BatchTranslation", extraTimeoutForBatch);
+            var buffer = new byte[65536]; // 64KB に拡張してバッファ不足を解決
+            var allData = new List<byte>();
+            int totalBytesRead = 0;
             
-            _logger?.LogInformation("🚨🚨🚨 [BATCH_DETAIL_7] ReadAsync呼び出し前 - HANG発生の可能性大 🚨🚨🚨");
-            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
-            _logger?.LogInformation("✅ [BATCH_DETAIL_8] ReadAsync完了 - bytesRead={BytesRead}", bytesRead);
+            _logger?.LogInformation("🔧 [TCP_FIX] 改良版ReadAsync開始 - ストリーム終端まで確実に読み取り");
             
-            _logger?.LogInformation("📨 [BATCH_SERVER] バッチレスポンス受信 - サイズ: {Size} bytes", bytesRead);
+            // ストリーム終端まで確実に読み取るループ処理
+            while (true)
+            {
+                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+                if (bytesRead == 0) 
+                {
+                    _logger?.LogDebug("📨 [TCP_FIX] ストリーム終了を検出 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
+                    break; // ストリーム終了
+                }
+                
+                allData.AddRange(buffer.Take(bytesRead));
+                totalBytesRead += bytesRead;
+                _logger?.LogDebug("📨 [TCP_FIX] 部分読み取り: {Bytes}bytes, 累計: {Total}bytes", bytesRead, totalBytesRead);
+                
+                // レスポンス完了の判定（改行文字で終端判定）
+                if (allData.Count > 0 && allData[^1] == '\n') 
+                {
+                    _logger?.LogDebug("📨 [TCP_FIX] 改行文字で終端検出 - レスポンス完了");
+                    break;
+                }
+                
+                // 無限ループ防止（最大10MB制限）
+                if (totalBytesRead > 10 * 1024 * 1024)
+                {
+                    _logger?.LogWarning("⚠️ [TCP_FIX] 最大サイズ超過 - 強制終了");
+                    break;
+                }
+            }
             
-            var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            _logger?.LogInformation("✅ [TCP_FIX] 改良版ReadAsync完了 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
+            
+            var responseJson = Encoding.UTF8.GetString(allData.ToArray());
             _logger?.LogInformation("📨 [BATCH_DETAIL_9] レスポンス内容: {ResponseJson}", responseJson);
             
             var response = JsonSerializer.Deserialize<BatchTranslationResult>(responseJson);
+            
+            // 🔥 [GEMINI_PHASE1] バッチ翻訳結果の復元処理
+            if (response != null && response.Translations != null)
+            {
+                response.Translations = response.Translations
+                    .Select(RestoreTextFromBatchTranslation)
+                    .ToList();
+                    
+                Console.WriteLine($"🔥 [BATCH_PROTOCOL] バッチ翻訳結果復元完了 - 復元件数: {response.Translations.Count}");
+                _logger?.LogInformation("バッチ翻訳結果復元完了 - 復元件数: {Count}", response.Translations.Count);
+            }
             
             var processingTime = DateTime.Now - startTime;
             _logger?.LogInformation("✅ [BATCH_SERVER] バッチ翻訳完了 - 処理時間: {ProcessingTime:F3}秒", processingTime.TotalSeconds);
@@ -822,6 +934,10 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             }
             
             using var client = new TcpClient();
+            
+            // 🔥 [GEMINI_PHASE1] Keep-Alive設定でアイドル切断防止
+            ConfigureKeepAlive(client);
+            
             await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
             
             // キャンセレーション再確認
@@ -829,15 +945,23 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             var stream = client.GetStream();
             
-            // 翻訳リクエスト送信（言語方向情報付き）
-            var request = new { text = text, direction = direction };
-            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
+            // 🔥 [GEMINI_PHASE1] 個別翻訳プロトコル修正: 改行文字の適切な前処理
+            var sanitizedText = SanitizeTextForBatchTranslation(text);
+            
+            var request = new { text = sanitizedText, direction = direction };
+            var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions 
+            { 
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                WriteIndented = false // プロトコル安定化のため改行なし
+            }) + "\n";
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
+            
+            Console.WriteLine($"🔥 [SINGLE_PROTOCOL] 修正版個別リクエスト送信 - オリジナル長: {text.Length}, サニタイズ後: {sanitizedText.Length}");
             
             await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
             
-            // レスポンス受信（タイムアウト付き）
-            using var cts = new CancellationTokenSource(TranslationTimeoutMs);
+            // 🔥 [GEMINI_PHASE1] 統一タイムアウト戦略でReadAsync実行
+            using var cts = CreateUnifiedReadTimeout("SingleTranslation");
             var buffer = new byte[4096];
             var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
             
@@ -845,6 +969,13 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
             
             var response = JsonSerializer.Deserialize<PersistentTranslationResult>(responseJson);
+            
+            // 🔥 [GEMINI_PHASE1] 個別翻訳結果の復元処理
+            if (response != null && !string.IsNullOrEmpty(response.Translation))
+            {
+                response.Translation = RestoreTextFromBatchTranslation(response.Translation);
+                Console.WriteLine($"🔥 [SINGLE_PROTOCOL] 個別翻訳結果復元完了 - 復元後: '{response.Translation}'");
+            }
             
             var processingTime = DateTime.Now - startTime;
             Console.WriteLine($"⚡ [SERVER_TRANSLATE] 翻訳完了 - 処理時間: {processingTime.TotalSeconds:F3}秒, 翻訳: '{response?.Translation}'");
@@ -889,27 +1020,23 @@ public class TransformersOpusMtEngine : TranslationEngineBase
 
             using var process = new Process { StartInfo = processInfo };
             Console.WriteLine($"🐍 [PYTHON_DEBUG] Process.Start()直前");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] Process.Start()直前{Environment.NewLine}");
+            _logger?.LogDebug("🐍 [PYTHON_DEBUG] Process.Start()直前");
             
             process.Start();
             
             Console.WriteLine($"🐍 [PYTHON_DEBUG] Process.Start()完了 - PID: {process.Id}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] Process.Start()完了 - PID: {process.Id}{Environment.NewLine}");
+            _logger?.LogDebug("🐍 [PYTHON_DEBUG] Process.Start()完了 - PID: {ProcessId}", process.Id);
 
             // タイムアウト制御 (初回モデルロードのため300秒=5分でタイムアウト)
             Console.WriteLine($"🐍 [PYTHON_DEBUG] 非同期タスク作成開始");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] 非同期タスク作成開始{Environment.NewLine}");
+            _logger?.LogDebug("🐍 [PYTHON_DEBUG] 非同期タスク作成開始");
             
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
             var processTask = process.WaitForExitAsync();
             
             Console.WriteLine($"🐍 [PYTHON_DEBUG] 非同期タスク作成完了");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] 非同期タスク作成完了{Environment.NewLine}");
+            _logger?.LogDebug("🐍 [PYTHON_DEBUG] 非同期タスク作成完了");
 
             var timeout = TimeSpan.FromSeconds(15); // 15秒に短縮（緊急修正）
             using var cts = new CancellationTokenSource(timeout);
@@ -917,8 +1044,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             try
             {
                 Console.WriteLine($"🔄 [PYTHON_DEBUG] Python処理実行中... (最大15秒待機)");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [PYTHON_DEBUG] Python処理実行中... (最大15秒待機){Environment.NewLine}");
+                _logger?.LogDebug("🔄 [PYTHON_DEBUG] Python処理実行中... (最大15秒待機)");
                 
                 var startTime = DateTime.Now;
                 
@@ -930,21 +1056,18 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                         await Task.Delay(10000, cts.Token).ConfigureAwait(false);
                         var elapsed = DateTime.Now - startTime;
                         Console.WriteLine($"⏱️ [PROGRESS] 処理継続中... 経過時間: {elapsed.TotalSeconds:F0}秒");
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏱️ [PROGRESS] 処理継続中... 経過時間: {elapsed.TotalSeconds:F0}秒{Environment.NewLine}");
+                        _logger?.LogDebug("⏱️ [PROGRESS] 処理継続中... 経過時間: {ElapsedSeconds}秒", elapsed.TotalSeconds);
                         if (elapsed.TotalSeconds > 15) break;
                     }
                 }, cts.Token);
                 
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] processTask.WaitAsync()呼び出し直前");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] processTask.WaitAsync()呼び出し直前{Environment.NewLine}");
+                _logger?.LogDebug("🐍 [PYTHON_DEBUG] processTask.WaitAsync()呼び出し直前");
                 
                 await processTask.WaitAsync(cts.Token).ConfigureAwait(false);
                 
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] processTask.WaitAsync()完了");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] processTask.WaitAsync()完了{Environment.NewLine}");
+                _logger?.LogDebug("🐍 [PYTHON_DEBUG] processTask.WaitAsync()完了");
                 var output = await outputTask.ConfigureAwait(false);
                 var error = await errorTask.ConfigureAwait(false);
 
@@ -965,12 +1088,9 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                         Source = text 
                     };
                 }
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] Pythonプロセス終了 - ExitCode: {process.ExitCode}{Environment.NewLine}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] Output: '{output}'{Environment.NewLine}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🐍 [PYTHON_DEBUG] Error: '{error}'{Environment.NewLine}");
+                _logger?.LogDebug("🐍 [PYTHON_DEBUG] Pythonプロセス終了 - ExitCode: {ExitCode}", process.ExitCode);
+                _logger?.LogDebug("🐍 [PYTHON_DEBUG] Output: {Output}", output);
+                _logger?.LogDebug("🐍 [PYTHON_DEBUG] Error: {Error}", error);
                 _logger.LogInformation("Pythonプロセス終了 - ExitCode: {ExitCode}, Output: {Output}, Error: {Error}", 
                     process.ExitCode, output, error);
 
@@ -981,12 +1101,10 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 }
 
                 Console.WriteLine($"🔍 [TRANSLATE_DEBUG] ParseResult呼び出し開始");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TRANSLATE_DEBUG] ParseResult呼び出し開始{Environment.NewLine}");
+                _logger?.LogDebug("🔍 [TRANSLATE_DEBUG] ParseResult呼び出し開始");
                 var result = ParseResult(output);
                 Console.WriteLine($"🔍 [TRANSLATE_DEBUG] ParseResult呼び出し完了 - Result: {result?.Success}, Translation: '{result?.Translation}'");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TRANSLATE_DEBUG] ParseResult呼び出し完了 - Result: {result?.Success}, Translation: '{result?.Translation}'{Environment.NewLine}");
+                _logger?.LogDebug("🔍 [TRANSLATE_DEBUG] ParseResult呼び出し完了 - Result: {Success}, Translation: {Translation}", result?.Success, result?.Translation);
                 return result;
             }
             catch (OperationCanceledException)
@@ -1074,10 +1192,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         {
             Console.WriteLine($"💥 [JSON_DEBUG] JSON解析失敗: {ex.Message}");
             Console.WriteLine($"💥 [JSON_DEBUG] 問題のある出力: '{output}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [JSON_DEBUG] JSON解析失敗: {ex.Message}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [JSON_DEBUG] 問題のある出力: '{output}'{Environment.NewLine}");
+            _logger?.LogError(ex, "💥 [JSON_DEBUG] JSON解析失敗: {Message}", ex.Message);
+            _logger?.LogError("💥 [JSON_DEBUG] 問題のある出力: {Output}", output);
             _logger.LogError(ex, "Python出力のJSONパースに失敗しました: {Output}", output);
             return null;
         }
@@ -1085,10 +1201,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         {
             Console.WriteLine($"💥 [JSON_DEBUG] 予期しないエラー: {ex.GetType().Name} - {ex.Message}");
             Console.WriteLine($"💥 [JSON_DEBUG] スタックトレース: {ex.StackTrace}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [JSON_DEBUG] 予期しないエラー: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [JSON_DEBUG] スタックトレース: {ex.StackTrace}{Environment.NewLine}");
+            _logger?.LogError(ex, "💥 [JSON_DEBUG] 予期しないエラー: {ExceptionType} - {Message}", ex.GetType().Name, ex.Message);
+            _logger?.LogError(ex, "💥 [JSON_DEBUG] スタックトレース");
             _logger.LogError(ex, "ParseResult処理中に予期しないエラーが発生しました: {Output}", output);
             return null;
         }
@@ -1199,8 +1313,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     {
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧹 [CLEANUP_START] Pythonプロセス終了処理開始{Environment.NewLine}");
+            _logger?.LogDebug("🧹 [CLEANUP_START] Pythonプロセス終了処理開始");
             
             // PowerShellでPythonプロセスを全て終了
             var processInfo = new ProcessStartInfo
@@ -1218,16 +1331,14 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             await process.WaitForExitAsync().ConfigureAwait(false);
             
-            // 2秒待機してプロセス終了を確実にする
-            await Task.Delay(2000).ConfigureAwait(false);
+            // 🔧 [TCP_STABILIZATION] 3秒待機してプロセス終了を確実にする
+            await Task.Delay(3000).ConfigureAwait(false);
             
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [CLEANUP_COMPLETE] Pythonプロセス終了処理完了{Environment.NewLine}");
+            _logger?.LogDebug("✅ [CLEANUP_COMPLETE] Pythonプロセス終了処理完了");
         }
         catch (Exception ex)
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [CLEANUP_ERROR] Pythonプロセス終了エラー: {ex.Message}{Environment.NewLine}");
+            _logger?.LogError(ex, "❌ [CLEANUP_ERROR] Pythonプロセス終了エラー: {Message}", ex.Message);
             _logger.LogWarning(ex, "既存Pythonプロセス終了中にエラーが発生しました");
         }
     }
@@ -1328,6 +1439,263 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         Console.WriteLine($"📊 [CACHE_STATS] ヒット率: {hitRate:F1}% ({hitCount}/{totalRequests}), エントリ数: {_translationCache.Count}/{_maxCacheSize}");
         _logger.LogInformation("キャッシュ統計 - ヒット率: {HitRate:F1}% ({HitCount}/{TotalRequests}), エントリ数: {EntryCount}/{MaxSize}",
             hitRate, hitCount, totalRequests, _translationCache.Count, _maxCacheSize);
+    }
+    
+    /// <summary>
+    /// 🔥 [GEMINI_PHASE1] Keep-Alive設定をTcpClientに適用
+    /// アイドル接続切断を防ぎ、TCP接続の安定性を向上
+    /// </summary>
+    /// <param name="client">設定対象のTcpClient</param>
+    private static void ConfigureKeepAlive(TcpClient client)
+    {
+        try
+        {
+            var socket = client.Client;
+            
+            // Keep-Aliveを有効化
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            
+            // Keep-Aliveタイマー設定（2時間 = 7200秒）
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 7200);
+            
+            // Keep-Alive送信間隔（1秒）
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 1);
+            
+            // Keep-Alive再試行回数（9回）
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 9);
+            
+            Console.WriteLine($"🔥 [KEEP_ALIVE] Keep-Alive設定完了 - アイドル時間: 7200秒, 送信間隔: 1秒, 再試行: 9回");
+        }
+        catch (Exception ex)
+        {
+            // Keep-Alive設定失敗は致命的でないため、ログのみ
+            Console.WriteLine($"⚠️ [KEEP_ALIVE] Keep-Alive設定失敗: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 🔥 [GEMINI_PHASE1] ReadAsync操作の統一タイムアウト戦略
+    /// すべてのReadAsync呼び出しで一貫したタイムアウト処理
+    /// </summary>
+    /// <param name="operationType">操作タイプ（ログ用）</param>
+    /// <param name="extraTimeoutMs">追加タイムアウト時間（オプション）</param>
+    /// <returns>統一設定されたCancellationTokenSource</returns>
+    private CancellationTokenSource CreateUnifiedReadTimeout(string operationType, int extraTimeoutMs = 0)
+    {
+        // 🔧 統一タイムアウト戦略: ベース（15秒） + 追加時間
+        var baseTimeoutMs = ConnectionTimeoutMs; // 15秒ベース
+        var totalTimeoutMs = baseTimeoutMs + extraTimeoutMs;
+        
+        Console.WriteLine($"🔥 [UNIFIED_TIMEOUT] {operationType}用タイムアウト設定: {totalTimeoutMs}ms (ベース:{baseTimeoutMs}ms + 追加:{extraTimeoutMs}ms)");
+        
+        return new CancellationTokenSource(totalTimeoutMs);
+    }
+    
+    /// <summary>
+    /// 🔥 [GEMINI_PHASE1] バッチ翻訳用テキストサニタイズ
+    /// DEFAULT_NEWLINE_FAIL問題を防ぐための改行文字とプロトコル特殊文字の適切な処理
+    /// </summary>
+    /// <param name="originalText">元のテキスト</param>
+    /// <returns>サニタイズ済みテキスト</returns>
+    private static string SanitizeTextForBatchTranslation(string originalText)
+    {
+        if (string.IsNullOrEmpty(originalText))
+            return originalText;
+        
+        // 改行文字をプレースホルダーに変換（JSON送信時の問題を回避）
+        var sanitized = originalText
+            .Replace("\r\n", "〔CRLF〕")    // Windows改行
+            .Replace("\n", "〔LF〕")        // Unix改行  
+            .Replace("\r", "〔CR〕")        // Mac改行
+            .Replace("\"", "〔QUOTE〕")     // JSONエスケープ問題回避
+            .Replace("\\", "〔BACKSLASH〕") // バックスラッシュエスケープ回避
+            .Trim(); // 前後の空白削除
+        
+        return sanitized;
+    }
+    
+    /// <summary>
+    /// 🔥 [GEMINI_PHASE1] バッチ翻訳結果の復元
+    /// サニタイズされたテキストを元の改行文字に復元
+    /// </summary>
+    /// <param name="sanitizedText">サニタイズ済みテキスト</param>
+    /// <returns>復元されたテキスト</returns>
+    private static string RestoreTextFromBatchTranslation(string sanitizedText)
+    {
+        if (string.IsNullOrEmpty(sanitizedText))
+            return sanitizedText;
+        
+        // プレースホルダーを元の文字に復元
+        var restored = sanitizedText
+            .Replace("〔CRLF〕", "\r\n")      // Windows改行復元
+            .Replace("〔LF〕", "\n")          // Unix改行復元
+            .Replace("〔CR〕", "\r")          // Mac改行復元
+            .Replace("〔QUOTE〕", "\"")       // クォート復元
+            .Replace("〔BACKSLASH〕", "\\");  // バックスラッシュ復元
+        
+        return restored;
+    }
+
+    /// <summary>
+    /// 🔥 並列チャンク処理でバッチ翻訳を高速化
+    /// リクエストを複数チャンクに分割し、各チャンクを並列処理することで3-5倍高速化を実現
+    /// </summary>
+    private async Task<BatchTranslationResult?> TranslateBatchWithParallelChunksAsync(
+        IReadOnlyList<TranslationRequest> requests, 
+        string direction,
+        CancellationToken cancellationToken = default)
+    {
+        var startTime = DateTime.Now;
+        _logger?.LogInformation("🔥 [PARALLEL_CHUNKS] 並列チャンク処理開始 - 総リクエスト数: {Count}", requests.Count);
+
+        try
+        {
+            // チャンクサイズの動的決定（最適化のため）
+            var chunkSize = CalculateOptimalChunkSize(requests.Count);
+            _logger?.LogInformation("📦 [CHUNK_SIZE] 最適チャンクサイズ決定: {ChunkSize}", chunkSize);
+
+            // リクエストをチャンクに分割
+            var chunks = SplitRequestsIntoChunks(requests, chunkSize);
+            _logger?.LogInformation("🔀 [CHUNK_SPLIT] チャンク分割完了 - チャンク数: {ChunkCount}", chunks.Count);
+
+            // 各チャンクを並列処理
+            var chunkTasks = chunks.Select(async (chunk, index) =>
+            {
+                _logger?.LogInformation("🚀 [CHUNK_{Index}] 並列処理開始 - サイズ: {Size}", index, chunk.Count);
+                
+                var chunkTexts = chunk.Select(r => r.SourceText).ToList();
+                var result = await TranslateBatchWithPersistentServerAsync(chunkTexts, direction, cancellationToken).ConfigureAwait(false);
+                
+                _logger?.LogInformation("✅ [CHUNK_{Index}] 処理完了 - 成功: {Success}", index, result?.Success ?? false);
+                return new { Index = index, Result = result, OriginalRequests = chunk };
+            }).ToList();
+
+            // 全チャンクの完了を待機（部分成功対応）
+            _logger?.LogInformation("⏳ [PARALLEL_WAIT] 全チャンクの完了を待機中（部分成功対応）...");
+            var chunkResults = await Task.WhenAll(chunkTasks.Select(async task =>
+            {
+                try
+                {
+                    return await task.ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "🔧 [PARTIAL_SUCCESS] 個別チャンク処理でエラー発生、部分成功として継続");
+                    return new { Index = -1, Result = new BatchTranslationResult { Success = false, Error = $"チャンクエラー: {ex.Message}" }, OriginalRequests = new List<TranslationRequest>() };
+                }
+            })).ConfigureAwait(false);
+            
+            // 結果をマージ
+            var mergedResult = MergeChunkResults(chunkResults, requests.Count);
+            var processingTime = (DateTime.Now - startTime).TotalSeconds;
+            
+            if (mergedResult != null)
+            {
+                mergedResult.ProcessingTime = processingTime;
+                _logger?.LogInformation("🎯 [PARALLEL_COMPLETE] 並列チャンク処理完了 - 総処理時間: {Time:F3}秒, 成功チャンク数: {SuccessCount}/{TotalCount}", 
+                    processingTime, chunkResults.Count(r => r.Result?.Success == true), chunkResults.Length);
+            }
+
+            return mergedResult;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "💥 [PARALLEL_ERROR] 並列チャンク処理エラー");
+            return new BatchTranslationResult { Success = false, Error = $"並列処理エラー: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// リクエスト数に基づく最適チャンクサイズ計算
+    /// </summary>
+    private static int CalculateOptimalChunkSize(int totalRequests)
+    {
+        // 最適化ルール:
+        // - 1-10件: チャンク分割なし（オーバーヘッド回避）
+        // - 11-50件: 2-3チャンクに分割
+        // - 51件以上: 並列度を最大化（最大4並列）
+        return totalRequests switch
+        {
+            <= 10 => totalRequests,           // 分割しない
+            <= 20 => totalRequests / 2,       // 2チャンク
+            <= 50 => totalRequests / 3,       // 3チャンク  
+            _ => Math.Max(totalRequests / 4, 10) // 4チャンク、最小10件
+        };
+    }
+
+    /// <summary>
+    /// リクエストをチャンクに分割
+    /// </summary>
+    private static List<List<TranslationRequest>> SplitRequestsIntoChunks(IReadOnlyList<TranslationRequest> requests, int chunkSize)
+    {
+        var chunks = new List<List<TranslationRequest>>();
+        
+        for (int i = 0; i < requests.Count; i += chunkSize)
+        {
+            var chunk = requests.Skip(i).Take(chunkSize).ToList();
+            chunks.Add(chunk);
+        }
+        
+        return chunks;
+    }
+
+    /// <summary>
+    /// チャンク結果をマージして単一の BatchTranslationResult に統合
+    /// </summary>
+    private BatchTranslationResult? MergeChunkResults(
+        dynamic[] chunkResults, 
+        int totalRequestCount)
+    {
+        var mergedTranslations = new List<string>();
+        var mergedSources = new List<string>();
+        var hasAnySuccess = false;
+        var errors = new List<string>();
+
+        // チャンク結果をインデックス順にソートしてマージ
+        var sortedResults = chunkResults.OrderBy(r => r.Index).ToArray();
+        
+        foreach (var chunkResult in sortedResults)
+        {
+            var result = chunkResult.Result as BatchTranslationResult;
+            
+            if (result?.Success == true && result.Translations != null)
+            {
+                hasAnySuccess = true;
+                mergedTranslations.AddRange(result.Translations);
+                mergedSources.AddRange(result.Sources ?? new List<string>());
+            }
+            else
+            {
+                // 失敗したチャンクの分だけプレースホルダーを追加
+                var originalRequests = chunkResult.OriginalRequests as List<TranslationRequest>;
+                var chunkSize = originalRequests?.Count ?? 0;
+                
+                for (int i = 0; i < chunkSize; i++)
+                {
+                    mergedTranslations.Add($"[Chunk Error] {originalRequests?[i]?.SourceText ?? "Unknown"}");
+                    mergedSources.Add(originalRequests?[i]?.SourceText ?? "Unknown");
+                }
+                
+                errors.Add(result?.Error ?? "Unknown chunk error");
+            }
+        }
+
+        if (!hasAnySuccess)
+        {
+            return new BatchTranslationResult 
+            { 
+                Success = false, 
+                Error = $"全チャンク処理失敗: {string.Join(", ", errors)}"
+            };
+        }
+
+        return new BatchTranslationResult
+        {
+            Success = true,
+            Translations = mergedTranslations,
+            Sources = mergedSources,
+            TranslationCount = mergedTranslations.Count
+        };
     }
 
     /// <summary>
