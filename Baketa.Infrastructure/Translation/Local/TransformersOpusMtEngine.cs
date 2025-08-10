@@ -39,7 +39,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     // 常駐サーバー設定
     private const string ServerHost = "127.0.0.1";
     private const int ServerPort = 7860;  // 🔥【CRITICAL FIX】Python server (opus_mt_persistent_server.py) と統一
-    private const int ConnectionTimeoutMs = 15000; // 🔧 [TCP_STABILIZATION] 3→15秒に延長
+    private const int ConnectionTimeoutMs = 5000; // 🚀 Phase 2 UI応答性: 15→5秒に短縮
     private const int TranslationTimeoutMs = 10000; // 🔧 [TCP_STABILIZATION] 5→10秒に延長
 
     /// <inheritdoc/>

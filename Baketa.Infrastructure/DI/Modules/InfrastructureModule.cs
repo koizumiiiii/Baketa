@@ -124,8 +124,14 @@ namespace Baketa.Infrastructure.DI.Modules;
                 services.Remove(service);
             }
             
-            // ⚡ Phase 1.1: TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, TransformersOpusMtEngine>();
+            // ⚡ Phase 2 DI修正: UI応答性向上のためTransformersOpusMtEngineを遅延初期化
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
+            {
+                // バックグラウンドで初期化して、UIをブロックしない
+                var logger = provider.GetService<ILogger<TransformersOpusMtEngine>>();
+                logger?.LogInformation("🚀 TransformersOpusMtEngine遅延初期化開始 - UIブロック回避");
+                return new TransformersOpusMtEngine(logger);
+            });
             
             // 🔧 ファサード実装バッチ処理ハング問題の修正: 具象型でも登録してServiceProviderからの直接取得を可能にする
             services.AddSingleton<TransformersOpusMtEngine>(provider => 
