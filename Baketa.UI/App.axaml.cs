@@ -271,6 +271,7 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine("✅ TranslationFlowModule初期化完了");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationFlowModule初期化完了");
                         _logger?.LogInformation("✅ TranslationFlowModule初期化完了");
+                        
                     }
                     catch (Exception moduleEx)
                     {
@@ -280,6 +281,38 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"💥 スタックトレース: {moduleEx.StackTrace}");
                         _logger?.LogError("💥 スタックトレース: {StackTrace}", moduleEx.StackTrace);
                         // エラーが発生してもアプリケーションの起動は継続
+                    }
+                    
+                    // 🔥【CRITICAL FIX】OPUS-MT事前起動サービスを開始 - TranslationFlowModule例外の影響を受けない独立実行
+                    Console.WriteLine("🔥🔥🔥 OPUS-MT事前起動サービス処理開始 🔥🔥🔥");
+                    try
+                    {
+                        Console.WriteLine("🔍 OpusMtPrewarmService取得開始");
+                        var prewarmService = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.IOpusMtPrewarmService>();
+                        Console.WriteLine($"✅ OpusMtPrewarmService取得成功: {prewarmService.GetType().Name}");
+                        Console.WriteLine("🚀 バックグラウンドタスク作成開始");
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                Console.WriteLine("🚀 prewarmService.StartPrewarmingAsync() 呼び出し開始");
+                                await prewarmService.StartPrewarmingAsync();
+                                Console.WriteLine("✅ prewarmService.StartPrewarmingAsync() 完了");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"⚠️ OpusMtPrewarmService開始エラー: {ex.Message}");
+                                _logger?.LogWarning(ex, "⚠️ OpusMtPrewarmService開始エラー: {Error}", ex.Message);
+                            }
+                        });
+                        Console.WriteLine("🚀 OpusMtPrewarmService開始要求完了");
+                        _logger?.LogInformation("🚀 OpusMtPrewarmService開始要求完了");
+                    }
+                    catch (Exception prewarmEx)
+                    {
+                        Console.WriteLine($"💥💥💥 OpusMtPrewarmService取得エラー: {prewarmEx.GetType().Name}: {prewarmEx.Message}");
+                        Console.WriteLine($"💥💥💥 スタックトレース: {prewarmEx.StackTrace}");
+                        _logger?.LogWarning(prewarmEx, "⚠️ OpusMtPrewarmService取得エラー: {Error}", prewarmEx.Message);
                     }
                     
                     // アプリケーション起動完了イベントをパブリッシュ
