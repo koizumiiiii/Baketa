@@ -142,12 +142,11 @@ public sealed class MultiMonitorTestRunner(
         var targetMonitor = monitors[1];
         
         // テスト座標
-        var testPoints = new Point[]
-        {
+        Point[] testPoints = [
             new(100, 100),
             new(sourceMonitor.Bounds.Width / 2, sourceMonitor.Bounds.Height / 2),
             new(sourceMonitor.Bounds.Width - 100, sourceMonitor.Bounds.Height - 100)
-        };
+        ];
         
         foreach (var point in testPoints)
         {

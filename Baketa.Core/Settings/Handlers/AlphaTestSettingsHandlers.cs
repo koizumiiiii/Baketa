@@ -10,14 +10,9 @@ namespace Baketa.Core.Settings.Handlers;
 /// <summary>
 /// αテスト用設定ハンドラーの基底クラス
 /// </summary>
-public abstract class AlphaTestSettingsHandlerBase : ISettingsHandler
+public abstract class AlphaTestSettingsHandlerBase(ILogger logger) : ISettingsHandler
 {
-    protected ILogger Logger { get; }
-
-    protected AlphaTestSettingsHandlerBase(ILogger logger)
-    {
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    protected ILogger Logger { get; } = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc />
     public abstract int Priority { get; }
@@ -91,10 +86,8 @@ public abstract class AlphaTestSettingsHandlerBase : ISettingsHandler
 /// αテスト翻訳設定ハンドラー
 /// 翻訳エンジン設定の適用を処理
 /// </summary>
-public sealed class AlphaTestTranslationSettingsHandler : AlphaTestSettingsHandlerBase
+public sealed class AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTranslationSettingsHandler> logger) : AlphaTestSettingsHandlerBase(logger)
 {
-    public AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTranslationSettingsHandler> logger) : base(logger) { }
-
     public override int Priority => 10; // 高優先度
     public override IReadOnlyList<string> HandledCategories => ["Translation"];
     public override string Name => "αテスト翻訳設定ハンドラー";
@@ -155,10 +148,8 @@ public sealed class AlphaTestTranslationSettingsHandler : AlphaTestSettingsHandl
 /// αテストUI設定ハンドラー
 /// フォント・透明度の即時適用を処理
 /// </summary>
-public sealed class AlphaTestUISettingsHandler : AlphaTestSettingsHandlerBase
+public sealed class AlphaTestUISettingsHandler(ILogger<AlphaTestUISettingsHandler> logger) : AlphaTestSettingsHandlerBase(logger)
 {
-    public AlphaTestUISettingsHandler(ILogger<AlphaTestUISettingsHandler> logger) : base(logger) { }
-
     public override int Priority => 20; // 中優先度
     public override IReadOnlyList<string> HandledCategories => ["MainUi", "Overlay"];
     public override string Name => "αテストUI設定ハンドラー";
@@ -227,10 +218,8 @@ public sealed class AlphaTestUISettingsHandler : AlphaTestSettingsHandlerBase
 /// αテストキャプチャ設定ハンドラー
 /// キャプチャ間隔・OCR設定の適用を処理
 /// </summary>
-public sealed class AlphaTestCaptureSettingsHandler : AlphaTestSettingsHandlerBase
+public sealed class AlphaTestCaptureSettingsHandler(ILogger<AlphaTestCaptureSettingsHandler> logger) : AlphaTestSettingsHandlerBase(logger)
 {
-    public AlphaTestCaptureSettingsHandler(ILogger<AlphaTestCaptureSettingsHandler> logger) : base(logger) { }
-
     public override int Priority => 30; // 低優先度
     public override IReadOnlyList<string> HandledCategories => ["Capture", "Ocr"];
     public override string Name => "αテストキャプチャ設定ハンドラー";

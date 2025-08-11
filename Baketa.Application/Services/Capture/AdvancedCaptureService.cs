@@ -29,7 +29,7 @@ namespace Baketa.Application.Services.Capture;
 /// 拡張キャプチャサービスの実装
 /// 連続キャプチャ、パフォーマンス最適化、ステータス管理機能を提供
 /// </summary>
-public class AdvancedCaptureService : IAdvancedCaptureService, IDisposable
+public sealed class AdvancedCaptureService : IAdvancedCaptureService, IDisposable
 {
     private readonly IGdiScreenCapturer _screenCapturer;
     private readonly CoreIDifferenceDetector _differenceDetector;
@@ -730,7 +730,7 @@ public class AdvancedCaptureService : IAdvancedCaptureService, IDisposable
         GC.SuppressFinalize(this);
     }
     
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         if (disposing)
         {

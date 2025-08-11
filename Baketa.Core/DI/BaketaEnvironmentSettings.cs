@@ -6,7 +6,7 @@ namespace Baketa.Core.DI;
     /// Baketaアプリケーションの環境設定を保持するクラス。
     /// DIコンテナで登録するためのラッパークラスです。
     /// </summary>
-    public class BaketaEnvironmentSettings
+    public sealed class BaketaEnvironmentSettings
     {
         /// <summary>
         /// アプリケーション実行環境

@@ -39,4 +39,21 @@ namespace Baketa.Core.Abstractions.Factories;
         /// <param name="backgroundColor">背景色（省略時は透明）</param>
         /// <returns>Windows画像</returns>
         Task<IWindowsImage> CreateEmptyAsync(int width, int height, Color? backgroundColor = null);
+
+        /// <summary>
+        /// 画像をリサイズ
+        /// </summary>
+        /// <param name="source">元画像</param>
+        /// <param name="width">新しい幅</param>
+        /// <param name="height">新しい高さ</param>
+        /// <returns>リサイズされた画像</returns>
+        IWindowsImage ResizeImage(IWindowsImage source, int width, int height);
+
+        /// <summary>
+        /// 画像の指定領域を切り出し
+        /// </summary>
+        /// <param name="source">元画像</param>
+        /// <param name="cropArea">切り出し領域</param>
+        /// <returns>切り出された画像</returns>
+        IWindowsImage CropImage(IWindowsImage source, Rectangle cropArea);
     }

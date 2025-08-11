@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Views.Auth;
 using Baketa.UI.Views;
+using Baketa.UI.ViewModels;
 
 namespace Baketa.UI.Services;
 
@@ -95,25 +96,25 @@ internal sealed class AvaloniaNavigationService(
         ThrowIfDisposed();
         try
         {
-            _logNavigating(_logger, "MainWindow", null);
+            _logNavigating(_logger, "MainOverlayView", null);
 
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var mainWindowViewModel = _serviceProvider.GetRequiredService<ViewModels.MainWindowViewModel>();
-                var mainWindow = new MainWindow
+                var mainOverlayViewModel = _serviceProvider.GetRequiredService<ViewModels.MainOverlayViewModel>();
+                var mainOverlayView = new MainOverlayView
                 {
-                    DataContext = mainWindowViewModel
+                    DataContext = mainOverlayViewModel
                 };
 
-                desktop.MainWindow = mainWindow;
-                mainWindow.Show();
+                desktop.MainWindow = mainOverlayView;
+                mainOverlayView.Show();
             }
 
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logNavigationError(_logger, "MainWindow", ex);
+            _logNavigationError(_logger, "MainOverlayView", ex);
         }
     }
 
@@ -127,12 +128,32 @@ internal sealed class AvaloniaNavigationService(
         {
             _logNavigating(_logger, "Settings", null);
 
-            // TODO: 設定画面の実装
-            // var settingsViewModel = _serviceProvider.GetRequiredService<SettingsWindowViewModel>();
-            // var settingsWindow = new SettingsWindow(settingsViewModel);
-            // await ShowDialogAsync(settingsWindow).ConfigureAwait(false);
-
-            await Task.CompletedTask.ConfigureAwait(false);
+            // αテスト向けSimpleSettings画面を表示
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始");
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始{Environment.NewLine}");
+            }
+            catch { }
+            
+            var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
+            
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}{Environment.NewLine}");
+            }
+            catch { }
+            var settingsWindow = new SimpleSettingsView
+            {
+                DataContext = settingsViewModel
+            };
+            
+            Console.WriteLine("🔧 設定画面を表示");
+            await ShowDialogAsync(settingsWindow).ConfigureAwait(false);
+            Console.WriteLine("🔧 設定画面表示完了");
         }
         catch (Exception ex)
         {

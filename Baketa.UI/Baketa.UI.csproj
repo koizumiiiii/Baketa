@@ -2,12 +2,13 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<Platforms>AnyCPU;x64</Platforms>
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<!-- WPFとWinFormsを無効化してAvaloniaとの競合を回避 -->
 		<!-- <UseWPF>true</UseWPF> -->
 		<!-- <UseWindowsForms>true</UseWindowsForms> -->
@@ -15,7 +16,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+		<!-- AVLN5001警告を抑制: AR風翻訳UIへの移行中のため廃止予定警告を抑制 -->
+		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822;NU1701;AVLN5001</NoWarn>
 		
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>
@@ -96,4 +99,21 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
   </ItemGroup>
+
+	<!-- ネイティブDLLの自動コピー（Platform層からも継承される） -->
+	<ItemGroup>
+		<None Include="..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and Exists('..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>BaketaCaptureNative.dll</Link>
+		</None>
+		<None Include="..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Release' and Exists('..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>BaketaCaptureNative.dll</Link>
+		</None>
+		<!-- net8.0-windows10.0.19041.0フォルダにあるDLLを直接リンク（暫定対応） -->
+		<None Include="..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and '$(Platform)' == 'x64' and Exists('..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>BaketaCaptureNative.dll</Link>
+		</None>
+	</ItemGroup>
 </Project>

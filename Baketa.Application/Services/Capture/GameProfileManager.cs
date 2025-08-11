@@ -51,7 +51,7 @@ public interface IGameProfileManager
 /// <summary>
 /// ゲームキャプチャプロファイル管理サービスの実装
 /// </summary>
-public class GameProfileManager : IGameProfileManager
+public sealed class GameProfileManager : IGameProfileManager
 {
     private readonly ILogger<GameProfileManager>? _logger;
     private readonly string _profilesDirectory;

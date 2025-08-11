@@ -9,7 +9,7 @@ namespace Baketa.Application.DI.Modules;
     /// <summary>
     /// キャプチャイベント関連のDIモジュール
     /// </summary>
-    public class CaptureEventsModule : IServiceModule
+    public sealed class CaptureEventsModule : IServiceModule
     {
         /// <summary>
         /// キャプチャイベント関連サービスを登録します

@@ -8,13 +8,18 @@ using Avalonia.ReactiveUI;
 using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
+using Baketa.Core.Performance;
 using Baketa.Infrastructure.DI.Modules;
+using Baketa.Infrastructure.DI;
 using Baketa.Infrastructure.Platform.DI;
+using Baketa.UI.DI.Services;
 using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using ReactiveUI;
+using System.Reactive;
 
 namespace Baketa.UI;
 
@@ -31,22 +36,17 @@ namespace Baketa.UI;
         [STAThread]
         public static void Main(string[] args)
         {
-            // ファイル出力で確実にログを残す（絶対パスで保存）
-            try
-            {
-                var startupLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_startup.txt");
-                File.WriteAllText(startupLogPath, $"🚀 Baketa.UI.exe 起動開始 - {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n");
-                File.AppendAllText(startupLogPath, $"📁 BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}\n");
-                File.AppendAllText(startupLogPath, $"📁 CurrentDirectory: {Environment.CurrentDirectory}\n");
-                Console.WriteLine($"📝 起動ログ作成: {startupLogPath}");
-            }
-            catch (Exception fileEx) 
-            { 
-                Console.WriteLine($"❌ 起動ログ作成失敗: {fileEx.Message}");
-            }
+            // 統一パフォーマンス測定システムを初期化
+            PerformanceLogger.Initialize();
+            PerformanceLogger.LogSystemInfo();
             
-            Console.WriteLine("🚀 Baketa.UI.exe 起動開始");
-            System.Diagnostics.Debug.WriteLine("🚀 Baketa.UI.exe 起動開始");
+            using var appStartMeasurement = new PerformanceMeasurement(
+                MeasurementType.OverallProcessing, "アプリケーション起動全体");
+            
+            PerformanceLogger.LogPerformance("🚀 Baketa.UI.exe 起動開始");
+            
+            // 重要な初期化タイミングをログ
+            appStartMeasurement.LogCheckpoint("統一ログシステム初期化完了");
             
             // 未処理例外の強制ログ出力
             AppDomain.CurrentDomain.UnhandledException += (sender, e) => 
@@ -88,13 +88,26 @@ namespace Baketa.UI;
                 System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
                 _ = Task.Run(PreInitializeOcrEngineAsync);
                 
-                Console.WriteLine("🎯 Avalonia アプリケーション開始");
-                System.Diagnostics.Debug.WriteLine("🎯 Avalonia アプリケーション開始");
+                // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップ開始（60秒→0秒削減）
+                Console.WriteLine("🔥 OPUS-MT事前ウォームアップ開始（バックグラウンド）");
+                System.Diagnostics.Debug.WriteLine("🔥 OPUS-MT事前ウォームアップ開始（バックグラウンド）");
+                _ = Task.Run(StartOpusMtPrewarmingAsync);
+                
+                appStartMeasurement.LogCheckpoint("Avalonia アプリケーション開始準備完了");
+                PerformanceLogger.LogPerformance("🎯 Avalonia アプリケーション開始");
                 
                 BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                
+                // アプリケーション終了時の最終サマリー
+                var startupResult = appStartMeasurement.Complete();
+                PerformanceLogger.LogPerformance($"✅ アプリケーション起動完了 - 総時間: {startupResult.Duration.TotalSeconds:F2}秒");
+                PerformanceLogger.Finalize();
             }
             catch (Exception ex)
             {
+                PerformanceLogger.LogPerformance($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                PerformanceLogger.Finalize();
+                
                 Console.WriteLine($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 Console.WriteLine($"💥 MAIN STACK: {ex.StackTrace}");
                 System.Diagnostics.Debug.WriteLine($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
@@ -141,6 +154,7 @@ namespace Baketa.UI;
             services.AddSingleton<IConfiguration>(configuration);
             
             // appsettings.jsonから設定を読み込み
+            services.Configure<Baketa.Core.Settings.AppSettings>(configuration);
             services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
                 configuration.GetSection("TranslationEngineStatus"));
             
@@ -162,42 +176,15 @@ namespace Baketa.UI;
                 }
             });
             
-            // Baketaの標準モジュールを登録
-            // Coreモジュールの登録
-            var coreModule = new CoreModule();
-            var registeredModules = new HashSet<Type>();
-            var moduleStack = new Stack<Type>();
-            coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            // 🚀 Phase 2-1: 段階的DI簡素化 - ステップ1: 基盤モジュール群の統合
+            Console.WriteLine("🔧 Phase 2-1: 基盤モジュール群登録開始");
+            RegisterFoundationModules(services);
+            Console.WriteLine("✅ Phase 2-1: 基盤モジュール群登録完了");
             
-            // 設定システムを登録（ISettingsServiceを提供）
-            services.AddSettingsSystem();
-            
-            // InfrastructureModuleの登録
-            var infrastructureModule = new InfrastructureModule();
-            infrastructureModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // PlatformModuleの登録
-            var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
-            platformModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
-            var authModule = new AuthModule();
-            authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // ApplicationModuleの明示的登録
-            var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
-            applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // UIモジュールの登録
-            var uiModule = new UIModule();
-            uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            
-            // PaddleOcrModuleの登録
-            var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
-            paddleOcrModule.RegisterServices(services);
-            
-            // アダプターサービスの登録
-            services.AddAdapterServices();
+            // 🚀 Phase 2-2: 段階的DI簡素化 - ステップ2: アプリケーション・特殊機能モジュール群の統合
+            Console.WriteLine("🔧 Phase 2-2: アプリケーション・特殊機能モジュール群登録開始");
+            RegisterApplicationAndSpecializedModules(services);
+            Console.WriteLine("✅ Phase 2-2: アプリケーション・特殊機能モジュール群登録完了");
             
             // DI登録デバッグ
             DebugServiceRegistration(services);
@@ -212,7 +199,40 @@ namespace Baketa.UI;
             Console.WriteLine("✅ ServiceProvider構築完了");
             System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
             
+            // ReactiveUIスケジューラの設定
+            ConfigureReactiveUI();
+            
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
+        }
+        
+        /// <summary>
+        /// ReactiveUIの設定を行います
+        /// </summary>
+        private static void ConfigureReactiveUI()
+        {
+            try
+            {
+                Console.WriteLine("🔧 ReactiveUI設定開始");
+                
+                // デフォルトエラーハンドラを設定
+                RxApp.DefaultExceptionHandler = Observer.Create<Exception>(ex =>
+                {
+                    Console.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
+                    // UIスレッド違反例外は詳細ログを出力
+                    if (ex is InvalidOperationException && ex.Message.Contains("thread"))
+                    {
+                        Console.WriteLine($"🧵 UIスレッド違反詳細: {ex.StackTrace}");
+                    }
+                });
+                
+                Console.WriteLine("✅ ReactiveUI設定完了");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ ReactiveUI設定失敗: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"⚠️ ReactiveUI設定失敗: {ex.Message}");
+            }
         }
         
         /// <summary>
@@ -234,9 +254,51 @@ namespace Baketa.UI;
                 System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
             }
             
+            // ITranslationEngineの登録確認
+            var translationEngines = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine));
+            System.Console.WriteLine($"ITranslationEngine registrations count: {translationEngines.Count()}");
+            
+            foreach (var service in translationEngines)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "N/A"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
+            // ITranslationServiceの登録確認
+            var translationServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationService));
+            System.Console.WriteLine($"ITranslationService registrations count: {translationServices.Count()}");
+            
+            foreach (var service in translationServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "N/A"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
             // AccessibilitySettingsViewModelの登録確認
             var accessibilityVM = services.Where(s => s.ServiceType == typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel));
             System.Console.WriteLine($"AccessibilitySettingsViewModel registrations count: {accessibilityVM.Count()}");
+            
+            // IOcrPreprocessingServiceの登録確認（Phase 3診断）
+            var ocrPreprocessingServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.OCR.IOcrPreprocessingService));
+            System.Console.WriteLine($"IOcrPreprocessingService registrations count: {ocrPreprocessingServices.Count()}");
+            
+            foreach (var service in ocrPreprocessingServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "Factory"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+                
+                // ファクトリ関数がある場合は、実際の実装タイプを推定
+                if (service.ImplementationFactory != null)
+                {
+                    System.Console.WriteLine($"  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)");
+                }
+            }
         }
         
         /// <summary>
@@ -249,9 +311,8 @@ namespace Baketa.UI;
             var viewModelTypes = new[]
             {
                 typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
-                typeof(Baketa.UI.ViewModels.SettingsViewModel),
-                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel),
-                typeof(Baketa.UI.ViewModels.MainWindowViewModel)
+                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel)
+                // typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindowは使用されていないため無効化
             };
             
             foreach (var vmType in viewModelTypes)
@@ -323,5 +384,208 @@ namespace Baketa.UI;
                 Console.WriteLine($"💥 OCRエンジン事前初期化エラー: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"💥 OCRエンジン事前初期化エラー: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// OPUS-MT翻訳エンジンの事前ウォームアップを開始
+        /// 🔥 [TCP_STABILIZATION] 60秒→0秒削減のための事前サーバー起動
+        /// </summary>
+        private static async Task StartOpusMtPrewarmingAsync()
+        {
+            try
+            {
+                Console.WriteLine("🔥 [PREWARMING] OPUS-MT事前ウォームアップ開始");
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                
+                // ServiceProviderが利用可能になるまで待機
+                while (ServiceProvider == null)
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                    if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
+                    {
+                        Console.WriteLine("⚠️ [PREWARMING] ServiceProvider初期化タイムアウト - OPUS-MT事前ウォームアップを中止");
+                        return;
+                    }
+                }
+                
+                // OPUS-MTプリウォーミングサービスを取得して開始
+                var prewarmService = ServiceProvider.GetService<Baketa.Core.Abstractions.Translation.IOpusMtPrewarmService>();
+                if (prewarmService != null)
+                {
+                    Console.WriteLine("🔧 [PREWARMING] OpusMtPrewarmService取得成功 - ウォームアップ開始");
+                    
+                    // プリウォーミングを開始（バックグラウンドで実行）
+                    await prewarmService.StartPrewarmingAsync().ConfigureAwait(false);
+                    
+                    timer.Stop();
+                    Console.WriteLine($"✅ [PREWARMING] OPUS-MT事前ウォームアップ開始完了 - 開始時間: {timer.ElapsedMilliseconds}ms");
+                    System.Diagnostics.Debug.WriteLine($"✅ [PREWARMING] OPUS-MT事前ウォームアップ開始完了 - 開始時間: {timer.ElapsedMilliseconds}ms");
+                }
+                else
+                {
+                    timer.Stop();
+                    Console.WriteLine($"⚠️ [PREWARMING] OpusMtPrewarmServiceが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [PREWARMING] OpusMtPrewarmServiceが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 基盤モジュール群（Core, Infrastructure, Platform）を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterFoundationModules(IServiceCollection services)
+        {
+            // 依存関係トラッキング用の共通変数
+            var registeredModules = new HashSet<Type>();
+            var moduleStack = new Stack<Type>();
+            
+            // Coreモジュールの登録
+            Console.WriteLine("🏗️ Core基盤モジュール登録開始");
+            var coreModule = new CoreModule();
+            coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Core基盤モジュール登録完了");
+            
+            // 設定システムを登録（ISettingsServiceを提供）
+            Console.WriteLine("⚙️ 設定システム登録開始");
+            services.AddSettingsSystem();
+            Console.WriteLine("✅ 設定システム登録完了");
+            
+            // InfrastructureModuleの登録
+            Console.WriteLine("🔧 Infrastructure基盤モジュール登録開始");
+            var infrastructureModule = new InfrastructureModule();
+            infrastructureModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Infrastructure基盤モジュール登録完了");
+            
+            // PlatformModuleの登録
+            Console.WriteLine("🖥️ Platform基盤モジュール登録開始");
+            var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
+            platformModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Platform基盤モジュール登録完了");
+            
+            // AdaptiveCaptureModuleの登録（ApplicationModuleのAdaptiveCaptureServiceに必要な依存関係を提供）
+            Console.WriteLine("📷 AdaptiveCapture基盤モジュール登録開始");
+            var adaptiveCaptureModule = new Baketa.Infrastructure.Platform.DI.Modules.AdaptiveCaptureModule();
+            adaptiveCaptureModule.RegisterServices(services);
+            Console.WriteLine("✅ AdaptiveCapture基盤モジュール登録完了");
+            
+            // AuthModuleの登録（InfrastructureレイヤーのAuthサービス）
+            Console.WriteLine("🔐 Auth基盤モジュール登録開始");
+            var authModule = new AuthModule();
+            authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ Auth基盤モジュール登録完了");
+            
+            Console.WriteLine($"📊 基盤モジュール登録済み数: {registeredModules.Count}");
+        }
+        
+        /// <summary>
+        /// アプリケーション・特殊機能モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterApplicationAndSpecializedModules(IServiceCollection services)
+        {
+            // 依存関係トラッキング用の共通変数
+            var registeredModules = new HashSet<Type>();
+            var moduleStack = new Stack<Type>();
+            
+            // ApplicationModuleの明示的登録
+            Console.WriteLine("🚀 ApplicationModule登録開始");
+            var applicationModule = new Baketa.Application.DI.Modules.ApplicationModule();
+            applicationModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ ApplicationModule登録完了");
+            
+            // Gemini推奨モジュール群
+            RegisterGeminiRecommendedModules(services, registeredModules, moduleStack);
+            
+            // UIモジュール群
+            RegisterUIModules(services, registeredModules, moduleStack);
+            
+            // OCR最適化モジュール群
+            RegisterOcrOptimizationModules(services);
+            
+            // アダプターサービスの登録
+            Console.WriteLine("🔗 アダプターサービス登録開始");
+            services.AddAdapterServices();
+            Console.WriteLine("✅ アダプターサービス登録完了");
+            
+            Console.WriteLine($"📊 アプリケーション・特殊機能モジュール登録済み数: {registeredModules.Count}");
+        }
+        
+        /// <summary>
+        /// Gemini推奨モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="registeredModules">登録済みモジュール</param>
+        /// <param name="moduleStack">モジュールスタック</param>
+        private static void RegisterGeminiRecommendedModules(IServiceCollection services, HashSet<Type> registeredModules, Stack<Type> moduleStack)
+        {
+            // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール登録
+            Console.WriteLine("🔍 [GEMINI] StagedOcrStrategyModule登録開始...");
+            var stagedOcrModule = new Baketa.Application.DI.Modules.StagedOcrStrategyModule();
+            stagedOcrModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [GEMINI] StagedOcrStrategyModule登録完了！");
+            
+            // 🎯 Gemini推奨Step3: 高度キャッシング戦略モジュール登録
+            Console.WriteLine("🔍 [GEMINI] AdvancedCachingModule登録開始...");
+            var advancedCachingModule = new Baketa.Application.DI.Modules.AdvancedCachingModule();
+            advancedCachingModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [GEMINI] AdvancedCachingModule登録完了！");
+        }
+        
+        /// <summary>
+        /// UIモジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="registeredModules">登録済みモジュール</param>
+        /// <param name="moduleStack">モジュールスタック</param>
+        private static void RegisterUIModules(IServiceCollection services, HashSet<Type> registeredModules, Stack<Type> moduleStack)
+        {
+            // UIモジュールの登録
+            Console.WriteLine("🎨 UIModule登録開始");
+            var uiModule = new UIModule();
+            uiModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ UIModule登録完了");
+            
+            // オーバーレイUIモジュールの登録
+            Console.WriteLine("🖼️ OverlayUIModule登録開始");
+            var overlayUIModule = new OverlayUIModule();
+            overlayUIModule.RegisterServices(services);
+            Console.WriteLine("✅ OverlayUIModule登録完了");
+        }
+        
+        /// <summary>
+        /// OCR最適化モジュール群を登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterOcrOptimizationModules(IServiceCollection services)
+        {
+            // バッチOCRモジュールの登録
+            Console.WriteLine("📦 BatchOcrModule登録開始");
+            var batchOcrModule = new Baketa.Infrastructure.DI.BatchOcrModule();
+            batchOcrModule.RegisterServices(services);
+            Console.WriteLine("✅ BatchOcrModule登録完了");
+            
+            // OCRモジュールの登録（IOcrPreprocessingService提供）
+            Console.WriteLine("🔍 OcrProcessingModule登録開始");
+            var ocrProcessingModule = new Baketa.Infrastructure.DI.OcrProcessingModule();
+            ocrProcessingModule.RegisterServices(services);
+            Console.WriteLine("✅ OcrProcessingModule登録完了");
+            
+            // OpenCvProcessingModuleの登録（IOcrPreprocessingService上書き）
+            Console.WriteLine("🎯 OpenCvProcessingModule登録開始");
+            var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
+            openCvProcessingModule.RegisterServices(services);
+            Console.WriteLine("✅ OpenCvProcessingModule登録完了");
+            
+            // PaddleOCRモジュールの登録
+            Console.WriteLine("🚀 PaddleOcrModule登録開始");
+            var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
+            paddleOcrModule.RegisterServices(services);
+            Console.WriteLine("✅ PaddleOcrModule登録完了");
         }
     }

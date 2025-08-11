@@ -82,7 +82,7 @@ public class StringNullToBoolConverter : IValueConverter
 
 /// <summary>
 /// Boolean値をオーバーレイの高さに変換するコンバーター
-/// true（折り畳み状態）の場合は40、false（展開状態）の場合は380の高さを返す
+/// true（折り畳み状態）の場合は40、false（展開状態）の場合は430の高さを返す
 /// </summary>
 public class BooleanToHeightConverter : IValueConverter
 {
@@ -90,9 +90,9 @@ public class BooleanToHeightConverter : IValueConverter
     {
         if (value is bool isCollapsed)
         {
-            return isCollapsed ? 40.0 : 380.0;
+            return isCollapsed ? 40.0 : 430.0;
         }
-        return 380.0; // デフォルトは展開状態
+        return 430.0; // デフォルトは展開状態
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

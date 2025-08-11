@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <LangVersion>12</LangVersion>
@@ -15,7 +16,8 @@
     <!-- テスト固有のCA警告を抑制 -->
     <!-- UI/ネットワーク関連テスト警告を抑制 -->
     <!-- Windows専用アプリのためプラットフォーム依存警告を抑制 -->
-    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201;CA1016;CA1416;AVLN2000;AVLN2001;NETSDK1206;CA1822;CA1848</NoWarn>
+    <!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+    <NoWarn>$(NoWarn);CA2007;CA1707;CA2000;CA1063;CA1816;CA5394;CA1001;CA2201;CA1016;CA1416;AVLN2000;AVLN2001;NETSDK1206;CA1822;CA1848;NU1701</NoWarn>
     
     <!-- テスト実行時の情報レベル警告を抑制 -->
     <OutputType>Library</OutputType>

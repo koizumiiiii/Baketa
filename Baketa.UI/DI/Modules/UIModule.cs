@@ -47,6 +47,9 @@ namespace Baketa.UI.DI.Modules;
             
             // 翻訳フローモジュールをDIコンテナに登録
             services.AddSingleton<TranslationFlowModule>();
+            
+            // 翻訳フローイベントプロセッサーを登録
+            services.AddSingleton<TranslationFlowEventProcessor>();
         }
 
         /// <summary>
@@ -68,13 +71,66 @@ namespace Baketa.UI.DI.Modules;
             // 設定ビューモデル
             services.AddSingleton<AccessibilitySettingsViewModel>();
             services.AddSingleton<LanguagePairsViewModel>();
-            services.AddSingleton<SettingsViewModel>();
+            services.AddSingleton<SimpleSettingsViewModel>(provider =>
+            {
+                var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+                var logger = provider.GetRequiredService<ILogger<SimpleSettingsViewModel>>();
+                
+                // TranslationOrchestrationServiceを必須サービスとして取得
+                Baketa.Application.Services.Translation.TranslationOrchestrationService? translationOrchestrationService = null;
+                try
+                {
+                    Console.WriteLine($"🔍 [DI_DEBUG] SimpleSettingsViewModel作成 - TranslationOrchestrationService取得開始");
+                    
+                    // より具体的な型で取得を試行
+                    var serviceDescriptor = provider.GetService(typeof(Baketa.Application.Services.Translation.TranslationOrchestrationService));
+                    Console.WriteLine($"🔍 [DI_DEBUG] ServiceDescriptor結果: {serviceDescriptor?.GetType().Name ?? "null"}");
+                    
+                    translationOrchestrationService = provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>();
+                    Console.WriteLine($"🔧 [DI_DEBUG] SimpleSettingsViewModel作成 - TranslationOrchestrationService: {translationOrchestrationService?.GetType().Name ?? "null"}");
+                    Console.WriteLine($"🔍 [DI_DEBUG] TranslationOrchestrationService取得成功 - Hash: {translationOrchestrationService?.GetHashCode() ?? -1}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] SimpleSettingsViewModel作成 - TranslationOrchestrationService取得失敗: {ex.GetType().Name}: {ex.Message}");
+                    Console.WriteLine($"💥 [DI_DEBUG] スタックトレース: {ex.StackTrace}");
+                    translationOrchestrationService = null;
+                }
+                
+                // ISettingsServiceを取得
+                Baketa.Core.Services.ISettingsService? settingsService = null;
+                try
+                {
+                    settingsService = provider.GetRequiredService<Baketa.Core.Services.ISettingsService>();
+                    Console.WriteLine($"🔧 [DI_DEBUG] SimpleSettingsViewModel作成 - ISettingsService: {settingsService.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] SimpleSettingsViewModel作成 - ISettingsService取得失敗: {ex.Message}");
+                    settingsService = null;
+                }
+                
+                // IUnifiedSettingsServiceを取得
+                Baketa.Core.Abstractions.Settings.IUnifiedSettingsService? unifiedSettingsService = null;
+                try
+                {
+                    unifiedSettingsService = provider.GetRequiredService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
+                    Console.WriteLine($"🔧 [DI_DEBUG] SimpleSettingsViewModel作成 - IUnifiedSettingsService: {unifiedSettingsService.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [DI_DEBUG] SimpleSettingsViewModel作成 - IUnifiedSettingsService取得失敗: {ex.Message}");
+                    unifiedSettingsService = null;
+                }
+                
+                return new SimpleSettingsViewModel(eventAggregator, logger, translationOrchestrationService, settingsService, unifiedSettingsService);
+            });
             
             // 認証ビューモデル
             services.AddTransient<LoginViewModel>();
             services.AddTransient<SignupViewModel>();
             
-            // メインウィンドウビューモデル（全依存関係解決後に登録）
+            // メインウィンドウビューモデル
             services.AddSingleton<MainWindowViewModel>();
             
             // 翻訳仕様を同期するサービス
@@ -96,6 +152,10 @@ namespace Baketa.UI.DI.Modules;
             // 翻訳エンジン状態監視サービス
             // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
             services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
+            
+            // OPUS-MT事前起動サービス（バックグラウンドサーバー初期化）
+            // IOpusMtPrewarmServiceはApplicationModuleで登録済み
+            
             
             // オーバーレイ関連サービス
             services.AddTransient<Baketa.UI.Overlay.AvaloniaOverlayWindowAdapter>();

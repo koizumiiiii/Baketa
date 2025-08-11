@@ -80,7 +80,7 @@ public sealed class SyncSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Sync", "競合解決", 
         Description = "設定競合が発生した場合の解決方法", 
-        ValidValues = new object[] { ConflictResolution.LocalWins, ConflictResolution.RemoteWins, ConflictResolution.Manual })]
+        ValidValues = [ConflictResolution.LocalWins, ConflictResolution.RemoteWins, ConflictResolution.Manual])]
     public ConflictResolution ConflictResolution { get; set; } = ConflictResolution.Manual;
     
     /// <summary>

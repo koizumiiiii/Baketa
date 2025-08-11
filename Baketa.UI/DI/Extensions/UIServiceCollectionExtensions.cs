@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Type or member is obsolete
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -54,8 +55,7 @@ internal static class UIServiceCollectionExtensions
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
         
-        // 翻訳結果オーバーレイマネージャー
-        services.AddSingleton<TranslationResultOverlayManager>();
+        // 翻訳結果オーバーレイマネージャーは削除済み（ARシステムに置き換え）
         
         // ローディングオーバーレイマネージャー
         services.AddSingleton<LoadingOverlayManager>();

@@ -40,6 +40,20 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         public TextRegionType RegionType { get; set; }
         
         /// <summary>
+        /// 検出に使用された手法
+        /// </summary>
+        public string DetectionMethod { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 検出の信頼度（TextRegionでは0.0-1.0の範囲）
+        /// </summary>
+        public double Confidence 
+        { 
+            get => ConfidenceScore; 
+            set => ConfidenceScore = (float)Math.Clamp(value, 0.0, 1.0); 
+        }
+        
+        /// <summary>
         /// 領域に対する前処理されたイメージ
         /// </summary>
         public IAdvancedImage? ProcessedImage { get; set; }
@@ -130,5 +144,26 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         public override string ToString()
         {
             return $"TextRegion [ID={RegionId.ToString()[..8]}..., Bounds={{{Bounds.X}, {Bounds.Y}, {Bounds.Width}, {Bounds.Height}}}, Type={RegionType}, Confidence={ConfidenceScore:F2}]";
+        }
+        
+        /// <summary>
+        /// TextRegionをリセットして再利用可能にします（オブジェクトプール用）
+        /// </summary>
+        /// <param name="bounds">新しいバウンディングボックス</param>
+        /// <param name="text">新しいテキスト（未使用だが互換性のため保持）</param>
+        /// <param name="confidence">新しい信頼度</param>
+        public void Reset(Baketa.Core.Abstractions.Memory.Rectangle bounds, string _, double confidence)
+        {
+            // Memory.Rectangle から System.Drawing.Rectangle への変換
+            Bounds = new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+            Confidence = confidence;
+            
+            // その他のプロパティをリセット
+            _contour = null;
+            RegionType = TextRegionType.Unknown;
+            DetectionMethod = string.Empty;
+            ProcessedImage?.Dispose();
+            ProcessedImage = null;
+            Metadata.Clear();
         }
     }

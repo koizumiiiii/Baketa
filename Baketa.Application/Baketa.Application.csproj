@@ -1,15 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Platforms>AnyCPU;x64</Platforms>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<!-- イベントハンドラークラスとstaticメソッド警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822;NU1701</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

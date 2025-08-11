@@ -1,0 +1,110 @@
+{
+  "dataset": [
+    {
+      "imagePath": "dialog-text/steinsgate.png",
+      "groundTruthText": "「そうか、それが運命石の扉の選択か。エル・プサイ・コングルゥ！」",
+      "sceneType": "dialog",
+      "brightness": "normal",
+      "textColor": "white",
+      "backgroundColor": "dark",
+      "fontStyle": "outlined",
+      "createdAt": "2025-07-27T10:30:00Z",
+      "notes": "Steins;Gate会話画面 - 白文字に黒縁取り"
+    },
+    {
+      "imagePath": "dialog-text/chronotriger.png", 
+      "groundTruthText": "ジナ「ああ、リーネの鐘があんなに気持ちよさそうに歌ってる。",
+      "sceneType": "dialog",
+      "brightness": "bright",
+      "textColor": "white",
+      "backgroundColor": "blue_gradient",
+      "fontStyle": "standard",
+      "createdAt": "2025-07-27T10:31:00Z",
+      "notes": "クロノトリガー会話画面 - 青グラデーション背景"
+    },
+    {
+      "imagePath": "dialog-text/stardewvalley.png",
+      "groundTruthText": "わたしはロビン。地元の大工だよ。ルイス町長から、あなたをあたらしい家まで案内するよう言われたんだ。",
+      "sceneType": "dialog", 
+      "brightness": "bright",
+      "textColor": "black",
+      "backgroundColor": "orange",
+      "fontStyle": "standard",
+      "createdAt": "2025-07-27T10:32:00Z",
+      "notes": "スターデューバレー会話画面 - オレンジ背景に黒文字"
+    },
+    {
+      "imagePath": "menu-ui/undertale.png",
+      "groundTruthText": "\"フリスク\"\nLV 1\nHP 20/20\n\nATK 0 (0)    EXP 0\nDEF 0 (0)    NEXT 10\n\nWPN ぼうきれ\nAMR ぼうたい\n\nGOLD 0\n\nITEM\nSTAT",
+      "sceneType": "menu",
+      "brightness": "dark", 
+      "textColor": "white",
+      "backgroundColor": "black",
+      "fontStyle": "pixel",
+      "createdAt": "2025-07-27T10:33:00Z",
+      "notes": "Undertaleステータス画面 - 白文字、ピクセルフォント"
+    },
+    {
+      "imagePath": "bright-scenes/thief.png",
+      "groundTruthText": "1625/2500\n残り日数: 0\n\nアイテムの盗難より!\nダークネス現れる",
+      "sceneType": "ui_overlay",
+      "brightness": "bright",
+      "textColor": "red_black", 
+      "backgroundColor": "white",
+      "fontStyle": "standard",
+      "createdAt": "2025-07-27T10:34:00Z",
+      "notes": "Thief - 明るい3D画面のUI要素"
+    },
+    {
+      "imagePath": "dark-scenes/octopathtraveler.png",
+      "groundTruthText": "体験版をダウンロードしていただき、ありがとうございます！\n\n体験版を楽しませていただくために---\n\n体験版を遊ぶ時間は\nNEW GAMEが始まって「3時間」です\n（セーブデータに記録のプレイ時間）\n\n追加購入を進く「8人の主人公」から\n選択ことができます\n\n体験版のセーブデータは、やがまま\n製品版へ「引き継ぎ」で\n進めることができます\n\n詳細な機能や性、序盤のエンタ設定可能します\nエンタの性能やしは、うにつけなく、同士うす施設改善水の自信の!\n\n 閉じる",
+      "sceneType": "notification",
+      "brightness": "dark",
+      "textColor": "white",
+      "backgroundColor": "dark_brown",
+      "fontStyle": "standard", 
+      "createdAt": "2025-07-27T10:35:00Z",
+      "notes": "オクトパストラベラー体験版説明画面 - 暗い背景"
+    },
+    {
+      "imagePath": "battle-ui/chronotriger4.png",
+      "groundTruthText": "たたかう\nまほう\nアイテム\n\nたたかう\nまほう\nアイテム\n\nたたかう\nれんけい\nアイテム\n\nクロノ   HP 999/999  MP 99/99\nエイラ   HP 999/999  MP 99/99\nロボ     HP 999/999  MP 99/99",
+      "sceneType": "battle",
+      "brightness": "normal",
+      "textColor": "white",
+      "backgroundColor": "blue_frame",
+      "fontStyle": "standard",
+      "createdAt": "2025-07-27T10:36:00Z",
+      "notes": "クロノトリガーバトル画面 - コマンドメニューとHP/MP"
+    },
+    {
+      "imagePath": "status-windows/chronotriger3.png",
+      "groundTruthText": "クロノ      LV    1\nHP          70/ 70    MP        8/  8\nEXP          0    NEXT        20\n\n装備                      武器\n\n木刀\n革の帽子\n革の服\n鉄鎧\n\n力        8   命中       16\nかしこさ  2   かいひ      2 \n体力     13   魔法力      6\n回避      8   体力        8\n魔法防御  2\n\n攻撃力",
+      "sceneType": "status",
+      "brightness": "dark",
+      "textColor": "white",
+      "backgroundColor": "gray_blue",
+      "fontStyle": "standard",
+      "createdAt": "2025-07-27T10:37:00Z",
+      "notes": "クロノトリガーステータス画面 - 詳細パラメータ表示"
+    }
+  ],
+  "metadata": {
+    "created": "2025-07-27T10:30:00Z",
+    "totalImages": 8,
+    "categories": {
+      "dialog": 3,
+      "menu": 1, 
+      "ui_overlay": 1,
+      "notification": 1,
+      "battle": 1,
+      "status": 1
+    },
+    "brightnesLevels": {
+      "bright": 3,
+      "normal": 2,
+      "dark": 3
+    },
+    "purpose": "OCR前処理パラメータ最適化用正解データセット"
+  }
+}

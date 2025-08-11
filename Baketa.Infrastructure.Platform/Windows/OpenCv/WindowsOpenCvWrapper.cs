@@ -279,6 +279,7 @@ namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
         /// <summary>
         /// モルフォロジー演算を適用します
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "OpenCVライブラリの公式メソッド名")]
         public static IAdvancedImage MorphologyEx(IAdvancedImage image, Baketa.Core.Abstractions.Imaging.MorphologyOperation _1, int _2)
         {
             ArgumentNullException.ThrowIfNull(image);

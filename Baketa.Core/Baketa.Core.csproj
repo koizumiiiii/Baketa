@@ -1,13 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Platforms>AnyCPU;x64</Platforms>
 		<PlatformTarget>x64</PlatformTarget>
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
+		<!-- ⚡ OCR処理最適化: 高速メモリ操作のためのunsafeコード有効化 -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- Windows専用アプリの適切な警告抑制 -->
 		<NoWarn>$(NoWarn);CA1711;CA1848;CA2227;CA1819;CA1822</NoWarn>
 	</PropertyGroup>

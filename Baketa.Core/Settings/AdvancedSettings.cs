@@ -42,7 +42,7 @@ public sealed class AdvancedSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Advanced", "プロセス優先度", 
         Description = "アプリケーションのプロセス優先度", 
-        ValidValues = new object[] { ProcessPriority.Low, ProcessPriority.BelowNormal, ProcessPriority.Normal, ProcessPriority.AboveNormal, ProcessPriority.High })]
+        ValidValues = [ProcessPriority.Low, ProcessPriority.BelowNormal, ProcessPriority.Normal, ProcessPriority.AboveNormal, ProcessPriority.High])]
     public ProcessPriority ProcessPriority { get; set; } = ProcessPriority.Normal;
     
     /// <summary>
@@ -68,7 +68,7 @@ public sealed class AdvancedSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Advanced", "バッファリング戦略", 
         Description = "メモリバッファリングの戦略", 
-        ValidValues = new object[] { BufferingStrategy.Conservative, BufferingStrategy.Balanced, BufferingStrategy.Aggressive })]
+        ValidValues = [BufferingStrategy.Conservative, BufferingStrategy.Balanced, BufferingStrategy.Aggressive])]
     public BufferingStrategy BufferingStrategy { get; set; } = BufferingStrategy.Balanced;
     
     /// <summary>
@@ -104,7 +104,7 @@ public sealed class AdvancedSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Advanced", "リトライ戦略", 
         Description = "失敗時の再試行戦略", 
-        ValidValues = new object[] { RetryStrategy.None, RetryStrategy.Linear, RetryStrategy.Exponential, RetryStrategy.Custom })]
+        ValidValues = [RetryStrategy.None, RetryStrategy.Linear, RetryStrategy.Exponential, RetryStrategy.Custom])]
     public RetryStrategy RetryStrategy { get; set; } = RetryStrategy.Exponential;
     
     /// <summary>

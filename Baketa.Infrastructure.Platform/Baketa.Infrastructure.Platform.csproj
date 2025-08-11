@@ -1,15 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<UseWPF>true</UseWPF>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Platforms>AnyCPU;x64</Platforms>
-		<SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+		<UseWinRT>true</UseWinRT>
 		<!-- プラットフォーム固有実装の警告抑制 -->
-		<NoWarn>$(NoWarn);CA1822;CA1848</NoWarn>
+		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+		<NoWarn>$(NoWarn);CA1822;CA1848;CA1416;CA2101;IDE0060;IDE0019;SYSLIB1096;NU1701</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -21,9 +23,26 @@
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-		<PackageReference Include="OpenCvSharp4" Version="4.10.0.20240616" />
-		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20240616" />
+		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
 		<PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+		<!-- Windows Graphics Capture API support -->
+		<PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
+		<!-- SharpDX パッケージは不要になったが、削除は後のフェーズで実施 -->
+		<PackageReference Include="SharpDX" Version="4.2.0" />
+		<PackageReference Include="SharpDX.Direct3D11" Version="4.2.0" />
+		<PackageReference Include="SharpDX.DXGI" Version="4.2.0" />
+		<PackageReference Include="Win32" Version="1.0.3" />
+	</ItemGroup>
+
+	<!-- ネイティブDLLの自動コピー -->
+	<ItemGroup>
+		<None Include="..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and Exists('..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Release' and Exists('..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

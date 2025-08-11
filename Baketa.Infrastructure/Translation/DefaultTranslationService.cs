@@ -29,6 +29,15 @@ namespace Baketa.Infrastructure.Translation;
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
+            
+            Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
+            _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
+            
+            foreach (var engine in _availableEngines)
+            {
+                Console.WriteLine($"🔧 [DEBUG] 登録エンジン: {engine.Name} ({engine.GetType().Name})");
+                _logger.LogInformation("登録エンジン: {Name} ({Type})", engine.Name, engine.GetType().Name);
+            }
 
             if (_availableEngines.Count == 0)
             {
@@ -37,6 +46,8 @@ namespace Baketa.Infrastructure.Translation;
 
             // 最初のエンジンをデフォルトのアクティブエンジンとして設定
             ActiveEngine = _availableEngines[0];
+            Console.WriteLine($"🔧 [DEBUG] アクティブエンジン設定: {ActiveEngine.Name} ({ActiveEngine.GetType().Name})");
+            _logger.LogInformation("アクティブエンジン設定: {Name} ({Type})", ActiveEngine.Name, ActiveEngine.GetType().Name);
         }
 
         /// <summary>
@@ -108,6 +119,8 @@ namespace Baketa.Infrastructure.Translation;
             ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
             ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
 
+            _logger.LogInformation("翻訳開始 - テキスト: '{Text}', エンジン: {Engine}", text, ActiveEngine.Name);
+
             // TransModelsをそのまま使用
             var request = new TransModels.TranslationRequest
             {
@@ -118,7 +131,10 @@ namespace Baketa.Infrastructure.Translation;
             };
 
             // 翻訳実行
-            return await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("翻訳結果 - IsSuccess: {IsSuccess}, Text: '{Text}'", result?.IsSuccess, result?.TranslatedText);
+            
+            return result!;
         }
 
         /// <summary>
@@ -146,6 +162,8 @@ namespace Baketa.Infrastructure.Translation;
                 throw new ArgumentException("テキストのコレクションが空です。", nameof(texts));
             }
 
+            _logger.LogInformation("バッチ翻訳開始 - テキスト数: {Count}, エンジン: {Engine}", texts.Count, ActiveEngine.Name);
+
             // リクエスト作成
             var transRequests = new List<TransModels.TranslationRequest>();
             foreach (var text in texts)
@@ -160,7 +178,10 @@ namespace Baketa.Infrastructure.Translation;
             }
 
             // 翻訳実行
-            return await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
+            var result = await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
                 .ConfigureAwait(false);
+                
+            _logger.LogInformation("バッチ翻訳完了 - 結果数: {Count}", result?.Count ?? 0);
+            return result!;
         }
     }

@@ -10,17 +10,12 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// 画面中央ローディングオーバーレイの管理サービス
 /// </summary>
-public class LoadingOverlayManager : IDisposable
+public class LoadingOverlayManager(ILogger<LoadingOverlayManager> logger) : IDisposable
 {
-    private readonly ILogger<LoadingOverlayManager> _logger;
+    private readonly ILogger<LoadingOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private LoadingOverlayView? _loadingWindow;
     private bool _disposed;
     private readonly object _lockObject = new();
-
-    public LoadingOverlayManager(ILogger<LoadingOverlayManager> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// ローディングオーバーレイを表示

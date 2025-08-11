@@ -5,7 +5,7 @@ namespace Baketa.Core.Events;
     /// <summary>
     /// アクセシビリティ設定変更イベント
     /// </summary>
-    public class AccessibilitySettingsChangedEvent : EventBase
+    public sealed class AccessibilitySettingsChangedEvent : EventBase
     {
         /// <summary>
         /// アニメーション無効化フラグ
@@ -46,7 +46,7 @@ namespace Baketa.Core.Events;
     /// <summary>
     /// フォント設定変更イベント
     /// </summary>
-    public class FontSettingsChangedEvent : EventBase
+    public sealed class FontSettingsChangedEvent : EventBase
     {
         /// <summary>
         /// プライマリフォントファミリー

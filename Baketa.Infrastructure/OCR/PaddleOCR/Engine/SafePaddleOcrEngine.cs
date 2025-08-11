@@ -65,7 +65,6 @@ public class SafePaddleOcrEngine(
         ThrowIfDisposed();
         
         Console.WriteLine("⚠️ SafePaddleOcrEngine初期化 - これはモックエンジンです！");
-        System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ SafePaddleOcrEngine初期化 - これはモックエンジンです！{Environment.NewLine}");
         
         if (_skipRealInitialization)
         {
@@ -85,6 +84,31 @@ public class SafePaddleOcrEngine(
 
         // 実際のPaddleOcrEngineは使用しない（開発・テスト環境では危険）
         throw new NotSupportedException("実際のPaddleOCRエンジンの初期化は開発・テスト環境では無効化されています");
+    }
+    
+    public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger?.LogInformation("SafePaddleOcrEngineウォームアップ開始");
+            
+            if (_skipRealInitialization)
+            {
+                // モックモードではダミーのウォームアップ
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                _logger?.LogInformation("SafePaddleOcrEngineウォームアップ完了（モック）");
+                return true;
+            }
+            
+            // 実際のウォームアップはスキップ（内部エンジンがnullの場合）
+            _logger?.LogWarning("SafePaddleOcrEngineウォームアップスキップ（実エンジン未実装）");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "SafePaddleOcrEngineウォームアップ中にエラーが発生");
+            return false;
+        }
     }
 
     /// <summary>
@@ -259,6 +283,17 @@ public class SafePaddleOcrEngine(
             StartTime = _startTime,
             LastUpdateTime = DateTime.UtcNow
         };
+    }
+
+    /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// SafePaddleOcrEngineではスタブ実装
+    /// </summary>
+    public void CancelCurrentOcrTimeout()
+    {
+        // SafePaddleOcrEngineではタイムアウト処理がないため何もしない
+        // ログで記録のみ
+        _logger?.LogDebug("SafePaddleOcrEngine: CancelCurrentOcrTimeout呼び出し（スタブ実装）");
     }
 
     #endregion

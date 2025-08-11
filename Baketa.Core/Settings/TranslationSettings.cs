@@ -18,7 +18,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = new object[] { TranslationEngine.Local, TranslationEngine.Gemini })]
+        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini])]
     public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
@@ -26,23 +26,23 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "言語自動検出", 
         Description = "翻訳元言語を自動的に検出します")]
-    public bool AutoDetectSourceLanguage { get; set; } = true;
+    public bool AutoDetectSourceLanguage { get; set; } = false;
     
     /// <summary>
     /// デフォルトソース言語
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
-        ValidValues = new object[] { "ja", "en", "zh-cn", "zh-tw", "ko", "fr", "de", "es", "pt", "ru" })]
-    public string DefaultSourceLanguage { get; set; } = "ja";
+        ValidValues = ["ja", "en"])]
+    public string DefaultSourceLanguage { get; set; } = "en";
     
     /// <summary>
     /// デフォルトターゲット言語
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
-        ValidValues = new object[] { "ja", "en", "zh-cn", "zh-tw", "ko", "fr", "de", "es", "pt", "ru" })]
-    public string DefaultTargetLanguage { get; set; } = "en";
+        ValidValues = ["ja", "en"])]
+    public string DefaultTargetLanguage { get; set; } = "ja";
     
     /// <summary>
     /// 翻訳遅延時間（ミリ秒）
@@ -66,7 +66,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳スタイル", 
         Description = "翻訳の文体・スタイル", 
-        ValidValues = new object[] { TranslationStyle.Natural, TranslationStyle.Literal, TranslationStyle.Formal, TranslationStyle.Casual })]
+        ValidValues = [TranslationStyle.Natural, TranslationStyle.Literal, TranslationStyle.Formal, TranslationStyle.Casual])]
     public TranslationStyle Style { get; set; } = TranslationStyle.Natural;
     
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = new object[] { TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini })]
+        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini])]
     public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
@@ -229,6 +229,62 @@ public sealed class TranslationSettings
     public bool RecordApiUsageStatistics { get; set; } = false;
     
     /// <summary>
+    /// テキストグループ化機能を有効にする
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "Translation", "文章グループ化", 
+        Description = "OCR結果を文章のまとまりごとにグループ化して翻訳表示します")]
+    public bool EnableTextGrouping { get; set; } = true;
+    
+    /// <summary>
+    /// 段落区切りを保持する
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "段落区切り保持", 
+        Description = "文章グループ化時に段落区切りを保持します")]
+    public bool PreserveParagraphs { get; set; } = true;
+    
+    /// <summary>
+    /// 同じ行と判定する閾値
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "行判定閾値", 
+        Description = "同じ行と判定する垂直距離の閾値（平均文字高に対する比率）", 
+        MinValue = 0.1, 
+        MaxValue = 1.0)]
+    public double SameLineThreshold { get; set; } = 0.5;
+    
+    /// <summary>
+    /// 段落区切り判定閾値
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "段落区切り閾値", 
+        Description = "段落区切りと判定する行間の閾値（平均行高に対する比率）", 
+        MinValue = 0.5, 
+        MaxValue = 3.0)]
+    public double ParagraphSeparationThreshold { get; set; } = 1.5;
+    
+    /// <summary>
+    /// 翻訳完了後のクールダウン時間（秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "翻訳後クールダウン", 
+        Description = "翻訳完了後の一時停止時間（重複翻訳を防止）", 
+        Unit = "秒", 
+        MinValue = 0, 
+        MaxValue = 10)]
+    public int PostTranslationCooldownSeconds { get; set; } = 3;
+    
+    /// <summary>
+    /// 真のウィンドウキャプチャを使用する
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "真のウィンドウキャプチャ", 
+        Description = "PrintWindowを使用して他のウィンドウの重なりを除外したキャプチャを行います")]
+    public bool UseTrueWindowCapture { get; set; } = true;
+    
+    /// <summary>
+    /// 従来のキャプチャ方式を優先する（デバッグ用）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "従来キャプチャ優先", 
+        Description = "BitBltを優先して使用します（PrintWindowでテキスト検出に問題がある場合）")]
+    public bool PreferLegacyCapture { get; set; } = false;
+    
+    /// <summary>
     /// 設定のクローンを作成します
     /// </summary>
     /// <returns>クローンされた設定</returns>
@@ -263,7 +319,14 @@ public sealed class TranslationSettings
             QualityThreshold = QualityThreshold,
             EnableVerboseLogging = EnableVerboseLogging,
             SaveTranslationResults = SaveTranslationResults,
-            RecordApiUsageStatistics = RecordApiUsageStatistics
+            RecordApiUsageStatistics = RecordApiUsageStatistics,
+            EnableTextGrouping = EnableTextGrouping,
+            PreserveParagraphs = PreserveParagraphs,
+            SameLineThreshold = SameLineThreshold,
+            ParagraphSeparationThreshold = ParagraphSeparationThreshold,
+            PostTranslationCooldownSeconds = PostTranslationCooldownSeconds,
+            UseTrueWindowCapture = UseTrueWindowCapture,
+            PreferLegacyCapture = PreferLegacyCapture
         };
     }
 }
@@ -286,7 +349,8 @@ public enum TranslationEngine
     /// <summary>
     /// Google Gemini AI翻訳（クラウド）
     /// </summary>
-    Gemini
+    Gemini,
+    
 }
 
 /// <summary>

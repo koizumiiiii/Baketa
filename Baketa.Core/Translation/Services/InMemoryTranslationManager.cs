@@ -18,7 +18,7 @@ namespace Baketa.Core.Translation.Services;
 /// </remarks>
 /// <param name="repository">翻訳リポジトリ</param>
 /// <param name="logger">ロガー</param>
-public class InMemoryTranslationManager(
+public sealed class InMemoryTranslationManager(
         ITranslationRepository repository,
         ILogger<InMemoryTranslationManager> logger) : ITranslationManager
     {

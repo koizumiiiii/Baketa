@@ -159,20 +159,7 @@ public class TranslationDisplayVisibilityChangedEvent(bool isVisible) : IEvent
     public bool IsVisible { get; } = isVisible;
 }
 
-/// <summary>
-/// 翻訳結果表示イベント
-/// </summary>
-public class TranslationResultDisplayEvent : IEvent
-{
-    public Guid Id { get; } = Guid.NewGuid();
-    public DateTime Timestamp { get; } = DateTime.UtcNow;
-    public string Name { get; } = nameof(TranslationResultDisplayEvent);
-    public string Category { get; } = "Translation";
-
-    public required string OriginalText { get; init; }
-    public required string TranslatedText { get; init; }
-    public System.Drawing.Point? DetectedPosition { get; init; }
-}
+// TranslationResultDisplayEvent は削除 - マルチウィンドウオーバーレイシステムに移行
 
 /// <summary>
 /// 設定変更イベント

@@ -27,15 +27,15 @@ namespace Baketa.Application.DI.Extensions;
             BaketaEnvironment environment = BaketaEnvironment.Production)
         {
             // 標準モジュールのインスタンスを作成
-            var standardModules = new IServiceModule[]
-            {
+            IServiceModule[] standardModules = [
                 new CoreModule(),              // コアレイヤー
                 new InfrastructureModule(),    // インフラストラクチャレイヤー
                 new PlatformModule(),          // プラットフォーム依存レイヤー
                 new ApplicationModule(),       // アプリケーションレイヤー
+                new StagedOcrStrategyModule(), // Gemini推奨Step2: 段階的OCR戦略
                 // UIModuleは別途登録する
                 // new UIModule()                 // UIレイヤー
-            };
+            ];
             
             // ServiceCollectionExtensions.AddBaketaServicesを使用して登録
             return services.AddBaketaServices(scanForModules, environment, standardModules);
@@ -89,7 +89,8 @@ namespace Baketa.Application.DI.Extensions;
                 new CoreModule(),
                 new InfrastructureModule(),
                 new PlatformModule(),
-                new ApplicationModule());
+                new ApplicationModule(),
+                new StagedOcrStrategyModule()); // Gemini推奨Step2: 段階的OCR戦略
         }
         
         /// <summary>

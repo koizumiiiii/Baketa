@@ -29,6 +29,7 @@
 - **Diagnostic Commands**: Read-only commands are auto-approved
 - **File Operations**: Read, list, and analysis operations are auto-approved
 - **AI Research**: Gemini MCP calls are auto-approved for technical problem-solving
+- **Python Execution**: Use PowerShell or `py` launcher commands (see Python Environment Guidelines below)
 
 ### **Autonomous Technical Problem-Solving**
 **PROACTIVE GEMINI EXECUTION FOR ENHANCED RESULTS**
@@ -100,6 +101,31 @@ After all code implementation, fixes, and refactoring, **always execute** the fo
 
 #### **1. Windows Native Environment**
 **IMPORTANT: Windows環境でClaude Codeを使用します。WindowsコマンドプロンプトまたはPowerShellでのdotnetコマンド実行が推奨されます。**
+
+#### **Python Environment Guidelines**
+**⚠️ CRITICAL**: Pythonスクリプトの実行にはGit Bash環境の制限があります。
+
+**問題**: pyenv-winとGit Bashの相性問題
+- Git Bash環境でpython実行時に「No global/local python version has been set yet」エラー
+- pyenvのshim機能とパス変換処理の競合
+- POSIX風パス表記とWindowsパスの変換エラー
+
+**推奨実行方法**:
+```cmd
+# 方法1: PowerShell経由（推奨）
+powershell -Command "python script.py"
+
+# 方法2: コマンドプロンプト経由
+cmd /c "python script.py"
+
+# 方法3: Python Launcher（最も信頼性が高い）
+py script.py
+```
+
+**Claude Code使用時の注意**:
+- Bashツールで`python`コマンドを直接実行しない
+- PowerShell環境またはPython Launcherを使用する
+- Git Bash環境でのPython実行は避ける
 
 #### **2. Code Analysis Alternative Methods**
 ```bash
@@ -605,3 +631,74 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 - **「この実装は全体的なシステム複雑性を減らすか増やすか？」**
 
 これらの指示に従うことで、症状ではなく根本原因に対処する持続可能で堅牢な解決策を構築しながら、Baketaプロジェクトの品質と一貫性を維持することが保証されます。
+
+---
+
+## サブエージェント活用戦略とワークフロー
+
+このプロジェクトでは、専門分野に特化したサブエージェントが定義されています。あなたは司令塔（オーケストレーター）として、これらのエージェントを自律的に、かつ効果的に活用する責務を負います。
+
+### サブエージェント一覧
+- **`@Architecture-Guardian`**: クリーンアーキテクチャの専門家。
+- **`@Native-Bridge`**: C#とC++/WinRTのネイティブ連携の専門家。
+- **`@UI-Maestro`**: Avalonia UIとReactiveUIの専門家。
+- **`@Test-Generator`**: 単体テストコード生成の専門家。
+- **`@Researcher`**: 技術調査とフィードバックの専門家。
+
+### **必須ワークフロー: 問題解決と機能実装**
+
+**このワークフローは、バグ修正、機能追加など、すべてのタスクにおいて必ず遵守してください。**
+
+#### **フェーズ1: 標準ツール主導の初期調査（担当: あなた自身）**
+
+**⚠️ 重要: Serena MCP制限事項**: Windowsパス処理エラー（`\\.\nul` junction point）により、Serena MCPのファイルスキャン系ツールは現在動作不能です。
+
+**🚫 使用不可能なSerena MCPツール:**
+- ❌ `/mcp__serena__get_symbols_overview` - プロジェクト構造分析
+- ❌ `/mcp__serena__search_for_pattern` - 意味的検索
+- ❌ `/mcp__serena__find_referencing_symbols` - 依存関係分析  
+- ❌ `/mcp__serena__find_symbol` - シンボル詳細分析
+- ❌ `/mcp__serena__list_dir` - ディレクトリ一覧
+- ❌ `/mcp__serena__find_file` - ファイル検索
+
+**✅ 使用可能なSerena MCPツール（メモリ系のみ）:**
+- ✅ `/mcp__serena__write_memory` - 調査結果のメモリ保存
+- ✅ `/mcp__serena__read_memory` - 既存メモリの読み込み
+- ✅ `/mcp__serena__list_memories` - メモリ一覧表示
+
+**1. 標準ツール活用段階（Serena MCP代替）:**
+1.  **プロジェクト構造把握:** `Glob "**/*.cs"` でプロジェクト全体を理解
+2.  **意味的検索:** `Grep pattern` で問題関連コードを特定
+3.  **依存関係分析:** `Grep "using|import"` で影響範囲を把握
+4.  **シンボル詳細分析:** `Read file_path` で具体的な実装を調査
+
+**2. 効率化手法:**
+- `Grep`ツールでの正規表現パターン検索を活用
+- `Glob`パターンで対象ファイルを絞り込み
+- 複数ツールの並列実行でパフォーマンス向上
+- 調査結果を`/mcp__serena__write_memory`で記録・活用
+
+**3. 専門分野仮説立案:** 標準ツールの分析結果を基に専門領域を特定
+- *例: `Grep "P/Invoke|DllImport"` でP/Invoke関連コード発見 → `@Native-Bridge` の領域*
+- *例: `Grep "ReactiveUI|ViewModel"` でReactiveUI問題検出 → `@UI-Maestro` の領域*
+- *例: `Grep "using.*Core.*Application"` でアーキテクチャ層違反発見 → `@Architecture-Guardian` の領域*
+- *例: `Glob "**/*Tests.cs"` でテストケース不足を特定 → `@Test-Generator` の領域*
+- *例: 新技術・ライブラリ調査が必要 → `@Researcher` の領域*
+
+**現実的効果（Serena MCP無効下）:**
+- **標準レベルのトークン消費**: MCP効率化は期待できない
+- **ripgrepベースの高精度検索**: Grepツールによる確実な検索
+- **並列処理による時間短縮**: 複数ツールの同時実行活用
+
+#### **フェーズ2: 専門家（サブエージェント）への委任**
+仮説に基づき、��も適したサブエージェントを **`@` でメンションして**、具体的かつ明確な指示と共にタスクを委任します。
+- **悪い例:** `@Native-Bridge "バグを直して"`
+- **良い例:** `@Native-Bridge "ログに記録されたこのPInvokeエラー（...）を解決するため、C#側のラッパーとC++側の実装で、引数のマーシャリングに不整合がないか調査・修正してください。"`
+
+#### **フェーズ3: 専門家による実行と結果の統合**
+サブエージェントが提示した解決策（コード、分析結果など）をあなたが受け取ります。
+1.  **結果の検証:** サブエージェントの提案が、プロジェクト全体の文脈と整合性が取れているかを確認します。
+2.  **統合:** 提案されたコードをプロジェクトに統合し、必要に応じて微調整を行います。
+3.  **最終確認:** 最終的に、ビルドとテストを実行し、問題が完全に解決されたことを確認します。
+
+このオーケストレーションモデルに従うことで、各専門家の能力を最大限に引き出し、迅速かつ高品質な開発を実現します。

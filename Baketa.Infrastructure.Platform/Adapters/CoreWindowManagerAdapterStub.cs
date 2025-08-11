@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Infrastructure.Platform.Windows;
 
 namespace Baketa.Infrastructure.Platform.Adapters;
 
@@ -282,8 +283,16 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             
             System.Diagnostics.Debug.WriteLine($"🖼️ キャプチャ試行: Handle={handle}, Size={width}x{height}, Thumb={thumbWidth}x{thumbHeight}");
 
-            // 方法1: PrintWindow（最優先）
-            var result = TryPrintWindow(handle, width, height, thumbWidth, thumbHeight);
+            // 方法1: Windows Graphics Capture API（最優先）
+            var result = TryWindowsGraphicsCapture(handle, width, height, thumbWidth, thumbHeight);
+            if (result != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"✅ Windows Graphics Capture API成功: Handle={handle}");
+                return result;
+            }
+
+            // 方法2: PrintWindow（フォールバック）
+            result = TryPrintWindow(handle, width, height, thumbWidth, thumbHeight);
             if (result != null)
             {
                 System.Diagnostics.Debug.WriteLine($"✅ PrintWindow成功: Handle={handle}");
@@ -443,6 +452,80 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
         {
             System.Diagnostics.Debug.WriteLine($"💥 フォールバック画像生成エラー: {ex.Message}");
             return string.Empty; // nullの代わりに空文字列を返す
+        }
+    }
+
+    /// <summary>
+    /// ネイティブ Windows Graphics Capture API を使用したキャプチャ試行
+    /// </summary>
+    /// <param name="handle">ウィンドウハンドル</param>
+    /// <param name="width">ウィンドウの幅</param>
+    /// <param name="height">ウィンドウの高さ</param>
+    /// <param name="thumbWidth">サムネイル幅</param>
+    /// <param name="thumbHeight">サムネイル高さ</param>
+    /// <returns>成功時はBase64エンコードされた画像、失敗時はnull</returns>
+    private string? TryWindowsGraphicsCapture(IntPtr handle, int width, int height, int thumbWidth, int thumbHeight)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"🚀 ネイティブ Windows Graphics Capture API 試行開始: Handle={handle}");
+            
+            // ネイティブキャプチャラッパーを使用
+            using var nativeCapture = new Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper(
+                new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(),
+                null);
+            
+            // ライブラリを初期化
+            if (!nativeCapture.Initialize())
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ ネイティブライブラリの初期化に失敗");
+                return null;
+            }
+            
+            // サポート状況をチェック
+            if (!nativeCapture.IsSupported())
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Windows Graphics Capture API がサポートされていません");
+                return null;
+            }
+            
+            // キャプチャセッションを作成
+            if (!nativeCapture.CreateCaptureSession(handle))
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ キャプチャセッションの作成に失敗");
+                return null;
+            }
+            
+            // フレームをキャプチャ（同期的に実行）
+            var windowsImage = nativeCapture.CaptureFrameAsync(5000).GetAwaiter().GetResult();
+            if (windowsImage == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ フレームキャプチャに失敗");
+                return null;
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"✅ ネイティブキャプチャ成功: {windowsImage.Width}x{windowsImage.Height}");
+            
+            // サムネイル作成
+            using var originalBitmap = windowsImage.GetBitmap();
+            using var thumbnail = new Bitmap(thumbWidth, thumbHeight);
+            using var graphics = Graphics.FromImage(thumbnail);
+            
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            graphics.DrawImage(originalBitmap, 0, 0, thumbWidth, thumbHeight);
+            
+            using var stream = new MemoryStream();
+            thumbnail.Save(stream, ImageFormat.Png);
+            var result = Convert.ToBase64String(stream.ToArray());
+            
+            System.Diagnostics.Debug.WriteLine($"📷 ネイティブ Windows Graphics Capture API 完了: サムネイル={thumbWidth}x{thumbHeight}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ ネイティブ Windows Graphics Capture API 失敗: {ex.Message}");
+            return null;
         }
     }
 

@@ -17,7 +17,7 @@ namespace Baketa.Application.Translation;
 /// </remarks>
 /// <param name="logger">ロガー</param>
 /// <param name="translationManager">翻訳マネージャー</param>
-public class TranslationTransactionManager(
+public sealed class TranslationTransactionManager(
         ILogger<TranslationTransactionManager> logger,
         ITranslationManager translationManager) : ITranslationTransactionManager, IDisposable
     {
@@ -337,7 +337,7 @@ public class TranslationTransactionManager(
         /// 破棄処理の実装
         /// </summary>
         /// <param name="disposing">マネージドリソースを破棄するかどうか</param>
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (disposing)
             {

@@ -325,7 +325,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         viewModel.StatusMessage.Should().Contain("有効");
     }
 
-    [Theory(Skip = "ハングアップ問題のため一時的に無効化")]
+    [Theory(Skip = "ReactiveUIスケジューラー問題のため一時的に無効化")]
     [InlineData("general", "一般設定")]
     [InlineData("appearance", "外観設定")]
     [InlineData("mainui", "操作パネル")]

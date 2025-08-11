@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Type or member is obsolete
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -14,6 +15,7 @@ using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
+using Baketa.Infrastructure.Platform.Windows.Capture;
 using ReactiveUI;
 
 namespace Baketa.UI;
@@ -137,6 +139,24 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
                         _logger?.LogInformation("✅ IEventAggregator取得成功: {AggregatorType}", _eventAggregator.GetType().Name);
+                        
+                        // EventHandlerInitializationServiceを取得して実行
+                        Console.WriteLine("🔥 EventHandlerInitializationService実行開始");
+                        var eventHandlerInitService = serviceProvider.GetRequiredService<Baketa.Application.Services.Events.EventHandlerInitializationService>();
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await eventHandlerInitService.InitializeAsync().ConfigureAwait(false);
+                                Console.WriteLine("🔥 EventHandlerInitializationService実行完了");
+                            }
+                            catch (Exception initEx)
+                            {
+                                Console.WriteLine($"🔥 [ERROR] EventHandlerInitializationService実行エラー: {initEx.Message}");
+                                _logger?.LogError(initEx, "EventHandlerInitializationService実行エラー");
+                            }
+                        });
+                        Console.WriteLine("🔥 EventHandlerInitializationService非同期実行開始");
                     }
                     catch (Exception eventAggregatorEx)
                     {
@@ -198,41 +218,41 @@ internal sealed partial class App : Avalonia.Application
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
                     }
                     
-                    // TranslationResultOverlayManagerを初期化（遅延初期化に変更）
-                    Console.WriteLine("🖥️ TranslationResultOverlayManager遅延初期化設定");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayManager遅延初期化設定");
+                    // インプレース翻訳オーバーレイマネージャーを初期化（優先）
+                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager初期化設定");
                     try
                     {
-                        var overlayManager = serviceProvider.GetRequiredService<Baketa.UI.Services.TranslationResultOverlayManager>();
-                        
-                        // UIスレッドデッドロックを避けるため、遅延初期化に変更
-                        Task.Run(async () =>
+                        var inPlaceOverlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
+                        if (inPlaceOverlayManager != null)
                         {
-                            try
+                            // UIスレッドデッドロックを避けるため、遅延初期化に変更
+                            Task.Run(async () =>
                             {
-                                Console.WriteLine("🖥️ TranslationResultOverlayManager非同期初期化開始");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ TranslationResultOverlayManager非同期初期化開始");
-                                await overlayManager.InitializeAsync().ConfigureAwait(false);
-                                Console.WriteLine("✅ TranslationResultOverlayManager初期化完了");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayManager初期化完了");
-                            }
-                            catch (Exception asyncEx)
-                            {
-                                Console.WriteLine($"⚠️ TranslationResultOverlayManager非同期初期化失敗: {asyncEx.Message}");
-                                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ TranslationResultOverlayManager非同期初期化失敗: {asyncEx.Message}");
-                            }
-                        });
-                        
-                        Console.WriteLine("✅ TranslationResultOverlayManager遅延初期化設定完了");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationResultOverlayManager遅延初期化設定完了");
+                                try
+                                {
+                                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager非同期初期化開始");
+                                    await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
+                                    Console.WriteLine("✅ InPlaceTranslationOverlayManager初期化完了");
+                                }
+                                catch (Exception asyncEx)
+                                {
+                                    Console.WriteLine($"⚠️ InPlaceTranslationOverlayManager非同期初期化失敗: {asyncEx.Message}");
+                                }
+                            });
+                            Console.WriteLine("✅ InPlaceTranslationOverlayManager遅延初期化設定完了");
+                        }
+                        else
+                        {
+                            Console.WriteLine("⚠️ InPlaceTranslationOverlayManagerが見つかりません");
+                        }
                     }
-                    catch (Exception overlayEx)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"⚠️ TranslationResultOverlayManager設定失敗: {overlayEx.Message}");
-                        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ TranslationResultOverlayManager設定失敗: {overlayEx.Message}");
-                        _logger?.LogWarning(overlayEx, "TranslationResultOverlayManager設定失敗");
-                        // オーバーレイ設定失敗は致命的ではないので続行
+                        Console.WriteLine($"❌ InPlaceTranslationOverlayManager初期化設定エラー: {ex.Message}");
                     }
+
+                    // 旧TranslationResultOverlayManagerは削除済み - インプレースシステムが自動で管理
+                    Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理");
                     
                     // TranslationFlowModuleを使用してイベント購読を設定
                     Console.WriteLine("🔧 TranslationFlowModuleのイベント購読を初期化中");
@@ -251,6 +271,7 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine("✅ TranslationFlowModule初期化完了");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationFlowModule初期化完了");
                         _logger?.LogInformation("✅ TranslationFlowModule初期化完了");
+                        
                     }
                     catch (Exception moduleEx)
                     {
@@ -262,8 +283,40 @@ internal sealed partial class App : Avalonia.Application
                         // エラーが発生してもアプリケーションの起動は継続
                     }
                     
-                    // アプリケーション起動完了イベントをパブリッシュ
-                    _eventAggregator?.PublishAsync(new ApplicationStartupEvent()).GetAwaiter().GetResult();
+                    // 🔥【CRITICAL FIX】OPUS-MT事前起動サービスを開始 - TranslationFlowModule例外の影響を受けない独立実行
+                    Console.WriteLine("🔥🔥🔥 OPUS-MT事前起動サービス処理開始 🔥🔥🔥");
+                    try
+                    {
+                        Console.WriteLine("🔍 OpusMtPrewarmService取得開始");
+                        var prewarmService = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.IOpusMtPrewarmService>();
+                        Console.WriteLine($"✅ OpusMtPrewarmService取得成功: {prewarmService.GetType().Name}");
+                        Console.WriteLine("🚀 バックグラウンドタスク作成開始");
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                Console.WriteLine("🚀 prewarmService.StartPrewarmingAsync() 呼び出し開始");
+                                await prewarmService.StartPrewarmingAsync();
+                                Console.WriteLine("✅ prewarmService.StartPrewarmingAsync() 完了");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"⚠️ OpusMtPrewarmService開始エラー: {ex.Message}");
+                                _logger?.LogWarning(ex, "⚠️ OpusMtPrewarmService開始エラー: {Error}", ex.Message);
+                            }
+                        });
+                        Console.WriteLine("🚀 OpusMtPrewarmService開始要求完了");
+                        _logger?.LogInformation("🚀 OpusMtPrewarmService開始要求完了");
+                    }
+                    catch (Exception prewarmEx)
+                    {
+                        Console.WriteLine($"💥💥💥 OpusMtPrewarmService取得エラー: {prewarmEx.GetType().Name}: {prewarmEx.Message}");
+                        Console.WriteLine($"💥💥💥 スタックトレース: {prewarmEx.StackTrace}");
+                        _logger?.LogWarning(prewarmEx, "⚠️ OpusMtPrewarmService取得エラー: {Error}", prewarmEx.Message);
+                    }
+                    
+                    // アプリケーション起動完了イベントをパブリッシュ（非ブロッキング）
+                    _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                     
                     if (_logger != null)
                     {
@@ -271,7 +324,10 @@ internal sealed partial class App : Avalonia.Application
                     }
                     
                     // シャットダウンイベントハンドラーの登録
-                    // desktop.ShutdownRequested += OnShutdownRequested;
+                    desktop.ShutdownRequested += OnShutdownRequested;
+                    
+                    // アプリケーション終了イベントハンドラーを追加
+                    AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -318,6 +374,63 @@ internal sealed partial class App : Avalonia.Application
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        /// <summary>
+        /// アプリケーションシャットダウン要求処理
+        /// </summary>
+        private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+        {
+            try
+            {
+                _logger?.LogInformation("アプリケーションシャットダウン要求を受信");
+                
+                // ネイティブライブラリの強制終了を設定
+                NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
+                
+                // シャットダウンイベントをパブリッシュ（非ブロッキング）
+                _ = _eventAggregator?.PublishAsync(new ApplicationShutdownEvent());
+                
+                if (_logger != null)
+                {
+                    _logShuttingDown(_logger, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_logger != null)
+                {
+                    _logShutdownError(_logger, ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// プロセス終了時の処理
+        /// </summary>
+        private void OnProcessExit(object? sender, EventArgs e)
+        {
+            try
+            {
+                _logger?.LogInformation("プロセス終了処理開始");
+                
+                // ネイティブライブラリの強制終了
+                NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
+                
+                _logger?.LogInformation("プロセス終了処理完了");
+            }
+            catch (Exception ex)
+            {
+                // プロセス終了時は例外を抑制
+                try
+                {
+                    _logger?.LogError(ex, "プロセス終了処理中に例外が発生");
+                }
+                catch
+                {
+                    // ログ出力も失敗する場合は抑制
+                }
+            }
         }
     }
     

@@ -2,6 +2,7 @@ using System;
 using System.Reactive;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
 using Baketa.Core.Abstractions.Events;
@@ -10,7 +11,9 @@ using UIEvents = Baketa.UI.Framework.Events;
 using EventTypes = Baketa.Core.Events.EventTypes;
 using TranslationEvents = Baketa.Core.Events.TranslationEvents;
 using CaptureEvents = Baketa.Core.Events.CaptureEvents;
-using Baketa.UI.Framework.ReactiveUI; 
+using Baketa.UI.Framework.ReactiveUI;
+using Baketa.Core.Translation.Models;
+using Baketa.UI.Services; 
 
 namespace Baketa.UI.ViewModels;
 
@@ -19,6 +22,8 @@ namespace Baketa.UI.ViewModels;
     /// </summary>
     public sealed class MainWindowViewModel : Framework.ViewModelBase
     {
+        private readonly INavigationService _navigationService;
+        private readonly Baketa.Application.Services.Translation.TranslationOrchestrationService? _translationOrchestrationService;
         // 選択中のタブインデックス
         private int _selectedTabIndex;
         public int SelectedTabIndex
@@ -90,6 +95,42 @@ namespace Baketa.UI.ViewModels;
             set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _notificationMessage, value);
         }
         
+        // 翻訳テスト関連プロパティ
+        private string _translationTestInput = "こんにちは";
+        public string TranslationTestInput
+        {
+            get => _translationTestInput;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _translationTestInput, value);
+        }
+        
+        private string _translationTestOutput = string.Empty;
+        public string TranslationTestOutput
+        {
+            get => _translationTestOutput;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _translationTestOutput, value);
+        }
+        
+        private string _translationTestStatus = "翻訳テスト準備完了";
+        public string TranslationTestStatus
+        {
+            get => _translationTestStatus;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _translationTestStatus, value);
+        }
+        
+        private string _selectedTranslationEngine = "Local";
+        public string SelectedTranslationEngine
+        {
+            get => _selectedTranslationEngine;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _selectedTranslationEngine, value);
+        }
+        
+        private string _selectedLanguagePair = "ja-en";
+        public string SelectedLanguagePair
+        {
+            get => _selectedLanguagePair;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _selectedLanguagePair, value);
+        }
+        
         // エラーメッセージ (newで基底クラスのプロパティを隠す)
         private string? _errorMessage;
         public new string? ErrorMessage
@@ -98,13 +139,18 @@ namespace Baketa.UI.ViewModels;
             set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _errorMessage, value);
         }
         
+        // 翻訳状態監視プロパティ
+        public bool IsTranslationInProgress => _translationOrchestrationService?.IsAnyTranslationActive ?? false;
+        public bool CanOpenSettings => !IsTranslationInProgress;
+        public string SettingsLockedMessage => "翻訳処理中は設定画面を開けません";
+        
         // 各タブのビューモデル
         public HomeViewModel HomeViewModel { get; }
         public CaptureViewModel CaptureViewModel { get; }
         public TranslationViewModel TranslationViewModel { get; }
         public OverlayViewModel OverlayViewModel { get; }
         public HistoryViewModel HistoryViewModel { get; }
-        public SettingsViewModel SettingsViewModel { get; }
+        public SimpleSettingsViewModel SimpleSettingsViewModel { get; }
         public AccessibilitySettingsViewModel AccessibilitySettingsViewModel { get; }
         
         // コマンド
@@ -118,6 +164,7 @@ namespace Baketa.UI.ViewModels;
         public ReactiveCommand<Unit, Unit> OpenHelpCommand { get; }
         public ReactiveCommand<Unit, Unit> OpenAboutCommand { get; }
         public ReactiveCommand<Unit, Unit> MinimizeToTrayCommand { get; }
+        public ReactiveCommand<Unit, Unit> TestTranslationCommand { get; }
         
         /// <summary>
         /// 新しいメインウィンドウビューモデルを初期化します
@@ -130,6 +177,8 @@ namespace Baketa.UI.ViewModels;
         /// <param name="historyViewModel">履歴ビューモデル</param>
         /// <param name="settingsViewModel">設定ビューモデル</param>
         /// <param name="accessibilityViewModel">アクセシビリティ設定ビューモデル</param>
+        /// <param name="navigationService">ナビゲーションサービス</param>
+        /// <param name="translationOrchestrationService">翻訳オーケストレーションサービス（オプション）</param>
         /// <param name="logger">ロガー</param>
         public MainWindowViewModel(
             IEventAggregator eventAggregator,
@@ -138,18 +187,23 @@ namespace Baketa.UI.ViewModels;
             TranslationViewModel translationViewModel,
             OverlayViewModel overlayViewModel,
             HistoryViewModel historyViewModel,
-            SettingsViewModel settingsViewModel,
+            SimpleSettingsViewModel simpleSettingsViewModel,
             AccessibilitySettingsViewModel accessibilityViewModel,
+            INavigationService navigationService,
+            Baketa.Application.Services.Translation.TranslationOrchestrationService? translationOrchestrationService = null,
             ILogger? logger = null)
             : base(eventAggregator, logger)
         {
+            _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+            _translationOrchestrationService = translationOrchestrationService;
+            
             // 各タブのビューモデルを初期化
             HomeViewModel = homeViewModel;
             CaptureViewModel = captureViewModel;
             TranslationViewModel = translationViewModel;
             OverlayViewModel = overlayViewModel;
             HistoryViewModel = historyViewModel;
-            SettingsViewModel = settingsViewModel;
+            SimpleSettingsViewModel = simpleSettingsViewModel;
             AccessibilitySettingsViewModel = accessibilityViewModel;
             
             // コマンドの実行可否条件
@@ -160,9 +214,13 @@ namespace Baketa.UI.ViewModels;
             var canStopCapture = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
                 x => x.IsCapturing,
                 isCapturing => isCapturing);
+                
+            var canOpenSettings = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
+                x => x.IsTranslationInProgress,
+                isTranslating => !isTranslating);
             
             // コマンドの初期化
-            OpenSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync);
+            OpenSettingsCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenSettingsAsync, canOpenSettings);
             ExitCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteExitAsync);
             StartCaptureCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteStartCaptureAsync, canStartCapture);
             StopCaptureCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteStopCaptureAsync, canStopCapture);
@@ -172,6 +230,10 @@ namespace Baketa.UI.ViewModels;
             OpenHelpCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenHelpAsync);
             OpenAboutCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteOpenAboutAsync);
             MinimizeToTrayCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteMinimizeToTrayAsync);
+            TestTranslationCommand = Framework.ReactiveUI.ReactiveCommandFactory.Create(ExecuteTestTranslationAsync);
+            
+            // 翻訳状態監視の初期化
+            InitializeTranslationStateMonitoring();
             
             // ナビゲーションイベントの購読
             SubscribeToNavigationEvents();
@@ -207,6 +269,43 @@ namespace Baketa.UI.ViewModels;
             
             // OpenAccessibilitySettingsRequestedEvent
             SubscribeToOpenAccessibilitySettings();
+            
+            // CloseSettingsRequestedEvent
+            SubscribeToCloseSettings();
+        }
+
+        
+        /// <summary>
+        /// 翻訳状態監視を初期化します
+        /// </summary>
+        private void InitializeTranslationStateMonitoring()
+        {
+            Console.WriteLine($"🔧 [INIT_TRANSLATION_MONITORING] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}");
+            
+            if (_translationOrchestrationService == null) 
+            {
+                Console.WriteLine("⚠️ [INIT_TRANSLATION_MONITORING] TranslationOrchestrationServiceがnullです - 翻訳状態監視を無効化");
+                return;
+            }
+            
+            Console.WriteLine("🔧 [INIT_TRANSLATION_MONITORING] 翻訳状態監視を開始");
+            
+            // TranslationOrchestrationServiceのIsAnyTranslationActive変更を監視
+            _translationOrchestrationService.WhenAnyValue(x => x.IsAnyTranslationActive)
+                .Subscribe(isActive =>
+                {
+                    this.RaisePropertyChanged(nameof(IsTranslationInProgress));
+                    this.RaisePropertyChanged(nameof(CanOpenSettings));
+                    Console.WriteLine($"🔒 [MAIN_TRANSLATION_STATE] 翻訳状態変更: IsActive={isActive}, CanOpenSettings={CanOpenSettings}");
+                    
+                    // 詳細デバッグログ
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔒 [MAIN_TRANSLATION_STATE] IsActive={isActive}, CanOpenSettings={CanOpenSettings}, IsTranslationInProgress={IsTranslationInProgress}{Environment.NewLine}");
+                    }
+                    catch { }
+                });
         }
         
         // 以下、イベント登録用ヘルパーメソッド
@@ -253,6 +352,31 @@ namespace Baketa.UI.ViewModels;
                 await Task.CompletedTask.ConfigureAwait(false);
             });
         }
+
+        
+        private void SubscribeToCloseSettings()
+        {
+            // 設定画面を閉じるイベント
+            SubscribeToEvent<UIEvents.CloseSettingsRequestedEvent>(async _ => 
+            {
+                try
+                {
+                    // 設定画面を閉じる（ナビゲーションサービスを使用）
+                    // TODO: 実際の設定画面クローズ処理を実装
+                    Console.WriteLine("🔧 [CLOSE_SETTINGS] 設定画面を閉じる要求を受信");
+                    
+                    // 通知表示
+                    ShowNotification("設定を保存しました", TimeSpan.FromSeconds(2));
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "設定画面のクローズ中にエラーが発生しました");
+                    ShowNotification("設定画面のクローズに失敗しました", TimeSpan.FromSeconds(3));
+                }
+                
+                await Task.CompletedTask.ConfigureAwait(false);
+            });
+        }
         
         /// <summary>
         /// 通知を表示します
@@ -290,10 +414,16 @@ namespace Baketa.UI.ViewModels;
         {
             Logger?.LogInformation("設定画面を開くコマンドが実行されました");
             
-            // 設定タブに切り替え
-            SelectedTabIndex = 5; // SettingsViewModelタブ
-            
-            await Task.CompletedTask.ConfigureAwait(false);
+            try
+            {
+                // ナビゲーションサービスを使って設定画面を表示
+                await _navigationService.ShowSettingsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "設定画面の表示中にエラーが発生しました");
+                StatusMessage = "設定画面の表示に失敗しました";
+            }
         }
         
         // アプリケーション終了コマンド実行
@@ -305,6 +435,102 @@ namespace Baketa.UI.ViewModels;
             await PublishEventAsync(new UIEvents.ApplicationExitRequestedEvent()).ConfigureAwait(false);
             
             await Task.CompletedTask.ConfigureAwait(false);
+        }
+        
+        // 翻訳テストコマンド実行
+        private async Task ExecuteTestTranslationAsync()
+        {
+            Logger?.LogInformation("翻訳テストコマンドが実行されました");
+            
+            try
+            {
+                TranslationTestStatus = "翻訳中...";
+                TranslationTestOutput = "";
+                
+                if (string.IsNullOrWhiteSpace(TranslationTestInput))
+                {
+                    TranslationTestStatus = "入力テキストが空です";
+                    return;
+                }
+                
+                // 言語ペアの解析
+                var parts = SelectedLanguagePair.Split('-');
+                if (parts.Length != 2)
+                {
+                    TranslationTestStatus = "無効な言語ペア形式です";
+                    return;
+                }
+                
+                var sourceLanguage = parts[0] == "ja" ? Language.Japanese : Language.English;
+                var targetLanguage = parts[1] == "ja" ? Language.Japanese : Language.English;
+                
+                // 翻訳リクエストの作成
+                var request = TranslationRequest.Create(
+                    TranslationTestInput,
+                    sourceLanguage,
+                    targetLanguage);
+                
+                // 実際の翻訳サービスを使用
+                var translationService = Program.ServiceProvider?.GetService<Baketa.Core.Abstractions.Translation.ITranslationService>();
+                if (translationService != null)
+                {
+                    var response = await translationService.TranslateAsync(
+                        TranslationTestInput,
+                        sourceLanguage,
+                        targetLanguage,
+                        null).ConfigureAwait(false);
+                    
+                    if (response.IsSuccess)
+                    {
+                        TranslationTestOutput = response.TranslatedText ?? string.Empty;
+                        TranslationTestStatus = $"翻訳完了 (エンジン: {response.EngineName})";
+                    }
+                    else
+                    {
+                        TranslationTestOutput = response.Error?.Message ?? "翻訳に失敗しました";
+                        TranslationTestStatus = "翻訳エラー";
+                    }
+                }
+                else
+                {
+                    // フォールバック：翻訳サービスが取得できない場合はダミー処理
+                    TranslationTestOutput = GenerateTestTranslation(TranslationTestInput, SelectedLanguagePair);
+                    TranslationTestStatus = $"テスト翻訳完了 (フォールバック)";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "翻訳テスト実行中にエラーが発生しました");
+                TranslationTestStatus = $"翻訳テストエラー: {ex.Message}";
+            }
+        }
+        
+        // テスト翻訳の生成
+        private string GenerateTestTranslation(string input, string languagePair)
+        {
+            // 簡易的なテスト翻訳
+            return languagePair switch
+            {
+                "ja-en" => input switch
+                {
+                    "こんにちは" => "Hello",
+                    "ありがとう" => "Thank you",
+                    "さようなら" => "Goodbye",
+                    "はい" => "Yes",
+                    "いいえ" => "No",
+                    _ => $"[Test JA→EN] {input}"
+                },
+                "en-ja" => input.ToLowerInvariant() switch
+                {
+                    "hello" => "こんにちは",
+                    "thank you" => "ありがとう",
+                    "goodbye" => "さようなら",
+                    "yes" => "はい",
+                    "no" => "いいえ",
+                    _ => $"[Test EN→JA] {input}"
+                },
+                _ => $"[Test {languagePair}] {input}"
+            };
         }
         
         // キャプチャ開始コマンド実行
@@ -425,6 +651,14 @@ namespace Baketa.UI.ViewModels;
             StatusMessage = $"翻訳完了: {eventData.SourceText[..Math.Min(20, eventData.SourceText.Length)]}...";
             IsProcessing = false;
             Progress = 0;
+            
+            // 翻訳テスト結果の表示
+            if (!string.IsNullOrEmpty(TranslationTestInput) && 
+                eventData.SourceText == TranslationTestInput)
+            {
+                TranslationTestOutput = eventData.TranslatedText;
+                TranslationTestStatus = $"翻訳完了 (テストモード)";
+            }
             
             // 通知表示
             ShowNotification("翻訳が完了しました");

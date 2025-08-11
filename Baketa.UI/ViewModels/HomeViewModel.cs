@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Framework.ReactiveUI;
 using Baketa.UI.Models;
+using Baketa.UI.Views;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -187,7 +188,59 @@ namespace Baketa.UI.ViewModels;
         private async Task ExecuteStartCaptureAsync()
         {
             //_logger?.LogInformation("キャプチャ開始コマンドが実行されました");
-            await PublishEventAsync(new StartCaptureRequestedEvent()).ConfigureAwait(false);
+            
+            try
+            {
+                // ウィンドウ選択ダイアログを直接表示（MainOverlayViewModelと同じアプローチ）
+                var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, null!, null!);
+                var dialog = new WindowSelectionDialogView
+                {
+                    DataContext = dialogViewModel
+                };
+
+                // 親ウィンドウを取得
+                var mainWindow = Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.MainWindow
+                    : null;
+
+                if (mainWindow != null)
+                {
+                    // ダイアログを表示して結果を待機
+                    await dialog.ShowDialog(mainWindow).ConfigureAwait(false);
+                    var selectedWindow = dialogViewModel.DialogResult;
+                    
+                    if (selectedWindow != null)
+                    {
+                        // 翻訳開始イベントを発行（ログ追加）
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行開始: {selectedWindow.Title}{Environment.NewLine}");
+                        }
+                        catch (Exception fileEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"HomeViewModel ファイル書き込みエラー: {fileEx.Message}");
+                        }
+                        
+                        await PublishEventAsync(new StartTranslationRequestEvent(selectedWindow)).ConfigureAwait(false);
+                        
+                        try
+                        {
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行完了: {selectedWindow.Title}{Environment.NewLine}");
+                        }
+                        catch (Exception fileEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"HomeViewModel ファイル書き込みエラー: {fileEx.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // エラーログ（_loggerがnullの場合もあるため、条件付き）
+                //_logger?.LogError(ex, "ウィンドウ選択ダイアログの表示中にエラーが発生しました");
+            }
         }
         
         // 設定画面を開くコマンド実行
