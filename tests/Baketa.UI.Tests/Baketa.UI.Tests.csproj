@@ -37,7 +37,7 @@
     </PackageReference>
     
     <!-- FluentAssertions for better test assertions -->
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="FluentAssertions" Version="8.5.0" />
     
     <!-- ReactiveUI Testing -->
     <PackageReference Include="ReactiveUI.Testing" Version="20.1.1" />
