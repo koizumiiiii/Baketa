@@ -65,7 +65,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: Download Native DLL
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: native-dll
         path: BaketaCaptureNative/bin/Debug/
