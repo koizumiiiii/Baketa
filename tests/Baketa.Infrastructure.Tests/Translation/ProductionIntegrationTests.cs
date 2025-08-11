@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Tests.Translation;
 /// 実運用環境でのOPUS-MT Native Tokenizer統合テスト
 /// 実際の翻訳パイプラインでの動作確認
 /// </summary>
-public class ProductionIntegrationTests : IDisposable
+public class ProductionIntegrationTests : Local.Onnx.SentencePiece.SentencePieceTestBase, IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly string _projectRoot;
@@ -35,7 +35,7 @@ public class ProductionIntegrationTests : IDisposable
         _serviceProvider = services.BuildServiceProvider();
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public void OpusMtModelsDirectory_ShouldExist()
     {
         // Arrange
@@ -57,17 +57,11 @@ public class ProductionIntegrationTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public async Task OpusMtNativeTokenizer_ShouldWorkInProductionScenario()
     {
         // Arrange
-        var modelPath = Path.Combine(_projectRoot, "Models", "SentencePiece", "opus-mt-ja-en.model");
-        
-        if (!File.Exists(modelPath))
-        {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
-            return;
-        }
+        var modelPath = GetModelPath("opus-mt-ja-en.model");
 
         _ = _serviceProvider.GetRequiredService<ILogger<OpusMtNativeTokenizer>>();
         
@@ -131,17 +125,11 @@ public class ProductionIntegrationTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public void RealSentencePieceTokenizer_ShouldWorkWithFallback()
     {
         // Arrange
-        var modelPath = Path.Combine(_projectRoot, "Models", "SentencePiece", "opus-mt-ja-en.model");
-        
-        if (!File.Exists(modelPath))
-        {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
-            return;
-        }
+        var modelPath = GetModelPath("opus-mt-ja-en.model");
 
         var logger = _serviceProvider.GetRequiredService<ILogger<RealSentencePieceTokenizer>>();
         var testText = "こんにちは、世界！";
@@ -173,17 +161,11 @@ public class ProductionIntegrationTests : IDisposable
         normalized.Should().StartWith("▁", "SentencePiece normalization should add prefix space symbol");
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public void SentencePieceTokenizerFactory_ShouldCreateCorrectImplementation()
     {
         // Arrange
-        var modelPath = Path.Combine(_projectRoot, "Models", "SentencePiece", "opus-mt-ja-en.model");
-        
-        if (!File.Exists(modelPath))
-        {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
-            return;
-        }
+        var modelPath = GetModelPath("opus-mt-ja-en.model");
 
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         
@@ -235,7 +217,7 @@ public class ProductionIntegrationTests : IDisposable
             fallbackDisposable.Dispose();
     }
 
-    [Theory]
+    [Theory(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     [InlineData("")]
     [InlineData("こんにちは")]
     [InlineData("Hello, World!")]
@@ -243,13 +225,7 @@ public class ProductionIntegrationTests : IDisposable
     public async Task OpusMtNativeTokenizer_ShouldHandleEdgeCases(string input)
     {
         // Arrange
-        var modelPath = Path.Combine(_projectRoot, "Models", "SentencePiece", "opus-mt-ja-en.model");
-        
-        if (!File.Exists(modelPath))
-        {
-            _output.WriteLine($"⚠️  Skipping test: Model file not found at {modelPath}");
-            return;
-        }
+        var modelPath = GetModelPath("opus-mt-ja-en.model");
 
         _output.WriteLine($"🧪 Edge case test: '{input}' (length: {input.Length})");
 

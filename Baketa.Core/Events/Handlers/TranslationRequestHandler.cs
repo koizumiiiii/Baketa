@@ -81,7 +81,7 @@ public class TranslationRequestHandler(
             Console.WriteLine($"🎯 [PHASE_2_3] 翻訳結果: {translationResponse?.TranslatedText ?? "null"}");
             Console.WriteLine($"🎯 [PHASE_2_3] 翻訳成功: {translationResponse?.IsSuccess ?? false}");
 
-            if (!translationResponse?.IsSuccess ?? true)
+            if (translationResponse == null || !translationResponse.IsSuccess)
             {
                 throw new InvalidOperationException($"翻訳処理が失敗しました: {translationResponse?.Error?.Message ?? "不明なエラー"}");
             }
