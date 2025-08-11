@@ -1,6 +1,5 @@
 using System;
 using Baketa.Core.Abstractions.DI;
-using Baketa.Infrastructure.Translation.Complete;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,8 +23,8 @@ public class TranslationModule(IConfiguration configuration) : IServiceModule
     /// <param name="services">サービスコレクション</param>
     public void RegisterServices(IServiceCollection services)
     {
-        // 完全な翻訳システムを登録（OPUS-MT + Gemini + ハイブリッド + 中国語対応）
-        services.AddCompleteTranslationSystem(_configuration);
+        // TranslationServiceExtensionsを使用してTransformersOpusMtEngineを登録
+        services.AddTranslationServices();
     }
 
 }

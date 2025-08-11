@@ -9,7 +9,7 @@ namespace Baketa.Core.Translation.Configuration;
 /// 言語設定の管理クラス
 /// 翻訳でサポートされる言語の詳細情報を提供
 /// </summary>
-public class LanguageConfiguration
+public sealed class LanguageConfiguration
 {
     /// <summary>
     /// サポートされている言語のリスト

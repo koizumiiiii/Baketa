@@ -42,9 +42,10 @@ public interface ITranslationOrchestrationService
     /// <summary>
     /// 自動翻訳を開始します
     /// </summary>
+    /// <param name="targetWindowHandle">翻訳対象ウィンドウハンドル（nullの場合は画面全体）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>自動翻訳実行タスク</returns>
-    Task StartAutomaticTranslationAsync(CancellationToken cancellationToken = default);
+    Task StartAutomaticTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 自動翻訳を停止します
@@ -56,9 +57,10 @@ public interface ITranslationOrchestrationService
     /// <summary>
     /// 単発翻訳を実行します
     /// </summary>
+    /// <param name="targetWindowHandle">翻訳対象ウィンドウハンドル（nullの場合は画面全体）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>単発翻訳実行タスク</returns>
-    Task TriggerSingleTranslationAsync(CancellationToken cancellationToken = default);
+    Task TriggerSingleTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default);
 
     #endregion
 
@@ -182,6 +184,11 @@ public sealed record TranslationResult
     /// 表示時間（単発翻訳の場合）
     /// </summary>
     public TimeSpan? DisplayDuration { get; init; }
+    
+    /// <summary>
+    /// 座標ベース翻訳モードかどうか
+    /// </summary>
+    public bool IsCoordinateBasedMode { get; init; }
 }
 
 /// <summary>
@@ -190,9 +197,19 @@ public sealed record TranslationResult
 public enum TranslationStatus
 {
     /// <summary>
-    /// アイドル状態
+    /// 初期化中（OCRエンジン初期化中）
+    /// </summary>
+    Initializing,
+
+    /// <summary>
+    /// アイドル状態（ウィンドウ未選択）
     /// </summary>
     Idle,
+
+    /// <summary>
+    /// 準備完了（ウィンドウ選択済み、翻訳開始可能）
+    /// </summary>
+    Ready,
 
     /// <summary>
     /// キャプチャ中

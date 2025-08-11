@@ -15,7 +15,7 @@ namespace Baketa.Core.Events.Implementation;
 /// </remarks>
 /// <param name="logger">ロガー（オプション）</param>
 // プライマリコンストラクターの使用を拒否（IDE0290）
-public class EventProcessorMetrics(ILogger<EventProcessorMetrics>? logger = null)
+public sealed class EventProcessorMetrics(ILogger<EventProcessorMetrics>? logger = null)
 {
     // コレクション初期化の簡素化を拒否（IDE0090）
     private readonly ConcurrentDictionary<string, ConcurrentQueue<double>> _processingTimes = new();

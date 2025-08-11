@@ -33,6 +33,9 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
         [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool DeleteObject(IntPtr hObject);
+        
+        [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+        internal static extern uint GetPixel(IntPtr hdc, int nXPos, int nYPos);
     }
     
     [Flags]

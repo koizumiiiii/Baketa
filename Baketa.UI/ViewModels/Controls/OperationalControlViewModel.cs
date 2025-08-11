@@ -121,7 +121,11 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         // 自動翻訳モード変更時の処理
         var subscription1 = this.WhenAnyValue(x => x.IsAutomaticMode)
             .Skip(1) // 初期値をスキップ
-            .Subscribe(async isAutomatic => await OnAutomaticModeChangedAsync(isAutomatic).ConfigureAwait(true));
+            .Subscribe(async isAutomatic => 
+            {
+                Console.WriteLine($"🎛️ UI - IsAutomaticMode変更検知: {isAutomatic}");
+                await OnAutomaticModeChangedAsync(isAutomatic).ConfigureAwait(true);
+            });
         Disposables.Add(subscription1);
 
         // 翻訳中状態の変更時にコマンド実行可否を更新
@@ -191,8 +195,10 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         try
         {
             var previousMode = CurrentMode;
+            Console.WriteLine($"🎛️ UI - モード切り替え: {previousMode} -> {!IsAutomaticMode}");
             IsAutomaticMode = !IsAutomaticMode;
             var newMode = CurrentMode;
+            Console.WriteLine($"🎛️ UI - モード切り替え完了: {newMode}");
 
             // モード変更イベントを発行
             await PublishEventAsync(new TranslationModeChangedEvent(newMode, previousMode)).ConfigureAwait(true);
@@ -228,37 +234,42 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
     /// <summary>
     /// 単発翻訳の実行
     /// </summary>
-    private async Task ExecuteTriggerSingleTranslationAsync()
+    private Task ExecuteTriggerSingleTranslationAsync()
     {
         try
         {
-            Logger?.LogInformation("単発翻訳を実行します");
+            Logger?.LogInformation("単発翻訳を実行します（Event Flow使用）");
 
-            // 翻訳統合サービス経由で単発翻訳を実行
-            await _translationOrchestrationService.TriggerSingleTranslationAsync().ConfigureAwait(true);
-
-            Logger?.LogInformation("単発翻訳コマンドを送信しました");
+            // Let the Event Flow handle the translation - UI Flow disabled to avoid conflicts
+            Console.WriteLine($"🎛️ UI - 単発翻訳もEvent Flow に委譲");
+            Logger?.LogInformation("単発翻訳もEvent Flow による処理を使用します");
+            
+            return Task.CompletedTask;
         }
         catch (OperationCanceledException ex)
         {
             Logger?.LogInformation(ex, "単発翻訳がキャンセルされました");
             ErrorMessage = "翻訳がキャンセルされました";
+            return Task.CompletedTask;
         }
         catch (InvalidOperationException ex)
         {
             Logger?.LogError(ex, "単発翻訳実行中に無効な操作が発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
+            return Task.CompletedTask;
         }
         catch (TimeoutException ex)
         {
             Logger?.LogError(ex, "単発翻訳がタイムアウトしました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
+            return Task.CompletedTask;
         }
 #pragma warning disable CA1031 // ViewModel層でのユーザー体験保護のため一般例外をキャッチ
         catch (Exception ex)
         {
             Logger?.LogError(ex, "単発翻訳実行中に予期しないエラーが発生しました");
             ErrorMessage = $"翻訳実行エラー: {ex.Message}";
+            return Task.CompletedTask;
         }
 #pragma warning restore CA1031
     }
@@ -272,13 +283,19 @@ public sealed class OperationalControlViewModel : Framework.ViewModelBase
         {
             if (isAutomatic)
             {
-                Logger?.LogInformation("自動翻訳モードを開始します");
-                await _translationOrchestrationService.StartAutomaticTranslationAsync().ConfigureAwait(true);
+                Console.WriteLine($"🎛️ UI - 自動翻訳モードを開始します（Event Flow使用）");
+                Logger?.LogInformation("自動翻訳モードを開始します（Event Flow使用）");
+                
+                // Let the Event Flow handle the translation - UI Flow disabled to avoid conflicts
+                Console.WriteLine($"🎛️ UI - Event Flow に翻訳処理を委譲、UI Flow は無効化");
+                Logger?.LogInformation("Event Flow による翻訳処理を使用します");
             }
             else
             {
+                Console.WriteLine($"🎛️ UI - 自動翻訳モードを停止します");
                 Logger?.LogInformation("自動翻訳モードを停止します");
                 await _translationOrchestrationService.StopAutomaticTranslationAsync().ConfigureAwait(true);
+                Console.WriteLine($"🎛️ UI - 自動翻訳停止完了");
             }
         }
         catch (InvalidOperationException ex)

@@ -13,7 +13,7 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.Onnx.SentencePiece;
 /// <summary>
 /// ImprovedSentencePieceTokenizerのテスト
 /// </summary>
-public class ImprovedSentencePieceTokenizerTests : IDisposable
+public class ImprovedSentencePieceTokenizerTests : SentencePieceTestBase, IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly ILogger<ImprovedSentencePieceTokenizer> _logger;
@@ -275,7 +275,7 @@ public class ImprovedSentencePieceTokenizerTests : IDisposable
         _output.WriteLine("✅ null配列でのデコード例外処理確認");
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public void CompareWithRealImplementation_SameBehavior()
     {
         // Arrange
@@ -423,7 +423,7 @@ public class ImprovedSentencePieceTokenizerTests : IDisposable
     public void TokenizerFactory_CanCreateMultipleInstances()
     {
         // Arrange & Act
-        var tokenizers = new ImprovedSentencePieceTokenizer[5];
+        ImprovedSentencePieceTokenizer[] tokenizers = new ImprovedSentencePieceTokenizer[5];
         
         try
         {

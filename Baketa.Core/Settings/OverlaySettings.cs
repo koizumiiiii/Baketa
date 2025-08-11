@@ -24,7 +24,9 @@ public sealed class OverlaySettings
     
     /// <summary>
     /// オーバーレイの透明度（0.0-1.0）
+    /// AR風UIでは自動調整されるため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは透明度は自動調整されます。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Basic, "Overlay", "透明度", 
         Description = "オーバーレイの透明度（0.0=完全透明、1.0=完全不透明）", 
         MinValue = 0.1, 
@@ -33,7 +35,9 @@ public sealed class OverlaySettings
     
     /// <summary>
     /// オーバーレイのフォントサイズ
+    /// AR風UIでは自動計算されるため非推奨
     /// </summary>
+    [Obsolete("AR風UIではフォントサイズは自動計算されます。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Basic, "Overlay", "フォントサイズ", 
         Description = "オーバーレイに表示されるテキストのフォントサイズ", 
         Unit = "pt", 
@@ -43,14 +47,18 @@ public sealed class OverlaySettings
     
     /// <summary>
     /// オーバーレイの背景色（ARGB形式）
+    /// AR風UIでは自動計算されるため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは背景色は自動計算されます。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Basic, "Overlay", "背景色", 
         Description = "オーバーレイの背景色（ARGB形式）")]
     public uint BackgroundColor { get; set; } = 0xFF000000; // 黒
     
     /// <summary>
     /// オーバーレイのテキスト色（ARGB形式）
+    /// AR風UIでは自動計算されるため非推奨
     /// </summary>
+    [Obsolete("AR風UIではテキスト色は自動計算されます。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Basic, "Overlay", "テキスト色", 
         Description = "オーバーレイのテキスト色（ARGB形式）")]
     public uint TextColor { get; set; } = 0xFFFFFFFF; // 白
@@ -154,7 +162,7 @@ public sealed class OverlaySettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "表示位置モード", 
         Description = "オーバーレイの表示位置の決定方法", 
-        ValidValues = new object[] { OverlayPositionMode.Fixed, OverlayPositionMode.NearText, OverlayPositionMode.MouseCursor })]
+        ValidValues = [OverlayPositionMode.Fixed, OverlayPositionMode.NearText, OverlayPositionMode.MouseCursor])]
     public OverlayPositionMode PositionMode { get; set; } = OverlayPositionMode.NearText;
     
     /// <summary>
@@ -179,21 +187,27 @@ public sealed class OverlaySettings
     
     /// <summary>
     /// オーバーレイの境界線を表示するか
+    /// AR風UIでは境界線は使用されないため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは境界線は使用されません。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "境界線表示", 
         Description = "オーバーレイの周囲に境界線を表示します")]
     public bool ShowBorder { get; set; } = true;
     
     /// <summary>
     /// 境界線の色（ARGB形式）
+    /// AR風UIでは境界線は使用されないため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは境界線は使用されません。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "境界線色", 
         Description = "オーバーレイの境界線色（ARGB形式）")]
     public uint BorderColor { get; set; } = 0xFF808080; // グレー
     
     /// <summary>
     /// 境界線の太さ（ピクセル）
+    /// AR風UIでは境界線は使用されないため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは境界線は使用されません。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "境界線太さ", 
         Description = "オーバーレイの境界線の太さ", 
         Unit = "px", 
@@ -203,7 +217,9 @@ public sealed class OverlaySettings
     
     /// <summary>
     /// オーバーレイの角丸半径（ピクセル）
+    /// AR風UIでは角丸は使用されないため非推奨
     /// </summary>
+    [Obsolete("AR風UIでは角丸は使用されません。この設定は将来削除される予定です。")]
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "角丸半径", 
         Description = "オーバーレイの角の丸み", 
         Unit = "px", 

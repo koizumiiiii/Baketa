@@ -16,7 +16,7 @@ namespace Baketa.Core.Events.Implementation;
 /// </remarks>
 /// <param name="logger">ロガー（オプション）</param>
 // プライマリコンストラクターの使用を拒否（IDE0290）
-public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.Core.Abstractions.Events.IEventAggregator
+public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.Core.Abstractions.Events.IEventAggregator
     {
         private readonly ILogger<EventAggregator>? _logger = logger;
         // Dictionary<Type, List<object>> そのままの実装を使用（IDE0028/IDE0090を拒否）
@@ -24,12 +24,24 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
         private readonly object _syncRoot = new();
 
     /// <inheritdoc />
-    public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    public Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             
             Console.WriteLine($"🚀 イベント発行: {typeof(TEvent).Name} (ID: {eventData.Id})");
             _logger?.LogDebug("🚀 イベント発行: {EventType} (ID: {EventId})", typeof(TEvent).Name, eventData.Id);
+            
+            // TranslationWithBoundsCompletedEvent特化デバッグ
+            if (typeof(TEvent).Name == "TranslationWithBoundsCompletedEvent")
+            {
+                Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEvent発行: ID={eventData.Id}");
+            }
+            
+            // TranslationRequestEvent特化デバッグ
+            if (typeof(TEvent).Name == "TranslationRequestEvent")
+            {
+                Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEvent発行: ID={eventData.Id}");
+            }
             
             var eventType = typeof(TEvent);
             List<object>? eventProcessors = null;
@@ -46,7 +58,36 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
             {
                 Console.WriteLine($"⚠️ イベント {eventType.Name} のプロセッサが登録されていません");
                 _logger?.LogWarning("⚠️ イベント {EventType} のプロセッサが登録されていません", eventType.Name);
-                return;
+                
+                // TranslationWithBoundsCompletedEvent特化デバッグ
+                if (eventType.Name == "TranslationWithBoundsCompletedEvent")
+                {
+                    Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🎯 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
+                    {
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🎯 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
+                    }
+                }
+                
+                // TranslationRequestEvent特化デバッグ
+                if (eventType.Name == "TranslationRequestEvent")
+                {
+                    Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🔥 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
+                    {
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🔥 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
+                    }
+                }
+                
+                return Task.CompletedTask;
             }
             
             Console.WriteLine($"📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count})");
@@ -121,9 +162,26 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
 #pragma warning restore CA1031
             }
             
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-            _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
+            // 🚀 Phase 2 イベント処理最適化: 非ブロッキング並列処理でUI応答性向上
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    _logger?.LogDebug("✅ イベント {EventType} の非同期処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                        eventType.Name, eventProcessors.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "💥 イベント {EventType} の非同期処理でエラーが発生しました", eventType.Name);
+                }
+            });
+            
+            // 即座に制御を返してUIをブロックしない
+            _logger?.LogDebug("🚀 イベント {EventType} の非ブロッキング処理を開始しました (プロセッサ数: {ProcessorCount})", 
                 eventType.Name, eventProcessors.Count);
+            
+            return Task.CompletedTask;
         }
         
         /// <summary>
@@ -133,7 +191,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
         /// <param name="eventData">イベント</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>イベント発行の完了を表すTask</returns>
-        public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
+        public Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
             where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
@@ -157,7 +215,7 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
             if (eventProcessors == null || eventProcessors.Count == 0)
             {
                 _logger?.LogDebug("イベント {EventType} のプロセッサが登録されていません", eventType.Name);
-                return;
+                return Task.CompletedTask;
             }
             
             var tasks = new List<Task>();
@@ -205,13 +263,34 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
 #pragma warning restore CA1031
             }
             
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-            
-            if (!cancellationToken.IsCancellationRequested)
+            // 🚀 Phase 2 イベント処理最適化: キャンセル可能な非ブロッキング並列処理
+            _ = Task.Run(async () =>
             {
-                _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
-                    eventType.Name, eventProcessors.Count);
-            }
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        _logger?.LogDebug("✅ イベント {EventType} のキャンセル可能非同期処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                            eventType.Name, eventProcessors.Count);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogDebug("⚠️ イベント {EventType} の処理がキャンセルされました", eventType.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "💥 イベント {EventType} のキャンセル可能非同期処理でエラーが発生しました", eventType.Name);
+                }
+            }, cancellationToken);
+            
+            // 即座に制御を返してUIをブロックしない
+            _logger?.LogDebug("🚀 イベント {EventType} のキャンセル可能非ブロッキング処理を開始しました (プロセッサ数: {ProcessorCount})", 
+                eventType.Name, eventProcessors.Count);
+            
+            return Task.CompletedTask;
         }
         
         /// <inheritdoc />
@@ -237,6 +316,15 @@ public class EventAggregator(ILogger<EventAggregator>? logger = null) : Baketa.C
                     // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ プロセッサ {processor.GetType().Name} をイベント {eventType.Name} に登録しました (現在の登録数: {handlers.Count}){Environment.NewLine}");
                     _logger?.LogInformation("✅ プロセッサ {ProcessorType} をイベント {EventType} に登録しました", 
                         processor.GetType().Name, eventType.Name);
+                    
+                    // TranslationWithBoundsCompletedEvent特化デバッグ
+                    if (eventType.Name == "TranslationWithBoundsCompletedEvent")
+                    {
+                        Console.WriteLine($"🎯 [登録確認] TranslationWithBoundsCompletedEvent用プロセッサ登録:");
+                        Console.WriteLine($"🎯 [登録確認]   - プロセッサ型: {processor.GetType().FullName}");
+                        Console.WriteLine($"🎯 [登録確認]   - イベント型: {eventType.FullName}");
+                        Console.WriteLine($"🎯 [登録確認]   - プロセッサハッシュ: {processor.GetHashCode()}");
+                    }
                 }
                 else
                 {

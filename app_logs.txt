@@ -1,0 +1,536 @@
+[01:15:31.750] ?? Performance Logging System Initialized
+[01:15:31.758] ???  System: Microsoft Windows NT 10.0.26100.0
+[01:15:31.760] ?? Memory: 0MB
+[01:15:31.762] ???  Runtime: 8.0.19
+[01:15:31.764] ?? WorkDir: E:\dev\Baketa
+[01:15:31.766] ?? BaseDir: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+[01:15:31.771] ?? START [OverallProcessing_0001_011531_771] OverallProcessing: アプリケーション起動全体
+[01:15:31.772] ?? Baketa.UI.exe 起動開始
+[01:15:31.774] ?? CHECKPOINT [OverallProcessing_0001_011531_771] 統一ログシステム初期化完了 - Elapsed: 2.8ms
+?? DIコンテナの初期化開始
+?? ConfigureServices開始
+?? 環境: Production
+?? TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録しました（削除した既存登録数: 0）
+? Phase 1.1: LRU翻訳キャッシュ（1000エントリ）が組み込まれています
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録開始
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録完了 - AdaptiveCaptureServiceをメインとして使用
+?? [DEBUG] StagedOcrStrategyModule登録開始...
+?? StagedOcrStrategyModule.RegisterServices 実行中！
+? [DEBUG] StagedOcrStrategyModule登録完了！
+?? [DEBUG] AdvancedCachingModule登録開始...
+?? AdvancedCachingModule.RegisterServices 実行中！
+? IAdvancedOcrCacheService登録完了
+? Step3: 高度キャッシング戦略登録完了
+?? 期待効果: キャッシュヒット時 数ミリ秒応答
+? [DEBUG] AdvancedCachingModule登録完了！
+?? Step 1: OCRエンジンプール化システム登録開始
+? IPaddleOcrEngineFactory登録完了
+? PaddleOcrEnginePoolPolicy登録完了
+?? 既存IOcrEngineシングルトン登録を削除
+? PooledOcrService登録完了 - IOcrEngineをプール化実装に置き換え
+? DefaultObjectPoolProvider登録完了
+?? Step 1: OCRエンジンプール化システム登録完了
+?? 予想効果: 14-18秒 → 5-8秒（並列競合解消）
+=== DI Service Registration Debug ===
+ISettingsService registrations count: 1
+  - ServiceType: ISettingsService
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationEngine registrations count: 1
+  - ServiceType: ITranslationEngine
+  - ImplementationType: TransformersOpusMtEngine
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+ITranslationService registrations count: 1
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+AccessibilitySettingsViewModel registrations count: 1
+IOcrPreprocessingService registrations count: 2
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: SimpleOcrPreprocessingService
+  - Lifetime: Transient
+  - ImplementationFactory: No
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: Factory
+  - Lifetime: Transient
+  - ImplementationFactory: Yes
+  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)
+=== ViewModel Registration Debug ===
+AccessibilitySettingsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: AccessibilitySettingsViewModel
+LanguagePairsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: LanguagePairsViewModel
+??? ServiceProvider構築開始
+? ServiceProvider構築完了
+?? ReactiveUI設定開始
+? ReactiveUI設定完了
+?? OCRエンジン事前初期化開始（バックグラウンド）
+[01:15:31.893] ?? CHECKPOINT [OverallProcessing_0001_011531_771] Avalonia アプリケーション開始準備完了 - Elapsed: 121.4ms
+?? OCRエンジン事前初期化開始
+[01:15:31.894] ?? Avalonia アプリケーション開始
+?? ObjectPool<IOcrEngine>初期化完了 - プール化OCRシステム開始
+?? OCRエンジンサービス取得成功 - 初期化開始
+info: Baketa.Infrastructure.OCR.PaddleOCR.Services.PooledOcrService[0]
+      ?? PooledOcrService初期化完了 - プール化OCRサービス開始
+? OCRエンジン事前初期化完了 - 初期化時間: 5ms
+info: Baketa.UI.App[1]
+      Baketaアプリケーションを初期化中
+?? OnFrameworkInitializationCompleted開始
+?? ReactiveUIエラーハンドラー設定完了
+??? IClassicDesktopStyleApplicationLifetime取得成功
+?? Program.ServiceProvider確認開始
+?? Program.ServiceProviderアクセス試行
+?? Program.ServiceProvider取得結果: not null
+? Program.ServiceProvider確認成功
+?? IEventAggregator取得開始
+? IEventAggregator取得成功: EventAggregator
+?? EventHandlerInitializationService実行開始
+info: Baketa.UI.App[0]
+      ? IEventAggregator取得成功: EventAggregator
+?? EventHandlerInitializationService非同期実行開始
+?? MainOverlayViewModel取得開始
+?? [DI_DEBUG] EventHandlerInitializationService - EventAggregator取得
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      イベントハンドラー初期化を開始します
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      EventAggregator取得成功
+?? [DI_DEBUG] EventAggregator型: Baketa.Core.Events.Implementation.EventAggregator
+?? [DI_DEBUG] EventAggregatorハッシュ: 34678979
+?? [DI_DEBUG] EventAggregator参照: Baketa.Core.Events.Implementation.EventAggregator
+? プロセッサ OcrCompletedHandler をイベント OcrCompletedEvent に登録しました (現在の登録数: 1)
+?? [DEBUG] OcrCompletedHandlerを登録しました
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ OcrCompletedHandler をイベント OcrCompletedEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      OcrCompletedHandlerを登録しました
+?? [DEBUG] TransformersOpusMtEngineのコンストラクタが呼び出されました
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      TransformersOpusMtEngineが作成されました
+?? [DEBUG] TransformersOpusMtEngine設定完了 - Python: py, ServerScript: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+?? [DEBUG] DefaultTranslationService作成 - エンジン数: 1
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      DefaultTranslationService作成 - エンジン数: 1
+?? [DEBUG] 登録エンジン: OPUS-MT Transformers (TransformersOpusMtEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      登録エンジン: OPUS-MT Transformers (TransformersOpusMtEngine)
+?? [DEBUG] アクティブエンジン設定: OPUS-MT Transformers (TransformersOpusMtEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      アクティブエンジン設定: OPUS-MT Transformers (TransformersOpusMtEngine)
+? プロセッサ TranslationRequestHandler をイベント TranslationRequestEvent に登録しました (現在の登録数: 1)
+?? [DEBUG] TranslationRequestHandlerを登録しました
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationRequestHandler をイベント TranslationRequestEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationRequestHandlerを登録しました
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      翻訳エンジン OPUS-MT Transformers を初期化しています...
+? プロセッサ TranslationWithBoundsCompletedHandler をイベント TranslationWithBoundsCompletedEvent に登録しました (現在の登録数: 1)
+?? [登録確認] TranslationWithBoundsCompletedEvent用プロセッサ登録:
+?? [登録確認]   - プロセッサ型: Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler
+?? [登録確認]   - イベント型: Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent
+?? [登録確認]   - プロセッサハッシュ: 16868352
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationWithBoundsCompletedHandler をイベント TranslationWithBoundsCompletedEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationWithBoundsCompletedHandlerを登録しました
+?? [DEBUG] TranslationWithBoundsCompletedHandlerを登録しました
+?? [INIT_DEBUG] OPUS-MT Transformers翻訳エンジンの初期化開始
+?? [INIT_DEBUG] Python実行環境確認: py
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      OPUS-MT Transformers翻訳エンジンの初期化開始
+?? [DEBUG] イベントハンドラー初期化が完了しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      ?? イベントハンドラー初期化が完了しました
+?? EventHandlerInitializationService実行完了
+? プロセッサ InlineEventProcessor`1 をイベント TranslationStatusChangedEvent に登録しました (現在の登録数: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ InlineEventProcessor`1 をイベント TranslationStatusChangedEvent に登録しました
+? プロセッサ InlineEventProcessor`1 をイベント TranslationDisplayVisibilityChangedEvent に登録しました (現在の登録数: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ InlineEventProcessor`1 をイベント TranslationDisplayVisibilityChangedEvent に登録しました
+? [INIT_DEBUG] Python Launcher動作確認完了: Python 3.12.7
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      Python Launcher動作確認完了: Python 3.12.7
+?? [INIT_DEBUG] 常駐サーバースクリプト確認: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+? [INIT_DEBUG] 常駐サーバースクリプト確認完了: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+? [INIT_DEBUG] 軽量初期化完了（サーバー起動は翻訳時に実行）
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      常駐サーバースクリプト確認完了: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      軽量初期化完了 - 常駐サーバーは翻訳時に起動します
+?? [DEBUG] TransformersOpusMtEngine初期化完了（遅延サーバー起動）
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      翻訳エンジン OPUS-MT Transformers の初期化が完了しました
+?? [DEBUG] TransformersOpusMtEngineのバックグラウンド初期化完了
+? MainOverlayViewModel取得成功: MainOverlayViewModel
+??? MainOverlayView作成開始
+info: Baketa.UI.App[0]
+      ? MainOverlayViewModel取得成功: MainOverlayViewModel
+?? MainOverlayView初期化開始
+?? MainOverlayView - InitializeComponent完了
+?? MainOverlayView - IsVisible: False
+?? MainOverlayView - WindowState: Normal
+??? MainOverlayView作成完了 - DataContext設定済み
+??? desktop.MainWindowに設定完了
+? MainOverlayView.Show()実行完了
+?? InPlaceTranslationOverlayManager初期化設定
+? InPlaceTranslationOverlayManager遅延初期化設定完了
+??? 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理
+?? TranslationFlowModuleのイベント購読を初期化中
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModuleのイベント購読を初期化中
+?? TranslationFlowModuleインスタンス作成完了
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModuleインスタンス作成完了
+?? InPlaceTranslationOverlayManager非同期初期化開始
+?? TranslationFlowModuleの初期化を開始
+?? InPlaceTranslationOverlayManager.InitializeAsync開始 - _isInitialized: False, _disposed: False
+?? インプレースオーバーレイマネージャー初期化ロック取得、実際の初期化を開始
+?? インプレースオーバーレイマネージャー初期化完了フラグ設定
+?? InPlaceTranslationOverlayManager.InitializeAsync正常完了
+? InPlaceTranslationOverlayManager初期化完了
+info: Baketa.UI.Services.InPlaceTranslationOverlayManager[0]
+      InPlace translation overlay manager initialized successfully
+?? TranslationFlowEventProcessorを取得中
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      AdaptiveCaptureService 登録完了
+info: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      AdaptiveCaptureServiceAdapter 登録完了
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      ICaptureService として AdaptiveCaptureServiceAdapter を登録
+?? [DI_DEBUG] TranslationOrchestrationService Factory開始
+info: Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory[0]
+      合計 0 個の翻訳エンジンが利用可能です
+?? [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入
+?? [DI_DEBUG] CoordinateBasedTranslationService Factory開始
+?? [DI_DEBUG] IBatchOcrProcessor取得中...
+info: Baketa.Infrastructure.Performance.AsyncPerformanceAnalyzer[0]
+      ? AsyncPerformanceAnalyzer initialized for performance monitoring
+? [DI_DEBUG] IBatchOcrProcessor取得成功: BatchOcrProcessor
+?? [DI_DEBUG] IInPlaceTranslationOverlayManager取得中...
+? [DI_DEBUG] IInPlaceTranslationOverlayManager取得成功: InPlaceTranslationOverlayManager
+?? [DI_DEBUG] ITranslationService取得中...
+? [DI_DEBUG] ITranslationService取得成功: DefaultTranslationService
+?? [DI_DEBUG] IEventAggregator取得中...
+? [DI_DEBUG] IEventAggregator取得成功: EventAggregator
+?? [DI_DEBUG] ILogger取得中...
+? [DI_DEBUG] ILogger取得成功: Logger`1
+?? [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始
+?? [DI_DEBUG] CoordinateBasedTranslationService初期化
+?? [DI_DEBUG] EventAggregator型: Baketa.Core.Events.Implementation.EventAggregator
+?? [DI_DEBUG] EventAggregatorハッシュ: 34678979
+?? [DI_DEBUG] EventAggregator参照: Baketa.Core.Events.Implementation.EventAggregator
+? [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了
+info: Baketa.Application.Services.Translation.CoordinateBasedTranslationService[0]
+      ?? CoordinateBasedTranslationService initialized - Hash: 29844704
+? [DI_DEBUG] CoordinateBasedTranslationService取得成功: CoordinateBasedTranslationService
+info: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      ?? 座標ベース翻訳システムが利用可能です - 座標ベース翻訳表示が有効
+? TranslationFlowEventProcessor取得成功: ハッシュ=166885
+?? イベント購読を開始
+? プロセッサ TranslationFlowEventProcessor をイベント StartTranslationRequestEvent に登録しました (現在の登録数: 1)
+? StartTranslationRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント StartTranslationRequestEvent に登録しました
+? プロセッサ TranslationFlowEventProcessor をイベント StopTranslationRequestEvent に登録しました (現在の登録数: 1)
+? StopTranslationRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント StopTranslationRequestEvent に登録しました
+? プロセッサ TranslationFlowEventProcessor をイベント ToggleTranslationDisplayRequestEvent に登録しました (現在の登録数: 1)
+? ToggleTranslationDisplayRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント ToggleTranslationDisplayRequestEvent に登録しました
+? プロセッサ TranslationFlowEventProcessor をイベント SettingsChangedEvent に登録しました (現在の登録数: 1)
+? SettingsChangedEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント SettingsChangedEvent に登録しました
+?? 翻訳フローイベントプロセッサーを正常に登録しました
+? TranslationFlowModule初期化完了
+info: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? 翻訳フローイベントプロセッサーを正常に登録しました
+info: Baketa.UI.App[0]
+      ? TranslationFlowModule初期化完了
+?? イベント発行: ApplicationStartupEvent (ID: a1742f6c-44b5-4715-88f8-fc107be78e66)
+?? イベント ApplicationStartupEvent のプロセッサが登録されていません
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント ApplicationStartupEvent のプロセッサが登録されていません
+info: Baketa.UI.App[2]
+      アプリケーション起動完了
+?? MainOverlayView - OnLoaded呼び出し
+?? MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+?? MainOverlayView - Position: 16, 350, Width: 70, Height: 430
+?? MainOverlayView - Show()とActivate()を実行
+info: Baketa.Core.Services.EnhancedSettingsService[0]
+      設定を再読み込みしました: C:\Users\suke0\AppData\Roaming\Baketa\settings.json
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ウィンドウ選択処理開始
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ウィンドウが選択されました: 'Supabase | The Postgres Development Platform. - Google Chrome' (Handle=67168)
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ウィンドウ選択処理完了
+?????? ExecuteStartStopAsync メソッドが呼び出されました！??????
+?? ExecuteStartStopAsync開始 - IsTranslationActive=False, IsLoading=False
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ?? 翻訳ワークフローを開始
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      選択済みウィンドウを使用: 'Supabase | The Postgres Development Platform. - Google Chrome' (Handle=67168)
+?? LoadingOverlayManager.ShowAsync開始
+?? LoadingOverlayView初期化開始
+? LoadingOverlayView初期化完了
+? ローディングオーバーレイ表示完了
+?? LoadingOverlayManager.HideAsync開始
+? ローディングオーバーレイ非表示完了
+?? InPlaceTranslationOverlayManager.InitializeAsync開始 - _isInitialized: True, _disposed: False
+?? インプレースオーバーレイマネージャー初期化スキップ (initialized: True, disposed: False)
+?? ViewModelBase.PublishEventAsync開始: StartTranslationRequestEvent (ID: 5001764d-a8b5-4ec4-9950-35bfeb8f5671)
+?? イベント発行: StartTranslationRequestEvent (ID: 5001764d-a8b5-4ec4-9950-35bfeb8f5671)
+?? イベント StartTranslationRequestEvent の処理を開始 (プロセッサ数: 1)
+?? デバッグ: eventProcessors.Count = 1
+?? デバッグ: 登録されたプロセッサ = TranslationFlowEventProcessor
+?? デバッグ: TranslationFlowEventProcessor は IEventProcessor<StartTranslationRequestEvent> か? = True
+?? デバッグ: TranslationFlowEventProcessor が実装するインターフェース: IEventProcessor`1
+?? デバッグ: TranslationFlowEventProcessor が実装するインターフェース: IEventProcessor`1
+?? デバッグ: TranslationFlowEventProcessor が実装するインターフェース: IEventProcessor`1
+?? デバッグ: TranslationFlowEventProcessor が実装するインターフェース: IEventProcessor`1
+?? デバッグ: 明示的型チェック後の Count = 1
+?? 実際に処理するプロセッサ: TranslationFlowEventProcessor
+?? ExecuteProcessorAsync内でHandleAsync呼び出し: TranslationFlowEventProcessor
+?? TranslationFlowEventProcessor.HandleAsync開始: 5001764d-a8b5-4ec4-9950-35bfeb8f5671
+?? ターゲットウィンドウ: Supabase | The Postgres Development Platform. - Google Chrome (Handle=67168)
+?? 現在の購読状態: null
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ?? HandleAsync(StartTranslationRequestEvent) 呼び出し開始: 5001764d-a8b5-4ec4-9950-35bfeb8f5671
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ?? ターゲットウィンドウ: Supabase | The Postgres Development Platform. - Google Chrome (Handle=67168)
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ?? 重複チェック: 現在処理中のウィンドウ数=0
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ? ウィンドウを処理中リストに追加: 67168
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      Processing translation start request for window: Supabase | The Postgres Development Platform. - Google Chrome (Handle=67168)
+?? イベント発行: TranslationStatusChangedEvent (ID: 5dd8bee6-9e73-48d7-93c6-58c6a992e07a)
+?? イベント TranslationStatusChangedEvent の処理を開始 (プロセッサ数: 1)
+?? デバッグ: eventProcessors.Count = 1
+?? デバッグ: 登録されたプロセッサ = InlineEventProcessor`1
+?? デバッグ: InlineEventProcessor`1 は IEventProcessor<TranslationStatusChangedEvent> か? = True
+?? デバッグ: InlineEventProcessor`1 が実装するインターフェース: IEventProcessor`1
+?? デバッグ: 明示的型チェック後の Count = 1
+?? 実際に処理するプロセッサ: InlineEventProcessor`1
+?? ExecuteProcessorAsync内でHandleAsync呼び出し: InlineEventProcessor`1
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ?? 翻訳状態変更: Capturing -> Capturing
+? ExecuteProcessorAsync内でHandleAsync完了: InlineEventProcessor`1
+?? すべてのインプレースオーバーレイを非表示開始
+? すべてのインプレースオーバーレイ非表示完了 - 処理済み: 0
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      Starting continuous translation process for window: Supabase | The Postgres Development Platform. - Google Chrome (Handle=67168)
+?? イベント発行: TranslationStatusChangedEvent (ID: 0c53c0e4-d1f4-41f5-95a7-a95a1d00eef9)
+?? イベント TranslationStatusChangedEvent の処理を開始 (プロセッサ数: 1)
+?? デバッグ: eventProcessors.Count = 1
+?? デバッグ: 登録されたプロセッサ = InlineEventProcessor`1
+?? デバッグ: InlineEventProcessor`1 は IEventProcessor<TranslationStatusChangedEvent> か? = True
+?? デバッグ: InlineEventProcessor`1 が実装するインターフェース: IEventProcessor`1
+?? デバッグ: 明示的型チェック後の Count = 1
+?? 実際に処理するプロセッサ: InlineEventProcessor`1
+?? ExecuteProcessorAsync内でHandleAsync呼び出し: InlineEventProcessor`1
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ?? 翻訳状態変更: Capturing -> Translating
+? ExecuteProcessorAsync内でHandleAsync完了: InlineEventProcessor`1
+?? StartAutomaticTranslationAsync呼び出し - this=Baketa.Application.Services.Translation.TranslationOrchestrationService@11404313
+info: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      自動翻訳を開始します
+?? ExecuteAutomaticTranslationLoopAsync開始
+   ?? 開始時キャンセル要求: False
+?? 自動翻訳ループを開始しました（間隔: 500ms）
+warn: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      自動翻訳間隔が短すぎるため、500msに調整しました
+?? 自動翻訳ループ実行中 - キャンセル: False
+   ?? 単発翻訳実行中: False
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ? Continuous translation started successfully for window: Supabase | The Postgres Development Platform. - Google Chrome
+info: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      ? 翻訳開始処理が完了しました
+? ExecuteProcessorAsync内でHandleAsync完了: TranslationFlowEventProcessor
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      プロセッサ TranslationFlowEventProcessor のイベント処理に 118.3792ms かかりました
+? ViewModelBase.PublishEventAsync呼び出し完了: StartTranslationRequestEvent
+?????? [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x10660
+info: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      ?? 適応的キャプチャサービスアダプター: CaptureWindowAsync呼び出され - HWND=0x10660
+info: Baketa.UI.ViewModels.MainOverlayViewModel[0]
+      ?? 翻訳が正常に開始されました: 'Supabase | The Postgres Development Platform. - Google Chrome' - 総処理時間: 208ms
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      適応的キャプチャ開始: HWND=0x10660
+info: Baketa.Infrastructure.Platform.Windows.GPU.GPUEnvironmentDetector[0]
+      GPU環境検出を開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.GPUEnvironmentDetector[0]
+      GPU環境検出完了: GPU=検出されたGPU, 統合=True, 専用=False
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      GPU環境検出完了: 検出されたGPU (統合=True, 専用=False)
+info: Baketa.Infrastructure.Platform.Windows.Capture.CaptureStrategyFactory[0]
+      戦略選択: DirectFullScreen
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      選択された戦略: DirectFullScreen
+info: Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper[0]
+      ネイティブ Windows Graphics Capture インスタンス初期化 (ActiveInstances=1)
+info: Baketa.Infrastructure.Platform.Windows.WindowsGraphicsCapturer[0]
+      Windows Graphics Captureが正常に初期化されました
+info: Baketa.Infrastructure.Platform.Windows.Capture.Strategies.DirectFullScreenCaptureStrategy[0]
+      DirectFullScreenキャプチャ成功: サイズ=1866x954, 処理時間=185ms
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      戦略成功: DirectFullScreen
+info: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      適応的ウィンドウキャプチャ成功: 戦略=DirectFullScreen, 処理時間=228.064ms
+[01:15:57.369] ?? START [OverallProcessing_0002_011557_369] OverallProcessing: 翻訳実行全体 - ID:1578f53c, Mode:Automatic
+?? 座標ベース翻訳条件評価結果: True
+   ?? coordinateAvailable: True
+   ?? hasWindowHandle: True
+   ??? isAdvancedImage: True
+info: Baketa.Application.Services.Translation.CoordinateBasedTranslationService[0]
+      ?? 座標ベース翻訳処理開始 - 画像: 1866x954, ウィンドウ: 0x10660
+?? [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: 1866x954
+[01:15:57.400] ?? START [BatchOcrProcessing_0003_011557_400] BatchOcrProcessing: バッチOCR処理 - 画像:1866x954
+?? [BATCH-DEBUG] _performanceAnalyzer != null: True
+?? [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+?? [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 01:15:57.402
+?? [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 1866x954
+?? [STAGE-1] 並列OCR開始 - 画像サイズ: 1866x954
+info: Baketa.Infrastructure.OCR.BatchProcessing.BatchOcrProcessor[0]
+      ? 高性能バッチOCR処理開始 - 画像: 1866x954, ウィンドウ: 10660
+?? [STAGE-2] タイル分割開始 - 目標サイズ: 1024x1024
+[01:15:57.411] ?? START [ImageTileGeneration_0004_011557_411] ImageTileGeneration: タイル分割処理 - 画像:1866x954, 目標サイズ:1024
+?? [TILE-SPLIT] 実際の画像分割開始 - 元画像: 1866x954, タイル: 2x1 = 2個
+?? [TILE-0] 画像切り出し開始 - 位置: (0,0), サイズ: 1024x954
+?? [EXTRACT] 画像領域抽出開始 - 座標: (0,0), サイズ: 1024x954
+?? [EXTRACT] 画像領域抽出完了 - 実行時間: 5ms
+?? [TILE-0] 画像切り出し完了 - 実行時間: 6ms
+?? [TILE-1] 画像切り出し開始 - 位置: (1024,0), サイズ: 842x954
+?? [EXTRACT] 画像領域抽出開始 - 座標: (1024,0), サイズ: 842x954
+?? [EXTRACT] 画像領域抽出完了 - 実行時間: 5ms
+?? [TILE-1] 画像切り出し完了 - 実行時間: 5ms
+?? [TILE-SPLIT] 画像分割完了 - 2個のタイルを作成
+[01:15:57.425] ? COMPLETE [ImageTileGeneration_0004_011557_411] Duration: 13.9ms, Memory: +8KB
+?? [STAGE-2] タイル分割完了 - 13.9ms, 2個のタイル
+?? [STAGE-3] 並列OCR実行開始 - タイル数: 2, 並列度: 16
+?? [TILE-0] OCR開始 - 実際のタイルサイズ: 1024x954
+[01:15:57.428] ?? START [OcrEngineExecution_0005_011557_428] OcrEngineExecution: PaddleOCR実行 - Tile0, サイズ:1024x954
+info: Baketa.Infrastructure.Memory.Pools.AdvancedImagePool[0]
+      ???♂? AdvancedImagePool initialized with capacity: 50
+info: Baketa.Infrastructure.OCR.PostProcessing.HybridOcrPostProcessorFactory[0]
+      ハイブリッドOCR後処理プロセッサを作成中
+info: Baketa.Infrastructure.OCR.PostProcessing.HybridOcrPostProcessorFactory[0]
+      ハイブリッドOCR後処理プロセッサ作成完了
+info: Baketa.Infrastructure.Performance.GpuMemoryManager[0]
+      ?? GpuMemoryManager initialized
+[01:15:57.443] ?? PaddleOcrEngine静的コンストラクタ実行
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOCR initialization bottleneck analysis started.
+?? NonSingletonPaddleOcrEngine: プール用インスタンス作成 - Hash: 14011335
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 1: Instance tracking finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 2: Settings validation finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PaddleOCRエンジンの初期化開始 - 言語: jpn, GPU: False, マルチスレッド: False
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 3: Settings preparation finished in 2ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 4: Native library check finished in 20ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PP-OCRv5多言語モデルを使用 - 言語: jpn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PP-OCRv5モデルを使用します - 言語: jpn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 5: Model preparation finished in 168ms.
+[2025-08-09 01:15:57.761] ?? [MainOverlayViewModel] ExecuteSettings開始 - 現在のダイアログ: 
+[2025-08-09 01:15:57.762] ?? [MainOverlayViewModel] 新しい設定ダイアログを作成開始
+[2025-08-09 01:15:57.762] ?? [MainOverlayViewModel] SimpleSettingsViewModel作成開始
+?? [DI_DEBUG] SimpleSettingsViewModel作成 - TranslationOrchestrationService取得開始
+?? [DI_DEBUG] ServiceDescriptor結果: TranslationOrchestrationService
+?? [DI_DEBUG] SimpleSettingsViewModel作成 - TranslationOrchestrationService: TranslationOrchestrationService
+?? [DI_DEBUG] TranslationOrchestrationService取得成功 - Hash: 11404313
+?? [DI_DEBUG] SimpleSettingsViewModel作成 - ISettingsService: EnhancedSettingsService
+[2025-08-09 01:15:57.763] ?? [SimpleSettingsViewModel#18191719] コンストラクタ開始
+?? [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: TranslationOrchestrationService
+?? [SIMPLE_SETTINGS_INIT] ISettingsService: EnhancedSettingsService
+?? [SIMPLE_SETTINGS_MONITORING] TranslationOrchestrationService: TranslationOrchestrationService
+?? [SIMPLE_SETTINGS_MONITORING] 翻訳状態監視を開始
+?? [SIMPLE_SETTINGS_STATE] 翻訳状態変更: IsActive=True, CanEditSettings=False
+[2025-08-09 01:15:57.783] ?? [SimpleSettingsViewModel#18191719] コンストラクタ完了 - 初期設定: Local:True Japanese→English Font:14
+[2025-08-09 01:15:57.783] ?? [MainOverlayViewModel] SimpleSettingsViewModel作成: 18191719
+[2025-08-09 01:15:57.783] ?? [MainOverlayViewModel] LoadSettingsAsync呼び出し前
+[2025-08-09 01:15:57.787] ?? [SimpleSettingsViewModel#18191719] LoadSettingsAsync開始
+[2025-08-09 01:15:57.789] ?? [SimpleSettingsViewModel#18191719] LoadSettingsFromFileAsync開始 - ファイルパス: C:\Users\suke0\.baketa\settings\translation-settings.json
+[2025-08-09 01:15:57.790] ?? [SimpleSettingsViewModel#18191719] ファイル読み込み完了: {
+  "useLocalEngine": true,
+  "sourceLanguage": "English",
+  "targetLanguage": "Japanese",
+  "fontSize": 14
+}
+[2025-08-09 01:15:57.791] ?? [SimpleSettingsViewModel#18191719] デシリアライズ完了: UseLocalEngine=True, SourceLanguage=English, TargetLanguage=Japanese, FontSize=14
+[2025-08-09 01:15:57.792] ?? [SimpleSettingsViewModel#18191719] 読み込み設定: UseLocalEngine=True, SourceLanguage=English, TargetLanguage=Japanese, FontSize=14
+[2025-08-09 01:15:57.792] ?? [SimpleSettingsViewModel#18191719] 設定適用開始
+[2025-08-09 01:15:57.792] ?? [SimpleSettingsViewModel#18191719] UseLocalEngine設定完了: True
+[2025-08-09 01:15:57.793] ?? [SimpleSettingsViewModel#18191719] SourceLanguage設定完了: English
+[2025-08-09 01:15:57.793] ?? [SimpleSettingsViewModel#18191719] TargetLanguage設定完了: Japanese
+[2025-08-09 01:15:57.793] ?? [SimpleSettingsViewModel#18191719] FontSize設定完了: 14
+[2025-08-09 01:15:57.794] ?? [SimpleSettingsViewModel#18191719] 設定適用完了: Local:True English→Japanese Font:14
+[2025-08-09 01:15:57.794] ?? [MainOverlayViewModel] LoadSettingsAsync呼び出し完了
+?? [SimpleSettingsView#28655997] コンストラクター開始
+?? [SimpleSettingsView#28655997] コンストラクター完了
+?? [SimpleSettingsView#28655997] OnDataContextChanged - DataContext: SimpleSettingsViewModel
+?? [SimpleSettingsView#28655997] 新しいViewModelを設定: 18191719
+?? [SimpleSettingsView#28655997] DataContext設定後の設定確認
+?? [SimpleSettingsView#28655997] ViewModel設定: UseLocalEngine=True, SourceLanguage=English, TargetLanguage=Japanese, FontSize=14
+[2025-08-09 01:15:57.827] ?? [MainOverlayViewModel] SimpleSettingsView作成: 28655997
+[2025-08-09 01:15:57.828] ?? [MainOverlayViewModel] Show()呼び出し - ダイアログ: 28655997
+?? [SimpleSettingsView#28655997] Openedイベント - IsVisible:True
+[2025-08-09 01:15:58.031] ?? [MainOverlayViewModel] Show()完了 - ダイアログ: 28655997
+?? [SimpleSettingsView#28655997] OnLoaded呼び出し
+?? [SimpleSettingsView#28655997] OnLoaded - ViewModel設定: UseLocalEngine=True, SourceLanguage=English, TargetLanguage=Japanese, FontSize=14
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      シングルスレッドOCRエンジン作成成功
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 6: Engine initialization finished in 920ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PaddleOCRエンジンの初期化完了
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 7: Finalization finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOCR initialization bottleneck analysis completed. Total time: 1113ms.
+?? [TILE-1] OCR開始 - 実際のタイルサイズ: 842x954
+[01:15:58.577] ?? START [OcrEngineExecution_0006_011558_577] OcrEngineExecution: PaddleOCR実行 - Tile1, サイズ:842x954
+?? NonSingletonPaddleOcrEngine: プール用インスタンス作成 - Hash: 33771145
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOCR initialization bottleneck analysis started.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 1: Instance tracking finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 2: Settings validation finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PaddleOCRエンジンの初期化開始 - 言語: jpn, GPU: False, マルチスレッド: False
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 3: Settings preparation finished in 2ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 4: Native library check finished in 0ms.
+info: Baketa.Infrastructure.Imaging.Services.GameOptimizedPreprocessingService[0]
+      ゲーム最適化前処理開始: プロファイル=暗い背景, サイズ=1024x954
+info: Baketa.Infrastructure.Imaging.Services.GameOptimizedPreprocessingService[0]
+      ?? ゲーム最適化処理完了: ColorMasking=True, AdaptiveThreshold=True, PoolObjectsUsed=0, MemoryEfficiency=0.0 %
+info: Baketa.Infrastructure.Imaging.Services.GameOptimizedPreprocessingService[0]
+      ゲーム最適化前処理完了: プロファイル=暗い背景
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PP-OCRv5多言語モデルを使用 - 言語: jpn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PP-OCRv5モデルを使用します - 言語: jpn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 5: Model preparation finished in 179ms.

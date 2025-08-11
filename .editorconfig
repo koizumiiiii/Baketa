@@ -117,6 +117,13 @@ dotnet_diagnostic.IDE0031.severity = suggestion
 # IDE0270: Null check simplification (newer pattern)
 dotnet_diagnostic.IDE0270.severity = suggestion
 
+# Collection initialization simplification - can impact readability in complex scenarios
+dotnet_diagnostic.IDE0305.severity = suggestion
+dotnet_diagnostic.IDE0028.severity = suggestion
+
+# Pattern matching suggestions - maintain balance between modern patterns and readability
+dotnet_diagnostic.IDE0019.severity = suggestion
+
 # === Resource Management ===
 
 # Disposal patterns
@@ -139,6 +146,15 @@ dotnet_diagnostic.CA1848.severity = none
 
 # IFormatProvider specification (encouraged but not critical)
 dotnet_diagnostic.CA1305.severity = suggestion
+
+# ConfigureAwait warnings - UI context aware code should not use ConfigureAwait(false)
+# This is intentional for UI applications where UI context must be preserved
+dotnet_diagnostic.CA2007.severity = none
+
+# Performance optimizations - span-based optimizations can impact readability
+# These are performance micro-optimizations that may not be critical for UI app
+dotnet_diagnostic.CA1845.severity = suggestion
+dotnet_diagnostic.CA1865.severity = suggestion
 
 # Wrapper suffix warnings (acceptable for adapter pattern)
 dotnet_diagnostic.CA1711.severity = none
@@ -199,6 +215,10 @@ dotnet_diagnostic.IDE0306.severity = none
 # Platform-specific wrappers
 [*OpenCvWrapper.cs]
 dotnet_diagnostic.CA1711.severity = none
+
+# PaddleOCR Engine - External API naming conventions
+[**/PaddleOCR/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none  # PaddleOCR model names use underscores
 
 [*ImageFilter*.cs]
 dotnet_diagnostic.CA1721.severity = none

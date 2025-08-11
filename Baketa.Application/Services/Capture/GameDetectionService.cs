@@ -289,7 +289,7 @@ public partial class GameDetectionService(
 /// <param name="processName">検出されたゲームのプロセス名</param>
 /// <param name="windowTitle">検出されたゲームのウィンドウタイトル</param>
 /// <param name="appliedProfile">適用されたプロファイル</param>
-public class GameDetectedEvent(string processName, string? windowTitle, SettingsGameCaptureProfile appliedProfile) : EventBase
+public sealed class GameDetectedEvent(string processName, string? windowTitle, SettingsGameCaptureProfile appliedProfile) : EventBase
 {
     /// <summary>
     /// 検出されたゲームのプロセス名
@@ -319,7 +319,7 @@ public class GameDetectedEvent(string processName, string? windowTitle, Settings
 /// ゲーム終了イベント
 /// </summary>
 /// <param name="processName">終了したゲームのプロセス名</param>
-public class GameExitedEvent(string processName) : EventBase
+public sealed class GameExitedEvent(string processName) : EventBase
 {
     /// <summary>
     /// 終了したゲームのプロセス名

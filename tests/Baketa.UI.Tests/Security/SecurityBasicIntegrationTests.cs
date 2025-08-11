@@ -200,7 +200,7 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
     {
         // Arrange
         const int requestCount = 10;
-        var tasks = new Task<string?>[requestCount];
+        Task<string?>[] tasks = new Task<string?>[requestCount];
 
         // Act
         for (int i = 0; i < requestCount; i++)
@@ -220,7 +220,7 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
     {
         // Arrange
         const int activityCount = 50;
-        var tasks = new Task[activityCount];
+        Task[] tasks = new Task[activityCount];
 
         // Act
         for (int i = 0; i < activityCount; i++)

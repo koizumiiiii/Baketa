@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     
@@ -13,7 +14,8 @@
     <!-- IDE0060警告抑制: テストスタブメソッドでの未使用パラメータ -->
     <!-- IDE0044警告抑制: テストでの動的フィールド変更 -->
     <!-- Windows専用アプリのためプラットフォーム依存警告を抑制 -->
-    <NoWarn>$(NoWarn);CA2007;CA1416;CA1822;IDE0060;IDE0044</NoWarn>
+    <!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+    <NoWarn>$(NoWarn);CA2007;CA1416;CA1822;IDE0060;IDE0044;NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

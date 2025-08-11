@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
 using Baketa.Core.Services;
+using Baketa.Core.Abstractions.Logging;
 
 namespace Baketa.Core.DI;
 

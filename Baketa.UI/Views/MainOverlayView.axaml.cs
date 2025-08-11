@@ -80,43 +80,6 @@ public partial class MainOverlayView : Window
         }
     }
     
-    // ボタンクリックイベントハンドラー（デバッグ用）
-    private void OnStartStopButtonClick(object? sender, RoutedEventArgs e)
-    {
-        Console.WriteLine("🎯 StartStopButtonがクリックされました（Clickイベント）");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 StartStopButtonがクリックされました（Clickイベント）");
-        
-        // DataContextとCommandの確認
-        Console.WriteLine($"🎯 DataContext: {DataContext?.GetType().Name ?? "null"}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 DataContext: {DataContext?.GetType().Name ?? "null"}");
-        
-        if (DataContext is MainOverlayViewModel viewModel)
-        {
-            Console.WriteLine($"🎯 StartStopCommand: {viewModel.StartStopCommand?.GetType().Name ?? "null"}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 StartStopCommand: {viewModel.StartStopCommand?.GetType().Name ?? "null"}");
-            
-            // 手動でコマンドを実行
-            try
-            {
-                if (viewModel.StartStopCommand?.CanExecute(null) == true)
-                {
-                    Console.WriteLine("🎯 手動でStartStopCommandを実行します");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 手動でStartStopCommandを実行します");
-                    viewModel.StartStopCommand.Execute(null);
-                }
-                else
-                {
-                    Console.WriteLine("🎯 StartStopCommandが実行できない状態です");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 StartStopCommandが実行できない状態です");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"🎯 StartStopCommand実行エラー: {ex.Message}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 StartStopCommand実行エラー: {ex.Message}");
-            }
-        }
-    }
     
     private void OnExitButtonClick(object? sender, RoutedEventArgs e)
     {

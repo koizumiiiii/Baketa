@@ -14,7 +14,7 @@ namespace Baketa.Application.EventHandlers.Capture;
 /// コンストラクタ
 /// </remarks>
 /// <param name="logger">ロガー</param>
-public class TextDisappearanceEventHandler(ILogger<TextDisappearanceEventHandler>? logger = null) : IEventProcessor<IEvent>
+public sealed class TextDisappearanceEventHandler(ILogger<TextDisappearanceEventHandler>? logger = null) : IEventProcessor<IEvent>
     {
         private readonly ILogger<TextDisappearanceEventHandler>? _logger = logger;
 

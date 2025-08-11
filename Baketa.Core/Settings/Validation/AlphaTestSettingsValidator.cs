@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Settings.Validation.Rules;
 
 namespace Baketa.Core.Settings.Validation;
 
@@ -125,7 +126,7 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     /// <inheritdoc />
     public IReadOnlyList<IValidationRule> GetRules()
     {
-        return _globalRules.Values.SelectMany(rules => rules).ToList();
+        return [.. _globalRules.Values.SelectMany(rules => rules)];
     }
 
     /// <inheritdoc />
@@ -135,7 +136,7 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
         
         if (_categoryRules.TryGetValue(category, out var categoryRules))
         {
-            return categoryRules.Values.SelectMany(rules => rules).ToList();
+            return [.. categoryRules.Values.SelectMany(rules => rules)];
         }
         
         return [];

@@ -89,7 +89,8 @@ public class OcrResults(
     IImage sourceImage,
     TimeSpan processingTime,
     string languageCode,
-    Rectangle? regionOfInterest = null)
+    Rectangle? regionOfInterest = null,
+    string? mergedText = null)
 {
     /// <summary>
     /// 認識されたテキスト領域のリスト
@@ -117,14 +118,159 @@ public class OcrResults(
     public string LanguageCode { get; } = languageCode ?? throw new ArgumentNullException(nameof(languageCode));
 
     /// <summary>
-    /// 画像内のすべてのテキストを結合（改行区切り）
+    /// 画像内のすべてのテキストを結合
+    /// 高度なテキスト結合アルゴリズムが適用されている場合はその結果、そうでなければ改行区切り結合
     /// </summary>
-    public string Text => string.Join(Environment.NewLine, TextRegions.Select(r => r.Text));
+    public string Text => mergedText ?? string.Join(Environment.NewLine, TextRegions.Select(r => r.Text));
     
     /// <summary>
     /// 有効なテキストが検出されているかどうか
     /// </summary>
     public bool HasText => TextRegions.Count > 0 && TextRegions.Any(r => !string.IsNullOrWhiteSpace(r.Text));
+
+    /// <summary>
+    /// レイアウト情報を活用してテキストをグループ化して結合
+    /// 文章のまとまりを保持した結合テキストを返す
+    /// </summary>
+    /// <param name="preserveParagraphs">段落区切りを保持するか</param>
+    /// <param name="sameLineThreshold">同じ行と判定する閾値</param>
+    /// <param name="paragraphSeparationThreshold">段落区切りと判定する閾値</param>
+    /// <returns>グループ化されたテキスト</returns>
+    public string GetGroupedText(bool preserveParagraphs = true, double sameLineThreshold = 0.5, double paragraphSeparationThreshold = 1.5)
+    {
+        if (!HasText)
+            return string.Empty;
+
+        // 簡易版のグループ化ロジック（Infrastructure層の依存関係を避けるため）
+        var sortedRegions = TextRegions
+            .OrderBy(r => r.Bounds.Y)
+            .ThenBy(r => r.Bounds.X)
+            .ToList();
+
+        var lines = new List<List<OcrTextRegion>>();
+        var currentLine = new List<OcrTextRegion>();
+
+        foreach (var region in sortedRegions)
+        {
+            if (currentLine.Count == 0)
+            {
+                currentLine.Add(region);
+                continue;
+            }
+
+            var lastRegion = currentLine.Last();
+            var verticalDistance = Math.Abs(region.Bounds.Y - lastRegion.Bounds.Y);
+            var averageHeight = (region.Bounds.Height + lastRegion.Bounds.Height) / 2.0;
+
+            if (verticalDistance <= averageHeight * sameLineThreshold)
+            {
+                currentLine.Add(region);
+            }
+            else
+            {
+                if (currentLine.Count > 0)
+                {
+                    lines.Add(currentLine);
+                }
+                currentLine = [region];
+            }
+        }
+
+        if (currentLine.Count > 0)
+        {
+            lines.Add(currentLine);
+        }
+
+        if (!preserveParagraphs)
+        {
+            // 行単位で結合
+            return string.Join(Environment.NewLine, lines.Select(line => GetLineText(line)));
+        }
+
+        // 段落単位でグループ化
+        var paragraphs = new List<List<List<OcrTextRegion>>>();
+        var currentParagraph = new List<List<OcrTextRegion>>();
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            
+            if (currentParagraph.Count == 0)
+            {
+                currentParagraph.Add(line);
+                continue;
+            }
+
+            if (i > 0)
+            {
+                var previousLine = lines[i - 1];
+                var currentLineTop = line.Min(r => r.Bounds.Y);
+                var previousLineBottom = previousLine.Max(r => r.Bounds.Bottom);
+                var verticalGap = currentLineTop - previousLineBottom;
+                var averageLineHeight = (GetLineHeight(line) + GetLineHeight(previousLine)) / 2.0;
+
+                if (verticalGap >= averageLineHeight * paragraphSeparationThreshold)
+                {
+                    if (currentParagraph.Count > 0)
+                    {
+                        paragraphs.Add(currentParagraph);
+                    }
+                    currentParagraph = [line];
+                    continue;
+                }
+            }
+
+            currentParagraph.Add(line);
+        }
+
+        if (currentParagraph.Count > 0)
+        {
+            paragraphs.Add(currentParagraph);
+        }
+
+        // 段落を2つの改行で区切る
+        return string.Join(Environment.NewLine + Environment.NewLine, 
+            paragraphs.Select(p => string.Join(Environment.NewLine, p.Select(GetLineText))));
+    }
+
+    private static string GetLineText(List<OcrTextRegion> line)
+    {
+        if (line.Count == 0)
+            return string.Empty;
+
+        if (line.Count == 1)
+            return line[0].Text;
+
+        // 横方向に並んだテキストを適切な間隔で結合
+        var sortedLine = line.OrderBy(r => r.Bounds.X).ToList();
+        var result = new List<string>();
+        var averageCharWidth = sortedLine.Average(r => r.Bounds.Width / Math.Max(1, r.Text.Length));
+
+        for (int i = 0; i < sortedLine.Count; i++)
+        {
+            result.Add(sortedLine[i].Text);
+
+            if (i < sortedLine.Count - 1)
+            {
+                var currentRegion = sortedLine[i];
+                var nextRegion = sortedLine[i + 1];
+                var horizontalGap = nextRegion.Bounds.Left - currentRegion.Bounds.Right;
+
+                // 文字幅の0.3倍以上の間隔がある場合はスペースを挿入
+                if (horizontalGap >= averageCharWidth * 0.3)
+                {
+                    result.Add(" ");
+                }
+            }
+        }
+
+        return string.Join("", result);
+    }
+
+    private static double GetLineHeight(List<OcrTextRegion> line)
+    {
+        return line.Count > 0 ? line.Average(r => r.Bounds.Height) : 0;
+    }
 }
 
 /// <summary>
@@ -139,13 +285,15 @@ public class OcrEngineSettings
     
     /// <summary>
     /// テキスト検出の信頼度閾値（0.0～1.0）
+    /// より低い値で広範囲のテキスト領域を検出
     /// </summary>
-    public double DetectionThreshold { get; set; } = 0.3;
+    public double DetectionThreshold { get; set; } = 0.09;
     
     /// <summary>
     /// テキスト認識の信頼度閾値（0.0～1.0）
+    /// より低い値で文字結合を促進し、完全なフレーズ認識を向上
     /// </summary>
-    public double RecognitionThreshold { get; set; } = 0.5;
+    public double RecognitionThreshold { get; set; } = 0.16;
     
     /// <summary>
     /// 使用するモデル名
@@ -155,7 +303,7 @@ public class OcrEngineSettings
     /// <summary>
     /// 最大テキスト検出数
     /// </summary>
-    public int MaxDetections { get; set; } = 100;
+    public int MaxDetections { get; set; } = 200;
     
     /// <summary>
     /// 方向分類を使用するか（将来拡張用）
@@ -173,6 +321,16 @@ public class OcrEngineSettings
     public int GpuDeviceId { get; set; }
     
     /// <summary>
+    /// GPU最大メモリ使用量（MB）- ゲーム競合回避用
+    /// </summary>
+    public int MaxGpuMemoryMB { get; set; } = 2048; // デフォルト2GB
+    
+    /// <summary>
+    /// GPUメモリ使用量監視を有効にするか
+    /// </summary>
+    public bool EnableGpuMemoryMonitoring { get; set; } = true;
+    
+    /// <summary>
     /// マルチスレッド処理を有効にするか
     /// </summary>
     public bool EnableMultiThread { get; set; }
@@ -181,6 +339,16 @@ public class OcrEngineSettings
     /// マルチスレッド時のワーカー数
     /// </summary>
     public int WorkerCount { get; set; } = 2;
+    
+    /// <summary>
+    /// 言語モデルを使用するか（PaddleOCR use_lm=True）
+    /// </summary>
+    public bool UseLanguageModel { get; set; }
+    
+    /// <summary>
+    /// 前処理を有効にするか
+    /// </summary>
+    public bool EnablePreprocessing { get; set; } = true;
 
     /// <summary>
     /// 設定の妥当性を検証する
@@ -206,6 +374,9 @@ public class OcrEngineSettings
         if (GpuDeviceId < 0)
             return false;
             
+        if (MaxGpuMemoryMB < 128 || MaxGpuMemoryMB > 16384) // 128MB～16GB
+            return false;
+            
         if (WorkerCount < 1 || WorkerCount > 10)
             return false;
             
@@ -228,8 +399,12 @@ public class OcrEngineSettings
             UseDirectionClassification = UseDirectionClassification,
             UseGpu = UseGpu,
             GpuDeviceId = GpuDeviceId,
+            MaxGpuMemoryMB = MaxGpuMemoryMB,
+            EnableGpuMemoryMonitoring = EnableGpuMemoryMonitoring,
             EnableMultiThread = EnableMultiThread,
-            WorkerCount = WorkerCount
+            WorkerCount = WorkerCount,
+            UseLanguageModel = UseLanguageModel,
+            EnablePreprocessing = EnablePreprocessing
         };
     }
 }
@@ -278,6 +453,13 @@ public interface IOcrEngine : IDisposable
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>初期化が成功した場合はtrue</returns>
     Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// エンジンのウォームアップを実行（初回実行時の遅延を解消）
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ウォームアップが成功した場合はtrue</returns>
+    Task<bool> WarmupAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// 画像からテキストを認識します
@@ -343,6 +525,12 @@ public interface IOcrEngine : IDisposable
     /// </summary>
     /// <returns>パフォーマンス統計</returns>
     OcrPerformanceStats GetPerformanceStats();
+    
+    /// <summary>
+    /// 進行中のOCRタイムアウト処理をキャンセル
+    /// 翻訳結果が表示された際に呼び出されます
+    /// </summary>
+    void CancelCurrentOcrTimeout();
 }
 
 /// <summary>

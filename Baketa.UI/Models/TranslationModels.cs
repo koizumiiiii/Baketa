@@ -235,17 +235,7 @@ namespace Baketa.UI.Models;
         [
             new() { Code = "auto", DisplayName = "自動検出", NativeName = "Auto Detect", Flag = "🌍", IsAutoDetect = true },
             new() { Code = "ja", DisplayName = "日本語", NativeName = "日本語", Flag = "🇯🇵", RegionCode = "JP" },
-            new() { Code = "en", DisplayName = "英語", NativeName = "English", Flag = "🇺🇸", RegionCode = "US" },
-            new() { Code = "zh", DisplayName = "中国語（自動）", NativeName = "中文（自动）", Flag = "🇨🇳", Variant = "Auto" },
-            new() { Code = "zh-Hans", DisplayName = "中国語（簡体字）", NativeName = "中文（简体）", Flag = "🇨🇳", Variant = "Simplified", RegionCode = "CN" },
-            new() { Code = "zh-Hant", DisplayName = "中国語（繁体字）", NativeName = "中文（繁體）", Flag = "🇹🇼", Variant = "Traditional", RegionCode = "TW" },
-            new() { Code = "yue", DisplayName = "広東語", NativeName = "粵語", Flag = "🇭🇰", Variant = "Cantonese", RegionCode = "HK" },
-            new() { Code = "ko", DisplayName = "韓国語", NativeName = "한국어", Flag = "🇰🇷", RegionCode = "KR" },
-            new() { Code = "es", DisplayName = "スペイン語", NativeName = "Español", Flag = "🇪🇸", RegionCode = "ES" },
-            new() { Code = "fr", DisplayName = "フランス語", NativeName = "Français", Flag = "🇫🇷", RegionCode = "FR" },
-            new() { Code = "de", DisplayName = "ドイツ語", NativeName = "Deutsch", Flag = "🇩🇪", RegionCode = "DE" },
-            new() { Code = "ru", DisplayName = "ロシア語", NativeName = "Русский", Flag = "🇷🇺", RegionCode = "RU" },
-            new() { Code = "ar", DisplayName = "アラビア語", NativeName = "العربية", Flag = "🇸🇦", RegionCode = "SA", IsRightToLeft = true }
+            new() { Code = "en", DisplayName = "英語", NativeName = "English", Flag = "🇺🇸", RegionCode = "US" }
         ];
         
         /// <summary>
@@ -254,13 +244,7 @@ namespace Baketa.UI.Models;
         public static readonly IReadOnlyList<string> SupportedLanguagePairs =
         [
             "ja-en",   // 日本語 → 英語
-            "en-ja",   // 英語 → 日本語
-            "zh-en",   // 中国語 → 英語
-            "en-zh",   // 英語 → 中国語
-            "zh-ja",   // 中国語 → 日本語
-            "ja-zh",   // 日本語 → 中国語（2段階）
-            "zh-Hans-ja", // 簡体字中国語 → 日本語
-            "ja-zh-Hans"  // 日本語 → 簡体字中国語
+            "en-ja"    // 英語 → 日本語
         ];
     }
 

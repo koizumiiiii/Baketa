@@ -7,13 +7,19 @@ using Baketa.Core.Abstractions.Dependency;
 using Baketa.Infrastructure.Imaging.Filters;
 using Baketa.Infrastructure.Imaging.Pipeline;
 using Baketa.Infrastructure.OCR.TextDetection;
+using Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Infrastructure.Services.OCR;
 using Microsoft.Extensions.DependencyInjection;
+using Baketa.Core.DI;
+using Baketa.Core.DI.Attributes;
 
 namespace Baketa.Infrastructure.DI;
 
     /// <summary>
     /// OCR処理関連のサービス登録モジュール
     /// </summary>
+    [ModulePriority(ModulePriority.Infrastructure)]
     public class OcrProcessingModule : IServiceModule
     {
         /// <summary>
@@ -29,6 +35,7 @@ namespace Baketa.Infrastructure.DI;
             // テキスト検出関連 - 検出器ごとに登録するが、実行時に選択可能
             services.AddTransient<MserTextRegionDetector>();
             services.AddTransient<SwtTextRegionDetector>();
+            services.AddSingleton<AdaptiveTextRegionDetector>(); // 履歴保持のためSingleton
             
             // ファクトリーを通じて適切な検出器を選択できるようにする
             services.AddTransient<Func<string, ITextRegionDetector>>(sp => detectorType =>
@@ -37,15 +44,30 @@ namespace Baketa.Infrastructure.DI;
                 {
                     "mser" => sp.GetRequiredService<MserTextRegionDetector>(),
                     "swt" => sp.GetRequiredService<SwtTextRegionDetector>(),
+                    "adaptive" => sp.GetRequiredService<AdaptiveTextRegionDetector>(),
                     _ => throw new ArgumentException($"不明な検出器タイプ: {detectorType}")
                 };
             });
+            
+            // デフォルトの検出器として適応的検出器を登録
+            services.AddSingleton<ITextRegionDetector>(sp => sp.GetRequiredService<AdaptiveTextRegionDetector>());
             
             // テキスト領域集約器
             services.AddTransient<ITextRegionAggregator, TextRegionAggregator>();
             
             // フィルター登録
             services.AddTransient<TextRegionDetectionFilter>();
+            
+            // OCR前処理サービス - SimpleOcrPreprocessingServiceを一時的に復元
+            // 注意: Phase 3のGameOptimizedPreprocessingServiceはOpenCvProcessingModuleで上書き登録される
+            services.AddTransient<SimpleOcrPreprocessingService>();
+            
+            // IOcrPreprocessingServiceとして登録（後でOpenCvProcessingModuleで上書きされる）
+            services.AddTransient<IOcrPreprocessingService, SimpleOcrPreprocessingService>();
+            
+            // OCR精度向上機能を追加（Phase 1実装）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.ConfidenceBasedReprocessor>();
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.UniversalMisrecognitionCorrector>();
             
             // パイプラインのイベントリスナー
             services.AddTransient<IPipelineEventListener, DefaultPipelineEventListener>();

@@ -226,6 +226,42 @@
       "description": "Comprehensive test suite with 1,300+ test cases",
       "coverage": "Core 85%+, Infrastructure 80%+, UI 70%+",
       "types": ["Unit tests", "Integration tests", "Performance tests", "UI tests"]
+    },
+    "serena_mcp_integration": {
+      "description": "Serena MCP integration with PARTIAL FUNCTIONALITY due to Windows path handling issues",
+      "status": "PARTIALLY FUNCTIONAL - Some tools disabled due to '\\\\.\\\nul' device path error",
+      "error_details": {
+        "root_cause": "Python os.path.relpath() fails on Windows junction point '\\\\.\\\nul'",
+        "error_message": "ValueError: path is on mount '\\\\\\\\.\\\\nul', start on mount 'E:'",
+        "affected_scope": "All file scanning operations in serena/util/file_system.py"
+      },
+      "working_functions": [
+        "/mcp__serena__write_memory - Memory file creation (✅ FUNCTIONAL)",
+        "/mcp__serena__read_memory - Memory file reading (✅ FUNCTIONAL)",
+        "/mcp__serena__list_memories - Memory listing (✅ FUNCTIONAL)",
+        "/mcp__serena__delete_memory - Memory deletion (✅ FUNCTIONAL)"
+      ],
+      "broken_functions": [
+        "/mcp__serena__get_symbols_overview - Project structure analysis (❌ BROKEN)",
+        "/mcp__serena__search_for_pattern - Semantic code search (❌ BROKEN)",
+        "/mcp__serena__find_referencing_symbols - Dependency analysis (❌ BROKEN)",
+        "/mcp__serena__find_symbol - Detailed symbol investigation (❌ BROKEN)",
+        "/mcp__serena__list_dir - Directory listing (❌ BROKEN)",
+        "/mcp__serena__find_file - File search (❌ BROKEN)"
+      ],
+      "alternative_workflow": "Use Claude Code standard tools (Read, Glob, Grep, Edit) instead of broken MCP functions",
+      "workaround_strategy": {
+        "file_operations": "Use Read, Write, Edit tools",
+        "code_search": "Use Grep tool with regex patterns",
+        "project_structure": "Use Glob tool for file discovery",
+        "memory_operations": "Serena MCP memory functions work normally"
+      },
+      "impact_assessment": {
+        "token_consumption": "Standard levels - no 90% reduction benefit available",
+        "search_method": "Fallback to ripgrep (rg) and standard Claude Code tools",
+        "development_workflow": "MCP-First strategy NOT applicable, use standard tools",
+        "expected_resolution": "Requires Serena MCP update or Windows path handling fix"
+      }
     }
   }
 }

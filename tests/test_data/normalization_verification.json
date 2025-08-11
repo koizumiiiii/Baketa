@@ -1,0 +1,93 @@
+{
+  "generated_by": "Manual verification data",
+  "test_cases": [
+    {
+      "test_case_id": "basic_en",
+      "category": "basic",
+      "input": "Hello World",
+      "expected_normalized": "▁Hello▁World",
+      "steps": {
+        "nfkc": "Hello World",
+        "control_filtered": "Hello World",
+        "whitespace_normalized": "Hello World",
+        "final": "▁Hello▁World"
+      }
+    },
+    {
+      "test_case_id": "basic_ja",
+      "category": "basic",
+      "input": "こんにちは",
+      "expected_normalized": "▁こんにちは",
+      "steps": {
+        "nfkc": "こんにちは",
+        "control_filtered": "こんにちは",
+        "whitespace_normalized": "こんにちは",
+        "final": "▁こんにちは"
+      }
+    },
+    {
+      "test_case_id": "unicode_fullwidth",
+      "category": "unicode",
+      "input": "ｈｅｌｌｏ",
+      "expected_normalized": "▁hello",
+      "steps": {
+        "nfkc": "hello",
+        "control_filtered": "hello",
+        "whitespace_normalized": "hello",
+        "final": "▁hello"
+      }
+    },
+    {
+      "test_case_id": "unicode_mixed",
+      "category": "unicode",
+      "input": "Ｈｅｌｌｏ世界",
+      "expected_normalized": "▁Hello世界",
+      "steps": {
+        "nfkc": "Hello世界",
+        "control_filtered": "Hello世界",
+        "whitespace_normalized": "Hello世界",
+        "final": "▁Hello世界"
+      }
+    },
+    {
+      "test_case_id": "control_tab",
+      "category": "control",
+      "input": "hello\tworld",
+      "expected_normalized": "▁hello▁world",
+      "steps": {
+        "nfkc": "hello\tworld",
+        "control_filtered": "hello world",
+        "whitespace_normalized": "hello world",
+        "final": "▁hello▁world"
+      }
+    },
+    {
+      "test_case_id": "multiple_spaces",
+      "category": "whitespace",
+      "input": "hello   world",
+      "expected_normalized": "▁hello▁world",
+      "steps": {
+        "nfkc": "hello   world",
+        "control_filtered": "hello   world",
+        "whitespace_normalized": "hello world",
+        "final": "▁hello▁world"
+      }
+    },
+    {
+      "test_case_id": "empty_string",
+      "category": "boundary",
+      "input": "",
+      "expected_normalized": "",
+      "steps": {
+        "nfkc": "",
+        "control_filtered": "",
+        "whitespace_normalized": "",
+        "final": ""
+      }
+    }
+  ],
+  "statistics": {
+    "total_cases": 7,
+    "categories": ["basic", "unicode", "control", "whitespace", "boundary"]
+  }
+}

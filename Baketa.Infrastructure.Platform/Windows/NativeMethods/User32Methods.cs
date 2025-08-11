@@ -100,6 +100,10 @@ internal static class User32Methods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool IsZoomed(IntPtr hWnd);
     
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(IntPtr hWnd);
+    
     // マルチモニターサポート用の追加API
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     internal static extern IntPtr MonitorFromPoint(POINT pt, MonitorFlags dwFlags);
@@ -159,6 +163,9 @@ internal static class User32Methods
     
     // 特殊ウィンドウハンドル
     internal static readonly IntPtr HWND_MESSAGE = new(-3);
+    
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = false)]
+    internal static extern int GetClassName(IntPtr hWnd, char[] lpClassName, int nMaxCount);
 }
 
 [Flags]

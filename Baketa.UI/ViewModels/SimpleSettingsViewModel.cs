@@ -5,6 +5,9 @@ using System.Reactive;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Services;
+using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Utils;
@@ -19,6 +22,10 @@ namespace Baketa.UI.ViewModels;
 /// </summary>
 public class SimpleSettingsViewModel : ViewModelBase
 {
+    private readonly Baketa.Application.Services.Translation.TranslationOrchestrationService? _translationOrchestrationService;
+    private readonly ISettingsService? _settingsService;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
+    
     private bool _useLocalEngine = true;
     private string _sourceLanguage = "Japanese";
     private string _targetLanguage = "English";
@@ -47,15 +54,53 @@ public class SimpleSettingsViewModel : ViewModelBase
         public int FontSize { get; set; } = 14;
     }
 
+    // ITranslationSettingsの実装クラス
+    private class SimpleTranslationSettings : ITranslationSettings
+    {
+        public bool AutoDetectSourceLanguage { get; set; }
+        public string DefaultSourceLanguage { get; set; } = "";
+        public string DefaultTargetLanguage { get; set; } = "";
+        public string DefaultEngine { get; set; } = "";
+        public bool UseLocalEngine { get; set; }
+        public double ConfidenceThreshold { get; set; }
+        public int TimeoutMs { get; set; }
+    }
+
     public SimpleSettingsViewModel(
         IEventAggregator eventAggregator,
-        ILogger<SimpleSettingsViewModel> logger)
+        ILogger<SimpleSettingsViewModel> logger,
+        Baketa.Application.Services.Translation.TranslationOrchestrationService? translationOrchestrationService = null,
+        ISettingsService? settingsService = null,
+        IUnifiedSettingsService? unifiedSettingsService = null)
         : base(eventAggregator, logger)
     {
+        _translationOrchestrationService = translationOrchestrationService;
+        _settingsService = settingsService;
+        _unifiedSettingsService = unifiedSettingsService;
+        
         var vmHash = GetHashCode();
         DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] コンストラクタ開始");
+        Console.WriteLine($"🔧 [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}");
+        Console.WriteLine($"🔧 [SIMPLE_SETTINGS_INIT] ISettingsService: {_settingsService?.GetType().Name ?? "NULL"}");
+        
+        // デバッグファイルログにも記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}, ISettingsService: {_settingsService?.GetType().Name ?? "NULL"}{Environment.NewLine}");
+        }
+        catch { }
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}{Environment.NewLine}");
+        }
+        catch { }
+        
         InitializeCommands();
         InitializeCollections();
+        InitializeTranslationStateMonitoring();
+        
         DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] コンストラクタ完了 - 初期設定: {DebugInfo}");
     }
 
@@ -209,6 +254,21 @@ public class SimpleSettingsViewModel : ViewModelBase
     /// </summary>
     public bool IsLanguagePairValid => !string.Equals(SourceLanguage, TargetLanguage, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 翻訳実行中かどうか
+    /// </summary>
+    public bool IsTranslationInProgress => _translationOrchestrationService?.IsAnyTranslationActive ?? false;
+    
+    /// <summary>
+    /// 設定変更可能かどうか
+    /// </summary>
+    public bool CanEditSettings => !IsTranslationInProgress;
+    
+    /// <summary>
+    /// 設定ロック中メッセージ
+    /// </summary>
+    public string SettingsLockedMessage => "翻訳処理中は設定を変更できません";
+
     #endregion
 
     #region Commands
@@ -225,11 +285,29 @@ public class SimpleSettingsViewModel : ViewModelBase
         // コマンドをUIスレッドで安全に初期化
         try
         {
-            ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync,
-                this.WhenAnyValue(x => x.HasChanges).ObserveOn(RxApp.MainThreadScheduler),
-                outputScheduler: RxApp.MainThreadScheduler);
-            CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync,
-                outputScheduler: RxApp.MainThreadScheduler);
+            // 設定画面内のボタンは翻訳状態に関係なく使用可能にする（UX改善）
+            // メインのSetボタンは別途MainOverlayViewModelで制御
+            var canApply = this.WhenAnyValue(x => x.HasChanges)
+                .ObserveOn(RxApp.MainThreadScheduler);
+                
+            // キャンセルボタンは常に使用可能
+            var canCancel = Observable.Return(true)
+                .ObserveOn(RxApp.MainThreadScheduler);
+            
+            ApplyCommand = ReactiveCommand.CreateFromTask(ExecuteApplyAsync, canApply, outputScheduler: RxApp.MainThreadScheduler);
+            CancelCommand = ReactiveCommand.CreateFromTask(ExecuteCancelAsync, canCancel, outputScheduler: RxApp.MainThreadScheduler);
+            
+            // 🚨 CRITICAL DEBUG: ApplyCommandのCanExecute状態をログ出力
+            canApply.Subscribe(canExecute =>
+            {
+                try
+                {
+                    System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [APPLY_BUTTON_STATE] ApplyCommand.CanExecute={canExecute}, HasChanges={HasChanges}{Environment.NewLine}");
+                }
+                catch { }
+                Console.WriteLine($"🔍 [APPLY_BUTTON_STATE] ApplyCommand.CanExecute={canExecute}, HasChanges={HasChanges}");
+            });
         }
         catch (Exception ex)
         {
@@ -268,7 +346,16 @@ public class SimpleSettingsViewModel : ViewModelBase
                 {
                     try
                     {
+                        // 🚨 CRITICAL DEBUG: プロパティ変更検出ログ
+                        try
+                        {
+                            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [PROPERTY_CHANGED] HasChanges=true設定: UseLocalEngine={UseLocalEngine}, SourceLanguage={SourceLanguage}{Environment.NewLine}");
+                        }
+                        catch { }
+                        
                         HasChanges = true;
+                        Console.WriteLine($"🔍 [PROPERTY_CHANGED] HasChanges設定: true, 現在値: UseLocalEngine={UseLocalEngine}, SourceLanguage={SourceLanguage}, TargetLanguage={TargetLanguage}, FontSize={FontSize}");
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -283,6 +370,32 @@ public class SimpleSettingsViewModel : ViewModelBase
         }
     }
 
+    
+    /// <summary>
+    /// 翻訳状態監視を初期化します
+    /// </summary>
+    private void InitializeTranslationStateMonitoring()
+    {
+        Console.WriteLine($"🔧 [SIMPLE_SETTINGS_MONITORING] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}");
+        
+        if (_translationOrchestrationService == null) 
+        {
+            Console.WriteLine("⚠️ [SIMPLE_SETTINGS_MONITORING] TranslationOrchestrationServiceがnullです - 翻訳状態監視を無効化");
+            return;
+        }
+        
+        Console.WriteLine("🔧 [SIMPLE_SETTINGS_MONITORING] 翻訳状態監視を開始");
+        
+        // TranslationOrchestrationServiceのIsAnyTranslationActive変更を監視
+        _translationOrchestrationService.WhenAnyValue(x => x.IsAnyTranslationActive)
+            .Subscribe(isActive =>
+            {
+                this.RaisePropertyChanged(nameof(IsTranslationInProgress));
+                this.RaisePropertyChanged(nameof(CanEditSettings));
+                Console.WriteLine($"🔒 [SIMPLE_SETTINGS_STATE] 翻訳状態変更: IsActive={isActive}, CanEditSettings={CanEditSettings}");
+            });
+    }
+
     #endregion
 
     #region Command Handlers
@@ -294,6 +407,14 @@ public class SimpleSettingsViewModel : ViewModelBase
             var vmHash = GetHashCode();
             Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] ExecuteApplyAsync開始 - スレッドID: {Environment.CurrentManagedThreadId}");
             Logger?.LogInformation("Applying settings changes");
+
+            // 🚨 CRITICAL DEBUG: ExecuteApplyAsync実行確認
+            try
+            {
+                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [APPLY_BUTTON] ExecuteApplyAsync実行開始: SourceLanguage='{SourceLanguage}'{Environment.NewLine}");
+            }
+            catch { }
 
             // 設定適用イベントを発行
             var settingsEvent = new SettingsChangedEvent
@@ -309,17 +430,79 @@ public class SimpleSettingsViewModel : ViewModelBase
             await PublishEventAsync(settingsEvent).ConfigureAwait(false);
             Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] SettingsChangedEvent発行完了");
 
-            // TODO: 実際の設定ファイルに保存する処理を実装
-            // 現在は一時的にメモリに保持のみ
-            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 設定保存開始");
+            // JSON設定ファイルに保存
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] JSON設定保存開始");
             await SaveCurrentSettingsAsync().ConfigureAwait(false);
-            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 設定保存完了");
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] JSON設定保存完了");
+            
+            // ISettingsServiceにも翻訳言語設定を保存（TranslationOrchestrationServiceが読み取り可能にする）
+            if (_settingsService != null)
+            {
+                Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] ISettingsService設定保存開始");
+                try
+                {
+                    // 🚨 CRITICAL DEBUG: SetValue呼び出し前の確認
+                    var beforeValue = _settingsService.GetValue("UI:TranslationLanguage", "設定前");
+                    Console.WriteLine($"🔍 [SimpleSettingsViewModel#{vmHash}] SetValue前確認: '{beforeValue}'");
+                    
+                    try
+                    {
+                        System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SETVALUE_BEFORE] SetValue呼び出し前: key='UI:TranslationLanguage', value='{SourceLanguage}', beforeValue='{beforeValue}'{Environment.NewLine}");
+                    }
+                    catch { }
+                    
+                    // 翻訳言語設定をISettingsServiceに保存（同期メソッド）
+                    _settingsService.SetValue("UI:TranslationLanguage", SourceLanguage);
+                    Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] ISettingsService翻訳言語保存完了: {SourceLanguage}");
+                    
+                    // 🚨 CRITICAL DEBUG: SetValue呼び出し直後の確認
+                    var afterSetValue = _settingsService.GetValue("UI:TranslationLanguage", "設定直後失敗");
+                    Console.WriteLine($"🔍 [SimpleSettingsViewModel#{vmHash}] SetValue直後確認: '{afterSetValue}'");
+                    
+                    try
+                    {
+                        System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SETVALUE_AFTER] SetValue呼び出し直後: afterSetValue='{afterSetValue}'{Environment.NewLine}");
+                    }
+                    catch { }
+                    
+                    // 設定を永続化
+                    await _settingsService.SaveAsync().ConfigureAwait(false);
+                    Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] ISettingsService設定永続化完了");
+                    
+                    // 保存確認用に読み取り直し
+                    var savedValue = _settingsService.GetValue("UI:TranslationLanguage", "確認失敗");
+                    Console.WriteLine($"🔍 [SimpleSettingsViewModel#{vmHash}] 保存確認 - 読み取り結果: '{savedValue}'");
+                    
+                    // ファイルログにも記録
+                    try
+                    {
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_SAVE] 保存: '{SourceLanguage}', 確認: '{savedValue}'{Environment.NewLine}");
+                    }
+                    catch { }
+                }
+                catch (Exception settingsEx)
+                {
+                    Console.WriteLine($"💥 [SimpleSettingsViewModel#{vmHash}] ISettingsService設定保存エラー: {settingsEx.Message}");
+                    Logger?.LogError(settingsEx, "ISettingsService設定保存失敗");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ [SimpleSettingsViewModel#{vmHash}] ISettingsService が null - 設定保存をスキップ");
+            }
 
             HasChanges = false;
             Logger?.LogInformation("Settings applied successfully");
 
-            // 適用ボタンは設定を保存するだけでウィンドウは閉じない
-            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 適用完了 - ウィンドウは開いたまま");
+            // 適用ボタンクリックで設定画面を閉じる（UIスレッドで実行）
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 適用完了 - 設定画面を閉じます");
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                CloseRequested?.Invoke();
+            });
         }
         catch (Exception ex)
         {
@@ -378,6 +561,24 @@ public class SimpleSettingsViewModel : ViewModelBase
             Logger?.LogDebug("Loading current settings");
 
             var settings = await LoadSettingsFromFileAsync().ConfigureAwait(false);
+            
+            // ISettingsServiceからも翻訳言語設定を読み込み（優先）
+            if (_settingsService != null)
+            {
+                try
+                {
+                    var translationLanguage = _settingsService.GetValue<string>("UI:TranslationLanguage", "");
+                    if (!string.IsNullOrEmpty(translationLanguage))
+                    {
+                        settings.SourceLanguage = translationLanguage;
+                        DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] ISettingsServiceから翻訳言語を上書き: {translationLanguage}");
+                    }
+                }
+                catch (Exception settingsEx)
+                {
+                    DebugHelper.Log($"⚠️ [SimpleSettingsViewModel#{vmHash}] ISettingsServiceからの読み込み失敗: {settingsEx.Message}");
+                }
+            }
             
             DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 読み込み設定: UseLocalEngine={settings.UseLocalEngine}, SourceLanguage={settings.SourceLanguage}, TargetLanguage={settings.TargetLanguage}, FontSize={settings.FontSize}");
             
@@ -485,14 +686,33 @@ public class SimpleSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 設定ファイルから読み込み
+    /// 設定ファイルから読み込み - 統一設定サービス経由
     /// </summary>
     private async Task<SimpleSettingsData> LoadSettingsFromFileAsync()
     {
         try
         {
             var vmHash = GetHashCode();
-            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] LoadSettingsFromFileAsync開始 - ファイルパス: {SettingsFilePath}");
+            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] LoadSettingsFromFileAsync開始 - 統一設定サービス使用: {_unifiedSettingsService != null}");
+            
+            if (_unifiedSettingsService != null)
+            {
+                // 統一設定サービスから読み込み
+                var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+                var unifiedResult = new SimpleSettingsData
+                {
+                    UseLocalEngine = true, // SimpleSettingsでは常にローカルエンジン
+                    SourceLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultSourceLanguage),
+                    TargetLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultTargetLanguage),
+                    FontSize = 14 // デフォルトフォントサイズ（統一設定にフォント設定はないため）
+                };
+                
+                DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスから読み込み完了: UseLocalEngine={unifiedResult.UseLocalEngine}, SourceLanguage={unifiedResult.SourceLanguage}, TargetLanguage={unifiedResult.TargetLanguage}, FontSize={unifiedResult.FontSize}");
+                return unifiedResult;
+            }
+            
+            // フォールバック：直接ファイル読み込み
+            DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスが利用できません - 直接ファイル読み込み: {SettingsFilePath}");
             
             if (!File.Exists(SettingsFilePath))
             {
@@ -521,14 +741,36 @@ public class SimpleSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 設定ファイルに保存
+    /// 設定ファイルに保存 - 統一設定サービス経由
     /// </summary>
     private async Task SaveSettingsToFileAsync(SimpleSettingsData settings)
     {
         try
         {
             var vmHash = GetHashCode();
-            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] SaveSettingsToFileAsync開始 - ファイルパス: {SettingsFilePath}");
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] SaveSettingsToFileAsync開始 - 統一設定サービス使用: {_unifiedSettingsService != null}");
+            
+            if (_unifiedSettingsService != null)
+            {
+                // 統一設定サービス経由で保存
+                var translationSettings = new SimpleTranslationSettings
+                {
+                    AutoDetectSourceLanguage = false,
+                    DefaultSourceLanguage = LanguageCodeConverter.ToLanguageCode(settings.SourceLanguage),
+                    DefaultTargetLanguage = LanguageCodeConverter.ToLanguageCode(settings.TargetLanguage),
+                    DefaultEngine = settings.UseLocalEngine ? "OPUS-MT" : "Gemini",
+                    UseLocalEngine = settings.UseLocalEngine,
+                    ConfidenceThreshold = 0.7,
+                    TimeoutMs = 30000
+                };
+                
+                await _unifiedSettingsService.UpdateTranslationSettingsAsync(translationSettings).ConfigureAwait(false);
+                Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービス経由での保存完了: {settings.SourceLanguage} → {settings.TargetLanguage}");
+                return;
+            }
+            
+            // フォールバック：直接ファイル保存
+            Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスが利用できません - 直接ファイル保存: {SettingsFilePath}");
             
             var directory = Path.GetDirectoryName(SettingsFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))

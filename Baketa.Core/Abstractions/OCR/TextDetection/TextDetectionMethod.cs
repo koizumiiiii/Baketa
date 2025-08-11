@@ -33,5 +33,25 @@ namespace Baketa.Core.Abstractions.OCR.TextDetection;
         /// <summary>
         /// 複合手法
         /// </summary>
-        Combined = 5
+        Combined = 5,
+        
+        /// <summary>
+        /// 高速検出 (グリッドベース)
+        /// </summary>
+        Fast = 6,
+        
+        /// <summary>
+        /// 適応的検出 (履歴ベース最適化)
+        /// </summary>
+        Adaptive = 7,
+        
+        /// <summary>
+        /// 機械学習ベース
+        /// </summary>
+        MachineLearning = 8,
+        
+        /// <summary>
+        /// ハイブリッド (複数手法の組み合わせ)
+        /// </summary>
+        Hybrid = 9
     }
