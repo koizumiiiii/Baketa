@@ -35,8 +35,8 @@
     </PackageReference>
     
     <!-- Avalonia UI Testing -->
-    <PackageReference Include="Avalonia" Version="11.2.7" />
-    <PackageReference Include="Avalonia.Headless" Version="11.2.7" />
+    <PackageReference Include="Avalonia" Version="11.3.3" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.3" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.2.7" />
   </ItemGroup>
 
