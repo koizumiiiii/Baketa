@@ -42,6 +42,9 @@ namespace Baketa.Core.Tests.Events;
 
             // Act
             await _eventAggregator.PublishAsync(testEvent);
+            
+            // 🚀 Phase 2対応: 非ブロッキング処理の完了を待機
+            await Task.Delay(100); // 非同期処理の完了を待機
 
             // Assert
             Assert.Equal(1, _testProcessor.CallCount);
@@ -61,6 +64,7 @@ namespace Baketa.Core.Tests.Events;
             
             // 一度イベントを発行して登録確認
             await _eventAggregator.PublishAsync(testEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             Assert.Equal(1, _testProcessor.CallCount);
             
             // テスト履歴をクリア
@@ -71,6 +75,7 @@ namespace Baketa.Core.Tests.Events;
             
             // Act
             await _eventAggregator.PublishAsync(testEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             
             // Assert
             Assert.Equal(0, _testProcessor.CallCount);
@@ -92,6 +97,7 @@ namespace Baketa.Core.Tests.Events;
             
             // Act
             await _eventAggregator.PublishAsync(testEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             
             // Assert
             Assert.Equal(1, _testProcessor.CallCount);
@@ -134,9 +140,11 @@ namespace Baketa.Core.Tests.Events;
             // Act
             // エラーイベントを発行
             await _eventAggregator.PublishAsync(errorEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             
             // 通常イベントを発行
             await _eventAggregator.PublishAsync(testEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             
             // Assert
             Assert.True(_errorProcessor.ErrorOccurred);
@@ -200,6 +208,7 @@ namespace Baketa.Core.Tests.Events;
             
             // Act
             await _eventAggregator.PublishAsync(testEvent);
+            await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
             
             // Assert
             Assert.Equal(1, _testProcessor.CallCount);
