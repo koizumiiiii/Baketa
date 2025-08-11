@@ -32,7 +32,7 @@
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
 		
 		<!-- SentencePiece トークナイザー -->
-		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />
+		<PackageReference Include="Microsoft.ML.Tokenizers" Version="1.0.2" />
 		
 		<!-- PaddleOCR パッケージ -->
 		<PackageReference Include="Sdcb.PaddleOCR" Version="2.7.0.3" />
