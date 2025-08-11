@@ -90,16 +90,25 @@ namespace Baketa.Application.DI.Modules;
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
             
+            // 🚨 [REGRESSION_FIX] エラーハンドリング統一による回帰問題を修正するため一時的に無効化
+            // services.AddSingleton<Baketa.Application.Services.Translation.ITranslationErrorHandlerService, 
+            //     Baketa.Application.Services.Translation.TranslationErrorHandlerService>();
+            
             // ファサードパターン: 依存関係注入の複雑さを軽減
             services.AddSingleton<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade, 
                 Baketa.Application.Services.Processing.TranslationProcessingFacade>();
             services.AddSingleton<Baketa.Core.Abstractions.Configuration.IConfigurationFacade,
                 Baketa.Application.Services.Configuration.ConfigurationFacade>();
             
-            // 座標ベース翻訳サービス（Singleton：TranslationOrchestrationServiceから参照されるため）
+            // 🔥 [STREAMING] ストリーミング翻訳サービス: 段階的結果表示による12.7秒→数秒体感速度向上
+            Console.WriteLine("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
+            services.AddSingleton<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
+            Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
+            
+            // 🚀 [Phase 2.1] 座標ベース翻訳サービス（Service Locator Anti-pattern除去済み）
             services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
             {
-                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (ファサード使用)");
+                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (Phase 2.1更新版)");
                 
                 try
                 {
@@ -111,14 +120,18 @@ namespace Baketa.Application.DI.Modules;
                     var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
                     Console.WriteLine($"✅ [DI_DEBUG] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
                     
-                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始 (3パラメータ)");
+                    Console.WriteLine("🔍 [DI_DEBUG] IStreamingTranslationService取得中...");
+                    var streamingService = provider.GetService<TranslationAbstractions.IStreamingTranslationService>();
+                    Console.WriteLine($"✅ [DI_DEBUG] IStreamingTranslationService取得成功: {streamingService?.GetType().Name ?? "null"}");
+                    
+                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始 (Service Locator除去済み)");
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                         processingFacade,
                         configurationFacade,
-                        provider,
+                        streamingService,
                         logger);
-                    Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了");
+                    Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了 (Phase 2.1)");
                     return instance;
                 }
                 catch (Exception ex)
@@ -162,20 +175,15 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
             
-            // 翻訳関連のアプリケーションサービス（将来拡張）
-            // 例: services.AddSingleton<ITranslationService, TranslationService>();
-            // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
-            // 例: services.AddSingleton<ILanguageService, LanguageService>();
-            
             // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップサービス: 60秒→0秒削減
             Console.WriteLine("🔍 [DI_DEBUG] OpusMtPrewarmService登録開始");
             services.AddSingleton<TranslationAbstractions.IOpusMtPrewarmService, OpusMtPrewarmService>();
             Console.WriteLine("✅ [DI_DEBUG] OpusMtPrewarmService登録完了");
             
-            // 🔥 [STREAMING] ストリーミング翻訳サービス: 段階的結果表示による12.7秒→数秒体感速度向上
-            Console.WriteLine("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
-            services.AddScoped<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
-            Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
+            // 翻訳関連のアプリケーションサービス（将来拡張）
+            // 例: services.AddSingleton<ITranslationService, TranslationService>();
+            // 例: services.AddSingleton<ITranslationProfileService, TranslationProfileService>();
+            // 例: services.AddSingleton<ILanguageService, LanguageService>();
             
             // 翻訳カスタマイズ（将来拡張）
             // 例: services.AddSingleton<IDictionaryService, DictionaryService>();

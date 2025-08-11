@@ -30,55 +30,51 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
         public bool SynchronousExecution => false;
 
     /// <inheritdoc />
+    /// <inheritdoc />
     public async Task HandleAsync(OcrCompletedEvent eventData)
-        {
-            // デバッグログ: ハンドラー呼び出し確認
-            Console.WriteLine($"🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}{Environment.NewLine}");
-            
-            // NULLチェック
-            ArgumentNullException.ThrowIfNull(eventData);
+    {
+        // デバッグログ: ハンドラー呼び出し確認
+        Console.WriteLine($"🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}{Environment.NewLine}");
+        
+        // NULLチェック
+        ArgumentNullException.ThrowIfNull(eventData);
 
-            // OCR結果が存在しない場合
-            if (eventData.Results == null || !eventData.Results.Any())
+        // OCR結果が存在しない場合
+        if (eventData.Results == null || !eventData.Results.Any())
+        {
+            var notificationEvent = new NotificationEvent(
+                "OCR処理は完了しましたが、テキストは検出されませんでした。",
+                NotificationType.Information,
+                "OCR完了");
+                
+            await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
+            return;
+        }
+        
+        // OCR結果を通知
+        var successNotificationEvent = new NotificationEvent(
+        $"OCR処理が完了しました: {eventData.Results.Count}個のテキスト領域を検出",
+        NotificationType.Success,
+        "OCR完了",
+        displayTime: 3000);
+        
+        await _eventAggregator.PublishAsync(successNotificationEvent).ConfigureAwait(false);
+        
+        // 🚀 [PHASE_2_2_OPTIMIZATION] バッチ並列翻訳処理実装
+        Console.WriteLine($"🚀 [PHASE_2_2] 並列翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト{Environment.NewLine}");
+        
+        // 各テキスト領域に対して翻訳要求イベントを並列で発行
+        var translationTasks = eventData.Results.Select(async result =>
+        {
+            try
             {
-                var notificationEvent = new NotificationEvent(
-                    "OCR処理は完了しましたが、テキストは検出されませんでした。",
-                    NotificationType.Information,
-                    "OCR完了");
-                    
-                await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
-                return;
-            }
-            
-            // OCR結果を通知
-            var successNotificationEvent = new NotificationEvent(
-            $"OCR処理が完了しました: {eventData.Results.Count}個のテキスト領域を検出",
-            NotificationType.Success,
-            "OCR完了",
-            displayTime: 3000);
-            
-            await _eventAggregator.PublishAsync(successNotificationEvent).ConfigureAwait(false);
-            
-            // 各テキスト領域に対して翻訳要求イベントを発行
-            Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト{Environment.NewLine}");
-            
-            foreach (var result in eventData.Results)
-            {
-                Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行: '{result.Text}'");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行: '{result.Text}'{Environment.NewLine}");
+                Console.WriteLine($"🚀 [PHASE_2_2] 翻訳要求イベント準備: '{result.Text}'");
                 
                 // 翻訳設定から言語情報を取得
-                Console.WriteLine($"🔍 [SETTINGS_DEBUG] _appSettings != null: {_appSettings != null}");
-                Console.WriteLine($"🔍 [SETTINGS_DEBUG] _appSettings.Translation != null: {_appSettings?.Translation != null}");
-                Console.WriteLine($"🔍 [SETTINGS_DEBUG] AutoDetectSourceLanguage値: {_appSettings?.Translation?.AutoDetectSourceLanguage}");
-                Console.WriteLine($"🔍 [SETTINGS_DEBUG] DefaultSourceLanguage値: '{_appSettings?.Translation?.DefaultSourceLanguage}'");
-                Console.WriteLine($"🔍 [SETTINGS_DEBUG] DefaultTargetLanguage値: '{_appSettings?.Translation?.DefaultTargetLanguage}'");
-                
                 var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
                     ? "auto" 
                     : _appSettings.Translation.DefaultSourceLanguage;
@@ -86,8 +82,6 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
                 var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
 
                 Console.WriteLine($"🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage})");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage}){Environment.NewLine}");
 
                 // 翻訳要求イベントを発行
                 var translationRequestEvent = new TranslationRequestEvent(
@@ -95,24 +89,30 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
                     sourceLanguage: sourceLanguageCode,
                     targetLanguage: targetLanguageCode);
                 
-                Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前: '{result.Text}'");
-                try
-                {
-                    await _eventAggregator.PublishAsync(translationRequestEvent).ConfigureAwait(false);
-                    Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync成功: '{result.Text}'");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"🔥 [ERROR] EventAggregator.PublishAsync例外: {ex.GetType().Name} - {ex.Message}");
-                    Console.WriteLine($"🔥 [ERROR] スタックトレース: {ex.StackTrace}");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] EventAggregator.PublishAsync例外: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
-                    throw;
-                }
+                Console.WriteLine($"🚀 [PHASE_2_2] EventAggregator.PublishAsync並列実行: '{result.Text}'");
+                await _eventAggregator.PublishAsync(translationRequestEvent).ConfigureAwait(false);
+                Console.WriteLine($"🚀 [PHASE_2_2] EventAggregator.PublishAsync並列完了: '{result.Text}'");
                 
-                Console.WriteLine($"🔥 [DEBUG] 翻訳要求イベント発行完了: '{result.Text}'");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] 翻訳要求イベント発行完了: '{result.Text}'{Environment.NewLine}");
+                return true; // 成功
             }
-        }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🔥 [ERROR] 並列翻訳要求でエラー: '{result.Text}' - {ex.GetType().Name}: {ex.Message}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] 並列翻訳要求でエラー: '{result.Text}' - {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+                return false; // 失敗
+            }
+        });
+
+        // すべての翻訳要求イベントが完了するまで待機
+        var results = await Task.WhenAll(translationTasks).ConfigureAwait(false);
+        
+        // 実行結果をログ出力
+        var successCount = results.Count(r => r);
+        var failureCount = results.Length - successCount;
+        
+        Console.WriteLine($"🚀 [PHASE_2_2] 並列翻訳要求イベント発行完了 - 成功: {successCount}, 失敗: {failureCount}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行完了 - 成功: {successCount}, 失敗: {failureCount}{Environment.NewLine}");
+    }
     }
