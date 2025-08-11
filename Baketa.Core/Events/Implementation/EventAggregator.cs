@@ -24,7 +24,7 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
         private readonly object _syncRoot = new();
 
     /// <inheritdoc />
-    public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    public Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
             
@@ -87,7 +87,7 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
                     }
                 }
                 
-                return;
+                return Task.CompletedTask;
             }
             
             Console.WriteLine($"📡 イベント {eventType.Name} の処理を開始 (プロセッサ数: {eventProcessors.Count})");
@@ -162,9 +162,26 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
 #pragma warning restore CA1031
             }
             
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-            _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
+            // 🚀 Phase 2 イベント処理最適化: 非ブロッキング並列処理でUI応答性向上
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    _logger?.LogDebug("✅ イベント {EventType} の非同期処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                        eventType.Name, eventProcessors.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "💥 イベント {EventType} の非同期処理でエラーが発生しました", eventType.Name);
+                }
+            });
+            
+            // 即座に制御を返してUIをブロックしない
+            _logger?.LogDebug("🚀 イベント {EventType} の非ブロッキング処理を開始しました (プロセッサ数: {ProcessorCount})", 
                 eventType.Name, eventProcessors.Count);
+            
+            return Task.CompletedTask;
         }
         
         /// <summary>
@@ -174,7 +191,7 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
         /// <param name="eventData">イベント</param>
         /// <param name="cancellationToken">キャンセレーショントークン</param>
         /// <returns>イベント発行の完了を表すTask</returns>
-        public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
+        public Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken) 
             where TEvent : IEvent
         {
             ArgumentNullException.ThrowIfNull(eventData);
@@ -198,7 +215,7 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
             if (eventProcessors == null || eventProcessors.Count == 0)
             {
                 _logger?.LogDebug("イベント {EventType} のプロセッサが登録されていません", eventType.Name);
-                return;
+                return Task.CompletedTask;
             }
             
             var tasks = new List<Task>();
@@ -246,13 +263,34 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
 #pragma warning restore CA1031
             }
             
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-            
-            if (!cancellationToken.IsCancellationRequested)
+            // 🚀 Phase 2 イベント処理最適化: キャンセル可能な非ブロッキング並列処理
+            _ = Task.Run(async () =>
             {
-                _logger?.LogDebug("イベント {EventType} の処理が完了しました (プロセッサ数: {ProcessorCount})", 
-                    eventType.Name, eventProcessors.Count);
-            }
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        _logger?.LogDebug("✅ イベント {EventType} のキャンセル可能非同期処理が完了しました (プロセッサ数: {ProcessorCount})", 
+                            eventType.Name, eventProcessors.Count);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogDebug("⚠️ イベント {EventType} の処理がキャンセルされました", eventType.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "💥 イベント {EventType} のキャンセル可能非同期処理でエラーが発生しました", eventType.Name);
+                }
+            }, cancellationToken);
+            
+            // 即座に制御を返してUIをブロックしない
+            _logger?.LogDebug("🚀 イベント {EventType} のキャンセル可能非ブロッキング処理を開始しました (プロセッサ数: {ProcessorCount})", 
+                eventType.Name, eventProcessors.Count);
+            
+            return Task.CompletedTask;
         }
         
         /// <inheritdoc />

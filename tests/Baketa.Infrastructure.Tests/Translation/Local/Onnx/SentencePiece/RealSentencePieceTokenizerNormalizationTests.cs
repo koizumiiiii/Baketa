@@ -12,7 +12,7 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.Onnx.SentencePiece;
 /// <summary>
 /// RealSentencePieceTokenizerの正規化機能の単体テスト
 /// </summary>
-public class RealSentencePieceTokenizerNormalizationTests : IDisposable
+public class RealSentencePieceTokenizerNormalizationTests : SentencePieceTestBase, IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<RealSentencePieceTokenizer>> _mockLogger;
@@ -82,7 +82,7 @@ public class RealSentencePieceTokenizerNormalizationTests : IDisposable
         _output.WriteLine($"✓ Control char normalization: '{input.Replace("\u0000", "\\0")}' -> '{result}'");
     }
 
-    [Theory]
+    [Theory(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     [InlineData("hello   world", "▁hello▁world")] // 複数空白 -> 単一空白
     [InlineData("  hello  world  ", "▁hello▁world")] // 前後空白 + 複数空白
     [InlineData("hello\u3000world", "▁hello▁world")] // 全角空白 -> 半角空白
@@ -160,7 +160,7 @@ public class RealSentencePieceTokenizerNormalizationTests : IDisposable
         _output.WriteLine($"✓ Tokenization with normalization: '{input}' -> [{string.Join(", ", tokens)}]");
     }
 
-    [Fact]
+    [Fact(Skip = "OPUS-MTモデルファイルが必要です。scripts/download_opus_mt_models.ps1を実行してモデルをダウンロードしてください。")]
     public void NormalizeText_ComplexRealWorldText_ShouldHandleCorrectly()
     {
         // Arrange
