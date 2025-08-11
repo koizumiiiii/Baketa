@@ -15,16 +15,11 @@ namespace Baketa.UI.DI.Services;
 /// DIモジュール登録の簡素化と一元化を担当するサービス
 /// Phase 2 DI簡素化の一環として作成
 /// </summary>
-public sealed class ModuleRegistrationService
+public sealed class ModuleRegistrationService(IServiceCollection services)
 {
-    private readonly IServiceCollection _services;
+    private readonly IServiceCollection _services = services ?? throw new ArgumentNullException(nameof(services));
     private readonly HashSet<Type> _registeredModules = [];
     private readonly Stack<Type> _moduleStack = [];
-
-    public ModuleRegistrationService(IServiceCollection services)
-    {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
-    }
 
     /// <summary>
     /// すべての必要なモジュールを適切な順序で登録します

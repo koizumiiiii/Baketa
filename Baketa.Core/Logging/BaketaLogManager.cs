@@ -161,7 +161,7 @@ public static class BaketaLogManager
             Level = "Debug",
             Message = message,
             ThreadId = Environment.CurrentManagedThreadId,
-            ProcessId = Environment.ProcessId
+            Environment.ProcessId
         };
         
         var operation = new LogWriteOperation
@@ -195,11 +195,11 @@ public static class BaketaLogManager
             Level = "Error",
             Context = context,
             ExceptionType = ex.GetType().FullName,
-            Message = ex.Message,
-            StackTrace = ex.StackTrace,
+            ex.Message,
+            ex.StackTrace,
             InnerException = ex.InnerException?.Message,
             ThreadId = Environment.CurrentManagedThreadId,
-            ProcessId = Environment.ProcessId
+            Environment.ProcessId
         };
         
         var operation = new LogWriteOperation

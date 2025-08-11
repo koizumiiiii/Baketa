@@ -18,8 +18,8 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT])]
-    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.AlphaOpusMT;
+        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini])]
+    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
     /// ソース言語の自動検出
@@ -74,7 +74,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini, TranslationEngine.AlphaOpusMT])]
+        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini])]
     public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
     
     /// <summary>
@@ -229,30 +229,6 @@ public sealed class TranslationSettings
     public bool RecordApiUsageStatistics { get; set; } = false;
     
     /// <summary>
-    /// αテスト向けOPUS-MT機能の有効化
-    /// </summary>
-    [SettingMetadata(SettingLevel.Basic, "Translation", "αテスト機能", 
-        Description = "αテスト向けOPUS-MT翻訳機能を有効にします")]
-    public bool EnableAlphaOpusMT { get; set; } = true;
-    
-    /// <summary>
-    /// αテスト向けOPUS-MTモデルディレクトリ
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "αテストモデルパス", 
-        Description = "αテスト向けOPUS-MTモデルファイルのディレクトリパス")]
-    public string AlphaOpusMTModelDirectory { get; set; } = "Models/OpusMT";
-    
-    /// <summary>
-    /// αテスト向けOPUS-MTメモリ制限（MB）
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "αテストメモリ制限", 
-        Description = "αテスト向けOPUS-MTの最大メモリ使用量", 
-        Unit = "MB", 
-        MinValue = 100, 
-        MaxValue = 1000)]
-    public int AlphaOpusMTMemoryLimitMb { get; set; } = 300;
-    
-    /// <summary>
     /// テキストグループ化機能を有効にする
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "文章グループ化", 
@@ -344,9 +320,6 @@ public sealed class TranslationSettings
             EnableVerboseLogging = EnableVerboseLogging,
             SaveTranslationResults = SaveTranslationResults,
             RecordApiUsageStatistics = RecordApiUsageStatistics,
-            EnableAlphaOpusMT = EnableAlphaOpusMT,
-            AlphaOpusMTModelDirectory = AlphaOpusMTModelDirectory,
-            AlphaOpusMTMemoryLimitMb = AlphaOpusMTMemoryLimitMb,
             EnableTextGrouping = EnableTextGrouping,
             PreserveParagraphs = PreserveParagraphs,
             SameLineThreshold = SameLineThreshold,
@@ -378,10 +351,6 @@ public enum TranslationEngine
     /// </summary>
     Gemini,
     
-    /// <summary>
-    /// αテスト向けOPUS-MT翻訳（ローカル）
-    /// </summary>
-    AlphaOpusMT
 }
 
 /// <summary>

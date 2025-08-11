@@ -9,18 +9,12 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Pool;
 /// PaddleOCRエンジンプール管理ポリシー
 /// ObjectPoolでのエンジンインスタンスライフサイクル管理
 /// </summary>
-public sealed class PaddleOcrEnginePoolPolicy : IPooledObjectPolicy<IOcrEngine>
+public sealed class PaddleOcrEnginePoolPolicy(
+    IPaddleOcrEngineFactory engineFactory,
+    ILogger<PaddleOcrEnginePoolPolicy> logger) : IPooledObjectPolicy<IOcrEngine>
 {
-    private readonly IPaddleOcrEngineFactory _engineFactory;
-    private readonly ILogger<PaddleOcrEnginePoolPolicy> _logger;
-    
-    public PaddleOcrEnginePoolPolicy(
-        IPaddleOcrEngineFactory engineFactory,
-        ILogger<PaddleOcrEnginePoolPolicy> logger)
-    {
-        _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IPaddleOcrEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+    private readonly ILogger<PaddleOcrEnginePoolPolicy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// プール用の新しいエンジンインスタンスを作成

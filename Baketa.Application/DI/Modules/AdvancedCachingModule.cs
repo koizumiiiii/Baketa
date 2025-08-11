@@ -38,13 +38,10 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
             // Step2のCompositeOcrEngineを取得
             var baseEngine = provider.GetServices<IOcrEngine>()
                 .FirstOrDefault(e => e.GetType().Name.Contains("Composite"));
-            
-            if (baseEngine == null)
-            {
-                // フォールバック: 最初に登録されたOCRエンジンを使用
-                baseEngine = provider.GetServices<IOcrEngine>().First();
-            }
-            
+
+            // フォールバック: 最初に登録されたOCRエンジンを使用
+            baseEngine ??= provider.GetServices<IOcrEngine>().First();
+
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
             

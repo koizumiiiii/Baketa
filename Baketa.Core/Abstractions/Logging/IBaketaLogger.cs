@@ -126,58 +126,47 @@ public enum BaketaLogLevel
 /// <summary>
 /// ログエントリの構造
 /// </summary>
-public sealed class BaketaLogEntry
+public sealed class BaketaLogEntry(
+    BaketaLogLevel level,
+    string component,
+    string message,
+    Dictionary<string, object>? data = null,
+    Exception? exception = null)
 {
     /// <summary>
     /// ログの一意ID
     /// </summary>
-    public string Id { get; }
+    public string Id { get; } = Guid.NewGuid().ToString("N")[..8];
 
     /// <summary>
     /// タイムスタンプ
     /// </summary>
-    public DateTime Timestamp { get; }
+    public DateTime Timestamp { get; } = DateTime.Now;
 
     /// <summary>
     /// ログレベル
     /// </summary>
-    public BaketaLogLevel Level { get; }
+    public BaketaLogLevel Level { get; } = level;
 
     /// <summary>
     /// コンポーネント名
     /// </summary>
-    public string Component { get; }
+    public string Component { get; } = component;
 
     /// <summary>
     /// ログメッセージ
     /// </summary>
-    public string Message { get; }
+    public string Message { get; } = message;
 
     /// <summary>
     /// 追加データ
     /// </summary>
-    public Dictionary<string, object> Data { get; }
+    public Dictionary<string, object> Data { get; } = data ?? new Dictionary<string, object>();
 
     /// <summary>
     /// 例外情報
     /// </summary>
-    public Exception? Exception { get; }
-
-    public BaketaLogEntry(
-        BaketaLogLevel level,
-        string component,
-        string message,
-        Dictionary<string, object>? data = null,
-        Exception? exception = null)
-    {
-        Id = Guid.NewGuid().ToString("N")[..8];
-        Timestamp = DateTime.Now;
-        Level = level;
-        Component = component;
-        Message = message;
-        Data = data ?? new Dictionary<string, object>();
-        Exception = exception;
-    }
+    public Exception? Exception { get; } = exception;
 
     /// <summary>
     /// ログエントリを文字列形式でフォーマット

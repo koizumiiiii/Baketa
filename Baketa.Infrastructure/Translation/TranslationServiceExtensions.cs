@@ -30,59 +30,8 @@ namespace Baketa.Infrastructure.Translation;
             // ITranslationEngineFactoryを登録（TranslationOrchestrationServiceで必要）
             services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
-            // αテスト向けOPUS-MTエンジンオプション（AlphaOpusMtEngineFactoryとAlphaOpusMtConfigurationはInfrastructureModuleで登録済み）
-            services.AddSingleton<AlphaOpusMtOptions>(provider =>
-            {
-                return new AlphaOpusMtOptions
-                {
-                    MaxSequenceLength = 256,
-                    MemoryLimitMb = 300,
-                    ThreadCount = 2
-                };
-            });
-
-            // デフォルトの翻訳エンジンとしてAlphaOpusMtTranslationEngineを登録（フォールバック付き）
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
-            {
-                var engineLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngine>>();
-                var adapterLogger = provider.GetRequiredService<ILogger<AlphaOpusMtTranslationEngineAdapter>>();
-                var simpleSentencePieceLogger = provider.GetRequiredService<ILogger<SimpleSentencePieceEngine>>();
-                var mockLogger = provider.GetRequiredService<ILogger<MockTranslationEngine>>();
-                
-                try
-                {
-                    engineLogger.LogInformation("AlphaOpusMtTranslationEngineの初期化を開始します");
-                    
-                    var factory = provider.GetRequiredService<AlphaOpusMtEngineFactory>();
-                    var options = provider.GetRequiredService<AlphaOpusMtOptions>();
-                    
-                    engineLogger.LogInformation("AlphaOpusMtEngineFactoryを取得しました");
-                    
-                    // 日英翻訳エンジンを作成（αテスト用のデフォルト）
-                    var engine = factory.CreateJapaneseToEnglishEngine(options, engineLogger);
-                    
-                    engineLogger.LogInformation("AlphaOpusMtTranslationEngineの作成が完了しました");
-                    
-                    // アダプターでラップして旧インターフェースに適応
-                    var adapter = new AlphaOpusMtTranslationEngineAdapter(engine, adapterLogger);
-                    
-                    engineLogger.LogInformation("AlphaOpusMtTranslationEngineAdapterの作成が完了しました");
-                    
-                    return adapter;
-                }
-                catch (Exception ex)
-                {
-                    // AlphaOpusMtTranslationEngineの初期化に失敗した場合
-                    engineLogger.LogError(ex, "AlphaOpusMtTranslationEngineの初期化に失敗しました。OPUS-MTモデルファイルを確認してください。");
-                    
-                    // MockTranslationEngineは実際の翻訳ができないため、使用しない
-                    // エラーをそのまま再スローして、問題を明確にする
-                    throw new InvalidOperationException(
-                        "OPUS-MT翻訳エンジンの初期化に失敗しました。" +
-                        "models/opus-mt/ ディレクトリにOPUS-MTモデルファイルが配置されているか確認してください。" +
-                        "モデルファイルは scripts/download_opus_mt_models.ps1 でダウンロードできます。", ex);
-                }
-            });
+            // OPUS-MT TransformersエンジンをデフォルトとしてITranslationEngineに登録
+            // TransformersOpusMtEngineは既にInfrastructureModuleで登録済み
 
             // フォールバック用のMockエンジンも登録（開発・テスト用）
             services.AddSingleton<MockTranslationEngine>();

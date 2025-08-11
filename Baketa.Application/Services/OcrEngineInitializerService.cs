@@ -13,22 +13,16 @@ namespace Baketa.Application.Services;
 /// OCRエンジンのバックグラウンド初期化サービス
 /// Gemini推奨のシングルトン化+非同期初期化戦略を実装
 /// </summary>
-public sealed class OcrEngineInitializerService : IHostedService
+public sealed class OcrEngineInitializerService(
+    ILogger<OcrEngineInitializerService> logger,
+    IServiceProvider serviceProvider) : IHostedService
 {
-    private readonly ILogger<OcrEngineInitializerService> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<OcrEngineInitializerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private IOcrEngine? _initializedEngine;
     private readonly object _lockObject = new();
     private volatile bool _isInitialized;
     private volatile bool _isInitializing;
-    
-    public OcrEngineInitializerService(
-        ILogger<OcrEngineInitializerService> logger, 
-        IServiceProvider serviceProvider)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    }
 
     /// <summary>
     /// 初期化されたOCRエンジンを取得（ブロッキングなし）

@@ -11,17 +11,12 @@ namespace Baketa.Core.Services.Performance;
 /// アプリケーション起動時間を測定・分析するサービス
 /// 2分間の起動時間ボトルネック特定に特化
 /// </summary>
-public sealed class StartupTimeMeasurer
+public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
 {
-    private readonly ILogger<StartupTimeMeasurer> _logger;
+    private readonly ILogger<StartupTimeMeasurer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ConcurrentDictionary<string, Stopwatch> _activeTimers = new();
     private readonly ConcurrentDictionary<string, TimeSpan> _completedTimings = new();
     private readonly Stopwatch _totalTimer = new();
-
-    public StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 全体の起動時間測定開始

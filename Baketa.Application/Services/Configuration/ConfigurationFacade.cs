@@ -9,24 +9,17 @@ namespace Baketa.Application.Services.Configuration;
 /// 設定ファサード実装
 /// 設定、イベント、ログに関連するサービス群を統合管理し、横断的関心事の依存関係を簡素化
 /// </summary>
-public sealed class ConfigurationFacade : IConfigurationFacade
+public sealed class ConfigurationFacade(
+    IUnifiedSettingsService settingsService,
+    IEventAggregator eventAggregator,
+    IBaketaLogger logger) : IConfigurationFacade
 {
     /// <inheritdoc />
-    public IUnifiedSettingsService SettingsService { get; }
-    
-    /// <inheritdoc />
-    public IEventAggregator EventAggregator { get; }
-    
-    /// <inheritdoc />
-    public IBaketaLogger Logger { get; }
+    public IUnifiedSettingsService SettingsService { get; } = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
-    public ConfigurationFacade(
-        IUnifiedSettingsService settingsService,
-        IEventAggregator eventAggregator,
-        IBaketaLogger logger)
-    {
-        SettingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        EventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    /// <inheritdoc />
+    public IEventAggregator EventAggregator { get; } = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+
+    /// <inheritdoc />
+    public IBaketaLogger Logger { get; } = logger ?? throw new ArgumentNullException(nameof(logger));
 }

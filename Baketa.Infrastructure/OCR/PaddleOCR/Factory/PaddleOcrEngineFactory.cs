@@ -15,18 +15,12 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 /// PaddleOCRエンジンファクトリー実装
 /// プール化されたOCRエンジンインスタンスの作成・管理を担当
 /// </summary>
-public sealed class PaddleOcrEngineFactory : IPaddleOcrEngineFactory
+public sealed class PaddleOcrEngineFactory(
+    IServiceProvider serviceProvider,
+    ILogger<PaddleOcrEngineFactory> logger) : IPaddleOcrEngineFactory
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<PaddleOcrEngineFactory> _logger;
-    
-    public PaddleOcrEngineFactory(
-        IServiceProvider serviceProvider,
-        ILogger<PaddleOcrEngineFactory> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<PaddleOcrEngineFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 新しいPaddleOCRエンジンインスタンスを作成します
@@ -153,22 +147,16 @@ public sealed class PaddleOcrEngineFactory : IPaddleOcrEngineFactory
 /// シングルトンパターンを無効化したPaddleOcrEngine
 /// プール化で複数インスタンスを許可するため
 /// </summary>
-internal sealed class NonSingletonPaddleOcrEngine : PaddleOcrEngine
+internal sealed class NonSingletonPaddleOcrEngine(
+    IModelPathResolver modelPathResolver,
+    IOcrPreprocessingService ocrPreprocessingService,
+    ITextMerger textMerger,
+    IOcrPostProcessor ocrPostProcessor,
+    IGpuMemoryManager gpuMemoryManager,
+    IUnifiedSettingsService unifiedSettingsService,
+    IUnifiedLoggingService? unifiedLoggingService = null,
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger)
 {
-    public NonSingletonPaddleOcrEngine(
-        IModelPathResolver modelPathResolver,
-        IOcrPreprocessingService ocrPreprocessingService,
-        ITextMerger textMerger,
-        IOcrPostProcessor ocrPostProcessor,
-        IGpuMemoryManager gpuMemoryManager,
-        IUnifiedSettingsService unifiedSettingsService,
-        IUnifiedLoggingService? unifiedLoggingService = null,
-        ILogger<PaddleOcrEngine>? logger = null)
-        : base(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger)
-    {
-        // 🚨 重要: 親クラスのシングルトンチェックを意図的にバイパス
-        // プール環境では複数インスタンスが必要
-    }
 
     /// <summary>
     /// プール化環境ではシングルトンチェックをスキップ
