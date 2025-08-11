@@ -1816,17 +1816,11 @@ internal sealed class TileOcrResult
 /// <summary>
 /// 簡易画像ラッパー（OCR結果作成用）
 /// </summary>
-internal sealed class SimpleImageWrapper : IImage
+internal sealed class SimpleImageWrapper(int width, int height) : IImage
 {
-    public int Width { get; }
-    public int Height { get; }
+    public int Width { get; } = width;
+    public int Height { get; } = height;
     public ImageFormat Format => ImageFormat.Rgba32;
-    
-    public SimpleImageWrapper(int width, int height)
-    {
-        Width = width;
-        Height = height;
-    }
 
     public IImage Clone()
     {

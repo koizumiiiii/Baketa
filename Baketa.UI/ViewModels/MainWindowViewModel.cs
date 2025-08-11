@@ -117,7 +117,7 @@ namespace Baketa.UI.ViewModels;
             set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _translationTestStatus, value);
         }
         
-        private string _selectedTranslationEngine = "AlphaOpusMT";
+        private string _selectedTranslationEngine = "Local";
         public string SelectedTranslationEngine
         {
             get => _selectedTranslationEngine;

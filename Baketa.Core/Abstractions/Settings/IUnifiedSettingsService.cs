@@ -67,23 +67,17 @@ public interface IUnifiedSettingsService
 /// <summary>
 /// 設定変更イベント引数
 /// </summary>
-public sealed class SettingsChangedEventArgs : EventArgs
+public sealed class SettingsChangedEventArgs(string sectionName, SettingsType settingsType) : EventArgs
 {
     /// <summary>
     /// 変更されたセクション名
     /// </summary>
-    public string SectionName { get; }
+    public string SectionName { get; } = sectionName;
 
     /// <summary>
     /// 変更された設定の種類
     /// </summary>
-    public SettingsType SettingsType { get; }
-
-    public SettingsChangedEventArgs(string sectionName, SettingsType settingsType)
-    {
-        SectionName = sectionName;
-        SettingsType = settingsType;
-    }
+    public SettingsType SettingsType { get; } = settingsType;
 }
 
 /// <summary>

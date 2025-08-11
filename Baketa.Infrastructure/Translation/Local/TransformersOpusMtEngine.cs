@@ -827,7 +827,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             // 🔥 [GEMINI_PHASE1] バッチ翻訳プロトコル修正: 改行文字の適切な前処理
             var sanitizedTexts = texts.Select(text => SanitizeTextForBatchTranslation(text)).ToList();
             
-            var request = new { batch_texts = sanitizedTexts, direction = direction };
+            var request = new { batch_texts = sanitizedTexts, direction };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions 
             { 
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -1195,7 +1195,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             // 🔥 [GEMINI_PHASE1] 個別翻訳プロトコル修正: 改行文字の適切な前処理
             var sanitizedText = SanitizeTextForBatchTranslation(text);
             
-            var request = new { text = sanitizedText, direction = direction };
+            var request = new { text = sanitizedText, direction };
             var requestJson = JsonSerializer.Serialize(request, new JsonSerializerOptions 
             { 
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -1490,7 +1490,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 int lastBrace = jsonStr.LastIndexOf('}');
                 if (lastBrace == -1)
                 {
-                    jsonStr = jsonStr + "}";
+                    jsonStr += "}";
                     Console.WriteLine($"🔧 [JSON_DEBUG] 末尾に }} を追加して修復");
                 }
                 else
@@ -2067,18 +2067,11 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
     /// キャッシュエントリ
     /// ⚡ Phase 1.1: 翻訳結果キャッシュのための軽量実装
     /// </summary>
-    private sealed class CacheEntry
+    private sealed class CacheEntry(TranslationResponse response)
     {
-        public TranslationResponse Response { get; }
-        public DateTime CreatedAt { get; }
-        public DateTime LastAccessedAt { get; set; }
-        
-        public CacheEntry(TranslationResponse response)
-        {
-            Response = response;
-            CreatedAt = DateTime.UtcNow;
-            LastAccessedAt = DateTime.UtcNow;
-        }
+        public TranslationResponse Response { get; } = response;
+        public DateTime CreatedAt { get; } = DateTime.UtcNow;
+        public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
     }
 
     private class PersistentTranslationResult

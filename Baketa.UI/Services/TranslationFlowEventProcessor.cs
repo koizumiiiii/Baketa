@@ -26,7 +26,9 @@ public class TranslationFlowEventProcessor :
     IEventProcessor<StartTranslationRequestEvent>,
     IEventProcessor<StopTranslationRequestEvent>,
     IEventProcessor<ToggleTranslationDisplayRequestEvent>,
-    IEventProcessor<SettingsChangedEvent>
+    IEventProcessor<SettingsChangedEvent>,
+    IEventProcessor<Baketa.UI.Framework.Events.StopCaptureRequestedEvent>,
+    IDisposable
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
@@ -43,6 +45,9 @@ public class TranslationFlowEventProcessor :
     
     // 継続的翻訳結果購読管理
     private IDisposable? _continuousTranslationSubscription;
+    
+    // Stop機能: CancellationToken による確実な停止制御
+    private CancellationTokenSource? _currentTranslationCancellationSource;
     
 
     public TranslationFlowEventProcessor(
@@ -224,6 +229,30 @@ public class TranslationFlowEventProcessor :
     }
 
     /// <summary>
+    /// UI停止要求イベントの処理（StopCaptureRequestedEvent → StopTranslationRequestEventに変換）
+    /// </summary>
+    public async Task HandleAsync(Baketa.UI.Framework.Events.StopCaptureRequestedEvent eventData)
+    {
+        try
+        {
+            _logger.LogInformation("🛑 UI停止要求を受信 - 翻訳停止要求に変換中");
+            Console.WriteLine("🛑 [TranslationFlowEventProcessor] UI停止要求を受信 - 翻訳停止要求に変換中");
+            
+            // UI停止要求をApplication停止要求に変換
+            var stopTranslationEvent = new StopTranslationRequestEvent();
+            await _eventAggregator.PublishAsync(stopTranslationEvent).ConfigureAwait(false);
+            
+            _logger.LogInformation("✅ UI停止要求 → 翻訳停止要求 変換完了");
+            Console.WriteLine("✅ [TranslationFlowEventProcessor] UI停止要求 → 翻訳停止要求 変換完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "UI停止要求処理中にエラーが発生しました");
+            Console.WriteLine($"❌ [TranslationFlowEventProcessor] UI停止要求処理エラー: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// 翻訳停止要求イベントの処理
     /// </summary>
     public async Task HandleAsync(StopTranslationRequestEvent eventData)
@@ -241,7 +270,18 @@ public class TranslationFlowEventProcessor :
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
 
-            // 4. 継続的翻訳結果購読を停止
+            // 4. 🚀 Stop機能: CancellationTokenキャンセル → 遅延翻訳結果表示を確実に防止
+            if (_currentTranslationCancellationSource != null)
+            {
+                Console.WriteLine("🛑 [Stop機能] CancellationTokenをキャンセル中 - 遅延翻訳結果表示防止");
+                _currentTranslationCancellationSource.Cancel();
+                _currentTranslationCancellationSource.Dispose();
+                _currentTranslationCancellationSource = null;
+                _logger.LogInformation("🚀 Stop機能: CancellationTokenキャンセル完了");
+                Console.WriteLine("✅ [Stop機能] CancellationTokenキャンセル完了 - 遅延結果表示防止OK");
+            }
+
+            // 5. 継続的翻訳結果購読を停止
             if (_continuousTranslationSubscription != null)
             {
                 Console.WriteLine("🛑 継続的翻訳結果購読を停止中...");
@@ -255,7 +295,7 @@ public class TranslationFlowEventProcessor :
                 Console.WriteLine("⚠️ 継続的翻訳結果購読がnull - 停止処理スキップ");
             }
 
-            // 5. 処理中ウィンドウリストをクリア - 継続翻訳の再開を許可するため
+            // 6. 処理中ウィンドウリストをクリア - 継続翻訳の再開を許可するため
             lock (_processedEventLock)
             {
                 var processingCount = _processingWindows.Count;
@@ -373,16 +413,30 @@ public class TranslationFlowEventProcessor :
             await _eventAggregator.PublishAsync(translatingEvent).ConfigureAwait(false);
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] ステップ1完了 - 翻訳中状態変更完了");
 
-            // 2. 翻訳結果のObservableを購読してUIイベントに変換
+            // 2. 翻訳結果のObservableを購読してUIイベントに変換（Stop機能: CancellationToken制御追加）
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] ステップ2 - Observable購読設定開始");
             _logger.LogDebug("Setting up translation result subscription for continuous translation");
             DebugLogUtility.WriteLog("🔗 継続翻訳結果のObservable購読を設定中");
             DebugLogUtility.WriteLog($"🔍 現在の購読状態(設定前): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] Observable購読オブジェクト作成開始");
+            
+            // 🚀 Stop機能: 新しい翻訳セッション開始時に古いCancellationTokenをキャンセル
+            _currentTranslationCancellationSource?.Cancel();
+            _currentTranslationCancellationSource?.Dispose();
+            _currentTranslationCancellationSource = new CancellationTokenSource();
+            var cancellationToken = _currentTranslationCancellationSource.Token;
+            
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] Observable購読オブジェクト作成開始（CancellationToken制御付き）");
             _continuousTranslationSubscription = _translationService.TranslationResults
                 .ObserveOn(RxApp.MainThreadScheduler) // UIスレッドスケジューラで実行
                 .Subscribe(result => 
                 {
+                    // 🚀 Stop機能: キャンセル状態チェック - Stop後の遅延結果表示を防止
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        Console.WriteLine("🛑 [TranslationFlowEventProcessor] 翻訳結果表示をキャンセル - Stop済み");
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🛑 翻訳結果表示をキャンセル - Stop済み");
+                        return;
+                    }
                     DebugLogUtility.WriteLog($"📝 継続的翻訳結果受信:");
                     DebugLogUtility.WriteLog($"   📖 オリジナル: '{result.OriginalText}'");
                     DebugLogUtility.WriteLog($"   🌐 翻訳結果: '{result.TranslatedText}'");
@@ -486,6 +540,34 @@ public class TranslationFlowEventProcessor :
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// リソースの解放 - Stop機能で使用されるCancellationTokenとSubscriptionを適切に解放
+    /// </summary>
+    public void Dispose()
+    {
+        try
+        {
+            _logger.LogDebug("TranslationFlowEventProcessor disposing...");
+            
+            // CancellationTokenSourceの解放
+            _currentTranslationCancellationSource?.Cancel();
+            _currentTranslationCancellationSource?.Dispose();
+            _currentTranslationCancellationSource = null;
+            
+            // Subscriptionの解放
+            _continuousTranslationSubscription?.Dispose();
+            _continuousTranslationSubscription = null;
+            
+            _logger.LogDebug("TranslationFlowEventProcessor disposed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during TranslationFlowEventProcessor disposal");
+        }
+        
+        GC.SuppressFinalize(this);
     }
 
     // LanguageSettingsChangedEvent処理は削除済み - SettingsViewModel削除に伴い不要

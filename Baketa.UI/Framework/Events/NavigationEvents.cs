@@ -77,7 +77,7 @@ namespace Baketa.UI.Framework.Events;
     /// <summary>
     /// キャプチャ停止リクエストイベント
     /// </summary>
-    internal sealed class StopCaptureRequestedEvent : UIEventBase
+    public sealed class StopCaptureRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "StopCaptureRequested";

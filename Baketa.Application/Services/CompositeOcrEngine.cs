@@ -12,22 +12,15 @@ namespace Baketa.Application.Services;
 /// Gemini推奨の段階的OCR戦略実装
 /// 高速エンジン（軽量）→ 高精度エンジン（重い）の段階的切り替え
 /// </summary>
-public sealed class CompositeOcrEngine : IOcrEngine
+public sealed class CompositeOcrEngine(
+    ILogger<CompositeOcrEngine> logger,
+    IOcrEngine fastEngine,
+    OcrEngineInitializerService heavyEngineService) : IOcrEngine
 {
-    private readonly ILogger<CompositeOcrEngine> _logger;
-    private readonly IOcrEngine _fastEngine;          // SafePaddleOcrEngine（5ms初期化）
-    private readonly OcrEngineInitializerService _heavyEngineService; // バックグラウンド初期化中の重いエンジン
+    private readonly ILogger<CompositeOcrEngine> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IOcrEngine _fastEngine = fastEngine ?? throw new ArgumentNullException(nameof(fastEngine));          // SafePaddleOcrEngine（5ms初期化）
+    private readonly OcrEngineInitializerService _heavyEngineService = heavyEngineService ?? throw new ArgumentNullException(nameof(heavyEngineService)); // バックグラウンド初期化中の重いエンジン
     private bool _disposed;
-
-    public CompositeOcrEngine(
-        ILogger<CompositeOcrEngine> logger,
-        IOcrEngine fastEngine,
-        OcrEngineInitializerService heavyEngineService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fastEngine = fastEngine ?? throw new ArgumentNullException(nameof(fastEngine));
-        _heavyEngineService = heavyEngineService ?? throw new ArgumentNullException(nameof(heavyEngineService));
-    }
 
     public string EngineName => "Composite OCR Engine (Fast→Heavy)";
     public string EngineVersion => "1.0.0 (Gemini Strategy)";
@@ -210,7 +203,7 @@ public sealed class CompositeOcrEngine : IOcrEngine
     {
         ThrowIfDisposed();
         var activeEngine = GetActiveEngine();
-        return activeEngine != null ? await activeEngine.IsLanguageAvailableAsync(languageCode, cancellationToken) : false;
+        return activeEngine != null && await activeEngine.IsLanguageAvailableAsync(languageCode, cancellationToken);
     }
 
     public OcrPerformanceStats GetPerformanceStats()

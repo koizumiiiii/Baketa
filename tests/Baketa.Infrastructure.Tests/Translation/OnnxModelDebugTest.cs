@@ -10,15 +10,8 @@ namespace Baketa.Infrastructure.Tests.Translation;
 /// <summary>
 /// ONNXモデルの入力・出力仕様を確認するテスト
 /// </summary>
-public class OnnxModelDebugTest
+public class OnnxModelDebugTest(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public OnnxModelDebugTest(ITestOutputHelper output)
-    {
-        _output = output;
-    }
-
     [Fact]
     public void DebugOnnxModelInputOutput()
     {
@@ -26,11 +19,11 @@ public class OnnxModelDebugTest
         var modelsBaseDir = FindModelsDirectory();
         var onnxModelPath = Path.Combine(modelsBaseDir, "ONNX", "opus-mt-ja-en.onnx");
         
-        _output.WriteLine($"ONNXモデルパス: {onnxModelPath}");
+        output.WriteLine($"ONNXモデルパス: {onnxModelPath}");
         
         if (!File.Exists(onnxModelPath))
         {
-            _output.WriteLine("❌ ONNXモデルファイルが見つかりません");
+            output.WriteLine("❌ ONNXモデルファイルが見つかりません");
             return;
         }
 
@@ -39,11 +32,11 @@ public class OnnxModelDebugTest
             var sessionOptions = new SessionOptions();
             using var session = new InferenceSession(onnxModelPath, sessionOptions);
             
-            _output.WriteLine("🔍 OPUS-MT ONNX モデル解析");
-            _output.WriteLine("=" + new string('=', 50));
+            output.WriteLine("🔍 OPUS-MT ONNX モデル解析");
+            output.WriteLine("=" + new string('=', 50));
             
             // 入力メタデータの確認
-            _output.WriteLine("\n📥 モデル入力:");
+            output.WriteLine("\n📥 モデル入力:");
             var inputMetadata = session.InputMetadata;
             for (int i = 0; i < inputMetadata.Count; i++)
             {
@@ -51,15 +44,15 @@ public class OnnxModelDebugTest
                 var name = kvp.Key;
                 var metadata = kvp.Value;
                 
-                _output.WriteLine($"  {i + 1}. 名前: '{name}'");
-                _output.WriteLine($"     型: {metadata.ElementType}");
-                _output.WriteLine($"     形状: [{string.Join(", ", metadata.Dimensions)}]");
-                _output.WriteLine($"     説明: {metadata.ToString()}");
-                _output.WriteLine("");
+                output.WriteLine($"  {i + 1}. 名前: '{name}'");
+                output.WriteLine($"     型: {metadata.ElementType}");
+                output.WriteLine($"     形状: [{string.Join(", ", metadata.Dimensions)}]");
+                output.WriteLine($"     説明: {metadata}");
+                output.WriteLine("");
             }
             
             // 出力メタデータの確認
-            _output.WriteLine("📤 モデル出力:");
+            output.WriteLine("📤 モデル出力:");
             var outputMetadata = session.OutputMetadata;
             for (int i = 0; i < outputMetadata.Count; i++)
             {
@@ -67,54 +60,54 @@ public class OnnxModelDebugTest
                 var name = kvp.Key;
                 var metadata = kvp.Value;
                 
-                _output.WriteLine($"  {i + 1}. 名前: '{name}'");
-                _output.WriteLine($"     型: {metadata.ElementType}");
-                _output.WriteLine($"     形状: [{string.Join(", ", metadata.Dimensions)}]");
-                _output.WriteLine($"     説明: {metadata.ToString()}");
-                _output.WriteLine("");
+                output.WriteLine($"  {i + 1}. 名前: '{name}'");
+                output.WriteLine($"     型: {metadata.ElementType}");
+                output.WriteLine($"     形状: [{string.Join(", ", metadata.Dimensions)}]");
+                output.WriteLine($"     説明: {metadata}");
+                output.WriteLine("");
             }
             
-            _output.WriteLine("=" + new string('=', 50));
+            output.WriteLine("=" + new string('=', 50));
             
             // 重要な分析ポイント
-            _output.WriteLine("\n🔍 分析結果:");
+            output.WriteLine("\n🔍 分析結果:");
             
             var hasEncoderHiddenStates = inputMetadata.ContainsKey("encoder_hidden_states");
             var hasEncoderOutputs = inputMetadata.ContainsKey("encoder_outputs");
             var hasLastHiddenState = inputMetadata.ContainsKey("last_hidden_state");
             
-            _output.WriteLine($"  ✅ encoder_hidden_states 入力: {hasEncoderHiddenStates}");
-            _output.WriteLine($"  ✅ encoder_outputs 入力: {hasEncoderOutputs}");
-            _output.WriteLine($"  ✅ last_hidden_state 入力: {hasLastHiddenState}");
+            output.WriteLine($"  ✅ encoder_hidden_states 入力: {hasEncoderHiddenStates}");
+            output.WriteLine($"  ✅ encoder_outputs 入力: {hasEncoderOutputs}");
+            output.WriteLine($"  ✅ last_hidden_state 入力: {hasLastHiddenState}");
             
             if (!hasEncoderHiddenStates && !hasEncoderOutputs && !hasLastHiddenState)
             {
-                _output.WriteLine("  ⚠️  エンコーダー出力に関連する入力が見つかりません！");
-                _output.WriteLine("  💡 これが「You about you」問題の根本原因の可能性があります");
+                output.WriteLine("  ⚠️  エンコーダー出力に関連する入力が見つかりません！");
+                output.WriteLine("  💡 これが「You about you」問題の根本原因の可能性があります");
             }
             
-            _output.WriteLine("\n📋 現在の実装で使用している入力名:");
-            _output.WriteLine("  - input_ids");
-            _output.WriteLine("  - attention_mask");
-            _output.WriteLine("  - decoder_input_ids");
+            output.WriteLine("\n📋 現在の実装で使用している入力名:");
+            output.WriteLine("  - input_ids");
+            output.WriteLine("  - attention_mask");
+            output.WriteLine("  - decoder_input_ids");
             
-            _output.WriteLine("\n💡 修正すべき入力名（推測）:");
+            output.WriteLine("\n💡 修正すべき入力名（推測）:");
             foreach (var input in inputMetadata.Keys)
             {
                 if (input.Contains("encoder") || input.Contains("hidden") || input.Contains("context"))
                 {
-                    _output.WriteLine($"  - {input} ← 重要！");
+                    output.WriteLine($"  - {input} ← 重要！");
                 }
                 else
                 {
-                    _output.WriteLine($"  - {input}");
+                    output.WriteLine($"  - {input}");
                 }
             }
         }
         catch (Exception ex)
         {
-            _output.WriteLine($"❌ エラー: {ex.Message}");
-            _output.WriteLine($"詳細: {ex}");
+            output.WriteLine($"❌ エラー: {ex.Message}");
+            output.WriteLine($"詳細: {ex}");
         }
     }
 

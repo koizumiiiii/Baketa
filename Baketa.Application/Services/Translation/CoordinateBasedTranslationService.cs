@@ -72,9 +72,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
             _configurationFacade.Logger?.LogInformation("CoordinateBasedTranslationService", "統一設定サービス注入完了", new
             {
-                AutoDetectSourceLanguage = translationSettings.AutoDetectSourceLanguage,
-                DefaultSourceLanguage = translationSettings.DefaultSourceLanguage,
-                DefaultTargetLanguage = translationSettings.DefaultTargetLanguage
+                translationSettings.AutoDetectSourceLanguage,
+                translationSettings.DefaultSourceLanguage,
+                translationSettings.DefaultTargetLanguage
             });
         }
         catch (Exception ex)
@@ -331,7 +331,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 chunk.TranslatedText = translatedText;
                                 
                                 Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
-                                                $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText.Substring(0, 30) + "..." : chunk.CombinedText)}'");
+                                                $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
                                 
                                 // 🔥 [STREAMING] 即座にオーバーレイ表示を更新（Stop時は確実に中断）
                                 _ = Task.Run(async () =>
@@ -396,7 +396,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         {
                             for (int i = 0; i < Math.Min(3, batchResults.Count); i++)
                             {
-                                Console.WriteLine($"🔍 [BATCH_RESULT] Result[{i}]: '{batchResults[i].Substring(0, Math.Min(30, batchResults[i].Length))}...'");
+                                Console.WriteLine($"🔍 [BATCH_RESULT] Result[{i}]: '{batchResults[i][..Math.Min(30, batchResults[i].Length)]}...'");
                             }
                         }
                         else
@@ -644,7 +644,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 
             // Step 1: リクエストサイズの実測
             var direction = $"{sourceLanguage.Code}-{targetLanguage.Code}";
-            var request = new { batch_texts = texts, direction = direction };
+            var request = new { batch_texts = texts, direction };
             var requestJson = System.Text.Json.JsonSerializer.Serialize(request) + "\n";
             var requestBytes = System.Text.Encoding.UTF8.GetBytes(requestJson);
             
@@ -673,7 +673,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                     
                     var startTime = DateTime.Now;
-                    var taskResult = method.Invoke(transformersEngine, new object[] { texts, direction, combinedCts.Token });
+                    var taskResult = method.Invoke(transformersEngine, [texts, direction, combinedCts.Token]);
                     
                     if (taskResult is Task task)
                     {

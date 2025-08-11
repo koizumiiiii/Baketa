@@ -17,7 +17,6 @@ public sealed class OnnxCommunityTranslationEngine : ITranslationEngine
     private readonly OpusMtNativeTokenizer _tokenizer;
     private readonly LanguagePair _languagePair;
     private readonly ILogger<OnnxCommunityTranslationEngine> _logger;
-    private readonly AlphaOpusMtOptions _options;
     private bool _disposed;
 
     public string Name => "ONNX-Community Translation Engine";
@@ -29,11 +28,9 @@ public sealed class OnnxCommunityTranslationEngine : ITranslationEngine
         string decoderModelPath,
         string tokenizerModelPath,
         LanguagePair languagePair,
-        AlphaOpusMtOptions options,
         ILogger<OnnxCommunityTranslationEngine> logger)
     {
         _languagePair = languagePair ?? throw new ArgumentNullException(nameof(languagePair));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         try
