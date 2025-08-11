@@ -111,6 +111,14 @@ class PersistentOpusMtServer:
             
             translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
+            # デバッグ情報追加
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [DEBUG_DECODE] Raw output tensor: {outputs[0][:10] if len(outputs[0]) > 10 else outputs[0]}", 
+                  file=sys.stderr, flush=True)
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [DEBUG_DECODE] Translation result: {repr(translation)}", 
+                  file=sys.stderr, flush=True)
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [DEBUG_DECODE] Translation bytes: {translation.encode('utf-8')}", 
+                  file=sys.stderr, flush=True)
+            
             processing_time = time.time() - start_time
             self.translation_count += 1
             
@@ -254,156 +262,183 @@ class PersistentOpusMtServer:
     
     def handle_client(self, client_socket, client_address):
         """
-        クライアント接続処理
+        🚀 [GEMINI_FIX] バッファリング処理によるTCPスティッキーメッセージ問題解決
         """
         print(f"🔗 [{datetime.now().strftime('%H:%M:%S')}] Client connected from {client_address}", 
               file=sys.stderr, flush=True)
         
+        buffer = ""  # 🚀 [GEMINI_FIX] バッファリング変数追加
         try:
             while self.running:
-                # リクエスト受信（改行区切りJSON）
-                print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Waiting for client data...", 
+                print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] [BUFFERING] Waiting for client data...", 
                       file=sys.stderr, flush=True)
                 
-                data = client_socket.recv(4096).decode('utf-8').strip()
-                
-                print(f"📨 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Received data: length={len(data)} bytes", 
-                      file=sys.stderr, flush=True)
-                print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Data preview: {data[:200]}...", 
-                      file=sys.stderr, flush=True)
-                
-                if not data:
-                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Empty data received - client disconnected", 
+                # 🚀 [GEMINI_FIX] recv()データをバッファに追加
+                raw_data = client_socket.recv(4096)
+                if not raw_data:
+                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [BUFFERING] Empty data received - client disconnected", 
                           file=sys.stderr, flush=True)
                     break
                 
-                # 特殊コマンド処理
-                if data == "PING":
-                    print(f"🏓 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] PING command received", 
-                          file=sys.stderr, flush=True)
-                    response = {"status": "alive", "uptime_seconds": (datetime.now() - self.start_time).total_seconds(), 
-                               "translation_count": self.translation_count}
-                    client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
-                    continue
-                elif data == "SHUTDOWN":
-                    print(f"🛑 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] SHUTDOWN command received", 
-                          file=sys.stderr, flush=True)
-                    self.running = False
-                    response = {"status": "shutting_down"}
-                    client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
-                    break
+                buffer += raw_data.decode('utf-8')
                 
-                # 翻訳リクエスト処理
-                try:
-                    print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Attempting JSON parse...", 
-                          file=sys.stderr, flush=True)
-                    
-                    request = json.loads(data)
-                    
-                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] JSON parse successful: {type(request)}", 
-                          file=sys.stderr, flush=True)
-                    print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Request keys: {list(request.keys())}", 
-                          file=sys.stderr, flush=True)
-                    
-                    # バッチ翻訳リクエストかチェック
-                    if "batch_texts" in request:
-                        texts = request.get("batch_texts", [])
-                        direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
-                        
-                        print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Batch request detected: {len(texts)} texts, direction={direction}", 
-                              file=sys.stderr, flush=True)
-                        
-                        if not texts or not any(text.strip() for text in texts):
-                            print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Empty batch texts detected", 
-                                  file=sys.stderr, flush=True)
-                            response = {"success": False, "error": "Empty batch texts"}
-                        else:
-                            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Starting batch translation...", 
-                                  file=sys.stderr, flush=True)
-                            response = self.translate_batch(texts, direction)
-                            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Batch translation completed: success={response.get('success', False)}", 
-                                  file=sys.stderr, flush=True)
-                    
-                    # 単一翻訳リクエスト
-                    else:
-                        text = request.get("text", "")
-                        direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
-                        
-                        if not text:
-                            response = {"success": False, "error": "Empty text"}
-                        else:
-                            # 改行文字を含む場合はバッチ処理で対応
-                            if "\n" in text:
-                                # 改行で分割し、空行を除去
-                                text_lines = [line.strip() for line in text.split("\n") if line.strip()]
-                                
-                                if not text_lines:
-                                    response = {"success": False, "error": "Empty text after splitting"}
-                                elif len(text_lines) == 1:
-                                    # 実際は1行だった場合は通常翻訳
-                                    response = self.translate(text_lines[0], direction)
-                                else:
-                                    # 複数行の場合はバッチ翻訳して結合
-                                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] Multi-line text detected - splitting into {len(text_lines)} lines", 
-                                          file=sys.stderr, flush=True)
-                                    batch_result = self.translate_batch(text_lines, direction)
-                                    
-                                    if batch_result["success"]:
-                                        # バッチ結果を改行で結合
-                                        combined_translation = "\n".join(batch_result["translations"])
-                                        response = {
-                                            "success": True,
-                                            "translation": combined_translation,
-                                            "source": text,
-                                            "processing_time": batch_result["processing_time"],
-                                            "translation_count": batch_result["translation_count"],
-                                            "split_lines": len(text_lines)  # デバッグ用
-                                        }
-                                    else:
-                                        response = batch_result
-                            else:
-                                # 改行なしの通常翻訳
-                                response = self.translate(text, direction)
-                    
-                    # レスポンス送信
-                    print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Preparing response...", 
-                          file=sys.stderr, flush=True)
-                    
-                    response_json = json.dumps(response, ensure_ascii=False) + "\n"
-                    response_bytes = response_json.encode('utf-8')
-                    
-                    print(f"📏 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response size: {len(response_bytes)} bytes", 
-                          file=sys.stderr, flush=True)
-                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response preview: {response_json[:200]}...", 
-                          file=sys.stderr, flush=True)
-                    
-                    print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Sending response...", 
-                          file=sys.stderr, flush=True)
-                    
-                    client_socket.send(response_bytes)
-                    
-                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Response sent successfully", 
-                          file=sys.stderr, flush=True)
-                    
-                except json.JSONDecodeError as e:
-                    print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] JSON decode error: {str(e)}", 
-                          file=sys.stderr, flush=True)
-                    print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Problem data: {data}", 
-                          file=sys.stderr, flush=True)
-                    
-                    error_response = {"success": False, "error": f"Invalid JSON: {str(e)}"}
-                    error_json = json.dumps(error_response, ensure_ascii=False) + "\n"
-                    client_socket.send(error_json.encode('utf-8'))
-                    
-                    print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [VERIFICATION] Error response sent", 
-                          file=sys.stderr, flush=True)
+                print(f"📨 [{datetime.now().strftime('%H:%M:%S')}] [BUFFERING] Buffer length: {len(buffer)} chars", 
+                      file=sys.stderr, flush=True)
+                print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [BUFFERING] Buffer preview: {repr(buffer[:200])}", 
+                      file=sys.stderr, flush=True)
                 
+                # 🚀 [GEMINI_FIX] バッファ内の改行を処理してメッセージを切り出す
+                while '\n' in buffer:
+                    # 最初の改行までをメッセージとして切り出す
+                    message, buffer = buffer.split('\n', 1)
+                    
+                    if not message.strip():
+                        continue  # 空のメッセージはスキップ
+                    
+                    print(f"✂️ [{datetime.now().strftime('%H:%M:%S')}] [BUFFERING] Extracted message: {repr(message[:100])}", 
+                          file=sys.stderr, flush=True)
+                    
+                    # メッセージ処理
+                    self.process_message(message.strip(), client_socket)
+                    
+        except ConnectionResetError:
+            print(f"💥 [{datetime.now().strftime('%H:%M:%S')}] Client closed connection abruptly", 
+                  file=sys.stderr, flush=True)
         except Exception as e:
             print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] Client handling error: {e}", 
                   file=sys.stderr, flush=True)
         finally:
             client_socket.close()
             print(f"🔗 [{datetime.now().strftime('%H:%M:%S')}] Client {client_address} disconnected", 
+                  file=sys.stderr, flush=True)
+    
+    def process_message(self, data, client_socket):
+        """
+        🚀 [GEMINI_FIX] 個別メッセージ処理（バッファリングから分離）
+        """
+        print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Processing message: {repr(data[:100])}", 
+              file=sys.stderr, flush=True)
+        
+        # 特殊コマンド処理
+        if data == "PING":
+            print(f"🏓 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] PING command received", 
+                  file=sys.stderr, flush=True)
+            response = {"status": "alive", "uptime_seconds": (datetime.now() - self.start_time).total_seconds(), 
+                       "translation_count": self.translation_count}
+            client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
+            return
+            
+        elif data == "SHUTDOWN":
+            print(f"🛑 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] SHUTDOWN command received", 
+                  file=sys.stderr, flush=True)
+            self.running = False
+            response = {"status": "shutting_down"}
+            client_socket.send((json.dumps(response, ensure_ascii=False) + "\n").encode('utf-8'))
+            return
+        
+        # 翻訳リクエスト処理
+        try:
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Attempting JSON parse...", 
+                  file=sys.stderr, flush=True)
+            
+            request = json.loads(data)
+            
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] JSON parse successful: {type(request)}", 
+                  file=sys.stderr, flush=True)
+            print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Request keys: {list(request.keys())}", 
+                  file=sys.stderr, flush=True)
+            
+            # バッチ翻訳リクエストかチェック
+            if "batch_texts" in request:
+                texts = request.get("batch_texts", [])
+                direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
+                
+                print(f"📦 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Batch request detected: {len(texts)} texts, direction={direction}", 
+                      file=sys.stderr, flush=True)
+                
+                if not texts or not any(text.strip() for text in texts):
+                    print(f"⚠️ [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Empty batch texts detected", 
+                          file=sys.stderr, flush=True)
+                    response = {"success": False, "error": "Empty batch texts"}
+                else:
+                    print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Starting batch translation...", 
+                          file=sys.stderr, flush=True)
+                    response = self.translate_batch(texts, direction)
+                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Batch translation completed: success={response.get('success', False)}", 
+                          file=sys.stderr, flush=True)
+            
+            # 単一翻訳リクエスト
+            else:
+                text = request.get("text", "")
+                direction = request.get("direction", "ja-en")  # 🔄 言語方向情報取得
+                
+                if not text:
+                    response = {"success": False, "error": "Empty text"}
+                else:
+                    # 改行文字を含む場合はバッチ処理で対応
+                    if "\n" in text:
+                        # 改行で分割し、空行を除去
+                        text_lines = [line.strip() for line in text.split("\n") if line.strip()]
+                        
+                        if not text_lines:
+                            response = {"success": False, "error": "Empty text after splitting"}
+                        elif len(text_lines) == 1:
+                            # 実際は1行だった場合は通常翻訳
+                            response = self.translate(text_lines[0], direction)
+                        else:
+                            # 複数行の場合はバッチ翻訳して結合
+                            print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] Multi-line text detected - splitting into {len(text_lines)} lines", 
+                                  file=sys.stderr, flush=True)
+                            batch_result = self.translate_batch(text_lines, direction)
+                            
+                            if batch_result["success"]:
+                                # バッチ結果を改行で結合
+                                combined_translation = "\n".join(batch_result["translations"])
+                                response = {
+                                    "success": True,
+                                    "translation": combined_translation,
+                                    "source": text,
+                                    "processing_time": batch_result["processing_time"],
+                                    "translation_count": batch_result["translation_count"],
+                                    "split_lines": len(text_lines)  # デバッグ用
+                                }
+                            else:
+                                response = batch_result
+                    else:
+                        # 改行なしの通常翻訳
+                        response = self.translate(text, direction)
+            
+            # レスポンス送信
+            print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Preparing response...", 
+                  file=sys.stderr, flush=True)
+            
+            response_json = json.dumps(response, ensure_ascii=False) + "\n"
+            response_bytes = response_json.encode('utf-8')
+            
+            print(f"📏 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Response size: {len(response_bytes)} bytes", 
+                  file=sys.stderr, flush=True)
+            print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Response preview: {response_json[:200]}...", 
+                  file=sys.stderr, flush=True)
+            
+            print(f"🚀 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Sending response...", 
+                  file=sys.stderr, flush=True)
+            
+            client_socket.send(response_bytes)
+            
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Response sent successfully", 
+                  file=sys.stderr, flush=True)
+            
+        except json.JSONDecodeError as e:
+            print(f"❌ [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] JSON decode error: {str(e)}", 
+                  file=sys.stderr, flush=True)
+            print(f"📄 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Problem data: {repr(data)}", 
+                  file=sys.stderr, flush=True)
+            
+            error_response = {"success": False, "error": f"Invalid JSON: {str(e)}"}
+            error_json = json.dumps(error_response, ensure_ascii=False) + "\n"
+            client_socket.send(error_json.encode('utf-8'))
+            
+            print(f"📤 [{datetime.now().strftime('%H:%M:%S')}] [MESSAGE_PROC] Error response sent", 
                   file=sys.stderr, flush=True)
     
     def start_server(self):
