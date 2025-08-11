@@ -20,7 +20,6 @@ using Baketa.Infrastructure.Performance;
 using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
-using Baketa.Infrastructure.Translation.Complete;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.Onnx;
 using Microsoft.Extensions.DependencyInjection;
@@ -130,7 +129,8 @@ namespace Baketa.Infrastructure.DI.Modules;
                 // バックグラウンドで初期化して、UIをブロックしない
                 var logger = provider.GetService<ILogger<TransformersOpusMtEngine>>();
                 logger?.LogInformation("🚀 TransformersOpusMtEngine遅延初期化開始 - UIブロック回避");
-                return new TransformersOpusMtEngine(logger);
+                var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
+                return new TransformersOpusMtEngine(logger, settingsService);
             });
             
             // 🔧 ファサード実装バッチ処理ハング問題の修正: 具象型でも登録してServiceProviderからの直接取得を可能にする

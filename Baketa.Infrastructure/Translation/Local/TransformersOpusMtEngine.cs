@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation;
+using Baketa.Core.Abstractions.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Local;
@@ -23,12 +24,21 @@ namespace Baketa.Infrastructure.Translation.Local;
 public class TransformersOpusMtEngine : TranslationEngineBase
 {
     private readonly ILogger<TransformersOpusMtEngine> _logger;
+    private readonly IUnifiedSettingsService _settingsService;
     private readonly string _pythonPath;
     private readonly string _serverScriptPath;
     private Process? _serverProcess;
     private bool _isInitialized;
     private bool _disposed;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
+    // 🔧 [CONNECTION_POOL] 真の永続接続管理（TIME_WAIT問題解決）
+    private TcpClient? _persistentClient;
+    private NetworkStream? _persistentStream;
+    private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private DateTime _lastConnectionTime = DateTime.MinValue;
+    private int _connectionRetryCount = 0;
+    private const int MaxConnectionRetries = 3;
+    private const int ConnectionIdleTimeoutMinutes = 5;
     
     // ⚡ Phase 1.1: LRU翻訳キャッシュ（シンプル実装）
     private readonly ConcurrentDictionary<string, CacheEntry> _translationCache = new();
@@ -51,9 +61,10 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <inheritdoc/>
     public override bool RequiresNetwork => false;
 
-    public TransformersOpusMtEngine(ILogger<TransformersOpusMtEngine> logger) : base(logger)
+    public TransformersOpusMtEngine(ILogger<TransformersOpusMtEngine> logger, IUnifiedSettingsService settingsService) : base(logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
         Console.WriteLine("🔧 [DEBUG] TransformersOpusMtEngineのコンストラクタが呼び出されました");
         _logger.LogInformation("TransformersOpusMtEngineが作成されました");
@@ -312,16 +323,14 @@ public class TransformersOpusMtEngine : TranslationEngineBase
         Interlocked.Increment(ref _cacheMissCount);
         Console.WriteLine($"🔍 [CACHE_MISS] キャッシュミス - 新規翻訳実行: '{request.SourceText}'");
 
-        // ⚡ Phase 0 緊急対応: 3秒タイムアウト実装
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(TranslationTimeoutMs)); // 🔥【CRITICAL FIX】3秒→10秒に延長
-        
+        // 🚀 [TIMEOUT_FIX] 外部CancellationTokenを優先し、独自タイムアウトとの競合を解決
+        // StreamingTranslationServiceから渡される長時間タイムアウト（30-300秒）を尊重
         var startTime = DateTime.Now;
-        Console.WriteLine($"⚡ [TIMEOUT] タイムアウト付き翻訳開始 - テキスト: '{request.SourceText}' (制限: {TranslationTimeoutMs}ms)");
+        Console.WriteLine($"⚡ [EXTERNAL_TIMEOUT] 外部CancellationToken使用開始 - テキスト: '{request.SourceText}'");
         
         try
         {
-            // 常駐サーバーでの翻訳を試行（タイムアウト付き）
+            // 常駐サーバーでの翻訳を試行（外部CancellationTokenをそのまま使用）
             Console.WriteLine($"⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: '{request.SourceText}'");
             _logger?.LogDebug("⚡ [DEBUG] 常駐サーバー翻訳を試行 - テキスト: {Text}", request.SourceText);
 
@@ -334,8 +343,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             
             _logger?.LogDebug("⚡ [BOUNDARY-4] メソッド呼び出し直前の最終ログ");
 
-            // 🚨 メソッド呼び出し境界
-            var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, direction, timeoutCts.Token).ConfigureAwait(false);
+            // 🚨 [CRITICAL_FIX] 外部CancellationTokenをそのまま使用（独自タイムアウトを削除）
+            var pythonResult = await TranslateWithPersistentServerAsync(request.SourceText, direction, cancellationToken).ConfigureAwait(false);
 
             Console.WriteLine($"⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
             _logger?.LogDebug("⚡ [DEBUG] TranslateWithPersistentServerAsync呼び出し完了");
@@ -369,10 +378,19 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             }
 
             // Pythonサーバー失敗時のエラー処理
+            string userFriendlyError = pythonResult?.Error switch
+            {
+                "The operation was canceled." => "翻訳処理がキャンセルされました",
+                string error when error?.Contains("timeout") == true => "翻訳処理がタイムアウトしました",
+                string error when error?.Contains("canceled") == true => "翻訳処理がキャンセルされました",
+                null => "常駐サーバー翻訳が失敗しました", // nullの場合
+                _ => pythonResult?.Error ?? "常駐サーバー翻訳が失敗しました" // その他のエラー
+            };
+            
             var errorResponse = new TranslationResponse
             {
                 RequestId = request.RequestId,
-                TranslatedText = pythonResult?.Error ?? "常駐サーバー翻訳が失敗しました",
+                TranslatedText = userFriendlyError,
                 SourceText = request.SourceText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
@@ -385,19 +403,19 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             _logger.LogError("高速翻訳失敗 - RequestId: {RequestId}, Error: '{Error}'", errorResponse.RequestId, errorResponse.TranslatedText);
             return errorResponse;
         }
-        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // ⚡ Phase 0: 3秒タイムアウト時のフォールバック処理
+            // ⚡ [TIMEOUT_FIX] 外部CancellationTokenがキャンセルされた場合
             var timeoutElapsed = DateTime.Now - startTime;
-            Console.WriteLine($"⏰ [TIMEOUT] 翻訳タイムアウト - テキスト: '{request.SourceText}', 経過時間: {timeoutElapsed.TotalMilliseconds:F0}ms");
-            _logger.LogWarning("翻訳タイムアウト(3秒) - テキスト: '{Text}', 経過時間: {ElapsedMs}ms", 
+            Console.WriteLine($"⏰ [EXTERNAL_TIMEOUT] 外部タイムアウト/キャンセル - テキスト: '{request.SourceText}', 経過時間: {timeoutElapsed.TotalMilliseconds:F0}ms");
+            _logger.LogWarning("外部タイムアウト/キャンセル - テキスト: '{Text}', 経過時間: {ElapsedMs}ms", 
                 request.SourceText, timeoutElapsed.TotalMilliseconds);
 
-            // TODO: 将来的にはキャッシュから取得またはONNX直接推論へフォールバック
+            // 外部からのキャンセル時はユーザーフレンドリーなメッセージを返す
             return new TranslationResponse
             {
                 RequestId = request.RequestId,
-                TranslatedText = $"[TIMEOUT-3s] {request.SourceText}", // 暫定フォールバック
+                TranslatedText = "翻訳処理がキャンセルされました",
                 SourceText = request.SourceText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
@@ -458,11 +476,11 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             Console.WriteLine($"🚀 [SERVER_DEBUG] 常駐Pythonサーバー起動開始");
             _logger.LogInformation("常駐Pythonサーバーを起動中...");
             
-            // 🔧 [PYTHON_FIX] PowerShell経由でPython実行（pyenv-win問題回避）
+            // 🔧 [PYTHON_FIX] 統一されたPython実行（pyenv-win問題回避）
             var processInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-Command \"python '{_serverScriptPath}'\"",
+                Arguments = $"-Command \"{_pythonPath} '{_serverScriptPath}'\"", // _pythonPath（"py"）を使用
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -471,11 +489,53 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 StandardErrorEncoding = Encoding.UTF8
             };
             
+            Console.WriteLine($"🚀 [SERVER_DEBUG] サーバー起動コマンド: {processInfo.FileName} {processInfo.Arguments}");
+            _logger?.LogInformation("🚀 [SERVER_DEBUG] サーバー起動コマンド: {FileName} {Arguments}", processInfo.FileName, processInfo.Arguments);
+            
             _serverProcess = new Process { StartInfo = processInfo };
             _serverProcess.Start();
             
             Console.WriteLine($"🚀 [SERVER_DEBUG] サーバープロセス起動 - PID: {_serverProcess.Id}");
             _logger.LogInformation("サーバープロセス起動 - PID: {ProcessId}", _serverProcess.Id);
+            
+            // サーバープロセスの標準出力/エラー出力を監視
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    while (!_serverProcess.StandardOutput.EndOfStream)
+                    {
+                        var line = _serverProcess.StandardOutput.ReadLine();
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            Console.WriteLine($"[PYTHON_STDOUT] {line}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[PYTHON_STDOUT_ERROR] {ex.Message}");
+                }
+            });
+            
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    while (!_serverProcess.StandardError.EndOfStream)
+                    {
+                        var line = _serverProcess.StandardError.ReadLine();
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            Console.WriteLine($"[PYTHON_STDERR] {line}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[PYTHON_STDERR_ERROR] {ex.Message}");
+                }
+            });
             
             // サーバーが起動するまで待機（最大60秒、モデルロード時間を考慮）
             var startTime = DateTime.Now;
@@ -489,6 +549,14 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 
                 var elapsedTime = DateTime.Now - startTime;
                 Console.WriteLine($"⏱️ [SERVER_DEBUG] サーバー接続試行中... 経過時間: {elapsedTime.TotalSeconds:F1}秒");
+                
+                // プロセス終了チェック
+                if (_serverProcess.HasExited)
+                {
+                    Console.WriteLine($"💥 [SERVER_DEBUG] Pythonサーバープロセスが異常終了しました - ExitCode: {_serverProcess.ExitCode}");
+                    _logger?.LogError("Pythonサーバープロセスが異常終了しました - ExitCode: {ExitCode}", _serverProcess.ExitCode);
+                    return false;
+                }
                 
                 if (await CheckServerHealthAsync().ConfigureAwait(false))
                 {
@@ -714,15 +782,31 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             // キャンセレーション確認
             cancellationToken.ThrowIfCancellationRequested();
 
-            // サーバーの健全性確認
+            // サーバーの健全性確認（バッチ翻訳前の詳細チェック）
+            Console.WriteLine("🔍 [BATCH_DEBUG] サーバー健全性確認開始");
+            _logger?.LogInformation("🔍 [BATCH_DEBUG] サーバー健全性確認開始");
+            
             if (!await CheckServerHealthAsync().ConfigureAwait(false))
             {
-                _logger?.LogWarning("サーバーに接続できません。再起動を試行します");
+                Console.WriteLine("⚠️ [BATCH_DEBUG] サーバー接続失敗 - 再起動を試行");
+                _logger?.LogWarning("⚠️ [BATCH_DEBUG] サーバー接続失敗 - 再起動を試行します");
                 
                 if (!await StartPersistentServerAsync().ConfigureAwait(false))
                 {
-                    return new BatchTranslationResult { Success = false, Error = "サーバー接続に失敗しました" };
+                    Console.WriteLine("💥 [BATCH_DEBUG] サーバー再起動失敗 - バッチ翻訳中止");
+                    _logger?.LogError("💥 [BATCH_DEBUG] サーバー再起動失敗 - バッチ翻訳中止");
+                    return new BatchTranslationResult { Success = false, Error = "サーバー接続に失敗しました - Pythonサーバーが起動していない可能性があります" };
                 }
+                else 
+                {
+                    Console.WriteLine("✅ [BATCH_DEBUG] サーバー再起動成功");
+                    _logger?.LogInformation("✅ [BATCH_DEBUG] サーバー再起動成功");
+                }
+            }
+            else
+            {
+                Console.WriteLine("✅ [BATCH_DEBUG] サーバー健全性確認OK");
+                _logger?.LogInformation("✅ [BATCH_DEBUG] サーバー健全性確認OK");
             }
             
             _logger?.LogInformation("🔗 [BATCH_DETAIL_1] TcpClient作成前");
@@ -752,6 +836,15 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
             
             Console.WriteLine($"🔥 [BATCH_PROTOCOL] 修正版バッチリクエスト送信 - オリジナル: {texts.Count}件, サニタイズ済み: {sanitizedTexts.Count}件");
+            Console.WriteLine($"📋 [BATCH_JSON_REQUEST] バッチリクエストJSON: {requestJson.TrimEnd()}");
+            Console.WriteLine($"🔢 [BATCH_JSON_REQUEST] バッチリクエストバイト数: {requestBytes.Length}, 文字列長: {requestJson.Length}");
+            
+            // サニタイズ前後の比較ログ
+            for (int i = 0; i < Math.Min(3, texts.Count); i++)
+            {
+                Console.WriteLine($"📝 [SANITIZE_DEBUG] Text[{i}] Before: '{texts[i]}' After: '{sanitizedTexts[i]}'");
+            }
+            
             _logger?.LogInformation("バッチ翻訳プロトコル修正版でリクエスト送信 - テキスト数: {Count}", sanitizedTexts.Count);
             
             _logger?.LogInformation("📤 [BATCH_SERVER] バッチリクエスト送信 - サイズ: {Size} bytes", requestBytes.Length);
@@ -764,7 +857,9 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             var extraTimeoutForBatch = texts.Count * 1000; // テキスト数に応じて動的追加
             _logger?.LogInformation("⏰ [BATCH_DETAIL_6] ReadAsync準備 - 動的追加タイムアウト: {ExtraTimeout}ms", extraTimeoutForBatch);
             
-            using var cts = CreateUnifiedReadTimeout("BatchTranslation", extraTimeoutForBatch);
+            // 🚀 [TIMEOUT_FIX] 外部CancellationTokenを直接使用（統一タイムアウトを削除）
+// using var cts = CreateUnifiedReadTimeout("BatchTranslation", extraTimeoutForBatch);
+Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッチReadAsync実行 - StreamingServiceのタイムアウト設定を尊重");
             var buffer = new byte[65536]; // 64KB に拡張してバッファ不足を解決
             var allData = new List<byte>();
             int totalBytesRead = 0;
@@ -774,7 +869,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             // ストリーム終端まで確実に読み取るループ処理
             while (true)
             {
-                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
+                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0) 
                 {
                     _logger?.LogDebug("📨 [TCP_FIX] ストリーム終了を検出 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
@@ -803,30 +898,54 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             _logger?.LogInformation("✅ [TCP_FIX] 改良版ReadAsync完了 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
             
             var responseJson = Encoding.UTF8.GetString(allData.ToArray());
+            Console.WriteLine($"📨 [BATCH_DEBUG] レスポンス内容（最初の500文字）: {responseJson.Substring(0, Math.Min(500, responseJson.Length))}...");
             _logger?.LogInformation("📨 [BATCH_DETAIL_9] レスポンス内容: {ResponseJson}", responseJson);
             
-            var response = JsonSerializer.Deserialize<BatchTranslationResult>(responseJson);
-            
-            // 🔥 [GEMINI_PHASE1] バッチ翻訳結果の復元処理
-            if (response != null && response.Translations != null)
+            // JSONデシリアライゼーション前の検証
+            if (string.IsNullOrWhiteSpace(responseJson))
             {
-                response.Translations = response.Translations
-                    .Select(RestoreTextFromBatchTranslation)
-                    .ToList();
-                    
-                Console.WriteLine($"🔥 [BATCH_PROTOCOL] バッチ翻訳結果復元完了 - 復元件数: {response.Translations.Count}");
-                _logger?.LogInformation("バッチ翻訳結果復元完了 - 復元件数: {Count}", response.Translations.Count);
+                Console.WriteLine("💥 [BATCH_DEBUG] 空のレスポンスを受信");
+                return new BatchTranslationResult { Success = false, Error = "空のレスポンスを受信しました" };
             }
             
-            var processingTime = DateTime.Now - startTime;
-            _logger?.LogInformation("✅ [BATCH_SERVER] バッチ翻訳完了 - 処理時間: {ProcessingTime:F3}秒", processingTime.TotalSeconds);
-            
-            if (response != null)
+            try
             {
-                response.ProcessingTime = processingTime.TotalSeconds;
+                var response = JsonSerializer.Deserialize<BatchTranslationResult>(responseJson);
+                Console.WriteLine($"✅ [BATCH_DEBUG] JSON デシリアライゼーション成功 - Success: {response?.Success ?? false}");
+                
+                if (response?.Success != true)
+                {
+                    Console.WriteLine($"⚠️ [BATCH_DEBUG] Pythonサーバーからエラーレスポンス: {response?.Error ?? "不明なエラー"}");
+                    return response ?? new BatchTranslationResult { Success = false, Error = "レスポンスデシリアライゼーション失敗" };
+                }
+                
+                // 🔥 [GEMINI_PHASE1] バッチ翻訳結果の復元処理
+                if (response != null && response.Translations != null)
+                {
+                    response.Translations = response.Translations
+                        .Select(RestoreTextFromBatchTranslation)
+                        .ToList();
+                        
+                    Console.WriteLine($"🔥 [BATCH_PROTOCOL] バッチ翻訳結果復元完了 - 復元件数: {response.Translations.Count}");
+                    _logger?.LogInformation("バッチ翻訳結果復元完了 - 復元件数: {Count}", response.Translations.Count);
+                }
+                
+                var processingTime = DateTime.Now - startTime;
+                _logger?.LogInformation("✅ [BATCH_SERVER] バッチ翻訳完了 - 処理時間: {ProcessingTime:F3}秒", processingTime.TotalSeconds);
+                
+                if (response != null)
+                {
+                    response.ProcessingTime = processingTime.TotalSeconds;
+                }
+                
+                return response;
             }
-            
-            return response;
+            catch (JsonException jsonEx)
+            {
+                Console.WriteLine($"💥 [BATCH_DEBUG] JSON デシリアライゼーション失敗: {jsonEx.Message}");
+                _logger?.LogError(jsonEx, "JSON デシリアライゼーション失敗");
+                return new BatchTranslationResult { Success = false, Error = $"JSONパースエラー: {jsonEx.Message}" };
+            }
         }
         catch (Exception ex)
         {
@@ -839,6 +958,140 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <summary>
     /// 常駐サーバーを使った高速翻訳（改行文字対応版）
     /// </summary>
+    /// <summary>
+    /// 🔧 [CONNECTION_POOL] 永続的なTCP接続を取得または作成
+    /// TIME_WAIT問題を解決するための接続再利用メカニズム
+    /// </summary>
+    private async Task<NetworkStream> GetOrCreatePersistentConnectionAsync(CancellationToken cancellationToken)
+    {
+        await _connectionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // 既存接続の有効性チェック
+            if (_persistentClient?.Connected == true && _persistentStream != null)
+            {
+                // アイドルタイムアウトチェック
+                var idleTime = DateTime.Now - _lastConnectionTime;
+                if (idleTime.TotalMinutes < ConnectionIdleTimeoutMinutes)
+                {
+                    try
+                    {
+                        // 接続の生存確認（ゼロバイト送信）
+                        if (_persistentClient.Client.Poll(0, SelectMode.SelectRead))
+                        {
+                            var buffer = new byte[1];
+                            if (_persistentClient.Client.Receive(buffer, SocketFlags.Peek) == 0)
+                            {
+                                // 接続が切断されている
+                                Console.WriteLine($"🔄 [PERSISTENT_CONNECTION] 接続切断を検出 - 再接続が必要");
+                            }
+                            else
+                            {
+                                // 接続は生きている
+                                Console.WriteLine($"✅ [PERSISTENT_CONNECTION] 既存接続を再利用 - アイドル時間: {idleTime.TotalSeconds:F1}秒");
+                                _lastConnectionTime = DateTime.Now;
+                                _connectionRetryCount = 0; // リトライカウントをリセット
+                                return _persistentStream;
+                            }
+                        }
+                        else
+                        {
+                            // 接続は生きている
+                            Console.WriteLine($"✅ [PERSISTENT_CONNECTION] 既存接続を再利用 - アイドル時間: {idleTime.TotalSeconds:F1}秒");
+                            _lastConnectionTime = DateTime.Now;
+                            _connectionRetryCount = 0;
+                            return _persistentStream;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"⚠️ [PERSISTENT_CONNECTION] 接続チェック中にエラー: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⏰ [PERSISTENT_CONNECTION] アイドルタイムアウト - {idleTime.TotalMinutes:F1}分経過");
+                }
+            }
+
+            // 既存接続のクリーンアップ
+            DisposePersistentConnection();
+
+            // リトライ制限チェック
+            if (_connectionRetryCount >= MaxConnectionRetries)
+            {
+                throw new InvalidOperationException($"接続の確立に{MaxConnectionRetries}回失敗しました");
+            }
+
+            // 新しい永続接続を作成
+            Console.WriteLine($"🔌 [PERSISTENT_CONNECTION] 新しい永続接続を確立中... (リトライ: {_connectionRetryCount}/{MaxConnectionRetries})");
+            
+            _persistentClient = new TcpClient();
+            
+            // Keep-Alive設定で接続を維持
+            ConfigureKeepAlive(_persistentClient);
+            
+            // 接続タイムアウトを設定
+            var connectTask = _persistentClient.ConnectAsync(ServerHost, ServerPort);
+            var timeoutTask = Task.Delay(ConnectionTimeoutMs, cancellationToken);
+            
+            if (await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false) == timeoutTask)
+            {
+                _connectionRetryCount++;
+                _persistentClient?.Dispose();
+                _persistentClient = null;
+                throw new TimeoutException($"サーバー接続がタイムアウトしました ({ConnectionTimeoutMs}ms)");
+            }
+            
+            await connectTask.ConfigureAwait(false);
+            _persistentStream = _persistentClient.GetStream();
+            _lastConnectionTime = DateTime.Now;
+            _connectionRetryCount = 0;
+            
+            Console.WriteLine($"✅ [PERSISTENT_CONNECTION] 新しい永続接続を確立完了 - {ServerHost}:{ServerPort}");
+            _logger.LogInformation("永続TCP接続を確立しました - {Host}:{Port}", ServerHost, ServerPort);
+            
+            return _persistentStream;
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 🧹 [CONNECTION_POOL] 永続接続を破棄
+    /// </summary>
+    private void DisposePersistentConnection()
+    {
+        try
+        {
+            if (_persistentStream != null)
+            {
+                _persistentStream.Close();
+                _persistentStream.Dispose();
+                _persistentStream = null;
+                Console.WriteLine($"🧹 [PERSISTENT_CONNECTION] ストリームを破棄");
+            }
+            
+            if (_persistentClient != null)
+            {
+                if (_persistentClient.Connected)
+                {
+                    _persistentClient.Close();
+                }
+                _persistentClient.Dispose();
+                _persistentClient = null;
+                Console.WriteLine($"🧹 [PERSISTENT_CONNECTION] クライアント接続を破棄");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ [PERSISTENT_CONNECTION] 接続破棄中にエラー: {ex.Message}");
+            _logger.LogWarning(ex, "永続接続の破棄中にエラーが発生しました");
+        }
+    }
+
     private async Task<PersistentTranslationResult?> TranslateWithPersistentServerAsync(string text, string direction, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🔥🔥🔥 [NEWLINE_DEBUG] TransformersOpusMtEngine.TranslateWithPersistentServerAsync 実行中！🔥🔥🔥");
@@ -933,17 +1186,11 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 }
             }
             
-            using var client = new TcpClient();
-            
-            // 🔥 [GEMINI_PHASE1] Keep-Alive設定でアイドル切断防止
-            ConfigureKeepAlive(client);
-            
-            await client.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+            // 🔧 [CONNECTION_POOL] 永続接続を取得（毎回新規作成ではなく再利用）
+            var stream = await GetOrCreatePersistentConnectionAsync(cancellationToken).ConfigureAwait(false);
             
             // キャンセレーション再確認
             cancellationToken.ThrowIfCancellationRequested();
-            
-            var stream = client.GetStream();
             
             // 🔥 [GEMINI_PHASE1] 個別翻訳プロトコル修正: 改行文字の適切な前処理
             var sanitizedText = SanitizeTextForBatchTranslation(text);
@@ -957,38 +1204,114 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             var requestBytes = Encoding.UTF8.GetBytes(requestJson);
             
             Console.WriteLine($"🔥 [SINGLE_PROTOCOL] 修正版個別リクエスト送信 - オリジナル長: {text.Length}, サニタイズ後: {sanitizedText.Length}");
+            Console.WriteLine($"📋 [JSON_REQUEST] 送信JSONリクエスト: {requestJson.TrimEnd()}");
+            Console.WriteLine($"🔢 [JSON_REQUEST] リクエストバイト数: {requestBytes.Length}, 文字列長: {requestJson.Length}");
             
-            await stream.WriteAsync(requestBytes, 0, requestBytes.Length).ConfigureAwait(false);
-            
-            // 🔥 [GEMINI_PHASE1] 統一タイムアウト戦略でReadAsync実行
-            using var cts = CreateUnifiedReadTimeout("SingleTranslation");
-            var buffer = new byte[4096];
-            var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
-            
-            var responseJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
-            
-            var response = JsonSerializer.Deserialize<PersistentTranslationResult>(responseJson);
-            
-            // 🔥 [GEMINI_PHASE1] 個別翻訳結果の復元処理
-            if (response != null && !string.IsNullOrEmpty(response.Translation))
+            // リクエスト送信前に接続状態を再確認
+            if (_persistentClient?.Connected != true)
             {
-                response.Translation = RestoreTextFromBatchTranslation(response.Translation);
-                Console.WriteLine($"🔥 [SINGLE_PROTOCOL] 個別翻訳結果復元完了 - 復元後: '{response.Translation}'");
+                Console.WriteLine($"⚠️ [PERSISTENT_CONNECTION] 接続が切断されています - 再接続を試行");
+                stream = await GetOrCreatePersistentConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
             
-            var processingTime = DateTime.Now - startTime;
-            Console.WriteLine($"⚡ [SERVER_TRANSLATE] 翻訳完了 - 処理時間: {processingTime.TotalSeconds:F3}秒, 翻訳: '{response?.Translation}'");
-            _logger.LogInformation("常駐サーバー翻訳完了 - 処理時間: {ProcessingTimeSeconds}秒", processingTime.TotalSeconds);
-            
-            return response;
+            try
+            {
+                await stream.WriteAsync(requestBytes, 0, requestBytes.Length, cancellationToken).ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false); // データを確実に送信
+                
+                // 🚀 [JSON_STREAM_FIX] StreamReaderを使用して改行区切りJSONを正しく読み取る
+                Console.WriteLine($"⚡ [JSON_STREAM_FIX] StreamReaderで改行区切りJSON読み取り開始");
+                
+                // StreamReaderを使用して1行ずつ読み取る（Pythonサーバーは改行区切りで送信）
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+                var responseJson = await reader.ReadLineAsync().ConfigureAwait(false);
+                
+                if (string.IsNullOrEmpty(responseJson))
+                {
+                    Console.WriteLine($"❌ [JSON_STREAM_FIX] 空のレスポンスを受信");
+                    return new PersistentTranslationResult 
+                    { 
+                        Success = false, 
+                        Error = "Empty response from server",
+                        Source = text
+                    };
+                }
+                
+                Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
+                Console.WriteLine($"🔢 [JSON_RESPONSE] レスポンス文字数: {responseJson?.Length}, IsNull: {responseJson == null}");
+                Console.WriteLine($"🔍 [JSON_RESPONSE] レスポンス先頭100文字: {responseJson?.Substring(0, Math.Min(100, responseJson?.Length ?? 0))}");
+                
+                PersistentTranslationResult? response;
+                try
+                {
+                    response = JsonSerializer.Deserialize<PersistentTranslationResult>(responseJson);
+                    Console.WriteLine($"✅ [JSON_DESERIALIZE] JSONデシリアライゼーション成功");
+                }
+                catch (JsonException jsonEx)
+                {
+                    Console.WriteLine($"❌ [JSON_DESERIALIZE] JSONデシリアライゼーション失敗: {jsonEx.Message}");
+                    Console.WriteLine($"📄 [JSON_DESERIALIZE] 問題のあるJSONデータ: {responseJson}");
+                    
+                    return new PersistentTranslationResult 
+                    { 
+                        Success = false, 
+                        Error = $"JSON parsing failed: {jsonEx.Message}",
+                        Source = text
+                    };
+                }
+                
+                // 🚨 [CRITICAL_FIX] レスポンスエラーチェック - エラーレスポンスを翻訳結果として表示しない
+                if (response?.Success == false && !string.IsNullOrEmpty(response.Error))
+                {
+                    Console.WriteLine($"❌ [SERVER_ERROR] Pythonサーバーエラー: {response.Error}");
+                    Console.WriteLine($"📄 [SERVER_ERROR] 元のテキスト: '{text}'");
+                    
+                    return new PersistentTranslationResult 
+                    { 
+                        Success = false, 
+                        Error = $"Server error: {response.Error}",
+                        Source = text
+                    };
+                }
+                
+                // 🔥 [GEMINI_PHASE1] 個別翻訳結果の復元処理（成功時のみ）
+                if (response != null && response.Success && !string.IsNullOrEmpty(response.Translation))
+                {
+                    response.Translation = RestoreTextFromBatchTranslation(response.Translation);
+                    Console.WriteLine($"🔥 [SINGLE_PROTOCOL] 個別翻訳結果復元完了 - 復元後: '{response.Translation}'");
+                }
+                
+                var processingTime = DateTime.Now - startTime;
+                Console.WriteLine($"⚡ [SERVER_TRANSLATE] 翻訳完了 - 処理時間: {processingTime.TotalSeconds:F3}秒, 成功: {response?.Success}, 翻訳: '{response?.Translation}'");
+                _logger.LogInformation("常駐サーバー翻訳完了 - 処理時間: {ProcessingTimeSeconds}秒", processingTime.TotalSeconds);
+                
+                return response;
+            }
+            catch (IOException ioEx)
+            {
+                // ネットワークエラーの場合は接続をリセット
+                Console.WriteLine($"💥 [PERSISTENT_CONNECTION] IOエラー発生 - 接続をリセット: {ioEx.Message}");
+                DisposePersistentConnection();
+                _connectionRetryCount++;
+                throw;
+            }
         }
         catch (Exception ex)
         {
             var processingTime = DateTime.Now - startTime;
+            
+            // OperationCanceledExceptionの場合は適切なエラーメッセージを設定
+            string errorMessage = ex switch
+            {
+                OperationCanceledException => "翻訳処理がキャンセルされました",
+                TimeoutException => "翻訳処理がタイムアウトしました",
+                IOException => "ネットワークエラーが発生しました",
+                _ => "翻訳処理中にエラーが発生しました"
+            };
+            
             Console.WriteLine($"💥 [SERVER_TRANSLATE] 翻訳エラー: {ex.Message} - 処理時間: {processingTime.TotalSeconds:F3}秒");
             _logger.LogError(ex, "常駐サーバー翻訳中にエラーが発生しました");
-            return new PersistentTranslationResult { Success = false, Error = ex.Message };
+            return new PersistentTranslationResult { Success = false, Error = errorMessage };
         }
     }
 
@@ -1238,11 +1561,23 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <inheritdoc/>
     public override async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
     {
-        // ✅ 両方向翻訳サポート: 日→英、英→日の両方をサポート
-        return (languagePair.SourceLanguage.Equals(Language.Japanese) && 
-                languagePair.TargetLanguage.Equals(Language.English)) ||
-               (languagePair.SourceLanguage.Equals(Language.English) && 
-                languagePair.TargetLanguage.Equals(Language.Japanese));
+        await Task.Delay(1).ConfigureAwait(false); // 非同期処理をシミュレート
+        
+        // 🚨 緊急修正: 言語コードによる直接比較で確実性を向上
+        var sourceCode = languagePair.SourceLanguage.Code?.ToLowerInvariant();
+        var targetCode = languagePair.TargetLanguage.Code?.ToLowerInvariant();
+        
+        Console.WriteLine($"🔍 [LANGUAGE_SUPPORT] 言語ペアチェック: '{sourceCode}' → '{targetCode}'");
+        _logger.LogDebug("🔍 [LANGUAGE_SUPPORT] 言語ペアチェック: '{Source}' → '{Target}'", sourceCode, targetCode);
+        
+        // ✅ 両方向翻訳サポート: en↔ja の両方をサポート
+        var isSupported = (sourceCode == "ja" && targetCode == "en") ||
+                         (sourceCode == "en" && targetCode == "ja");
+                         
+        Console.WriteLine($"✅ [LANGUAGE_SUPPORT] サポート結果: {isSupported}");
+        _logger.LogDebug("✅ [LANGUAGE_SUPPORT] サポート結果: {IsSupported}", isSupported);
+        
+        return isSupported;
     }
     
     /// <summary>
@@ -1251,21 +1586,47 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     /// <param name="sourceLanguage">ソース言語</param>
     /// <param name="targetLanguage">ターゲット言語</param>
     /// <returns>翻訳方向 ("ja-en" または "en-ja")</returns>
-    private static string GetTranslationDirection(Language sourceLanguage, Language targetLanguage)
+    private string GetTranslationDirection(Language sourceLanguage, Language targetLanguage)
     {
+        // 🚀 [修正] 設定サービスから言語設定を取得
+        var translationSettings = _settingsService.GetTranslationSettings();
+        
+        // 設定から言語コードを取得
+        var defaultSourceLang = translationSettings.DefaultSourceLanguage;
+        var defaultTargetLang = translationSettings.DefaultTargetLanguage;
+        
+        Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定から読み込み: Source={defaultSourceLang}, Target={defaultTargetLang}");
+        
+        // 設定に基づいた言語方向の決定
+        if (string.Equals(defaultSourceLang, "en", StringComparison.OrdinalIgnoreCase) && 
+            string.Equals(defaultTargetLang, "ja", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: en-ja");
+            return "en-ja";
+        }
+        else if (string.Equals(defaultSourceLang, "ja", StringComparison.OrdinalIgnoreCase) && 
+                 string.Equals(defaultTargetLang, "en", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: ja-en");
+            return "ja-en";
+        }
+        
+        // フォールバック: パラメータから判定（従来ロジック）
         if (sourceLanguage.Equals(Language.Japanese) && targetLanguage.Equals(Language.English))
         {
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: ja-en");
             return "ja-en";
         }
         else if (sourceLanguage.Equals(Language.English) && targetLanguage.Equals(Language.Japanese))
         {
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: en-ja");
             return "en-ja";
         }
-        else
-        {
-            // デフォルト: 日→英（既存の動作を維持）
-            return "ja-en";
-        }
+        
+        // 最終フォールバック: 設定に基づくデフォルト
+        var fallbackDirection = $"{defaultSourceLang}-{defaultTargetLang}";
+        Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 最終フォールバック: {fallbackDirection}");
+        return fallbackDirection;
     }
 
     /// <inheritdoc/>
@@ -1298,6 +1659,10 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             {
                 _logger.LogError(ex, "常駐サーバー停止中にエラーが発生しました");
             }
+            
+            // 🧹 [CONNECTION_POOL] 永続接続のクリーンアップ
+            DisposePersistentConnection();
+            _connectionLock?.Dispose();
             
             _serverLock?.Dispose();
             _logger.LogInformation("OPUS-MT Transformers翻訳エンジンが破棄されました");
