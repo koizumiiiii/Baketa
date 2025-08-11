@@ -33,7 +33,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 {
     private readonly ITranslationProcessingFacade _processingFacade;
     private readonly IConfigurationFacade _configurationFacade;
-    private readonly IServiceProvider _serviceProvider;
+    // 🚀 [Phase 2.1] Service Locator Anti-pattern完全除去: _serviceProviderフィールド削除
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IStreamingTranslationService? _streamingTranslationService;
@@ -42,17 +42,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     public CoordinateBasedTranslationService(
         ITranslationProcessingFacade processingFacade,
         IConfigurationFacade configurationFacade,
-        IServiceProvider serviceProvider,
+        IStreamingTranslationService? streamingTranslationService,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
         _configurationFacade = configurationFacade ?? throw new ArgumentNullException(nameof(configurationFacade));
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _streamingTranslationService = streamingTranslationService;
         _logger = logger;
         
-        // 🔥 [STREAMING] ストリーミング翻訳サービスとイベントアグリゲータを取得
-        _streamingTranslationService = _serviceProvider.GetService<IStreamingTranslationService>();
-        _eventAggregator = _serviceProvider.GetService<IEventAggregator>();
+        // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
+        _eventAggregator = _configurationFacade.EventAggregator;
         
         if (_streamingTranslationService != null)
         {
@@ -179,16 +178,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
             
-            // 🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行を無効化してバッチ翻訳を直接実行
-            Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止");
-            // 🔥 [FILE_CONFLICT_FIX_7] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行をスキップ - 個別翻訳の大量発行を防止");
+            // 🚀 [PHASE_2_2_FIX] OCR完了イベント発行を再有効化 - 非同期バッチ処理で65秒遅延解決
+            _logger?.LogInformation("🚀 [PHASE_2_2] OCR完了イベント発行を再開 - バッチ処理最適化済み");
                 
-            // await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
             
-            Console.WriteLine($"🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行");
-            // 🔥 [FILE_CONFLICT_FIX_8] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🚨 [ROOT_CAUSE_FIX] OCR完了イベント発行スキップ完了 - バッチ翻訳処理に移行");
+            _logger?.LogInformation("🚀 [PHASE_2_2] OCR完了イベント発行完了 - 後続処理は非同期で並列実行");
             
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
@@ -318,6 +313,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     if (_streamingTranslationService != null)
                     {
                         Console.WriteLine("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
+                        
+                        // 🚨 [BATCH_CRITICAL] ストリーミング翻訳サービス呼び出し前の詳細ログ
+                        Console.WriteLine($"🚨 [BATCH_STREAMING] ストリーミング翻訳呼び出し前 - StreamingService: {_streamingTranslationService?.GetType().Name}");
+                        Console.WriteLine($"🔍 [BATCH_STREAMING] バッチテキスト数: {batchTexts?.Count}, SourceLang: {sourceLanguage?.Code}, TargetLang: {targetLanguage?.Code}");
+                        Console.WriteLine($"🔍 [TRANSLATION_FLOW] バッチ翻訳開始 - テキスト数: {batchTexts.Count}, 言語: {sourceLanguage.Code} → {targetLanguage.Code}");
+                        
                         // 🔥 [FILE_CONFLICT_FIX_13] ファイルアクセス競合回避のためILogger使用
                         _logger?.LogDebug("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
                         
@@ -374,6 +375,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         // キャンセル要求を無視せず、適切に伝播
                         var translationToken = cancellationToken;
                         
+                        Console.WriteLine($"🚀 [BATCH_TRANSLATION] TranslateBatchWithStreamingAsync呼び出し直前");
+                        
+                        // 🚨 [BATCH_CRITICAL] StreamingService呼び出し直前の最終確認ログ
+                        Console.WriteLine($"🚨 [FINAL_CHECK] StreamingService.TranslateBatchWithStreamingAsync呼び出し直前");
+                        Console.WriteLine($"🔍 [FINAL_CHECK] テキスト配列: [{string.Join(", ", batchTexts.Take(3).Select(t => $"'{t.Substring(0, Math.Min(20, t.Length))}...'"))}]");
+                        
                         batchResults = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
                             batchTexts,
                             sourceLanguage,
@@ -381,7 +388,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                             OnChunkCompleted,
                             translationToken).ConfigureAwait(false);
                         
-                        Console.WriteLine($"✅ [STREAMING] ストリーミング翻訳完了 - 結果数: {batchResults.Count}");
+                        Console.WriteLine($"✅ [BATCH_TRANSLATION] TranslateBatchWithStreamingAsync完了 - 結果数: {batchResults?.Count ?? 0}");
+                        
+                        // 🚨 [BATCH_RESULT] 結果詳細のログ出力
+                        Console.WriteLine($"🚨 [BATCH_RESULT] TranslateBatchWithStreamingAsync完了後の詳細ログ");
+                        if (batchResults != null && batchResults.Count > 0)
+                        {
+                            for (int i = 0; i < Math.Min(3, batchResults.Count); i++)
+                            {
+                                Console.WriteLine($"🔍 [BATCH_RESULT] Result[{i}]: '{batchResults[i].Substring(0, Math.Min(30, batchResults[i].Length))}...'");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"❌ [BATCH_RESULT] 翻訳結果が空または null");
+                        }
+                        Console.WriteLine($"✅ [STREAMING] ストリーミング翻訳完了 - 結果数: {batchResults?.Count ?? 0}");
                     }
                     else
                     {
@@ -601,6 +623,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         Language targetLanguage,
         CancellationToken cancellationToken)
     {
+        // 🚨 [CRITICAL_DEBUG] メソッド開始の即座ログ出力
+        Console.WriteLine($"🚨 [BATCH_CRITICAL] TranslateBatchAsync開始 - テキスト数: {texts?.Count ?? 0}");
+        Console.WriteLine($"🔍 [BATCH_LANGUAGE] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName})");
+        
         _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}");
         // 🔥 [FILE_CONFLICT_FIX_18] ファイルアクセス競合回避のためILogger使用
@@ -608,7 +634,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _processingFacade.TranslationService?.GetType().Name);
         
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
-        var transformersEngine = _serviceProvider.GetService<TransformersOpusMtEngine>();
+        // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
+        var transformersEngine = _processingFacade.TranslationService as TransformersOpusMtEngine;
         if (transformersEngine != null)
         {
             Console.WriteLine($"🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
@@ -784,15 +811,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             }
             _logger?.LogInformation("❌ [BATCH_DEBUG] 直接キャスト失敗");
 
-            // TranslationServiceから依存関係注入でTransformersOpusMtEngineを取得
-            var transformersEngine = _serviceProvider.GetService<TransformersOpusMtEngine>();
+            // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
+            // 注意: ServiceProvider直接アクセスを除去し、ファサード経由でアクセス
+            var transformersEngine = _processingFacade.TranslationService as TransformersOpusMtEngine;
             if (transformersEngine != null)
             {
-                _logger?.LogInformation("✅ [BATCH_DEBUG] ServiceProvider経由で取得成功: {EngineType}", transformersEngine.GetType().Name);
+                _logger?.LogInformation("✅ [BATCH_DEBUG] ファサード経由で取得成功: {EngineType}", transformersEngine.GetType().Name);
                 engine = transformersEngine;
                 return true;
             }
-            _logger?.LogInformation("❌ [BATCH_DEBUG] ServiceProvider経由での取得失敗");
+            _logger?.LogInformation("❌ [BATCH_DEBUG] ファサード経由での取得失敗");
 
             // リフレクションを使ってDefaultTranslationServiceから探索
             var serviceType = _processingFacade.TranslationService.GetType();
