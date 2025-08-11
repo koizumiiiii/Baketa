@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Baketa.Core.Constants;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -245,7 +246,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             appSettings.DefaultTargetLanguage,
             appSettings.DefaultEngine.ToString(),
             true, // ユーザー設定がない場合はローカルエンジンを使用
-            0.7, // デフォルト信頼度しきい値
+            BaketaConstants.Ocr.DefaultConfidenceThreshold, // デフォルト信頼度しきい値
             appSettings.TimeoutSeconds * 1000); // 秒をミリ秒に変換
     }
 
@@ -276,7 +277,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         return new UnifiedOcrSettings(
             "ja", // デフォルト言語
             appSettings.ConfidenceThreshold,
-            30000, // デフォルトタイムアウト30秒
+            BaketaConstants.Ocr.DefaultTimeoutMs, // デフォルトタイムアウト30秒
             appSettings.AutoOptimizationEnabled);
     }
 
