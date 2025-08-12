@@ -482,6 +482,18 @@ capture_cache/
 # API Keys in Claude settings
 .claude/settings.json
 
+# ===== MCP (Model Context Protocol) CONFIGURATION =====
+
+# Cipher MCP data files (SQLite databases and cache)
+data/cipher-sessions.db*
+data/cipher-*.db*
+data/*.sqlite*
+
+# User-specific MCP settings and API keys
+%USERPROFILE%/.claude/
+~/.claude/
+**/claude_desktop_config.json
+
 # ===== DEVELOPMENT ENVIRONMENT =====
 
 # GitHub Issues offline cache
