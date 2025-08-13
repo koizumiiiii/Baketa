@@ -45,7 +45,7 @@ public sealed class CaptureModule : ServiceModuleBase
         services.AddSingleton<AdaptiveCaptureService>(provider => {
             try 
             {
-                var gpuDetector = provider.GetRequiredService<Baketa.Core.Abstractions.Capture.IGPUEnvironmentDetector>();
+                var gpuDetector = provider.GetRequiredService<Baketa.Core.Abstractions.Capture.ICaptureEnvironmentDetector>();
                 var strategyFactory = provider.GetRequiredService<Baketa.Core.Abstractions.Capture.ICaptureStrategyFactory>();
                 var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AdaptiveCaptureService>>();
                 var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();

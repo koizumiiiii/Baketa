@@ -562,7 +562,7 @@ public static class GameTextPreprocessor
     /// <summary>
     /// プロファイルと設定からパラメータを取得
     /// </summary>
-    private static GamePreprocessingParameters GetParametersForProfile(GameTextProfile profile, Mat input, GamePreprocessingSettings? settings)
+    private static GamePreprocessingParameters GetParametersForProfile(GameTextProfile profile, Mat _, GamePreprocessingSettings? settings)
     {
         if (settings == null)
         {

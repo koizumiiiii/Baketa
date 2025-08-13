@@ -9,9 +9,8 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-		<!-- イベントハンドラークラスとstaticメソッド警告を抑制 -->
-		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822;NU1701</NoWarn>
+		<!-- イベントハンドラークラスとstaticメソッド警告を抑制 - 最適化版 -->
+		<NoWarn>$(NoWarn);CA1848;CA1711</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

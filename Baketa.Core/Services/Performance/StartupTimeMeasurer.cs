@@ -83,7 +83,7 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
     /// </summary>
     private void OutputDetailedAnalysis(TimeSpan totalTime)
     {
-        if (!_completedTimings.Any())
+        if (_completedTimings.IsEmpty)
         {
             _logger.LogWarning("⚠️ [STARTUP-ANALYSIS] フェーズ測定データがありません");
             return;

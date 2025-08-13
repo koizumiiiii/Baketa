@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Logging;
 
@@ -9,16 +10,10 @@ namespace Baketa.Infrastructure.Services.Logging;
 /// Console.WriteLine、File.AppendAllText、DebugLogUtilityを統一し、
 /// ILoggerベースの標準ロギングに移行するサービス
 /// </summary>
-public sealed class UnifiedLoggingService : IUnifiedLoggingService
+public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger) : IUnifiedLoggingService
 {
-    private readonly ILogger<UnifiedLoggingService> _logger;
-    private readonly bool _enableConsoleOutput;
-
-    public UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _enableConsoleOutput = Environment.GetEnvironmentVariable("BAKETA_ENABLE_CONSOLE_LOG") == "true";
-    }
+    private readonly ILogger<UnifiedLoggingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly bool _enableConsoleOutput = Environment.GetEnvironmentVariable("BAKETA_ENABLE_CONSOLE_LOG") == "true";
 
     /// <inheritdoc />
     public void LogInformation(string message)
@@ -32,20 +27,20 @@ public sealed class UnifiedLoggingService : IUnifiedLoggingService
     }
 
     /// <inheritdoc />
-    public void LogInformation(string template, params object[] args)
+    public void LogInformation(string messageTemplate, params object[] args)
     {
-        _logger.LogInformation(template, args);
+        _logger.LogInformation(messageTemplate, args);
         
         if (_enableConsoleOutput)
         {
             try
             {
-                var formattedMessage = string.Format(template, args);
+                var formattedMessage = string.Format(CultureInfo.InvariantCulture, messageTemplate, args);
                 Console.WriteLine($"[INFO] {formattedMessage}");
             }
             catch
             {
-                Console.WriteLine($"[INFO] {template} (format error)");
+                Console.WriteLine($"[INFO] {messageTemplate} (format error)");
             }
         }
     }
@@ -106,20 +101,20 @@ public sealed class UnifiedLoggingService : IUnifiedLoggingService
     }
 
     /// <inheritdoc />
-    public void LogDebug(string template, params object[] args)
+    public void LogDebug(string messageTemplate, params object[] args)
     {
-        _logger.LogDebug(template, args);
+        _logger.LogDebug(messageTemplate, args);
         
         if (_enableConsoleOutput)
         {
             try
             {
-                var formattedMessage = string.Format(template, args);
+                var formattedMessage = string.Format(CultureInfo.InvariantCulture, messageTemplate, args);
                 Console.WriteLine($"[DEBUG] {formattedMessage}");
             }
             catch
             {
-                Console.WriteLine($"[DEBUG] {template} (format error)");
+                Console.WriteLine($"[DEBUG] {messageTemplate} (format error)");
             }
         }
     }

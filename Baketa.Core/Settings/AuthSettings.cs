@@ -82,7 +82,7 @@ public sealed class AuthSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Authentication", "Enable Auth Logging", 
         Description = "Log authentication events for debugging")]
-    public bool EnableAuthLogging { get; set; } = false;
+    public bool EnableAuthLogging { get; set; }
 
     /// <summary>
     /// User profile synchronization interval in hours
@@ -96,7 +96,7 @@ public sealed class AuthSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Authentication", "Enable Offline Mode", 
         Description = "Allow limited functionality when authentication service is unavailable")]
-    public bool EnableOfflineMode { get; set; } = false;
+    public bool EnableOfflineMode { get; set; }
 
     /// <summary>
     /// Maximum login attempts before lockout

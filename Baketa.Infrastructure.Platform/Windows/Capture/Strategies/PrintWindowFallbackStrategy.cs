@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
@@ -25,7 +26,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
         _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
     }
 
-    public bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd)
+    public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         try
         {

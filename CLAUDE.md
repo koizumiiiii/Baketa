@@ -464,6 +464,28 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 
 This project defines sub-agents responsible for specific areas of expertise to improve development efficiency and quality.
 
+### **⚠️ Gemini API Fallback Strategy**
+
+**重要**: Gemini APIが利用できない場合の代替機能として、静的解析によるコードレビューシステムを構築しました。
+
+#### **Gemini API障害時の対応**
+```bash
+# 1. 静的コードレビュー実行（Gemini代替）
+.\scripts\code-review-simple.ps1 -Detailed
+
+# 2. 手動チェックリスト使用
+# scripts\code-review-checklist.md を参照
+
+# 3. 専門エージェント活用
+@Code-Reviewer "static analysis results based code review"
+```
+
+#### **静的解析機能**
+- **ripgrepベース**: 高速パターンマッチング検索
+- **Baketa特化**: クリーンアーキテクチャ、C# 12、ReactiveUI特化
+- **即座利用可能**: APIクォータ・ネットワーク問題に影響されない
+- **包括的カバレッジ**: アーキテクチャ〜セキュリティまで全領域
+
 ### **🎯 Serena MCP優先戦略 (MCP-First Strategy)**
 
 **基本方針**: 大規模コードベース（1,300+テストケース）での効率化のため、Serena MCPを主要ツールとして活用し、サブエージェントと連携する。
@@ -507,8 +529,18 @@ This project defines sub-agents responsible for specific areas of expertise to i
 - **`@UI-Maestro`**: The Avalonia UI and ReactiveUI specialist.
 - **`@Test-Generator`**: The specialist for unit test code generation.
 - **`@Researcher`**: The specialist for technical research and feedback.
+- **`@Code-Reviewer`**: The specialist for code review and quality analysis (Gemini API fallback).
 
 The main agent (you) acts as the orchestrator, responsible for invoking Serena MCP first, then these specialists appropriately.
+
+### **Code Review Fallback Protocol**
+
+When Gemini API is unavailable, follow this protocol:
+
+1. **Detect Gemini API failure**: Monitor API error responses
+2. **Execute static analysis**: `.\scripts\code-review-simple.ps1 -Detailed`
+3. **Invoke Code-Reviewer agent**: `@Code-Reviewer "Analyze the static analysis results and provide comprehensive code review"`
+4. **Manual checklist validation**: Reference `scripts\code-review-checklist.md`
 
 **For detailed workflows and specific instructions on how to utilize these sub-agents, you must refer to `.claude/instructions.md`.**
 

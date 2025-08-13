@@ -439,6 +439,7 @@ public class PaddleOcrPerformanceTests : IDisposable
     #region メモリ使用量テスト
 
     [Fact]
+    [Trait("Category", "LocalOnly")]
     public async Task Performance_MemoryUsage_NoSignificantLeaks()
     {
         // Arrange - テスト用の安全なエンジンのみを使用

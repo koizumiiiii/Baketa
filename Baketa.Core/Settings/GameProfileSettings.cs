@@ -21,7 +21,7 @@ public sealed class GameProfileSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "GameProfile", "アクティブ", 
         Description = "このプロファイルが現在アクティブかどうか")]
-    public bool IsActive { get; set; } = false;
+    public bool IsActive { get; set; }
     
     /// <summary>
     /// プロファイル名

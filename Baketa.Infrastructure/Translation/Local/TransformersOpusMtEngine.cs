@@ -36,7 +36,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
     private NetworkStream? _persistentStream;
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private DateTime _lastConnectionTime = DateTime.MinValue;
-    private int _connectionRetryCount = 0;
+    private int _connectionRetryCount;
     private const int MaxConnectionRetries = 3;
     private const int ConnectionIdleTimeoutMinutes = 5;
     
@@ -235,8 +235,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 for (int i = 0; i < Math.Min(responses.Count, 5); i++) // 最初の5個を表示
                 {
                     var response = responses[i];
-                    Console.WriteLine($"  [{i}] 原文: '{response.SourceText?.Substring(0, Math.Min(50, response.SourceText?.Length ?? 0))}...'");
-                    Console.WriteLine($"  [{i}] 訳文: '{response.TranslatedText?.Substring(0, Math.Min(50, response.TranslatedText?.Length ?? 0))}...'");
+                    Console.WriteLine($"  [{i}] 原文: '{response.SourceText?[..Math.Min(50, response.SourceText?.Length ?? 0)]}...'");
+                    Console.WriteLine($"  [{i}] 訳文: '{response.TranslatedText?[..Math.Min(50, response.TranslatedText?.Length ?? 0)]}...'");
                     Console.WriteLine($"  [{i}] 成功: {response.IsSuccess}");
                 }
                 _logger?.LogInformation("🔍 [TRANSLATION_RESULTS] バッチ翻訳結果: {Count}個の翻訳完了", responses.Count);
@@ -435,7 +435,7 @@ public class TransformersOpusMtEngine : TranslationEngineBase
             return new TranslationResponse
             {
                 RequestId = request.RequestId,
-                TranslatedText = $"[ERROR] {request.SourceText}",
+                TranslatedText = "[翻訳エラー]",
                 SourceText = request.SourceText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
@@ -897,8 +897,8 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             
             _logger?.LogInformation("✅ [TCP_FIX] 改良版ReadAsync完了 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
             
-            var responseJson = Encoding.UTF8.GetString(allData.ToArray());
-            Console.WriteLine($"📨 [BATCH_DEBUG] レスポンス内容（最初の500文字）: {responseJson.Substring(0, Math.Min(500, responseJson.Length))}...");
+            var responseJson = Encoding.UTF8.GetString([.. allData]);
+            Console.WriteLine($"📨 [BATCH_DEBUG] レスポンス内容（最初の500文字）: {responseJson[..Math.Min(500, responseJson.Length)]}...");
             _logger?.LogInformation("📨 [BATCH_DETAIL_9] レスポンス内容: {ResponseJson}", responseJson);
             
             // JSONデシリアライゼーション前の検証
@@ -922,9 +922,8 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 // 🔥 [GEMINI_PHASE1] バッチ翻訳結果の復元処理
                 if (response != null && response.Translations != null)
                 {
-                    response.Translations = response.Translations
-                        .Select(RestoreTextFromBatchTranslation)
-                        .ToList();
+                    response.Translations = [.. response.Translations
+                        .Select(RestoreTextFromBatchTranslation)];
                         
                     Console.WriteLine($"🔥 [BATCH_PROTOCOL] バッチ翻訳結果復元完了 - 復元件数: {response.Translations.Count}");
                     _logger?.LogInformation("バッチ翻訳結果復元完了 - 復元件数: {Count}", response.Translations.Count);
@@ -1239,7 +1238,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 
                 Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
                 Console.WriteLine($"🔢 [JSON_RESPONSE] レスポンス文字数: {responseJson?.Length}, IsNull: {responseJson == null}");
-                Console.WriteLine($"🔍 [JSON_RESPONSE] レスポンス先頭100文字: {responseJson?.Substring(0, Math.Min(100, responseJson?.Length ?? 0))}");
+                Console.WriteLine($"🔍 [JSON_RESPONSE] レスポンス先頭100文字: {responseJson?[..Math.Min(100, responseJson?.Length ?? 0)]}");
                 
                 PersistentTranslationResult? response;
                 try
@@ -1397,7 +1396,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] Pythonプロセス終了 - ExitCode: {process.ExitCode}");
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] Output長さ: {output?.Length}文字");
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] Output (RAW): '{output}'");
-                Console.WriteLine($"🐍 [PYTHON_DEBUG] Output (HEX最初の20バイト): '{BitConverter.ToString(System.Text.Encoding.UTF8.GetBytes(output ?? "").Take(20).ToArray())}'");
+                Console.WriteLine($"🐍 [PYTHON_DEBUG] Output (HEX最初の20バイト): '{BitConverter.ToString([.. System.Text.Encoding.UTF8.GetBytes(output ?? "").Take(20)])}'");
                 Console.WriteLine($"🐍 [PYTHON_DEBUG] Error: '{error}'");
                 
                 // ExitCode 143 (SIGTERM) の場合はタイムアウトエラーとして扱う
@@ -1466,9 +1465,9 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             string jsonStr = output.Trim();
             
             // BOMを除去
-            if (jsonStr.StartsWith("\uFEFF"))
+            if (jsonStr.StartsWith("\uFEFF", StringComparison.Ordinal))
             {
-                jsonStr = jsonStr.Substring(1);
+                jsonStr = jsonStr[1..];
                 Console.WriteLine($"🔧 [JSON_DEBUG] BOMを除去しました");
             }
             
@@ -1477,14 +1476,14 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             
             // JSON形式の自動修復
             // {が欠落している場合の修復
-            if (!jsonStr.StartsWith("{") && jsonStr.Contains("\"success\""))
+            if (!jsonStr.StartsWith("{", StringComparison.Ordinal) && jsonStr.Contains("\"success\"", StringComparison.Ordinal))
             {
                 jsonStr = "{" + jsonStr;
                 Console.WriteLine($"🔧 [JSON_DEBUG] 先頭に {{ を追加して修復");
             }
             
             // }が欠落している場合の修復
-            if (!jsonStr.EndsWith("}") && jsonStr.StartsWith("{"))
+            if (!jsonStr.EndsWith("}", StringComparison.Ordinal) && jsonStr.StartsWith("{", StringComparison.Ordinal))
             {
                 // 最後の}を探す
                 int lastBrace = jsonStr.LastIndexOf('}');
@@ -1496,7 +1495,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 else
                 {
                     // 最後の}以降の文字を削除
-                    jsonStr = jsonStr.Substring(0, lastBrace + 1);
+                    jsonStr = jsonStr[..(lastBrace + 1)];
                 }
             }
             
@@ -1548,14 +1547,16 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
     }
 
     /// <inheritdoc/>
-    public override async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
+    public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
     {
         // ✅ 両方向翻訳サポート: 日→英、英→日の両方に対応
-        return new[]
+        var result = new[]
         {
             new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.English },
             new LanguagePair { SourceLanguage = Language.English, TargetLanguage = Language.Japanese }
-        };
+        } as IReadOnlyCollection<LanguagePair>;
+        
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc/>
@@ -1588,45 +1589,57 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
     /// <returns>翻訳方向 ("ja-en" または "en-ja")</returns>
     private string GetTranslationDirection(Language sourceLanguage, Language targetLanguage)
     {
-        // 🚀 [修正] 設定サービスから言語設定を取得
-        var translationSettings = _settingsService.GetTranslationSettings();
-        
-        // 設定から言語コードを取得
-        var defaultSourceLang = translationSettings.DefaultSourceLanguage;
-        var defaultTargetLang = translationSettings.DefaultTargetLanguage;
-        
-        Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定から読み込み: Source={defaultSourceLang}, Target={defaultTargetLang}");
-        
-        // 設定に基づいた言語方向の決定
-        if (string.Equals(defaultSourceLang, "en", StringComparison.OrdinalIgnoreCase) && 
-            string.Equals(defaultTargetLang, "ja", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: en-ja");
+            // 🚀 [修正] 設定サービスから言語設定を取得（エラーハンドリング付き）
+            var translationSettings = _settingsService.GetTranslationSettings();
+            
+            // 設定から言語コードを取得
+            var defaultSourceLang = translationSettings.DefaultSourceLanguage;
+            var defaultTargetLang = translationSettings.DefaultTargetLanguage;
+            
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定から読み込み: Source={defaultSourceLang}, Target={defaultTargetLang}");
+            
+            // 設定に基づいた言語方向の決定
+            if (string.Equals(defaultSourceLang, "en", StringComparison.OrdinalIgnoreCase) && 
+                string.Equals(defaultTargetLang, "ja", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: en-ja");
+                return "en-ja";
+            }
+            else if (string.Equals(defaultSourceLang, "ja", StringComparison.OrdinalIgnoreCase) && 
+                     string.Equals(defaultTargetLang, "en", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: ja-en");
+                return "ja-en";
+            }
+            
+            // 最終フォールバック: 設定に基づくデフォルト
+            var fallbackDirection = $"{defaultSourceLang}-{defaultTargetLang}";
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 最終フォールバック: {fallbackDirection}");
+            return fallbackDirection;
+        }
+        catch (Exception ex)
+        {
+            // 設定読み込みエラー時はパラメータから判定（従来ロジック）
+            Console.WriteLine($"⚠️ [WARNING] GetTranslationDirection - 設定読み込みエラー: {ex.Message}");
+            _logger?.LogWarning(ex, "設定から言語方向を取得できませんでした。パラメータから判定します。");
+            
+            if (sourceLanguage.Equals(Language.Japanese) && targetLanguage.Equals(Language.English))
+            {
+                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: ja-en");
+                return "ja-en";
+            }
+            else if (sourceLanguage.Equals(Language.English) && targetLanguage.Equals(Language.Japanese))
+            {
+                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: en-ja");
+                return "en-ja";
+            }
+            
+            // デフォルト（English to Japanese）
+            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - デフォルト判定結果: en-ja");
             return "en-ja";
         }
-        else if (string.Equals(defaultSourceLang, "ja", StringComparison.OrdinalIgnoreCase) && 
-                 string.Equals(defaultTargetLang, "en", StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: ja-en");
-            return "ja-en";
-        }
-        
-        // フォールバック: パラメータから判定（従来ロジック）
-        if (sourceLanguage.Equals(Language.Japanese) && targetLanguage.Equals(Language.English))
-        {
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: ja-en");
-            return "ja-en";
-        }
-        else if (sourceLanguage.Equals(Language.English) && targetLanguage.Equals(Language.Japanese))
-        {
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: en-ja");
-            return "en-ja";
-        }
-        
-        // 最終フォールバック: 設定に基づくデフォルト
-        var fallbackDirection = $"{defaultSourceLang}-{defaultTargetLang}";
-        Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 最終フォールバック: {fallbackDirection}");
-        return fallbackDirection;
     }
 
     /// <inheritdoc/>
@@ -2101,7 +2114,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
         public bool Success { get; set; }
         
         [JsonPropertyName("translations")]
-        public List<string> Translations { get; set; } = new();
+        public List<string> Translations { get; set; } = [];
         
         [JsonPropertyName("sources")]
         public List<string> Sources { get; set; } = new();

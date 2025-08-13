@@ -15,7 +15,6 @@ public sealed class PooledOcrService : IOcrEngine
 {
     private readonly ObjectPool<IOcrEngine> _enginePool;
     private readonly ILogger<PooledOcrService> _logger;
-    private bool _disposed;
 
     public PooledOcrService(
         ObjectPool<IOcrEngine> enginePool,
@@ -27,7 +26,7 @@ public sealed class PooledOcrService : IOcrEngine
         _logger.LogInformation("🏊 PooledOcrService初期化完了 - プール化OCRサービス開始");
     }
 
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed { get; private set; }
 
     // IOcrEngine インターフェース実装
     public string EngineName => "PooledPaddleOCR";
@@ -88,8 +87,7 @@ public sealed class PooledOcrService : IOcrEngine
     {
         ThrowIfDisposed();
         
-        if (image == null)
-            throw new ArgumentNullException(nameof(image));
+        ArgumentNullException.ThrowIfNull(image);
 
         var engine = _enginePool.Get();
         if (engine == null)
@@ -173,10 +171,10 @@ public sealed class PooledOcrService : IOcrEngine
         return new[] { "PaddleOCR-v4-jpn" }; // 利用可能なモデル名のリスト
     }
 
-    public async Task<bool> IsLanguageAvailableAsync(string language, CancellationToken cancellationToken = default)
+    public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        return await Task.FromResult(language == "jpn" || language == "japanese");
+        return await Task.FromResult(languageCode == "jpn" || languageCode == "japanese");
     }
 
     public OcrPerformanceStats GetPerformanceStats()
@@ -203,7 +201,7 @@ public sealed class PooledOcrService : IOcrEngine
         _logger.LogDebug("🔄 PooledOcrService: OCRタイムアウトキャンセル要求");
     }
 
-    public async Task<bool> SwitchLanguageAsync(string language, CancellationToken cancellationToken = default)
+    public async Task<bool> SwitchLanguageAsync(string language, CancellationToken _ = default)
     {
         ThrowIfDisposed();
         
@@ -221,7 +219,7 @@ public sealed class PooledOcrService : IOcrEngine
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
         
         try
         {
@@ -230,7 +228,7 @@ public sealed class PooledOcrService : IOcrEngine
             // ObjectPoolは自動的にクリーンアップされるため、明示的な処理は不要
             // 各エンジンインスタンスのDisposeはObjectPoolPolicyで管理される
             
-            _disposed = true;
+            IsDisposed = true;
             _logger.LogInformation("✅ PooledOcrService: リソース解放完了");
         }
         catch (Exception ex)
@@ -241,7 +239,6 @@ public sealed class PooledOcrService : IOcrEngine
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(PooledOcrService));
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
     }
 }

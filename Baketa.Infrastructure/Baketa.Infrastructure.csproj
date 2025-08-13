@@ -9,8 +9,8 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<!-- OCR結果コレクションクラスとstaticメソッド警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		<!-- OCR結果コレクションクラスとstaticメソッド警告を抑制 - 最適化版 -->
+		<NoWarn>$(NoWarn);CA1848;CA1711</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -37,6 +37,9 @@
 		<!-- ONNX Runtime パッケージ -->
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.1" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
+		<!-- GPU環境検出・テンソル処理用パッケージ（Issue #143対応） -->
+		<PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.17.1" />
 		
 		<!-- SentencePiece トークナイザー -->
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />

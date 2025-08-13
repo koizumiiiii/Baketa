@@ -644,6 +644,7 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 - **`@UI-Maestro`**: Avalonia UIとReactiveUIの専門家。
 - **`@Test-Generator`**: 単体テストコード生成の専門家。
 - **`@Researcher`**: 技術調査とフィードバックの専門家。
+- **`@Code-Reviewer`**: コードレビューとコード品質分析の専門家（Gemini API代替機能）。
 
 ### **必須ワークフロー: 問題解決と機能実装**
 

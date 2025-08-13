@@ -499,7 +499,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             httpClient.Timeout = TimeSpan.FromSeconds(10); // 短いタイムアウト
             
             // 3. APIキー設定の確認（実際の設定から取得を試みる）
-            var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? "demo_key";
+            var apiKey = Environment.GetEnvironmentVariable("GEMINI_TRANSLATION_API_KEY") ?? "demo_key";
             
             if (string.IsNullOrEmpty(apiKey) || apiKey == "demo_key")
             {

@@ -7,6 +7,7 @@ using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.GPU;
 using System.Drawing;
 
 namespace Baketa.Application.Services.Capture;
@@ -15,18 +16,18 @@ namespace Baketa.Application.Services.Capture;
 /// 適応的キャプチャサービスの実装
 /// </summary>
 public class AdaptiveCaptureService(
-    IGPUEnvironmentDetector gpuDetector,
+    ICaptureEnvironmentDetector gpuDetector,
     ICaptureStrategyFactory strategyFactory,
     ILogger<AdaptiveCaptureService> logger,
     IEventAggregator eventAggregator) : IAdaptiveCaptureService, IDisposable
 {
-    private readonly IGPUEnvironmentDetector _gpuDetector = gpuDetector ?? throw new ArgumentNullException(nameof(gpuDetector));
+    private readonly ICaptureEnvironmentDetector _gpuDetector = gpuDetector ?? throw new ArgumentNullException(nameof(gpuDetector));
     private readonly ICaptureStrategyFactory _strategyFactory = strategyFactory ?? throw new ArgumentNullException(nameof(strategyFactory));
     private readonly ILogger<AdaptiveCaptureService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     
-    // GPUEnvironmentInfoのキャッシュ（起動時に1回だけ検出）
-    private GPUEnvironmentInfo? _cachedEnvironment;
+    // GpuEnvironmentInfoのキャッシュ（起動時に1回だけ検出）
+    private GpuEnvironmentInfo? _cachedEnvironment;
     private readonly object _cacheLock = new();
     
     // キャンセレーションとリソース管理
@@ -48,11 +49,11 @@ public class AdaptiveCaptureService(
             _logger.LogInformation("適応的キャプチャ開始: HWND=0x{Hwnd:X}", hwnd.ToInt64());
 
             // 1. GPU環境取得（キャッシュ利用）
-            result.GPUEnvironment = await GetOrDetectGPUEnvironmentAsync().ConfigureAwait(false);
+            result.GpuEnvironment = await GetOrDetectGpuEnvironmentAsync().ConfigureAwait(false);
             
             
             // 2. 戦略選択
-            var strategy = await SelectOptimalStrategyAsync(result.GPUEnvironment).ConfigureAwait(false);
+            var strategy = await SelectOptimalStrategyAsync(result.GpuEnvironment).ConfigureAwait(false);
             
             
             // 3. キャプチャ実行（フォールバック付き）
@@ -100,7 +101,7 @@ public class AdaptiveCaptureService(
         }
     }
 
-    public async Task<GPUEnvironmentInfo> DetectGPUEnvironmentAsync()
+    public async Task<GpuEnvironmentInfo> DetectGpuEnvironmentAsync()
     {
         try
         {
@@ -114,7 +115,7 @@ public class AdaptiveCaptureService(
             }
             
             _logger.LogInformation("GPU環境検出完了: {GpuName} (統合={IsIntegrated}, 専用={IsDedicated})", 
-                environment.GPUName, environment.IsIntegratedGPU, environment.IsDedicatedGPU);
+                environment.GpuName, environment.IsIntegratedGpu, environment.IsDedicatedGpu);
             
             return environment;
         }
@@ -125,7 +126,7 @@ public class AdaptiveCaptureService(
         }
     }
 
-    public async Task<ICaptureStrategy> SelectOptimalStrategyAsync(GPUEnvironmentInfo environment)
+    public async Task<ICaptureStrategy> SelectOptimalStrategyAsync(GpuEnvironmentInfo environment)
     {
         try
         {
@@ -143,7 +144,7 @@ public class AdaptiveCaptureService(
         }
     }
 
-    public GPUEnvironmentInfo? GetCachedEnvironmentInfo()
+    public GpuEnvironmentInfo? GetCachedEnvironmentInfo()
     {
         lock (_cacheLock)
         {
@@ -161,7 +162,7 @@ public class AdaptiveCaptureService(
         _logger.LogDebug("GPU環境キャッシュをクリア");
     }
 
-    private async Task<GPUEnvironmentInfo> GetOrDetectGPUEnvironmentAsync()
+    private async Task<GpuEnvironmentInfo> GetOrDetectGpuEnvironmentAsync()
     {
         lock (_cacheLock)
         {
@@ -172,7 +173,7 @@ public class AdaptiveCaptureService(
             }
         }
 
-        return await DetectGPUEnvironmentAsync().ConfigureAwait(false);
+        return await DetectGpuEnvironmentAsync().ConfigureAwait(false);
     }
 
     private async Task<CaptureStrategyResult> ExecuteWithFallbackAsync(

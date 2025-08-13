@@ -41,6 +41,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
                 // UI関連のWindowsサービス
                 RegisterWindowsUIServices(services);
                 
+                // GPU環境検出サービス（Issue #143対応）
+                RegisterGpuServices(services);
+                
                 // その他のWindows固有サービス
                 RegisterWindowsServices(services);
             }
@@ -109,6 +112,32 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             
             // システムトレイ
             // 例: services.AddSingleton<ISystemTrayService, Win32SystemTrayService>();
+        }
+        
+        /// <summary>
+        /// GPU環境検出サービスを登録します（Issue #143対応）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterGpuServices(IServiceCollection services)
+        {
+            Console.WriteLine("🎮 Windows GPU サービス登録開始 - Issue #143");
+            
+            // GPU環境検出サービス
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector, 
+                Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector>();
+            Console.WriteLine("✅ WindowsGpuEnvironmentDetector登録完了");
+            
+            // GPU デバイス管理サービス（Issue #143 Week 2: Multi-GPU対応）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuDeviceManager, 
+                Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuDeviceManager>();
+            Console.WriteLine("✅ WindowsGpuDeviceManager登録完了");
+            
+            // TDR回復システム（Issue #143 Week 2 Phase 3: 高可用性）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.ITdrRecoveryManager, 
+                Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager>();
+            Console.WriteLine("✅ WindowsTdrRecoveryManager登録完了");
+            
+            Console.WriteLine("✅ Windows GPU サービス登録完了");
         }
         
         /// <summary>

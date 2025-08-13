@@ -5,6 +5,7 @@ using Xunit;
 using Moq;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 using Baketa.Core.Abstractions.Platform.Windows;
@@ -19,108 +20,72 @@ public class GPUEnvironmentMockTests
     /// <summary>
     /// 統合GPUモック環境の作成
     /// </summary>
-    public static GPUEnvironmentInfo CreateMockIntegratedGPU()
+    public static GpuEnvironmentInfo CreateMockIntegratedGpu()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = true,
-            IsDedicatedGPU = false,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = true,
+            IsDedicatedGpu = false,
+            SupportsCuda = false,
+            SupportsOpenCL = true,
+            SupportsDirectML = true,
+            SupportsOpenVINO = true,
+            SupportsTensorRT = false,
             MaximumTexture2DDimension = 4096,
             AvailableMemoryMB = 512,
-            GPUName = "Intel UHD Graphics 620 (Mock)",
-            HasHDRSupport = false,
-            ColorSpaceSupport = "sRGB",
-            FeatureLevel = DirectXFeatureLevel.Level111,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = true,
-            IsWDDMVersion2OrHigher = true,
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = [
-                new GPUAdapter
-                {
-                    Name = "Intel UHD Graphics 620 (Mock)",
-                    IsIntegrated = true,
-                    DedicatedVideoMemoryMB = 128,
-                    SharedSystemMemoryMB = 2048,
-                    MaximumTexture2DDimension = 4096,
-                    VendorId = 0x8086, // Intel
-                    DeviceId = 0x5917
-                }
-            ]
+            GpuName = "Intel UHD Graphics 620 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D111,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Unknown,
+            RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
         };
     }
 
     /// <summary>
     /// 専用GPUモック環境の作成
     /// </summary>
-    public static GPUEnvironmentInfo CreateMockDedicatedGPU()
+    public static GpuEnvironmentInfo CreateMockDedicatedGPU()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = false,
-            IsDedicatedGPU = true,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = false,
+            IsDedicatedGpu = true,
+            SupportsCuda = true,
+            SupportsOpenCL = true,
+            SupportsDirectML = true,
+            SupportsOpenVINO = false,
+            SupportsTensorRT = true,
             MaximumTexture2DDimension = 16384,
             AvailableMemoryMB = 8192,
-            GPUName = "NVIDIA GeForce RTX 3060 (Mock)",
-            HasHDRSupport = true,
-            ColorSpaceSupport = "HDR10",
-            FeatureLevel = DirectXFeatureLevel.Level121,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = false,
-            IsWDDMVersion2OrHigher = true,
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = [
-                new GPUAdapter
-                {
-                    Name = "NVIDIA GeForce RTX 3060 (Mock)",
-                    IsIntegrated = false,
-                    DedicatedVideoMemoryMB = 8192,
-                    SharedSystemMemoryMB = 0,
-                    MaximumTexture2DDimension = 16384,
-                    VendorId = 0x10DE, // NVIDIA
-                    DeviceId = 0x2504
-                }
-            ]
+            GpuName = "NVIDIA GeForce RTX 3060 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D121,
+            GpuDeviceId = 1,
+            ComputeCapability = ComputeCapability.Compute75,
+            RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.TensorRT]
         };
     }
 
     /// <summary>
     /// 低性能統合GPUモック環境の作成（制約あり）
     /// </summary>
-    public static GPUEnvironmentInfo CreateMockLowEndIntegratedGPU()
+    public static GpuEnvironmentInfo CreateMockLowEndIntegratedGPU()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = true,
-            IsDedicatedGPU = false,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = true,
+            IsDedicatedGpu = false,
+            SupportsCuda = false,
+            SupportsOpenCL = false,
+            SupportsDirectML = true,
+            SupportsOpenVINO = false,
+            SupportsTensorRT = false,
             MaximumTexture2DDimension = 2048, // 制約あり
             AvailableMemoryMB = 256,           // 低メモリ
-            GPUName = "Intel HD Graphics 4000 (Mock)",
-            HasHDRSupport = false,
-            ColorSpaceSupport = "sRGB",
-            FeatureLevel = DirectXFeatureLevel.Level110,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = true,
-            IsWDDMVersion2OrHigher = false,    // 古いドライバー
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = [
-                new GPUAdapter
-                {
-                    Name = "Intel HD Graphics 4000 (Mock)",
-                    IsIntegrated = true,
-                    DedicatedVideoMemoryMB = 64,
-                    SharedSystemMemoryMB = 1024,
-                    MaximumTexture2DDimension = 2048,
-                    VendorId = 0x8086, // Intel
-                    DeviceId = 0x0166
-                }
-            ]
+            GpuName = "Intel HD Graphics 4000 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D110,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Unknown,
+            RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
         };
     }
 
@@ -131,7 +96,7 @@ public class GPUEnvironmentMockTests
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
         var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
-        var integratedGPUEnv = CreateMockIntegratedGPU();
+        var integratedGPUEnv = CreateMockIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
 
         // Act
@@ -186,8 +151,23 @@ public class GPUEnvironmentMockTests
         var mockCapturer = new Mock<IWindowsCapturer>();
         var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
         
-        var gpuEnv = CreateMockIntegratedGPU();
-        gpuEnv.MaximumTexture2DDimension = (uint)textureSize;
+        var gpuEnv = new GpuEnvironmentInfo
+        {
+            IsIntegratedGpu = true,
+            IsDedicatedGpu = false,
+            SupportsCuda = false,
+            SupportsOpenCL = true,
+            SupportsDirectML = true,
+            SupportsOpenVINO = true,
+            SupportsTensorRT = false,
+            MaximumTexture2DDimension = textureSize,
+            AvailableMemoryMB = 512,
+            GpuName = "Intel UHD Graphics 620 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D111,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Unknown,
+            RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
+        };
         var windowHandle = new IntPtr(0x12345);
 
         // Act
@@ -237,17 +217,16 @@ public class GPUEnvironmentMockTests
     public void GPUEnvironmentInfo_IntegratedGPU_Properties()
     {
         // Arrange & Act
-        var integratedGPU = CreateMockIntegratedGPU();
+        var integratedGPU = CreateMockIntegratedGpu();
 
         // Assert
-        Assert.True(integratedGPU.IsIntegratedGPU);
-        Assert.False(integratedGPU.IsDedicatedGPU);
-        Assert.True(integratedGPU.HasDirectX11Support);
-        Assert.Equal(4096u, integratedGPU.MaximumTexture2DDimension);
+        Assert.True(integratedGPU.IsIntegratedGpu);
+        Assert.False(integratedGPU.IsDedicatedGpu);
+        Assert.True(integratedGPU.SupportsDirectML);
+        Assert.Equal(4096, integratedGPU.MaximumTexture2DDimension);
         Assert.Equal(512, integratedGPU.AvailableMemoryMB);
-        Assert.Contains("Intel UHD Graphics", integratedGPU.GPUName);
-        Assert.Single(integratedGPU.AvailableAdapters);
-        Assert.Equal(DirectXFeatureLevel.Level111, integratedGPU.FeatureLevel);
+        Assert.Contains("Intel UHD Graphics", integratedGPU.GpuName);
+        Assert.Equal(DirectXFeatureLevel.D3D111, integratedGPU.DirectXFeatureLevel);
     }
 
     [Fact]
@@ -257,15 +236,13 @@ public class GPUEnvironmentMockTests
         var dedicatedGPU = CreateMockDedicatedGPU();
 
         // Assert
-        Assert.False(dedicatedGPU.IsIntegratedGPU);
-        Assert.True(dedicatedGPU.IsDedicatedGPU);
-        Assert.True(dedicatedGPU.HasDirectX11Support);
-        Assert.Equal(16384u, dedicatedGPU.MaximumTexture2DDimension);
+        Assert.False(dedicatedGPU.IsIntegratedGpu);
+        Assert.True(dedicatedGPU.IsDedicatedGpu);
+        Assert.True(dedicatedGPU.SupportsCuda);
+        Assert.Equal(16384, dedicatedGPU.MaximumTexture2DDimension);
         Assert.Equal(8192, dedicatedGPU.AvailableMemoryMB);
-        Assert.Contains("NVIDIA GeForce RTX", dedicatedGPU.GPUName);
-        Assert.Single(dedicatedGPU.AvailableAdapters);
-        Assert.Equal(DirectXFeatureLevel.Level121, dedicatedGPU.FeatureLevel);
-        Assert.True(dedicatedGPU.HasHDRSupport);
+        Assert.Contains("NVIDIA GeForce RTX", dedicatedGPU.GpuName);
+        Assert.Equal(DirectXFeatureLevel.D3D121, dedicatedGPU.DirectXFeatureLevel);
     }
 
     [Fact]
@@ -275,27 +252,24 @@ public class GPUEnvironmentMockTests
         var lowEndGPU = CreateMockLowEndIntegratedGPU();
 
         // Assert
-        Assert.True(lowEndGPU.IsIntegratedGPU);
-        Assert.Equal(2048u, lowEndGPU.MaximumTexture2DDimension); // 制約確認
+        Assert.True(lowEndGPU.IsIntegratedGpu);
+        Assert.Equal(2048, lowEndGPU.MaximumTexture2DDimension); // 制約確認
         Assert.Equal(256, lowEndGPU.AvailableMemoryMB);           // 低メモリ確認
-        Assert.False(lowEndGPU.IsWDDMVersion2OrHigher);           // 古いドライバー確認
-        Assert.Contains("Intel HD Graphics 4000", lowEndGPU.GPUName);
-        Assert.Equal(DirectXFeatureLevel.Level110, lowEndGPU.FeatureLevel);
+        Assert.False(lowEndGPU.SupportsCuda);                     // CUDAサポートなし
+        Assert.Contains("Intel HD Graphics 4000", lowEndGPU.GpuName);
+        Assert.Equal(DirectXFeatureLevel.D3D110, lowEndGPU.DirectXFeatureLevel);
     }
 
     [Fact]
-    public void GPUAdapter_Properties_AreCorrect()
+    public void GpuEnvironmentInfo_IntegratedGpu_BasicProperties()
     {
         // Arrange & Act
-        var integratedGPU = CreateMockIntegratedGPU();
-        var adapter = integratedGPU.AvailableAdapters.First();
+        var integratedGPU = CreateMockIntegratedGpu();
 
         // Assert
-        Assert.True(adapter.IsIntegrated);
-        Assert.Equal("Intel UHD Graphics 620 (Mock)", adapter.Name);
-        Assert.Equal(128, adapter.DedicatedVideoMemoryMB);
-        Assert.Equal(2048, adapter.SharedSystemMemoryMB);
-        Assert.Equal(4096u, adapter.MaximumTexture2DDimension);
-        Assert.Equal(0x8086u, adapter.VendorId); // Intel
+        Assert.Contains("Intel UHD Graphics", integratedGPU.GpuName);
+        Assert.Equal(0, integratedGPU.GpuDeviceId);
+        Assert.True(integratedGPU.IsIntegratedGpu);
+        Assert.False(integratedGPU.IsDedicatedGpu);
     }
 }

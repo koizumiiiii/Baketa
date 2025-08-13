@@ -9,6 +9,7 @@ using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Application.Services.Capture;
 // GPU Environment Mock Helper moved here to avoid cross-project test dependencies
 
@@ -17,71 +18,68 @@ namespace Baketa.Application.Tests.Services.Capture;
 /// <summary>
 /// GPU環境モック作成ヘルパー（テスト用）
 /// </summary>
-internal static class GPUEnvironmentMockHelper
+internal static class GpuEnvironmentMockHelper
 {
-    public static GPUEnvironmentInfo CreateMockIntegratedGPU()
+    public static GpuEnvironmentInfo CreateMockIntegratedGpu()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = true,
-            IsDedicatedGPU = false,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = true,
+            IsDedicatedGpu = false,
+            SupportsCuda = false,
+            SupportsOpenCL = true,
+            SupportsDirectML = true,
+            SupportsOpenVINO = true,
+            SupportsTensorRT = false,
             MaximumTexture2DDimension = 4096,
             AvailableMemoryMB = 512,
-            GPUName = "Intel UHD Graphics 620 (Mock)",
-            HasHDRSupport = false,
-            ColorSpaceSupport = "sRGB",
-            FeatureLevel = DirectXFeatureLevel.Level111,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = true,
-            IsWDDMVersion2OrHigher = true,
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = []
+            GpuName = "Intel UHD Graphics 620 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D111,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Unknown,
+            RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
         };
     }
 
-    public static GPUEnvironmentInfo CreateMockDedicatedGPU()
+    public static GpuEnvironmentInfo CreateMockDedicatedGpu()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = false,
-            IsDedicatedGPU = true,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = false,
+            IsDedicatedGpu = true,
+            SupportsCuda = true,
+            SupportsOpenCL = false,
+            SupportsDirectML = false,
+            SupportsOpenVINO = false,
+            SupportsTensorRT = true,
             MaximumTexture2DDimension = 16384,
             AvailableMemoryMB = 8192,
-            GPUName = "NVIDIA GeForce RTX 3060 (Mock)",
-            HasHDRSupport = true,
-            ColorSpaceSupport = "HDR10",
-            FeatureLevel = DirectXFeatureLevel.Level121,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = false,
-            IsWDDMVersion2OrHigher = true,
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = []
+            GpuName = "NVIDIA GeForce RTX 3060 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D121,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Compute86,
+            RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.TensorRT]
         };
     }
 
-    public static GPUEnvironmentInfo CreateMockLowEndIntegratedGPU()
+    public static GpuEnvironmentInfo CreateMockLowEndIntegratedGpu()
     {
-        return new GPUEnvironmentInfo
+        return new GpuEnvironmentInfo
         {
-            IsIntegratedGPU = true,
-            IsDedicatedGPU = false,
-            HasDirectX11Support = true,
+            IsIntegratedGpu = true,
+            IsDedicatedGpu = false,
+            SupportsCuda = false,
+            SupportsOpenCL = false,
+            SupportsDirectML = true,
+            SupportsOpenVINO = false,
+            SupportsTensorRT = false,
             MaximumTexture2DDimension = 2048,
             AvailableMemoryMB = 256,
-            GPUName = "Intel HD Graphics 4000 (Mock)",
-            HasHDRSupport = false,
-            ColorSpaceSupport = "sRGB",
-            FeatureLevel = DirectXFeatureLevel.Level110,
-            IsMultiGPUEnvironment = false,
-            SupportsSoftwareRendering = true,
-            IsWDDMVersion2OrHigher = false,
-            DetectionTime = DateTime.Now,
-            DetectionSource = "Mock Test",
-            AvailableAdapters = []
+            GpuName = "Intel HD Graphics 4000 (Mock)",
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D110,
+            GpuDeviceId = 0,
+            ComputeCapability = ComputeCapability.Unknown,
+            RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
         };
     }
 }
@@ -92,7 +90,7 @@ internal static class GPUEnvironmentMockHelper
 public class AdaptiveCaptureServiceMockTests
 {
     private readonly Mock<ILogger<AdaptiveCaptureService>> _mockLogger;
-    private readonly Mock<IGPUEnvironmentDetector> _mockGpuDetector;
+    private readonly Mock<ICaptureEnvironmentDetector> _mockGpuDetector;
     private readonly Mock<ICaptureStrategyFactory> _mockStrategyFactory;
     private readonly Mock<ICaptureStrategy> _mockDirectFullScreenStrategy;
     private readonly Mock<ICaptureStrategy> _mockROIStrategy;
@@ -102,7 +100,7 @@ public class AdaptiveCaptureServiceMockTests
     public AdaptiveCaptureServiceMockTests()
     {
         _mockLogger = new Mock<ILogger<AdaptiveCaptureService>>();
-        _mockGpuDetector = new Mock<IGPUEnvironmentDetector>();
+        _mockGpuDetector = new Mock<ICaptureEnvironmentDetector>();
         _mockStrategyFactory = new Mock<ICaptureStrategyFactory>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         
@@ -124,12 +122,12 @@ public class AdaptiveCaptureServiceMockTests
     public async Task CaptureAsync_IntegratedGPU_SelectsDirectFullScreenStrategy()
     {
         // Arrange
-        var integratedGPU = GPUEnvironmentMockHelper.CreateMockIntegratedGPU();
+        var integratedGpu = GpuEnvironmentMockHelper.CreateMockIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
         var options = new CaptureOptions();
 
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
-            .ReturnsAsync(integratedGPU);
+            .ReturnsAsync(integratedGpu);
 
         var availableStrategies = new List<ICaptureStrategy> 
         { 
@@ -142,11 +140,11 @@ public class AdaptiveCaptureServiceMockTests
             .Returns(availableStrategies);
             
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
-        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGPU, IntPtr.Zero))
+        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGpu, IntPtr.Zero))
             .Returns(_mockDirectFullScreenStrategy.Object);
 
         // DirectFullScreen戦略が統合GPUで適用可能
-        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGPU, windowHandle))
+        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGpu, windowHandle))
             .Returns(true);
         _mockDirectFullScreenStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);
@@ -184,12 +182,12 @@ public class AdaptiveCaptureServiceMockTests
     public async Task CaptureAsync_DedicatedGPU_SelectsROIStrategy()
     {
         // Arrange
-        var dedicatedGPU = GPUEnvironmentMockHelper.CreateMockDedicatedGPU();
+        var dedicatedGpu = GpuEnvironmentMockHelper.CreateMockDedicatedGpu();
         var windowHandle = new IntPtr(0x12345);
         var options = new CaptureOptions();
 
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
-            .ReturnsAsync(dedicatedGPU);
+            .ReturnsAsync(dedicatedGpu);
 
         var availableStrategies = new List<ICaptureStrategy> 
         { 
@@ -202,15 +200,15 @@ public class AdaptiveCaptureServiceMockTests
             .Returns(availableStrategies);
             
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
-        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(dedicatedGPU, IntPtr.Zero))
+        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(dedicatedGpu, IntPtr.Zero))
             .Returns(_mockROIStrategy.Object);
 
         // DirectFullScreen戦略は専用GPUでは適用不可
-        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(dedicatedGPU, windowHandle))
+        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(dedicatedGpu, windowHandle))
             .Returns(false);
 
         // ROI戦略が専用GPUで適用可能
-        _mockROIStrategy.Setup(x => x.CanApply(dedicatedGPU, windowHandle))
+        _mockROIStrategy.Setup(x => x.CanApply(dedicatedGpu, windowHandle))
             .Returns(true);
         _mockROIStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);
@@ -248,12 +246,12 @@ public class AdaptiveCaptureServiceMockTests
     public async Task CaptureAsync_LowEndGPU_FallsBackToGDI()
     {
         // Arrange
-        var lowEndGPU = GPUEnvironmentMockHelper.CreateMockLowEndIntegratedGPU();
+        var lowEndGpu = GpuEnvironmentMockHelper.CreateMockLowEndIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
         var options = new CaptureOptions();
 
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
-            .ReturnsAsync(lowEndGPU);
+            .ReturnsAsync(lowEndGpu);
 
         var availableStrategies = new List<ICaptureStrategy> 
         { 
@@ -266,17 +264,17 @@ public class AdaptiveCaptureServiceMockTests
             .Returns(availableStrategies);
             
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
-        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(lowEndGPU, IntPtr.Zero))
+        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(lowEndGpu, IntPtr.Zero))
             .Returns(_mockFallbackStrategy.Object);
 
         // 全てのハイパフォーマンス戦略が適用不可
-        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(lowEndGPU, windowHandle))
+        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(lowEndGpu, windowHandle))
             .Returns(false);
-        _mockROIStrategy.Setup(x => x.CanApply(lowEndGPU, windowHandle))
+        _mockROIStrategy.Setup(x => x.CanApply(lowEndGpu, windowHandle))
             .Returns(false);
 
         // フォールバック戦略のみ適用可能
-        _mockFallbackStrategy.Setup(x => x.CanApply(lowEndGPU, windowHandle))
+        _mockFallbackStrategy.Setup(x => x.CanApply(lowEndGpu, windowHandle))
             .Returns(true);
         _mockFallbackStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);
@@ -314,12 +312,12 @@ public class AdaptiveCaptureServiceMockTests
     public async Task CaptureAsync_StrategyFailure_AttemptsRetryAndFallback()
     {
         // Arrange
-        var integratedGPU = GPUEnvironmentMockHelper.CreateMockIntegratedGPU();
+        var integratedGpu = GpuEnvironmentMockHelper.CreateMockIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
         var options = new CaptureOptions { MaxRetryAttempts = 2 };
 
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
-            .ReturnsAsync(integratedGPU);
+            .ReturnsAsync(integratedGpu);
 
         var availableStrategies = new List<ICaptureStrategy> 
         { 
@@ -331,11 +329,11 @@ public class AdaptiveCaptureServiceMockTests
             .Returns(availableStrategies);
             
         // GetOptimalStrategy のモック設定を追加（最初の戦略が失敗するため、実装ではIntPtr.Zeroが使用される）
-        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGPU, IntPtr.Zero))
+        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGpu, IntPtr.Zero))
             .Returns(_mockDirectFullScreenStrategy.Object);
 
         // DirectFullScreen戦略は適用可能だが失敗
-        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGPU, windowHandle))
+        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGpu, windowHandle))
             .Returns(true);
         _mockDirectFullScreenStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);
@@ -351,7 +349,7 @@ public class AdaptiveCaptureServiceMockTests
             .ReturnsAsync(failureResult);
 
         // フォールバック戦略は成功
-        _mockFallbackStrategy.Setup(x => x.CanApply(integratedGPU, windowHandle))
+        _mockFallbackStrategy.Setup(x => x.CanApply(integratedGpu, windowHandle))
             .Returns(true);
         _mockFallbackStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);
@@ -409,18 +407,18 @@ public class AdaptiveCaptureServiceMockTests
             _mockEventAggregator.Object);
 
         // Act - プライベートメソッドのテストの代わりに、戦略選択の動作をテスト
-        var integratedGPU = GPUEnvironmentMockHelper.CreateMockIntegratedGPU();
+        var integratedGpu = GpuEnvironmentMockHelper.CreateMockIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
 
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
-            .ReturnsAsync(integratedGPU);
+            .ReturnsAsync(integratedGpu);
 
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
-        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGPU, IntPtr.Zero))
+        _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGpu, IntPtr.Zero))
             .Returns(_mockDirectFullScreenStrategy.Object);
 
         // 最高優先度の戦略が最初に試されることを確認
-        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGPU, windowHandle))
+        _mockDirectFullScreenStrategy.Setup(x => x.CanApply(integratedGpu, windowHandle))
             .Returns(true);
         _mockDirectFullScreenStrategy.Setup(x => x.ValidatePrerequisitesAsync(windowHandle))
             .ReturnsAsync(true);

@@ -36,7 +36,7 @@ public static class PerformanceLogger
     ];
 
     private static readonly object LogLock = new();
-    private static bool _initialized = false;
+    private static bool _initialized;
 
     /// <summary>
     /// ログシステムを初期化し、既存の分散ログをクリーンアップ
@@ -210,7 +210,7 @@ public static class PerformanceLogger
     /// <summary>
     /// アプリケーション終了時の最終サマリー出力
     /// </summary>
-    public static void Finalize()
+    public static void FinalizeSession()
     {
         LogPerformanceSummary();
         LogPerformance($"📊 Performance Analysis Session Ended at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");

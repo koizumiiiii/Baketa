@@ -18,7 +18,7 @@ public static class BaketaLogManager
 {
     private static readonly string LogsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
     private static readonly object InitializationLock = new();
-    private static volatile bool _initialized = false;
+    private static volatile bool _initialized;
     
     // ログファイルのパス定数
     private static readonly string OcrResultsLogPath = Path.Combine(LogsDirectory, "ocr_results.log");
@@ -378,7 +378,7 @@ public static class BaketaLogManager
 /// <summary>
 /// ログ書き込み操作を表すレコード
 /// </summary>
-internal record LogWriteOperation
+internal sealed record LogWriteOperation
 {
     public required string FilePath { get; init; }
     public required string Content { get; init; }

@@ -15,6 +15,7 @@ using WinRT.Interop;
 using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
+using System.Runtime.Versioning;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 
@@ -22,6 +23,7 @@ namespace Baketa.Infrastructure.Platform.Windows.Capture;
 /// Windows Graphics Capture API を使用した最新のウィンドウキャプチャ実装
 /// Discordのような高品質なウィンドウキャプチャを実現
 /// </summary>
+[SupportedOSPlatform("windows10.0.17134.0")]
 public class WinRTWindowCapture : IDisposable
 {
     private readonly IWindowsImageFactory _imageFactory;
