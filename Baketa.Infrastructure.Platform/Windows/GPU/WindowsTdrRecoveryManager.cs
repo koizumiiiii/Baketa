@@ -49,8 +49,8 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
             
             while (!_monitoringCts.Token.IsCancellationRequested)
             {
-                await MonitorTdrEventsAsync(_monitoringCts.Token);
-                await Task.Delay(1000, _monitoringCts.Token); // 1秒間隔
+                await MonitorTdrEventsAsync(_monitoringCts.Token).ConfigureAwait(false);
+                await Task.Delay(1000, _monitoringCts.Token).ConfigureAwait(false); // 1秒間隔
             }
         }
         catch (OperationCanceledException)
@@ -63,11 +63,11 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         }
     }
 
-    public async Task<TdrRecoveryResult> RecoverFromTdrAsync(TdrContext tdrContext, CancellationToken cancellationToken = default)
+    public Task<TdrRecoveryResult> RecoverFromTdrAsync(TdrContext tdrContext, CancellationToken cancellationToken = default)
     {
         lock (_recoveryLock)
         {
-            return RecoverFromTdrInternal(tdrContext, cancellationToken);
+            return Task.FromResult(RecoverFromTdrInternal(tdrContext, cancellationToken));
         }
     }
 
@@ -83,7 +83,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
                 return cachedStatus;
             }
             
-            var status = await GetTdrStatusInternal(pnpDeviceId, cancellationToken);
+            var status = await GetTdrStatusInternal(pnpDeviceId, cancellationToken).ConfigureAwait(false);
             _tdrStatusCache.TryAdd(pnpDeviceId, status);
             
             return status;
@@ -110,12 +110,12 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
             var effectiveness = 0.0;
             
             // TDRリスク評価（PnpDeviceIdがないので固定GPU使用）
-            var tdrStatus = await GetTdrStatusAsync("default", cancellationToken);
+            var tdrStatus = await GetTdrStatusAsync("default", cancellationToken).ConfigureAwait(false);
             
             if (tdrStatus.RiskLevel >= TdrRiskLevel.Medium)
             {
                 // 高リスク時の予防戦略
-                strategies.AddRange(await GetHighRiskPreventionStrategies(sessionInfo, cancellationToken));
+                strategies.AddRange(await GetHighRiskPreventionStrategies(sessionInfo, cancellationToken).ConfigureAwait(false));
                 effectiveness += 0.7;
             }
             
@@ -132,7 +132,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
             }
             
             // 予防戦略を実行
-            await ExecutePreventionStrategies(strategies, sessionInfo, cancellationToken);
+            await ExecutePreventionStrategies(strategies, sessionInfo, cancellationToken).ConfigureAwait(false);
             
             var result = new TdrPreventionResult
             {
@@ -185,13 +185,13 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         try
         {
             // Windows イベントログからTDR関連イベントを監視
-            await CheckWindowsEventLogForTdr(cancellationToken);
+            await CheckWindowsEventLogForTdr(cancellationToken).ConfigureAwait(false);
             
             // レジストリからTDR情報を取得
-            await CheckRegistryForTdrInfo(cancellationToken);
+            await CheckRegistryForTdrInfo(cancellationToken).ConfigureAwait(false);
             
             // アクティブセッションの健全性チェック
-            await CheckActiveSessionHealth(cancellationToken);
+            await CheckActiveSessionHealth(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -264,15 +264,15 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     private async Task<TdrStatus> GetTdrStatusInternal(string pnpDeviceId, CancellationToken cancellationToken)
     {
         // Windows レジストリからTDR情報を取得
-        var tdrCount = await GetTdrCountFromRegistry(pnpDeviceId, cancellationToken);
-        var lastTdrTime = await GetLastTdrTimeFromEventLog(pnpDeviceId, cancellationToken);
+        var tdrCount = await GetTdrCountFromRegistry(pnpDeviceId, cancellationToken).ConfigureAwait(false);
+        var lastTdrTime = await GetLastTdrTimeFromEventLog(pnpDeviceId, cancellationToken).ConfigureAwait(false);
         
         // リスクレベル計算
         var riskLevel = CalculateTdrRiskLevel(tdrCount, lastTdrTime);
         
         return new TdrStatus
         {
-            IsInTdrState = await IsCurrentlyInTdrState(pnpDeviceId, cancellationToken),
+            IsInTdrState = await IsCurrentlyInTdrState(pnpDeviceId, cancellationToken).ConfigureAwait(false),
             TdrCountLast24Hours = tdrCount,
             LastTdrTime = lastTdrTime,
             RiskLevel = riskLevel,
@@ -282,27 +282,27 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
 
     private async Task<List<TdrPreventionStrategy>> GetHighRiskPreventionStrategies(OnnxSessionInfo sessionInfo, CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー
         
-        return new List<TdrPreventionStrategy>
-        {
+        return
+        [
             TdrPreventionStrategy.ReduceBatchSize,
             TdrPreventionStrategy.ExtendTimeout,
             TdrPreventionStrategy.LimitConcurrency
-        };
+        ];
     }
 
     private async Task ExecutePreventionStrategies(List<TdrPreventionStrategy> strategies, OnnxSessionInfo sessionInfo, CancellationToken cancellationToken)
     {
         foreach (var strategy in strategies)
         {
-            await ExecutePreventionStrategy(strategy, sessionInfo, cancellationToken);
+            await ExecutePreventionStrategy(strategy, sessionInfo, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task ExecutePreventionStrategy(TdrPreventionStrategy strategy, OnnxSessionInfo sessionInfo, CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー実装
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
         
         switch (strategy)
         {
@@ -409,37 +409,37 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
 
     private async Task CheckWindowsEventLogForTdr(CancellationToken cancellationToken)
     {
-        await Task.Delay(50, cancellationToken); // プレースホルダー実装
+        await Task.Delay(50, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
         // 実装: Windows イベントログからTDRイベントを検索
     }
 
     private async Task CheckRegistryForTdrInfo(CancellationToken cancellationToken)
     {
-        await Task.Delay(50, cancellationToken); // プレースホルダー実装
+        await Task.Delay(50, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
         // 実装: レジストリからTDR設定と履歴を取得
     }
 
     private async Task CheckActiveSessionHealth(CancellationToken cancellationToken)
     {
-        await Task.Delay(50, cancellationToken); // プレースホルダー実装
+        await Task.Delay(50, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
         // 実装: アクティブセッションの健全性チェック
     }
 
     private async Task<int> GetTdrCountFromRegistry(string pnpDeviceId, CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー
         return 0; // 実装: レジストリからTDR回数を取得
     }
 
     private async Task<DateTime?> GetLastTdrTimeFromEventLog(string pnpDeviceId, CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー
         return null; // 実装: イベントログから最後のTDR時刻を取得
     }
 
     private async Task<bool> IsCurrentlyInTdrState(string pnpDeviceId, CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー
         return false; // 実装: 現在のTDR状態を確認
     }
 
@@ -468,7 +468,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
                 try
                 {
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-                    await MonitorTdrEventsAsync(cts.Token);
+                    await MonitorTdrEventsAsync(cts.Token).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

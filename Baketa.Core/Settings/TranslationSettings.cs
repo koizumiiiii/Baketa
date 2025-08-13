@@ -26,7 +26,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "言語自動検出", 
         Description = "翻訳元言語を自動的に検出します")]
-    public bool AutoDetectSourceLanguage { get; set; } = false;
+    public bool AutoDetectSourceLanguage { get; set; }
     
     /// <summary>
     /// デフォルトソース言語
@@ -196,7 +196,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "品質推定", 
         Description = "翻訳結果の品質を推定して表示します")]
-    public bool EnableQualityEstimation { get; set; } = false;
+    public bool EnableQualityEstimation { get; set; }
     
     /// <summary>
     /// 品質推定の最小閾値
@@ -212,21 +212,21 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Translation", "詳細ログ", 
         Description = "翻訳処理の詳細ログを出力します（開発者向け）")]
-    public bool EnableVerboseLogging { get; set; } = false;
+    public bool EnableVerboseLogging { get; set; }
     
     /// <summary>
     /// 翻訳結果の保存
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Translation", "結果保存", 
         Description = "翻訳結果をファイルに保存します（開発者向け）")]
-    public bool SaveTranslationResults { get; set; } = false;
+    public bool SaveTranslationResults { get; set; }
     
     /// <summary>
     /// API使用統計の記録
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Translation", "API統計記録", 
         Description = "翻訳API使用統計を記録します（開発者向け）")]
-    public bool RecordApiUsageStatistics { get; set; } = false;
+    public bool RecordApiUsageStatistics { get; set; }
     
     /// <summary>
     /// テキストグループ化機能を有効にする
@@ -282,7 +282,7 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "従来キャプチャ優先", 
         Description = "BitBltを優先して使用します（PrintWindowでテキスト検出に問題がある場合）")]
-    public bool PreferLegacyCapture { get; set; } = false;
+    public bool PreferLegacyCapture { get; set; }
     
     /// <summary>
     /// 設定のクローンを作成します

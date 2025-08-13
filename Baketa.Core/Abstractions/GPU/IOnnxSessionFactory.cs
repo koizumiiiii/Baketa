@@ -108,17 +108,17 @@ public class OnnxSessionInfo
     /// <summary>
     /// 入力テンソル名一覧
     /// </summary>
-    public List<string> InputNames { get; init; } = new();
+    public List<string> InputNames { get; init; } = [];
     
     /// <summary>
     /// 出力テンソル名一覧
     /// </summary>
-    public List<string> OutputNames { get; init; } = new();
+    public List<string> OutputNames { get; init; } = [];
     
     /// <summary>
     /// 使用プロバイダー名
     /// </summary>
-    public List<string> UsedProviders { get; init; } = new();
+    public List<string> UsedProviders { get; init; } = [];
     
     /// <summary>
     /// セッション初期化時間（ミリ秒）

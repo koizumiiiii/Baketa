@@ -65,12 +65,12 @@ public sealed record GpuEnvironmentInfo
     /// <summary>
     /// GPU デバイス ID（Multi-GPU環境での識別用）
     /// </summary>
-    public int GpuDeviceId { get; init; } = 0;
+    public int GpuDeviceId { get; init; }
     
     /// <summary>
     /// GPU Compute能力（CUDA Compute Capability）
     /// </summary>
-    public ComputeCapability ComputeCapability { get; init; } = ComputeCapability.Unknown;
+    public ComputeCapability ComputeCapability { get; init; }
     
     /// <summary>
     /// 推奨ONNX Runtime Execution Provider
@@ -95,11 +95,11 @@ public sealed record GpuEnvironmentInfo
 public enum DirectXFeatureLevel
 {
     Unknown = 0,
-    D3D11_0 = 1,
-    D3D11_1 = 2,
-    D3D12_0 = 3,
-    D3D12_1 = 4,
-    D3D12_2 = 5
+    D3D110 = 1,
+    D3D111 = 2,
+    D3D120 = 3,
+    D3D121 = 4,
+    D3D122 = 5
 }
 
 /// <summary>

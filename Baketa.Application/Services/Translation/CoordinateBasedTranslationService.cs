@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -348,7 +349,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                         if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
                                         {
                                             // キャンセレーショントークンを確実に渡す
-                                            await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken);
+                                            await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
                                             Console.WriteLine($"🎯 [STREAMING] 即座オーバーレイ更新完了 - チャンク {chunk.ChunkId}");
                                         }
                                     }
@@ -379,7 +380,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         
                         // 🚨 [BATCH_CRITICAL] StreamingService呼び出し直前の最終確認ログ
                         Console.WriteLine($"🚨 [FINAL_CHECK] StreamingService.TranslateBatchWithStreamingAsync呼び出し直前");
-                        Console.WriteLine($"🔍 [FINAL_CHECK] テキスト配列: [{string.Join(", ", batchTexts.Take(3).Select(t => $"'{t.Substring(0, Math.Min(20, t.Length))}...'"))}]");
+                        Console.WriteLine($"🔍 [FINAL_CHECK] テキスト配列: [{string.Join(", ", batchTexts.Take(3).Select(t => $"'{t[..Math.Min(20, t.Length)]}...'"))}]");
                         
                         batchResults = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
                             batchTexts,
@@ -635,8 +636,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
         // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
-        var transformersEngine = _processingFacade.TranslationService as TransformersOpusMtEngine;
-        if (transformersEngine != null)
+        if (_processingFacade.TranslationService is TransformersOpusMtEngine transformersEngine)
         {
             Console.WriteLine($"🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
             // 🔥 [FILE_CONFLICT_FIX_19] ファイルアクセス競合回避のためILogger使用
@@ -649,12 +649,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var requestBytes = System.Text.Encoding.UTF8.GetBytes(requestJson);
             
             Console.WriteLine($"📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes");
-            Console.WriteLine($"📄 [VERIFICATION] リクエストJSON preview: {requestJson.Substring(0, Math.Min(200, requestJson.Length))}...");
+            Console.WriteLine($"📄 [VERIFICATION] リクエストJSON preview: {requestJson[..Math.Min(200, requestJson.Length)]}...");
             // 🔥 [FILE_CONFLICT_FIX_20] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("📏 [VERIFICATION] 実際のバッチリクエストサイズ: {RequestSize} bytes", requestBytes.Length);
             // 🔥 [FILE_CONFLICT_FIX_21] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("📄 [VERIFICATION] リクエストJSON preview: {JsonPreview}...", 
-                requestJson.Substring(0, Math.Min(200, requestJson.Length)));
+                requestJson[..Math.Min(200, requestJson.Length)]);
             
             // Step 2: タイムアウト付きバッチ翻訳実行
             try
@@ -679,7 +679,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     {
                         Console.WriteLine($"⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}");
                         // 🔥 [FILE_CONFLICT_FIX_23] ファイルアクセス競合回避のためILogger使用
-                        _logger?.LogDebug("⏱️ [VERIFICATION] Task実行中 - 開始時刻: {StartTime}", startTime.ToString("HH:mm:ss.fff"));
+                        _logger?.LogDebug("⏱️ [VERIFICATION] Task実行中 - 開始時刻: {StartTime}", startTime.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture));
                         
                         await task.ConfigureAwait(false);
                         
@@ -712,7 +712,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
                                 // 🔥 [FILE_CONFLICT_FIX_26] ファイルアクセス競合回避のためILogger使用
                                 _logger?.LogDebug("🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
-                                return translations.ToList();
+                                return [.. translations];
                             }
                             else
                             {
@@ -753,40 +753,40 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         {
             try
             {
-                Console.WriteLine($"🌍 [FACADE_DEBUG] Individual translate call for: '{text.Substring(0, Math.Min(20, text.Length))}...'");
+                Console.WriteLine($"🌍 [FACADE_DEBUG] Individual translate call for: '{text[..Math.Min(20, text.Length)]}...'");
                 // 🔥 [FILE_CONFLICT_FIX_31] ファイルアクセス競合回避のためILogger使用
                 _logger?.LogDebug("🌍 [FACADE_DEBUG] Individual translate call for: '{TextPreview}...'", 
-                    text.Substring(0, Math.Min(20, text.Length)));
+                    text[..Math.Min(20, text.Length)]);
                     
                 var result = await _processingFacade.TranslationService.TranslateAsync(
                     text, sourceLanguage, targetLanguage, null, cancellationToken)
                     .ConfigureAwait(false);
                     
-                Console.WriteLine($"🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null"}...'");
+                Console.WriteLine($"🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?[..Math.Min(20, result?.TranslatedText?.Length ?? 0)] ?? "null"}...'");
                 // 🔥 [FILE_CONFLICT_FIX_32] ファイルアクセス競合回避のためILogger使用
                 _logger?.LogDebug("🔍 [FACADE_DEBUG] Translation result: IsSuccess={IsSuccess}, Text='{TextPreview}...'", 
-                    result?.IsSuccess, result?.TranslatedText?.Substring(0, Math.Min(20, result?.TranslatedText?.Length ?? 0)) ?? "null");
+                    result?.IsSuccess, result?.TranslatedText?[..Math.Min(20, result?.TranslatedText?.Length ?? 0)] ?? "null");
                 results.Add(result.TranslatedText ?? "[Translation Failed]");
                 
                 _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}", 
-                    text.Length > 20 ? text.Substring(0, 20) + "..." : text,
+                    text.Length > 20 ? string.Concat(text.AsSpan(0, 20), "...") : text,
                     (result.TranslatedText ?? "[Translation Failed]").Length > 20 ? 
-                        result.TranslatedText.Substring(0, 20) + "..." : result.TranslatedText ?? "[Translation Failed]");
+                        string.Concat(result.TranslatedText.AsSpan(0, 20), "...") : result.TranslatedText ?? "[Translation Failed]");
             }
             catch (TaskCanceledException)
             {
                 results.Add("[Translation Timeout]");
-                _logger?.LogWarning("⚠️ 翻訳タイムアウト: {Text}", text.Length > 20 ? text.Substring(0, 20) + "..." : text);
+                _logger?.LogWarning("⚠️ 翻訳タイムアウト: {Text}", text.Length > 20 ? string.Concat(text.AsSpan(0, 20), "...") : text);
             }
             catch (Exception ex)
             {
                 results.Add("[Translation Failed]");
-                _logger?.LogError(ex, "❌ 翻訳エラー: {Text}", text.Length > 20 ? text.Substring(0, 20) + "..." : text);
+                _logger?.LogError(ex, "❌ 翻訳エラー: {Text}", text.Length > 20 ? string.Concat(text.AsSpan(0, 20), "...") : text);
             }
         }
         
         _logger?.LogInformation("🏁 順次翻訳完了 - 成功: {Success}/{Total}", 
-            results.Count(r => !r.StartsWith("[", StringComparison.Ordinal)), results.Count);
+            results.Count(r => !r.StartsWith('[')), results.Count);
         
         return results;
     }
@@ -813,8 +813,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
             // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
             // 注意: ServiceProvider直接アクセスを除去し、ファサード経由でアクセス
-            var transformersEngine = _processingFacade.TranslationService as TransformersOpusMtEngine;
-            if (transformersEngine != null)
+            if (_processingFacade.TranslationService is TransformersOpusMtEngine transformersEngine)
             {
                 _logger?.LogInformation("✅ [BATCH_DEBUG] ファサード経由で取得成功: {EngineType}", transformersEngine.GetType().Name);
                 engine = transformersEngine;

@@ -10,7 +10,7 @@ namespace Baketa.Infrastructure.Translation.Local.Onnx.SentencePiece.Native;
 /// OPUS-MT専用の自前実装SentencePieceトークナイザー
 /// 外部ライブラリ依存を排除し、高性能なトークン化を提供
 /// </summary>
-public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
+public sealed partial class OpusMtNativeTokenizer : ITokenizer, IDisposable
 {
     private readonly BpeTokenizer _bpeTokenizer;
     private readonly SentencePieceModel _model;
@@ -314,7 +314,7 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
             filteredList.Add(token);
         }
 
-        return filteredList.ToArray();
+        return [.. filteredList];
     }
 
     /// <summary>
@@ -335,7 +335,7 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
         text = text.Trim();
         
         // 連続する空白を単一の空白に変換
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+        text = MyRegex().Replace(text, " ");
         
         return text;
     }
@@ -354,4 +354,7 @@ public sealed class OpusMtNativeTokenizer : ITokenizer, IDisposable
         
         _logger.LogDebug("OpusMtNativeTokenizer disposed: {TokenizerId}", TokenizerId);
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\s+")]
+    private static partial System.Text.RegularExpressions.Regex MyRegex();
 }

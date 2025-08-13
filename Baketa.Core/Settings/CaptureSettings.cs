@@ -56,7 +56,7 @@ public sealed class CaptureSettings
         Unit = "px", 
         MinValue = 0, 
         MaxValue = 3840)]
-    public int FixedCaptureAreaX { get; set; } = 0;
+    public int FixedCaptureAreaX { get; set; }
     
     /// <summary>
     /// 固定キャプチャ領域のY座標
@@ -66,7 +66,7 @@ public sealed class CaptureSettings
         Unit = "px", 
         MinValue = 0, 
         MaxValue = 2160)]
-    public int FixedCaptureAreaY { get; set; } = 0;
+    public int FixedCaptureAreaY { get; set; }
     
     /// <summary>
     /// 固定キャプチャ領域の幅
@@ -150,7 +150,7 @@ public sealed class CaptureSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Capture", "履歴保存", 
         Description = "キャプチャした画像の履歴を保存します")]
-    public bool SaveCaptureHistory { get; set; } = false;
+    public bool SaveCaptureHistory { get; set; }
     
     /// <summary>
     /// キャプチャ履歴の最大保存数
@@ -180,7 +180,7 @@ public sealed class CaptureSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Capture", "デバッグ保存", 
         Description = "デバッグ用にキャプチャ画像を保存します（開発者向け）")]
-    public bool SaveDebugCaptures { get; set; } = false;
+    public bool SaveDebugCaptures { get; set; }
     
     /// <summary>
     /// デバッグ用キャプチャ保存パス

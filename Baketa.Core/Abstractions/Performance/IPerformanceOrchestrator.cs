@@ -123,7 +123,7 @@ public class OptimizedOcrResult
     /// <summary>
     /// 詳細メタデータ
     /// </summary>
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, object> Metadata { get; init; } = [];
 }
 
 /// <summary>

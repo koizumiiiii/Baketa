@@ -68,7 +68,7 @@ public class TranslationErrorHandlerService(
                 
                 _logger.LogDebug("🚀 [ERROR_HANDLER] 翻訳サービス呼び出し開始: '{SourceText}'", 
                     sourceText.Length > 20 ? sourceText[..20] : sourceText);
-                Console.WriteLine($"🚀 [ERROR_HANDLER] 翻訳サービス呼び出し開始: '{sourceText.Substring(0, Math.Min(20, sourceText.Length))}'");
+                Console.WriteLine($"🚀 [ERROR_HANDLER] 翻訳サービス呼び出し開始: '{sourceText[..Math.Min(20, sourceText.Length)]}'");
                 
                 // 既存のITranslationServiceを使用してシンプルに翻訳実行
                 var translationResult = await _translationService.TranslateAsync(
@@ -79,8 +79,8 @@ public class TranslationErrorHandlerService(
                     cancellationToken).ConfigureAwait(false);
                 
                 _logger.LogDebug("📝 [ERROR_HANDLER] 翻訳サービス応答受信: IsSuccess={IsSuccess}, Text='{Text}'", 
-                    translationResult?.IsSuccess, translationResult?.TranslatedText?.Substring(0, Math.Min(20, translationResult?.TranslatedText?.Length ?? 0)));
-                Console.WriteLine($"📝 [ERROR_HANDLER] 翻訳サービス応答受信: IsSuccess={translationResult?.IsSuccess}, Text='{translationResult?.TranslatedText?.Substring(0, Math.Min(20, translationResult?.TranslatedText?.Length ?? 0))}'");
+                    translationResult?.IsSuccess, translationResult?.TranslatedText?[..Math.Min(20, translationResult?.TranslatedText?.Length ?? 0)]);
+                Console.WriteLine($"📝 [ERROR_HANDLER] 翻訳サービス応答受信: IsSuccess={translationResult?.IsSuccess}, Text='{translationResult?.TranslatedText?[..Math.Min(20, translationResult?.TranslatedText?.Length ?? 0)]}'");
                 
                 if (IsValidTranslationResult(translationResult))
                 {

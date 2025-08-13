@@ -111,7 +111,7 @@ public sealed class MockGpuOcrEngine : IGpuOcrEngine
             ComputeCapability = ComputeCapability.Compute89,
             RecommendedProviders = new[] { ExecutionProvider.CUDA, ExecutionProvider.DirectML },
             MaximumTexture2DDimension = 16384,
-            DirectXFeatureLevel = DirectXFeatureLevel.D3D12_2
+            DirectXFeatureLevel = DirectXFeatureLevel.D3D122
         };
 
         return Task.FromResult(environment);

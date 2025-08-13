@@ -24,29 +24,31 @@ public class MockOnnxSessionProvider : IOnnxSessionProvider
     public SessionOptions CreateOptimalSessionOptions(GpuEnvironmentInfo gpuInfo)
     {
         // テスト用の基本SessionOptions
-        var sessionOptions = new SessionOptions();
-        
-        // GPU設定をシミュレート（実際のプロバイダー追加なし）
-        sessionOptions.InterOpNumThreads = 1;
-        sessionOptions.IntraOpNumThreads = Environment.ProcessorCount;
-        sessionOptions.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
-        sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
-        
+        var sessionOptions = new SessionOptions
+        {
+            // GPU設定をシミュレート（実際のプロバイダー追加なし）
+            InterOpNumThreads = 1,
+            IntraOpNumThreads = Environment.ProcessorCount,
+            ExecutionMode = ExecutionMode.ORT_SEQUENTIAL,
+            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
+        };
+
         return sessionOptions;
     }
 
     public SessionOptions CreateDirectMLOnlySessionOptions()
     {
         // DirectMLフォールバック用の基本SessionOptions
-        var sessionOptions = new SessionOptions();
-        
-        sessionOptions.EnableMemoryPattern = false;
-        sessionOptions.EnableCpuMemArena = false;
-        sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_EXTENDED;
-        sessionOptions.InterOpNumThreads = 1;
-        sessionOptions.IntraOpNumThreads = Environment.ProcessorCount;
-        sessionOptions.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
-        
+        var sessionOptions = new SessionOptions
+        {
+            EnableMemoryPattern = false,
+            EnableCpuMemArena = false,
+            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_EXTENDED,
+            InterOpNumThreads = 1,
+            IntraOpNumThreads = Environment.ProcessorCount,
+            ExecutionMode = ExecutionMode.ORT_SEQUENTIAL
+        };
+
         return sessionOptions;
     }
 }

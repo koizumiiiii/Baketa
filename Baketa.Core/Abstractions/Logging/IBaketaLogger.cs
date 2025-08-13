@@ -161,7 +161,7 @@ public sealed class BaketaLogEntry(
     /// <summary>
     /// 追加データ
     /// </summary>
-    public Dictionary<string, object> Data { get; } = data ?? new Dictionary<string, object>();
+    public Dictionary<string, object> Data { get; } = data ?? [];
 
     /// <summary>
     /// 例外情報

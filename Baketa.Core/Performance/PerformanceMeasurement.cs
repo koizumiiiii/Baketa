@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 
@@ -149,8 +150,7 @@ public sealed class PerformanceMeasurement : IDisposable
     /// </summary>
     public PerformanceMeasurementResult Complete()
     {
-        if (_disposed) 
-            throw new ObjectDisposedException(nameof(PerformanceMeasurement));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         
         _stopwatch.Stop();
         var endTime = DateTime.Now;
@@ -183,7 +183,7 @@ public sealed class PerformanceMeasurement : IDisposable
         WriteToConsole(message);
     }
 
-    private void LogComplete(PerformanceMeasurementResult result)
+    private static void LogComplete(PerformanceMeasurementResult result)
     {
         var memoryDelta = result.MemoryAfter - result.MemoryBefore;
         var memoryDeltaStr = memoryDelta >= 0 ? $"+{memoryDelta / 1024:N0}KB" : $"{memoryDelta / 1024:N0}KB";
@@ -246,16 +246,16 @@ public sealed class PerformanceMeasurement : IDisposable
             var avgTime = group.Average(r => r.Duration.TotalMilliseconds);
             var count = group.Count();
             
-            summary.AppendLine($"{group.Key}: {totalTime:F1}ms total, {avgTime:F1}ms avg, {count} calls");
+            summary.AppendLine(CultureInfo.InvariantCulture, $"{group.Key}: {totalTime:F1}ms total, {avgTime:F1}ms avg, {count} calls");
             
             foreach (var result in group.OrderByDescending(r => r.Duration.TotalMilliseconds))
             {
-                summary.AppendLine($"  - {result.Description}: {result.Duration.TotalMilliseconds:F1}ms");
+                summary.AppendLine(CultureInfo.InvariantCulture, $"  - {result.Description}: {result.Duration.TotalMilliseconds:F1}ms");
             }
         }
         
         var overallTime = results.Sum(r => r.Duration.TotalMilliseconds);
-        summary.AppendLine($"\n🎯 TOTAL MEASURED TIME: {overallTime:F1}ms ({overallTime / 1000:F1}s)");
+        summary.AppendLine(CultureInfo.InvariantCulture, $"\n🎯 TOTAL MEASURED TIME: {overallTime:F1}ms ({overallTime / 1000:F1}s)");
         
         return summary.ToString();
     }

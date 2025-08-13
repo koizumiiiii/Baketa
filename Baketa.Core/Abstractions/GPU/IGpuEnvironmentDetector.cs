@@ -76,18 +76,11 @@ public interface IWarmupService
 /// <summary>
 /// ウォームアップ進捗イベント引数
 /// </summary>
-public class WarmupProgressEventArgs : EventArgs
+public class WarmupProgressEventArgs(double progress, string status, WarmupPhase phase) : EventArgs
 {
-    public double Progress { get; }
-    public string Status { get; }
-    public WarmupPhase Phase { get; }
-    
-    public WarmupProgressEventArgs(double progress, string status, WarmupPhase phase)
-    {
-        Progress = Math.Clamp(progress, 0.0, 1.0);
-        Status = status;
-        Phase = phase;
-    }
+    public double Progress { get; } = Math.Clamp(progress, 0.0, 1.0);
+    public string Status { get; } = status;
+    public WarmupPhase Phase { get; } = phase;
 }
 
 /// <summary>

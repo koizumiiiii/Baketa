@@ -32,7 +32,7 @@ public class OcrResult
     /// <summary>
     /// 追加メタデータ
     /// </summary>
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, object> Metadata { get; init; } = [];
     
     /// <summary>
     /// 全体の信頼度スコア
@@ -135,7 +135,7 @@ public class DetectedText
     /// <summary>
     /// 追加メタデータ
     /// </summary>
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, object> Metadata { get; init; } = [];
     
     /// <summary>
     /// テキストが高品質かどうか

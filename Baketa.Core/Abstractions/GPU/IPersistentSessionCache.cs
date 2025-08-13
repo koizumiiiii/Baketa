@@ -94,7 +94,7 @@ public class SessionCacheData
     /// <summary>
     /// セッション固有オプション
     /// </summary>
-    public Dictionary<string, object> SessionOptions { get; init; } = new();
+    public Dictionary<string, object> SessionOptions { get; init; } = [];
     
     /// <summary>
     /// 初期化データ（シリアライズ可能な形式）
@@ -130,7 +130,7 @@ public class SessionMetadata
     /// <summary>
     /// 使用回数
     /// </summary>
-    public int UsageCount { get; set; } = 0;
+    public int UsageCount { get; set; }
     
     /// <summary>
     /// GPU環境情報
@@ -155,7 +155,7 @@ public class SessionMetadata
     /// <summary>
     /// カスタム属性
     /// </summary>
-    public Dictionary<string, object> CustomAttributes { get; init; } = new();
+    public Dictionary<string, object> CustomAttributes { get; init; } = [];
 }
 
 /// <summary>
@@ -212,12 +212,12 @@ public class ExecutionProviderConfiguration
     /// <summary>
     /// プロバイダー固有オプション
     /// </summary>
-    public Dictionary<ExecutionProvider, Dictionary<string, object>> ProviderOptions { get; init; } = new();
+    public Dictionary<ExecutionProvider, Dictionary<string, object>> ProviderOptions { get; init; } = [];
     
     /// <summary>
     /// GPU デバイスID
     /// </summary>
-    public int GpuDeviceId { get; init; } = 0;
+    public int GpuDeviceId { get; init; }
     
     /// <summary>
     /// メモリ制限（MB）
@@ -233,22 +233,22 @@ public class TensorConfiguration
     /// <summary>
     /// 入力テンソル名とサイズ
     /// </summary>
-    public Dictionary<string, int[]> InputTensors { get; init; } = new();
+    public Dictionary<string, int[]> InputTensors { get; init; } = [];
     
     /// <summary>
     /// 出力テンソル名とサイズ
     /// </summary>
-    public Dictionary<string, int[]> OutputTensors { get; init; } = new();
+    public Dictionary<string, int[]> OutputTensors { get; init; } = [];
     
     /// <summary>
     /// テンソル データ型
     /// </summary>
-    public Dictionary<string, string> TensorDataTypes { get; init; } = new();
+    public Dictionary<string, string> TensorDataTypes { get; init; } = [];
     
     /// <summary>
     /// 動的シェイプ対応
     /// </summary>
-    public bool SupportsDynamicShapes { get; init; } = false;
+    public bool SupportsDynamicShapes { get; init; }
 }
 
 /// <summary>
@@ -259,12 +259,12 @@ public class WarmupData
     /// <summary>
     /// ウォームアップ入力データ
     /// </summary>
-    public Dictionary<string, byte[]> WarmupInputs { get; init; } = new();
+    public Dictionary<string, byte[]> WarmupInputs { get; init; } = [];
     
     /// <summary>
     /// 期待される出力形状
     /// </summary>
-    public Dictionary<string, int[]> ExpectedOutputShapes { get; init; } = new();
+    public Dictionary<string, int[]> ExpectedOutputShapes { get; init; } = [];
     
     /// <summary>
     /// ウォームアップ実行回数

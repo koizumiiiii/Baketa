@@ -88,7 +88,7 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
     {
         var gpuInfo = DetectPrimaryGpu();
         var directXLevel = DetectDirectXFeatureLevel();
-        var memoryInfo = DetectGpuMemory(gpuInfo.IsIntegratedGpu);
+        var (AvailableMemoryMB, MaxTexture2DDimension) = DetectGpuMemory(gpuInfo.IsIntegratedGpu);
         var capabilities = DetectGpuCapabilities(gpuInfo);
         
         return new GpuEnvironmentInfo
@@ -100,8 +100,8 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             SupportsDirectML = capabilities.SupportsDirectML,
             SupportsOpenVINO = capabilities.SupportsOpenVINO,
             SupportsTensorRT = capabilities.SupportsTensorRT,
-            AvailableMemoryMB = memoryInfo.AvailableMemoryMB,
-            MaximumTexture2DDimension = memoryInfo.MaxTexture2DDimension,
+            AvailableMemoryMB = AvailableMemoryMB,
+            MaximumTexture2DDimension = MaxTexture2DDimension,
             DirectXFeatureLevel = directXLevel,
             GpuName = gpuInfo.GpuName,
             ComputeCapability = capabilities.ComputeCapability,
@@ -118,7 +118,7 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             
             var gpus = new List<(string Name, uint AdapterRAM, string PNPDeviceID)>();
             
-            foreach (ManagementObject gpu in results)
+            foreach (ManagementObject gpu in results.Cast<ManagementObject>())
             {
                 var name = gpu["Name"]?.ToString() ?? "Unknown GPU";
                 var adapterRAM = Convert.ToUInt32(gpu["AdapterRAM"] ?? 0);
@@ -128,10 +128,10 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             }
             
             // 専用GPU優先（VRAM容量で判定）
-            var primaryGpu = gpus.OrderByDescending(g => g.AdapterRAM).First();
-            var isIntegrated = IsIntegratedGpu(primaryGpu.Name, primaryGpu.PNPDeviceID);
+            var (Name, AdapterRAM, PNPDeviceID) = gpus.OrderByDescending(g => g.AdapterRAM).First();
+            var isIntegrated = IsIntegratedGpu(Name, PNPDeviceID);
             
-            return (primaryGpu.Name, isIntegrated, !isIntegrated);
+            return (Name, isIntegrated, !isIntegrated);
         }
         catch (Exception ex)
         {
@@ -142,12 +142,12 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
 
     private static bool IsIntegratedGpu(string gpuName, string pnpDeviceID)
     {
-        var integratedIndicators = new[]
-        {
+        string[] integratedIndicators =
+        [
             "Intel", "UHD", "Iris", "HD Graphics",
             "AMD Radeon Graphics", "Vega",
             "Microsoft Basic"
-        };
+        ];
         
         return integratedIndicators.Any(indicator => 
             gpuName.Contains(indicator, StringComparison.OrdinalIgnoreCase)) ||
@@ -162,19 +162,19 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             var featureLevel = NativeMethods.GetDirectXFeatureLevel();
             return featureLevel switch
             {
-                0xc100 => DirectXFeatureLevel.D3D12_2,
-                0xc000 => DirectXFeatureLevel.D3D12_1,
-                0xb100 => DirectXFeatureLevel.D3D12_0,
-                0xb000 => DirectXFeatureLevel.D3D11_1,
-                0xa100 => DirectXFeatureLevel.D3D11_1,
-                0xa000 => DirectXFeatureLevel.D3D11_0,
+                0xc100 => DirectXFeatureLevel.D3D122,
+                0xc000 => DirectXFeatureLevel.D3D121,
+                0xb100 => DirectXFeatureLevel.D3D120,
+                0xb000 => DirectXFeatureLevel.D3D111,
+                0xa100 => DirectXFeatureLevel.D3D111,
+                0xa000 => DirectXFeatureLevel.D3D110,
                 _ => DirectXFeatureLevel.Unknown
             };
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "DirectXフィーチャーレベル検出失敗");
-            return DirectXFeatureLevel.D3D11_0; // 安全なフォールバック
+            return DirectXFeatureLevel.D3D110; // 安全なフォールバック
         }
     }
 

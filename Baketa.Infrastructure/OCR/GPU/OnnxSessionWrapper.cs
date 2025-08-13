@@ -8,29 +8,18 @@ namespace Baketa.Infrastructure.OCR.GPU;
 /// Clean Architecture 原則に従い、Infrastructure層で具象型を抽象化
 /// Issue #143 Week 2: DI統合とClean Architecture準拠
 /// </summary>
-internal sealed class OnnxSessionWrapper : IOnnxSession
+internal sealed class OnnxSessionWrapper(
+    InferenceSession session,
+    GpuEnvironmentInfo gpuEnvironment,
+    string sessionName,
+    string modelPath) : IOnnxSession
 {
-    private readonly InferenceSession _session;
-    private readonly GpuEnvironmentInfo _gpuEnvironment;
-    private readonly string _sessionName;
-    private readonly DateTime _createdAt;
-    private readonly OnnxSessionInfo _sessionInfo;
+    private readonly InferenceSession _session = session ?? throw new ArgumentNullException(nameof(session));
+    private readonly GpuEnvironmentInfo _gpuEnvironment = gpuEnvironment ?? throw new ArgumentNullException(nameof(gpuEnvironment));
+    private readonly string _sessionName = sessionName ?? throw new ArgumentNullException(nameof(sessionName));
+    private readonly DateTime _createdAt = DateTime.UtcNow;
+    private readonly OnnxSessionInfo _sessionInfo = BuildSessionInfo(session, modelPath);
     private bool _disposed = false;
-
-    public OnnxSessionWrapper(
-        InferenceSession session, 
-        GpuEnvironmentInfo gpuEnvironment, 
-        string sessionName, 
-        string modelPath)
-    {
-        _session = session ?? throw new ArgumentNullException(nameof(session));
-        _gpuEnvironment = gpuEnvironment ?? throw new ArgumentNullException(nameof(gpuEnvironment));
-        _sessionName = sessionName ?? throw new ArgumentNullException(nameof(sessionName));
-        _createdAt = DateTime.UtcNow;
-        
-        // セッション情報を初期化時に構築
-        _sessionInfo = BuildSessionInfo(session, modelPath);
-    }
 
     public string SessionName => _sessionName;
 

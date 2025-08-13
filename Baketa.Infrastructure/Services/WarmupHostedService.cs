@@ -9,18 +9,12 @@ namespace Baketa.Infrastructure.Services;
 /// ウォームアップホストサービス（Issue #143: アプリケーション起動時の自動ウォームアップ）
 /// BackgroundServiceとして動作し、アプリケーション開始時に非同期ウォームアップを自動実行
 /// </summary>
-public sealed class WarmupHostedService : BackgroundService
+public sealed class WarmupHostedService(
+    IServiceProvider serviceProvider,
+    ILogger<WarmupHostedService> logger) : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<WarmupHostedService> _logger;
-
-    public WarmupHostedService(
-        IServiceProvider serviceProvider,
-        ILogger<WarmupHostedService> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<WarmupHostedService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

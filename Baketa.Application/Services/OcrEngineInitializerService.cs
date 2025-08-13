@@ -144,7 +144,7 @@ public sealed class OcrEngineInitializerService(
         // Stage 3: 言語別認識モデルの遅延読み込み準備
         stageWatch.Restart();
         _logger.LogInformation("🔄 Stage 3: 認識モデル準備完了");
-        await Task.Delay(1, cancellationToken); // 将来の拡張用
+        await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 将来の拡張用
         _logger.LogInformation("✅ Stage 3完了: {ElapsedMs}ms", stageWatch.ElapsedMilliseconds);
     }
 

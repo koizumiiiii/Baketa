@@ -110,7 +110,7 @@ public class GpuDeviceInfo
     /// <summary>
     /// 対応実行プロバイダー
     /// </summary>
-    public List<ExecutionProvider> SupportedProviders { get; init; } = new();
+    public List<ExecutionProvider> SupportedProviders { get; init; } = [];
     
     /// <summary>
     /// パフォーマンス評価スコア（0-100）
@@ -250,7 +250,7 @@ public class GpuAllocationRecommendation
     /// <summary>
     /// 推奨GPU配置一覧
     /// </summary>
-    public List<GpuAllocationItem> Allocations { get; init; } = new();
+    public List<GpuAllocationItem> Allocations { get; init; } = [];
     
     /// <summary>
     /// 配置理由
@@ -281,7 +281,7 @@ public class GpuAllocationItem
     /// <summary>
     /// 推奨実行プロバイダー
     /// </summary>
-    public List<ExecutionProvider> RecommendedProviders { get; init; } = new();
+    public List<ExecutionProvider> RecommendedProviders { get; init; } = [];
     
     /// <summary>
     /// 配置信頼度（0-1）

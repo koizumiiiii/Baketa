@@ -91,7 +91,7 @@ public sealed class OcrSettings
         Description = "二値化処理の閾値（自動の場合は0）", 
         MinValue = 0, 
         MaxValue = 255)]
-    public int BinarizationThreshold { get; set; } = 0; // 0 = 自動
+    public int BinarizationThreshold { get; set; } // 0 = 自動
     
     /// <summary>
     /// ノイズ除去の有効化
@@ -188,21 +188,21 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "詳細ログ", 
         Description = "OCR処理の詳細ログを出力します（開発者向け）")]
-    public bool EnableVerboseLogging { get; set; } = false;
+    public bool EnableVerboseLogging { get; set; }
     
     /// <summary>
     /// OCR結果の保存
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "結果保存", 
         Description = "OCR結果をファイルに保存します（開発者向け）")]
-    public bool SaveOcrResults { get; set; } = false;
+    public bool SaveOcrResults { get; set; }
     
     /// <summary>
     /// 処理済み画像の保存
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "処理済み画像保存", 
         Description = "前処理後の画像を保存します（開発者向け）")]
-    public bool SaveProcessedImages { get; set; } = false;
+    public bool SaveProcessedImages { get; set; }
     
     /// <summary>
     /// ゲーム特化前処理の有効化
@@ -228,7 +228,7 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "言語モデル使用", 
         Description = "PaddleOCRの言語モデルを使用してOCR精度を向上させます")]
-    public bool UseLanguageModel { get; set; } = false;
+    public bool UseLanguageModel { get; set; }
     
     /// <summary>
     /// GPU加速の有効化
@@ -458,7 +458,7 @@ public class GamePreprocessingSettings
     /// <summary>
     /// A/Bテストの有効化
     /// </summary>
-    public bool EnableAbTesting { get; set; } = false;
+    public bool EnableAbTesting { get; set; }
     
     /// <summary>
     /// 設定のクローンを作成
@@ -545,7 +545,7 @@ public class GpuOcrSettings
     /// <summary>
     /// GPU Device ID
     /// </summary>
-    public int GpuDeviceId { get; set; } = 0;
+    public int GpuDeviceId { get; set; }
     
     /// <summary>
     /// バッチサイズ
