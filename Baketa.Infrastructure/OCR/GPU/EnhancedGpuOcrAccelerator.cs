@@ -101,6 +101,7 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
         }
     }
 
+
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         if (!_initialized || _ocrSession == null)

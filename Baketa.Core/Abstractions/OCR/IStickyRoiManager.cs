@@ -67,11 +67,11 @@ public interface IStickyRoiManager
     /// <summary>
     /// ROI設定を更新
     /// </summary>
-    /// <param name="settings">新しい設定</param>
+    /// <param name="settings">新しい設定（実装固有の型）</param>
     /// <param name="cancellationToken">キャンセレーション トークン</param>
     /// <returns>更新結果</returns>
     Task<bool> UpdateSettingsAsync(
-        StickyRoiSettings settings, 
+        object settings, 
         CancellationToken cancellationToken = default);
     
     /// <summary>
