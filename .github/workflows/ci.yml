@@ -115,14 +115,14 @@ jobs:
       run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
     - name: Run Core Tests
-      run: dotnet test tests/Baketa.Core.Tests/ --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Core -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+      run: dotnet test tests/Baketa.Core.Tests/Baketa.Core.Tests.csproj --configuration Debug --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Core
       env:
         MODELS_BASE_PATH: ${{ github.workspace }}\Models
         DEBUG_LOG_PATH: ${{ github.workspace }}\debug_app_logs.txt
         CI: true
         
     - name: Run Application Tests
-      run: dotnet test tests/Baketa.Application.Tests/ --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Application -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+      run: dotnet test tests/Baketa.Application.Tests/Baketa.Application.Tests.csproj --configuration Debug --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Application
       env:
         MODELS_BASE_PATH: ${{ github.workspace }}\Models
         DEBUG_LOG_PATH: ${{ github.workspace }}\debug_app_logs.txt
