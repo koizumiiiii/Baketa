@@ -1,4 +1,5 @@
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Core.Abstractions.Capture;
 
@@ -10,12 +11,12 @@ public interface ICaptureEnvironmentDetector
     /// <summary>
     /// GPU環境を検出
     /// </summary>
-    Task<GPUEnvironmentInfo> DetectEnvironmentAsync();
+    Task<GpuEnvironmentInfo> DetectEnvironmentAsync();
     
     /// <summary>
     /// 特定のGPUアダプターの詳細情報を取得
     /// </summary>
-    Task<GPUAdapter?> GetAdapterDetailsAsync(int adapterIndex);
+    Task<string?> GetAdapterDetailsAsync(int adapterIndex);
     
     /// <summary>
     /// DirectXの最大テクスチャサイズを確認
@@ -30,7 +31,7 @@ public interface ICaptureEnvironmentDetector
     /// <summary>
     /// 環境検出結果をキャッシュから取得（高速）
     /// </summary>
-    GPUEnvironmentInfo? GetCachedEnvironmentInfo();
+    GpuEnvironmentInfo? GetCachedEnvironmentInfo();
     
     /// <summary>
     /// 環境情報キャッシュをクリア

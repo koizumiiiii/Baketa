@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -25,12 +26,12 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
         _strategyCreators = InitializeStrategyCreators();
     }
 
-    public ICaptureStrategy GetOptimalStrategy(GPUEnvironmentInfo environment, IntPtr hwnd)
+    public ICaptureStrategy GetOptimalStrategy(GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         try
         {
             _logger.LogDebug("最適戦略選択開始: GPU={GpuName}, 統合={IsIntegrated}, 専用={IsDedicated}", 
-                environment.GPUName, environment.IsIntegratedGPU, environment.IsDedicatedGPU);
+                environment.GpuName, environment.IsIntegratedGpu, environment.IsDedicatedGpu);
 
             var strategies = GetStrategiesInOrder();
             
@@ -127,7 +128,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
         return [.. _strategyCreators.Keys];
     }
 
-    public async Task<bool> ValidateStrategyAsync(ICaptureStrategy strategy, GPUEnvironmentInfo environment, IntPtr hwnd)
+    public async Task<bool> ValidateStrategyAsync(ICaptureStrategy strategy, GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         try
         {

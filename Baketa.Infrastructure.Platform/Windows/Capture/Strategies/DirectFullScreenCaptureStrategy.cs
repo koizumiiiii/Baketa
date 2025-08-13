@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows;
 using System;
 
@@ -27,17 +28,17 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
         _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
     }
 
-    public bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd)
+    public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         try
         {
             // 統合GPUかつ十分なテクスチャサイズサポートの場合に適用
-            var canApply = environment.IsIntegratedGPU && 
-                          environment.HasDirectX11Support &&
+            var canApply = environment.IsIntegratedGpu && 
+                          environment.DirectXFeatureLevel >= DirectXFeatureLevel.D3D111 &&
                           environment.MaximumTexture2DDimension >= 4096;
 
             _logger.LogDebug("DirectFullScreen戦略適用可能性: {CanApply} (統合GPU: {IsIntegrated}, DX11: {HasDx11}, MaxTexture: {MaxTexture})", 
-                canApply, environment.IsIntegratedGPU, environment.HasDirectX11Support, environment.MaximumTexture2DDimension);
+                canApply, environment.IsIntegratedGpu, environment.DirectXFeatureLevel >= DirectXFeatureLevel.D3D111, environment.MaximumTexture2DDimension);
 
             return canApply;
         }

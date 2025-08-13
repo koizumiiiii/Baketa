@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Exceptions.Capture;
 using System.Runtime.InteropServices;
 
@@ -12,7 +13,7 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
 {
     private readonly ILogger<GPUEnvironmentDetector> _logger;
-    private GPUEnvironmentInfo? _cachedEnvironment;
+    private GpuEnvironmentInfo? _cachedEnvironment;
     private readonly object _cacheLock = new();
     
     // Windows API とDirectX関連の定数
@@ -23,38 +24,56 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<GPUEnvironmentInfo> DetectEnvironmentAsync()
+    public async Task<GpuEnvironmentInfo> DetectEnvironmentAsync()
     {
         _logger.LogInformation("GPU環境検出を開始");
         
         try
         {
-            var info = new GPUEnvironmentInfo
-            {
-                DetectionTime = DateTime.Now,
-                DetectionSource = "GPUEnvironmentDetector"
-            };
-            
             // 1. DirectXサポートレベル確認
-            await CheckDirectXSupportAsync(info).ConfigureAwait(false);
+            var hasDirectX11 = await Task.Run(() => CheckDirectX11Available()).ConfigureAwait(false);
+            var featureLevel = await Task.Run(() => GetDirectXFeatureLevel()).ConfigureAwait(false);
             
-            // 2. 利用可能なGPUアダプター列挙
-            await EnumerateAdaptersAsync(info).ConfigureAwait(false);
+            // 2. 利用可能なGPUアダプター情報取得
+            var gpuInfo = await Task.Run(() => GetPrimaryGpuInfo()).ConfigureAwait(false);
             
             // 3. GPU種別判定（統合/専用）
-            DetermineGPUType(info);
+            var isIntegrated = DetermineIfIntegratedGpu(gpuInfo.Name);
+            var isDedicated = !isIntegrated;
             
             // 4. テクスチャサイズ制限確認
-            await CheckTextureLimitsAsync(info).ConfigureAwait(false);
+            var maxTextureSize = await Task.Run(() => GetMaxTextureSize()).ConfigureAwait(false);
             
             // 5. HDR・色空間サポート確認
-            await CheckDisplayCapabilitiesAsync(info).ConfigureAwait(false);
+            var hasHdrSupport = await Task.Run(() => CheckHDRDisplaySupport()).ConfigureAwait(false);
             
             // 6. WDDM バージョン確認
-            CheckWDDMVersion(info);
+            var wddmVersion = GetWDDMVersion();
             
             // 7. ソフトウェアレンダリング対応確認
-            CheckSoftwareRenderingSupport(info);
+            var supportsWarp = CheckWARPSupport();
+            
+            // GPU種別に基づく推奨プロバイダーの決定
+            var recommendedProviders = DetermineRecommendedProviders(isIntegrated, isDedicated, hasDirectX11);
+            
+            // GPU環境情報を構築
+            var info = new GpuEnvironmentInfo
+            {
+                GpuName = gpuInfo.Name,
+                GpuDeviceId = 0,
+                IsIntegratedGpu = isIntegrated,
+                IsDedicatedGpu = isDedicated,
+                SupportsCuda = isDedicated && gpuInfo.Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
+                SupportsOpenCL = true, // 多くの現代GPUで対応
+                SupportsDirectML = true, // Windows 10+で対応
+                SupportsOpenVINO = gpuInfo.Name.Contains("Intel", StringComparison.OrdinalIgnoreCase),
+                SupportsTensorRT = isDedicated && gpuInfo.Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
+                AvailableMemoryMB = gpuInfo.MemoryMB,
+                MaximumTexture2DDimension = maxTextureSize,
+                DirectXFeatureLevel = featureLevel,
+                ComputeCapability = DetermineComputeCapability(gpuInfo.Name),
+                RecommendedProviders = recommendedProviders
+            };
             
             // 結果をキャッシュ
             lock (_cacheLock)
@@ -63,7 +82,7 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
             }
             
             _logger.LogInformation("GPU環境検出完了: GPU={GpuName}, 統合={IsIntegrated}, 専用={IsDedicated}", 
-                info.GPUName, info.IsIntegratedGPU, info.IsDedicatedGPU);
+                info.GpuName, info.IsIntegratedGpu, info.IsDedicatedGpu);
                 
             return info;
         }
@@ -74,7 +93,7 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         }
     }
 
-    public GPUEnvironmentInfo? GetCachedEnvironmentInfo()
+    public GpuEnvironmentInfo? GetCachedEnvironmentInfo()
     {
         lock (_cacheLock)
         {
@@ -91,15 +110,16 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         _logger.LogDebug("GPU環境キャッシュをクリア");
     }
 
-    public async Task<GPUAdapter?> GetAdapterDetailsAsync(int adapterIndex)
+    public async Task<string?> GetAdapterDetailsAsync(int adapterIndex)
     {
         try
         {
             // この実装は簡易版。実際のDXGI APIを使用した実装が必要
             var environment = await DetectEnvironmentAsync().ConfigureAwait(false);
-            if (adapterIndex < environment.AvailableAdapters.Count)
+            if (adapterIndex == 0 && !string.IsNullOrEmpty(environment.GpuName))
             {
-                return environment.AvailableAdapters[adapterIndex];
+                return $"GPU: {environment.GpuName}, Memory: {environment.AvailableMemoryMB}MB, " +
+                       $"Integrated: {environment.IsIntegratedGpu}, Dedicated: {environment.IsDedicatedGpu}";
             }
             return null;
         }
@@ -115,7 +135,7 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         try
         {
             var environment = await DetectEnvironmentAsync().ConfigureAwait(false);
-            return environment.MaximumTexture2DDimension;
+            return (uint)environment.MaximumTexture2DDimension;
         }
         catch (Exception ex)
         {
@@ -129,7 +149,8 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         try
         {
             var environment = await DetectEnvironmentAsync().ConfigureAwait(false);
-            return environment.HasHDRSupport;
+            // HDRサポートは現在の実装では常にfalseを返す（実装予定）
+            return false;
         }
         catch (Exception ex)
         {
@@ -138,170 +159,50 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
         }
     }
 
-    private async Task CheckDirectXSupportAsync(GPUEnvironmentInfo info)
+    private IReadOnlyList<ExecutionProvider> DetermineRecommendedProviders(bool isIntegrated, bool isDedicated, bool hasDirectX11)
     {
-        await Task.Run(() =>
+        var providers = new List<ExecutionProvider>();
+        
+        if (isDedicated)
         {
-            try
-            {
-                // D3D11CreateDevice を使用してFeature Level確認
-                // この実装では簡易チェック版
-                info.HasDirectX11Support = CheckDirectX11Available();
-                info.FeatureLevel = GetDirectXFeatureLevel();
-                
-                _logger.LogDebug("DirectXサポート確認完了: DX11={HasDx11}, FeatureLevel={FeatureLevel}", 
-                    info.HasDirectX11Support, info.FeatureLevel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "DirectXサポート確認中にエラー");
-                info.HasDirectX11Support = false;
-                info.FeatureLevel = DirectXFeatureLevel.Unknown;
-            }
-        }).ConfigureAwait(false);
+            // 専用GPU環境の場合の優先順位
+            providers.Add(ExecutionProvider.CUDA);
+            providers.Add(ExecutionProvider.TensorRT);
+            providers.Add(ExecutionProvider.DirectML);
+        }
+        else if (isIntegrated)
+        {
+            // 統合GPU環境の場合の優先順位
+            providers.Add(ExecutionProvider.DirectML);
+            providers.Add(ExecutionProvider.OpenVINO);
+            providers.Add(ExecutionProvider.OpenCL);
+        }
+        
+        // 共通のフォールバック
+        providers.Add(ExecutionProvider.CPU);
+        
+        return providers.AsReadOnly();
     }
-
-    private async Task EnumerateAdaptersAsync(GPUEnvironmentInfo info)
+    
+    private ComputeCapability DetermineComputeCapability(string gpuName)
     {
-        await Task.Run(() =>
-        {
-            try
-            {
-                // IDXGIFactory1::EnumAdapters1 の代替実装
-                // 実際の実装では P/Invoke を使用してDXGI APIを呼び出す必要があります
-                var adapters = GetAvailableGraphicsAdapters();
-                info.AvailableAdapters = adapters;
-                
-                if (adapters.Count > 0)
-                {
-                    info.GPUName = adapters[0].Name;
-                    info.AvailableMemoryMB = adapters[0].DedicatedVideoMemoryMB;
-                    info.IsMultiGPUEnvironment = adapters.Count > 1;
-                }
-                
-                _logger.LogDebug("GPU アダプター列挙完了: {AdapterCount}個のアダプターを検出", adapters.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "GPUアダプター列挙中にエラー");
-                info.AvailableAdapters = [];
-            }
-        }).ConfigureAwait(false);
-    }
-
-    private void DetermineGPUType(GPUEnvironmentInfo info)
-    {
-        try
-        {
-            if (info.AvailableAdapters.Count == 0)
-            {
-                info.IsIntegratedGPU = false;
-                info.IsDedicatedGPU = false;
-                return;
-            }
-
-            // 統合GPUの判定ロジック
-            var primaryAdapter = info.AvailableAdapters[0];
-            info.IsIntegratedGPU = primaryAdapter.IsIntegrated;
-            info.IsDedicatedGPU = !primaryAdapter.IsIntegrated;
+        // GPU名からCompute Capabilityを推定（簡易実装）
+        if (gpuName.Contains("RTX 40", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute89;
+        if (gpuName.Contains("RTX 30", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute86;
+        if (gpuName.Contains("RTX 20", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute75;
+        if (gpuName.Contains("GTX 10", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute61;
+        if (gpuName.Contains("GTX 9", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute50;
+        if (gpuName.Contains("GTX 7", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute35;
+        if (gpuName.Contains("GTX 6", StringComparison.OrdinalIgnoreCase))
+            return ComputeCapability.Compute30;
             
-            // 複数GPU環境での詳細判定
-            if (info.IsMultiGPUEnvironment)
-            {
-                var hasIntegrated = info.AvailableAdapters.Any(a => a.IsIntegrated);
-                var hasDedicated = info.AvailableAdapters.Any(a => !a.IsIntegrated);
-                
-                if (hasIntegrated && hasDedicated)
-                {
-                    // 統合GPU + 専用GPU の環境では、通常統合GPUを使用する方が効率的
-                    info.IsIntegratedGPU = true;
-                    info.IsDedicatedGPU = false;
-                    _logger.LogInformation("マルチGPU環境: 統合GPUを優先選択");
-                }
-            }
-            
-            _logger.LogDebug("GPU種別判定完了: 統合={IsIntegrated}, 専用={IsDedicated}", 
-                info.IsIntegratedGPU, info.IsDedicatedGPU);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "GPU種別判定中にエラー");
-            info.IsIntegratedGPU = false;
-            info.IsDedicatedGPU = false;
-        }
-    }
-
-    private async Task CheckTextureLimitsAsync(GPUEnvironmentInfo info)
-    {
-        await Task.Run(() =>
-        {
-            try
-            {
-                // D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS取得の代替実装
-                info.MaximumTexture2DDimension = GetMaxTextureSize();
-                
-                _logger.LogDebug("テクスチャ制限確認完了: MaxTexture2D={MaxSize}", info.MaximumTexture2DDimension);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "テクスチャ制限確認中にエラー");
-                info.MaximumTexture2DDimension = 4096; // セーフティデフォルト
-            }
-        }).ConfigureAwait(false);
-    }
-
-    private async Task CheckDisplayCapabilitiesAsync(GPUEnvironmentInfo info)
-    {
-        await Task.Run(() =>
-        {
-            try
-            {
-                // HDRサポートと色空間の確認
-                info.HasHDRSupport = CheckHDRDisplaySupport();
-                info.ColorSpaceSupport = GetSupportedColorSpaces();
-                
-                _logger.LogDebug("ディスプレイ機能確認完了: HDR={HasHdr}, ColorSpace={ColorSpace}", 
-                    info.HasHDRSupport, info.ColorSpaceSupport);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "ディスプレイ機能確認中にエラー");
-                info.HasHDRSupport = false;
-                info.ColorSpaceSupport = "sRGB";
-            }
-        }).ConfigureAwait(false);
-    }
-
-    private void CheckWDDMVersion(GPUEnvironmentInfo info)
-    {
-        try
-        {
-            // WDDM バージョン確認（レジストリから）
-            info.IsWDDMVersion2OrHigher = GetWDDMVersion() >= 2.0;
-            
-            _logger.LogDebug("WDDM バージョン確認完了: Version2Plus={IsVersion2Plus}", info.IsWDDMVersion2OrHigher);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "WDDM バージョン確認中にエラー");
-            info.IsWDDMVersion2OrHigher = true; // 多くの現代システムで true と仮定
-        }
-    }
-
-    private void CheckSoftwareRenderingSupport(GPUEnvironmentInfo info)
-    {
-        try
-        {
-            // D3D_DRIVER_TYPE_WARPの利用可否判定
-            info.SupportsSoftwareRendering = CheckWARPSupport();
-            
-            _logger.LogDebug("ソフトウェアレンダリング確認完了: Supported={Supported}", info.SupportsSoftwareRendering);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "ソフトウェアレンダリング確認中にエラー");
-            info.SupportsSoftwareRendering = true; // Windows 10+ では通常利用可能
-        }
+        return ComputeCapability.Unknown;
     }
 
     // 以下は実際の実装で P/Invoke や Windows API を使用する部分のプレースホルダー
@@ -315,24 +216,27 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
     private DirectXFeatureLevel GetDirectXFeatureLevel()
     {
         // 実装: 実際のDirectX Feature Levelを取得
-        return DirectXFeatureLevel.Level110; // プレースホルダー
+        return DirectXFeatureLevel.D3D111; // プレースホルダー
     }
 
-    private List<GPUAdapter> GetAvailableGraphicsAdapters()
+    private (string Name, long MemoryMB, bool IsIntegrated) GetPrimaryGpuInfo()
     {
         // 実装: DXGI を使用してアダプター情報を取得
-        return [
-            new() {
-                Name = "検出されたGPU", // WMI やレジストリから実際の名前を取得
-                DedicatedVideoMemoryMB = 4096, // 実際の値を取得
-                IsIntegrated = true, // 実際の判定ロジック
-                VendorId = 0x8086, // Intel の例
-                MaximumTexture2DDimension = 16384
-            }
-        ];
+        return (
+            Name: "検出されたGPU", // WMI やレジストリから実際の名前を取得
+            MemoryMB: 4096, // 実際の値を取得
+            IsIntegrated: true // 実際の判定ロジック
+        );
+    }
+    
+    private bool DetermineIfIntegratedGpu(string gpuName)
+    {
+        // GPU名から統合GPU判定（簡易実装）
+        var integratedKeywords = new[] { "Intel", "AMD Radeon", "UHD", "Iris", "Vega" };
+        return integratedKeywords.Any(keyword => gpuName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 
-    private uint GetMaxTextureSize()
+    private int GetMaxTextureSize()
     {
         // 実装: D3D11 デバイスから最大テクスチャサイズを取得
         return 16384; // プレースホルダー

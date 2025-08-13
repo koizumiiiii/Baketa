@@ -4,6 +4,7 @@ using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.GPU;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
@@ -33,16 +34,16 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
     }
 
-    public bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd)
+    public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         try
         {
             // 専用GPUまたは大画面での制約回避が必要な場合
-            var canApply = environment.IsDedicatedGPU || 
+            var canApply = environment.IsDedicatedGpu || 
                           environment.MaximumTexture2DDimension < 8192;
 
             _logger.LogInformation("ROIBased戦略適用判定: {CanApply} (専用GPU: {IsDedicated}, MaxTexture: {MaxTexture})", 
-                canApply, environment.IsDedicatedGPU, environment.MaximumTexture2DDimension);
+                canApply, environment.IsDedicatedGpu, environment.MaximumTexture2DDimension);
 
             return canApply;
         }
