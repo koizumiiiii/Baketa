@@ -404,11 +404,20 @@ FodyWeavers.xsd
 # ===== BAKETA PROJECT SPECIFIC =====
 
 # Machine Learning Models (large files, downloaded separately)
-Models/
+# Note: Only ignore ML model files, not source code files
 *.onnx
 *.model
 *.vocab
 *.bin
+Models/*/detection/
+Models/*/recognition/
+Models/HuggingFace/
+Models/ngram/
+Models/Official_Helsinki/
+Models/ONNX/
+Models/opus-mt-*/
+Models/ppocrv5/
+Models/pp-ocrv5/
 
 # OCR/Translation temporary files
 temp_ocr/
