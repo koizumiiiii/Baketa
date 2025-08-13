@@ -597,7 +597,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         if (intersection.IsEmpty) return 0.0;
         
         var union = Rectangle.Union(rect1, rect2);
-        return (double)(intersection.Width * intersection.Height) / (union.Width * union.Height);
+        return ((double)intersection.Width * intersection.Height) / ((double)union.Width * union.Height);
     }
 
     private int CalculateDistance(Rectangle rect1, Rectangle rect2)
@@ -608,7 +608,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         var dx = center1.X - center2.X;
         var dy = center1.Y - center2.Y;
         
-        return (int)Math.Sqrt((double)(dx * dx) + (double)(dy * dy));
+        return (int)Math.Sqrt((double)dx * dx + (double)dy * dy);
     }
 
     private Rectangle AdjustRegionBounds(Rectangle current, Rectangle detected)
