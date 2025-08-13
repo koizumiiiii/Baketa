@@ -27,7 +27,7 @@ public class PerformanceBenchmarkTests : IDisposable
     private readonly IntegratedPerformanceOrchestrator _orchestrator;
     
     private readonly byte[] _testImageData;
-    private readonly List<PerformanceMeasurement> _measurements = new();
+    private readonly List<PerformanceMeasurement> _measurements = [];
 
     public PerformanceBenchmarkTests()
     {

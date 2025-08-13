@@ -16,13 +16,13 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
     private readonly ILogger<StickyRoiEnhancedOcrEngine> _logger;
     private readonly ISimpleOcrEngine _baseOcrEngine;
     private readonly IStickyRoiManager _roiManager;
-    private bool _disposed = false;
+    private bool _disposed;
     
     // パフォーマンス統計
-    private long _totalRequests = 0;
-    private long _roiHits = 0;
-    private double _totalProcessingTime = 0;
-    private double _roiProcessingTime = 0;
+    private long _totalRequests;
+    private long _roiHits;
+    private double _totalProcessingTime;
+    private double _roiProcessingTime;
 
     public StickyRoiEnhancedOcrEngine(
         ILogger<StickyRoiEnhancedOcrEngine> logger,
@@ -136,7 +136,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
         _logger.LogInformation("🧹 StickyRoiEnhancedOcrEngine リソース解放完了");
     }
 
-    private async Task<Rectangle> GetImageBoundsAsync(byte[] imageData, CancellationToken cancellationToken)
+    private async Task<Rectangle> GetImageBoundsAsync(byte[] imageData, CancellationToken _)
     {
         try
         {
@@ -209,7 +209,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
         }
     }
 
-    private async Task<byte[]?> ExtractRoiImageAsync(byte[] imageData, Rectangle roi, CancellationToken cancellationToken)
+    private async Task<byte[]?> ExtractRoiImageAsync(byte[] imageData, Rectangle roi, CancellationToken _)
     {
         try
         {
@@ -245,7 +245,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
 
     private List<Baketa.Core.Abstractions.OCR.DetectedText> AdjustCoordinates(IReadOnlyList<Baketa.Core.Abstractions.OCR.DetectedText> texts, Rectangle roiRegion)
     {
-        return texts.Select(text => new Baketa.Core.Abstractions.OCR.DetectedText
+        return [.. texts.Select(text => new Baketa.Core.Abstractions.OCR.DetectedText
         {
             Text = text.Text,
             Confidence = text.Confidence,
@@ -256,7 +256,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
                 text.BoundingBox.Height),
             Language = text.Language,
             Metadata = text.Metadata
-        }).ToList();
+        })];
     }
 
     private Baketa.Core.Abstractions.OCR.OcrResult MergeResults(Baketa.Core.Abstractions.OCR.OcrResult? roiResult, Baketa.Core.Abstractions.OCR.OcrResult fullResult)
@@ -269,7 +269,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
                 DetectedTexts = fullResult.DetectedTexts,
                 ProcessingTime = fullResult.ProcessingTime,
                 IsSuccessful = fullResult.IsSuccessful,
-                Metadata = fullResult.Metadata ?? new Dictionary<string, object>()
+                Metadata = fullResult.Metadata ?? []
             };
             
             if (!enhancedResult.Metadata.ContainsKey("ProcessingMode"))

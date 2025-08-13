@@ -9,8 +9,8 @@
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<!-- OCR結果コレクションクラスとstaticメソッド警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822</NoWarn>
+		<!-- OCR結果コレクションクラスとstaticメソッド警告を抑制 - 最適化版 -->
+		<NoWarn>$(NoWarn);CA1848;CA1711</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

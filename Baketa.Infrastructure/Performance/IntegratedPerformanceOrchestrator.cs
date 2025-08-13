@@ -26,20 +26,20 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
     private readonly IOptions<OcrSettings> _ocrSettings;
     
     // 統合処理統計
-    private long _totalRequests = 0;
-    private long _gpuAcceleratedRequests = 0;
-    private long _roiOptimizedRequests = 0;
-    private long _tdrRecoveryEvents = 0;
-    private double _totalProcessingTimeMs = 0;
-    private double _totalOptimizedTimeMs = 0;
+    private long _totalRequests;
+    private long _gpuAcceleratedRequests;
+    private long _roiOptimizedRequests;
+    private long _tdrRecoveryEvents;
+    private double _totalProcessingTimeMs;
+    private double _totalOptimizedTimeMs;
     
     // システム状態管理
-    private bool _gpuAvailable = false;
-    private bool _roiSystemHealthy = true;
-    private bool _tdrProtectionActive = true;
+    private bool _gpuAvailable;
+    private readonly bool _roiSystemHealthy = true;
+    private readonly bool _tdrProtectionActive = true;
     private DateTime _lastHealthCheck = DateTime.UtcNow;
     private readonly object _statsLock = new();
-    private bool _disposed = false;
+    private bool _disposed;
     private readonly TaskCompletionSource<bool> _initializationComplete = new();
 
     public IntegratedPerformanceOrchestrator(
@@ -64,7 +64,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         {
             try 
             {
-                await InitializeSystemAsync();
+                await InitializeSystemAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -89,15 +89,15 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             _logger.LogDebug("🎯 統合最適化OCR開始 - データサイズ: {Size}B", imageData.Length);
             
             // Phase 1: システム健全性チェック
-            var healthReport = await CheckSystemHealthAsync(cancellationToken);
+            var healthReport = await CheckSystemHealthAsync(cancellationToken).ConfigureAwait(false);
             if (healthReport.OverallHealthScore < 0.3)
             {
                 _logger.LogWarning("⚠️ システム健全性低下 - CPUフォールバック実行");
-                return await ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
+                return ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
             }
             
             // Phase 2: 適応的最適化戦略選択
-            var strategy = await SelectOptimizationStrategyAsync(imageData, options, healthReport, cancellationToken);
+            var strategy = await SelectOptimizationStrategyAsync(imageData, options, healthReport, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("📋 最適化戦略選択: {Strategy}", strategy);
             
             OptimizedOcrResult result;
@@ -106,36 +106,36 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             switch (strategy)
             {
                 case OptimizationTechnique.FullyIntegrated:
-                    result = await ExecuteFullyIntegratedProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken);
+                    result = await ExecuteFullyIntegratedProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken).ConfigureAwait(false);
                     break;
                     
                 case OptimizationTechnique.GpuRoiIntegrated:
-                    result = await ExecuteGpuRoiIntegratedAsync(imageData, options, optimizationStopwatch, cancellationToken);
+                    result = await ExecuteGpuRoiIntegratedAsync(imageData, options, optimizationStopwatch, cancellationToken).ConfigureAwait(false);
                     break;
                     
                 case OptimizationTechnique.GpuWithTdrProtection:
-                    result = await ExecuteGpuWithTdrProtectionAsync(imageData, options, optimizationStopwatch, cancellationToken);
+                    result = await ExecuteGpuWithTdrProtectionAsync(imageData, options, optimizationStopwatch, cancellationToken).ConfigureAwait(false);
                     break;
                     
                 case OptimizationTechnique.RoiOnly:
-                    result = await ExecuteRoiOnlyProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken);
+                    result = ExecuteRoiOnlyProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken);
                     break;
                     
                 case OptimizationTechnique.GpuOnly:
-                    result = await ExecuteGpuOnlyProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken);
+                    result = await ExecuteGpuOnlyProcessingAsync(imageData, options, optimizationStopwatch, cancellationToken).ConfigureAwait(false);
                     break;
                     
                 default:
-                    result = await ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
+                    result = ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
                     break;
             }
             
             // Phase 4: 結果最適化と統計更新
             totalStopwatch.Stop();
-            await UpdateProcessingStatisticsAsync(strategy, totalStopwatch.Elapsed, optimizationStopwatch.Elapsed);
+            UpdateProcessingStatisticsAsync(strategy, totalStopwatch.Elapsed, optimizationStopwatch.Elapsed);
             
             // Phase 5: 適応的学習
-            await AdaptiveOptimizationLearningAsync(result, strategy, healthReport, cancellationToken);
+            AdaptiveOptimizationLearningAsync(result, strategy, healthReport, cancellationToken);
             
             _logger.LogInformation("✅ 統合最適化OCR完了 - 戦略: {Strategy}, 検出数: {Count}, " +
                 "総時間: {Total}ms, 最適化時間: {Optimized}ms, 改善率: {Improvement:P1}",
@@ -149,7 +149,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             totalStopwatch.Stop();
             _logger.LogError(ex, "❌ 統合最適化OCR失敗 - CPUフォールバック実行");
             
-            return await ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
+            return ExecuteCpuFallbackAsync(imageData, totalStopwatch, cancellationToken);
         }
     }
 
@@ -158,8 +158,8 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
     {
         try
         {
-            var roiStats = await _roiManager.GetStatisticsAsync(cancellationToken);
-            var gpuStatus = await _tdrManager.GetTdrStatusAsync("default", cancellationToken);
+            var roiStats = await _roiManager.GetStatisticsAsync(cancellationToken).ConfigureAwait(false);
+            var gpuStatus = await _tdrManager.GetTdrStatusAsync("default", cancellationToken).ConfigureAwait(false);
             
             lock (_statsLock)
             {
@@ -303,7 +303,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             }
             
             // メモリ健全性チェック
-            var memoryHealth = await CheckMemoryHealthAsync(cancellationToken);
+            var memoryHealth = CheckMemoryHealthAsync(cancellationToken);
             if (memoryHealth.Status == HealthStatus.Warning)
             {
                 recommendations.Add("メモリ使用量の監視を継続してください");
@@ -528,7 +528,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             await _tdrManager.RecoverFromTdrAsync(tdrContext, cancellationToken);
             
             // CPUフォールバック
-            return await ExecuteCpuFallbackAsync(imageData, stopwatch, cancellationToken);
+            return ExecuteCpuFallbackAsync(imageData, stopwatch, cancellationToken);
         }
     }
 
@@ -623,11 +623,11 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
             await _tdrManager.RecoverFromTdrAsync(tdrContext, cancellationToken);
             
             // CPUフォールバック
-            return await ExecuteCpuFallbackAsync(imageData, stopwatch, cancellationToken);
+            return ExecuteCpuFallbackAsync(imageData, stopwatch, cancellationToken);
         }
     }
 
-    private async Task<OptimizedOcrResult> ExecuteRoiOnlyProcessingAsync(
+    private OptimizedOcrResult ExecuteRoiOnlyProcessingAsync(
         byte[] imageData, 
         PerformanceOptimizationOptions options, 
         Stopwatch stopwatch, 
@@ -643,7 +643,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         
         return new OptimizedOcrResult
         {
-            DetectedTexts = Array.Empty<DetectedText>(),
+            DetectedTexts = [],
             TotalProcessingTime = stopwatch.Elapsed,
             UsedTechnique = OptimizationTechnique.RoiOnly,
             PerformanceImprovement = 0.2, // ROI効率向上
@@ -674,7 +674,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         };
     }
 
-    private async Task<OptimizedOcrResult> ExecuteCpuFallbackAsync(
+    private OptimizedOcrResult ExecuteCpuFallbackAsync(
         byte[] imageData, 
         Stopwatch stopwatch, 
         CancellationToken cancellationToken)
@@ -686,7 +686,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         
         return new OptimizedOcrResult
         {
-            DetectedTexts = Array.Empty<DetectedText>(),
+            DetectedTexts = [],
             TotalProcessingTime = stopwatch.Elapsed,
             UsedTechnique = OptimizationTechnique.CpuFallback,
             PerformanceImprovement = 0.0,
@@ -704,7 +704,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
 
     private List<DetectedText> AdjustCoordinates(IReadOnlyList<DetectedText> texts, Rectangle roiRegion)
     {
-        return texts.Select(text => new DetectedText
+        return [.. texts.Select(text => new DetectedText
         {
             Text = text.Text,
             Confidence = text.Confidence,
@@ -715,7 +715,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
                 text.BoundingBox.Height),
             Language = text.Language,
             ProcessingTechnique = OptimizationTechnique.FullyIntegrated
-        }).ToList();
+        })];
     }
 
     private double CalculatePerformanceImprovement(TimeSpan actualTime, OptimizationTechnique technique)
@@ -755,7 +755,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         return Math.Max(qualityScore, 0.75); // 最低品質保証
     }
 
-    private async Task UpdateProcessingStatisticsAsync(
+    private void UpdateProcessingStatisticsAsync(
         OptimizationTechnique technique, 
         TimeSpan totalTime, 
         TimeSpan optimizedTime)
@@ -767,7 +767,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         }
     }
 
-    private async Task AdaptiveOptimizationLearningAsync(
+    private void AdaptiveOptimizationLearningAsync(
         OptimizedOcrResult result, 
         OptimizationTechnique strategy, 
         SystemHealthReport healthReport, 
@@ -836,7 +836,7 @@ public sealed class IntegratedPerformanceOrchestrator : IPerformanceOrchestrator
         }
     }
 
-    private async Task<ComponentHealth> CheckMemoryHealthAsync(CancellationToken cancellationToken)
+    private ComponentHealth CheckMemoryHealthAsync(CancellationToken cancellationToken)
     {
         try
         {

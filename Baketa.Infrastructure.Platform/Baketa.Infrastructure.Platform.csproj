@@ -9,9 +9,8 @@
 		<Platforms>AnyCPU;x64</Platforms>
 		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<UseWinRT>true</UseWinRT>
-		<!-- プラットフォーム固有実装の警告抑制 -->
-		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
-		<NoWarn>$(NoWarn);CA1822;CA1848;CA1416;CA2101;IDE0060;IDE0019;SYSLIB1096;NU1701</NoWarn>
+		<!-- プラットフォーム固有実装の警告抑制 - Win32パッケージ削除後の最適化版 -->
+		<NoWarn>$(NoWarn);CA1848;CA2101;IDE0060;IDE0019;SYSLIB1096</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -32,7 +31,8 @@
 		<PackageReference Include="SharpDX" Version="4.2.0" />
 		<PackageReference Include="SharpDX.Direct3D11" Version="4.2.0" />
 		<PackageReference Include="SharpDX.DXGI" Version="4.2.0" />
-		<PackageReference Include="Win32" Version="1.0.3" />
+		<!-- Win32パッケージを削除: .NET 8との非互換性問題(NU1701)を解決 -->
+		<!-- <PackageReference Include="Win32" Version="1.0.3" /> -->
 		<!-- GPU環境検出用パッケージ（Issue #143対応） -->
 		<PackageReference Include="System.Management" Version="8.0.0" />
 	</ItemGroup>

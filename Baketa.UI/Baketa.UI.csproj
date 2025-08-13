@@ -15,10 +15,9 @@
 		<LangVersion>12</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 -->
-		<!-- NU1701警告を抑制: Win32パッケージの.NET Framework互換性問題 -->
+		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 - 最適化版 -->
 		<!-- AVLN5001警告を抑制: AR風翻訳UIへの移行中のため廃止予定警告を抑制 -->
-		<NoWarn>$(NoWarn);CA1711;CA1848;CA1822;NU1701;AVLN5001</NoWarn>
+		<NoWarn>$(NoWarn);CA1848;CA1711;AVLN5001</NoWarn>
 		
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>

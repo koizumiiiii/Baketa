@@ -205,7 +205,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var logger = provider.GetService<ILogger<TransformersOpusMtEngine>>();
                 logger?.LogInformation("🚀 TransformersOpusMtEngine遅延初期化開始 - UIブロック回避");
                 var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
-                return new TransformersOpusMtEngine(logger, settingsService);
+                return new TransformersOpusMtEngine(logger!, settingsService);
             });
             
             // 🔧 ファサード実装バッチ処理ハング問題の修正: 具象型でも登録してServiceProviderからの直接取得を可能にする

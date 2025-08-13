@@ -155,7 +155,7 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
     /// <summary>
     /// 指定サイズでのウォームアップフェーズ実行
     /// </summary>
-    private async Task ExecuteWarmupPhase(string phaseName, int width, int height, CancellationToken cancellationToken)
+    private async Task ExecuteWarmupPhase(string phaseName, int width, int height, CancellationToken _)
     {
         try
         {
@@ -290,10 +290,7 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
             throw new InvalidOperationException("GPU OCRエンジンが初期化されていません");
         }
 
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(EnhancedGpuOcrAccelerator));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -842,11 +839,11 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
     {
         if (tensorValue is Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<int> intTensor)
         {
-            return intTensor.ToArray();
+            return [.. intTensor];
         }
         else if (tensorValue is Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<long> longTensor)
         {
-            return longTensor.ToArray().Select(x => (int)x).ToArray();
+            return [.. longTensor.ToArray().Select(x => (int)x)];
         }
         return null;
     }
@@ -855,7 +852,7 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
     {
         if (tensorValue is Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<float> floatTensor)
         {
-            return floatTensor.ToArray();
+            return [.. floatTensor];
         }
         return null;
     }

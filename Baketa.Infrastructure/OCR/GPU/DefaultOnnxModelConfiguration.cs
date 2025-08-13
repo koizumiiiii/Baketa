@@ -67,10 +67,7 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
             throw new ArgumentException("モデル名が指定されていません", nameof(modelName));
         }
         
-        if (modelInfo == null)
-        {
-            throw new ArgumentNullException(nameof(modelInfo));
-        }
+        ArgumentNullException.ThrowIfNull(modelInfo);
         
         lock (_configLock)
         {

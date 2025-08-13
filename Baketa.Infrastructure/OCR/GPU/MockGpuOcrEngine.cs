@@ -15,14 +15,14 @@ public sealed class MockGpuOcrEngine : IGpuOcrEngine
 {
     private readonly ILogger<MockGpuOcrEngine> _logger;
     private readonly Random _random = new();
-    private bool _disposed = false;
+    private bool _disposed;
     
     // 統計情報
-    private long _totalExecutions = 0;
-    private long _successfulExecutions = 0;
-    private double _totalExecutionTimeMs = 0;
-    private long _peakMemoryUsageMB = 0;
-    private long _errorCount = 0;
+    private long _totalExecutions;
+    private long _successfulExecutions;
+    private double _totalExecutionTimeMs;
+    private long _peakMemoryUsageMB;
+    private long _errorCount;
 
     public MockGpuOcrEngine(ILogger<MockGpuOcrEngine> logger)
     {
@@ -83,7 +83,7 @@ public sealed class MockGpuOcrEngine : IGpuOcrEngine
             
             return new OcrResult
             {
-                DetectedTexts = Array.Empty<DetectedText>(),
+                DetectedTexts = [],
                 IsSuccessful = false,
                 ProcessingTime = stopwatch.Elapsed,
                 Metadata = new Dictionary<string, object>

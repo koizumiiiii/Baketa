@@ -12,7 +12,7 @@ public class OcrResult
     /// <summary>
     /// 検出されたテキスト一覧
     /// </summary>
-    public IReadOnlyList<DetectedText> DetectedTexts { get; init; } = Array.Empty<DetectedText>();
+    public IReadOnlyList<DetectedText> DetectedTexts { get; init; } = [];
     
     /// <summary>
     /// 処理が成功したかどうか
