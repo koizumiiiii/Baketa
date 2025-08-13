@@ -397,6 +397,27 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         }
     }
 
+    public async Task<bool> UpdateSettingsAsync(object settings, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (settings is StickyRoiSettings roiSettings)
+            {
+                _settings = roiSettings;
+                _logger.LogInformation("⚙️ ROI設定更新完了");
+                return true;
+            }
+            
+            _logger.LogWarning("⚠️ 無効な設定タイプ: {Type}", settings?.GetType().Name ?? "null");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ ROI設定更新失敗");
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

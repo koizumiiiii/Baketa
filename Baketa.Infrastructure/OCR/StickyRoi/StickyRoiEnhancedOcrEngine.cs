@@ -191,7 +191,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
             
             return new Baketa.Core.Abstractions.OCR.OcrResult
             {
-                DetectedTexts = detectedTexts,
+                DetectedTexts = detectedTexts.AsReadOnly(),
                 ProcessingTime = TimeSpan.Zero, // 個別計測済み
                 IsSuccessful = true,
                 Metadata = new Dictionary<string, object>
@@ -261,7 +261,24 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
 
     private Baketa.Core.Abstractions.OCR.OcrResult MergeResults(Baketa.Core.Abstractions.OCR.OcrResult? roiResult, Baketa.Core.Abstractions.OCR.OcrResult fullResult)
     {
-        if (roiResult == null) return fullResult;
+        if (roiResult == null) 
+        {
+            // ROIなしの場合でも、ProcessingModeを追加
+            var enhancedResult = new Baketa.Core.Abstractions.OCR.OcrResult
+            {
+                DetectedTexts = fullResult.DetectedTexts,
+                ProcessingTime = fullResult.ProcessingTime,
+                IsSuccessful = fullResult.IsSuccessful,
+                Metadata = fullResult.Metadata ?? new Dictionary<string, object>()
+            };
+            
+            if (!enhancedResult.Metadata.ContainsKey("ProcessingMode"))
+            {
+                enhancedResult.Metadata["ProcessingMode"] = "Full";
+            }
+            
+            return enhancedResult;
+        }
         
         // 重複除去と結果統合
         var allTexts = new List<Baketa.Core.Abstractions.OCR.DetectedText>(roiResult.DetectedTexts);
@@ -281,7 +298,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
         
         return new Baketa.Core.Abstractions.OCR.OcrResult
         {
-            DetectedTexts = allTexts,
+            DetectedTexts = allTexts.AsReadOnly(),
             ProcessingTime = fullResult.ProcessingTime,
             IsSuccessful = true,
             Metadata = new Dictionary<string, object>
@@ -362,4 +379,5 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
         
         return hitRate * (speedup - 1.0) / speedup;
     }
+
 }
