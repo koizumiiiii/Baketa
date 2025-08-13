@@ -63,6 +63,11 @@ public sealed record GpuEnvironmentInfo
     public string GpuName { get; init; } = string.Empty;
     
     /// <summary>
+    /// GPU デバイス ID（Multi-GPU環境での識別用）
+    /// </summary>
+    public int GpuDeviceId { get; init; } = 0;
+    
+    /// <summary>
     /// GPU Compute能力（CUDA Compute Capability）
     /// </summary>
     public ComputeCapability ComputeCapability { get; init; } = ComputeCapability.Unknown;

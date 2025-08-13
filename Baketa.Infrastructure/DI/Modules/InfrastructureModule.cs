@@ -60,6 +60,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
             
+            // GPU統合サービス（Issue #143 Week 2: DI統合とMulti-GPU対応）
+            RegisterGpuServices(services);
+            
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
             
@@ -125,6 +128,30 @@ namespace Baketa.Infrastructure.DI.Modules;
             // ウォームアップサービスをホストサービスとしても登録（アプリケーション開始時に自動実行）
             services.AddHostedService<WarmupHostedService>();
             Console.WriteLine("✅ WarmupHostedService登録完了");
+        }
+        
+        /// <summary>
+        /// GPU関連サービスを登録します（Issue #143 Week 2: DI統合とMulti-GPU対応）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterGpuServices(IServiceCollection services)
+        {
+            Console.WriteLine("🎮 GPU統合サービス登録開始 - Issue #143 Week 2");
+            
+            // ONNX Runtime セッション管理（DI Container完全統合）
+            services.AddSingleton<Baketa.Infrastructure.OCR.GPU.IOnnxSessionProvider, Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionProvider>();
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IOnnxSessionFactory, Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionFactory>();
+            Console.WriteLine("✅ IOnnxSessionFactory登録完了 - DI統合");
+            
+            // ONNX モデル設定管理（Phase 2: テンソル名外部化）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IOnnxModelConfiguration, Baketa.Infrastructure.OCR.GPU.DefaultOnnxModelConfiguration>();
+            Console.WriteLine("✅ IOnnxModelConfiguration登録完了 - モデル外部化");
+            
+            // TDR対策・永続キャッシュシステム（Phase 3: 高可用性・高速起動）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IPersistentSessionCache, Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache>();
+            Console.WriteLine("✅ IPersistentSessionCache登録完了 - 永続キャッシュ");
+            
+            Console.WriteLine("✅ GPU統合サービス登録完了");
         }
         
         /// <summary>
