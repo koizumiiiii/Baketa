@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Integration.Tests.GPU;
 
@@ -94,56 +95,80 @@ public static class GPUEnvironmentTestHelper
     /// <summary>
     /// テスト用のモック戦略ファクトリ作成
     /// </summary>
-    public static GPUEnvironmentInfo CreateTestEnvironment(GPUEnvironmentCategory category)
+    public static GpuEnvironmentInfo CreateTestEnvironment(GPUEnvironmentCategory category)
     {
         return category switch
         {
-            GPUEnvironmentCategory.HighEndDedicated => new GPUEnvironmentInfo
+            GPUEnvironmentCategory.HighEndDedicated => new GpuEnvironmentInfo
             {
-                IsIntegratedGPU = false,
-                IsDedicatedGPU = true,
-                HasDirectX11Support = true,
+                IsIntegratedGpu = false,
+                IsDedicatedGpu = true,
+                SupportsCuda = true,
+                SupportsOpenCL = true,
+                SupportsDirectML = true,
+                SupportsOpenVINO = false,
+                SupportsTensorRT = true,
                 MaximumTexture2DDimension = 16384,
                 AvailableMemoryMB = 8192,
-                GPUName = "High-End Dedicated GPU (Test)",
-                FeatureLevel = DirectXFeatureLevel.Level121,
-                HasHDRSupport = true
+                GpuName = "High-End Dedicated GPU (Test)",
+                DirectXFeatureLevel = DirectXFeatureLevel.D3D121,
+                GpuDeviceId = 1,
+                ComputeCapability = ComputeCapability.Compute75,
+                RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.TensorRT]
             },
             
-            GPUEnvironmentCategory.MidRangeDedicated => new GPUEnvironmentInfo
+            GPUEnvironmentCategory.MidRangeDedicated => new GpuEnvironmentInfo
             {
-                IsIntegratedGPU = false,
-                IsDedicatedGPU = true,
-                HasDirectX11Support = true,
+                IsIntegratedGpu = false,
+                IsDedicatedGpu = true,
+                SupportsCuda = true,
+                SupportsOpenCL = true,
+                SupportsDirectML = true,
+                SupportsOpenVINO = false,
+                SupportsTensorRT = false,
                 MaximumTexture2DDimension = 8192,
                 AvailableMemoryMB = 4096,
-                GPUName = "Mid-Range Dedicated GPU (Test)",
-                FeatureLevel = DirectXFeatureLevel.Level111,
-                HasHDRSupport = false
+                GpuName = "Mid-Range Dedicated GPU (Test)",
+                DirectXFeatureLevel = DirectXFeatureLevel.D3D111,
+                GpuDeviceId = 1,
+                ComputeCapability = ComputeCapability.Compute61,
+                RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.DirectML]
             },
             
-            GPUEnvironmentCategory.ModernIntegrated => new GPUEnvironmentInfo
+            GPUEnvironmentCategory.ModernIntegrated => new GpuEnvironmentInfo
             {
-                IsIntegratedGPU = true,
-                IsDedicatedGPU = false,
-                HasDirectX11Support = true,
+                IsIntegratedGpu = true,
+                IsDedicatedGpu = false,
+                SupportsCuda = false,
+                SupportsOpenCL = true,
+                SupportsDirectML = true,
+                SupportsOpenVINO = true,
+                SupportsTensorRT = false,
                 MaximumTexture2DDimension = 4096,
                 AvailableMemoryMB = 2048,
-                GPUName = "Modern Integrated GPU (Test)",
-                FeatureLevel = DirectXFeatureLevel.Level111,
-                HasHDRSupport = false
+                GpuName = "Modern Integrated GPU (Test)",
+                DirectXFeatureLevel = DirectXFeatureLevel.D3D111,
+                GpuDeviceId = 0,
+                ComputeCapability = ComputeCapability.Unknown,
+                RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
             },
             
-            GPUEnvironmentCategory.LegacyIntegrated => new GPUEnvironmentInfo
+            GPUEnvironmentCategory.LegacyIntegrated => new GpuEnvironmentInfo
             {
-                IsIntegratedGPU = true,
-                IsDedicatedGPU = false,
-                HasDirectX11Support = true,
+                IsIntegratedGpu = true,
+                IsDedicatedGpu = false,
+                SupportsCuda = false,
+                SupportsOpenCL = false,
+                SupportsDirectML = true,
+                SupportsOpenVINO = false,
+                SupportsTensorRT = false,
                 MaximumTexture2DDimension = 2048,
                 AvailableMemoryMB = 512,
-                GPUName = "Legacy Integrated GPU (Test)",
-                FeatureLevel = DirectXFeatureLevel.Level110,
-                HasHDRSupport = false
+                GpuName = "Legacy Integrated GPU (Test)",
+                DirectXFeatureLevel = DirectXFeatureLevel.D3D110,
+                GpuDeviceId = 0,
+                ComputeCapability = ComputeCapability.Unknown,
+                RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
             },
             
             _ => throw new ArgumentException($"Unsupported GPU category: {category}")

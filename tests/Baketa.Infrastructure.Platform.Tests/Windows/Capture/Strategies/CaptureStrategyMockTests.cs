@@ -7,6 +7,7 @@ using Moq;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 using Baketa.Infrastructure.Platform.Tests.Windows.GPU;
 
@@ -39,7 +40,7 @@ public class CaptureStrategyMockTests
 
     [Theory]
     [MemberData(nameof(GetGPUEnvironmentTestCases))]
-    public void StrategySelection_BasedOnGPUEnvironment(GPUEnvironmentInfo gpuEnv, string expectedStrategy, string testDescription)
+    public void StrategySelection_BasedOnGPUEnvironment(GpuEnvironmentInfo gpuEnv, string expectedStrategy, string testDescription)
     {
         // Arrange
         var directFullScreenStrategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
@@ -149,7 +150,7 @@ public class CaptureStrategyMockTests
     public void Multiple_GPU_Environments_Strategy_Selection()
     {
         // Arrange
-        var integratedGPU = GPUEnvironmentMockTests.CreateMockIntegratedGPU();
+        var integratedGPU = GPUEnvironmentMockTests.CreateMockIntegratedGpu();
         var dedicatedGPU = GPUEnvironmentMockTests.CreateMockDedicatedGPU();
         var lowEndGPU = GPUEnvironmentMockTests.CreateMockLowEndIntegratedGPU();
         
@@ -196,12 +197,12 @@ public class CaptureStrategyMockTests
         Assert.Equal(string.Empty, metrics.PerformanceCategory);
     }
 
-    public static TheoryData<GPUEnvironmentInfo, string, string> GetGPUEnvironmentTestCases()
+    public static TheoryData<GpuEnvironmentInfo, string, string> GetGPUEnvironmentTestCases()
     {
-        return new TheoryData<GPUEnvironmentInfo, string, string>
+        return new TheoryData<GpuEnvironmentInfo, string, string>
         {
             {
-                GPUEnvironmentMockTests.CreateMockIntegratedGPU(),
+                GPUEnvironmentMockTests.CreateMockIntegratedGpu(),
                 "DirectFullScreen",
                 "統合GPU（十分な性能）"
             },

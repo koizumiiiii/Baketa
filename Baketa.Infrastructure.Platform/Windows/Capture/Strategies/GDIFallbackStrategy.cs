@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
@@ -21,7 +22,7 @@ public class GDIFallbackStrategy : ICaptureStrategy
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd)
+    public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
     {
         // GDI APIは常に利用可能
         return hwnd != IntPtr.Zero;
