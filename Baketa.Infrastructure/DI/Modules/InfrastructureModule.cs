@@ -23,6 +23,7 @@ using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.Onnx;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.DI.Modules;
@@ -55,6 +56,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
+            
+            // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
+            RegisterWarmupServices(services);
             
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
@@ -104,6 +108,23 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 翻訳サービスを登録
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
+        }
+        
+        /// <summary>
+        /// ウォームアップサービスを登録します（Issue #143: コールドスタート遅延根絶）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterWarmupServices(IServiceCollection services)
+        {
+            Console.WriteLine("🚀 ウォームアップサービス登録開始 - Issue #143");
+            
+            // バックグラウンドウォームアップサービス（OCR・翻訳エンジンの非同期初期化）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IWarmupService, BackgroundWarmupService>();
+            Console.WriteLine("✅ IWarmupService登録完了");
+            
+            // ウォームアップサービスをホストサービスとしても登録（アプリケーション開始時に自動実行）
+            services.AddHostedService<WarmupHostedService>();
+            Console.WriteLine("✅ WarmupHostedService登録完了");
         }
         
         /// <summary>

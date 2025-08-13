@@ -33,6 +33,8 @@
 		<PackageReference Include="SharpDX.Direct3D11" Version="4.2.0" />
 		<PackageReference Include="SharpDX.DXGI" Version="4.2.0" />
 		<PackageReference Include="Win32" Version="1.0.3" />
+		<!-- GPU環境検出用パッケージ（Issue #143対応） -->
+		<PackageReference Include="System.Management" Version="8.0.0" />
 	</ItemGroup>
 
 	<!-- ネイティブDLLの自動コピー -->

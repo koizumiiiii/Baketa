@@ -9,7 +9,7 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 /// <summary>
 /// GPU環境を検出する実装クラス
 /// </summary>
-public class GPUEnvironmentDetector : IGPUEnvironmentDetector
+public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
 {
     private readonly ILogger<GPUEnvironmentDetector> _logger;
     private GPUEnvironmentInfo? _cachedEnvironment;

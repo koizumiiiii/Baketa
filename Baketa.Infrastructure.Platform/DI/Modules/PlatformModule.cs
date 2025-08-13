@@ -41,6 +41,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
                 // UI関連のWindowsサービス
                 RegisterWindowsUIServices(services);
                 
+                // GPU環境検出サービス（Issue #143対応）
+                RegisterGpuServices(services);
+                
                 // その他のWindows固有サービス
                 RegisterWindowsServices(services);
             }
@@ -109,6 +112,17 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             
             // システムトレイ
             // 例: services.AddSingleton<ISystemTrayService, Win32SystemTrayService>();
+        }
+        
+        /// <summary>
+        /// GPU環境検出サービスを登録します（Issue #143対応）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterGpuServices(IServiceCollection services)
+        {
+            // GPU環境検出サービス
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector, 
+                Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector>();
         }
         
         /// <summary>
