@@ -216,7 +216,7 @@ public static class PaddleOcrUsageExample
             return;
         }
         
-        var results = OcrResult.FromPaddleResults(paddleResults);
+        var results = Baketa.Infrastructure.OCR.PaddleOCR.Results.OcrResult.FromPaddleResults(paddleResults);
         
         Console.WriteLine($"認識されたテキスト数: {results.Length}");
         

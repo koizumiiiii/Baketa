@@ -1,6 +1,37 @@
 namespace Baketa.Core.Abstractions.GPU;
 
 /// <summary>
+/// TDRエラーの種類
+/// </summary>
+public enum TdrErrorType
+{
+    /// <summary>
+    /// タイムアウト
+    /// </summary>
+    Timeout,
+    
+    /// <summary>
+    /// GPU応答停止
+    /// </summary>
+    Hang,
+    
+    /// <summary>
+    /// メモリ不足
+    /// </summary>
+    OutOfMemory,
+    
+    /// <summary>
+    /// ドライバエラー
+    /// </summary>
+    DriverError,
+    
+    /// <summary>
+    /// 不明なエラー
+    /// </summary>
+    Unknown
+}
+
+/// <summary>
 /// TDR (Timeout Detection and Recovery) 管理インターフェース
 /// DirectX/OpenGL GPU タイムアウト検出と自動回復システム
 /// Issue #143 Week 2 Phase 3: TDR対策システム
@@ -60,6 +91,11 @@ public class TdrContext
     /// TDR発生時刻
     /// </summary>
     public DateTime OccurredAt { get; init; } = DateTime.UtcNow;
+    
+    /// <summary>
+    /// TDRエラーの種類
+    /// </summary>
+    public TdrErrorType ErrorType { get; init; }
     
     /// <summary>
     /// TDR発生時のGPU使用率
@@ -134,9 +170,24 @@ public class TdrStatus
     public int TdrCountLast24Hours { get; init; }
     
     /// <summary>
+    /// 最近のTDR回数
+    /// </summary>
+    public int RecentTdrCount { get; init; }
+    
+    /// <summary>
+    /// システムが健全かどうか
+    /// </summary>
+    public bool IsHealthy { get; init; }
+    
+    /// <summary>
     /// 最後のTDR発生時刻
     /// </summary>
     public DateTime? LastTdrTime { get; init; }
+    
+    /// <summary>
+    /// 最後のTDR発生時刻（別名）
+    /// </summary>
+    public DateTime? LastTdrOccurredAt { get; init; }
     
     /// <summary>
     /// TDRリスク評価

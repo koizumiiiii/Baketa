@@ -51,6 +51,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // OCR関連サービス
             RegisterOcrServices(services);
             
+            // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
+            RegisterStickyRoiServices(services);
+            
             // HuggingFace Transformers OPUS-MT翻訳サービス（高品質版）を先に登録
             RegisterTransformersOpusMTServices(services);
             
@@ -151,7 +154,31 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Core.Abstractions.GPU.IPersistentSessionCache, Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache>();
             Console.WriteLine("✅ IPersistentSessionCache登録完了 - 永続キャッシュ");
             
+            // GPU OCRエンジン（Week 3 Phase 2: 統合最適化対応）
+            services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuOcrEngine, Baketa.Infrastructure.OCR.GPU.MockGpuOcrEngine>();
+            Console.WriteLine("✅ IGpuOcrEngine登録完了 - Mock実装");
+            
             Console.WriteLine("✅ GPU統合サービス登録完了");
+        }
+        
+        /// <summary>
+        /// スティッキーROIシステムを登録します（Issue #143 Week 3: 処理効率向上）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterStickyRoiServices(IServiceCollection services)
+        {
+            Console.WriteLine("🎯 スティッキーROIシステム登録開始 - Issue #143 Week 3");
+            
+            // スティッキーROI管理サービス
+            services.AddSingleton<Baketa.Core.Abstractions.OCR.IStickyRoiManager, Baketa.Infrastructure.OCR.StickyRoi.InMemoryStickyRoiManager>();
+            Console.WriteLine("✅ IStickyRoiManager登録完了 - InMemory実装");
+            
+            // ROI拡張OCRエンジン（デコレーターパターンで既存エンジンを拡張）
+            // 注意: 実際のプロダクションでは適切なOCRエンジンファクトリーと統合が必要
+            services.AddSingleton<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>();
+            Console.WriteLine("✅ StickyRoiEnhancedOcrEngine登録完了 - デコレーター実装");
+            
+            Console.WriteLine("✅ スティッキーROIシステム登録完了");
         }
         
         /// <summary>
@@ -196,17 +223,25 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterPerformanceServices(IServiceCollection services)
         {
+            Console.WriteLine("🚀 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2");
+            
             // GPUメモリ管理
             services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
             
             // パフォーマンス分析サービス
             services.AddSingleton<IAsyncPerformanceAnalyzer, AsyncPerformanceAnalyzer>();
             
+            // 統合パフォーマンスオーケストレーター（Week 3 Phase 2: 60-80%改善目標）
+            services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
+            Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
+            
             // 翻訳精度検証システム（デバッグビルドのみ）
             // TODO: 翻訳精度検証システムは将来実装予定
             // #if DEBUG
             // services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
             // #endif
+            
+            Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了");
         }
         
         /// <summary>
