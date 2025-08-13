@@ -608,7 +608,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         var dx = center1.X - center2.X;
         var dy = center1.Y - center2.Y;
         
-        return (int)Math.Sqrt(dx * dx + dy * dy);
+        return (int)Math.Sqrt((double)(dx * dx) + (double)(dy * dy));
     }
 
     private Rectangle AdjustRegionBounds(Rectangle current, Rectangle detected)
