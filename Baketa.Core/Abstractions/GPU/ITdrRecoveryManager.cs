@@ -120,7 +120,7 @@ public class TdrContext
     /// <summary>
     /// 追加コンテキスト情報
     /// </summary>
-    public Dictionary<string, object> AdditionalContext { get; init; } = new();
+    public Dictionary<string, object> AdditionalContext { get; init; } = [];
 }
 
 /// <summary>

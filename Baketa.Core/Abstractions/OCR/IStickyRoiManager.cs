@@ -123,7 +123,7 @@ public class TextRegion
     /// <summary>
     /// 追加メタデータ
     /// </summary>
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, object> Metadata { get; init; } = [];
 }
 
 /// <summary>
@@ -169,12 +169,12 @@ public class StickyRoi
     /// <summary>
     /// 検出回数
     /// </summary>
-    public int DetectionCount { get; set; } = 0;
+    public int DetectionCount { get; set; }
     
     /// <summary>
     /// 連続失敗回数
     /// </summary>
-    public int ConsecutiveFailures { get; set; } = 0;
+    public int ConsecutiveFailures { get; set; }
     
     /// <summary>
     /// ROIタイプ
@@ -184,7 +184,7 @@ public class StickyRoi
     /// <summary>
     /// 拡張プロパティ
     /// </summary>
-    public Dictionary<string, object> Properties { get; init; } = new();
+    public Dictionary<string, object> Properties { get; init; } = [];
 }
 
 /// <summary>

@@ -426,18 +426,10 @@ internal sealed record UnifiedOcrSettings(
 /// <summary>
 /// 統一アプリケーション設定実装
 /// </summary>
-internal sealed class UnifiedAppSettings : IAppSettings
+internal sealed class UnifiedAppSettings(ITranslationSettings translation, IOcrSettings ocr, AppSettings appSettings) : IAppSettings
 {
-    public ITranslationSettings Translation { get; }
-    public IOcrSettings Ocr { get; }
-    public string LogLevel { get; }
-    public bool EnableDebugMode { get; }
-
-    public UnifiedAppSettings(ITranslationSettings translation, IOcrSettings ocr, AppSettings appSettings)
-    {
-        Translation = translation;
-        Ocr = ocr;
-        LogLevel = "Information"; // デフォルトログレベル
-        EnableDebugMode = false; // デフォルトデバッグモード
-    }
+    public ITranslationSettings Translation { get; } = translation;
+    public IOcrSettings Ocr { get; } = ocr;
+    public string LogLevel { get; } = "Information"; // デフォルトログレベル
+    public bool EnableDebugMode { get; } = false; // デフォルトデバッグモード
 }

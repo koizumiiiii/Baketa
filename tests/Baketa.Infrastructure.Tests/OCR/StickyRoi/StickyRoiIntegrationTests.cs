@@ -48,15 +48,13 @@ public class StickyRoiIntegrationTests : IDisposable
         var testImageData = CreateTestImageData();
         var expectedTexts = new List<Baketa.Core.Abstractions.OCR.DetectedText>
         {
-            new Baketa.Core.Abstractions.OCR.DetectedText
-            {
+            new() {
                 Text = "Test Text 1",
                 Confidence = 0.95,
                 BoundingBox = new Rectangle(100, 100, 200, 50),
                 Language = "ja"
             },
-            new Baketa.Core.Abstractions.OCR.DetectedText
-            {
+            new() {
                 Text = "Test Text 2", 
                 Confidence = 0.88,
                 BoundingBox = new Rectangle(300, 200, 150, 40),
@@ -127,14 +125,12 @@ public class StickyRoiIntegrationTests : IDisposable
         // Arrange
         var overlappingRegions = new List<TextRegion>
         {
-            new TextRegion
-            {
+            new() {
                 Bounds = new Rectangle(100, 100, 100, 50),
                 Text = "Text A",
                 Confidence = 0.9
             },
-            new TextRegion
-            {
+            new() {
                 Bounds = new Rectangle(120, 110, 100, 50), // 重複領域
                 Text = "Text B",
                 Confidence = 0.85
@@ -164,8 +160,7 @@ public class StickyRoiIntegrationTests : IDisposable
         // Arrange
         var testRegions = new List<TextRegion>
         {
-            new TextRegion
-            {
+            new() {
                 Bounds = new Rectangle(50, 50, 100, 30),
                 Text = "Expired Text",
                 Confidence = 0.8
@@ -226,8 +221,7 @@ public class StickyRoiIntegrationTests : IDisposable
         // Arrange
         var testRegions = new List<TextRegion>
         {
-            new TextRegion
-            {
+            new() {
                 Bounds = new Rectangle(200, 200, 100, 50),
                 Text = "Confidence Test",
                 Confidence = 0.8
@@ -261,8 +255,8 @@ public class StickyRoiIntegrationTests : IDisposable
     private static byte[] CreateTestImageData()
     {
         // テスト用の最小限画像データ（PNG形式のダミー）
-        return new byte[] 
-        {
+        return
+        [
             0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG シグネチャ
             0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR チャンク
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 ピクセル
@@ -274,7 +268,7 @@ public class StickyRoiIntegrationTests : IDisposable
             0x63, 0xF8, 0x0F, 0x00, 0x00, 0x01, 0x00, 0x01,
             0x76, 0x36, 0xDD, 0xDB, 0x00, 0x00, 0x00, 0x00,
             0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
-        };
+        ];
     }
 
     public void Dispose()

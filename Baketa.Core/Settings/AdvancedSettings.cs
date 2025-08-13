@@ -12,7 +12,7 @@ public sealed class AdvancedSettings
     [SettingMetadata(SettingLevel.Advanced, "Advanced", "高度な設定有効", 
         Description = "高度な設定とオプションを有効にします", 
         WarningMessage = "高度な設定を変更すると予期しない動作が発生する可能性があります")]
-    public bool EnableAdvancedFeatures { get; set; } = false;
+    public bool EnableAdvancedFeatures { get; set; }
     
     /// <summary>
     /// メモリ管理の最適化
@@ -35,7 +35,7 @@ public sealed class AdvancedSettings
         Description = "特定のCPUコアにプロセスを割り当てます（0=自動）", 
         MinValue = 0, 
         MaxValue = 64)]
-    public int CpuAffinityMask { get; set; } = 0;
+    public int CpuAffinityMask { get; set; }
     
     /// <summary>
     /// プロセス優先度
@@ -52,7 +52,7 @@ public sealed class AdvancedSettings
         Description = "バックグラウンド処理に使用するスレッド数（0=自動）", 
         MinValue = 0, 
         MaxValue = 32)]
-    public int WorkerThreadCount { get; set; } = 0;
+    public int WorkerThreadCount { get; set; }
     
     /// <summary>
     /// I/Oスレッド数
@@ -61,7 +61,7 @@ public sealed class AdvancedSettings
         Description = "ファイル入出力に使用するスレッド数（0=自動）", 
         MinValue = 0, 
         MaxValue = 16)]
-    public int IoThreadCount { get; set; } = 0;
+    public int IoThreadCount { get; set; }
     
     /// <summary>
     /// バッファリング戦略
@@ -148,7 +148,7 @@ public sealed class AdvancedSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Advanced", "プロファイリング", 
         Description = "詳細なパフォーマンスプロファイリングを有効にします")]
-    public bool EnableProfiling { get; set; } = false;
+    public bool EnableProfiling { get; set; }
     
     /// <summary>
     /// 異常検出の有効化
@@ -170,28 +170,28 @@ public sealed class AdvancedSettings
     [SettingMetadata(SettingLevel.Debug, "Advanced", "実験的機能", 
         Description = "実験的な機能を有効にします（開発者向け）", 
         WarningMessage = "実験的機能は不安定である可能性があります")]
-    public bool EnableExperimentalFeatures { get; set; } = false;
+    public bool EnableExperimentalFeatures { get; set; }
     
     /// <summary>
     /// 内部API露出
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Advanced", "内部API露出", 
         Description = "内部APIへのアクセスを許可します（開発者向け）")]
-    public bool ExposeInternalApis { get; set; } = false;
+    public bool ExposeInternalApis { get; set; }
     
     /// <summary>
     /// デバッグブレークポイント
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Advanced", "デバッグブレーク", 
         Description = "特定の条件でデバッガーブレークを発生させます（開発者向け）")]
-    public bool EnableDebugBreaks { get; set; } = false;
+    public bool EnableDebugBreaks { get; set; }
     
     /// <summary>
     /// メモリダンプ生成
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "Advanced", "メモリダンプ", 
         Description = "クラッシュ時にメモリダンプを生成します（開発者向け）")]
-    public bool GenerateMemoryDumps { get; set; } = false;
+    public bool GenerateMemoryDumps { get; set; }
     
     /// <summary>
     /// カスタム設定ファイルパス

@@ -235,8 +235,8 @@ public class TransformersOpusMtEngine : TranslationEngineBase
                 for (int i = 0; i < Math.Min(responses.Count, 5); i++) // 最初の5個を表示
                 {
                     var response = responses[i];
-                    Console.WriteLine($"  [{i}] 原文: '{response.SourceText?.Substring(0, Math.Min(50, response.SourceText?.Length ?? 0))}...'");
-                    Console.WriteLine($"  [{i}] 訳文: '{response.TranslatedText?.Substring(0, Math.Min(50, response.TranslatedText?.Length ?? 0))}...'");
+                    Console.WriteLine($"  [{i}] 原文: '{response.SourceText?[..Math.Min(50, response.SourceText?.Length ?? 0)]}...'");
+                    Console.WriteLine($"  [{i}] 訳文: '{response.TranslatedText?[..Math.Min(50, response.TranslatedText?.Length ?? 0)]}...'");
                     Console.WriteLine($"  [{i}] 成功: {response.IsSuccess}");
                 }
                 _logger?.LogInformation("🔍 [TRANSLATION_RESULTS] バッチ翻訳結果: {Count}個の翻訳完了", responses.Count);
@@ -898,7 +898,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             _logger?.LogInformation("✅ [TCP_FIX] 改良版ReadAsync完了 - 総読み取り: {TotalBytes}bytes", totalBytesRead);
             
             var responseJson = Encoding.UTF8.GetString(allData.ToArray());
-            Console.WriteLine($"📨 [BATCH_DEBUG] レスポンス内容（最初の500文字）: {responseJson.Substring(0, Math.Min(500, responseJson.Length))}...");
+            Console.WriteLine($"📨 [BATCH_DEBUG] レスポンス内容（最初の500文字）: {responseJson[..Math.Min(500, responseJson.Length)]}...");
             _logger?.LogInformation("📨 [BATCH_DETAIL_9] レスポンス内容: {ResponseJson}", responseJson);
             
             // JSONデシリアライゼーション前の検証
@@ -1239,7 +1239,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 
                 Console.WriteLine($"📨 [SERVER_TRANSLATE] レスポンス内容: {responseJson}");
                 Console.WriteLine($"🔢 [JSON_RESPONSE] レスポンス文字数: {responseJson?.Length}, IsNull: {responseJson == null}");
-                Console.WriteLine($"🔍 [JSON_RESPONSE] レスポンス先頭100文字: {responseJson?.Substring(0, Math.Min(100, responseJson?.Length ?? 0))}");
+                Console.WriteLine($"🔍 [JSON_RESPONSE] レスポンス先頭100文字: {responseJson?[..Math.Min(100, responseJson?.Length ?? 0)]}");
                 
                 PersistentTranslationResult? response;
                 try
@@ -1468,7 +1468,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
             // BOMを除去
             if (jsonStr.StartsWith("\uFEFF"))
             {
-                jsonStr = jsonStr.Substring(1);
+                jsonStr = jsonStr[1..];
                 Console.WriteLine($"🔧 [JSON_DEBUG] BOMを除去しました");
             }
             
@@ -1496,7 +1496,7 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
                 else
                 {
                     // 最後の}以降の文字を削除
-                    jsonStr = jsonStr.Substring(0, lastBrace + 1);
+                    jsonStr = jsonStr[..(lastBrace + 1)];
                 }
             }
             

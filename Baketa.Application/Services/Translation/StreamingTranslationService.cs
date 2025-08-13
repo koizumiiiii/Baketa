@@ -69,7 +69,7 @@ public class StreamingTranslationService : IStreamingTranslationService
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] テキストリスト空のため早期リターン - texts={textsStatus}");
             System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] テキストリスト空のため早期リターン - texts={textsStatus}{Environment.NewLine}");
-            return new List<string>();
+            return [];
         }
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Stopwatch開始前");
@@ -136,7 +136,7 @@ public class StreamingTranslationService : IStreamingTranslationService
         _logger.LogInformation("✅ [STREAMING] バッチ翻訳完了 - 総時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         Console.WriteLine($"✅ [STREAMING] バッチ翻訳完了 - 総時間: {stopwatch.ElapsedMilliseconds}ms");
         
-        return results.ToList();
+        return [.. results];
     }
     
     /// <inheritdoc/>
@@ -358,6 +358,6 @@ public class StreamingTranslationService : IStreamingTranslationService
     {
         public int StartIndex { get; set; }
         public int EndIndex { get; set; }
-        public List<string> Texts { get; set; } = new();
+        public List<string> Texts { get; set; } = [];
     }
 }

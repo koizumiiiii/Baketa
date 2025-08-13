@@ -42,28 +42,22 @@ public enum OcrPhase
 /// <summary>
 /// OCR処理の進捗状況を表すクラス
 /// </summary>
-public class OcrProgress
+public class OcrProgress(double progress, string status)
 {
     /// <summary>
     /// 進捗率（0.0～1.0）
     /// </summary>
-    public double Progress { get; init; }
+    public double Progress { get; init; } = Math.Clamp(progress, 0.0, 1.0);
 
     /// <summary>
     /// 現在の処理ステータス
     /// </summary>
-    public string Status { get; init; } = string.Empty;
-    
+    public string Status { get; init; } = status ?? string.Empty;
+
     /// <summary>
     /// 現在の処理フェーズ
     /// </summary>
     public OcrPhase Phase { get; init; } = OcrPhase.Initializing;
-
-    public OcrProgress(double progress, string status)
-    {
-        Progress = Math.Clamp(progress, 0.0, 1.0);
-        Status = status ?? string.Empty;
-    }
 }
 
 /// <summary>

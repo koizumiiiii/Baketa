@@ -8,14 +8,9 @@ namespace Baketa.Infrastructure.OCR.GPU;
 /// デフォルトONNXセッションプロバイダー実装
 /// 実際のONNX Runtimeを使用したセッション作成
 /// </summary>
-public sealed class DefaultOnnxSessionProvider : IOnnxSessionProvider
+public sealed class DefaultOnnxSessionProvider(ILogger<DefaultOnnxSessionProvider> logger) : IOnnxSessionProvider
 {
-    private readonly ILogger<DefaultOnnxSessionProvider> _logger;
-
-    public DefaultOnnxSessionProvider(ILogger<DefaultOnnxSessionProvider> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<DefaultOnnxSessionProvider> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<InferenceSession> CreateSessionAsync(string modelPath, GpuEnvironmentInfo gpuInfo, CancellationToken cancellationToken = default)
     {

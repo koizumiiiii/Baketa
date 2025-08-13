@@ -966,19 +966,12 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
 /// TDR（GPU Timeout Detection and Recovery）保護実行者
 /// Issue #143: GPU競合・タイムアウト自動復旧機能
 /// </summary>
-public sealed class TdrProtectedExecutor : IDisposable
+public sealed class TdrProtectedExecutor(ILogger logger, Func<SessionOptions> createDirectMLSessionOptions, Action triggerSessionRebuild) : IDisposable
 {
-    private readonly ILogger _logger;
-    private readonly Func<SessionOptions> _createDirectMLSessionOptions;
-    private readonly Action _triggerSessionRebuild;
+    private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly Func<SessionOptions> _createDirectMLSessionOptions = createDirectMLSessionOptions ?? throw new ArgumentNullException(nameof(createDirectMLSessionOptions));
+    private readonly Action _triggerSessionRebuild = triggerSessionRebuild ?? throw new ArgumentNullException(nameof(triggerSessionRebuild));
     private bool _disposed;
-
-    public TdrProtectedExecutor(ILogger logger, Func<SessionOptions> createDirectMLSessionOptions, Action triggerSessionRebuild)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _createDirectMLSessionOptions = createDirectMLSessionOptions ?? throw new ArgumentNullException(nameof(createDirectMLSessionOptions));
-        _triggerSessionRebuild = triggerSessionRebuild ?? throw new ArgumentNullException(nameof(triggerSessionRebuild));
-    }
 
     public async Task<T> ExecuteWithProtection<T>(Func<Task<T>> operation)
     {

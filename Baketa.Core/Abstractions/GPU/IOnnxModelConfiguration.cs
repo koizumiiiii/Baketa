@@ -76,17 +76,17 @@ public class OnnxModelInfo
     /// <summary>
     /// 入力テンソル形状定義
     /// </summary>
-    public Dictionary<string, int[]> InputShapes { get; init; } = new();
+    public Dictionary<string, int[]> InputShapes { get; init; } = [];
     
     /// <summary>
     /// 出力テンソル形状定義
     /// </summary>
-    public Dictionary<string, int[]> OutputShapes { get; init; } = new();
+    public Dictionary<string, int[]> OutputShapes { get; init; } = [];
     
     /// <summary>
     /// モデルメタデータ
     /// </summary>
-    public Dictionary<string, object> Metadata { get; init; } = new();
+    public Dictionary<string, object> Metadata { get; init; } = [];
     
     /// <summary>
     /// 推奨バッチサイズ
@@ -194,7 +194,7 @@ public class PostprocessingConfig
     /// <summary>
     /// カスタム後処理パラメータ
     /// </summary>
-    public Dictionary<string, object> CustomParameters { get; init; } = new();
+    public Dictionary<string, object> CustomParameters { get; init; } = [];
 }
 
 /// <summary>
@@ -220,7 +220,7 @@ public class ModelValidationResult
     /// <summary>
     /// 検証詳細情報
     /// </summary>
-    public Dictionary<string, object> ValidationDetails { get; init; } = new();
+    public Dictionary<string, object> ValidationDetails { get; init; } = [];
     
     /// <summary>
     /// 検証実行時刻

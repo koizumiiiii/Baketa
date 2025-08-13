@@ -101,12 +101,12 @@ namespace Baketa.UI;
                 // アプリケーション終了時の最終サマリー
                 var startupResult = appStartMeasurement.Complete();
                 PerformanceLogger.LogPerformance($"✅ アプリケーション起動完了 - 総時間: {startupResult.Duration.TotalSeconds:F2}秒");
-                PerformanceLogger.Finalize();
+                PerformanceLogger.FinalizeSession();
             }
             catch (Exception ex)
             {
                 PerformanceLogger.LogPerformance($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                PerformanceLogger.Finalize();
+                PerformanceLogger.FinalizeSession();
                 
                 Console.WriteLine($"💥 MAIN EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 Console.WriteLine($"💥 MAIN STACK: {ex.StackTrace}");

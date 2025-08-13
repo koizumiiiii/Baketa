@@ -9,16 +9,10 @@ namespace Baketa.Infrastructure.Services.Logging;
 /// Console.WriteLine、File.AppendAllText、DebugLogUtilityを統一し、
 /// ILoggerベースの標準ロギングに移行するサービス
 /// </summary>
-public sealed class UnifiedLoggingService : IUnifiedLoggingService
+public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger) : IUnifiedLoggingService
 {
-    private readonly ILogger<UnifiedLoggingService> _logger;
-    private readonly bool _enableConsoleOutput;
-
-    public UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _enableConsoleOutput = Environment.GetEnvironmentVariable("BAKETA_ENABLE_CONSOLE_LOG") == "true";
-    }
+    private readonly ILogger<UnifiedLoggingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly bool _enableConsoleOutput = Environment.GetEnvironmentVariable("BAKETA_ENABLE_CONSOLE_LOG") == "true";
 
     /// <inheritdoc />
     public void LogInformation(string message)

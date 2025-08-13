@@ -286,7 +286,7 @@ public class IntegratedPerformanceOrchestratorTests : IDisposable
         _mockRoiManager.Setup(x => x.GetPriorityRoisAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<StickyRoi>
             {
-                new StickyRoi { 
+                new() { 
                     Region = new Rectangle(100, 100, 200, 50), 
                     ConfidenceScore = 0.9,
                     RoiId = "test-roi-1",
@@ -360,8 +360,8 @@ public class IntegratedPerformanceOrchestratorTests : IDisposable
     private static byte[] CreateTestImageData()
     {
         // テスト用の最小限PNG画像データ
-        return new byte[]
-        {
+        return
+        [
             0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
             0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -373,7 +373,7 @@ public class IntegratedPerformanceOrchestratorTests : IDisposable
             0x63, 0xF8, 0x0F, 0x00, 0x00, 0x01, 0x00, 0x01,
             0x76, 0x36, 0xDD, 0xDB, 0x00, 0x00, 0x00, 0x00,
             0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
-        };
+        ];
     }
 
     public void Dispose()

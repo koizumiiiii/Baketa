@@ -11,10 +11,12 @@ namespace Baketa.Infrastructure.Services;
 /// バックグラウンドウォームアップサービス（Issue #143: 95%コールドスタート遅延削減）
 /// OCRと翻訳エンジンの非同期初期化により、初回実行遅延を根絶
 /// </summary>
-public sealed class BackgroundWarmupService : IWarmupService, IDisposable
+public sealed class BackgroundWarmupService(
+    IServiceProvider serviceProvider,
+    ILogger<BackgroundWarmupService> logger) : IWarmupService, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<BackgroundWarmupService> _logger;
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<BackgroundWarmupService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
     // ウォームアップ状態管理
     private volatile bool _isWarmupCompleted;
@@ -31,14 +33,6 @@ public sealed class BackgroundWarmupService : IWarmupService, IDisposable
     private readonly ConcurrentDictionary<Type, object> _engineCache = new();
     
     private bool _disposed;
-
-    public BackgroundWarmupService(
-        IServiceProvider serviceProvider,
-        ILogger<BackgroundWarmupService> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public bool IsWarmupCompleted => _isWarmupCompleted;
     public bool IsOcrWarmupCompleted => _isOcrWarmupCompleted;
