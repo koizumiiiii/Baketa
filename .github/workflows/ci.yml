@@ -114,8 +114,15 @@ jobs:
     - name: Build solution
       run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
-    - name: Run tests (CI/CD safe tests only)
-      run: dotnet test tests/Baketa.Core.Tests/ tests/Baketa.Application.Tests/ --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration&FullyQualifiedName!~SentencePiece&FullyQualifiedName!~PaddleOcrPerformanceTests&FullyQualifiedName!~RealSentencePieceTokenizerTests&FullyQualifiedName!~SentencePieceModelManagerTests" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+    - name: Run Core Tests
+      run: dotnet test tests/Baketa.Core.Tests/ --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Core -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+      env:
+        MODELS_BASE_PATH: ${{ github.workspace }}\Models
+        DEBUG_LOG_PATH: ${{ github.workspace }}\debug_app_logs.txt
+        CI: true
+        
+    - name: Run Application Tests
+      run: dotnet test tests/Baketa.Application.Tests/ --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Application -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
       env:
         MODELS_BASE_PATH: ${{ github.workspace }}\Models
         DEBUG_LOG_PATH: ${{ github.workspace }}\debug_app_logs.txt
@@ -127,8 +134,10 @@ jobs:
       with:
         name: test-results
         path: |
+          TestResults/**/*.trx
+          TestResults/**/*.xml
           **/TestResults/**/*.trx
-          **/TestResults/**/coverage.cobertura.xml
+          **/TestResults/**/*.xml
         if-no-files-found: warn
     
     - name: Build artifacts summary
