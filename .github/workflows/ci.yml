@@ -35,8 +35,12 @@ jobs:
       
     - name: Build Native DLL
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-        msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64 /v:minimal
+        if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" (
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+        ) else (
+          call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+        )
+        msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64 /v:normal
       shell: cmd
       
     - name: Upload Native DLL
@@ -90,10 +94,10 @@ jobs:
       run: dotnet restore --verbosity minimal
     
     - name: Build solution
-      run: dotnet build Baketa.sln --configuration Debug --verbosity normal -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
+      run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
     - name: Run tests
-      run: dotnet test --configuration Debug --no-build --verbosity minimal --logger "trx" --collect:"XPlat Code Coverage" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+      run: dotnet test --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
     
     - name: Upload test results
       uses: actions/upload-artifact@v4
