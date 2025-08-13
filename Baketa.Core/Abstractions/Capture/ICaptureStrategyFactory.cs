@@ -1,4 +1,5 @@
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Core.Abstractions.Capture;
 
@@ -10,7 +11,7 @@ public interface ICaptureStrategyFactory
     /// <summary>
     /// GPU環境に基づいて最適な戦略を取得
     /// </summary>
-    ICaptureStrategy GetOptimalStrategy(GPUEnvironmentInfo environment, IntPtr hwnd);
+    ICaptureStrategy GetOptimalStrategy(GpuEnvironmentInfo environment, IntPtr hwnd);
     
     /// <summary>
     /// 利用可能なすべての戦略を優先順位順で取得
@@ -30,5 +31,5 @@ public interface ICaptureStrategyFactory
     /// <summary>
     /// 戦略の実行条件を検証
     /// </summary>
-    Task<bool> ValidateStrategyAsync(ICaptureStrategy strategy, GPUEnvironmentInfo environment, IntPtr hwnd);
+    Task<bool> ValidateStrategyAsync(ICaptureStrategy strategy, GpuEnvironmentInfo environment, IntPtr hwnd);
 }

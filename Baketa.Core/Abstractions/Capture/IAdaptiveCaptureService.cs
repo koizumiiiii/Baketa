@@ -1,4 +1,5 @@
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Core.Abstractions.Capture;
 
@@ -15,17 +16,17 @@ public interface IAdaptiveCaptureService
     /// <summary>
     /// GPU環境を検出
     /// </summary>
-    Task<GPUEnvironmentInfo> DetectGPUEnvironmentAsync();
+    Task<GpuEnvironmentInfo> DetectGpuEnvironmentAsync();
     
     /// <summary>
     /// 最適な戦略を選択
     /// </summary>
-    Task<ICaptureStrategy> SelectOptimalStrategyAsync(GPUEnvironmentInfo environment);
+    Task<ICaptureStrategy> SelectOptimalStrategyAsync(GpuEnvironmentInfo environment);
     
     /// <summary>
     /// 現在キャッシュされているGPU環境情報を取得
     /// </summary>
-    GPUEnvironmentInfo? GetCachedEnvironmentInfo();
+    GpuEnvironmentInfo? GetCachedEnvironmentInfo();
     
     /// <summary>
     /// GPU環境情報のキャッシュをクリア（再検出を強制）

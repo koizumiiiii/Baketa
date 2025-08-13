@@ -170,7 +170,7 @@ public static class BaketaExceptionHandler
             onError: async (ex, message) =>
             {
                 logger?.LogWarning(ex, "Translation engine failed: {Message}", message);
-                await Task.CompletedTask;
+                await Task.CompletedTask.ConfigureAwait(false);
             }
         ).ConfigureAwait(false);
     }

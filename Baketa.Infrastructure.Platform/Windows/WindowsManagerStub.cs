@@ -73,7 +73,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
         /// <param name="maxWidth">最大幅</param>
         /// <param name="maxHeight">最大高さ</param>
         /// <returns>Base64エンコードされたサムネイル画像</returns>
-        private string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
+        private static string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
         {
             try
             {

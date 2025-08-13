@@ -65,7 +65,7 @@ public sealed partial class VersionComparisonService(ILogger<VersionComparisonSe
     /// </summary>
     /// <param name="version">System.Versionオブジェクト</param>
     /// <returns>SemverVersionオブジェクト</returns>
-    public SemverVersion FromSystemVersion(Version version)
+    public static SemverVersion FromSystemVersion(Version version)
     {
         ArgumentNullException.ThrowIfNull(version);
 
@@ -86,7 +86,7 @@ public sealed partial class VersionComparisonService(ILogger<VersionComparisonSe
     /// <param name="version1">比較元バージョン</param>
     /// <param name="version2">比較先バージョン</param>
     /// <returns>比較結果（-1: version1 < version2, 0: 等しい, 1: version1 > version2）</returns>
-    public int CompareVersions(SemverVersion version1, SemverVersion version2)
+    public static int CompareVersions(SemverVersion version1, SemverVersion version2)
     {
         ArgumentNullException.ThrowIfNull(version1);
         ArgumentNullException.ThrowIfNull(version2);

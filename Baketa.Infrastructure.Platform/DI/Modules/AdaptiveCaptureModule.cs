@@ -30,7 +30,7 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         catch { /* ログファイル書き込み失敗は無視 */ }
         
         // GPU環境検出
-        services.AddSingleton<IGPUEnvironmentDetector, GPUEnvironmentDetector>();
+        services.AddSingleton<ICaptureEnvironmentDetector, GPUEnvironmentDetector>();
         
         // WindowsImage作成ファクトリー
         services.AddSingleton<WindowsImageFactory>();

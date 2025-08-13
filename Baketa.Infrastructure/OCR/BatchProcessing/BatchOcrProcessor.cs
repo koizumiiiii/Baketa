@@ -205,10 +205,12 @@ public readonly record struct LanguageInfo
 /// </summary>
 public sealed class BatchOcrProcessor(
     IOcrEngine ocrEngine, 
+    IPerformanceOrchestrator? performanceOrchestrator = null,
     IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
     ILogger<BatchOcrProcessor>? logger = null) : IBatchOcrProcessor, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
     private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
     private readonly ILogger<BatchOcrProcessor>? _logger = logger;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor = new(
@@ -680,13 +682,75 @@ public sealed class BatchOcrProcessor(
     }
 
     /// <summary>
-    /// 最適化されたOCR実行
+    /// 最適化されたOCR実行 - 統合パフォーマンスシステム対応
     /// </summary>
     private async Task<OcrResults> ExecuteOcrWithOptimizationsAsync(
         IAdvancedImage image, 
         ImageQualityMetrics qualityMetrics, 
         CancellationToken cancellationToken)
     {
+        // 🚀 統合パフォーマンスオーケストレーターが利用可能な場合は使用
+        if (_performanceOrchestrator != null)
+        {
+            try
+            {
+                _logger?.LogInformation("🚀 統合パフォーマンス最適化システム使用開始");
+                
+                // 画像をバイト配列に変換
+                var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
+                
+                // パフォーマンス最適化オプション設定
+                var optimizationOptions = new PerformanceOptimizationOptions
+                {
+                    PreferGpuAcceleration = true,
+                    UseStickyRoi = true,
+                    Priority = PerformancePriority.Balanced,
+                    QualitySettings = QualitySpeedTradeoff.Balanced,
+                    EnableTdrProtection = true
+                };
+                
+                // 統合最適化OCR実行
+                var optimizedResult = await _performanceOrchestrator.ExecuteOptimizedOcrAsync(
+                    imageBytes, optimizationOptions, cancellationToken).ConfigureAwait(false);
+                    
+                if (optimizedResult.IsSuccessful)
+                {
+                    _logger?.LogInformation("✅ 統合パフォーマンス最適化完了 - 戦略: {Strategy}, 改善率: {Improvement:P1}, 処理時間: {Time}ms",
+                        optimizedResult.UsedTechnique, optimizedResult.PerformanceImprovement, optimizedResult.TotalProcessingTime.TotalMilliseconds);
+                    
+                    // OptimizedOcrResultをOcrResultsに変換
+                    // DetectedTextをOcrTextRegionに変換
+                    var ocrTextRegions = optimizedResult.DetectedTexts
+                        .Select(dt => new OcrTextRegion(
+                            dt.Text,
+                            dt.BoundingBox,
+                            dt.Confidence,
+                            [], // 空のContour
+                            0.0 // デフォルトDirection
+                        ))
+                        .ToList();
+                    
+                    return new OcrResults(
+                        ocrTextRegions,
+                        image,
+                        optimizedResult.TotalProcessingTime,
+                        "jpn"
+                    );
+                }
+                else
+                {
+                    _logger?.LogWarning("⚠️ 統合パフォーマンス最適化失敗 - 従来のOCRエンジンにフォールバック");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "❌ 統合パフォーマンス最適化中にエラー - 従来のOCRエンジンにフォールバック");
+            }
+        }
+        
+        // 🔄 フォールバック: 従来のOCRエンジン実行
+        _logger?.LogInformation("🔄 従来のOCRエンジン実行開始");
+        
         // 品質に応じた前処理パラメータ調整
         var processingOptions = qualityMetrics.RecommendedProcessing switch
         {

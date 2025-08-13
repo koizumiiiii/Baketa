@@ -18,9 +18,9 @@ public interface IUnifiedLoggingService
     /// <summary>
     /// フォーマット付き情報レベルのログを出力します
     /// </summary>
-    /// <param name="template">メッセージテンプレート</param>
+    /// <param name="messageTemplate">メッセージテンプレート</param>
     /// <param name="args">フォーマット引数</param>
-    void LogInformation(string template, params object[] args);
+    void LogInformation(string messageTemplate, params object[] args);
 
     /// <summary>
     /// 警告レベルのログを出力します
@@ -57,9 +57,9 @@ public interface IUnifiedLoggingService
     /// <summary>
     /// デバッグレベルのログを出力します（フォーマット付き）
     /// </summary>
-    /// <param name="template">メッセージテンプレート</param>
+    /// <param name="messageTemplate">メッセージテンプレート</param>
     /// <param name="args">フォーマット引数</param>
-    void LogDebug(string template, params object[] args);
+    void LogDebug(string messageTemplate, params object[] args);
 
     /// <summary>
     /// デバッグファイル専用のログを出力します（旧DebugLogUtility互換）

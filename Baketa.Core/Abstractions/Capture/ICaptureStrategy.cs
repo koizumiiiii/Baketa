@@ -1,4 +1,5 @@
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 
 namespace Baketa.Core.Abstractions.Capture;
 
@@ -15,7 +16,7 @@ public interface ICaptureStrategy
     /// <summary>
     /// この戦略が適用可能かチェック
     /// </summary>
-    bool CanApply(GPUEnvironmentInfo environment, IntPtr hwnd);
+    bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd);
     
     /// <summary>
     /// キャプチャを実行

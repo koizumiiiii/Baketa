@@ -91,7 +91,7 @@ public sealed class OcrSettings
         Description = "二値化処理の閾値（自動の場合は0）", 
         MinValue = 0, 
         MaxValue = 255)]
-    public int BinarizationThreshold { get; set; } = 0; // 0 = 自動
+    public int BinarizationThreshold { get; set; } // 0 = 自動
     
     /// <summary>
     /// ノイズ除去の有効化
@@ -188,21 +188,21 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "詳細ログ", 
         Description = "OCR処理の詳細ログを出力します（開発者向け）")]
-    public bool EnableVerboseLogging { get; set; } = false;
+    public bool EnableVerboseLogging { get; set; }
     
     /// <summary>
     /// OCR結果の保存
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "結果保存", 
         Description = "OCR結果をファイルに保存します（開発者向け）")]
-    public bool SaveOcrResults { get; set; } = false;
+    public bool SaveOcrResults { get; set; }
     
     /// <summary>
     /// 処理済み画像の保存
     /// </summary>
     [SettingMetadata(SettingLevel.Debug, "OCR", "処理済み画像保存", 
         Description = "前処理後の画像を保存します（開発者向け）")]
-    public bool SaveProcessedImages { get; set; } = false;
+    public bool SaveProcessedImages { get; set; }
     
     /// <summary>
     /// ゲーム特化前処理の有効化
@@ -228,7 +228,46 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "言語モデル使用", 
         Description = "PaddleOCRの言語モデルを使用してOCR精度を向上させます")]
-    public bool UseLanguageModel { get; set; } = false;
+    public bool UseLanguageModel { get; set; }
+    
+    /// <summary>
+    /// GPU加速の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "GPU加速", 
+        Description = "GPU（DirectML/CUDA/TensorRT）を使用したOCR高速化を有効にします")]
+    public bool EnableGpuAcceleration { get; set; } = true;
+    
+    /// <summary>
+    /// ONNX Runtimeプロバイダー優先順位
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "実行プロバイダー", 
+        Description = "ONNX Runtime実行プロバイダーの優先順位", 
+        ValidValues = ["Auto", "DirectML", "CUDA", "TensorRT", "OpenVINO", "CPU"])]
+    public string OnnxExecutionProvider { get; set; } = "Auto";
+    
+    /// <summary>
+    /// OCRモデルパス（ONNX形式）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ONNXモデルパス", 
+        Description = "使用するOCR ONNX モデルファイルのパス")]
+    public string OnnxModelPath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// TDR保護の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "TDR保護", 
+        Description = "GPU Timeout Detection and Recovery保護を有効にします")]
+    public bool EnableTdrProtection { get; set; } = true;
+    
+    /// <summary>
+    /// GPU推論タイムアウト（ミリ秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "GPU推論タイムアウト", 
+        Description = "GPU推論処理のタイムアウト時間", 
+        Unit = "ms", 
+        MinValue = 100, 
+        MaxValue = 30000)]
+    public int GpuInferenceTimeoutMs { get; set; } = 5000;
     
     /// <summary>
     /// テキスト領域検出設定
@@ -239,6 +278,11 @@ public sealed class OcrSettings
     /// アンサンブル検出設定
     /// </summary>
     public EnsembleSettings TextDetectionEnsemble { get; set; } = new();
+    
+    /// <summary>
+    /// GPU設定
+    /// </summary>
+    public GpuOcrSettings GpuSettings { get; set; } = new();
     
     /// <summary>
     /// 設定のクローンを作成します
@@ -272,8 +316,14 @@ public sealed class OcrSettings
             SaveOcrResults = SaveOcrResults,
             SaveProcessedImages = SaveProcessedImages,
             UseLanguageModel = UseLanguageModel,
+            EnableGpuAcceleration = EnableGpuAcceleration,
+            OnnxExecutionProvider = OnnxExecutionProvider,
+            OnnxModelPath = OnnxModelPath,
+            EnableTdrProtection = EnableTdrProtection,
+            GpuInferenceTimeoutMs = GpuInferenceTimeoutMs,
             TextDetectionSettings = TextDetectionSettings,
             TextDetectionEnsemble = TextDetectionEnsemble,
+            GpuSettings = GpuSettings.Clone(),
             EnableGameSpecificPreprocessing = EnableGameSpecificPreprocessing,
             DefaultGameTextProfile = DefaultGameTextProfile,
             GamePreprocessingSettings = GamePreprocessingSettings.Clone()
@@ -408,7 +458,7 @@ public class GamePreprocessingSettings
     /// <summary>
     /// A/Bテストの有効化
     /// </summary>
-    public bool EnableAbTesting { get; set; } = false;
+    public bool EnableAbTesting { get; set; }
     
     /// <summary>
     /// 設定のクローンを作成
@@ -463,6 +513,94 @@ public class GameProfileParameters
             CLAHEClipLimit = CLAHEClipLimit,
             BilateralSigmaColor = BilateralSigmaColor,
             GaussianSigma = GaussianSigma
+        };
+    }
+}
+
+/// <summary>
+/// GPU OCR設定
+/// </summary>
+public class GpuOcrSettings
+{
+    /// <summary>
+    /// 検出モデルパス
+    /// </summary>
+    public string DetectionModelPath { get; set; } = @"models\paddle_ocr\detection\ch_PP-OCRv4_det_infer.onnx";
+    
+    /// <summary>
+    /// 認識モデルパス
+    /// </summary>
+    public string RecognitionModelPath { get; set; } = @"models\paddle_ocr\recognition\ch_PP-OCRv4_rec_infer.onnx";
+    
+    /// <summary>
+    /// 言語識別モデルパス
+    /// </summary>
+    public string LanguageIdentificationModelPath { get; set; } = @"models\paddle_ocr\cls\ch_ppocr_mobile_v2.0_cls_infer.onnx";
+    
+    /// <summary>
+    /// CPUスレッド数（CPU実行時）
+    /// </summary>
+    public int CpuThreadCount { get; set; } = 4;
+    
+    /// <summary>
+    /// GPU Device ID
+    /// </summary>
+    public int GpuDeviceId { get; set; }
+    
+    /// <summary>
+    /// バッチサイズ
+    /// </summary>
+    public int BatchSize { get; set; } = 1;
+    
+    /// <summary>
+    /// ウォームアップの有効化
+    /// </summary>
+    public bool EnableWarmup { get; set; } = true;
+    
+    /// <summary>
+    /// ウォームアップ実行回数
+    /// </summary>
+    public int WarmupIterations { get; set; } = 3;
+    
+    /// <summary>
+    /// メモリ最適化の有効化
+    /// </summary>
+    public bool EnableMemoryOptimization { get; set; } = true;
+    
+    /// <summary>
+    /// ONNX最適化レベル
+    /// </summary>
+    public string OnnxOptimizationLevel { get; set; } = "All";
+    
+    /// <summary>
+    /// DirectML最適化の有効化
+    /// </summary>
+    public bool EnableDirectMLOptimization { get; set; } = true;
+    
+    /// <summary>
+    /// CUDA最適化の有効化
+    /// </summary>
+    public bool EnableCudaOptimization { get; set; } = true;
+    
+    /// <summary>
+    /// 設定のクローンを作成
+    /// </summary>
+    public GpuOcrSettings Clone()
+    {
+        return new GpuOcrSettings
+        {
+            DetectionModelPath = DetectionModelPath,
+            RecognitionModelPath = RecognitionModelPath,
+            LanguageIdentificationModelPath = LanguageIdentificationModelPath,
+            CpuThreadCount = CpuThreadCount,
+            GpuDeviceId = GpuDeviceId,
+            BatchSize = BatchSize,
+            EnableWarmup = EnableWarmup,
+            WarmupIterations = WarmupIterations,
+            EnableMemoryOptimization = EnableMemoryOptimization,
+            OnnxOptimizationLevel = OnnxOptimizationLevel,
+            EnableDirectMLOptimization = EnableDirectMLOptimization,
+            EnableCudaOptimization = EnableCudaOptimization
         };
     }
 }

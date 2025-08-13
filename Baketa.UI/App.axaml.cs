@@ -296,7 +296,7 @@ internal sealed partial class App : Avalonia.Application
                             try
                             {
                                 Console.WriteLine("🚀 prewarmService.StartPrewarmingAsync() 呼び出し開始");
-                                await prewarmService.StartPrewarmingAsync();
+                                await prewarmService.StartPrewarmingAsync().ConfigureAwait(false);
                                 Console.WriteLine("✅ prewarmService.StartPrewarmingAsync() 完了");
                             }
                             catch (Exception ex)

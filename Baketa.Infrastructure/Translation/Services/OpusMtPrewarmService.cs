@@ -57,12 +57,12 @@ public class OpusMtPrewarmService : IOpusMtPrewarmService, IDisposable
     public string PrewarmStatus => _prewarmStatus;
 
     /// <inheritdoc/>
-    public async Task StartPrewarmingAsync(CancellationToken cancellationToken = default)
+    public Task StartPrewarmingAsync(CancellationToken cancellationToken = default)
     {
         if (_disposed)
         {
             _logger.LogWarning("サービスが破棄されているため、プリウォーミングを開始できません");
-            return;
+            return Task.CompletedTask;
         }
 
         _logger.LogInformation("🔥 [PREWARMING] OPUS-MT事前ウォームアップを開始します...");
@@ -82,6 +82,8 @@ public class OpusMtPrewarmService : IOpusMtPrewarmService, IDisposable
                 _prewarmStatus = $"エラー: {ex.Message}";
             }
         }, cancellationToken);
+        
+        return Task.CompletedTask;
     }
 
     private async Task PerformPrewarmingAsync(CancellationToken cancellationToken)

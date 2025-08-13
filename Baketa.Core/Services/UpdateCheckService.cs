@@ -156,7 +156,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
     public bool IsVersionNewer(SemverVersion version)
     {
         ArgumentNullException.ThrowIfNull(version);
-        var currentSemver = _versionComparison.FromSystemVersion(CurrentVersion);
+        var currentSemver = VersionComparisonService.FromSystemVersion(CurrentVersion);
         return _versionComparison.IsNewer(version, currentSemver);
     }
 
@@ -170,7 +170,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
 
         try
         {
-            var currentSemver = _versionComparison.FromSystemVersion(CurrentVersion);
+            var currentSemver = VersionComparisonService.FromSystemVersion(CurrentVersion);
             var targetSemver = _versionComparison.ParseVersion(versionString);
             return _versionComparison.IsNewer(targetSemver, currentSemver);
         }
@@ -497,6 +497,6 @@ internal sealed class SemverComparer(VersionComparisonService versionComparison)
         if (x == null && y == null) return 0;
         if (x == null) return -1;
         if (y == null) return 1;
-        return _versionComparison.CompareVersions(x, y);
+        return VersionComparisonService.CompareVersions(x, y);
     }
 }
