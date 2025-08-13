@@ -92,7 +92,7 @@ internal static class GPUEnvironmentMockHelper
 public class AdaptiveCaptureServiceMockTests
 {
     private readonly Mock<ILogger<AdaptiveCaptureService>> _mockLogger;
-    private readonly Mock<IGPUEnvironmentDetector> _mockGpuDetector;
+    private readonly Mock<ICaptureEnvironmentDetector> _mockGpuDetector;
     private readonly Mock<ICaptureStrategyFactory> _mockStrategyFactory;
     private readonly Mock<ICaptureStrategy> _mockDirectFullScreenStrategy;
     private readonly Mock<ICaptureStrategy> _mockROIStrategy;
@@ -102,7 +102,7 @@ public class AdaptiveCaptureServiceMockTests
     public AdaptiveCaptureServiceMockTests()
     {
         _mockLogger = new Mock<ILogger<AdaptiveCaptureService>>();
-        _mockGpuDetector = new Mock<IGPUEnvironmentDetector>();
+        _mockGpuDetector = new Mock<ICaptureEnvironmentDetector>();
         _mockStrategyFactory = new Mock<ICaptureStrategyFactory>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         

@@ -15,12 +15,12 @@ namespace Baketa.Application.Services.Capture;
 /// 適応的キャプチャサービスの実装
 /// </summary>
 public class AdaptiveCaptureService(
-    IGPUEnvironmentDetector gpuDetector,
+    ICaptureEnvironmentDetector gpuDetector,
     ICaptureStrategyFactory strategyFactory,
     ILogger<AdaptiveCaptureService> logger,
     IEventAggregator eventAggregator) : IAdaptiveCaptureService, IDisposable
 {
-    private readonly IGPUEnvironmentDetector _gpuDetector = gpuDetector ?? throw new ArgumentNullException(nameof(gpuDetector));
+    private readonly ICaptureEnvironmentDetector _gpuDetector = gpuDetector ?? throw new ArgumentNullException(nameof(gpuDetector));
     private readonly ICaptureStrategyFactory _strategyFactory = strategyFactory ?? throw new ArgumentNullException(nameof(strategyFactory));
     private readonly ILogger<AdaptiveCaptureService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));

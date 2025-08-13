@@ -4,19 +4,66 @@ using Baketa.Core.Abstractions.Imaging;
 namespace Baketa.Core.Abstractions.OCR;
 
 /// <summary>
+/// OCR処理のフェーズ
+/// </summary>
+public enum OcrPhase
+{
+    /// <summary>
+    /// 初期化フェーズ
+    /// </summary>
+    Initializing = 0,
+    
+    /// <summary>
+    /// 前処理フェーズ（画像処理）
+    /// </summary>
+    Preprocessing = 1,
+    
+    /// <summary>
+    /// テキスト検出フェーズ
+    /// </summary>
+    TextDetection = 2,
+    
+    /// <summary>
+    /// テキスト認識フェーズ
+    /// </summary>
+    TextRecognition = 3,
+    
+    /// <summary>
+    /// 後処理フェーズ
+    /// </summary>
+    PostProcessing = 4,
+    
+    /// <summary>
+    /// 完了
+    /// </summary>
+    Completed = 5
+}
+
+/// <summary>
 /// OCR処理の進捗状況を表すクラス
 /// </summary>
-public class OcrProgress(double progress, string status)
+public class OcrProgress
 {
     /// <summary>
     /// 進捗率（0.0～1.0）
     /// </summary>
-    public double Progress { get; } = Math.Clamp(progress, 0.0, 1.0);
+    public double Progress { get; init; }
 
     /// <summary>
     /// 現在の処理ステータス
     /// </summary>
-    public string Status { get; } = status ?? string.Empty;
+    public string Status { get; init; } = string.Empty;
+    
+    /// <summary>
+    /// 現在の処理フェーズ
+    /// </summary>
+    public OcrPhase Phase { get; init; } = OcrPhase.Initializing;
+
+    public OcrProgress(double progress, string status)
+    {
+        Progress = Math.Clamp(progress, 0.0, 1.0);
+        Status = status ?? string.Empty;
+    }
 }
 
 /// <summary>
