@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Management;
 using Microsoft.Win32;
 using Baketa.Core.Abstractions.GPU;
@@ -22,7 +23,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     private readonly ConcurrentDictionary<string, OnnxSessionInfo> _activeSessions = new();
     private readonly Timer _tdrMonitorTimer;
     private readonly object _recoveryLock = new();
-    private bool _disposed = false;
+    private bool _disposed;
     private CancellationTokenSource? _monitoringCts;
 
     public WindowsTdrRecoveryManager(
@@ -453,7 +454,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
 
     private string GenerateRiskAssessment(int tdrCount, DateTime? lastTdrTime, TdrRiskLevel riskLevel)
     {
-        var lastTdrText = lastTdrTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "不明";
+        var lastTdrText = lastTdrTime?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "不明";
         return $"TDR回数: {tdrCount}, 最終TDR: {lastTdrText}, リスクレベル: {riskLevel}";
     }
 

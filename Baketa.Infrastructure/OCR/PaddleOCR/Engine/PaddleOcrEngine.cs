@@ -39,7 +39,7 @@ public class PaddleOcrEngine : IOcrEngine
 {
     // 🚨 シングルトンパターン: 多重初期化防止
     private static readonly object _globalLock = new();
-    private static volatile int _instanceCount = 0;
+    private static volatile int _instanceCount;
     private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
 
     // Dependencies
@@ -891,7 +891,7 @@ public class PaddleOcrEngine : IOcrEngine
                     var classification180 = true;  // PP-OCRv5高速化設定
                     // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 モデル別設定適用: RotateDetection={rotateDetection}, 180Classification={classification180}");
                 }
-                catch (Exception createEx)
+                catch (Exception)
                 {
                     // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ PaddleOcrAll作成エラー: {createEx.Message}");
                     throw;
@@ -1017,8 +1017,8 @@ public class PaddleOcrEngine : IOcrEngine
                                             }
                                         }
                                     }
-                                    catch (Exception ex)
-                                    {
+                                    catch (Exception)
+                                        {
                                         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 認識器プロパティ{recProp.Name}設定エラー: {ex.Message}");
                                     }
                                 }
@@ -1063,7 +1063,7 @@ public class PaddleOcrEngine : IOcrEngine
                                             }
                                         }
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception)
                                     {
                                         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 検出器プロパティ{detProp.Name}設定エラー: {ex.Message}");
                                     }
@@ -1109,7 +1109,7 @@ public class PaddleOcrEngine : IOcrEngine
                                             }
                                         }
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception)
                                     {
                                         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 分類器プロパティ{classProp.Name}設定エラー: {ex.Message}");
                                     }
@@ -2109,7 +2109,7 @@ public class PaddleOcrEngine : IOcrEngine
     /// <summary>
     /// 単一のPaddleOcrResultを処理してOcrTextRegionに変換
     /// </summary>
-    private void ProcessSinglePaddleResult(object paddleResult, int index, List<OcrTextRegion> textRegions)
+    private void ProcessSinglePaddleResult(object paddleResult, int _, List<OcrTextRegion> textRegions)
     {
         try
         {
@@ -2967,7 +2967,7 @@ public class PaddleOcrEngine : IOcrEngine
             
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ✅ 高度Un-sharp Masking完了");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"     ❌ 高度Un-sharp Maskingエラー: {ex.Message}");
             input.CopyTo(output);

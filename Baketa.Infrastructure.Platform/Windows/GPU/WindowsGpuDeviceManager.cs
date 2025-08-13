@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Management;
 using Baketa.Core.Abstractions.GPU;
 
@@ -18,7 +19,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     private readonly ConcurrentDictionary<string, GpuWorkloadStatus> _workloadCache = new();
     private readonly Timer _cacheRefreshTimer;
     private readonly object _cacheLock = new();
-    private bool _disposed = false;
+    private bool _disposed;
 
     public WindowsGpuDeviceManager(ILogger<WindowsGpuDeviceManager> logger)
     {
@@ -68,7 +69,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ GPU デバイス検索失敗");
-            return Array.Empty<GpuDeviceInfo>();
+            return [];
         }
     }
 
@@ -324,7 +325,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             var pnpDeviceId = obj["PNPDeviceID"]?.ToString() ?? string.Empty;
-            var name = obj["Name"]?.ToString() ?? $"Unknown GPU {deviceIndex}";
+            var name = obj["Name"]?.ToString() ?? string.Format(CultureInfo.InvariantCulture, "Unknown GPU {0}", deviceIndex);
             var adapterRAM = Convert.ToInt64(obj["AdapterRAM"] ?? 0);
             
             // ベンダー判定

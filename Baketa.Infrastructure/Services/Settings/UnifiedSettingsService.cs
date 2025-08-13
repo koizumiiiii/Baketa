@@ -431,5 +431,5 @@ internal sealed class UnifiedAppSettings(ITranslationSettings translation, IOcrS
     public ITranslationSettings Translation { get; } = translation;
     public IOcrSettings Ocr { get; } = ocr;
     public string LogLevel { get; } = "Information"; // デフォルトログレベル
-    public bool EnableDebugMode { get; } = false; // デフォルトデバッグモード
+    public bool EnableDebugMode { get; } // デフォルトデバッグモード
 }

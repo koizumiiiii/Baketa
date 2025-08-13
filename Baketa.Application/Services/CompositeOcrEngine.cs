@@ -220,8 +220,7 @@ public sealed class CompositeOcrEngine(
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(CompositeOcrEngine));
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     public void Dispose()

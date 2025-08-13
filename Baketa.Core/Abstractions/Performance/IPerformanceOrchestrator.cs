@@ -93,7 +93,7 @@ public class OptimizedOcrResult
     /// <summary>
     /// 検出されたテキスト一覧
     /// </summary>
-    public IReadOnlyList<DetectedText> DetectedTexts { get; init; } = Array.Empty<DetectedText>();
+    public IReadOnlyList<DetectedText> DetectedTexts { get; init; } = [];
 
     /// <summary>
     /// 総処理時間
@@ -190,7 +190,7 @@ public class OptimizationAdjustmentResult
     /// <summary>
     /// 実行された調整内容
     /// </summary>
-    public IReadOnlyList<string> ExecutedAdjustments { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ExecutedAdjustments { get; init; } = [];
 
     /// <summary>
     /// 予想される改善効果
@@ -231,12 +231,12 @@ public class SystemHealthReport
     /// <summary>
     /// 検出された問題
     /// </summary>
-    public IReadOnlyList<HealthIssue> DetectedIssues { get; init; } = Array.Empty<HealthIssue>();
+    public IReadOnlyList<HealthIssue> DetectedIssues { get; init; } = [];
 
     /// <summary>
     /// 推奨アクション
     /// </summary>
-    public IReadOnlyList<string> RecommendedActions { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> RecommendedActions { get; init; } = [];
 
     /// <summary>
     /// レポート生成時刻

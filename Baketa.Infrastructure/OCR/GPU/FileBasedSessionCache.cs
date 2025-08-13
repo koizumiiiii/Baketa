@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -27,12 +28,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly object _statsLock = new();
-    private bool _disposed = false;
+    private bool _disposed;
     
     // 統計情報
-    private int _hitCount = 0;
-    private int _missCount = 0;
-    private long _totalStoredSize = 0;
+    private int _hitCount;
+    private int _missCount;
+    private long _totalStoredSize;
 
     public FileBasedSessionCache(
         ILogger<FileBasedSessionCache> logger,
@@ -79,7 +80,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var tempDataPath = dataFilePath + ".tmp";
             var tempMetadataPath = metadataFilePath + ".tmp";
             
-            await _fileLock.WaitAsync(cancellationToken);
+            await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             
             try
             {
@@ -91,11 +92,11 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 }
                 
                 // セッションデータの保存
-                await SaveSessionDataToFile(tempDataPath, sessionData, cancellationToken);
+                await SaveSessionDataToFile(tempDataPath, sessionData, cancellationToken).ConfigureAwait(false);
                 
                 // メタデータの保存
                 metadata.LastAccessedAt = DateTime.UtcNow;
-                await SaveMetadataToFile(tempMetadataPath, metadata, cancellationToken);
+                await SaveMetadataToFile(tempMetadataPath, metadata, cancellationToken).ConfigureAwait(false);
                 
                 // アトミックな置換
                 System.IO.File.Move(tempDataPath, dataFilePath, true);
@@ -186,12 +187,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 };
             }
             
-            await _fileLock.WaitAsync(cancellationToken);
+            await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             
             try
             {
                 // メタデータを読み込み、有効期限をチェック
-                var metadata = await LoadMetadataFromFile(metadataFilePath, cancellationToken);
+                var metadata = await LoadMetadataFromFile(metadataFilePath, cancellationToken).ConfigureAwait(false);
                 if (metadata.ExpiresAt < DateTime.UtcNow)
                 {
                     _logger.LogDebug("⏰ キャッシュエントリが期限切れ: {CacheKey}", cacheKey);
@@ -226,7 +227,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 }
                 
                 // セッションデータを読み込み
-                var sessionData = await LoadSessionDataFromFile(dataFilePath, cancellationToken);
+                var sessionData = await LoadSessionDataFromFile(dataFilePath, cancellationToken).ConfigureAwait(false);
                 
                 // メタデータを更新
                 metadata.LastAccessedAt = DateTime.UtcNow;
@@ -237,7 +238,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 {
                     try
                     {
-                        await SaveMetadataToFile(metadataFilePath, metadata, CancellationToken.None);
+                        await SaveMetadataToFile(metadataFilePath, metadata, CancellationToken.None).ConfigureAwait(false);
                         _metadataCache.AddOrUpdate(cacheKey, metadata, (_, _) => metadata);
                         _accessTracker.AddOrUpdate(cacheKey, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
                     }
@@ -307,7 +308,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             }
             
             // 期限切れチェック
-            var metadata = await LoadMetadataFromFile(metadataFilePath, cancellationToken);
+            var metadata = await LoadMetadataFromFile(metadataFilePath, cancellationToken).ConfigureAwait(false);
             return metadata.ExpiresAt >= DateTime.UtcNow;
         }
         catch (Exception ex)
@@ -325,7 +326,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var dataFilePath = GetDataFilePath(keyHash);
             var metadataFilePath = GetMetadataFilePath(keyHash);
             
-            await _fileLock.WaitAsync(cancellationToken);
+            await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             
             try
             {
@@ -381,7 +382,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var expiredKeys = new List<string>();
             
             // 期限切れエントリを特定
-            await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken))
+            await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (metadata.ExpiresAt < currentTime)
                 {
@@ -403,7 +404,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                         freedSize += size;
                     }
                     
-                    if (await RemoveAsync(key, cancellationToken))
+                    if (await RemoveAsync(key, cancellationToken).ConfigureAwait(false))
                     {
                         removedCount++;
                     }
@@ -437,7 +438,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var expiredCount = 0;
             var currentTime = DateTime.UtcNow;
             
-            await foreach (var (_, metadata) in GetAllMetadataAsync(cancellationToken))
+            await foreach (var (_, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (metadata.ExpiresAt < currentTime)
                 {
@@ -477,7 +478,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             _logger.LogInformation("⚡ キャッシュ最適化開始");
             
             // 1. 期限切れエントリの削除
-            var expiredRemoved = await CleanupExpiredEntriesAsync(cancellationToken);
+            var expiredRemoved = await CleanupExpiredEntriesAsync(cancellationToken).ConfigureAwait(false);
             if (expiredRemoved > 0)
             {
                 removedEntries += expiredRemoved;
@@ -486,7 +487,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             
             // 2. 低優先度かつ長期未使用エントリの削除
             var unusedThreshold = DateTime.UtcNow.AddDays(-7);
-            var lowPriorityRemoved = await RemoveLowPriorityUnusedEntries(unusedThreshold, cancellationToken);
+            var lowPriorityRemoved = await RemoveLowPriorityUnusedEntries(unusedThreshold, cancellationToken).ConfigureAwait(false);
             if (lowPriorityRemoved > 0)
             {
                 removedEntries += lowPriorityRemoved;
@@ -494,7 +495,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             }
             
             // 3. ディスク容量チェックとサイズベース削除
-            var diskSpaceOptimization = await OptimizeDiskSpace(cancellationToken);
+            var diskSpaceOptimization = await OptimizeDiskSpace(cancellationToken).ConfigureAwait(false);
             removedEntries += diskSpaceOptimization.removedCount;
             freedSize += diskSpaceOptimization.freedSize;
             if (diskSpaceOptimization.removedCount > 0)
@@ -538,7 +539,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         {
             var keys = new List<string>();
             
-            await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken))
+            await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (metadata.ExpiresAt >= DateTime.UtcNow)
                 {
@@ -554,7 +555,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ 利用可能キー取得失敗");
-            return Array.Empty<string>();
+            return [];
         }
     }
 
@@ -606,8 +607,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
 
     private string GenerateKeyHash(string key)
     {
-        using var sha256 = SHA256.Create();
-        var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(key));
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(key));
         return Convert.ToHexString(hashBytes)[..16]; // 最初の16文字を使用
     }
 
@@ -627,24 +627,24 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     private async Task SaveSessionDataToFile(string filePath, SessionCacheData sessionData, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(sessionData, _jsonOptions);
-        await System.IO.File.WriteAllTextAsync(filePath, json, cancellationToken);
+        await System.IO.File.WriteAllTextAsync(filePath, json, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SaveMetadataToFile(string filePath, SessionMetadata metadata, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(metadata, _jsonOptions);
-        await System.IO.File.WriteAllTextAsync(filePath, json, cancellationToken);
+        await System.IO.File.WriteAllTextAsync(filePath, json, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<SessionCacheData> LoadSessionDataFromFile(string filePath, CancellationToken cancellationToken)
     {
-        var json = await System.IO.File.ReadAllTextAsync(filePath, cancellationToken);
+        var json = await System.IO.File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Deserialize<SessionCacheData>(json, _jsonOptions) ?? new SessionCacheData();
     }
 
     private async Task<SessionMetadata> LoadMetadataFromFile(string filePath, CancellationToken cancellationToken)
     {
-        var json = await System.IO.File.ReadAllTextAsync(filePath, cancellationToken);
+        var json = await System.IO.File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Deserialize<SessionMetadata>(json, _jsonOptions) ?? new SessionMetadata();
     }
 
@@ -663,7 +663,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         }
     }
 
-    private async IAsyncEnumerable<(string key, SessionMetadata metadata)> GetAllMetadataAsync(CancellationToken cancellationToken)
+    private async IAsyncEnumerable<(string key, SessionMetadata metadata)> GetAllMetadataAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         foreach (var kvp in _metadataCache)
         {
@@ -671,7 +671,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             yield return (kvp.Key, kvp.Value);
         }
         
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private async Task<int> RemoveLowPriorityUnusedEntries(DateTime unusedThreshold, CancellationToken cancellationToken)
@@ -679,7 +679,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         var removedCount = 0;
         var keysToRemove = new List<string>();
         
-        await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken))
+        await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
         {
             if (metadata.Priority == CachePriority.Low && 
                 metadata.LastAccessedAt < unusedThreshold)
@@ -690,7 +690,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         
         foreach (var key in keysToRemove)
         {
-            if (await RemoveAsync(key, cancellationToken))
+            if (await RemoveAsync(key, cancellationToken).ConfigureAwait(false))
             {
                 removedCount++;
             }
@@ -701,7 +701,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
 
     private async Task<(int removedCount, long freedSize)> OptimizeDiskSpace(CancellationToken cancellationToken)
     {
-        await Task.Delay(10, cancellationToken); // プレースホルダー実装
+        await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
         
         // 実装: ディスク容量チェックとサイズベース最適化
         // 例: 使用可能容量が10%以下の場合、古いエントリから削除
@@ -720,7 +720,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 try
                 {
                     using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-                    await CleanupExpiredEntriesAsync(cts.Token);
+                    await CleanupExpiredEntriesAsync(cts.Token).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

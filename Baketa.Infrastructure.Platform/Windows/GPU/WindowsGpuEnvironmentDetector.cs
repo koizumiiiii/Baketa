@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.GPU;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Management;
 using System.Runtime.InteropServices;
 
@@ -121,7 +122,7 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             foreach (ManagementObject gpu in results.Cast<ManagementObject>())
             {
                 var name = gpu["Name"]?.ToString() ?? "Unknown GPU";
-                var adapterRAM = Convert.ToUInt32(gpu["AdapterRAM"] ?? 0);
+                var adapterRAM = Convert.ToUInt32(gpu["AdapterRAM"] ?? 0, CultureInfo.InvariantCulture);
                 var pnpDeviceID = gpu["PNPDeviceID"]?.ToString() ?? "";
                 
                 gpus.Add((name, adapterRAM, pnpDeviceID));
@@ -196,7 +197,7 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                 using var results = searcher.Get();
                 
                 var maxVram = results.Cast<ManagementObject>()
-                    .Select(gpu => Convert.ToUInt64(gpu["AdapterRAM"] ?? 0))
+                    .Select(gpu => Convert.ToUInt64(gpu["AdapterRAM"] ?? 0, CultureInfo.InvariantCulture))
                     .Max();
                 
                 var availableMemoryMB = maxVram > 0 ? (long)(maxVram / (1024 * 1024)) : 4096; // フォールバック4GB

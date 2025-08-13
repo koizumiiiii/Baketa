@@ -14,33 +14,26 @@ internal sealed class OnnxSessionWrapper(
     string sessionName,
     string modelPath) : IOnnxSession
 {
-    private readonly InferenceSession _session = session ?? throw new ArgumentNullException(nameof(session));
-    private readonly GpuEnvironmentInfo _gpuEnvironment = gpuEnvironment ?? throw new ArgumentNullException(nameof(gpuEnvironment));
-    private readonly string _sessionName = sessionName ?? throw new ArgumentNullException(nameof(sessionName));
-    private readonly DateTime _createdAt = DateTime.UtcNow;
     private readonly OnnxSessionInfo _sessionInfo = BuildSessionInfo(session, modelPath);
-    private bool _disposed = false;
+    private bool _disposed;
 
-    public string SessionName => _sessionName;
+    public string SessionName { get; } = sessionName ?? throw new ArgumentNullException(nameof(sessionName));
 
-    public bool IsInitialized => !_disposed && _session != null;
+    public bool IsInitialized => !_disposed && InternalSession != null;
 
-    public DateTime CreatedAt => _createdAt;
+    public DateTime CreatedAt { get; } = DateTime.UtcNow;
 
-    public GpuEnvironmentInfo GpuEnvironment => _gpuEnvironment;
+    public GpuEnvironmentInfo GpuEnvironment { get; } = gpuEnvironment ?? throw new ArgumentNullException(nameof(gpuEnvironment));
 
     /// <summary>
     /// 内部のInferenceSessionを取得
     /// Infrastructure層内でのみ使用
     /// </summary>
-    internal InferenceSession InternalSession => _session;
+    internal InferenceSession InternalSession { get; } = session ?? throw new ArgumentNullException(nameof(session));
 
     public OnnxSessionInfo GetSessionInfo()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(OnnxSessionWrapper));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
         
         return _sessionInfo;
     }
@@ -51,7 +44,7 @@ internal sealed class OnnxSessionWrapper(
         
         try
         {
-            _session?.Dispose();
+            InternalSession?.Dispose();
         }
         catch
         {
@@ -65,8 +58,8 @@ internal sealed class OnnxSessionWrapper(
     {
         try
         {
-            var inputNames = session.InputMetadata?.Keys.ToList() ?? new List<string>();
-            var outputNames = session.OutputMetadata?.Keys.ToList() ?? new List<string>();
+            var inputNames = session.InputMetadata?.Keys.ToList() ?? [];
+            var outputNames = session.OutputMetadata?.Keys.ToList() ?? [];
             
             // プロバイダー情報は実行時に取得困難なため、推定値を使用
             var usedProviders = new List<string> { "Unknown" };
@@ -87,9 +80,9 @@ internal sealed class OnnxSessionWrapper(
             return new OnnxSessionInfo
             {
                 ModelPath = modelPath,
-                InputNames = new List<string>(),
-                OutputNames = new List<string>(),
-                UsedProviders = new List<string> { "Unknown" },
+                InputNames = [],
+                OutputNames = [],
+                UsedProviders = ["Unknown"],
                 InitializationTimeMs = 0,
                 EstimatedMemoryUsageMB = 0
             };

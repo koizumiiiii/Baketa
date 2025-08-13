@@ -725,7 +725,7 @@ public sealed class BatchOcrProcessor(
                             dt.Text,
                             dt.BoundingBox,
                             dt.Confidence,
-                            new System.Drawing.Point[0], // 空のContour
+                            [], // 空のContour
                             0.0 // デフォルトDirection
                         ))
                         .ToList();

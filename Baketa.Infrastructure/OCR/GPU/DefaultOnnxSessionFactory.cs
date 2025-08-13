@@ -22,16 +22,16 @@ public sealed class DefaultOnnxSessionFactory : IOnnxSessionFactory, IDisposable
     // セッション統計管理
     private readonly ConcurrentDictionary<string, SessionMetrics> _sessionMetrics = new();
     private readonly object _statsLock = new();
-    private int _totalSessionsCreated = 0;
-    private int _gpuAcceleratedSessions = 0;
-    private int _cpuFallbackSessions = 0;
-    private int _tdrFallbackCount = 0;
+    private int _totalSessionsCreated;
+    private int _gpuAcceleratedSessions;
+    private int _cpuFallbackSessions;
+    private readonly int _tdrFallbackCount;
     private DateTime _lastSessionCreatedAt = DateTime.MinValue;
-    private readonly List<double> _creationTimes = new();
+    private readonly List<double> _creationTimes = [];
     
     // リソース管理
-    private readonly ConcurrentBag<InferenceSession> _managedSessions = new();
-    private bool _disposed = false;
+    private readonly ConcurrentBag<InferenceSession> _managedSessions = [];
+    private bool _disposed;
 
     public DefaultOnnxSessionFactory(
         IOnnxSessionProvider sessionProvider,
@@ -59,7 +59,7 @@ public sealed class DefaultOnnxSessionFactory : IOnnxSessionFactory, IDisposable
                 throw new InvalidOperationException("検出モデルパスが設定されていません");
             }
             
-            var session = await _sessionProvider.CreateSessionAsync(modelPath, gpuInfo, cancellationToken);
+            var session = await _sessionProvider.CreateSessionAsync(modelPath, gpuInfo, cancellationToken).ConfigureAwait(false);
             var wrapper = new OnnxSessionWrapper(session, gpuInfo, "TextDetection", modelPath);
             
             _managedSessions.Add(session);
@@ -89,7 +89,7 @@ public sealed class DefaultOnnxSessionFactory : IOnnxSessionFactory, IDisposable
                 throw new InvalidOperationException("認識モデルパスが設定されていません");
             }
             
-            var session = await _sessionProvider.CreateSessionAsync(modelPath, gpuInfo, cancellationToken);
+            var session = await _sessionProvider.CreateSessionAsync(modelPath, gpuInfo, cancellationToken).ConfigureAwait(false);
             var wrapper = new OnnxSessionWrapper(session, gpuInfo, "TextRecognition", modelPath);
             
             _managedSessions.Add(session);
@@ -219,7 +219,7 @@ public sealed class DefaultOnnxSessionFactory : IOnnxSessionFactory, IDisposable
             }
         }));
         
-        await Task.WhenAll(disposeTasks);
+        await Task.WhenAll(disposeTasks).ConfigureAwait(false);
         
         // 統計情報をログ出力
         var stats = GetCreationStats();

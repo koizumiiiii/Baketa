@@ -20,17 +20,17 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
     private readonly System.Threading.Timer _cleanupTimer;
     private readonly object _statsLock = new();
     private StickyRoiSettings _settings;
-    private bool _disposed = false;
+    private bool _disposed;
     
     // 統計情報
-    private long _totalDetections = 0;
-    private long _successfulDetections = 0;
-    private double _totalProcessingTimeMs = 0;
-    private int _cleanupCount = 0;
+    private long _totalDetections;
+    private long _successfulDetections;
+    private double _totalProcessingTimeMs;
+    private int _cleanupCount;
 
     public InMemoryStickyRoiManager(
         ILogger<InMemoryStickyRoiManager> logger,
-        IOptions<OcrSettings> ocrSettings)
+        IOptions<OcrSettings> _)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
@@ -179,7 +179,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ 優先ROI取得失敗");
-            return Array.Empty<Core.Abstractions.OCR.StickyRoi>();
+            return [];
         }
     }
 
@@ -322,7 +322,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
 
     public async Task<bool> UpdateSettingsAsync(
         StickyRoiSettings settings, 
-        CancellationToken cancellationToken = default)
+        CancellationToken _ = default)
     {
         try
         {
@@ -527,7 +527,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         };
     }
 
-    private async Task EnforceRoiLimitsAsync(CancellationToken cancellationToken)
+    private async Task EnforceRoiLimitsAsync(CancellationToken _)
     {
         if (_rois.Count <= _settings.MaxRoiCount) return;
         
@@ -542,7 +542,7 @@ public sealed class InMemoryStickyRoiManager : IStickyRoiManager, IDisposable
         
         foreach (var roi in leastValuableRois)
         {
-            _rois.TryRemove(roi.RoiId, out _);
+            _rois.TryRemove(roi.RoiId, out var _);
         }
         
         _logger.LogDebug("🧹 ROI数制限適用 - 削除数: {Count}", excessCount);

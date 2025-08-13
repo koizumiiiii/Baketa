@@ -54,10 +54,7 @@ public sealed class BackgroundWarmupService(
 
     public async Task StartWarmupAsync(CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(BackgroundWarmupService));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         await _warmupSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         
