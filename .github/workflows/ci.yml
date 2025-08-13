@@ -90,7 +90,7 @@ jobs:
       run: dotnet restore --verbosity minimal
     
     - name: Build solution
-      run: dotnet build Baketa.sln --configuration Debug --verbosity normal -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false -p:WarningsAsErrors="" --nowarn CA1822,CS1822
+      run: dotnet build Baketa.sln --configuration Debug --verbosity normal -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
     - name: Run tests
       run: dotnet test --configuration Debug --no-build --verbosity minimal --logger "trx" --collect:"XPlat Code Coverage" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
