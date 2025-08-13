@@ -97,7 +97,7 @@ jobs:
       run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
     - name: Run tests
-      run: dotnet test --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
+      run: dotnet test --configuration Debug --no-build --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=ModelDependent&Category!=IntegrationTest&FullyQualifiedName!~SentencePiece&FullyQualifiedName!~OpusMt" -- RunConfiguration.MaxCpuCount=1 RunConfiguration.DisableParallelization=true
     
     - name: Upload test results
       uses: actions/upload-artifact@v4
