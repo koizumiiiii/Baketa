@@ -1,10 +1,14 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local;
+using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -18,13 +22,18 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
+    private readonly Mock<FixedSizeConnectionPool> _mockConnectionPool;
+    private readonly Mock<IOptions<TranslationSettings>> _mockTranslationSettings;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineTests(ITestOutputHelper output)
     {
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object);
+        _mockConnectionPool = new Mock<FixedSizeConnectionPool>();
+        _mockTranslationSettings = new Mock<IOptions<TranslationSettings>>();
+        _mockTranslationSettings.Setup(x => x.Value).Returns(new TranslationSettings());
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockTranslationSettings.Object);
     }
 
     [Fact]
@@ -285,13 +294,18 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
+    private readonly Mock<FixedSizeConnectionPool> _mockConnectionPool;
+    private readonly Mock<IOptions<TranslationSettings>> _mockTranslationSettings;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineIntegrationTests(ITestOutputHelper output)
     {
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object);
+        _mockConnectionPool = new Mock<FixedSizeConnectionPool>();
+        _mockTranslationSettings = new Mock<IOptions<TranslationSettings>>();
+        _mockTranslationSettings.Setup(x => x.Value).Returns(new TranslationSettings());
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockTranslationSettings.Object);
     }
 
     [Fact(Skip = "Pythonサーバーが必要")]

@@ -1957,7 +1957,7 @@ public class PaddleOcrEngine : IOcrEngine
             {
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🧵 マルチスレッドOCRエンジンで処理実行");
                 __logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
-                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+                result = _queuedEngine.Run(processedMat);
             }
             else if (_ocrEngine != null)
             {
@@ -1995,7 +1995,7 @@ public class PaddleOcrEngine : IOcrEngine
             if (IsMultiThreadEnabled && _queuedEngine != null)
             {
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 マルチスレッドOCRエンジンで再試行");
-                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+                result = _queuedEngine.Run(processedMat);
             }
             else if (_ocrEngine != null)
             {
