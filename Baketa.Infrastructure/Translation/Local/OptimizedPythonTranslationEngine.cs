@@ -370,9 +370,199 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
         if (requests.Count == 0)
             return [];
+
+        // 言語ペアでグループ化
+        var groupedRequests = requests.GroupBy(r => $"{r.SourceLanguage.Code}_{r.TargetLanguage.Code}");
+        var allResponses = new List<TranslationResponse>();
+
+        foreach (var group in groupedRequests)
+        {
+            var groupList = group.ToList();
             
-        // バッチ処理をサポートするカスタム実装がある場合は、サブクラスで上書きしてください
-        // このデフォルト実装は個別のリクエストを順次処理します
+            // バッチサイズ制限確認
+            const int maxBatchSize = 50;
+            if (groupList.Count > maxBatchSize)
+            {
+                // 大きなバッチを分割処理
+                var splitResponses = await ProcessLargeBatchAsync(groupList, maxBatchSize, cancellationToken).ConfigureAwait(false);
+                allResponses.AddRange(splitResponses);
+            }
+            else
+            {
+                // 通常のバッチ処理
+                var batchResponses = await ProcessSingleBatchAsync(groupList, cancellationToken).ConfigureAwait(false);
+                allResponses.AddRange(batchResponses);
+            }
+        }
+
+        // 元の順序を保持するため、RequestIdでソート
+        var responseMap = allResponses.ToDictionary(r => r.RequestId);
+        return requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
+            ? response 
+            : TranslationResponse.CreateError(req, 
+                new TranslationError { ErrorCode = "BATCH_PROCESSING_ERROR", Message = "Response not found" }, 
+                Name)).ToList();
+    }
+
+    private async Task<IReadOnlyList<TranslationResponse>> ProcessSingleBatchAsync(
+        IReadOnlyList<TranslationRequest> requests, 
+        CancellationToken cancellationToken)
+    {
+        var batchStopwatch = Stopwatch.StartNew();
+        PersistentConnection? connection = null;
+
+        try
+        {
+            // Phase 1統合: 接続プールから接続を取得
+            connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+            // バッチリクエスト構築（同じ言語ペアが保証されている）
+            var batchRequest = new
+            {
+                texts = requests.Select(r => r.SourceText).ToList(),
+                source_lang = requests[0].SourceLanguage.Code,
+                target_lang = requests[0].TargetLanguage.Code,
+                batch_mode = true,
+                max_batch_size = 50
+            };
+
+            // JSON送信（接続プールの接続を使用）
+            var jsonRequest = JsonSerializer.Serialize(batchRequest);
+            await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
+
+            // レスポンス受信（接続プールの接続を使用）
+            var jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
+            
+            if (string.IsNullOrEmpty(jsonResponse))
+                throw new InvalidOperationException("Empty response from Python server");
+
+            var batchResponse = JsonSerializer.Deserialize<PythonBatchResponse>(jsonResponse);
+            
+            if (batchResponse == null)
+                throw new InvalidOperationException("Failed to deserialize batch response");
+
+            batchStopwatch.Stop();
+
+            // レスポンスマッピング
+            return MapBatchResponse(batchResponse, requests, batchStopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            batchStopwatch.Stop();
+            _logger.LogError(ex, "バッチ翻訳エラー: {Error}", ex.Message);
+            
+            // エラー時は個別処理でフォールバック
+            return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Phase 1統合: 接続をプールに返却
+            if (connection != null)
+                await _connectionPool.ReleaseConnectionAsync(connection).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<IReadOnlyList<TranslationResponse>> ProcessLargeBatchAsync(
+        IReadOnlyList<TranslationRequest> requests,
+        int maxBatchSize,
+        CancellationToken cancellationToken)
+    {
+        var results = new List<TranslationResponse>();
+
+        // バッチを分割して並列処理
+        var batches = requests
+            .Select((request, index) => new { request, index })
+            .GroupBy(x => x.index / maxBatchSize)
+            .Select(g => g.Select(x => x.request).ToList())
+            .ToList();
+
+        // 並列バッチ処理（接続プール活用）
+        var tasks = batches.Select(batch => TranslateBatchAsync(batch, cancellationToken));
+        var batchResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        // 結果をフラット化
+        foreach (var batchResult in batchResults)
+        {
+            results.AddRange(batchResult);
+        }
+
+        return results;
+    }
+
+    private IReadOnlyList<TranslationResponse> MapBatchResponse(
+        PythonBatchResponse batchResponse, 
+        IReadOnlyList<TranslationRequest> originalRequests, 
+        long elapsedMilliseconds)
+    {
+        const string engineName = "OptimizedPythonTranslation";
+        
+        if (!batchResponse.success || batchResponse.translations == null)
+        {
+            // エラー時は全てFailureで返す
+            var errorMessage = batchResponse.errors?.FirstOrDefault() ?? "Unknown batch translation error";
+            return originalRequests.Select(req => 
+            {
+                var error = new TranslationError
+                {
+                    ErrorCode = "BATCH_TRANSLATION_ERROR",
+                    Message = errorMessage
+                };
+                return TranslationResponse.CreateError(req, error, engineName);
+            }).ToList();
+        }
+
+        var results = new List<TranslationResponse>();
+        var translations = batchResponse.translations;
+        var confidenceScores = batchResponse.confidence_scores ?? [];
+
+        for (int i = 0; i < originalRequests.Count && i < translations.Count; i++)
+        {
+            var request = originalRequests[i];
+            var translation = translations[i];
+            var confidence = i < confidenceScores.Count ? confidenceScores[i] : 0.95f;
+            var avgProcessingTime = elapsedMilliseconds / originalRequests.Count;
+
+            var response = TranslationResponse.CreateSuccessWithConfidence(
+                request,
+                translation,
+                engineName,
+                avgProcessingTime,
+                confidence
+            );
+
+            results.Add(response);
+        }
+
+        // バッチサイズ不一致の場合のフォールバック
+        if (results.Count < originalRequests.Count)
+        {
+            _logger.LogWarning("バッチレスポンスサイズ不一致: expected {Expected}, got {Actual}", 
+                originalRequests.Count, results.Count);
+            
+            // 不足分はエラーレスポンスで埋める
+            for (int i = results.Count; i < originalRequests.Count; i++)
+            {
+                var request = originalRequests[i];
+                var error = new TranslationError
+                {
+                    ErrorCode = "BATCH_SIZE_MISMATCH",
+                    Message = "Batch response size mismatch"
+                };
+                var errorResponse = TranslationResponse.CreateError(request, error, engineName);
+                errorResponse.ProcessingTimeMs = elapsedMilliseconds;
+                results.Add(errorResponse);
+            }
+        }
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<TranslationResponse>> FallbackToIndividualProcessingAsync(
+        IReadOnlyList<TranslationRequest> requests,
+        CancellationToken cancellationToken)
+    {
+        const string engineName = "OptimizedPythonTranslation";
+        _logger.LogInformation("バッチ処理失敗 - 個別処理にフォールバック: {Count}件", requests.Count);
         
         var results = new List<TranslationResponse>();
         
@@ -381,8 +571,24 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (cancellationToken.IsCancellationRequested)
                 break;
                 
-            var response = await TranslateAsync(request, cancellationToken).ConfigureAwait(false);
-            results.Add(response);
+            try
+            {
+                var response = await TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+                results.Add(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "個別翻訳処理エラー: {Text}", request.SourceText);
+                var errorResponse = TranslationResponse.CreateErrorFromException(
+                    request,
+                    engineName,
+                    "INDIVIDUAL_PROCESSING_ERROR",
+                    ex.Message,
+                    ex,
+                    0
+                );
+                results.Add(errorResponse);
+            }
         }
         
         return results;
@@ -760,5 +966,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         public float? confidence { get; set; }
         public string? error { get; set; }
         public double? processing_time { get; set; }
+    }
+
+    private class PythonBatchResponse
+    {
+        public bool success { get; set; }
+        public List<string>? translations { get; set; }
+        public List<float>? confidence_scores { get; set; }
+        public double? processing_time { get; set; }
+        public int? batch_size { get; set; }
+        public List<string>? errors { get; set; }
     }
 }

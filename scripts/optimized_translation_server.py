@@ -12,7 +12,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import argparse
 
 import torch
@@ -41,6 +41,25 @@ class TranslationResponse:
     confidence: float = 0.0
     error: Optional[str] = None
     processing_time: float = 0.0
+
+@dataclass
+class BatchTranslationRequest:
+    """バッチ翻訳リクエスト"""
+    texts: List[str]
+    source_lang: str
+    target_lang: str
+    batch_mode: bool = True
+    max_batch_size: int = 50
+
+@dataclass
+class BatchTranslationResponse:
+    """バッチ翻訳レスポンス"""
+    success: bool
+    translations: List[str]
+    confidence_scores: List[float]
+    processing_time: float
+    batch_size: int
+    errors: Optional[List[str]] = None
 
 class OptimizedTranslationServer:
     """最適化された翻訳サーバー"""
@@ -212,6 +231,104 @@ class OptimizedTranslationServer:
                 error=str(e),
                 processing_time=processing_time / 1000.0
             )
+
+    async def translate_batch(self, request: BatchTranslationRequest) -> BatchTranslationResponse:
+        """バッチ翻訳処理 - 複数テキストを1回のリクエストで効率的に処理"""
+        start_time = time.time()
+        
+        try:
+            # バッチサイズ制限
+            if len(request.texts) > request.max_batch_size:
+                raise ValueError(f"Batch size {len(request.texts)} exceeds limit {request.max_batch_size}")
+            
+            # モデル取得
+            model_key = self._get_model_key(request.source_lang, request.target_lang)
+            if model_key not in self.models:
+                raise ValueError(f"Model not loaded for {model_key}")
+                
+            model, tokenizer = self.models[model_key]
+            
+            # バッチトークナイズ（効率化）
+            inputs = tokenizer(
+                request.texts, 
+                return_tensors="pt", 
+                padding=True, 
+                truncation=True, 
+                max_length=512
+            )
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            # バッチ推論実行（GPU最適化）
+            loop = asyncio.get_event_loop()
+            translations = await loop.run_in_executor(
+                self.executor,
+                self._batch_inference,
+                model, tokenizer, inputs
+            )
+            
+            processing_time = (time.time() - start_time) * 1000  # ms
+            
+            # 信頼度スコア（現在は固定値、将来的にlogitsから計算予定）
+            confidence_scores = [0.95] * len(request.texts)
+            
+            # メトリクス更新
+            self.request_count += len(request.texts)
+            self.total_processing_time += processing_time
+            
+            # パフォーマンス情報ログ
+            avg_time_per_text = processing_time / len(request.texts)
+            if avg_time_per_text > 100:
+                logger.warning(f"Batch translation exceeded 100ms/text target: {avg_time_per_text:.1f}ms/text")
+            else:
+                logger.info(f"Fast batch translation completed: {avg_time_per_text:.1f}ms/text, batch size: {len(request.texts)}")
+            
+            return BatchTranslationResponse(
+                success=True,
+                translations=translations,
+                confidence_scores=confidence_scores,
+                processing_time=processing_time / 1000.0,  # seconds
+                batch_size=len(request.texts)
+            )
+            
+        except Exception as e:
+            processing_time = (time.time() - start_time) * 1000
+            logger.error(f"Batch translation error: {e}")
+            
+            return BatchTranslationResponse(
+                success=False,
+                translations=[],
+                confidence_scores=[],
+                processing_time=processing_time / 1000.0,
+                batch_size=len(request.texts),
+                errors=[str(e)]
+            )
+
+    def _batch_inference(self, model, tokenizer, inputs):
+        """バッチ推論処理（同期処理でThreadPoolExecutorで実行）"""
+        with torch.no_grad():
+            if self.device.type == "cuda":
+                with torch.cuda.amp.autocast():
+                    outputs = model.generate(
+                        **inputs, 
+                        max_length=512, 
+                        num_beams=1, 
+                        early_stopping=True
+                    )
+            else:
+                outputs = model.generate(
+                    **inputs, 
+                    max_length=512, 
+                    num_beams=1, 
+                    early_stopping=True
+                )
+        
+        # バッチデコード
+        translations = []
+        for output in outputs:
+            translation = tokenizer.decode(output, skip_special_tokens=True)
+            translations.append(translation)
+            
+        return translations
             
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """クライアント接続処理"""
@@ -228,24 +345,46 @@ class OptimizedTranslationServer:
                 try:
                     # JSONパース
                     request_data = json.loads(data.decode('utf-8'))
-                    request = TranslationRequest(
-                        text=request_data['text'],
-                        source_lang=request_data.get('source_lang', 'ja'),
-                        target_lang=request_data.get('target_lang', 'en'),
-                        request_id=request_data.get('request_id')
-                    )
                     
-                    # 翻訳実行
-                    response = await self.translate(request)
-                    
-                    # レスポンス送信
-                    response_data = {
-                        'success': response.success,
-                        'translation': response.translation,
-                        'confidence': response.confidence,
-                        'error': response.error,
-                        'processing_time': response.processing_time
-                    }
+                    # バッチリクエストかどうか判定
+                    if 'texts' in request_data and request_data.get('batch_mode', False):
+                        # バッチ翻訳処理
+                        batch_request = BatchTranslationRequest(
+                            texts=request_data['texts'],
+                            source_lang=request_data.get('source_lang', 'ja'),
+                            target_lang=request_data.get('target_lang', 'en'),
+                            batch_mode=request_data.get('batch_mode', True),
+                            max_batch_size=request_data.get('max_batch_size', 50)
+                        )
+                        
+                        batch_response = await self.translate_batch(batch_request)
+                        
+                        response_data = {
+                            'success': batch_response.success,
+                            'translations': batch_response.translations,
+                            'confidence_scores': batch_response.confidence_scores,
+                            'processing_time': batch_response.processing_time,
+                            'batch_size': batch_response.batch_size,
+                            'errors': batch_response.errors
+                        }
+                    else:
+                        # 単一翻訳処理（従来の処理）
+                        request = TranslationRequest(
+                            text=request_data['text'],
+                            source_lang=request_data.get('source_lang', 'ja'),
+                            target_lang=request_data.get('target_lang', 'en'),
+                            request_id=request_data.get('request_id')
+                        )
+                        
+                        response = await self.translate(request)
+                        
+                        response_data = {
+                            'success': response.success,
+                            'translation': response.translation,
+                            'confidence': response.confidence,
+                            'error': response.error,
+                            'processing_time': response.processing_time
+                        }
                     
                     response_json = json.dumps(response_data, ensure_ascii=False) + '\n'
                     writer.write(response_json.encode('utf-8'))
