@@ -96,6 +96,22 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 例: services.AddSingleton<ITextBoxDetector, PaddleTextBoxDetector>();
             // 例: services.AddSingleton<ITextRecognizer, PaddleTextRecognizer>();
             
+            // 🎯 Issue #147 Phase 2: AdaptiveTileStrategy登録
+            services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.ITileStrategy>(provider =>
+            {
+                var textDetector = provider.GetRequiredService<IOcrEngine>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy>>();
+                var adaptiveStrategy = new Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy(textDetector, logger);
+                
+                var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();
+                moduleLogger?.LogInformation("🚀 AdaptiveTileStrategy登録完了 - テキスト分割問題解決版");
+                
+                return adaptiveStrategy;
+            });
+            
+            // OcrRegionGenerator（ITileStrategy使用）
+            services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.OcrRegionGenerator>();
+            
             // OCR精度測定システム
             services.AddSingleton<IOcrAccuracyMeasurement, OcrAccuracyMeasurement>();
             services.AddSingleton<AccuracyBenchmarkService>();
