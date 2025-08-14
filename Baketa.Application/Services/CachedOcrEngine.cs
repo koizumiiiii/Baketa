@@ -213,6 +213,21 @@ public sealed class CachedOcrEngine : IOcrEngine
     }
 
     /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// キャッシュ対応版
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        
+        _logger.LogDebug("🔍 CachedOcrEngine: DetectTextRegionsAsync - ベースエンジンに委譲");
+        
+        // キャッシングは複雑になるため、現在は直接ベースエンジンに委譲
+        // TODO: 将来的には検出専用キャッシュの実装を検討
+        return await _baseEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// キャッシュ統計情報をログ出力
     /// </summary>
     public void LogCacheStatistics()

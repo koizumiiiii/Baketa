@@ -186,6 +186,15 @@ public class AdaptiveOcrEngine(
     }
 
     /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        // ベースエンジンに検出専用処理を委任
+        return await baseOcrEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Dispose実装
     /// </summary>
     public void Dispose()

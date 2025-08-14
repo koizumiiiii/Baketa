@@ -296,6 +296,35 @@ public class SafePaddleOcrEngine(
         _logger?.LogDebug("SafePaddleOcrEngine: CancelCurrentOcrTimeout呼び出し（スタブ実装）");
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// SafePaddleOcrEngineではダミー実装を提供
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
+
+        _logger?.LogDebug("SafePaddleOcrEngine: DetectTextRegionsAsync実行（ダミー実装）");
+
+        await Task.Delay(10, cancellationToken); // 軽微な遅延でリアリティを演出
+
+        var dummyTextRegions = new List<OcrTextRegion>
+        {
+            new("", new Rectangle(10, 10, 100, 30), 0.95), // 検出専用なのでテキストは空
+            new("", new Rectangle(50, 60, 80, 25), 0.88)
+        };
+
+        return new OcrResults(
+            dummyTextRegions,
+            image,
+            TimeSpan.FromMilliseconds(10),
+            CurrentLanguage ?? "jpn",
+            null,
+            "" // 検出専用なので結合テキストも空
+        );
+    }
+
     #endregion
 
     #region 言語切り替え支援メソッド（Safe版）

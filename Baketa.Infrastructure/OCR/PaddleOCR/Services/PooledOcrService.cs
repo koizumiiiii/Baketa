@@ -201,6 +201,36 @@ public sealed class PooledOcrService : IOcrEngine
         _logger.LogDebug("🔄 PooledOcrService: OCRタイムアウトキャンセル要求");
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
+
+        _logger.LogDebug("🔍 PooledOcrService: DetectTextRegionsAsync実行");
+
+        // プールから一時的にエンジンを取得して検出専用処理を実行
+        // TODO: 実際のプール実装時により効率的な方法に改善
+        
+        // 現在は基本実装として、RecognizeAsyncでテキスト部分を空にする方式を採用
+        var fullResult = await RecognizeAsync(image, null, cancellationToken);
+        
+        var detectionOnlyRegions = fullResult.TextRegions.Select(region => 
+            new OcrTextRegion("", region.Bounds, region.Confidence, region.Contour, region.Direction))
+            .ToList();
+
+        return new OcrResults(
+            detectionOnlyRegions,
+            image,
+            fullResult.ProcessingTime,
+            fullResult.LanguageCode,
+            fullResult.RegionOfInterest,
+            ""
+        );
+    }
+
     public async Task<bool> SwitchLanguageAsync(string language, CancellationToken _ = default)
     {
         ThrowIfDisposed();

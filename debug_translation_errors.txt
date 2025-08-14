@@ -15,3 +15,7 @@
 2025-08-14 16:38:41.444 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
 2025-08-14 16:44:54.364 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
 2025-08-14 16:47:21.664 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-14 18:40:12.571 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-14 18:40:13.474 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-14 19:34:51.753 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-14 19:48:55.357 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
