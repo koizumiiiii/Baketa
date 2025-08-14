@@ -14,6 +14,7 @@ using Baketa.Core.DI.Modules;
 using Baketa.Core.Services;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
+using CoreTranslation = Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Logging;
 using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Infrastructure.Performance;
@@ -22,6 +23,7 @@ using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.Onnx;
+using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -112,6 +114,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 翻訳エンジンファクトリーを登録
             services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();
             
+            // パフォーマンス監視サービスを登録 (Issue #144)
+            services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
+            
             // 翻訳サービスを登録
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
         }
@@ -188,7 +193,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTransformersOpusMTServices(IServiceCollection services)
         {
-            // 既存のITranslationEngine登録を全て削除して、TransformersOpusMtEngineのみを登録
+            // 既存のITranslationEngine登録を全て削除して、最適化されたエンジンを登録
             var existingTranslationEngines = services
                 .Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine))
                 .ToList();
@@ -198,23 +203,28 @@ namespace Baketa.Infrastructure.DI.Modules;
                 services.Remove(service);
             }
             
-            // ⚡ Phase 2 DI修正: UI応答性向上のためTransformersOpusMtEngineを遅延初期化
+            // 🚀 Issue #144: OptimizedPythonTranslationEngineを優先エンジンとして登録（500ms目標）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
             {
-                // バックグラウンドで初期化して、UIをブロックしない
+                var logger = provider.GetService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
+                logger?.LogInformation("🚀 OptimizedPythonTranslationEngine初期化開始 - 500ms目標エンジン");
+                var optimizedEngine = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
+                // OptimizedPythonTranslationEngineは両方のITranslationEngineインターフェースを実装
+                return (Baketa.Core.Abstractions.Translation.ITranslationEngine)optimizedEngine;
+            });
+            
+            // フォールバック用にTransformersOpusMtEngineも登録（具象型）
+            services.AddSingleton<TransformersOpusMtEngine>(provider =>
+            {
                 var logger = provider.GetService<ILogger<TransformersOpusMtEngine>>();
-                logger?.LogInformation("🚀 TransformersOpusMtEngine遅延初期化開始 - UIブロック回避");
+                logger?.LogInformation("🔧 TransformersOpusMtEngineフォールバック初期化");
                 var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
                 return new TransformersOpusMtEngine(logger!, settingsService);
             });
             
-            // 🔧 ファサード実装バッチ処理ハング問題の修正: 具象型でも登録してServiceProviderからの直接取得を可能にする
-            services.AddSingleton<TransformersOpusMtEngine>(provider => 
-                provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationEngine>() as TransformersOpusMtEngine 
-                ?? throw new InvalidOperationException("TransformersOpusMtEngine の取得に失敗しました"));
-            
-            Console.WriteLine($"🔧 TransformersOpusMtEngine（組み込みLRUキャッシュ付き）を登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
-            Console.WriteLine("⚡ Phase 1.1: LRU翻訳キャッシュ（1000エントリ）が組み込まれています");
+            Console.WriteLine($"🚀 OptimizedPythonTranslationEngine（500ms目標）を優先エンジンとして登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
+            Console.WriteLine("⚡ Issue #144: Python翻訳最適化エンジンがアクティブです");
         }
         
         /// <summary>
