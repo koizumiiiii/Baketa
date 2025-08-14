@@ -141,3 +141,96 @@
 - **UI strings**: Japanese for user-facing content
 
 This configuration optimizes Claude Code's understanding while preserving essential Japanese domain knowledge.
+
+---
+
+# Log Management Rules
+
+## **📋 Log File Management Policy**
+
+### **Essential Log Files**
+Only the following log files should be retained and used for analysis:
+
+1. **`debug_app_logs.txt`** - Main application log (69.7KB)
+   - **Purpose**: Latest OCR results, general application behavior
+   - **Priority**: Highest
+   - **Retention**: Continuously updated, maintain latest state
+
+2. **`translation_debug_output.txt`** - Translation debug log (47KB) 
+   - **Purpose**: Translation engine debug information
+   - **Priority**: High
+   - **Retention**: Reference during translation issue investigation
+
+3. **`debug_translation_errors.txt`** - Translation error tracking (2.3KB)
+   - **Purpose**: Detailed translation failure error information
+   - **Priority**: High  
+   - **Retention**: Reference during error investigation
+
+4. **`debug_batch_ocr.txt`** - OCR performance analysis (571 bytes)
+   - **Purpose**: OCR batch processing performance measurement
+   - **Priority**: Medium
+   - **Retention**: Reference during performance analysis
+
+### **Deleted Obsolete Log Files**
+The following log files were deleted on 2025/08/14 and are prohibited from future creation:
+
+- ❌ `latest_run.txt` (190KB) - Redundant execution log
+- ❌ `translation_flow_analysis.txt` (435KB) - Outdated analysis log
+- ❌ `debug_memory_usage.txt` (3.8KB) - Outdated memory usage
+- ❌ `debug_performance_analysis.txt` (8.5KB) - Outdated performance analysis
+- ❌ `debug_captured_*.png` (4 files) - Outdated captured images
+- ❌ `debug_*.txt.old` (backup files) - Outdated backups
+
+### **Log Reference Rules**
+
+#### **Log File Selection by Analysis Purpose**
+
+| Analysis Purpose | Log Files to Reference | Description |
+|------------------|------------------------|-------------|
+| **OCR Results Verification** | `debug_app_logs.txt` | Latest OCR detection results and text |
+| **Translation Results Verification** | `debug_app_logs.txt` | Translation outputs and overlay display results |
+| **Translation Error Investigation** | `debug_translation_errors.txt` → `debug_app_logs.txt` | Error details → Overall flow verification |
+| **Application Behavior Analysis** | `debug_app_logs.txt` | General application operation |
+| **Performance Analysis** | `debug_app_logs.txt` + `debug_batch_ocr.txt` | Overall operation + OCR-specific analysis |
+| **Translation Engine Investigation** | `translation_debug_output.txt` | Translation engine internal operation |
+
+#### **Log Content Verification Rules**
+
+1. **Required Verification Steps**:
+   - Verify log file last modification time
+   - Check file size validity  
+   - Confirm consistency between actual file content and reported content
+
+2. **Handling Inconsistencies**:
+   - Immediately correct when reported content differs from actual log content
+   - Re-read log files and re-verify content
+   - Apologize to user for inconsistencies and provide accurate information
+
+3. **Information Quality Assurance**:
+   - Prohibit information provision based on speculation or assumptions
+   - Base responses only on actual log file content
+   - Clearly state "Verifying log file" when uncertain
+
+### **Implementation Guidelines**
+
+1. **Log Output Control**:
+   - Delete/disable output code to deleted log files
+   - Output only to essential log files in new implementations
+   - Consider implementing log rotation functionality
+
+2. **Disk Space Management**:
+   - Total size of essential log files: ~120KB (significant reduction achieved)
+   - Saved 640KB+ disk space through deletion
+   - Regular file size monitoring
+
+3. **Development Efficiency Improvement**:
+   - Analysis efficiency improved through significant reduction in log file count
+   - Reduced problem identification time through important information consolidation
+   - Eliminated confusion from unnecessary logs
+
+---
+
+**Established**: 2025-08-14  
+**Last Updated**: 2025-08-14  
+**Established by**: Claude Code Assistant  
+**Scope**: Baketa project-wide log management

@@ -419,9 +419,19 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         var connectionAcquireStopwatch = Stopwatch.StartNew();
         
         // Issue #147: 接続プールから接続を取得（接続ロック競合を解決）
-        var connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
-        connectionAcquireStopwatch.Stop();
-        _logger.LogInformation("[TIMING] 接続プール取得: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
+        PersistentConnection? connection = null;
+        try
+        {
+            connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+            connectionAcquireStopwatch.Stop();
+            _logger.LogInformation("[TIMING] 接続プール取得: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            connectionAcquireStopwatch.Stop();
+            _logger.LogError(ex, "接続プール取得失敗 - 経過時間: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
+            throw new InvalidOperationException($"接続プールから接続取得に失敗: {ex.Message}", ex);
+        }
         
         try
         {
@@ -453,8 +463,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             if (string.IsNullOrEmpty(jsonResponse))
             {
+                _logger.LogError("空のレスポンス受信 - 接続状態: Connected={Connected}, DataAvailable={DataAvailable}", 
+                    connection?.TcpClient?.Connected ?? false, 
+                    connection?.TcpClient?.GetStream()?.DataAvailable ?? false);
                 throw new InvalidOperationException("サーバーから空のレスポンスを受信しました");
             }
+            
+            _logger.LogDebug("Python応答受信: {Response}", jsonResponse.Length > 200 ? jsonResponse[..200] + "..." : jsonResponse);
             
             var deserializationStopwatch = Stopwatch.StartNew();
             var response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse);
@@ -478,12 +493,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 translatedText = response.translation;
                 confidenceScore = response.confidence ?? 0.95f;
                 isSuccess = true;
+                _logger.LogDebug("翻訳成功 - Text: '{Text}', Confidence: {Confidence}", 
+                    translatedText, confidenceScore);
             }
             else
             {
                 translatedText = "翻訳エラーが発生しました";
                 confidenceScore = 0.0f;
                 isSuccess = false;
+                _logger.LogError("翻訳失敗 - Success: {Success}, Translation: '{Translation}', Error: '{Error}'", 
+                    response.success, response.translation ?? "null", response.error ?? "none");
             }
             
             var result = new TranslationResponse
