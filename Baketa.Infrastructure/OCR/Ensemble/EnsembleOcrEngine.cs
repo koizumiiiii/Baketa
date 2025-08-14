@@ -17,6 +17,7 @@ public class EnsembleOcrEngine(
     private readonly List<EnsembleEngineInfo> _engines = [];
     private readonly ConcurrentDictionary<string, EnsembleEngineStats> _engineStats = new();
     private OcrEngineSettings? _currentSettings;
+    private bool _disposed;
 
     // IOcrEngineプロパティの実装
     public string EngineName => "EnsembleOCR";
@@ -380,8 +381,31 @@ public class EnsembleOcrEngine(
         }
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// 最初の利用可能エンジンに委任
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(EnsembleOcrEngine));
+        }
+        
+        var availableEngine = _engines.FirstOrDefault()?.Engine;
+        if (availableEngine == null)
+        {
+            throw new InvalidOperationException("利用可能なOCRエンジンがありません");
+        }
+        
+        return await availableEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+    }
+
     public void Dispose()
     {
+        if (_disposed) return;
+        
         foreach (var engineInfo in _engines)
         {
             try
@@ -396,11 +420,14 @@ public class EnsembleOcrEngine(
         
         _engines.Clear();
         _engineStats.Clear();
+        _disposed = true;
         GC.SuppressFinalize(this);
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        
         foreach (var engineInfo in _engines)
         {
             try
@@ -422,6 +449,7 @@ public class EnsembleOcrEngine(
 
         _engines.Clear();
         _engineStats.Clear();
+        _disposed = true;
     }
 
     #endregion

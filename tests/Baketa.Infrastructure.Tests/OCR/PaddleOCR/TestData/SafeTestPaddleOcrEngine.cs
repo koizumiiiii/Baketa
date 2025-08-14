@@ -295,6 +295,32 @@ public class SafeTestPaddleOcrEngine(
         _logger?.LogDebug("SafeTestPaddleOcrEngine: CancelCurrentOcrTimeout呼び出し（スタブ実装）");
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// テスト用の簡易実装
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
+        ThrowIfNotInitialized();
+        
+        _logger?.LogDebug("SafeTestPaddleOcrEngine: DetectTextRegionsAsync実行（テスト用）");
+        
+        // テスト用の最短遅延
+        await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+        
+        // 空の結果を返す（テスト用）
+        return new OcrResults(
+            [],
+            image,
+            TimeSpan.FromMilliseconds(1),
+            CurrentLanguage ?? _settings.Language,
+            null,
+            ""
+        );
+    }
+
     #endregion
 
     #region 言語切り替え支援メソッド（テスト用）

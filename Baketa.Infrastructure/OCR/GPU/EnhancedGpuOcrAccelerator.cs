@@ -947,6 +947,29 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
         // TODO: タイムアウトキャンセル実装
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        // TODO: GPU最適化版のテキスト検出専用実装
+        // 暫定的には完全なOCR実行でテキスト部分を空にする
+        var fullResult = await RecognizeAsync(image, null, cancellationToken);
+        
+        var detectionOnlyRegions = fullResult.TextRegions.Select(region => 
+            new OcrTextRegion("", region.Bounds, region.Confidence, region.Contour, region.Direction))
+            .ToList();
+
+        return new OcrResults(
+            detectionOnlyRegions,
+            image,
+            fullResult.ProcessingTime,
+            fullResult.LanguageCode,
+            fullResult.RegionOfInterest,
+            ""
+        );
+    }
+
     public void Dispose()
     {
         if (!_disposed)
