@@ -624,11 +624,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         Language targetLanguage,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         // 🚨 [CRITICAL_DEBUG] メソッド開始の即座ログ出力
         Console.WriteLine($"🚨 [BATCH_CRITICAL] TranslateBatchAsync開始 - テキスト数: {texts?.Count ?? 0}");
         Console.WriteLine($"🔍 [BATCH_LANGUAGE] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName})");
         
         _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
+        _logger?.LogInformation("[TIMING] CoordinateBasedTranslationService.TranslateBatchAsync開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}");
         // 🔥 [FILE_CONFLICT_FIX_18] ファイルアクセス競合回避のためILogger使用
         _logger?.LogDebug("🚀 [FACADE_DEBUG] TranslationService via Facade: {ServiceType}", 
@@ -652,11 +654,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 Console.WriteLine($"🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
                 _logger?.LogDebug("🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
                 
+                var timeoutSetupStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 // 10秒タイムアウトを設定
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                timeoutSetupStopwatch.Stop();
+                _logger?.LogInformation("[TIMING] タイムアウト設定: {ElapsedMs}ms", timeoutSetupStopwatch.ElapsedMilliseconds);
                 
                 var startTime = DateTime.Now;
+                var batchCallStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 
                 // ITranslationServiceのTranslateBatchAsyncメソッドを使用（文字列リスト）
                 var batchResults = await translationService.TranslateBatchAsync(
@@ -666,11 +672,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     null, 
                     combinedCts.Token).ConfigureAwait(false);
                 
+                batchCallStopwatch.Stop();
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
                 
                 Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
                 _logger?.LogDebug("✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {Duration:F0}ms", duration.TotalMilliseconds);
+                _logger?.LogInformation("[TIMING] ITranslationService.TranslateBatchAsync実行: {ElapsedMs}ms", batchCallStopwatch.ElapsedMilliseconds);
                 
                 // 結果を詳細分析
                 if (batchResults != null && batchResults.Count > 0)
@@ -686,6 +694,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     {
                         Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
                         _logger?.LogDebug("🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
+                        totalStopwatch.Stop();
+                        _logger?.LogInformation("[TIMING] CoordinateBasedTranslationService.TranslateBatchAsync完了（成功）: {ElapsedMs}ms", totalStopwatch.ElapsedMilliseconds);
                         return translations;
                     }
                     else
