@@ -233,16 +233,33 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         
         try
         {
-            // 初期化確認
+            // 初期化確認（テスト環境では迅速に失敗）
             if (!await IsReadyAsync().ConfigureAwait(false))
             {
+                // テスト環境やサーバーなし環境では初期化を試行しない
+                if (!File.Exists(_serverScriptPath))
+                {
+                    _logger.LogWarning("サーバースクリプトが見つかりません: {ScriptPath}", _serverScriptPath);
+                    return new TranslationResponse
+                    {
+                        RequestId = request.RequestId,
+                        TranslatedText = "翻訳エラーが発生しました",
+                        SourceText = request.SourceText,
+                        SourceLanguage = request.SourceLanguage,
+                        TargetLanguage = request.TargetLanguage,
+                        ConfidenceScore = 0.0f,
+                        EngineName = Name,
+                        IsSuccess = false
+                    };
+                }
+                
                 var initResult = await InitializeAsync().ConfigureAwait(false);
                 if (!initResult)
                 {
                     return new TranslationResponse
                     {
                         RequestId = request.RequestId,
-                        TranslatedText = "翻訳エンジンの初期化に失敗しました",
+                        TranslatedText = "翻訳エラーが発生しました",
                         SourceText = request.SourceText,
                         SourceLanguage = request.SourceLanguage,
                         TargetLanguage = request.TargetLanguage,
@@ -406,10 +423,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         TranslationRequest request,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        var connectionLockStopwatch = Stopwatch.StartNew();
+        
         await _connectionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        connectionLockStopwatch.Stop();
+        _logger.LogInformation("[TIMING] 接続ロック取得: {ElapsedMs}ms", connectionLockStopwatch.ElapsedMilliseconds);
         
         try
         {
+            var connectionCheckStopwatch = Stopwatch.StartNew();
             // 接続確認と再接続
             if (_persistentWriter == null || _persistentReader == null || 
                 _persistentClient == null || !_persistentClient.Connected)
@@ -420,7 +443,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     throw new InvalidOperationException("永続接続の確立に失敗しました");
                 }
             }
+            connectionCheckStopwatch.Stop();
+            _logger.LogInformation("[TIMING] 接続確認・再接続: {ElapsedMs}ms", connectionCheckStopwatch.ElapsedMilliseconds);
             
+            var serializationStopwatch = Stopwatch.StartNew();
             // リクエスト送信
             var requestData = new
             {
@@ -431,34 +457,72 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             };
             
             var jsonRequest = JsonSerializer.Serialize(requestData);
-            await _persistentWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
+            serializationStopwatch.Stop();
+            _logger.LogInformation("[TIMING] JSONシリアライゼーション: {ElapsedMs}ms", serializationStopwatch.ElapsedMilliseconds);
             
+            var networkSendStopwatch = Stopwatch.StartNew();
+            await _persistentWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
+            networkSendStopwatch.Stop();
+            _logger.LogInformation("[TIMING] ネットワーク送信: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
+            
+            var networkReceiveStopwatch = Stopwatch.StartNew();
             // レスポンス受信
             var jsonResponse = await _persistentReader!.ReadLineAsync().ConfigureAwait(false);
+            networkReceiveStopwatch.Stop();
+            _logger.LogInformation("[TIMING] ネットワーク受信（Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             
             if (string.IsNullOrEmpty(jsonResponse))
             {
                 throw new InvalidOperationException("サーバーから空のレスポンスを受信しました");
             }
             
+            var deserializationStopwatch = Stopwatch.StartNew();
             var response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse);
+            deserializationStopwatch.Stop();
+            _logger.LogInformation("[TIMING] JSONデシリアライゼーション: {ElapsedMs}ms", deserializationStopwatch.ElapsedMilliseconds);
             
             if (response == null)
             {
                 throw new InvalidOperationException("レスポンスのデシリアライズに失敗しました");
             }
             
+            var resultCreationStopwatch = Stopwatch.StartNew();
+            
+            // エラー時の適切なハンドリング
+            string translatedText;
+            float confidenceScore;
+            bool isSuccess;
+            
+            if (response.success && !string.IsNullOrEmpty(response.translation))
+            {
+                translatedText = response.translation;
+                confidenceScore = response.confidence ?? 0.95f;
+                isSuccess = true;
+            }
+            else
+            {
+                translatedText = "翻訳エラーが発生しました";
+                confidenceScore = 0.0f;
+                isSuccess = false;
+            }
+            
             var result = new TranslationResponse
             {
                 RequestId = request.RequestId,
-                TranslatedText = response.translation ?? string.Empty,
+                TranslatedText = translatedText,
                 SourceText = request.SourceText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
-                ConfidenceScore = response.confidence ?? 0.95f,
+                ConfidenceScore = confidenceScore,
                 EngineName = Name,
-                IsSuccess = response.success
+                IsSuccess = isSuccess
             };
+            resultCreationStopwatch.Stop();
+            _logger.LogInformation("[TIMING] レスポンス生成: {ElapsedMs}ms", resultCreationStopwatch.ElapsedMilliseconds);
+            
+            totalStopwatch.Stop();
+            _logger.LogInformation("[TIMING] 合計処理時間（C#側）: {ElapsedMs}ms", totalStopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("[TIMING] Python側処理時間: {PythonTimeMs}ms", (response.processing_time ?? 0) * 1000);
             
             // 詳細ログ出力
             _logger.LogInformation("翻訳結果詳細 - IsSuccess: {IsSuccess}, Text: '{Text}', Length: {Length}", 
