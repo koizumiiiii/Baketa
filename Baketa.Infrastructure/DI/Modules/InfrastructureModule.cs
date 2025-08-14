@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
@@ -23,10 +24,12 @@ using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.Onnx;
+using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -189,6 +192,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// HuggingFace Transformers OPUS-MT翻訳サービスを登録します。
         /// 語彙サイズ不整合問題を完全解決した高品質版です。
+        /// Issue #147: 接続プール統合による接続ロック競合問題解決
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTransformersOpusMTServices(IServiceCollection services)
@@ -203,12 +207,24 @@ namespace Baketa.Infrastructure.DI.Modules;
                 services.Remove(service);
             }
             
-            // 🚀 Issue #144: OptimizedPythonTranslationEngineを優先エンジンとして登録（500ms目標）
-            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
+            // 🔥 Issue #147: FixedSizeConnectionPoolを登録（Python翻訳エンジン接続プール）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+            Console.WriteLine("🔥 FixedSizeConnectionPool登録完了 - Issue #147 接続プール統合");
+            
+            // 🚀 Issue #147: OptimizedPythonTranslationEngineを優先エンジンとして登録（接続プール統合版）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
+                var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+                var translationSettings = provider.GetRequiredService<IOptions<TranslationSettings>>();
+                logger?.LogInformation("🚀 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版");
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, translationSettings);
+            });
+            
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
             {
                 var logger = provider.GetService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                logger?.LogInformation("🚀 OptimizedPythonTranslationEngine初期化開始 - 500ms目標エンジン");
+                logger?.LogInformation("🔥 OptimizedPythonTranslationEngine（接続プール統合版）をITranslationEngineとして登録");
                 var optimizedEngine = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
                 // OptimizedPythonTranslationEngineは両方のITranslationEngineインターフェースを実装
                 return (Baketa.Core.Abstractions.Translation.ITranslationEngine)optimizedEngine;
@@ -223,8 +239,8 @@ namespace Baketa.Infrastructure.DI.Modules;
                 return new TransformersOpusMtEngine(logger!, settingsService);
             });
             
-            Console.WriteLine($"🚀 OptimizedPythonTranslationEngine（500ms目標）を優先エンジンとして登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
-            Console.WriteLine("⚡ Issue #144: Python翻訳最適化エンジンがアクティブです");
+            Console.WriteLine($"🔥 Issue #147: OptimizedPythonTranslationEngine（接続プール統合版）を優先エンジンとして登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
+            Console.WriteLine("⚡ Issue #147: 接続プール統合による接続ロック競合問題解決完了");
         }
         
         /// <summary>

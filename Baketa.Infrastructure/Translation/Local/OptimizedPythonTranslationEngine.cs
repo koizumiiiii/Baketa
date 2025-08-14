@@ -10,25 +10,26 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Translation.Local;
 
 /// <summary>
 /// 最適化された高速Python翻訳エンジン（目標: 500ms以下）
+/// Issue #147: 接続プール統合により接続ロック競合を解決
 /// </summary>
 public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
-    private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private readonly FixedSizeConnectionPool _connectionPool; // Issue #147: 接続プール統合
+    private readonly TranslationSettings _translationSettings; // Issue #147: 設定管理
     
-    // 永続化サーバー管理
+    // サーバープロセス管理（接続は接続プールが管理）
     private Process? _serverProcess;
-    private TcpClient? _persistentClient;
-    private NetworkStream? _persistentStream;
-    private StreamReader? _persistentReader;
-    private StreamWriter? _persistentWriter;
     
     // パフォーマンス監視
     private readonly ConcurrentDictionary<string, TranslationMetrics> _metricsCache = new();
@@ -38,7 +39,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private const int ServerPort = 5556; // ポート番号を5556に変更
+    private const int ServerPort = 5555; // ポート番号を5555に統一（既存サーバーと一致）
     private const int ConnectionTimeoutMs = 5000;
     private const int StartupTimeoutMs = 30000; // 起動タイムアウトを30秒に短縮
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
@@ -51,9 +52,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     public string Description => "高速化されたPython翻訳エンジン（500ms目標）";
     public bool RequiresNetwork => false;
 
-    public OptimizedPythonTranslationEngine(ILogger<OptimizedPythonTranslationEngine> logger)
+    public OptimizedPythonTranslationEngine(
+        ILogger<OptimizedPythonTranslationEngine> logger,
+        FixedSizeConnectionPool connectionPool,
+        IOptions<TranslationSettings> translationSettings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _connectionPool = connectionPool ?? throw new ArgumentNullException(nameof(connectionPool));
+        _translationSettings = translationSettings?.Value ?? throw new ArgumentNullException(nameof(translationSettings));
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
@@ -88,22 +94,37 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
-            _logger.LogInformation("永続化Pythonサーバー起動開始");
-            
-            // 既存サーバープロセスをクリーンアップ
-            await CleanupExistingProcessesAsync().ConfigureAwait(false);
-            
-            // サーバー起動
-            if (!await StartOptimizedServerAsync().ConfigureAwait(false))
+            // Issue #147: 外部サーバー使用設定の確認
+            if (_translationSettings.UseExternalServer)
             {
-                _logger.LogError("サーバー起動失敗");
-                return false;
+                _logger.LogInformation("外部Pythonサーバー使用モード - プロセス起動をスキップ");
+            }
+            else
+            {
+                _logger.LogInformation("永続化Pythonサーバー起動開始");
+                
+                // 既存サーバープロセスをクリーンアップ
+                await CleanupExistingProcessesAsync().ConfigureAwait(false);
+                
+                // サーバー起動
+                if (!await StartOptimizedServerAsync().ConfigureAwait(false))
+                {
+                    _logger.LogError("サーバー起動失敗");
+                    return false;
+                }
             }
             
-            // 接続確立
-            if (!await EstablishPersistentConnectionAsync().ConfigureAwait(false))
+            // Issue #147: 接続プールによるサーバー接続確認
+            try
             {
-                _logger.LogError("永続接続確立失敗");
+                using var testCts = new CancellationTokenSource(5000); // 5秒タイムアウト
+                var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
+                await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                _logger.LogInformation("接続プール経由でサーバー接続を確認");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "接続プール経由のサーバー接続確認失敗");
                 return false;
             }
             
@@ -167,12 +188,20 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     return false;
                 }
                 
-                // TCP接続テスト
-                if (await TestConnectionAsync().ConfigureAwait(false))
+                // Issue #147: 接続プールによる接続テスト
+                try
                 {
+                    using var testCts = new CancellationTokenSource(3000);
+                    var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
+                    await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                    
                     var elapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
                     _logger.LogInformation("サーバー起動成功 - 起動時間: {ElapsedMs}ms", elapsedMs);
                     return true;
+                }
+                catch
+                {
+                    // 接続テスト失敗 - サーバーがまだ起動していない
                 }
             }
             
@@ -185,45 +214,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
     }
 
-    private async Task<bool> EstablishPersistentConnectionAsync()
-    {
-        try
-        {
-            await _connectionLock.WaitAsync().ConfigureAwait(false);
-            
-            // 既存接続をクローズ
-            DisposePersistentConnection();
-            
-            _persistentClient = new TcpClient();
-            _persistentClient.NoDelay = true; // Nagleアルゴリズム無効化
-            _persistentClient.ReceiveTimeout = 30000;
-            _persistentClient.SendTimeout = 30000;
-            
-            await _persistentClient.ConnectAsync(ServerHost, ServerPort).ConfigureAwait(false);
-            
-            _persistentStream = _persistentClient.GetStream();
-            _persistentReader = new StreamReader(_persistentStream, Encoding.UTF8, false, 4096, true);
-            _persistentWriter = new StreamWriter(_persistentStream, Encoding.UTF8, 4096, true)
-            {
-                AutoFlush = true
-            };
-            
-            // Keep-Alive設定
-            ConfigureKeepAlive(_persistentClient);
-            
-            _logger.LogInformation("永続接続確立成功");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "永続接続確立失敗");
-            return false;
-        }
-        finally
-        {
-            _connectionLock.Release();
-        }
-    }
+    // Issue #147: EstablishPersistentConnectionAsyncメソッドは接続プール統合により削除
+    // 接続管理は FixedSizeConnectionPool が担当
 
     public async Task<TranslationResponse> TranslateAsync(
         TranslationRequest request,
@@ -424,28 +416,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CancellationToken cancellationToken)
     {
         var totalStopwatch = Stopwatch.StartNew();
-        var connectionLockStopwatch = Stopwatch.StartNew();
+        var connectionAcquireStopwatch = Stopwatch.StartNew();
         
-        await _connectionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        connectionLockStopwatch.Stop();
-        _logger.LogInformation("[TIMING] 接続ロック取得: {ElapsedMs}ms", connectionLockStopwatch.ElapsedMilliseconds);
+        // Issue #147: 接続プールから接続を取得（接続ロック競合を解決）
+        var connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+        connectionAcquireStopwatch.Stop();
+        _logger.LogInformation("[TIMING] 接続プール取得: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
         
         try
         {
-            var connectionCheckStopwatch = Stopwatch.StartNew();
-            // 接続確認と再接続
-            if (_persistentWriter == null || _persistentReader == null || 
-                _persistentClient == null || !_persistentClient.Connected)
-            {
-                _logger.LogInformation("永続接続が無効 - 再接続を試行");
-                if (!await EstablishPersistentConnectionAsync().ConfigureAwait(false))
-                {
-                    throw new InvalidOperationException("永続接続の確立に失敗しました");
-                }
-            }
-            connectionCheckStopwatch.Stop();
-            _logger.LogInformation("[TIMING] 接続確認・再接続: {ElapsedMs}ms", connectionCheckStopwatch.ElapsedMilliseconds);
-            
             var serializationStopwatch = Stopwatch.StartNew();
             // リクエスト送信
             var requestData = new
@@ -461,13 +440,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             _logger.LogInformation("[TIMING] JSONシリアライゼーション: {ElapsedMs}ms", serializationStopwatch.ElapsedMilliseconds);
             
             var networkSendStopwatch = Stopwatch.StartNew();
-            await _persistentWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
+            await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
+            await connection.Writer.FlushAsync().ConfigureAwait(false); // 手動フラッシュ
             networkSendStopwatch.Stop();
             _logger.LogInformation("[TIMING] ネットワーク送信: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
             
             var networkReceiveStopwatch = Stopwatch.StartNew();
             // レスポンス受信
-            var jsonResponse = await _persistentReader!.ReadLineAsync().ConfigureAwait(false);
+            var jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
             networkReceiveStopwatch.Stop();
             _logger.LogInformation("[TIMING] ネットワーク受信（Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             
@@ -532,7 +512,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
         finally
         {
-            _connectionLock.Release();
+            // Issue #147: 接続プールに接続を返却
+            await _connectionPool.ReleaseConnectionAsync(connection).ConfigureAwait(false);
         }
     }
 
@@ -544,10 +525,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 await Task.Delay(HealthCheckIntervalMs).ConfigureAwait(false);
                 
-                if (!await TestConnectionAsync().ConfigureAwait(false))
+                // Issue #147: 接続プールのヘルスチェックに委任
+                // 接続プール自体がヘルスチェックを行うため、サーバープロセスの監視に専念
+                if (_serverProcess == null || _serverProcess.HasExited)
                 {
-                    _logger.LogWarning("ヘルスチェック失敗 - 再接続を試行");
-                    await EstablishPersistentConnectionAsync().ConfigureAwait(false);
+                    _logger.LogWarning("サーバープロセス異常終了を検出 - 再起動を試行");
+                    await StartOptimizedServerAsync().ConfigureAwait(false);
                 }
                 
                 // メトリクスログ
@@ -604,19 +587,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
-            using var testClient = new TcpClient();
-            var connectTask = testClient.ConnectAsync(ServerHost, ServerPort);
-            var timeoutTask = Task.Delay(ConnectionTimeoutMs);
-            
-            var completedTask = await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false);
-            
-            if (completedTask == connectTask && testClient.Connected)
-            {
-                testClient.Close();
-                return true;
-            }
-            
-            return false;
+            // Issue #147: 接続プールによる接続テスト
+            using var testCts = new CancellationTokenSource(ConnectionTimeoutMs);
+            var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
+            await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+            return true;
         }
         catch
         {
@@ -639,25 +614,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
     }
 
-    private void DisposePersistentConnection()
-    {
-        try
-        {
-            _persistentWriter?.Dispose();
-            _persistentReader?.Dispose();
-            _persistentStream?.Dispose();
-            _persistentClient?.Dispose();
-            
-            _persistentWriter = null;
-            _persistentReader = null;
-            _persistentStream = null;
-            _persistentClient = null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "永続接続のクリーンアップ中にエラー");
-        }
-    }
+    // Issue #147: DisposePersistentConnectionメソッドは接続プール統合により削除
+    // 接続管理は FixedSizeConnectionPool が担当
 
     private async Task CleanupExistingProcessesAsync()
     {
@@ -728,7 +686,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             _disposed = true;
             
-            DisposePersistentConnection();
+            // Issue #147: 接続プールの破棄は DI コンテナが管理
+            // FixedSizeConnectionPool は IAsyncDisposable として適切に破棄される
             
             if (_serverProcess != null)
             {
@@ -753,7 +712,6 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             }
             
             _serverLock?.Dispose();
-            _connectionLock?.Dispose();
             
             _logger.LogInformation("OptimizedPythonTranslationEngineが破棄されました");
         }
