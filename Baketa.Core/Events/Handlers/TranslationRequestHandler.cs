@@ -83,6 +83,15 @@ public class TranslationRequestHandler(
 
             if (translationResponse == null || !translationResponse.IsSuccess)
             {
+                // 詳細なエラー情報をログ出力
+                var errorDetails = translationResponse == null 
+                    ? "翻訳レスポンスがnull" 
+                    : $"IsSuccess={translationResponse.IsSuccess}, Error={translationResponse.Error?.Message ?? "null"}, ErrorType={translationResponse.Error?.ErrorType}, TranslatedText={translationResponse.TranslatedText ?? "null"}";
+                
+                Console.WriteLine($"🔥 [PHASE_2_3] エラー詳細: {errorDetails}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_errors.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} エラー詳細: {errorDetails}\n");
+                
                 throw new InvalidOperationException($"翻訳処理が失敗しました: {translationResponse?.Error?.Message ?? "不明なエラー"}");
             }
 

@@ -9,6 +9,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Events.EventTypes;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +21,7 @@ namespace Baketa.UI.Services;
 /// </summary>
 public class InPlaceTranslationOverlayManager(
     IEventAggregator eventAggregator,
-    ILogger<InPlaceTranslationOverlayManager> logger) : IInPlaceTranslationOverlayManager, IDisposable
+    ILogger<InPlaceTranslationOverlayManager> logger) : IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IDisposable
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly ILogger<InPlaceTranslationOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -331,6 +332,77 @@ public class InPlaceTranslationOverlayManager(
     /// 現在アクティブなインプレースオーバーレイの数を取得
     /// </summary>
     public int ActiveOverlayCount => _activeOverlays.Count;
+
+    /// <summary>
+    /// イベントプロセッサの優先度
+    /// </summary>
+    public int Priority => 100; // UI関連なので高い優先度
+
+    /// <summary>
+    /// 同期実行フラグ（UIスレッドでの実行が必要なため非同期）
+    /// </summary>
+    public bool SynchronousExecution => false;
+
+    /// <summary>
+    /// OverlayUpdateEventを処理するハンドラ（優先度対応版）
+    /// </summary>
+    public async Task HandleAsync(OverlayUpdateEvent eventData) => await HandleAsync(eventData, CancellationToken.None);
+
+    /// <summary>
+    /// OverlayUpdateEventを処理して翻訳結果をオーバーレイ表示
+    /// </summary>
+    /// <param name="eventData">オーバーレイ更新イベントデータ</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    public async Task HandleAsync(OverlayUpdateEvent eventData, CancellationToken cancellationToken = default)
+    {
+        if (eventData == null)
+        {
+            _logger.LogWarning("OverlayUpdateEvent is null - skipping overlay update");
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine($"🎯 [OVERLAY] オーバーレイ更新処理開始 - Text: '{eventData.Text}', Area: {eventData.DisplayArea}");
+            _logger.LogDebug("OverlayUpdateEvent処理開始 - Text: {Text}, DisplayArea: {Area}", 
+                eventData.Text, eventData.DisplayArea);
+
+            // UIスレッドでオーバーレイ表示処理を実行
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (!_isInitialized)
+                {
+                    Console.WriteLine("⚠️ [OVERLAY] オーバーレイマネージャーが初期化されていません - 初期化を実行");
+                    _logger.LogWarning("オーバーレイマネージャーが初期化されていないため初期化を実行");
+                    await InitializeAsync().ConfigureAwait(false);
+                }
+
+                // オーバーレイ表示のためにTextChunkを作成
+                var textChunk = new TextChunk
+                {
+                    ChunkId = eventData.GetHashCode(), // イベントデータのハッシュをチャンクIDとして使用
+                    TextResults = [], // 空のリスト（OverlayUpdateEventからは個別結果が得られない）
+                    CombinedBounds = eventData.DisplayArea,
+                    CombinedText = eventData.OriginalText ?? eventData.Text, // 元テキストまたは翻訳テキスト
+                    SourceWindowHandle = IntPtr.Zero, // OverlayUpdateEventからは取得できない
+                    DetectedLanguage = eventData.SourceLanguage ?? "en"
+                };
+                
+                // TranslatedTextは分離されたプロパティなので別途設定
+                textChunk.TranslatedText = eventData.Text;
+                
+                await ShowInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
+
+                Console.WriteLine($"✅ [OVERLAY] オーバーレイ表示完了 - ChunkId: {textChunk.ChunkId}");
+                _logger.LogDebug("OverlayUpdateEvent処理完了 - ChunkId: {ChunkId}", textChunk.ChunkId);
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [OVERLAY] オーバーレイ更新処理エラー: {ex.Message}");
+            _logger.LogError(ex, "OverlayUpdateEvent処理中にエラーが発生: {Error}", ex.Message);
+        }
+    }
 
     /// <summary>
     /// リソースを解放

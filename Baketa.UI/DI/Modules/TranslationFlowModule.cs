@@ -1,6 +1,7 @@
 using System;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
+using Baketa.Core.Events.EventTypes;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
@@ -66,6 +67,22 @@ public class TranslationFlowModule : ServiceModuleBase
                 Console.WriteLine("✅ SettingsChangedEvent購読完了");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ SettingsChangedEvent購読完了");
                 logger.LogDebug("✅ SettingsChangedEvent購読完了");
+
+                // OverlayUpdateEventの購読を追加
+                try
+                {
+                    var overlayManager = serviceProvider.GetRequiredService<InPlaceTranslationOverlayManager>();
+                    eventAggregator.Subscribe<OverlayUpdateEvent>(overlayManager);
+                    Console.WriteLine("✅ OverlayUpdateEvent購読完了");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ OverlayUpdateEvent購読完了");
+                    logger.LogDebug("✅ OverlayUpdateEvent購読完了");
+                }
+                catch (Exception overlayEx)
+                {
+                    Console.WriteLine($"⚠️ OverlayUpdateEvent購読失敗: {overlayEx.Message}");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ OverlayUpdateEvent購読失敗: {overlayEx.Message}");
+                    logger.LogWarning(overlayEx, "OverlayUpdateEvent購読失敗");
+                }
 
                 Console.WriteLine("🎉 翻訳フローイベントプロセッサーを正常に登録しました");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎉 翻訳フローイベントプロセッサーを正常に登録しました");
