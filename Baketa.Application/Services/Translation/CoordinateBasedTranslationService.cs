@@ -635,93 +635,69 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _processingFacade.TranslationService?.GetType().Name);
         
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
-        // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
-        if (_processingFacade.TranslationService is TransformersOpusMtEngine transformersEngine)
+        // 🚀 汎用的なITranslationServiceベースのアプローチに変更（OptimizedPythonTranslationEngine対応）
+        var translationService = _processingFacade.TranslationService;
+        if (translationService != null)
         {
-            Console.WriteLine($"🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
-            // 🔥 [FILE_CONFLICT_FIX_19] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🚀 [VERIFICATION] TransformersOpusMtEngine取得成功 - バッチ翻訳検証開始");
+            Console.WriteLine($"🚀 [VERIFICATION] 翻訳サービス取得成功 - バッチ翻訳検証開始: {translationService.GetType().Name}");
+            _logger?.LogDebug("🚀 [VERIFICATION] 翻訳サービス取得成功 - バッチ翻訳検証開始: {ServiceType}", translationService.GetType().Name);
                 
-            // Step 1: リクエストサイズの実測
-            var direction = $"{sourceLanguage.Code}-{targetLanguage.Code}";
-            var request = new { batch_texts = texts, direction };
-            var requestJson = System.Text.Json.JsonSerializer.Serialize(request) + "\n";
-            var requestBytes = System.Text.Encoding.UTF8.GetBytes(requestJson);
+            // 汎用的なバッチ翻訳処理（ITranslationServiceの標準的なアプローチ）
+            Console.WriteLine($"📏 [VERIFICATION] バッチ翻訳開始 - テキスト数: {texts.Count}");
+            _logger?.LogDebug("📏 [VERIFICATION] バッチ翻訳開始 - テキスト数: {Count}", texts.Count);
             
-            Console.WriteLine($"📏 [VERIFICATION] 実際のバッチリクエストサイズ: {requestBytes.Length} bytes");
-            Console.WriteLine($"📄 [VERIFICATION] リクエストJSON preview: {requestJson[..Math.Min(200, requestJson.Length)]}...");
-            // 🔥 [FILE_CONFLICT_FIX_20] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("📏 [VERIFICATION] 実際のバッチリクエストサイズ: {RequestSize} bytes", requestBytes.Length);
-            // 🔥 [FILE_CONFLICT_FIX_21] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("📄 [VERIFICATION] リクエストJSON preview: {JsonPreview}...", 
-                requestJson[..Math.Min(200, requestJson.Length)]);
-            
-            // Step 2: タイムアウト付きバッチ翻訳実行
+            // ITranslationServiceのTranslateBatchAsyncメソッドを使用
             try
             {
-                var method = transformersEngine.GetType().GetMethod("TranslateBatchWithPersistentServerAsync", 
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                Console.WriteLine($"🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
+                _logger?.LogDebug("🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
                 
-                if (method != null)
+                // 10秒タイムアウトを設定
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                
+                var startTime = DateTime.Now;
+                
+                // ITranslationServiceのTranslateBatchAsyncメソッドを使用（文字列リスト）
+                var batchResults = await translationService.TranslateBatchAsync(
+                    texts, 
+                    sourceLanguage, 
+                    targetLanguage, 
+                    null, 
+                    combinedCts.Token).ConfigureAwait(false);
+                
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                
+                Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
+                _logger?.LogDebug("✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {Duration:F0}ms", duration.TotalMilliseconds);
+                
+                // 結果を詳細分析
+                if (batchResults != null && batchResults.Count > 0)
                 {
-                    Console.WriteLine($"🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始");
-                    // 🔥 [FILE_CONFLICT_FIX_22] ファイルアクセス競合回避のためILogger使用
-                    _logger?.LogDebug("🎯 [VERIFICATION] バッチ翻訳メソッド発見 - 10秒タイムアウトで実行開始");
+                    var successCount = batchResults.Count(r => r.IsSuccess);
+                    var translations = batchResults.Select(r => r.TranslatedText ?? "").ToList();
                     
-                    // 10秒タイムアウトを設定
-                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    Console.WriteLine($"🔍 [VERIFICATION] 結果分析: SuccessCount={successCount}/{batchResults.Count}, Translations={translations.Count}");
+                    _logger?.LogDebug("🔍 [VERIFICATION] 結果分析: SuccessCount={SuccessCount}/{TotalCount}, Translations={TranslationCount}", 
+                        successCount, batchResults.Count, translations.Count);
                     
-                    var startTime = DateTime.Now;
-                    var taskResult = method.Invoke(transformersEngine, [texts, direction, combinedCts.Token]);
-                    
-                    if (taskResult is Task task)
+                    if (successCount == batchResults.Count)
                     {
-                        Console.WriteLine($"⏱️ [VERIFICATION] Task実行中 - 開始時刻: {startTime:HH:mm:ss.fff}");
-                        // 🔥 [FILE_CONFLICT_FIX_23] ファイルアクセス競合回避のためILogger使用
-                        _logger?.LogDebug("⏱️ [VERIFICATION] Task実行中 - 開始時刻: {StartTime}", startTime.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture));
-                        
-                        await task.ConfigureAwait(false);
-                        
-                        var endTime = DateTime.Now;
-                        var duration = endTime - startTime;
-                        var batchResult = task.GetType().GetProperty("Result")?.GetValue(task);
-                        
-                        Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
-                        // 🔥 [FILE_CONFLICT_FIX_24] ファイルアクセス競合回避のためILogger使用
-                        _logger?.LogDebug("✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {Duration:F0}ms", duration.TotalMilliseconds);
-                        
-                        // 結果を詳細分析
-                        if (batchResult != null)
-                        {
-                            var successProperty = batchResult.GetType().GetProperty("Success");
-                            var translationsProperty = batchResult.GetType().GetProperty("Translations");
-                            var errorProperty = batchResult.GetType().GetProperty("Error");
-                            
-                            var isSuccess = successProperty?.GetValue(batchResult) as bool? ?? false;
-                            var translations = translationsProperty?.GetValue(batchResult) as IList<string>;
-                            var error = errorProperty?.GetValue(batchResult)?.ToString();
-                            
-                            Console.WriteLine($"🔍 [VERIFICATION] 結果分析: Success={isSuccess}, TranslationCount={translations?.Count ?? 0}, Error={error ?? "None"}");
-                            // 🔥 [FILE_CONFLICT_FIX_25] ファイルアクセス競合回避のためILogger使用
-                            _logger?.LogDebug("🔍 [VERIFICATION] 結果分析: Success={Success}, TranslationCount={Count}, Error={Error}", 
-                                isSuccess, translations?.Count ?? 0, error ?? "None");
-                            
-                            if (isSuccess && translations != null)
-                            {
-                                Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
-                                // 🔥 [FILE_CONFLICT_FIX_26] ファイルアクセス競合回避のためILogger使用
-                                _logger?.LogDebug("🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
-                                return [.. translations];
-                            }
-                            else
-                            {
-                                Console.WriteLine($"❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック");
-                                // 🔥 [FILE_CONFLICT_FIX_27] ファイルアクセス競合回避のためILogger使用
-                                _logger?.LogDebug("❌ [VERIFICATION] バッチ翻訳結果が失敗 - 個別翻訳にフォールバック");
-                            }
-                        }
+                        Console.WriteLine($"🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
+                        _logger?.LogDebug("🎉 [VERIFICATION] バッチ翻訳成功！フォールバックせずに結果を返します");
+                        return translations;
                     }
+                    else
+                    {
+                        Console.WriteLine($"❌ [VERIFICATION] バッチ翻訳の一部が失敗 - 個別翻訳にフォールバック");
+                        _logger?.LogDebug("❌ [VERIFICATION] バッチ翻訳の一部が失敗 - 個別翻訳にフォールバック");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"❌ [VERIFICATION] バッチ翻訳結果が空 - 個別翻訳にフォールバック");
+                    _logger?.LogDebug("❌ [VERIFICATION] バッチ翻訳結果が空 - 個別翻訳にフォールバック");
                 }
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
