@@ -266,7 +266,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
             stream.WriteTimeout = _settings.ConnectionTimeoutMs;
             
             reader = new StreamReader(stream, System.Text.Encoding.UTF8, false, 8192, true);
-            writer = new StreamWriter(stream, System.Text.Encoding.UTF8, 8192, true) 
+            writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false), 8192, true) 
             { 
                 AutoFlush = false // パフォーマンス向上のため手動フラッシュ
             };

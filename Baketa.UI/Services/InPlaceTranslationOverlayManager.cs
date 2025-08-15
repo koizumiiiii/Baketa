@@ -232,17 +232,33 @@ public class InPlaceTranslationOverlayManager(
             overlaysToHide.Add(kvp);
         }
         
+        Console.WriteLine($"🔢 [STOP_DEBUG] 非表示対象オーバーレイ数: {overlaysToHide.Count}");
+        
+        if (overlaysToHide.Count == 0)
+        {
+            Console.WriteLine("⚠️ [STOP_DEBUG] アクティブオーバーレイが存在しません - Stop処理スキップ");
+            return;
+        }
+        
         // すべてのオーバーレイを並行して非表示
         var hideTasks = overlaysToHide.Select(async kvp =>
         {
             try
             {
+                Console.WriteLine($"🎯 [STOP_DEBUG] オーバーレイ非表示開始 - ChunkId: {kvp.Key}");
+                
                 _activeOverlays.TryRemove(kvp.Key, out _);
                 await kvp.Value.HideAsync().ConfigureAwait(false);
+                
+                Console.WriteLine($"✅ [STOP_DEBUG] オーバーレイHide完了 - ChunkId: {kvp.Key}");
+                
                 kvp.Value.Dispose();
+                
+                Console.WriteLine($"🧹 [STOP_DEBUG] オーバーレイDispose完了 - ChunkId: {kvp.Key}");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"❌ [STOP_DEBUG] オーバーレイ非表示エラー - ChunkId: {kvp.Key}, Error: {ex.Message}");
                 _logger.LogError(ex, "インプレースオーバーレイ一括非表示エラー - ChunkId: {ChunkId}", kvp.Key);
             }
         });
@@ -250,6 +266,8 @@ public class InPlaceTranslationOverlayManager(
         await Task.WhenAll(hideTasks).ConfigureAwait(false);
         
         Console.WriteLine($"✅ すべてのインプレースオーバーレイ非表示完了 - 処理済み: {overlaysToHide.Count}");
+        Console.WriteLine($"📊 [STOP_DEBUG] 残存アクティブオーバーレイ数: {_activeOverlays.Count}");
+        
         _logger.LogDebug("すべてのインプレースオーバーレイ非表示完了 - Count: {Count}", overlaysToHide.Count);
     }
 

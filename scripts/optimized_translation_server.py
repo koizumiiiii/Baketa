@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 import argparse
 
 import torch
-from transformers import MarianMTModel, MarianTokenizer
+from transformers import MarianMTModel, MarianTokenizer, AutoModelForSeq2SeqLM, AutoTokenizer
 
 # ロギング設定
 logging.basicConfig(
@@ -68,16 +68,24 @@ class OptimizedTranslationServer:
         self.port = port
         self.models: Dict[str, Tuple[MarianMTModel, MarianTokenizer]] = {}
         self.executor = ThreadPoolExecutor(max_workers=4)
-        self.cache: Dict[str, str] = {}
-        self.max_cache_size = 1000
+        # 🚨 キャッシュを完全無効化 - 汚染問題解決のため
+        # self.cache: Dict[str, str] = {}
+        # self.max_cache_size = 1000
         self.request_count = 0
         self.total_processing_time = 0.0
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
         
+        # 🧹 PyTorチクリーンアップ設定
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        
     def load_models(self):
         """翻訳モデルを事前ロード"""
         logger.info("翻訳モデルをロード中...")
+        logger.info("🚀 MODEL_LOAD_START: モデルロード開始")
         start_time = time.time()
         
         # 日本語→英語モデル
@@ -91,22 +99,39 @@ class OptimizedTranslationServer:
         except Exception as e:
             logger.error(f"日本語→英語モデルのロード失敗: {e}")
             
-        # 英語→日本語モデル
+        # 英語→日本語モデル（NLLB-200に変更 - Helsinki-NLP汚染問題回避）
         try:
-            model_name_en_ja = "Helsinki-NLP/opus-mt-en-jap"
-            tokenizer_en_ja = MarianTokenizer.from_pretrained(model_name_en_ja)
-            model_en_ja = MarianMTModel.from_pretrained(model_name_en_ja).to(self.device)
+            model_name_en_ja = "facebook/nllb-200-distilled-600M"
+            logger.info(f"🔄 [MODEL_UPGRADE] Helsinki-NLP代替: {model_name_en_ja}モデルロード開始")
+            tokenizer_en_ja = AutoTokenizer.from_pretrained(model_name_en_ja)
+            model_en_ja = AutoModelForSeq2SeqLM.from_pretrained(model_name_en_ja).to(self.device)
             model_en_ja.eval()  # 評価モードに設定
             self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
-            logger.info("英語→日本語モデルロード完了")
+            logger.info("✅ 英語→日本語モデル（NLLB-200）ロード完了 - 汚染問題解決")
         except Exception as e:
-            logger.error(f"英語→日本語モデルのロード失敗: {e}")
+            logger.error(f"❌ 英語→日本語モデル（NLLB-200）ロード失敗: {e}")
+            # フォールバックとして従来モデルを試行
+            try:
+                logger.info("🔄 フォールバック: Helsinki-NLPモデルを試行")
+                model_name_en_ja_fallback = "Helsinki-NLP/opus-mt-en-jap"
+                tokenizer_en_ja = MarianTokenizer.from_pretrained(model_name_en_ja_fallback)
+                model_en_ja = MarianMTModel.from_pretrained(model_name_en_ja_fallback).to(self.device)
+                model_en_ja.eval()
+                self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
+                logger.warning("⚠️ フォールバック成功: Helsinki-NLPモデル使用（汚染リスクあり）")
+            except Exception as fallback_error:
+                logger.error(f"❌ フォールバックも失敗: {fallback_error}")
             
         load_time = time.time() - start_time
         logger.info(f"モデルロード完了 - 所要時間: {load_time:.2f}秒")
+        logger.info("🎉 MODEL_LOAD_COMPLETE: モデルロード完了 - 翻訳リクエスト受付開始")
         
         # ウォームアップ（初回推論の遅延を回避）
         self._warmup_models()
+        
+        # 終了シグナル
+        total_time = time.time() - start_time
+        logger.info("🏁 MODEL_READY: すべての初期化完了 - 総時間: {:.2f}秒".format(total_time))
         
     def _warmup_models(self):
         """モデルのウォームアップ"""
@@ -140,9 +165,84 @@ class OptimizedTranslationServer:
             return "en-ja"
         else:
             raise ValueError(f"Unsupported language pair: {source_lang} -> {target_lang}")
+    
+    def _cleanup_model_state_before_request(self, model):
+        """リクエスト前のモデル状態クリーンアップ"""
+        try:
+            # PyTorchメモリクリーンアップ
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+            # モデルを確実に評価モードに設定
+            model.eval()
+            
+            # 勾配計算を無効化（念のため）
+            for param in model.parameters():
+                param.grad = None
+                
+            logger.debug("Pre-request model state cleanup completed")
+            
+        except Exception as e:
+            logger.warning(f"Pre-request cleanup error: {e}")
+    
+    def _cleanup_model_state_after_request(self, model, inputs_tensors=None):
+        """リクエスト後のモデル状態クリーンアップ"""
+        try:
+            # 入力テンソルのメモリ解放
+            if inputs_tensors:
+                for key, tensor in inputs_tensors.items():
+                    if hasattr(tensor, 'data'):
+                        tensor.data = tensor.data.detach()
+                del inputs_tensors
+            
+            # PyTorchキャッシュクリーンアップ
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # ガベージコレクション実行（軽量）
+            import gc
+            gc.collect()
+            
+            logger.debug("Post-request model state cleanup completed")
+            
+        except Exception as e:
+            logger.warning(f"Post-request cleanup error: {e}")
+    
+    async def _force_model_state_reset(self):
+        """強制的なモデル状態完全リセット（接続プール対応）"""
+        try:
+            logger.debug("🔄 FORCE MODEL STATE RESET: 接続プール汚染対策")
+            
+            # すべてのモデルに対して状態リセット実行
+            for model_key, (model, tokenizer) in self.models.items():
+                # モデル評価モード強制設定
+                model.eval()
+                
+                # 勾配情報完全クリア
+                for param in model.parameters():
+                    param.grad = None
+                
+                # モデル内部キャッシュクリア（あれば）
+                if hasattr(model, 'clear_cache'):
+                    model.clear_cache()
+            
+            # PyTorch全体の状態クリア
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+            # 強制ガベージコレクション
+            import gc
+            gc.collect()
+            
+            logger.debug("✅ Force model state reset completed")
+            
+        except Exception as e:
+            logger.error(f"❌ Force model state reset failed: {e}")
             
     def _translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
-        """テキストを翻訳（内部メソッド）"""
+        """テキストを翻訳（内部メソッド）- NLLB-200対応版"""
         model_key = self._get_model_key(source_lang, target_lang)
         
         if model_key not in self.models:
@@ -150,43 +250,86 @@ class OptimizedTranslationServer:
             
         model, tokenizer = self.models[model_key]
         
-        # トークナイズ
-        inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # 🧹 PRE-REQUEST STATE CLEANUP - リクエスト前状態クリーンアップ
+        self._cleanup_model_state_before_request(model)
         
-        # 推論（高速化のためno_gradとhalf精度を使用）
-        with torch.no_grad():
-            if self.device.type == "cuda":
-                with torch.cuda.amp.autocast():
-                    outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
-            else:
-                outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
+        try:
+            # 🆕 NLLB-200モデル判定とBCP-47言語コード使用
+            is_nllb_model = "nllb" in str(type(tokenizer)).lower() or hasattr(tokenizer, 'lang_code_to_id')
+            
+            if is_nllb_model and model_key == "en-ja":
+                # NLLB-200専用処理：BCP-47言語コードを使用
+                logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (eng_Latn -> jpn_Jpan)")
                 
-        # デコード
-        translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # デバッグ: 翻訳結果をログ出力
-        logger.info(f"Translation result: '{translation}' (type: {type(translation)})")
-        logger.info(f"Translation bytes: {translation.encode('utf-8')}")
-        
-        return translation
+                # トークナイズ（NLLB-200は特別な処理が必要）
+                inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                
+                # NLLB-200の場合、target言語のBOSトークンを強制
+                target_lang_bos_id = tokenizer.convert_tokens_to_ids("jpn_Jpan")
+                
+                # 推論実行
+                with torch.no_grad():
+                    if self.device.type == "cuda":
+                        with torch.cuda.amp.autocast():
+                            outputs = model.generate(
+                                **inputs, 
+                                max_length=512, 
+                                num_beams=4,  # NLLB-200では品質向上のためbeam_searchを使用
+                                early_stopping=True,
+                                forced_bos_token_id=target_lang_bos_id
+                            )
+                    else:
+                        outputs = model.generate(
+                            **inputs, 
+                            max_length=512, 
+                            num_beams=4, 
+                            early_stopping=True,
+                            forced_bos_token_id=target_lang_bos_id
+                        )
+                
+                # デコード
+                translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+                logger.info(f"✨ [NLLB-200] 高品質翻訳完了: '{translation[:50]}...'")
+                
+            else:
+                # 従来のMarianMTモデル処理
+                logger.info(f"🔄 [MarianMT] 従来モデル翻訳: '{text[:30]}...'")
+                
+                # トークナイズ
+                inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                
+                # 推論（高速化のためno_gradとhalf精度を使用）
+                with torch.no_grad():
+                    if self.device.type == "cuda":
+                        with torch.cuda.amp.autocast():
+                            outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
+                    else:
+                        outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
+                        
+                # デコード
+                translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # デバッグ: 翻訳結果をログ出力
+            logger.info(f"Translation result: '{translation}' (type: {type(translation)})")
+            logger.info(f"Translation bytes: {translation.encode('utf-8')}")
+            
+            return translation
+            
+        finally:
+            # 🧹 POST-REQUEST STATE CLEANUP - リクエスト後状態クリーンアップ
+            self._cleanup_model_state_after_request(model, inputs if 'inputs' in locals() else None)
         
     async def translate(self, request: TranslationRequest) -> TranslationResponse:
         """非同期翻訳処理"""
         start_time = time.time()
         
         try:
-            # キャッシュチェック
-            cache_key = f"{request.source_lang}:{request.target_lang}:{request.text}"
-            if cache_key in self.cache:
-                processing_time = (time.time() - start_time) * 1000  # ms
-                logger.debug(f"Cache hit for: {request.text[:50]}... ({processing_time:.1f}ms)")
-                return TranslationResponse(
-                    success=True,
-                    translation=self.cache[cache_key],
-                    confidence=0.95,
-                    processing_time=processing_time / 1000.0
-                )
+            # 🚨 キャッシュ機能完全無効化 - 汚染問題根本解決
+            logger.info(f"🚀 [NO_CACHE] キャッシュなし新鮮翻訳実行: '{request.text[:30]}...'")
+            
+            # キャッシュ関連のコードをすべて無効化
                 
             # 翻訳実行（別スレッドで）
             loop = asyncio.get_event_loop()
@@ -198,11 +341,9 @@ class OptimizedTranslationServer:
                 request.target_lang
             )
             
-            # キャッシュ保存
-            if len(self.cache) >= self.max_cache_size:
-                # 最も古いエントリを削除（簡易LRU）
-                self.cache.pop(next(iter(self.cache)))
-            self.cache[cache_key] = translation
+            # ✅ キャッシュ機能完全無効化により汚染問題解決
+            logger.info(f"✅ [TRANSLATION_SUCCESS] 新鮮な翻訳完了: '{request.text[:30]}...' -> '{translation[:30]}...'")
+            
             
             processing_time = (time.time() - start_time) * 1000  # ms
             
@@ -304,31 +445,39 @@ class OptimizedTranslationServer:
             )
 
     def _batch_inference(self, model, tokenizer, inputs):
-        """バッチ推論処理（同期処理でThreadPoolExecutorで実行）"""
-        with torch.no_grad():
-            if self.device.type == "cuda":
-                with torch.cuda.amp.autocast():
+        """バッチ推論処理（同期処理でThreadPoolExecutorで実行）- 状態管理修正版"""
+        # 🧹 PRE-BATCH STATE CLEANUP - バッチ前状態クリーンアップ
+        self._cleanup_model_state_before_request(model)
+        
+        try:
+            with torch.no_grad():
+                if self.device.type == "cuda":
+                    with torch.cuda.amp.autocast():
+                        outputs = model.generate(
+                            **inputs, 
+                            max_length=512, 
+                            num_beams=1, 
+                            early_stopping=True
+                        )
+                else:
                     outputs = model.generate(
                         **inputs, 
                         max_length=512, 
                         num_beams=1, 
                         early_stopping=True
                     )
-            else:
-                outputs = model.generate(
-                    **inputs, 
-                    max_length=512, 
-                    num_beams=1, 
-                    early_stopping=True
-                )
-        
-        # バッチデコード
-        translations = []
-        for output in outputs:
-            translation = tokenizer.decode(output, skip_special_tokens=True)
-            translations.append(translation)
             
-        return translations
+            # バッチデコード
+            translations = []
+            for output in outputs:
+                translation = tokenizer.decode(output, skip_special_tokens=True)
+                translations.append(translation)
+                
+            return translations
+            
+        finally:
+            # 🧹 POST-BATCH STATE CLEANUP - バッチ後状態クリーンアップ
+            self._cleanup_model_state_after_request(model, inputs)
             
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """クライアント接続処理"""
@@ -341,13 +490,29 @@ class OptimizedTranslationServer:
                 data = await reader.readline()
                 if not data:
                     break
+                
+                # 🧹 CRITICAL: 各リクエスト前に完全な状態リセット
+                await self._force_model_state_reset()
                     
                 try:
                     # JSONパース
                     request_data = json.loads(data.decode('utf-8'))
                     
+                    # Pingリクエスト判定（ヘルスチェック用）
+                    if 'ping' in request_data:
+                        ping_response = {
+                            'success': True,
+                            'pong': True,
+                            'status': 'ready',
+                            'processing_time': 0.001
+                        }
+                        response_json = json.dumps(ping_response, ensure_ascii=False) + '\n'
+                        writer.write(response_json.encode('utf-8'))
+                        await writer.drain()
+                        continue
+                    
                     # バッチリクエストかどうか判定
-                    if 'texts' in request_data and request_data.get('batch_mode', False):
+                    elif 'texts' in request_data and request_data.get('batch_mode', False):
                         # バッチ翻訳処理
                         batch_request = BatchTranslationRequest(
                             texts=request_data['texts'],
@@ -440,7 +605,7 @@ class OptimizedTranslationServer:
             await asyncio.sleep(60)  # 1分ごと
             if self.request_count > 0:
                 avg_time = self.total_processing_time / self.request_count
-                logger.info(f"Stats - Requests: {self.request_count}, Avg time: {avg_time:.1f}ms, Cache size: {len(self.cache)}")
+                logger.info(f"Stats - Requests: {self.request_count}, Avg time: {avg_time:.1f}ms, State management: Active")
                 
     def shutdown(self, signum, frame):
         """シャットダウン処理"""
