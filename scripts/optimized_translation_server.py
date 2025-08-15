@@ -99,25 +99,31 @@ class OptimizedTranslationServer:
         except Exception as e:
             logger.error(f"日本語→英語モデルのロード失敗: {e}")
             
-        # 英語→日本語モデル（NLLB-200に変更 - Helsinki-NLP汚染問題回避）
+        # 双方向翻訳用 NLLB-200モデル（英語↔日本語）
         try:
-            model_name_en_ja = "facebook/nllb-200-distilled-600M"
-            logger.info(f"🔄 [MODEL_UPGRADE] Helsinki-NLP代替: {model_name_en_ja}モデルロード開始")
-            tokenizer_en_ja = AutoTokenizer.from_pretrained(model_name_en_ja)
-            model_en_ja = AutoModelForSeq2SeqLM.from_pretrained(model_name_en_ja).to(self.device)
-            model_en_ja.eval()  # 評価モードに設定
-            self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
-            logger.info("✅ 英語→日本語モデル（NLLB-200）ロード完了 - 汚染問題解決")
+            model_name_nllb = "facebook/nllb-200-distilled-600M"
+            logger.info(f"🔄 [MODEL_UPGRADE] 双方向翻訳NLLB-200: {model_name_nllb}モデルロード開始")
+            tokenizer_nllb = AutoTokenizer.from_pretrained(model_name_nllb)
+            model_nllb = AutoModelForSeq2SeqLM.from_pretrained(model_name_nllb).to(self.device)
+            model_nllb.eval()  # 評価モードに設定
+            
+            # 同じNLLBモデルを英語→日本語と日本語→英語の両方向で使用
+            self.models["en-ja"] = (model_nllb, tokenizer_nllb)
+            self.models["ja-en"] = (model_nllb, tokenizer_nllb)
+            logger.info("✅ 双方向翻訳モデル（NLLB-200）ロード完了 - 汚染問題解決")
         except Exception as e:
-            logger.error(f"❌ 英語→日本語モデル（NLLB-200）ロード失敗: {e}")
+            logger.error(f"❌ NLLB-200モデルロード失敗: {e}")
             # フォールバックとして従来モデルを試行
             try:
                 logger.info("🔄 フォールバック: Helsinki-NLPモデルを試行")
+                # 英語→日本語
                 model_name_en_ja_fallback = "Helsinki-NLP/opus-mt-en-jap"
                 tokenizer_en_ja = MarianTokenizer.from_pretrained(model_name_en_ja_fallback)
                 model_en_ja = MarianMTModel.from_pretrained(model_name_en_ja_fallback).to(self.device)
                 model_en_ja.eval()
                 self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
+                
+                # 日本語→英語（既にロード済み）は変更なし
                 logger.warning("⚠️ フォールバック成功: Helsinki-NLPモデル使用（汚染リスクあり）")
             except Exception as fallback_error:
                 logger.error(f"❌ フォールバックも失敗: {fallback_error}")
@@ -257,16 +263,31 @@ class OptimizedTranslationServer:
             # 🆕 NLLB-200モデル判定とBCP-47言語コード使用
             is_nllb_model = "nllb" in str(type(tokenizer)).lower() or hasattr(tokenizer, 'lang_code_to_id')
             
-            if is_nllb_model and model_key == "en-ja":
+            # 🔍 [DEBUG] モデルキーと言語設定をログ出力
+            logger.info(f"🔍 [DEBUG] 翻訳要求 - model_key: '{model_key}', is_nllb_model: {is_nllb_model}, text: '{text[:50]}...'")
+            
+            if is_nllb_model:
                 # NLLB-200専用処理：BCP-47言語コードを使用
-                logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (eng_Latn -> jpn_Jpan)")
+                if model_key == "en-ja":
+                    src_lang_code = "eng_Latn"
+                    target_lang_code = "jpn_Jpan"
+                    logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (eng_Latn -> jpn_Jpan)")
+                elif model_key == "ja-en":
+                    src_lang_code = "jpn_Jpan"
+                    target_lang_code = "eng_Latn"
+                    logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (jpn_Jpan -> eng_Latn)")
+                else:
+                    logger.error(f"🚨 [ERROR] サポートされていないNLLBモデルキー: {model_key}")
+                    raise ValueError(f"Unsupported NLLB model key: {model_key}")
                 
                 # トークナイズ（NLLB-200は特別な処理が必要）
+                # ソース言語を指定してトークナイズ
+                tokenizer.src_lang = src_lang_code
                 inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 
                 # NLLB-200の場合、target言語のBOSトークンを強制
-                target_lang_bos_id = tokenizer.convert_tokens_to_ids("jpn_Jpan")
+                target_lang_bos_id = tokenizer.convert_tokens_to_ids(target_lang_code)
                 
                 # 推論実行
                 with torch.no_grad():
@@ -377,6 +398,9 @@ class OptimizedTranslationServer:
         """バッチ翻訳処理 - 複数テキストを1回のリクエストで効率的に処理"""
         start_time = time.time()
         
+        # 🔍 [DEBUG] 受信した言語設定をログ出力  
+        logger.info(f"🔍 [DEBUG] translate_batch - source_lang: '{request.source_lang}', target_lang: '{request.target_lang}', texts: {len(request.texts)}個")
+        
         try:
             # バッチサイズ制限
             if len(request.texts) > request.max_batch_size:
@@ -384,6 +408,7 @@ class OptimizedTranslationServer:
             
             # モデル取得
             model_key = self._get_model_key(request.source_lang, request.target_lang)
+            logger.info(f"🔍 [DEBUG] 決定されたmodel_key: '{model_key}'")
             if model_key not in self.models:
                 raise ValueError(f"Model not loaded for {model_key}")
                 

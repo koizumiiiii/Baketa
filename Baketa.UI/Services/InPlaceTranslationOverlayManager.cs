@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,6 +98,12 @@ public class InPlaceTranslationOverlayManager(
         // 初期化後にもう一度キャンセレーションチェック
         cancellationToken.ThrowIfCancellationRequested();
 
+        // 🔍 [DISPLAY_DEBUG] オーバーレイ表示直前のテキスト内容をログ出力
+        Console.WriteLine($"🔍 [DISPLAY_DEBUG] ShowInPlaceOverlayAsync - ChunkId: {textChunk.ChunkId}");
+        Console.WriteLine($"🔍 [DISPLAY_DEBUG] CombinedText: '{textChunk.CombinedText}'");
+        Console.WriteLine($"🔍 [DISPLAY_DEBUG] TranslatedText: '{textChunk.TranslatedText}'");
+        Console.WriteLine($"🔍 [DISPLAY_DEBUG] CanShowInPlace: {textChunk.CanShowInPlace()}");
+        
         if (!textChunk.CanShowInPlace())
         {
             _logger.LogWarning("インプレース表示条件を満たしていません: {InPlaceLog}", textChunk.ToInPlaceLogString());
@@ -197,25 +204,6 @@ public class InPlaceTranslationOverlayManager(
         }
     }
 
-    /// <summary>
-    /// 指定されたチャンクのインプレースオーバーレイを非表示
-    /// </summary>
-    public async Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
-    {
-        if (_activeOverlays.TryRemove(chunkId, out var overlay))
-        {
-            try
-            {
-                await overlay.HideAsync(cancellationToken).ConfigureAwait(false);
-                overlay.Dispose();
-                _logger.LogDebug("インプレースオーバーレイ非表示完了 - ChunkId: {ChunkId}", chunkId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "インプレースオーバーレイ非表示エラー - ChunkId: {ChunkId}", chunkId);
-            }
-        }
-    }
 
     /// <summary>
     /// すべてのインプレースオーバーレイを非表示
@@ -352,6 +340,79 @@ public class InPlaceTranslationOverlayManager(
     public int ActiveOverlayCount => _activeOverlays.Count;
 
     /// <summary>
+    /// 指定されたChunkIdのオーバーレイを非表示にする（翻訳完了時の原文非表示用）
+    /// </summary>
+    public async Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (_activeOverlays.TryRemove(chunkId, out var overlay))
+            {
+                _logger.LogDebug("オーバーレイ非表示実行 - ChunkId: {ChunkId}", chunkId);
+                
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    overlay.Hide();
+                    overlay.Dispose();
+                }, DispatcherPriority.Normal, cancellationToken);
+                
+                _logger.LogDebug("オーバーレイ非表示完了 - ChunkId: {ChunkId}", chunkId);
+            }
+            else
+            {
+                _logger.LogDebug("非表示対象オーバーレイが見つかりません - ChunkId: {ChunkId}", chunkId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "オーバーレイ非表示処理エラー - ChunkId: {ChunkId}", chunkId);
+        }
+    }
+
+    /// <summary>
+    /// 指定されたエリア内の既存オーバーレイを非表示にする（翻訳結果表示時の原文非表示用）
+    /// </summary>
+    private async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var overlaysToHide = new List<(int chunkId, InPlaceTranslationOverlayWindow overlay)>();
+            
+            // 同一エリア内の既存オーバーレイを特定（除外ChunkId以外）
+            foreach (var kvp in _activeOverlays)
+            {
+                if (kvp.Key != excludeChunkId)
+                {
+                    // エリアが重複している場合は非表示対象とする
+                    // TODO: より精密な重複判定を実装する場合は、オーバーレイの位置情報を取得
+                    overlaysToHide.Add((kvp.Key, kvp.Value));
+                }
+            }
+            
+            _logger.LogDebug("エリア内オーバーレイ非表示対象: {Count}個 - Area: {Area}", overlaysToHide.Count, area);
+            
+            // 非表示実行
+            foreach (var (chunkId, overlay) in overlaysToHide)
+            {
+                if (_activeOverlays.TryRemove(chunkId, out _))
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        overlay.Hide();
+                        overlay.Dispose();
+                    }, DispatcherPriority.Normal, cancellationToken);
+                    
+                    _logger.LogDebug("エリア内オーバーレイ非表示完了 - ChunkId: {ChunkId}", chunkId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "エリア内オーバーレイ非表示処理エラー - Area: {Area}", area);
+        }
+    }
+
+    /// <summary>
     /// イベントプロセッサの優先度
     /// </summary>
     public int Priority => 100; // UI関連なので高い優先度
@@ -379,10 +440,18 @@ public class InPlaceTranslationOverlayManager(
             return;
         }
 
+        // 🚫 翻訳アプリケーションとして、OCR結果（原文）は表示せず翻訳結果のみ表示
+        if (!eventData.IsTranslationResult)
+        {
+            Console.WriteLine($"🚫 [TRANSLATION_ONLY] OCR結果表示をスキップ - Text: '{eventData.Text}' (翻訳結果のみ表示ポリシー)");
+            _logger.LogDebug("OCR結果表示をスキップ - 翻訳結果のみ表示: Text={Text}", eventData.Text);
+            return;
+        }
+
         try
         {
-            Console.WriteLine($"🎯 [OVERLAY] オーバーレイ更新処理開始 - Text: '{eventData.Text}', Area: {eventData.DisplayArea}");
-            _logger.LogDebug("OverlayUpdateEvent処理開始 - Text: {Text}, DisplayArea: {Area}", 
+            Console.WriteLine($"🎯 [OVERLAY] 翻訳結果オーバーレイ処理開始 - Text: '{eventData.Text}', Area: {eventData.DisplayArea}");
+            _logger.LogDebug("翻訳結果OverlayUpdateEvent処理開始 - Text: {Text}, DisplayArea: {Area}", 
                 eventData.Text, eventData.DisplayArea);
 
             // UIスレッドでオーバーレイ表示処理を実行
@@ -409,6 +478,8 @@ public class InPlaceTranslationOverlayManager(
                 // TranslatedTextは分離されたプロパティなので別途設定
                 textChunk.TranslatedText = eventData.Text;
                 
+                // 🎯 翻訳結果のみ表示（OCR結果は事前にフィルタリング済み）
+                Console.WriteLine($"🎯 [TRANSLATION] 翻訳結果表示 - Area: {eventData.DisplayArea}");
                 await ShowInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
 
                 Console.WriteLine($"✅ [OVERLAY] オーバーレイ表示完了 - ChunkId: {textChunk.ChunkId}");
