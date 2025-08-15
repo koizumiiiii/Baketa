@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Performance;
 using Baketa.Core.Logging;
 using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Infrastructure.OCR.Strategies;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
@@ -207,12 +208,14 @@ public sealed class BatchOcrProcessor(
     IOcrEngine ocrEngine, 
     IPerformanceOrchestrator? performanceOrchestrator = null,
     IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
-    ILogger<BatchOcrProcessor>? logger = null) : IBatchOcrProcessor, IDisposable
+    ILogger<BatchOcrProcessor>? logger = null,
+    OcrRegionGenerator? regionGenerator = null) : IBatchOcrProcessor, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
     private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
     private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
     private readonly ILogger<BatchOcrProcessor>? _logger = logger;
+    private readonly OcrRegionGenerator? _regionGenerator = regionGenerator;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor = new(
         logger as ILogger<CoordinateBasedLineBreakProcessor> ?? 
         Microsoft.Extensions.Logging.Abstractions.NullLogger<CoordinateBasedLineBreakProcessor>.Instance);
@@ -373,7 +376,16 @@ public sealed class BatchOcrProcessor(
                 Core.Performance.MeasurementType.ImageTileGeneration, 
                 $"タイル分割処理 - 画像:{image.Width}x{image.Height}, 目標サイズ:{optimalTileSize}");
                 
-            var tiles = await SplitImageIntoOptimalTilesAsync(image, optimalTileSize).ConfigureAwait(false);
+            // 戦略的タイル生成オプション作成
+            var tileOptions = new TileGenerationOptions
+            {
+                DefaultTileSize = optimalTileSize,
+                EnableDebugCapture = true, // デバッグキャプチャ有効化
+                DebugCapturePath = "E:\\dev\\Baketa\\debug_captures",
+                MaxRegionCount = 20
+            };
+
+            var tiles = await GenerateOcrRegionsAsync(image, tileOptions).ConfigureAwait(false);
             
             var tileResult = tileGenerationMeasurement.Complete();
             Console.WriteLine($"🔥 [STAGE-2] タイル分割完了 - {tileResult.Duration.TotalMilliseconds:F1}ms, {tiles.Count}個のタイル");
@@ -1697,6 +1709,49 @@ public sealed class BatchOcrProcessor(
     /// 画像を最適なタイルサイズに分割
     /// ⚡ Phase 0: OCR並列化のためのタイル分割ロジック
     /// </summary>
+    /// <summary>
+    /// ITileStrategy を使用したOCR領域生成
+    /// SplitImageIntoOptimalTilesAsync の新実装版
+    /// </summary>
+    private async Task<List<ImageTile>> GenerateOcrRegionsAsync(IAdvancedImage image, TileGenerationOptions options)
+    {
+        // OcrRegionGeneratorが利用可能な場合は新戦略を使用
+        if (_regionGenerator != null)
+        {
+            try
+            {
+                _logger?.LogDebug("🎯 OcrRegionGenerator使用による戦略的領域生成開始");
+
+                var regionImages = await _regionGenerator.GenerateRegionImagesAsync(image, options)
+                    .ConfigureAwait(false);
+
+                var tiles = regionImages.Select((pair, index) => new ImageTile
+                {
+                    Image = pair.Image,
+                    Offset = pair.Bounds.Location,
+                    Width = pair.Bounds.Width,
+                    Height = pair.Bounds.Height,
+                    TileIndex = index,
+                    RegionMetadata = pair.Region
+                }).ToList();
+
+                _logger?.LogInformation("✅ 戦略的領域生成完了 - 戦略: {Strategy}, 領域数: {Count}",
+                    _regionGenerator.StrategyName, tiles.Count);
+
+                return tiles;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "⚠️ OcrRegionGenerator失敗、従来ロジックにフォールバック");
+                // 従来ロジックにフォールバック
+            }
+        }
+
+        // フォールバック: 従来の固定グリッド分割
+        return await SplitImageIntoOptimalTilesAsync(image, options.DefaultTileSize)
+            .ConfigureAwait(false);
+    }
+
     private static async Task<List<ImageTile>> SplitImageIntoOptimalTilesAsync(IAdvancedImage image, int optimalTileSize)
     {
         var tiles = new List<ImageTile>();
@@ -1705,6 +1760,9 @@ public sealed class BatchOcrProcessor(
         // 画像サイズがタイルサイズより小さい場合はそのまま使用
         if (image.Width <= optimalTileSize && image.Height <= optimalTileSize)
         {
+            // デバッグキャプチャ: 分割なしの場合でもデバッグ画像を保存
+            await SaveDebugCaptureWithTilesAsync(image, [], "no-split").ConfigureAwait(false);
+            
             return [new ImageTile
             {
                 Image = image,
@@ -1721,6 +1779,9 @@ public sealed class BatchOcrProcessor(
 
         Console.WriteLine($"🔥 [TILE-SPLIT] 実際の画像分割開始 - 元画像: {image.Width}x{image.Height}, タイル: {tilesX}x{tilesY} = {tilesX * tilesY}個");
 
+        // タイル境界線情報を記録
+        var tileRectangles = new List<Rectangle>();
+
         for (var y = 0; y < tilesY; y++)
         {
             for (var x = 0; x < tilesX; x++)
@@ -1732,6 +1793,8 @@ public sealed class BatchOcrProcessor(
 
                 // ⚡ 重要修正: タイムアウト監視付きExtractRegionAsync
                 var tileRectangle = new Rectangle(startX, startY, width, height);
+                tileRectangles.Add(tileRectangle);
+                
                 var extractTimer = Stopwatch.StartNew();
                 Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し開始 - 位置: ({startX},{startY}), サイズ: {width}x{height}");
 
@@ -1758,7 +1821,126 @@ public sealed class BatchOcrProcessor(
         }
 
         Console.WriteLine($"🔥 [TILE-SPLIT] 画像分割完了 - {tiles.Count}個のタイルを作成");
+        
+        // デバッグキャプチャ: タイル分割の可視化画像を保存
+        await SaveDebugCaptureWithTilesAsync(image, tileRectangles, $"split-{tilesX}x{tilesY}").ConfigureAwait(false);
+        
         return tiles;
+    }
+
+    /// <summary>
+    /// デバッグ用にタイル境界線を描画した画像を保存
+    /// </summary>
+    private static async Task SaveDebugCaptureWithTilesAsync(IAdvancedImage image, List<Rectangle> tileRectangles, string suffix)
+    {
+        try
+        {
+            // デバッグキャプチャが有効かチェック
+            var debugCapturePath = "E:\\dev\\Baketa\\debug_captures";
+            if (!System.IO.Directory.Exists(debugCapturePath))
+            {
+                System.IO.Directory.CreateDirectory(debugCapturePath);
+            }
+
+            // 元画像のバイト配列を取得
+            var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
+            
+            // タイムスタンプ付きファイル名を生成
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
+            
+            // 元画像を保存
+            var originalFilename = $"tile-debug-original_{timestamp}_{suffix}_{image.Width}x{image.Height}.png";
+            var originalPath = System.IO.Path.Combine(debugCapturePath, originalFilename);
+            await System.IO.File.WriteAllBytesAsync(originalPath, imageBytes).ConfigureAwait(false);
+
+            // タイル境界線を描画した画像を作成
+            if (tileRectangles.Count > 0)
+            {
+                var annotatedFilename = $"tile-debug-annotated_{timestamp}_{suffix}_{image.Width}x{image.Height}.png";
+                var annotatedPath = System.IO.Path.Combine(debugCapturePath, annotatedFilename);
+                
+                await CreateAnnotatedTileImageAsync(imageBytes, tileRectangles, image.Width, image.Height, annotatedPath).ConfigureAwait(false);
+                
+                Console.WriteLine($"🎯 [DEBUG-CAPTURE] 注釈付き画像保存完了: {annotatedFilename}");
+            }
+            
+            Console.WriteLine($"🎯 [DEBUG-CAPTURE] デバッグ画像保存完了: {originalFilename}");
+            Console.WriteLine($"   - パス: {originalPath}");
+            Console.WriteLine($"   - タイル数: {tileRectangles.Count}");
+            Console.WriteLine($"   - 画像サイズ: {image.Width}x{image.Height}");
+            
+            // ログファイルにも記録
+            var logMessage = $"🎯 [DEBUG-CAPTURE] {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} デバッグ画像保存: {originalFilename}, タイル数: {tileRectangles.Count}";
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", $"{logMessage}{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🚨 [DEBUG-CAPTURE] デバッグ画像保存エラー: {ex.Message}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEBUG-CAPTURE] エラー: {ex.Message}{Environment.NewLine}");
+        }
+    }
+
+    /// <summary>
+    /// タイル境界線を描画した注釈付き画像を作成
+    /// </summary>
+    private static async Task CreateAnnotatedTileImageAsync(byte[] imageBytes, List<Rectangle> tileRectangles, int width, int height, string outputPath)
+    {
+        try
+        {
+            using var memoryStream = new System.IO.MemoryStream(imageBytes);
+            using var originalBitmap = new System.Drawing.Bitmap(memoryStream);
+            using var annotatedBitmap = new System.Drawing.Bitmap(originalBitmap);
+            using var graphics = System.Drawing.Graphics.FromImage(annotatedBitmap);
+            
+            // 高品質な描画設定
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            
+            // タイル境界線を描画（赤色、太い線）
+            using var tilePen = new System.Drawing.Pen(System.Drawing.Color.Red, 3.0f);
+            using var tileDashPen = new System.Drawing.Pen(System.Drawing.Color.Yellow, 2.0f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+            
+            for (int i = 0; i < tileRectangles.Count; i++)
+            {
+                var rect = tileRectangles[i];
+                
+                // タイル境界を赤い実線で描画
+                graphics.DrawRectangle(tilePen, rect);
+                
+                // タイル番号を描画
+                var tileNumberText = $"Tile-{i}";
+                using var font = new System.Drawing.Font("Arial", 16, System.Drawing.FontStyle.Bold);
+                using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Red);
+                using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 255, 255, 255)); // 半透明白
+                
+                var textSize = graphics.MeasureString(tileNumberText, font);
+                var textRect = new System.Drawing.RectangleF(rect.X + 5, rect.Y + 5, textSize.Width + 4, textSize.Height + 2);
+                
+                // 背景を描画
+                graphics.FillRectangle(backgroundBrush, textRect);
+                
+                // テキストを描画
+                graphics.DrawString(tileNumberText, font, brush, rect.X + 7, rect.Y + 6);
+                
+                // タイル情報をコンソールに出力
+                Console.WriteLine($"🎯 [TILE-{i}] 境界: ({rect.X},{rect.Y}) {rect.Width}x{rect.Height}");
+            }
+            
+            // 全体の境界を黄色い破線で描画
+            graphics.DrawRectangle(tileDashPen, 0, 0, width - 1, height - 1);
+            
+            // 注釈付き画像を保存
+            annotatedBitmap.Save(outputPath, System.Drawing.Imaging.ImageFormat.Png);
+            
+            Console.WriteLine($"🎯 [DEBUG-ANNOTATION] タイル境界線描画完了 - {tileRectangles.Count}個のタイル");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🚨 [DEBUG-ANNOTATION] 注釈描画エラー: {ex.Message}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEBUG-ANNOTATION] エラー: {ex.Message}{Environment.NewLine}");
+        }
     }
 
     /// <summary>
@@ -1864,6 +2046,11 @@ internal sealed class ImageTile
     public required int Width { get; init; }
     public required int Height { get; init; }
     public required int TileIndex { get; init; }
+    
+    /// <summary>
+    /// タイル生成戦略からのメタデータ情報
+    /// </summary>
+    public TileRegion? RegionMetadata { get; init; }
 }
 
 /// <summary>

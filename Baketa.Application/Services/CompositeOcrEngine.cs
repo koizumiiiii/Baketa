@@ -218,6 +218,27 @@ public sealed class CompositeOcrEngine(
         GetActiveEngine()?.CancelCurrentOcrTimeout();
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// アクティブなエンジンに委譲
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(image);
+        
+        var activeEngine = GetActiveEngine();
+        if (activeEngine == null)
+        {
+            throw new InvalidOperationException("利用可能なOCRエンジンがありません。InitializeAsync()を先に呼び出してください。");
+        }
+        
+        var engineType = activeEngine == _fastEngine ? "高速エンジン" : "高精度エンジン";
+        _logger.LogDebug("🔍 CompositeOcrEngine: DetectTextRegionsAsync - {EngineType}を使用", engineType);
+        
+        return await activeEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+    }
+
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

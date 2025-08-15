@@ -83,6 +83,15 @@ public class TranslationRequestHandler(
 
             if (translationResponse == null || !translationResponse.IsSuccess)
             {
+                // 詳細なエラー情報をログ出力
+                var errorDetails = translationResponse == null 
+                    ? "翻訳レスポンスがnull" 
+                    : $"IsSuccess={translationResponse.IsSuccess}, Error={translationResponse.Error?.Message ?? "null"}, ErrorType={translationResponse.Error?.ErrorType}, TranslatedText={translationResponse.TranslatedText ?? "null"}";
+                
+                Console.WriteLine($"🔥 [PHASE_2_3] エラー詳細: {errorDetails}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_errors.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} エラー詳細: {errorDetails}\n");
+                
                 throw new InvalidOperationException($"翻訳処理が失敗しました: {translationResponse?.Error?.Message ?? "不明なエラー"}");
             }
 
@@ -96,9 +105,9 @@ public class TranslationRequestHandler(
             
             _logger.LogWarning("プライマリ翻訳が失敗、フォールバック処理を実行中: '{Text}'", eventData.OcrResult.Text);
             
-            // フォールバック戦略: 元のテキストをそのまま返す
+            // フォールバック戦略: 空文字を返して非表示にする（元テキスト表示を防止）
             await Task.Delay(100).ConfigureAwait(false); // 軽微な遅延でリトライ効果
-            return eventData.OcrResult.Text; // 翻訳失敗時は元テキストを返す
+            return string.Empty; // 翻訳失敗時は空文字で非表示
         },
         onError: async (ex) =>
         {

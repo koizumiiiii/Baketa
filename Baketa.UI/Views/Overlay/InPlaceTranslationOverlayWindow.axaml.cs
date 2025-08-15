@@ -122,6 +122,14 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 Width = overlaySize.Width;
                 Height = overlaySize.Height;
                 
+                // 🛡️ [CORRUPTED_TRANSLATION_FILTER] 汚染翻訳とエラーメッセージを完全フィルタリング
+                if (IsCorruptedOrErrorTranslation(textChunk.TranslatedText))
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🛡️ [CORRUPTED_FILTER] 汚染翻訳検出で非表示 - ChunkId: {ChunkId}, Text: '{textChunk.TranslatedText}'");
+                    Hide();
+                    return;
+                }
+                
                 // インプレース表示スタイルを適用（設定画面のフォントサイズを使用）
                 var configuredFontSize = GetConfiguredFontSize();
                 var finalFontSize = configuredFontSize > 0 ? configuredFontSize : optimalFontSize;
@@ -264,6 +272,14 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 [InPlaceTranslationOverlay] インプレース内容更新開始 - ChunkId: {ChunkId}");
                 
+                // 🛡️ [CORRUPTED_TRANSLATION_FILTER] 更新時も汚染翻訳とエラーメッセージを完全フィルタリング
+                if (IsCorruptedOrErrorTranslation(updatedTextChunk.TranslatedText))
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🛡️ [CORRUPTED_FILTER] 汚染翻訳検出で非表示 - ChunkId: {ChunkId}, Text: '{updatedTextChunk.TranslatedText}'");
+                    Hide();
+                    return;
+                }
+                
                 // 新しい翻訳テキストで更新
                 TranslatedText = updatedTextChunk.TranslatedText;
                 
@@ -313,6 +329,63 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         }
     }
 
+    /// <summary>
+    /// 汚染翻訳またはエラーメッセージかどうかを判定
+    /// Helsinki-NLP/opus-mt-en-japモデルの汚染出力を検出
+    /// </summary>
+    private static bool IsCorruptedOrErrorTranslation(string? translatedText)
+    {
+        if (string.IsNullOrEmpty(translatedText))
+            return true;
+            
+        // 既存のエラーメッセージパターン
+        if (translatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase) ||
+            translatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal) ||
+            translatedText.Equals("翻訳エラーが発生しました", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        
+        // 🚨 Helsinki-NLP/opus-mt-en-japモデル汚染パターン検出（厳格化）
+        var corruptedPatterns = new[]
+        {
+            "オベル,",         // "Hello" -> "オベル," の正確な汚染パターン（カンマ含む）
+            "テマ の 子 ら は", // "テマ の 子 ら は 奪 わ れ ず" の正確なパターン
+            "ハマ テ で あ っ た", // "ハマ テ で あ っ た" の正確なパターン
+            "ピハヒロテは",     // "ピハヒロテは" の正確なパターン
+            "マグブキ バス",   // "マグブキ バス" の正確なパターン
+        };
+        
+        // 汚染パターンが含まれているかチェック
+        foreach (var pattern in corruptedPatterns)
+        {
+            if (translatedText.Contains(pattern, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        
+        // 異常な空白文字の連続パターンを検出
+        if (System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"(ぁ|ぃ|ぅ|ぇ|ぉ)\s*\1{3,}"))
+        {
+            return true; // "ぁ ぁ ぁ ぁ ぁ ぁ ぁ" のようなパターン
+        }
+        
+        // 非日本語文字の検出（デバナーガリー文字など）
+        if (System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"[\u0900-\u097F]")) // デバナーガリー文字
+        {
+            return true;
+        }
+        
+        // ランダムな数字や記号のみの文字列（短い文字列は除外）
+        if (translatedText.Length > 5 && System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"^[0-9\s\-\.~\p{P}]+$"))
+        {
+            return true; // "2473~928" のようなパターン（5文字以上のみ）
+        }
+        
+        return false;
+    }
+    
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -335,6 +408,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 {
                     try
                     {
+                        Hide();
                         Close();
                     }
                     catch (Exception ex)

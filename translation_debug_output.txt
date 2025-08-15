@@ -1,0 +1,654 @@
+  å¾©å…ƒå¯¾è±¡ã®ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆã‚’æ±ºå®šã—ã¦ã„ã¾ã™...
+E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚
+E:\dev\Baketa\Baketa.Application\Baketa.Application.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚ [E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj]
+E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚ [E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj]
+E:\dev\Baketa\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚ [E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj]
+  å¾©å…ƒå¯¾è±¡ã®ã™ã¹ã¦ã®ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆã¯æœ€æ–°ã§ã™ã€‚
+E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚
+E:\dev\Baketa\Baketa.Application\Baketa.Application.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚
+E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚
+E:\dev\Baketa\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj : warning NU1603: Baketa.Infrastructure ã¯ Sdcb.PaddleInference.runtime.win64.mkl (>= 3.0.1) ã«ä¾å­˜ã—ã¾ã™ãŒã€Sdcb.PaddleInference.runtime.win64.mkl 3.0.1 ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚ä»£ã‚ã‚Šã« Sdcb.PaddleInference.runtime.win64.mkl 3.1.0.54 ãŒè§£æ±ºã•ã‚Œã¾ã—ãŸã€‚
+  Baketa.Core -> E:\dev\Baketa\Baketa.Core\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Core.dll
+  Baketa.Infrastructure -> E:\dev\Baketa\Baketa.Infrastructure\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.dll
+  0 IID calculations/fetches patched
+  Baketa.Infrastructure.Platform -> E:\dev\Baketa\Baketa.Infrastructure.Platform\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Infrastructure.Platform.dll
+  Baketa.Application -> E:\dev\Baketa\Baketa.Application\bin\Debug\net8.0-windows10.0.19041.0\Baketa.Application.dll
+  Baketa.UI -> E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\Baketa.UI.dll
+[16:06:49.596] ?? Performance Logging System Initialized
+[16:06:49.604] ???  System: Microsoft Windows NT 10.0.26100.0
+[16:06:49.606] ?? Memory: 0MB
+[16:06:49.608] ???  Runtime: 8.0.19
+[16:06:49.610] ?? WorkDir: E:\dev\Baketa
+[16:06:49.612] ?? BaseDir: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+[16:06:49.618] ?? START [OverallProcessing_0001_160649_618] OverallProcessing: ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‹N“®‘S‘Ì
+[16:06:49.619] ?? Baketa.UI.exe ‹N“®ŠJn
+[16:06:49.621] ?? CHECKPOINT [OverallProcessing_0001_160649_618] “ˆêƒƒOƒVƒXƒeƒ€‰Šú‰»Š®—¹ - Elapsed: 2.9ms
+?? DIƒRƒ“ƒeƒi‚Ì‰Šú‰»ŠJn
+?? ConfigureServicesŠJn
+?? ŠÂ‹«: Production
+?? Phase 2-1: Šî”Õƒ‚ƒWƒ…[ƒ‹ŒQ“o˜^ŠJn
+??? CoreŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+? CoreŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹
+?? İ’èƒVƒXƒeƒ€“o˜^ŠJn
+? İ’èƒVƒXƒeƒ€“o˜^Š®—¹
+?? InfrastructureŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+?? ƒXƒeƒBƒbƒL[ROIƒVƒXƒeƒ€“o˜^ŠJn - Issue #143 Week 3
+? IStickyRoiManager“o˜^Š®—¹ - InMemoryÀ‘•
+? StickyRoiEnhancedOcrEngine“o˜^Š®—¹ - ƒfƒRƒŒ[ƒ^[À‘•
+? ƒXƒeƒBƒbƒL[ROIƒVƒXƒeƒ€“o˜^Š®—¹
+?? FixedSizeConnectionPool“o˜^Š®—¹ - Issue #147 Ú‘±ƒv[ƒ‹“‡
+?? Issue #147: OptimizedPythonTranslationEngineiÚ‘±ƒv[ƒ‹“‡”Åj‚ğ—DæƒGƒ“ƒWƒ“‚Æ‚µ‚Ä“o˜^‚µ‚Ü‚µ‚½iíœ‚µ‚½Šù‘¶“o˜^”: 0j
+? Issue #147: Ú‘±ƒv[ƒ‹“‡‚É‚æ‚éÚ‘±ƒƒbƒN‹£‡–â‘è‰ğŒˆŠ®—¹
+?? ƒEƒH[ƒ€ƒAƒbƒvƒT[ƒrƒX“o˜^ŠJn - Issue #143
+? IWarmupService“o˜^Š®—¹
+? WarmupHostedService“o˜^Š®—¹
+?? GPU“‡ƒT[ƒrƒX“o˜^ŠJn - Issue #143 Week 2
+? IOnnxSessionFactory“o˜^Š®—¹ - DI“‡
+? IOnnxModelConfiguration“o˜^Š®—¹ - ƒ‚ƒfƒ‹ŠO•”‰»
+? IPersistentSessionCache“o˜^Š®—¹ - ‰i‘±ƒLƒƒƒbƒVƒ…
+? IGpuOcrEngine“o˜^Š®—¹ - MockÀ‘•
+? GPU“‡ƒT[ƒrƒX“o˜^Š®—¹
+?? “‡ƒpƒtƒH[ƒ}ƒ“ƒXŠÇ—ƒVƒXƒeƒ€“o˜^ŠJn - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator“o˜^Š®—¹ - “‡Å“K‰»ƒVƒXƒeƒ€
+? “‡ƒpƒtƒH[ƒ}ƒ“ƒXŠÇ—ƒVƒXƒeƒ€“o˜^Š®—¹
+? InfrastructureŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹
+??? PlatformŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+?? Windows GPU ƒT[ƒrƒX“o˜^ŠJn - Issue #143
+? WindowsGpuEnvironmentDetector“o˜^Š®—¹
+? WindowsGpuDeviceManager“o˜^Š®—¹
+? WindowsTdrRecoveryManager“o˜^Š®—¹
+? Windows GPU ƒT[ƒrƒX“o˜^Š®—¹
+? PlatformŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹
+?? AdaptiveCaptureŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+?????? AdaptiveCaptureModule.RegisterServices ŒÄ‚Ño‚³‚ê‚Ü‚µ‚½I
+? AdaptiveCaptureŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹
+?? AuthŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+? AuthŠî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹
+?? Šî”Õƒ‚ƒWƒ…[ƒ‹“o˜^Ï‚İ”: 5
+? Phase 2-1: Šî”Õƒ‚ƒWƒ…[ƒ‹ŒQ“o˜^Š®—¹
+?? Phase 2-2: ƒAƒvƒŠƒP[ƒVƒ‡ƒ“E“Áê‹@”\ƒ‚ƒWƒ…[ƒ‹ŒQ“o˜^ŠJn
+?? ApplicationModule“o˜^ŠJn
+?? Windows GPU ƒT[ƒrƒX“o˜^ŠJn - Issue #143
+? WindowsGpuEnvironmentDetector“o˜^Š®—¹
+? WindowsGpuDeviceManager“o˜^Š®—¹
+? WindowsTdrRecoveryManager“o˜^Š®—¹
+? Windows GPU ƒT[ƒrƒX“o˜^Š®—¹
+?? ƒXƒeƒBƒbƒL[ROIƒVƒXƒeƒ€“o˜^ŠJn - Issue #143 Week 3
+? IStickyRoiManager“o˜^Š®—¹ - InMemoryÀ‘•
+? StickyRoiEnhancedOcrEngine“o˜^Š®—¹ - ƒfƒRƒŒ[ƒ^[À‘•
+? ƒXƒeƒBƒbƒL[ROIƒVƒXƒeƒ€“o˜^Š®—¹
+?? FixedSizeConnectionPool“o˜^Š®—¹ - Issue #147 Ú‘±ƒv[ƒ‹“‡
+?? Issue #147: OptimizedPythonTranslationEngineiÚ‘±ƒv[ƒ‹“‡”Åj‚ğ—DæƒGƒ“ƒWƒ“‚Æ‚µ‚Ä“o˜^‚µ‚Ü‚µ‚½iíœ‚µ‚½Šù‘¶“o˜^”: 1j
+? Issue #147: Ú‘±ƒv[ƒ‹“‡‚É‚æ‚éÚ‘±ƒƒbƒN‹£‡–â‘è‰ğŒˆŠ®—¹
+?? ƒEƒH[ƒ€ƒAƒbƒvƒT[ƒrƒX“o˜^ŠJn - Issue #143
+? IWarmupService“o˜^Š®—¹
+? WarmupHostedService“o˜^Š®—¹
+?? GPU“‡ƒT[ƒrƒX“o˜^ŠJn - Issue #143 Week 2
+? IOnnxSessionFactory“o˜^Š®—¹ - DI“‡
+? IOnnxModelConfiguration“o˜^Š®—¹ - ƒ‚ƒfƒ‹ŠO•”‰»
+? IPersistentSessionCache“o˜^Š®—¹ - ‰i‘±ƒLƒƒƒbƒVƒ…
+? IGpuOcrEngine“o˜^Š®—¹ - MockÀ‘•
+? GPU“‡ƒT[ƒrƒX“o˜^Š®—¹
+?? “‡ƒpƒtƒH[ƒ}ƒ“ƒXŠÇ—ƒVƒXƒeƒ€“o˜^ŠJn - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator“o˜^Š®—¹ - “‡Å“K‰»ƒVƒXƒeƒ€
+? “‡ƒpƒtƒH[ƒ}ƒ“ƒXŠÇ—ƒVƒXƒeƒ€“o˜^Š®—¹
+?? Windows GPU ƒT[ƒrƒX“o˜^ŠJn - Issue #143
+? WindowsGpuEnvironmentDetector“o˜^Š®—¹
+? WindowsGpuDeviceManager“o˜^Š®—¹
+? WindowsTdrRecoveryManager“o˜^Š®—¹
+? Windows GPU ƒT[ƒrƒX“o˜^Š®—¹
+?????? AdaptiveCaptureModule.RegisterServices ŒÄ‚Ño‚³‚ê‚Ü‚µ‚½I
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      ƒLƒƒƒvƒ`ƒƒƒT[ƒrƒX“‡ƒ‚ƒWƒ…[ƒ‹“o˜^ŠJn
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      ƒLƒƒƒvƒ`ƒƒƒT[ƒrƒX“‡ƒ‚ƒWƒ…[ƒ‹“o˜^Š®—¹ - AdaptiveCaptureService‚ğƒƒCƒ“‚Æ‚µ‚Äg—p
+?? [DI_DEBUG] StreamingTranslationService“o˜^ŠJn
+? [DI_DEBUG] StreamingTranslationService“o˜^Š®—¹
+?? [DI_DEBUG] OpusMtPrewarmService“o˜^ŠJn
+? [DI_DEBUG] OpusMtPrewarmService“o˜^Š®—¹
+? ApplicationModule“o˜^Š®—¹
+?? [GEMINI] StagedOcrStrategyModule“o˜^ŠJn...
+?? StagedOcrStrategyModule.RegisterServices Às’†I
+? [GEMINI] StagedOcrStrategyModule“o˜^Š®—¹I
+?? [GEMINI] AdvancedCachingModule“o˜^ŠJn...
+?? AdvancedCachingModule.RegisterServices Às’†I
+? IAdvancedOcrCacheService“o˜^Š®—¹
+? Step3: ‚“xƒLƒƒƒbƒVƒ“ƒOí—ª“o˜^Š®—¹
+?? Šú‘ÒŒø‰Ê: ƒLƒƒƒbƒVƒ…ƒqƒbƒg ”ƒ~ƒŠ•b‰“š
+? [GEMINI] AdvancedCachingModule“o˜^Š®—¹I
+?? UIModule“o˜^ŠJn
+? UIModule“o˜^Š®—¹
+??? OverlayUIModule“o˜^ŠJn
+? OverlayUIModule“o˜^Š®—¹
+?? BatchOcrModule“o˜^ŠJn
+? BatchOcrModule“o˜^Š®—¹
+?? OcrProcessingModule“o˜^ŠJn
+? OcrProcessingModule“o˜^Š®—¹
+?? OpenCvProcessingModule“o˜^ŠJn
+? OpenCvProcessingModule“o˜^Š®—¹
+?? PaddleOcrModule“o˜^ŠJn
+?? Step 1: OCRƒGƒ“ƒWƒ“ƒv[ƒ‹‰»ƒVƒXƒeƒ€“o˜^ŠJn
+? IPaddleOcrEngineFactory“o˜^Š®—¹
+? PaddleOcrEnginePoolPolicy“o˜^Š®—¹
+?? Šù‘¶IOcrEngineƒVƒ“ƒOƒ‹ƒgƒ““o˜^‚ğíœ
+? PooledOcrService“o˜^Š®—¹ - IOcrEngine‚ğƒv[ƒ‹‰»À‘•‚É’u‚«Š·‚¦
+? DefaultObjectPoolProvider“o˜^Š®—¹
+?? Step 1: OCRƒGƒ“ƒWƒ“ƒv[ƒ‹‰»ƒVƒXƒeƒ€“o˜^Š®—¹
+?? —\‘zŒø‰Ê: 14-18•b ¨ 5-8•bi•À—ñ‹£‡‰ğÁj
+? PaddleOcrModule“o˜^Š®—¹
+?? ƒAƒ_ƒvƒ^[ƒT[ƒrƒX“o˜^ŠJn
+? ƒAƒ_ƒvƒ^[ƒT[ƒrƒX“o˜^Š®—¹
+?? ƒAƒvƒŠƒP[ƒVƒ‡ƒ“E“Áê‹@”\ƒ‚ƒWƒ…[ƒ‹“o˜^Ï‚İ”: 10
+? Phase 2-2: ƒAƒvƒŠƒP[ƒVƒ‡ƒ“E“Áê‹@”\ƒ‚ƒWƒ…[ƒ‹ŒQ“o˜^Š®—¹
+=== DI Service Registration Debug ===
+ISettingsService registrations count: 1
+  - ServiceType: ISettingsService
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationEngine registrations count: 1
+  - ServiceType: ITranslationEngine
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationService registrations count: 2
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+AccessibilitySettingsViewModel registrations count: 1
+IOcrPreprocessingService registrations count: 2
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: SimpleOcrPreprocessingService
+  - Lifetime: Transient
+  - ImplementationFactory: No
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: Factory
+  - Lifetime: Transient
+  - ImplementationFactory: Yes
+  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)
+=== ViewModel Registration Debug ===
+AccessibilitySettingsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: AccessibilitySettingsViewModel
+LanguagePairsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: LanguagePairsViewModel
+??? ServiceProvider\’zŠJn
+? ServiceProvider\’zŠ®—¹
+?? ReactiveUIİ’èŠJn
+? ReactiveUIİ’èŠ®—¹
+?? OCRƒGƒ“ƒWƒ“–‘O‰Šú‰»ŠJniƒoƒbƒNƒOƒ‰ƒEƒ“ƒhj
+?? OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒvŠJniƒoƒbƒNƒOƒ‰ƒEƒ“ƒhj
+?? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒvŠJn
+?? OCRƒGƒ“ƒWƒ“–‘O‰Šú‰»ŠJn
+[16:06:49.789] ?? CHECKPOINT [OverallProcessing_0001_160649_618] Avalonia ƒAƒvƒŠƒP[ƒVƒ‡ƒ“ŠJn€”õŠ®—¹ - Elapsed: 171.3ms
+[16:06:49.790] ?? Avalonia ƒAƒvƒŠƒP[ƒVƒ‡ƒ“ŠJn
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? TransformersOpusMtEngineƒtƒH[ƒ‹ƒoƒbƒN‰Šú‰»
+?? ObjectPool<IOcrEngine>‰Šú‰»Š®—¹ - ƒv[ƒ‹‰»OCRƒVƒXƒeƒ€ŠJn
+?? OCRƒGƒ“ƒWƒ“ƒT[ƒrƒXæ“¾¬Œ÷ - ‰Šú‰»ŠJn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Services.PooledOcrService[0]
+      ?? PooledOcrService‰Šú‰»Š®—¹ - ƒv[ƒ‹‰»OCRƒT[ƒrƒXŠJn
+? OCRƒGƒ“ƒWƒ“–‘O‰Šú‰»Š®—¹ - ‰Šú‰»ŠÔ: 6ms
+info: Baketa.Infrastructure.Services.Settings.UnifiedSettingsService[0]
+      UnifiedSettingsService‰Šú‰»Š®—¹ - ŠÄ‹ƒfƒBƒŒƒNƒgƒŠ: C:\Users\suke0\.baketa\settings
+?? [DEBUG] TransformersOpusMtEngine‚ÌƒRƒ“ƒXƒgƒ‰ƒNƒ^‚ªŒÄ‚Ño‚³‚ê‚Ü‚µ‚½
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      TransformersOpusMtEngine‚ªì¬‚³‚ê‚Ü‚µ‚½
+?? [DEBUG] TransformersOpusMtEngineİ’èŠ®—¹ - Python: py, ServerScript: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+?? [PREWARM_DEBUG] OpusMtPrewarmServiceì¬Š®—¹
+?? [PYTHON_SERVER] ƒXƒNƒŠƒvƒgƒpƒX: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\..\..\..\..\scripts\opus_mt_persistent_server.py
+?? [PREWARMING] OpusMtPrewarmServiceæ“¾¬Œ÷ - ƒEƒH[ƒ€ƒAƒbƒvŠJn
+info: Baketa.Infrastructure.Translation.Services.OpusMtPrewarmService[0]
+      OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒvƒT[ƒrƒX‚ª‰Šú‰»‚³‚ê‚Ü‚µ‚½
+?? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒv‚ğŠJn‚µ‚Ü‚·...
+info: Baketa.Infrastructure.Translation.Services.OpusMtPrewarmService[0]
+      ?? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒv‚ğŠJn‚µ‚Ü‚·...
+? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒvŠJnŠ®—¹ - ŠJnŠÔ: 14ms
+?? [PREWARMING] ƒtƒF[ƒY0: PythonƒT[ƒo[Šm”FE‹N“®
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      –|–óƒGƒ“ƒWƒ“ OPUS-MT Transformers ‚ğ‰Šú‰»‚µ‚Ä‚¢‚Ü‚·...
+?? [INIT_DEBUG] OPUS-MT Transformers–|–óƒGƒ“ƒWƒ“‚Ì‰Šú‰»ŠJn
+?? [INIT_DEBUG] PythonÀsŠÂ‹«Šm”F: py
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      OPUS-MT Transformers–|–óƒGƒ“ƒWƒ“‚Ì‰Šú‰»ŠJn
+? [PYTHON_SERVER] ƒT[ƒo[‚ÍŠù‚É‹N“®Ï‚İ‚Å‚·
+?? [PREWARMING] ƒtƒF[ƒY1: OPUS-MTƒGƒ“ƒWƒ“‰Šú‰»ŠJn
+? [INIT_DEBUG] Python Launcher“®ìŠm”FŠ®—¹: Python 3.12.7
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      Python Launcher“®ìŠm”FŠ®—¹: Python 3.12.7
+?? [INIT_DEBUG] í’“ƒT[ƒo[ƒXƒNƒŠƒvƒgŠm”F: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+? [INIT_DEBUG] í’“ƒT[ƒo[ƒXƒNƒŠƒvƒgŠm”FŠ®—¹: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+? [INIT_DEBUG] Œy—Ê‰Šú‰»Š®—¹iƒT[ƒo[‹N“®‚Í–|–ó‚ÉÀsj
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      í’“ƒT[ƒo[ƒXƒNƒŠƒvƒgŠm”FŠ®—¹: E:\dev\Baketa\scripts\opus_mt_persistent_server.py
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      Œy—Ê‰Šú‰»Š®—¹ - í’“ƒT[ƒo[‚Í–|–ó‚É‹N“®‚µ‚Ü‚·
+?? [DEBUG] TransformersOpusMtEngine‰Šú‰»Š®—¹i’x‰„ƒT[ƒo[‹N“®j
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      –|–óƒGƒ“ƒWƒ“ OPUS-MT Transformers ‚Ì‰Šú‰»‚ªŠ®—¹‚µ‚Ü‚µ‚½
+?? [DEBUG] TransformersOpusMtEngine‚ÌƒoƒbƒNƒOƒ‰ƒEƒ“ƒh‰Šú‰»Š®—¹
+? [PREWARMING] ƒtƒF[ƒY1Š®—¹: OPUS-MTƒGƒ“ƒWƒ“‰Šú‰»Š®—¹
+?? [PREWARMING] ƒtƒF[ƒY2: ƒeƒXƒg–|–óŠJn
+?? [LANGUAGE_SUPPORT] Œ¾ŒêƒyƒAƒ`ƒFƒbƒN: 'en' ¨ 'ja'
+? [LANGUAGE_SUPPORT] ƒTƒ|[ƒgŒ‹‰Ê: True
+?? [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync ŒÄ‚Ño‚µ - ƒeƒLƒXƒg: 'Hello'
+?? [DEBUG] GetTranslationDirection - İ’è‚©‚ç“Ç‚İ‚İ: Source=en, Target=ja
+?? [DEBUG] GetTranslationDirection - İ’èƒx[ƒX”»’èŒ‹‰Ê: en-ja
+?? [DIRECTION] –|–ó•ûŒü”»’è: en ¨ ja = en-ja
+?? [CACHE_MISS] ƒLƒƒƒbƒVƒ…ƒ~ƒX - V‹K–|–óÀs: 'Hello'
+? [EXTERNAL_TIMEOUT] ŠO•”CancellationTokeng—pŠJn - ƒeƒLƒXƒg: 'Hello'
+? [DEBUG] í’“ƒT[ƒo[–|–ó‚ğs - ƒeƒLƒXƒg: 'Hello'
+? [BOUNDARY-1] Console.WriteLineÀsŠ®—¹
+? [BOUNDARY-3] TranslateWithPersistentServerAsyncŒÄ‚Ño‚µ’¼‘O
+?????? [NEWLINE_DEBUG] TransformersOpusMtEngine.TranslateWithPersistentServerAsync Às’†I??????
+? [SERVER_TRANSLATE] í’“ƒT[ƒo[–|–óŠJn: 'Hello'
+? [SINGLE_TRANSLATE] ’Pˆês–|–óÀs: 'Hello'
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?????? [NEWLINE_DEBUG] TransformersOpusMtEngine ‰üs•¶šˆ—”Å‚ªÀs‚³‚ê‚Ä‚¢‚Ü‚·I ƒeƒLƒXƒg: 'Hello'
+?? [HEALTH_CHECK] s 1/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+info: Baketa.UI.App[1]
+      BaketaƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚ğ‰Šú‰»’†
+?? OnFrameworkInitializationCompletedŠJn
+?? ReactiveUIƒGƒ‰[ƒnƒ“ƒhƒ‰[İ’èŠ®—¹
+??? IClassicDesktopStyleApplicationLifetimeæ“¾¬Œ÷
+?? Program.ServiceProviderŠm”FŠJn
+?? Program.ServiceProviderƒAƒNƒZƒXs
+?? Program.ServiceProvideræ“¾Œ‹‰Ê: not null
+? Program.ServiceProviderŠm”F¬Œ÷
+?? IEventAggregatoræ“¾ŠJn
+? IEventAggregatoræ“¾¬Œ÷: EventAggregator
+?? EventHandlerInitializationServiceÀsŠJn
+info: Baketa.UI.App[0]
+      ? IEventAggregatoræ“¾¬Œ÷: EventAggregator
+?? EventHandlerInitializationService”ñ“¯ŠúÀsŠJn
+?? MainOverlayViewModelæ“¾ŠJn
+?? [DI_DEBUG] EventHandlerInitializationService - EventAggregatoræ“¾
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      ƒCƒxƒ“ƒgƒnƒ“ƒhƒ‰[‰Šú‰»‚ğŠJn‚µ‚Ü‚·
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      EventAggregatoræ“¾¬Œ÷
+?? [DI_DEBUG] EventAggregatorŒ^: Baketa.Core.Events.Implementation.EventAggregator
+?? [DI_DEBUG] EventAggregatorƒnƒbƒVƒ…: 47846228
+?? [DI_DEBUG] EventAggregatorQÆ: Baketa.Core.Events.Implementation.EventAggregator
+? ƒvƒƒZƒbƒT OcrCompletedHandler ‚ğƒCƒxƒ“ƒg OcrCompletedEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+?? [DEBUG] OcrCompletedHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT OcrCompletedHandler ‚ğƒCƒxƒ“ƒg OcrCompletedEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      OcrCompletedHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? OptimizedPythonTranslationEngineiÚ‘±ƒv[ƒ‹“‡”Åj‚ğITranslationEngine‚Æ‚µ‚Ä“o˜^
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      Ú‘±ƒv[ƒ‹‰Šú‰»: Å‘åÚ‘±”=8, Å¬Ú‘±”=1
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? OptimizedPythonTranslationEngine‰Šú‰»ŠJn - Ú‘±ƒv[ƒ‹“‡”Å
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      OptimizedPythonTranslationEngine‰Šú‰» - Python: py, Script: E:\dev\Baketa\scripts\optimized_translation_server.py
+?? [DEBUG] DefaultTranslationServiceì¬ - ƒGƒ“ƒWƒ“”: 1
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      DefaultTranslationServiceì¬ - ƒGƒ“ƒWƒ“”: 1
+?? [DEBUG] “o˜^ƒGƒ“ƒWƒ“: OptimizedPythonTranslation (OptimizedPythonTranslationEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      “o˜^ƒGƒ“ƒWƒ“: OptimizedPythonTranslation (OptimizedPythonTranslationEngine)
+?? [DEBUG] ƒAƒNƒeƒBƒuƒGƒ“ƒWƒ“İ’è: OptimizedPythonTranslation (OptimizedPythonTranslationEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      ƒAƒNƒeƒBƒuƒGƒ“ƒWƒ“İ’è: OptimizedPythonTranslation (OptimizedPythonTranslationEngine)
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      Å¬Ú‘±”(1)‚Ì‰Šú‰»ŠJn
+? ƒvƒƒZƒbƒT TranslationRequestHandler ‚ğƒCƒxƒ“ƒg TranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+?? [DEBUG] TranslationRequestHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationRequestHandler ‚ğƒCƒxƒ“ƒg TranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationRequestHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+? ƒvƒƒZƒbƒT TranslationWithBoundsCompletedHandler ‚ğƒCƒxƒ“ƒg TranslationWithBoundsCompletedEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+?? [“o˜^Šm”F] TranslationWithBoundsCompletedEvent—pƒvƒƒZƒbƒT“o˜^:
+?? [“o˜^Šm”F]   - ƒvƒƒZƒbƒTŒ^: Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationWithBoundsCompletedHandler ‚ğƒCƒxƒ“ƒg TranslationWithBoundsCompletedEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+?? [“o˜^Šm”F]   - ƒCƒxƒ“ƒgŒ^: Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent
+?? [“o˜^Šm”F]   - ƒvƒƒZƒbƒTƒnƒbƒVƒ…: 12558393
+?? [DEBUG] TranslationWithBoundsCompletedHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationWithBoundsCompletedHandler‚ğ“o˜^‚µ‚Ü‚µ‚½
+?? [DEBUG] ƒCƒxƒ“ƒgƒnƒ“ƒhƒ‰[‰Šú‰»‚ªŠ®—¹‚µ‚Ü‚µ‚½
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      ?? ƒCƒxƒ“ƒgƒnƒ“ƒhƒ‰[‰Šú‰»‚ªŠ®—¹‚µ‚Ü‚µ‚½
+?? EventHandlerInitializationServiceÀsŠ®—¹
+? ƒvƒƒZƒbƒT InlineEventProcessor`1 ‚ğƒCƒxƒ“ƒg TranslationStatusChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT InlineEventProcessor`1 ‚ğƒCƒxƒ“ƒg TranslationStatusChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+? ƒvƒƒZƒbƒT InlineEventProcessor`1 ‚ğƒCƒxƒ“ƒg TranslationDisplayVisibilityChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT InlineEventProcessor`1 ‚ğƒCƒxƒ“ƒg TranslationDisplayVisibilityChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+? MainOverlayViewModelæ“¾¬Œ÷: MainOverlayViewModel
+??? MainOverlayViewì¬ŠJn
+info: Baketa.UI.App[0]
+      ? MainOverlayViewModelæ“¾¬Œ÷: MainOverlayViewModel
+?? MainOverlayView‰Šú‰»ŠJn
+?? MainOverlayView - InitializeComponentŠ®—¹
+?? MainOverlayView - IsVisible: False
+?? MainOverlayView - WindowState: Normal
+??? MainOverlayViewì¬Š®—¹ - DataContextİ’èÏ‚İ
+??? desktop.MainWindow‚Éİ’èŠ®—¹
+? MainOverlayView.Show()ÀsŠ®—¹
+?? InPlaceTranslationOverlayManager‰Šú‰»İ’è
+? InPlaceTranslationOverlayManager’x‰„‰Šú‰»İ’èŠ®—¹
+??? ‹ŒƒI[ƒo[ƒŒƒCƒVƒXƒeƒ€‚ÍíœÏ‚İ - ƒCƒ“ƒvƒŒ[ƒXƒVƒXƒeƒ€‚ª©“®‚ÅŠÇ—
+?? TranslationFlowModule‚ÌƒCƒxƒ“ƒgw“Ç‚ğ‰Šú‰»’†
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModule‚ÌƒCƒxƒ“ƒgw“Ç‚ğ‰Šú‰»’†
+?? TranslationFlowModuleƒCƒ“ƒXƒ^ƒ“ƒXì¬Š®—¹
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModuleƒCƒ“ƒXƒ^ƒ“ƒXì¬Š®—¹
+?? InPlaceTranslationOverlayManager”ñ“¯Šú‰Šú‰»ŠJn
+?? TranslationFlowModule‚Ì‰Šú‰»‚ğŠJn
+?? InPlaceTranslationOverlayManager.InitializeAsyncŠJn - _isInitialized: False, _disposed: False
+?? ƒCƒ“ƒvƒŒ[ƒXƒI[ƒo[ƒŒƒCƒ}ƒl[ƒWƒƒ[‰Šú‰»ƒƒbƒNæ“¾AÀÛ‚Ì‰Šú‰»‚ğŠJn
+?? ƒCƒ“ƒvƒŒ[ƒXƒI[ƒo[ƒŒƒCƒ}ƒl[ƒWƒƒ[‰Šú‰»Š®—¹ƒtƒ‰ƒOİ’è
+?? InPlaceTranslationOverlayManager.InitializeAsync³íŠ®—¹
+? InPlaceTranslationOverlayManager‰Šú‰»Š®—¹
+info: Baketa.UI.Services.InPlaceTranslationOverlayManager[0]
+      InPlace translation overlay manager initialized successfully
+?? TranslationFlowEventProcessor‚ğæ“¾’†
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      AdaptiveCaptureService “o˜^Š®—¹
+info: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      AdaptiveCaptureServiceAdapter “o˜^Š®—¹
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      ICaptureService ‚Æ‚µ‚Ä AdaptiveCaptureServiceAdapter ‚ğ“o˜^
+?? [DI_DEBUG] TranslationOrchestrationService FactoryŠJn
+info: Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory[0]
+      ‡Œv 0 ŒÂ‚Ì–|–óƒGƒ“ƒWƒ“‚ª—˜—p‰Â”\‚Å‚·
+?? [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationService‚ğ³‚µ‚­’“ü
+?? [DI_DEBUG] CoordinateBasedTranslationService FactoryŠJn (Phase 2.1XV”Å)
+?? [DI_DEBUG] ITranslationProcessingFacadeæ“¾’†...
+info: Baketa.Infrastructure.OCR.GPU.MockGpuOcrEngine[0]
+      ?? MockGpuOcrEngine‰Šú‰»Š®—¹ - ‰¼‘zGPU‰Á‘¬OCRŠJn
+info: Baketa.Infrastructure.OCR.StickyRoi.InMemoryStickyRoiManager[0]
+      ?? InMemoryStickyRoiManager‰Šú‰»Š®—¹ - ƒXƒeƒBƒbƒL[ROIƒVƒXƒeƒ€ŠJn
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuDeviceManager[0]
+      ?? WindowsGpuDeviceManager‰Šú‰»Š®—¹ - Multi-GPUŠÇ—ŠJn
+info: Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionFactory[0]
+      ?? DefaultOnnxSessionFactory‰Šú‰»Š®—¹ - DI Container“‡
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ??? WindowsTdrRecoveryManager‰Šú‰»Š®—¹ - TDRŠÄ‹ŠJn
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? ƒƒ^ƒf[ƒ^ƒLƒƒƒbƒVƒ…‰Šú‰»Š®—¹ - “Ç‚İ‚İ: 0Œ
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? FileBasedSessionCache‰Šú‰»Š®—¹ - ƒpƒX: C:\Users\suke0\AppData\Local\Baketa\SessionCache
+info: Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator[0]
+      ?? IntegratedPerformanceOrchestrator‰Šú‰»Š®—¹ - “‡Å“K‰»ƒVƒXƒeƒ€ŠJn
+info: Baketa.Infrastructure.Performance.AsyncPerformanceAnalyzer[0]
+      ? AsyncPerformanceAnalyzer initialized for performance monitoring
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ?? TDRŠÄ‹ŠJn
+? [DI_DEBUG] ITranslationProcessingFacadeæ“¾¬Œ÷: TranslationProcessingFacade
+?? [DI_DEBUG] IConfigurationFacadeæ“¾’†...
+? [DI_DEBUG] IConfigurationFacadeæ“¾¬Œ÷: ConfigurationFacade
+?? [DI_DEBUG] IStreamingTranslationServiceæ“¾’†...
+?? [STREAMING] StreamingTranslationService‰Šú‰»Š®—¹
+? [DI_DEBUG] IStreamingTranslationServiceæ“¾¬Œ÷: StreamingTranslationService
+?? [DI_DEBUG] CoordinateBasedTranslationService ƒCƒ“ƒXƒ^ƒ“ƒXì¬ŠJn (Service Locatorœ‹Ï‚İ)
+info: Baketa.Application.Services.Translation.StreamingTranslationService[0]
+      StreamingTranslationService‰Šú‰»Š®—¹
+?? [STREAMING] ƒXƒgƒŠ[ƒ~ƒ“ƒO–|–óƒT[ƒrƒX‚ª—˜—p‰Â”\
+info: Baketa.Infrastructure.Logging.BaketaLogger[0]
+      CoordinateBasedTranslationService: “ˆêİ’èƒT[ƒrƒX’“üŠ®—¹
+? [DI_DEBUG] CoordinateBasedTranslationService ƒCƒ“ƒXƒ^ƒ“ƒXì¬Š®—¹ (Phase 2.1)
+info: Baketa.Application.Services.Translation.CoordinateBasedTranslationService[0]
+      ?? CoordinateBasedTranslationService initialized - Hash: 36482533
+? [DI_DEBUG] CoordinateBasedTranslationServiceæ“¾¬Œ÷: CoordinateBasedTranslationService
+info: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      ?? À•Wƒx[ƒX–|–óƒVƒXƒeƒ€‚ª—˜—p‰Â”\‚Å‚· - À•Wƒx[ƒX–|–ó•\¦‚ª—LŒø
+? TranslationFlowEventProcessoræ“¾¬Œ÷: ƒnƒbƒVƒ…=59907344
+?? ƒCƒxƒ“ƒgw“Ç‚ğŠJn
+? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg StartTranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+? StartTranslationRequestEventw“ÇŠ®—¹
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg StartTranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg StopTranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+? StopTranslationRequestEventw“ÇŠ®—¹
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg StopTranslationRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg ToggleTranslationDisplayRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+? ToggleTranslationDisplayRequestEventw“ÇŠ®—¹
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg ToggleTranslationDisplayRequestEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg SettingsChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½ (Œ»İ‚Ì“o˜^”: 1)
+? SettingsChangedEventw“ÇŠ®—¹
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? ƒvƒƒZƒbƒT TranslationFlowEventProcessor ‚ğƒCƒxƒ“ƒg SettingsChangedEvent ‚É“o˜^‚µ‚Ü‚µ‚½
+?? –|–óƒtƒ[ƒCƒxƒ“ƒgƒvƒƒZƒbƒT[‚ğ³í‚É“o˜^‚µ‚Ü‚µ‚½
+? TranslationFlowModule‰Šú‰»Š®—¹
+info: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? –|–óƒtƒ[ƒCƒxƒ“ƒgƒvƒƒZƒbƒT[‚ğ³í‚É“o˜^‚µ‚Ü‚µ‚½
+?????? OPUS-MT–‘O‹N“®ƒT[ƒrƒXˆ—ŠJn ??????
+info: Baketa.UI.App[0]
+      ? TranslationFlowModule‰Šú‰»Š®—¹
+?? OpusMtPrewarmServiceæ“¾ŠJn
+? OpusMtPrewarmServiceæ“¾¬Œ÷: OpusMtPrewarmService
+?? ƒoƒbƒNƒOƒ‰ƒEƒ“ƒhƒ^ƒXƒNì¬ŠJn
+?? OpusMtPrewarmServiceŠJn—v‹Š®—¹
+info: Baketa.UI.App[0]
+      ?? OpusMtPrewarmServiceŠJn—v‹Š®—¹
+?? prewarmService.StartPrewarmingAsync() ŒÄ‚Ño‚µŠJn
+?? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒv‚ğŠJn‚µ‚Ü‚·...
+? prewarmService.StartPrewarmingAsync() Š®—¹
+info: Baketa.Infrastructure.Translation.Services.OpusMtPrewarmService[0]
+      ?? [PREWARMING] OPUS-MT–‘OƒEƒH[ƒ€ƒAƒbƒv‚ğŠJn‚µ‚Ü‚·...
+?? [PREWARMING] ƒtƒF[ƒY0: PythonƒT[ƒo[Šm”FE‹N“®
+? [PYTHON_SERVER] ƒT[ƒo[‚ÍŠù‚É‹N“®Ï‚İ‚Å‚·
+?? [PREWARMING] ƒtƒF[ƒY1: OPUS-MTƒGƒ“ƒWƒ“‰Šú‰»ŠJn
+? [PREWARMING] ƒtƒF[ƒY1Š®—¹: OPUS-MTƒGƒ“ƒWƒ“‰Šú‰»Š®—¹
+?? [PREWARMING] ƒtƒF[ƒY2: ƒeƒXƒg–|–óŠJn
+?? ƒCƒxƒ“ƒg”­s: ApplicationStartupEvent (ID: d4856442-204c-4c80-84e5-f10e9700858c)
+?? ƒCƒxƒ“ƒg ApplicationStartupEvent ‚ÌƒvƒƒZƒbƒT‚ª“o˜^‚³‚ê‚Ä‚¢‚Ü‚¹‚ñ
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? ƒCƒxƒ“ƒg ApplicationStartupEvent ‚ÌƒvƒƒZƒbƒT‚ª“o˜^‚³‚ê‚Ä‚¢‚Ü‚¹‚ñ
+info: Baketa.UI.App[2]
+      ƒAƒvƒŠƒP[ƒVƒ‡ƒ“‹N“®Š®—¹
+?? [LANGUAGE_SUPPORT] Œ¾ŒêƒyƒAƒ`ƒFƒbƒN: 'en' ¨ 'ja'
+? [LANGUAGE_SUPPORT] ƒTƒ|[ƒgŒ‹‰Ê: True
+?? [DEBUG] TransformersOpusMtEngine.TranslateInternalAsync ŒÄ‚Ño‚µ - ƒeƒLƒXƒg: 'Hello'
+?? [DEBUG] GetTranslationDirection - İ’è‚©‚ç“Ç‚İ‚İ: Source=en, Target=ja
+?? [DEBUG] GetTranslationDirection - İ’èƒx[ƒX”»’èŒ‹‰Ê: en-ja
+?? [DIRECTION] –|–ó•ûŒü”»’è: en ¨ ja = en-ja
+?? [CACHE_MISS] ƒLƒƒƒbƒVƒ…ƒ~ƒX - V‹K–|–óÀs: 'Hello'
+? [EXTERNAL_TIMEOUT] ŠO•”CancellationTokeng—pŠJn - ƒeƒLƒXƒg: 'Hello'
+? [DEBUG] í’“ƒT[ƒo[–|–ó‚ğs - ƒeƒLƒXƒg: 'Hello'
+? [BOUNDARY-1] Console.WriteLineÀsŠ®—¹
+? [BOUNDARY-3] TranslateWithPersistentServerAsyncŒÄ‚Ño‚µ’¼‘O
+?????? [NEWLINE_DEBUG] TransformersOpusMtEngine.TranslateWithPersistentServerAsync Às’†I??????
+? [SERVER_TRANSLATE] í’“ƒT[ƒo[–|–óŠJn: 'Hello'
+? [SINGLE_TRANSLATE] ’Pˆês–|–óÀs: 'Hello'
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?????? [NEWLINE_DEBUG] TransformersOpusMtEngine ‰üs•¶šˆ—”Å‚ªÀs‚³‚ê‚Ä‚¢‚Ü‚·I ƒeƒLƒXƒg: 'Hello'
+?? [HEALTH_CHECK] s 1/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+?? MainOverlayView - OnLoadedŒÄ‚Ño‚µ
+?? MainOverlayView - OnLoadedŒã: IsVisible=True, IsEnabled=True
+?? MainOverlayView - Position: 16, 350, Width: 70, Height: 430
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] s1¸”sA1000msŒã‚ÉƒŠƒgƒ‰ƒC
+?? MainOverlayView - Show()‚ÆActivate()‚ğÀs
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ‰i‘±‰»PythonƒT[ƒo[‹N“®ŠJn
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      PythonƒT[ƒo[ƒvƒƒZƒX‹N“® - PID: 10796
+info: Baketa.Core.Services.EnhancedSettingsService[0]
+      İ’è‚ğÄ“Ç‚İ‚İ‚µ‚Ü‚µ‚½: C:\Users\suke0\AppData\Roaming\Baketa\settings.json
+?? [HEALTH_CHECK] s 2/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+?? [HEALTH_CHECK] s1¸”sA1000msŒã‚ÉƒŠƒgƒ‰ƒC
+fail: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      TCPÚ‘±‚ÌŠm—§‚É¸”s: 471540a6
+      System.Net.Sockets.SocketException (10061): ‘ÎÛ‚ÌƒRƒ“ƒsƒ…[ƒ^[‚É‚æ‚Á‚Ä‹‘”Û‚³‚ê‚½‚½‚ßAÚ‘±‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½B
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Sockets.TcpClient.CompleteConnectAsync(ValueTask task)
+         at Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool.CreateNewConnectionAsync(CancellationToken cancellationToken) in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs:line 260
+warn: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      ‰ŠúÚ‘±‚Ìì¬‚É¸”s: 0
+      System.Net.Sockets.SocketException (10061): ‘ÎÛ‚ÌƒRƒ“ƒsƒ…[ƒ^[‚É‚æ‚Á‚Ä‹‘”Û‚³‚ê‚½‚½‚ßAÚ‘±‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½B
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Sockets.TcpClient.CompleteConnectAsync(ValueTask task)
+         at Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool.CreateNewConnectionAsync(CancellationToken cancellationToken) in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs:line 260
+         at Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool.InitializeMinConnectionsAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs:line 219
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      Å¬Ú‘±”‚Ì‰Šú‰»Š®—¹: 0ŒÂ
+?? [HEALTH_CHECK] s 2/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] s2¸”sA1000msŒã‚ÉƒŠƒgƒ‰ƒC
+?? [HEALTH_CHECK] s 3/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] s2¸”sA1000msŒã‚ÉƒŠƒgƒ‰ƒC
+fail: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      TCPÚ‘±‚ÌŠm—§‚É¸”s: e321e3f2
+      System.Net.Sockets.SocketException (10061): ‘ÎÛ‚ÌƒRƒ“ƒsƒ…[ƒ^[‚É‚æ‚Á‚Ä‹‘”Û‚³‚ê‚½‚½‚ßAÚ‘±‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½B
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Sockets.TcpClient.CompleteConnectAsync(ValueTask task)
+         at Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool.CreateNewConnectionAsync(CancellationToken cancellationToken) in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs:line 260
+?? [HEALTH_CHECK] s 3/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+?? [HEALTH_CHECK] TCPÚ‘±¬Œ÷ - PING‘—M’†
+?? [UNIFIED_TIMEOUT] HealthCheck—pƒ^ƒCƒ€ƒAƒEƒgİ’è: 5000ms (ƒx[ƒX:5000ms + ’Ç‰Á:0ms)
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] ‘SƒŠƒgƒ‰ƒC¸”s - ƒT[ƒo[Ú‘±•s‰Â
+?? [SERVER_TRANSLATE] ƒT[ƒo[Ú‘±¸”s - Ä‹N“®s
+warn: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ƒT[ƒo[‚ÉÚ‘±‚Å‚«‚Ü‚¹‚ñBÄ‹N“®‚ğs‚µ‚Ü‚·
+?? [HEALTH_CHECK] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+fail: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [HEALTH_EXCEPTION] ƒwƒ‹ƒXƒ`ƒFƒbƒN—áŠO: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+      System.IO.IOException: Unable to read data from the transport connection: Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B.
+       ---> System.Net.Sockets.SocketException (10054): Šù‘¶‚ÌÚ‘±‚ÍƒŠƒ‚[ƒg ƒzƒXƒg‚É‹­§“I‚ÉØ’f‚³‚ê‚Ü‚µ‚½B
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Threading.Tasks.ValueTask`1.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+      --- End of stack trace from previous location ---
+         at Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine.CheckServerHealthInternalAsync() in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\TransformersOpusMtEngine.cs:line 728
+?? [HEALTH_CHECK] ‘SƒŠƒgƒ‰ƒC¸”s - ƒT[ƒo[Ú‘±•s‰Â
+?? [SERVER_TRANSLATE] ƒT[ƒo[Ú‘±¸”s - Ä‹N“®s
+warn: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ƒT[ƒo[‚ÉÚ‘±‚Å‚«‚Ü‚¹‚ñBÄ‹N“®‚ğs‚µ‚Ü‚·
+fail: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      TCPÚ‘±‚ÌŠm—§‚É¸”s: ecd71103
+      System.Net.Sockets.SocketException (10061): ‘ÎÛ‚ÌƒRƒ“ƒsƒ…[ƒ^[‚É‚æ‚Á‚Ä‹‘”Û‚³‚ê‚½‚½‚ßAÚ‘±‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½B
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Sockets.TcpClient.CompleteConnectAsync(ValueTask task)
+         at Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool.CreateNewConnectionAsync(CancellationToken cancellationToken) in E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs:line 260
+fail: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ƒT[ƒo[ƒvƒƒZƒX‚ªˆÙíI—¹ - ExitCode: -1
+fail: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ƒT[ƒo[‹N“®¸”s
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ƒoƒbƒNƒOƒ‰ƒEƒ“ƒh‰Šú‰»Š®—¹
+?? [SERVER_DEBUG] í’“PythonƒT[ƒo[‹N“®ŠJn
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      í’“PythonƒT[ƒo[‚ğ‹N“®’†...
+?? [SERVER_DEBUG] ƒT[ƒo[‹N“®ƒRƒ}ƒ“ƒh: powershell.exe -Command "py 'E:\dev\Baketa\scripts\opus_mt_persistent_server.py'"
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ?? [SERVER_DEBUG] ƒT[ƒo[‹N“®ƒRƒ}ƒ“ƒh: powershell.exe -Command "py 'E:\dev\Baketa\scripts\opus_mt_persistent_server.py'"
+?? [SERVER_DEBUG] ƒT[ƒo[ƒvƒƒZƒX‹N“® - PID: 5508
+info: Baketa.Infrastructure.Translation.Local.TransformersOpusMtEngine[0]
+      ƒT[ƒo[ƒvƒƒZƒX‹N“® - PID: 5508
+?? [SERVER_DEBUG] ƒT[ƒo[‹N“®‘Ò‹@ŠJn - Å‘å60•b
+?? [SERVER_DEBUG] ƒT[ƒo[Ú‘±s’†... Œo‰ßŠÔ: 5.0•b
+?? [HEALTH_CHECK] s 1/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+[PYTHON_STDERR] ?? [16:07:06] Baketa OPUS-MT Persistent Server starting...
+[PYTHON_STDERR] ?? [16:07:06] Loading tokenizer for ja-en (Helsinki-NLP/opus-mt-ja-en)...
+[PYTHON_STDERR] ?? [16:07:06] Loading model for ja-en (Helsinki-NLP/opus-mt-ja-en)...
+? [HEALTH_CHECK] Ú‘±¸”s - client.Connected = false
+?? [HEALTH_CHECK] s1¸”sA1000msŒã‚ÉƒŠƒgƒ‰ƒC
+?? [HEALTH_CHECK] s 2/3 - ƒT[ƒo[Ú‘±Šm”F’†...
+?? [HEALTH_CHECK] ƒT[ƒo[Ú‘±s - 127.0.0.1:7860
+?? [KEEP_ALIVE] Keep-Aliveİ’èŠ®—¹ - ƒAƒCƒhƒ‹ŠÔ: 7200•b, ‘—MŠÔŠu: 1•b, Äs: 9‰ñ
+[PYTHON_STDERR] ? [16:07:08] Model ja-en loaded successfully!
+[PYTHON_STDERR] ?? [16:07:08] Loading tokenizer for en-ja (Helsinki-NLP/opus-mt-en-jap)...

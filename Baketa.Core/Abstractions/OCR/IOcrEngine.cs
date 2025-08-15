@@ -572,6 +572,17 @@ public interface IOcrEngine : IDisposable
     /// 翻訳結果が表示された際に呼び出されます
     /// </summary>
     void CancelCurrentOcrTimeout();
+    
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// AdaptiveTileStrategy等での高速テキスト領域検出用
+    /// </summary>
+    /// <param name="image">画像</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>検出されたテキスト領域（テキスト内容は空またはダミー）</returns>
+    Task<OcrResults> DetectTextRegionsAsync(
+        IImage image,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

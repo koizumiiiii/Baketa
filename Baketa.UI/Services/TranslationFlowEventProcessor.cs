@@ -265,7 +265,11 @@ public class TranslationFlowEventProcessor :
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
-            // 2. 古いオーバーレイは削除済み（ARシステムが自動で管理）
+            // 2. 🚨 [STOP_FIX] すべてのインプレースオーバーレイを非表示
+            Console.WriteLine("🛑 [Stop機能] すべてのインプレースオーバーレイを非表示中...");
+            await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+            Console.WriteLine("✅ [Stop機能] すべてのインプレースオーバーレイ非表示完了");
+            _logger.LogInformation("🚀 Stop機能: すべてのインプレースオーバーレイ非表示完了");
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
