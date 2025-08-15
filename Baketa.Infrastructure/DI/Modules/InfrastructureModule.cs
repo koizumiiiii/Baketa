@@ -65,6 +65,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
             
+            // Phase 5: ポート競合防止機構サービス
+            RegisterPortManagementServices(services);
+            
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
             
@@ -125,9 +128,24 @@ namespace Baketa.Infrastructure.DI.Modules;
         }
         
         /// <summary>
-        /// 翻訳サービスを登録します。
+        /// Phase 5: ポート競合防止機構サービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
+        private static void RegisterPortManagementServices(IServiceCollection services)
+        {
+            Console.WriteLine("🚀 Issue #147 Phase 5: ポート競合防止機構サービス登録開始");
+            
+            // ポート管理サービス（Singleton: グローバルMutex管理）
+            services.AddSingleton<IPortManagementService, Baketa.Infrastructure.Translation.Services.PortManagementService>();
+            Console.WriteLine("✅ PortManagementService登録完了 - Mutexプロセス間競合防止");
+            
+            // Pythonサーバー管理サービス（Singleton: ヘルスチェック機能付き）
+            services.AddSingleton<IPythonServerManager, Baketa.Infrastructure.Translation.Services.PythonServerManager>();
+            Console.WriteLine("✅ PythonServerManager登録完了 - 動的ポート管理・自動復旧");
+            
+            Console.WriteLine("🎉 Phase 5: ポート競合防止機構サービス登録完了");
+        }
+        
         /// <summary>
         /// 翻訳サービスを登録します。
         /// </summary>
