@@ -180,7 +180,6 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         _output.WriteLine($"🔢 初期メトリクス - Active: {initialMetrics.ActiveConnections}, Total: {initialMetrics.TotalConnectionsCreated}");
 
         // 複数の接続取得・返却をシミュレート
-        var metricsHistory = new List<ConnectionPoolMetrics>();
         const int operationCount = 3;
 
         for (int i = 0; i < operationCount; i++)
@@ -191,13 +190,11 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
                 var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
                 
                 var acquireMetrics = connectionPool.GetMetrics();
-                metricsHistory.Add(acquireMetrics);
                 _output.WriteLine($"🔗 接続取得 {i+1} - Active: {acquireMetrics.ActiveConnections}, Total: {acquireMetrics.TotalConnectionsCreated}");
 
                 await connectionPool.ReleaseConnectionAsync(connection);
                 
                 var releaseMetrics = connectionPool.GetMetrics();
-                metricsHistory.Add(releaseMetrics);
                 _output.WriteLine($"🔓 接続返却 {i+1} - Active: {releaseMetrics.ActiveConnections}, Available: {releaseMetrics.AvailableConnections}");
             }
             catch (Exception ex)
