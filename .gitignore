@@ -664,3 +664,13 @@ BaketaCaptureNative/*.sln.docstates
 !BaketaCaptureNative/*.vcxproj.filters
 !BaketaCaptureNative/*.sln
 !BaketaCaptureNative/CMakeLists.txt
+
+# Issue #147 Debug files (temporary development artifacts)
+debug_*.txt
+debug_*.py
+test_*.py
+verify_*.py
+simple_*.py
+debug_captures/
+TestDirect/
+nul
