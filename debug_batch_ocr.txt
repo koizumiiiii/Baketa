@@ -1,5 +1,12 @@
-2025-08-14 21:05:52.260 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
-2025-08-14 21:05:52.261 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
-2025-08-14 21:05:52.262 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 21:05:52.260
-2025-08-14 21:05:52.267 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
-🎯 [DEBUG-CAPTURE] 2025-08-14 21:05:52.464 デバッグ画像保存: tile-debug-original_2025-08-14_21-05-52-345_split-3x2_2560x1080.png, タイル数: 6
+2025-08-15 16:57:12.937 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-15 16:57:12.939 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-15 16:57:12.939 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 16:57:12.937
+2025-08-15 16:57:12.944 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-15 16:57:20.290 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 7348.3037ms, 成功: True
+2025-08-15 16:57:20.292 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=5
+2025-08-15 16:57:42.817 🔍 [BATCH-DEBUG] _performanceAnalyzer != null: True
+2025-08-15 16:57:42.818 🔍 [BATCH-DEBUG] _performanceAnalyzer型: AsyncPerformanceAnalyzer
+2025-08-15 16:57:42.819 🔍 [BATCH-DEBUG] ProcessBatchAsync呼び出し開始 - 16:57:42.817
+2025-08-15 16:57:42.819 🔥 [STAGE-0] ProcessBatchInternalAsync開始 - 画像: 2560x1080
+2025-08-15 16:57:45.358 📊 BatchOcr パフォーマンス測定完了 - 実行時間: 2538.3996ms, 成功: True
+2025-08-15 16:57:45.360 🔍 [BATCH-DEBUG] measurement.IsSuccessful=True, batchResult.Count=6

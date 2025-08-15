@@ -51,7 +51,9 @@ public class TranslationWithBoundsCompletedHandler(
                 text: eventData.TranslatedText,
                 displayArea: eventData.Bounds,
                 originalText: eventData.SourceText,
-                sourceLanguage: eventData.SourceLanguage);
+                sourceLanguage: eventData.SourceLanguage,
+                targetLanguage: eventData.TargetLanguage,
+                isTranslationResult: true);
                 
             await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);
 

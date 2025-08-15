@@ -25,7 +25,7 @@ public sealed class LanguageConfiguration
     /// <summary>
     /// デフォルトのターゲット言語
     /// </summary>
-    public string DefaultTargetLanguage { get; set; } = "ja";
+    public string DefaultTargetLanguage { get; set; } = "en";
 
     /// <summary>
     /// 中国語変種の自動検出を有効にするかどうか
@@ -439,7 +439,7 @@ public sealed class LanguageConfiguration
         SupportedLanguages.Clear();
         SupportedLanguages.AddRange(GetDefaultSupportedLanguages());
         DefaultSourceLanguage = "auto";
-        DefaultTargetLanguage = "ja";
+        DefaultTargetLanguage = "en";
         EnableChineseVariantAutoDetection = true;
         EnableLanguageDetection = true;
     }

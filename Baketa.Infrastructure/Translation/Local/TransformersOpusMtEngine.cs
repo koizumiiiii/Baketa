@@ -1582,62 +1582,41 @@ Console.WriteLine($"⚡ [EXTERNAL_TOKEN_BATCH] 外部CancellationTokenでバッ�
     }
     
     /// <summary>
-    /// 🌍 言語ペアから適切な翻訳方向を判定
+    /// 🌍 実際の言語パラメータに基づく翻訳方向を判定（動的言語検出対応）
     /// </summary>
-    /// <param name="sourceLanguage">ソース言語</param>
-    /// <param name="targetLanguage">ターゲット言語</param>
+    /// <param name="sourceLanguage">実際のソース言語</param>
+    /// <param name="targetLanguage">実際のターゲット言語</param>
     /// <returns>翻訳方向 ("ja-en" または "en-ja")</returns>
     private string GetTranslationDirection(Language sourceLanguage, Language targetLanguage)
     {
         try
         {
-            // 🚀 [修正] 設定サービスから言語設定を取得（エラーハンドリング付き）
-            var translationSettings = _settingsService.GetTranslationSettings();
+            Console.WriteLine($"🔍 [DYNAMIC_LANG] GetTranslationDirection - 実際の言語パラメータ: Source={sourceLanguage.Code}, Target={targetLanguage.Code}");
             
-            // 設定から言語コードを取得
-            var defaultSourceLang = translationSettings.DefaultSourceLanguage;
-            var defaultTargetLang = translationSettings.DefaultTargetLanguage;
-            
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定から読み込み: Source={defaultSourceLang}, Target={defaultTargetLang}");
-            
-            // 設定に基づいた言語方向の決定
-            if (string.Equals(defaultSourceLang, "en", StringComparison.OrdinalIgnoreCase) && 
-                string.Equals(defaultTargetLang, "ja", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: en-ja");
-                return "en-ja";
-            }
-            else if (string.Equals(defaultSourceLang, "ja", StringComparison.OrdinalIgnoreCase) && 
-                     string.Equals(defaultTargetLang, "en", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 設定ベース判定結果: ja-en");
-                return "ja-en";
-            }
-            
-            // 最終フォールバック: 設定に基づくデフォルト
-            var fallbackDirection = $"{defaultSourceLang}-{defaultTargetLang}";
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - 最終フォールバック: {fallbackDirection}");
-            return fallbackDirection;
-        }
-        catch (Exception ex)
-        {
-            // 設定読み込みエラー時はパラメータから判定（従来ロジック）
-            Console.WriteLine($"⚠️ [WARNING] GetTranslationDirection - 設定読み込みエラー: {ex.Message}");
-            _logger?.LogWarning(ex, "設定から言語方向を取得できませんでした。パラメータから判定します。");
-            
+            // 🔥 [ROOT_CAUSE_FIX] 実際の言語パラメータに基づく翻訳方向判定
             if (sourceLanguage.Equals(Language.Japanese) && targetLanguage.Equals(Language.English))
             {
-                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: ja-en");
+                Console.WriteLine($"🔍 [DYNAMIC_LANG] 日本語→英語翻訳方向: ja-en");
                 return "ja-en";
             }
             else if (sourceLanguage.Equals(Language.English) && targetLanguage.Equals(Language.Japanese))
             {
-                Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - パラメータベース判定結果: en-ja");
+                Console.WriteLine($"🔍 [DYNAMIC_LANG] 英語→日本語翻訳方向: en-ja");
                 return "en-ja";
             }
             
+            // 他の言語ペア（将来拡張用）
+            var direction = $"{sourceLanguage.Code.ToLowerInvariant()}-{targetLanguage.Code.ToLowerInvariant()}";
+            Console.WriteLine($"🔍 [DYNAMIC_LANG] 汎用翻訳方向: {direction}");
+            return direction;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ [WARNING] GetTranslationDirection - 言語判定エラー: {ex.Message}");
+            _logger?.LogWarning(ex, "言語方向判定でエラーが発生しました。デフォルトを使用します。");
+            
             // デフォルト（English to Japanese）
-            Console.WriteLine($"🔍 [DEBUG] GetTranslationDirection - デフォルト判定結果: en-ja");
+            Console.WriteLine($"🔍 [DYNAMIC_LANG] エラー時デフォルト: en-ja");
             return "en-ja";
         }
     }

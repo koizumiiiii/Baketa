@@ -20,7 +20,8 @@ public class OverlayUpdateEvent(
         Rectangle displayArea,
         string? originalText = null,
         string? sourceLanguage = null,
-        string? targetLanguage = null) : EventBase
+        string? targetLanguage = null,
+        bool isTranslationResult = false) : EventBase
     {
     /// <summary>
     /// 更新されたテキスト
@@ -46,6 +47,11 @@ public class OverlayUpdateEvent(
     /// 翻訳先言語
     /// </summary>
     public string? TargetLanguage { get; } = targetLanguage ?? string.Empty;
+
+    /// <summary>
+    /// 翻訳結果かどうか（falseの場合はOCR結果）
+    /// </summary>
+    public bool IsTranslationResult { get; } = isTranslationResult;
 
     /// <inheritdoc />
     public override string Name => "OverlayUpdate";

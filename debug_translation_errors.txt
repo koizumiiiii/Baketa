@@ -1,21 +1,50 @@
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:37.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:39.705 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:16:52.778 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:17:05.867 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:19:28.446 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:19:30.491 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:21:40.363 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:23:37.682 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:38:41.444 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:44:54.364 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 16:47:21.664 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 18:40:12.571 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 18:40:13.474 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 19:34:51.753 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
-2025-08-14 19:48:55.357 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+
+2025-08-15 16:55:32.915 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.021 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.122 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.220 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.325 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.435 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.545 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.647 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.745 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.840 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:33.933 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.032 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.137 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.253 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.356 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.451 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.556 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.651 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.746 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.851 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:34.958 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.050 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.148 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.252 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.348 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.449 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.563 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.671 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.778 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:35.881 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:55:37.437 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.438 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.551 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.676 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.768 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.858 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:20.943 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:21.034 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:21.130 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:45.499 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:45.608 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:45.802 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:45.943 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.141 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.312 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.491 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.666 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.807 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
+2025-08-15 16:57:46.976 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=言語ペア en-en はサポートされていません
