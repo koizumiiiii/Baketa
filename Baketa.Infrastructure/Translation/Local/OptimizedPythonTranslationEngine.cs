@@ -12,6 +12,7 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
+using Baketa.Infrastructure.Translation.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +20,7 @@ namespace Baketa.Infrastructure.Translation.Local;
 
 /// <summary>
 /// 最適化された高速Python翻訳エンジン（目標: 500ms以下）
-/// Issue #147: 接続プール統合により接続ロック競合を解決
+/// Issue #147 Phase 5: 動的ポート対応とサーバー管理統合
 /// </summary>
 public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
@@ -27,9 +28,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly SemaphoreSlim _serverLock = new(1, 1);
     private readonly FixedSizeConnectionPool _connectionPool; // Issue #147: 接続プール統合
     private readonly TranslationSettings _translationSettings; // Issue #147: 設定管理
+    private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     
-    // サーバープロセス管理（接続は接続プールが管理）
+    // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
+    private IPythonServerInfo? _managedServerInstance;
     
     // パフォーマンス監視
     // 🚨 CACHE_DISABLED: キャッシュ汚染問題根本解決のためキャッシュ機能完全無効化
@@ -61,11 +64,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     public OptimizedPythonTranslationEngine(
         ILogger<OptimizedPythonTranslationEngine> logger,
         FixedSizeConnectionPool? connectionPool,
-        IOptions<TranslationSettings> translationSettings)
+        IOptions<TranslationSettings> translationSettings,
+        IPythonServerManager? serverManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
         _translationSettings = translationSettings?.Value ?? throw new ArgumentNullException(nameof(translationSettings));
+        _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
@@ -172,70 +177,118 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             await _serverLock.WaitAsync().ConfigureAwait(false);
             
-            // 直接Python実行（PowerShell経由を排除）
-            var processInfo = new ProcessStartInfo
+            // Phase 5: PythonServerManagerが利用可能な場合は動的ポート管理を使用
+            if (_serverManager != null)
             {
-                FileName = _pythonPath,
-                Arguments = $"\"{_serverScriptPath}\" --port {ServerPort} --optimized",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-            
-            _serverProcess = new Process { StartInfo = processInfo };
-            _serverProcess.Start();
-            
-            _logger.LogInformation("Pythonサーバープロセス起動 - PID: {ProcessId}", _serverProcess.Id);
-            
-            // 非同期でログ監視
-            _ = Task.Run(async () => await MonitorServerOutputAsync().ConfigureAwait(false));
-            
-            // サーバー起動待機（最大60秒、モデルロード完了まで）
-            var startTime = DateTime.UtcNow;
-            while ((DateTime.UtcNow - startTime).TotalMilliseconds < StartupTimeoutMs)
-            {
-                await Task.Delay(2000).ConfigureAwait(false); // ポーリング間隔を2秒に延長
-                
-                try
-                {
-                    if (_serverProcess.HasExited)
-                    {
-                        _logger.LogError("サーバープロセスが異常終了 - ExitCode: {ExitCode}", _serverProcess.ExitCode);
-                        return false;
-                    }
-                }
-                catch (InvalidOperationException)
-                {
-                    _logger.LogError("サーバープロセスが無効な状態");
-                    return false;
-                }
-                
-                // Issue #147: 接続テスト（タイムアウト延長）
-                try
-                {
-                    if (await TestConnectionAsync().ConfigureAwait(false))
-                    {
-                        var elapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                        _logger.LogInformation("サーバー起動成功 - 起動時間: {ElapsedMs}ms", elapsedMs);
-                        return true;
-                    }
-                }
-                catch
-                {
-                    // 接続テスト失敗 - サーバーがまだ起動していない
-                }
+                return await StartManagedServerAsync().ConfigureAwait(false);
             }
             
-            _logger.LogError("サーバー起動タイムアウト");
-            return false;
+            // 従来の固定ポートモード（後方互換性）
+            return await StartLegacyFixedPortServerAsync().ConfigureAwait(false);
         }
         finally
         {
             _serverLock.Release();
         }
+    }
+    
+    /// <summary>
+    /// PythonServerManager経由での動的ポートサーバー起動
+    /// </summary>
+    private async Task<bool> StartManagedServerAsync()
+    {
+        try
+        {
+            _logger.LogInformation("🚀 動的ポート管理によるサーバー起動開始");
+            
+            // 日本語→英語翻訳用サーバー起動（Phase 5では言語ペア指定）
+            _managedServerInstance = await _serverManager!.StartServerAsync("ja-en").ConfigureAwait(false);
+            
+            _logger.LogInformation("✅ 動的ポートサーバー起動完了: Port {Port}, StartedAt {StartedAt}", 
+                _managedServerInstance.Port, _managedServerInstance.StartedAt);
+            
+            // 接続プールのポート更新
+            if (_connectionPool != null)
+            {
+                // TODO: 接続プールにポート変更通知メソッドを追加予定
+                _logger.LogDebug("接続プール更新: Port {Port}", _managedServerInstance.Port);
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ 動的ポートサーバー起動失敗");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// 従来の固定ポートサーバー起動（後方互換性）
+    /// </summary>
+    private async Task<bool> StartLegacyFixedPortServerAsync()
+    {
+        _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", ServerPort);
+        
+        // 直接Python実行（PowerShell経由を排除）
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = _pythonPath,
+            Arguments = $"\"{_serverScriptPath}\" --port {ServerPort} --optimized",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+        
+        _serverProcess = new Process { StartInfo = processInfo };
+        _serverProcess.Start();
+        
+        _logger.LogInformation("Pythonサーバープロセス起動 - PID: {ProcessId}", _serverProcess.Id);
+        
+        // 非同期でログ監視
+        _ = Task.Run(async () => await MonitorServerOutputAsync().ConfigureAwait(false));
+        
+        // サーバー起動待機（最大60秒、モデルロード完了まで）
+        var startTime = DateTime.UtcNow;
+        while ((DateTime.UtcNow - startTime).TotalMilliseconds < StartupTimeoutMs)
+        {
+            await Task.Delay(2000).ConfigureAwait(false); // ポーリング間隔を2秒に延長
+            
+            try
+            {
+                if (_serverProcess.HasExited)
+                {
+                    _logger.LogError("サーバープロセスが異常終了 - ExitCode: {ExitCode}", _serverProcess.ExitCode);
+                    return false;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                _logger.LogError("サーバープロセスが無効な状態");
+                return false;
+            }
+            
+            // Issue #147: 接続テスト（タイムアウト延長）
+            try
+            {
+                if (await TestConnectionAsync().ConfigureAwait(false))
+                {
+                    var elapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                    _logger.LogInformation("サーバー起動成功 - 起動時間: {ElapsedMs}ms", elapsedMs);
+                    return true;
+                }
+            }
+            catch
+            {
+                // 接続テスト失敗 - サーバーがまだ起動していない
+            }
+        }
+        
+        _logger.LogError("サーバー起動タイムアウト");
+        return false;
     }
 
     /// <summary>
@@ -981,6 +1034,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
+            // Phase 5: 動的ポート対応
+            var targetPort = GetCurrentServerPort();
+            
             if (_connectionPool != null)
             {
                 // Issue #147: 接続プールによる接続テスト
@@ -991,8 +1047,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             }
             else
             {
-                // 🔄 単発接続テスト（汚染対策モード）
-                return await TestDirectConnectionAsync().ConfigureAwait(false);
+                // 🔄 単発接続テスト（汚染対策モード）- 動的ポート対応
+                return await TestDirectConnectionAsync(targetPort).ConfigureAwait(false);
             }
         }
         catch
@@ -1000,11 +1056,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             return false;
         }
     }
+    
+    /// <summary>
+    /// 現在のサーバーポート番号を取得
+    /// </summary>
+    private int GetCurrentServerPort()
+    {
+        // Phase 5: 動的ポート管理の場合
+        if (_managedServerInstance != null)
+        {
+            return _managedServerInstance.Port;
+        }
+        
+        // 固定ポートモード
+        return ServerPort;
+    }
 
     /// <summary>
     /// 単発接続での接続テスト（接続プール無効化時用）
     /// </summary>
-    private async Task<bool> TestDirectConnectionAsync()
+    private async Task<bool> TestDirectConnectionAsync(int? port = null)
     {
         TcpClient? testClient = null;
         NetworkStream? testStream = null;
@@ -1014,9 +1085,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             using var testCts = new CancellationTokenSource(ConnectionTimeoutMs);
+            
+            // Phase 5: 動的ポート対応
+            var targetPort = port ?? GetCurrentServerPort();
 
             testClient = new TcpClient();
-            await testClient.ConnectAsync(ServerHost, ServerPort, testCts.Token).ConfigureAwait(false);
+            await testClient.ConnectAsync(ServerHost, targetPort, testCts.Token).ConfigureAwait(false);
 
             testStream = testClient.GetStream();
             testStream.ReadTimeout = ConnectionTimeoutMs;
