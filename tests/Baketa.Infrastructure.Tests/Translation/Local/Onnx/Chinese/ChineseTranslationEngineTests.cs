@@ -28,7 +28,7 @@ public class ChineseTranslationEngineTests : IDisposable
     public ChineseTranslationEngineTests()
     {
         _mockLogger = new Mock<ILogger<ChineseTranslationEngine>>();
-        _chineseProcessor = new ChineseLanguageProcessor(Mock.Of<ILogger<ChineseLanguageProcessor>>());
+        _chineseProcessor = new ChineseLanguageProcessor(Moq.Mock.Of<ILogger<ChineseLanguageProcessor>>());
         _mockBaseEngine = CreateMockTranslationEngine();
         
         _chineseEngine = new TestableChineseTranslationEngine(
