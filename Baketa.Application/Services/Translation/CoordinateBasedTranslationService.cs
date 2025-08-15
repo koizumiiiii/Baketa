@@ -335,33 +335,37 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
                                 
                                 // 🔥 [STREAMING] 即座にオーバーレイ表示を更新（Stop時は確実に中断）
-                                _ = Task.Run(async () =>
+                                // 🛠️ [FIX] 適切なキャンセレーション処理でStop時の表示を防ぐ
+                                if (!cancellationToken.IsCancellationRequested)
                                 {
-                                    try
+                                    Task.Run(async () =>
                                     {
-                                        // Task内での再度のキャンセル確認（確実な停止のため）
-                                        if (cancellationToken.IsCancellationRequested)
+                                        try
                                         {
-                                            Console.WriteLine($"🛑 [STOP_PROTECTION] Stop要求のためオーバーレイ表示をスキップ - チャンク {chunk.ChunkId}");
-                                            return;
+                                            // Task内での再度のキャンセル確認（確実な停止のため）
+                                            cancellationToken.ThrowIfCancellationRequested();
+                                            
+                                            if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
+                                            {
+                                                // キャンセレーショントークンを確実に渡す
+                                                await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
+                                                Console.WriteLine($"🎯 [STREAMING] 即座オーバーレイ更新完了 - チャンク {chunk.ChunkId}");
+                                            }
                                         }
-                                        
-                                        if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
+                                        catch (OperationCanceledException)
                                         {
-                                            // キャンセレーショントークンを確実に渡す
-                                            await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
-                                            Console.WriteLine($"🎯 [STREAMING] 即座オーバーレイ更新完了 - チャンク {chunk.ChunkId}");
+                                            Console.WriteLine($"🛑 [STOP_SUCCESS] オーバーレイ表示が正常にキャンセルされました - チャンク {chunk.ChunkId}");
                                         }
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        Console.WriteLine($"🛑 [STOP_SUCCESS] オーバーレイ表示が正常にキャンセルされました - チャンク {chunk.ChunkId}");
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"⚠️ [STREAMING] オーバーレイ更新エラー - チャンク {chunk.ChunkId}: {ex.Message}");
-                                    }
-                                }, cancellationToken); // ← CancellationTokenを渡す
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"⚠️ [STREAMING] オーバーレイ更新エラー - チャンク {chunk.ChunkId}: {ex.Message}");
+                                        }
+                                    }, cancellationToken); // CancellationTokenを渡す
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"🛑 [STOP_EARLY] Stop要求のためオーバーレイ表示を完全スキップ - チャンク {chunk.ChunkId}");
+                                }
                             }
                         }
                         
@@ -455,7 +459,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                             var engineName = translationResult.EngineName ?? "Unknown";
                             DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
                                 
-                            chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
+                            // 🛡️ [ERROR_SKIP] エラー結果（IsSuccess=false）のオーバーレイ表示をスキップ
+                            Console.WriteLine($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
+                            DebugLogUtility.WriteLog($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
+                            
+                            if (translationResult.IsSuccess)
+                            {
+                                chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
+                                Console.WriteLine($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
+                                DebugLogUtility.WriteLog($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}");
+                                DebugLogUtility.WriteLog($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}, エラー: '{translationResult.TranslatedText}'");
+                                _logger?.LogWarning("🚫 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {ChunkId}, エラー: {Error}", 
+                                    chunk.ChunkId, translationResult.TranslatedText);
+                                chunk.TranslatedText = ""; // エラー時は空文字に設定してオーバーレイ表示を阻止
+                                continue; // 次のチャンクに進む
+                            }
                             
                             _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
                                 chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
@@ -501,7 +523,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
                         DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
                         
-                        if (chunk.CanShowInPlace())
+                        // 🛡️ [ERROR_PROTECTION] エラー結果や空文字列はオーバーレイ表示しない
+                        var hasValidTranslation = !string.IsNullOrEmpty(chunk.TranslatedText) && 
+                                                 !chunk.TranslatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase) &&
+                                                 !chunk.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal) &&
+                                                 !chunk.TranslatedText.Equals("翻訳エラーが発生しました", StringComparison.Ordinal);
+                        
+                        DebugLogUtility.WriteLog($"   翻訳結果: '{chunk.TranslatedText}'");
+                        DebugLogUtility.WriteLog($"   有効な翻訳: {hasValidTranslation}");
+                        
+                        if (chunk.CanShowInPlace() && hasValidTranslation)
                         {
                             _logger?.LogDebug("🎭 インプレース表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
                                 chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
@@ -521,8 +552,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         }
                         else
                         {
-                            _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
-                            DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                            if (!hasValidTranslation)
+                            {
+                                DebugLogUtility.WriteLog($"   🚫 インプレース表示スキップ - チャンク {chunk.ChunkId}: エラー結果のため表示阻止");
+                                _logger?.LogInformation("🚫 エラー結果のためオーバーレイ表示をスキップ - ChunkId: {ChunkId}", chunk.ChunkId);
+                            }
+                            else
+                            {
+                                _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
+                                DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                            }
                         }
                     }
                     

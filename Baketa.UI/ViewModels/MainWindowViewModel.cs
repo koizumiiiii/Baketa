@@ -80,6 +80,14 @@ namespace Baketa.UI.ViewModels;
             set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _isProcessing, value);
         }
         
+        // 翻訳エンジン初期化状態
+        private bool _isTranslationEngineInitializing;
+        public bool IsTranslationEngineInitializing
+        {
+            get => _isTranslationEngineInitializing;
+            set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _isTranslationEngineInitializing, value);
+        }
+        
         // 通知関連プロパティ
         private bool _isNotificationVisible;
         public bool IsNotificationVisible
@@ -207,9 +215,10 @@ namespace Baketa.UI.ViewModels;
             AccessibilitySettingsViewModel = accessibilityViewModel;
             
             // コマンドの実行可否条件
-            var canStartCapture = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
+            var canStartCapture = this.WhenAnyValue<MainWindowViewModel, bool, bool, bool>(
                 x => x.IsCapturing,
-                isCapturing => !isCapturing);
+                x => x.IsTranslationEngineInitializing,
+                (isCapturing, isInitializing) => !isCapturing && !isInitializing);
                 
             var canStopCapture = this.WhenAnyValue<MainWindowViewModel, bool, bool>(
                 x => x.IsCapturing,
