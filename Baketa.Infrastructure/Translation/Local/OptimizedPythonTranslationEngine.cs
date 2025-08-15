@@ -26,7 +26,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
-    private readonly FixedSizeConnectionPool _connectionPool; // Issue #147: 接続プール統合
+    private readonly FixedSizeConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
     private readonly TranslationSettings _translationSettings; // Issue #147: 設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     

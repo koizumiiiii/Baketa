@@ -18,8 +18,8 @@ namespace Baketa.Infrastructure.Translation.Services;
 public class PortManagementService(ILogger<PortManagementService> logger) : IPortManagementService
 {
     private readonly string _portRegistryFile = Path.Combine(Environment.CurrentDirectory, "translation_ports.json");
-    private readonly Mutex _globalMutex = new(false, "Global\\BaketaPortManagement");
-    private readonly TimeSpan _mutexTimeout = TimeSpan.FromSeconds(10);
+    private readonly SemaphoreSlim _semaphore = new(1, 1); // SemaphoreSlim使用でスレッドセーフ性確保
+    private readonly TimeSpan _lockTimeout = TimeSpan.FromSeconds(10);
     private bool _disposed;
 
     /// <inheritdoc />
@@ -27,9 +27,9 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
     {
         logger.LogDebug("🔍 ポート取得開始: 範囲 {StartPort}-{EndPort}", startPort, endPort);
         
-        if (!_globalMutex.WaitOne(_mutexTimeout))
+        if (!await _semaphore.WaitAsync(_lockTimeout).ConfigureAwait(false))
         {
-            throw new TimeoutException($"ポート管理Mutex取得がタイムアウトしました（{_mutexTimeout.TotalSeconds}秒）");
+            throw new TimeoutException($"ポート管理セマフォ取得がタイムアウトしました（{_lockTimeout.TotalSeconds}秒）");
         }
         
         try
@@ -61,7 +61,7 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         }
         finally
         {
-            _globalMutex.ReleaseMutex();
+            _semaphore.Release();
         }
     }
 
@@ -70,9 +70,9 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
     {
         logger.LogDebug("🔓 ポート {Port} の解放開始", port);
         
-        if (!_globalMutex.WaitOne(_mutexTimeout))
+        if (!await _semaphore.WaitAsync(_lockTimeout).ConfigureAwait(false))
         {
-            logger.LogWarning("⚠️ ポート解放時のMutex取得がタイムアウトしました: Port {Port}", port);
+            logger.LogWarning("⚠️ ポート解放時のセマフォ取得がタイムアウトしました: Port {Port}", port);
             return;
         }
         
@@ -95,7 +95,7 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         }
         finally
         {
-            _globalMutex.ReleaseMutex();
+            _semaphore.Release();
         }
     }
 
@@ -108,9 +108,9 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
     /// <inheritdoc />
     public async Task<IReadOnlyList<int>> GetActivePortsAsync()
     {
-        if (!_globalMutex.WaitOne(_mutexTimeout))
+        if (!await _semaphore.WaitAsync(_lockTimeout).ConfigureAwait(false))
         {
-            logger.LogWarning("⚠️ アクティブポート取得時のMutex取得がタイムアウトしました");
+            logger.LogWarning("⚠️ アクティブポート取得時のセマフォ取得がタイムアウトしました");
             return Array.Empty<int>();
         }
         
@@ -121,16 +121,16 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         }
         finally
         {
-            _globalMutex.ReleaseMutex();
+            _semaphore.Release();
         }
     }
 
     /// <inheritdoc />
     public async Task CleanupOrphanedProcessesAsync()
     {
-        if (!_globalMutex.WaitOne(_mutexTimeout))
+        if (!await _semaphore.WaitAsync(_lockTimeout).ConfigureAwait(false))
         {
-            logger.LogWarning("⚠️ 孤立プロセスクリーンアップのMutex取得がタイムアウトしました");
+            logger.LogWarning("⚠️ 孤立プロセスクリーンアップのセマフォ取得がタイムアウトしました");
             return;
         }
         
@@ -140,7 +140,7 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         }
         finally
         {
-            _globalMutex.ReleaseMutex();
+            _semaphore.Release();
         }
     }
 
@@ -345,11 +345,11 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         
         try
         {
-            _globalMutex.Dispose();
+            _semaphore.Dispose();
         }
         catch (Exception ex)
         {
-            logger.LogWarning("⚠️ Mutex破棄エラー: {Error}", ex.Message);
+            logger.LogWarning("⚠️ セマフォ破棄エラー: {Error}", ex.Message);
         }
         
         _disposed = true;
