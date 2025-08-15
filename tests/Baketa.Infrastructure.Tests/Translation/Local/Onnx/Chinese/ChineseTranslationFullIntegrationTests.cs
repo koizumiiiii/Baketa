@@ -319,7 +319,7 @@ public class ChineseTranslationPerformanceTests(ITestOutputHelper testOutput)
     public void Performance_ChineseVariantDetection_ShouldBeFast(string testText)
     {
         // パフォーマンステスト用 - 簡単な基本動作確認
-        var processor = new ChineseLanguageProcessor(Mock.Of<ILogger<ChineseLanguageProcessor>>());
+        var processor = new ChineseLanguageProcessor(Moq.Mock.Of<ILogger<ChineseLanguageProcessor>>());
         
         // Act
         var result = processor.DetectScriptType(testText);
@@ -334,7 +334,7 @@ public class ChineseTranslationPerformanceTests(ITestOutputHelper testOutput)
     public void RealWorld_ChineseTranslation_WithActualModel()
     {
         // このテストは基本的な中国語言語評定機能の確認を行います
-        var processor = new ChineseLanguageProcessor(Mock.Of<ILogger<ChineseLanguageProcessor>>());
+        var processor = new ChineseLanguageProcessor(Moq.Mock.Of<ILogger<ChineseLanguageProcessor>>());
         
         // Act - 中国語コードのサポート確認
         var isChineseSupported = processor.IsChineseLanguageCode("zh");

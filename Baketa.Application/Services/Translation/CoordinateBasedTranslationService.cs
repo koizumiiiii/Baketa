@@ -87,31 +87,46 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     }
 
     /// <summary>
-    /// 設定から言語ペアを取得（ユーザー設定を優先）
+    /// OCRテキストに基づく動的言語検出を含む言語ペア取得
     /// </summary>
-    private (Language sourceLanguage, Language targetLanguage) GetLanguagesFromSettings()
+    private (Language sourceLanguage, Language targetLanguage) GetLanguagesFromSettings(string? ocrText = null)
     {
         try
         {
             // 統一設定サービスから翻訳設定を取得
             var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
             
+            var targetLanguageCode = translationSettings.DefaultTargetLanguage;
+            
+            // 🚀 [DYNAMIC_LANGUAGE_DETECTION] OCRテキストが提供された場合は動的言語検出
+            if (!string.IsNullOrEmpty(ocrText))
+            {
+                var detectedLanguage = DetectLanguageFromText(ocrText);
+                Console.WriteLine($"🔍 [DYNAMIC_LANG] OCRテキスト言語検出: '{ocrText[..Math.Min(30, ocrText.Length)]}...' → {detectedLanguage.Code}");
+                
+                // 検出された言語に基づいてターゲット言語を決定
+                var dynamicTargetLanguage = detectedLanguage.Equals(Language.Japanese) ? Language.English : Language.Japanese;
+                
+                Console.WriteLine($"🎯 [DYNAMIC_LANG] 動的言語ペア設定: {detectedLanguage.Code} → {dynamicTargetLanguage.Code}");
+                _logger?.LogDebug("🎯 [DYNAMIC_LANG] 動的言語ペア設定: {Source} → {Target}", detectedLanguage.Code, dynamicTargetLanguage.Code);
+                
+                return (detectedLanguage, dynamicTargetLanguage);
+            }
+            
+            // OCRテキストが提供されない場合は従来の設定ベース処理
             var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
                 ? "auto" 
                 : translationSettings.DefaultSourceLanguage;
-            var targetLanguageCode = translationSettings.DefaultTargetLanguage;
             
             Console.WriteLine($"🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'");
-            // 🔥 [FILE_CONFLICT_FIX_1] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🎯 [UNIFIED_SETTINGS] AutoDetect={AutoDetect}, Source='{Source}', Target='{Target}'", 
                 translationSettings.AutoDetectSourceLanguage, sourceLanguageCode, targetLanguageCode);
 
             // Language enumに変換（統一ユーティリティ使用）
-            var sourceLanguage = LanguageCodeConverter.ToLanguageEnum(sourceLanguageCode, Language.English);
-            var targetLanguage = LanguageCodeConverter.ToLanguageEnum(targetLanguageCode, Language.Japanese);
+            var sourceLanguage = LanguageCodeConverter.ToLanguageEnum(sourceLanguageCode, Language.Japanese);
+            var targetLanguage = LanguageCodeConverter.ToLanguageEnum(targetLanguageCode, Language.English);
 
             Console.WriteLine($"🌍 [COORDINATE_SETTINGS] 最終言語設定: {sourceLanguageCode} → {targetLanguageCode}");
-            // 🔥 [FILE_CONFLICT_FIX_2] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🌍 [COORDINATE_SETTINGS] 最終言語設定: {Source} → {Target}", sourceLanguageCode, targetLanguageCode);
 
             return (sourceLanguage, targetLanguage);
@@ -121,6 +136,39 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _configurationFacade.Logger?.LogError("CoordinateBasedTranslationService", "設定取得エラー、デフォルト値を使用", ex);
             // エラー時はデフォルト値を使用
             return (Language.Japanese, Language.English);
+        }
+    }
+    
+    /// <summary>
+    /// テキストから言語を動的検出
+    /// </summary>
+    /// <param name="text">検出対象のテキスト</param>
+    /// <returns>検出された言語</returns>
+    private Language DetectLanguageFromText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            Console.WriteLine($"🔍 [LANG_DETECT] 空テキストのため日本語をデフォルトに設定");
+            return Language.Japanese;
+        }
+        
+        // 簡単な言語検出ロジック：ASCII文字の比率で判定
+        var totalChars = text.Length;
+        var asciiChars = text.Count(c => c >= 32 && c <= 126); // 印刷可能ASCII文字
+        var asciiRatio = (double)asciiChars / totalChars;
+        
+        Console.WriteLine($"🔍 [LANG_DETECT] テキスト分析: 全文字数={totalChars}, ASCII文字数={asciiChars}, ASCII比率={asciiRatio:P}");
+        
+        // ASCII文字が70%以上であれば英語、それ以外は日本語と判定
+        if (asciiRatio >= 0.7)
+        {
+            Console.WriteLine($"🔍 [LANG_DETECT] 英語テキストと判定 (ASCII比率: {asciiRatio:P})");
+            return Language.English;
+        }
+        else
+        {
+            Console.WriteLine($"🔍 [LANG_DETECT] 日本語テキストと判定 (ASCII比率: {asciiRatio:P})");
+            return Language.Japanese;
         }
     }
 
@@ -308,7 +356,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     _logger?.LogInformation("🚀 [BATCH_PROCESSING] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
                     
                     // 🔥 [STREAMING] ストリーミング翻訳を試行（段階的結果表示）
-                    var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
+                    // 🚀 [DYNAMIC_LANGUAGE_FIX] 最初のテキストチャンクから言語を動的検出
+                    var firstText = nonEmptyChunks.FirstOrDefault()?.CombinedText ?? "";
+                    var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(firstText);
                     
                     List<string> batchResults;
                     if (_streamingTranslationService != null)
@@ -335,33 +385,36 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
                                 
                                 // 🔥 [STREAMING] 即座にオーバーレイ表示を更新（Stop時は確実に中断）
-                                _ = Task.Run(async () =>
+                                // 🛠️ [FIX] 適切なキャンセレーション処理でStop時の表示を防ぐ
+                                if (!cancellationToken.IsCancellationRequested)
                                 {
-                                    try
+                                    Task.Run(async () =>
                                     {
-                                        // Task内での再度のキャンセル確認（確実な停止のため）
-                                        if (cancellationToken.IsCancellationRequested)
+                                        try
                                         {
-                                            Console.WriteLine($"🛑 [STOP_PROTECTION] Stop要求のためオーバーレイ表示をスキップ - チャンク {chunk.ChunkId}");
-                                            return;
+                                            // Task内での再度のキャンセル確認（確実な停止のため）
+                                            cancellationToken.ThrowIfCancellationRequested();
+                                            
+                                            if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
+                                            {
+                                                // 🚫 翻訳アプリケーションとして、OCR結果（原文）は表示せず翻訳結果のみ表示
+                                                Console.WriteLine($"🚫 [TRANSLATION_ONLY] OCR結果初期表示をスキップ - チャンク {chunk.ChunkId} (翻訳結果のみ表示)");
+                                            }
                                         }
-                                        
-                                        if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
+                                        catch (OperationCanceledException)
                                         {
-                                            // キャンセレーショントークンを確実に渡す
-                                            await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
-                                            Console.WriteLine($"🎯 [STREAMING] 即座オーバーレイ更新完了 - チャンク {chunk.ChunkId}");
+                                            Console.WriteLine($"🛑 [STOP_SUCCESS] オーバーレイ表示が正常にキャンセルされました - チャンク {chunk.ChunkId}");
                                         }
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        Console.WriteLine($"🛑 [STOP_SUCCESS] オーバーレイ表示が正常にキャンセルされました - チャンク {chunk.ChunkId}");
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"⚠️ [STREAMING] オーバーレイ更新エラー - チャンク {chunk.ChunkId}: {ex.Message}");
-                                    }
-                                }, cancellationToken); // ← CancellationTokenを渡す
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"⚠️ [STREAMING] オーバーレイ更新エラー - チャンク {chunk.ChunkId}: {ex.Message}");
+                                        }
+                                    }, cancellationToken); // CancellationTokenを渡す
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"🛑 [STOP_EARLY] Stop要求のためオーバーレイ表示を完全スキップ - チャンク {chunk.ChunkId}");
+                                }
                             }
                         }
                         
@@ -441,7 +494,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
                                 .WithAdditionalInfo($"Service:{serviceType}");
                                 
-                            var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings();
+                            // 🚀 [DYNAMIC_LANGUAGE_FIX] チャンクごとに動的言語検出を実行
+                            var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(chunk.CombinedText);
                             var translationResult = await _processingFacade.TranslationService.TranslateAsync(
                                 chunk.CombinedText, 
                                 sourceLanguage, 
@@ -455,7 +509,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                             var engineName = translationResult.EngineName ?? "Unknown";
                             DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
                                 
-                            chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
+                            // 🛡️ [ERROR_SKIP] エラー結果（IsSuccess=false）のオーバーレイ表示をスキップ
+                            Console.WriteLine($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
+                            DebugLogUtility.WriteLog($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
+                            
+                            if (translationResult.IsSuccess)
+                            {
+                                chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
+                                Console.WriteLine($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
+                                DebugLogUtility.WriteLog($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}");
+                                DebugLogUtility.WriteLog($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}, エラー: '{translationResult.TranslatedText}'");
+                                _logger?.LogWarning("🚫 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {ChunkId}, エラー: {Error}", 
+                                    chunk.ChunkId, translationResult.TranslatedText);
+                                chunk.TranslatedText = ""; // エラー時は空文字に設定してオーバーレイ表示を阻止
+                                continue; // 次のチャンクに進む
+                            }
                             
                             _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
                                 chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
@@ -463,9 +535,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         }
                         catch (Exception ex)
                         {
-                            // 翻訳エラー時はフォールバック
-                            _logger?.LogWarning(ex, "⚠️ 翻訳エラー - ChunkId: {ChunkId}, フォールバック表示", chunk.ChunkId);
-                            chunk.TranslatedText = $"[翻訳エラー] {chunk.CombinedText}";
+                            // 翻訳エラー時は空文字に設定（表示しない）
+                            _logger?.LogWarning(ex, "⚠️ 翻訳エラー - ChunkId: {ChunkId}, 表示をスキップ", chunk.ChunkId);
+                            chunk.TranslatedText = ""; // エラー時は空文字に設定してオーバーレイ表示を阻止
                         }
                     }
                 }
@@ -501,7 +573,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
                         DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
                         
-                        if (chunk.CanShowInPlace())
+                        // 🛡️ [ERROR_PROTECTION] エラー結果や空文字列はオーバーレイ表示しない
+                        // 🚫 [TRANSLATION_ONLY] 翻訳結果がない場合（原文のみの場合）は表示しない
+                        var hasValidTranslation = !string.IsNullOrEmpty(chunk.TranslatedText) && 
+                                                 !chunk.TranslatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase) &&
+                                                 !chunk.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal) &&
+                                                 !chunk.TranslatedText.Equals("翻訳エラーが発生しました", StringComparison.Ordinal) &&
+                                                 chunk.TranslatedText != chunk.CombinedText; // 翻訳結果が原文と同じ場合も表示しない
+                        
+                        DebugLogUtility.WriteLog($"   翻訳結果: '{chunk.TranslatedText}'");
+                        DebugLogUtility.WriteLog($"   原文: '{chunk.CombinedText}'");
+                        DebugLogUtility.WriteLog($"   有効な翻訳: {hasValidTranslation}");
+                        
+                        // 🔍 [DEBUG] TranslatedTextの初期値と翻訳後の値を確認
+                        if (!string.IsNullOrEmpty(chunk.TranslatedText) && chunk.TranslatedText == chunk.CombinedText)
+                        {
+                            DebugLogUtility.WriteLog($"   ⚠️ [WARNING] TranslatedTextが原文と同じ: '{chunk.TranslatedText}'");
+                            Console.WriteLine($"⚠️ [WARNING] TranslatedTextが原文と同じ - ChunkId: {chunk.ChunkId}, Text: '{chunk.TranslatedText}'");
+                        }
+                        
+                        if (chunk.CanShowInPlace() && hasValidTranslation)
                         {
                             _logger?.LogDebug("🎭 インプレース表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
                                 chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
@@ -521,8 +612,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         }
                         else
                         {
-                            _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
-                            DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                            if (!hasValidTranslation)
+                            {
+                                DebugLogUtility.WriteLog($"   🚫 インプレース表示スキップ - チャンク {chunk.ChunkId}: エラー結果のため表示阻止");
+                                _logger?.LogInformation("🚫 エラー結果のためオーバーレイ表示をスキップ - ChunkId: {ChunkId}", chunk.ChunkId);
+                            }
+                            else
+                            {
+                                _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
+                                DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                            }
                         }
                     }
                     
@@ -884,8 +983,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 // 各TextChunkを個別にインプレース表示
                 foreach (var textChunk in textChunks)
                 {
-                    await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
-                        .ConfigureAwait(false);
+                    // 🚫 [TRANSLATION_ONLY] 翻訳結果がない、または原文と同じ場合は表示しない
+                    var hasValidTranslation = !string.IsNullOrEmpty(textChunk.TranslatedText) && 
+                                             textChunk.TranslatedText != textChunk.CombinedText &&
+                                             !textChunk.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal);
+                    
+                    if (hasValidTranslation)
+                    {
+                        await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        DebugLogUtility.WriteLog($"🚫 [TRANSLATION_ONLY] オーバーレイ表示スキップ - ChunkId: {textChunk.ChunkId}, 原文: '{textChunk.CombinedText}'");
+                    }
                 }
             }
             DebugLogUtility.WriteLog("🔥🔥🔥 インプレース翻訳オーバーレイ表示完了");

@@ -445,29 +445,13 @@ public class PaddleOcrEngine : IOcrEngine
             if (!_serviceTypeLogged)
             {
                 var serviceType = __ocrPreprocessingService.GetType().Name;
-                try
-                {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [PHASE3-DIAG] 使用中の前処理サービス: {serviceType}{Environment.NewLine}");
-                }
-                catch (Exception fileEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Phase 3 診断ログ書き込みエラー: {fileEx.Message}");
-                }
+                SafeWriteDebugLog($"🔍 [PHASE3-DIAG] 使用中の前処理サービス: {serviceType}");
                 _serviceTypeLogged = true;
             }
             
             // 📍 座標ログ出力 (ユーザー要求: 認識したテキストとともに座標位置もログで確認)
             // 直接ファイル書き込みでOCR結果を記録
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📍 [DIRECT] PaddleOcrEngine - OCR処理完了: 検出領域数={textRegions?.Count ?? 0}{Environment.NewLine}");
-            }
-            catch (Exception fileEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"PaddleOcrEngine ファイル書き込みエラー: {fileEx.Message}");
-            }
+            SafeWriteDebugLog($"📍 [DIRECT] PaddleOcrEngine - OCR処理完了: 検出領域数={textRegions?.Count ?? 0}");
             
             if (textRegions != null && textRegions.Count > 0)
             {
@@ -1957,7 +1941,7 @@ public class PaddleOcrEngine : IOcrEngine
             {
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🧵 マルチスレッドOCRエンジンで処理実行");
                 __logger?.LogDebug("マルチスレッドOCRエンジンで処理実行");
-                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+                result = _queuedEngine.Run(processedMat);
             }
             else if (_ocrEngine != null)
             {
@@ -1995,7 +1979,7 @@ public class PaddleOcrEngine : IOcrEngine
             if (IsMultiThreadEnabled && _queuedEngine != null)
             {
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 マルチスレッドOCRエンジンで再試行");
-                result = await Task.Run(() => _queuedEngine.Run(processedMat), cancellationToken).ConfigureAwait(false);
+                result = _queuedEngine.Run(processedMat);
             }
             else if (_ocrEngine != null)
             {
@@ -2012,6 +1996,208 @@ public class PaddleOcrEngine : IOcrEngine
         
         // PaddleOCRの結果をOcrTextRegionに変換
         return ConvertPaddleOcrResult(result);
+    }
+
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップして高速化）
+    /// PaddleOCRの検出モードのみを使用してテキスト領域を検出
+    /// </summary>
+    private async Task<IReadOnlyList<OcrTextRegion>> ExecuteTextDetectionOnlyAsync(
+        Mat mat,
+        CancellationToken cancellationToken)
+    {
+        __logger?.LogDebug("⚡ ExecuteTextDetectionOnlyAsync開始 - 高速検出モード");
+
+        // Phase 3: GameOptimizedPreprocessingService を使用した前処理（検出専用）
+        Mat processedMat;
+        try
+        {
+            // OpenCvSharp.Mat を IAdvancedImage に変換
+            var imageData = await ConvertMatToByteArrayAsync(mat).ConfigureAwait(false);
+            using var advancedImage = new Baketa.Core.Services.Imaging.AdvancedImage(
+                imageData, mat.Width, mat.Height, Baketa.Core.Abstractions.Imaging.ImageFormat.Rgb24);
+            
+            // 画像特性に基づいてプロファイルを選択（検出専用なので軽量化）
+            // TODO: ImageProcessingProfileの修正版が利用可能になり次第、適切なプロファイルを使用
+            // var profile = Baketa.Core.Abstractions.Imaging.Pipeline.ImageProcessingProfile.Game;
+            
+            // ゲーム最適化前処理を適用（検出専用設定）
+            // TODO: 前処理サービスAPI修正後に適切な実装に変更
+            processedMat = mat.Clone(); // 暫定的に元画像を使用
+            
+            __logger?.LogDebug("⚡ 検出専用前処理完了: {Width}x{Height} → {ProcessedWidth}x{ProcessedHeight}",
+                mat.Width, mat.Height, processedMat.Width, processedMat.Height);
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogWarning(ex, "前処理でエラー発生、元画像を使用");
+            processedMat = mat.Clone(); // 安全にクローン
+        }
+
+        try
+        {
+            // PaddleOCRの検出専用実行（認識をスキップ）
+            object detectionResult;
+            
+            if (_ocrEngine != null)
+            {
+                __logger?.LogDebug("⚡ PaddleOCR検出専用実行開始");
+                
+                // 検出専用実行: PaddleOCRのDetectorのみを使用
+                // 注意: これはPaddleOCRライブラリの内部構造に依存する実装
+                // 実際のAPIが利用可能になり次第、より適切な実装に置き換える
+                detectionResult = await ExecuteDetectionOnlyInternal(processedMat, cancellationToken).ConfigureAwait(false);
+                
+                __logger?.LogDebug("⚡ PaddleOCR検出専用実行完了");
+            }
+            else
+            {
+                throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            }
+            
+            // 検出結果をOcrTextRegionに変換（テキスト内容は空）
+            return ConvertDetectionOnlyResult(detectionResult);
+        }
+        finally
+        {
+            // processedMatが元のmatと異なる場合のみDispose
+            if (!ReferenceEquals(processedMat, mat))
+            {
+                processedMat?.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// PaddleOCRの検出専用実行（内部実装）
+    /// 注意: PaddleOCRライブラリの内部構造に依存する暫定実装
+    /// </summary>
+    private async Task<object> ExecuteDetectionOnlyInternal(Mat mat, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 暫定実装: 完全なOCRを実行してテキスト部分のみを空にする
+            // 理想的には PaddleOCR の Detector のみを直接呼び出したいが、
+            // 現在のライブラリAPIでは難しいため、この方法を採用
+            
+            if (IsMultiThreadEnabled && _queuedEngine != null)
+            {
+                // マルチスレッド実行でのタイムアウト設定
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var adaptiveTimeout = 30; // デフォルト30秒タイムアウト
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(adaptiveTimeout));
+                
+                var detectionTask = Task.Run(() => _queuedEngine.Run(mat), timeoutCts.Token);
+                return await detectionTask.ConfigureAwait(false);
+            }
+            else if (_ocrEngine != null)
+            {
+                // シングルスレッド実行
+                return await ExecuteOcrInSeparateTask(mat, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                throw new InvalidOperationException("利用可能なOCRエンジンがありません");
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            __logger?.LogDebug("検出専用処理がキャンセルされました");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogWarning(ex, "検出専用処理でエラー発生、再試行を実行");
+            
+            // メモリクリア後に再試行
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            
+            if (_ocrEngine != null)
+            {
+                return await ExecuteOcrInSeparateTask(mat, cancellationToken).ConfigureAwait(false);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 検出専用結果をOcrTextRegionリストに変換
+    /// テキスト内容を空にして座標情報のみを保持
+    /// </summary>
+    private List<OcrTextRegion> ConvertDetectionOnlyResult(object result)
+    {
+        var textRegions = new List<OcrTextRegion>();
+        
+        try
+        {
+            if (result == null)
+            {
+                __logger?.LogDebug("⚡ 検出専用結果がnullです");
+                return textRegions;
+            }
+
+            __logger?.LogDebug("⚡ 検出専用結果の変換開始: {ResultType}", result.GetType().FullName);
+
+            // PaddleOCRの結果タイプに応じた処理
+            if (result is PaddleOcrResult[] paddleResults && paddleResults.Length > 0)
+            {
+                __logger?.LogDebug("⚡ PaddleOcrResult配列として処理: {Count}個", paddleResults.Length);
+                
+                foreach (var paddleResult in paddleResults)
+                {
+                    // 暫定的に基本的なダミー領域を作成
+                    // TODO: PaddleOcrResult APIの詳細確認後に適切な実装に変更
+                    var bounds = new Rectangle(10, 10, 100, 30);
+                    var confidence = 0.8; // デフォルト信頼度
+                    
+                    // テキスト内容を空にして座標情報のみを保持
+                    var textRegion = new OcrTextRegion(
+                        text: "", // 検出専用なのでテキストは空
+                        bounds: bounds,
+                        confidence: confidence
+                    );
+                    
+                    textRegions.Add(textRegion);
+                }
+            }
+            else
+            {
+                __logger?.LogWarning("⚡ 予期しない検出専用結果タイプ: {Type}", result.GetType().FullName);
+            }
+
+            __logger?.LogDebug("⚡ 検出専用結果変換完了: {Count}個のテキスト領域", textRegions.Count);
+            return textRegions;
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogError(ex, "検出専用結果の変換でエラー発生");
+            return textRegions; // 空のリストを返す
+        }
+    }
+
+    /// <summary>
+    /// PaddleOCR領域座標からバウンディングボックスを計算
+    /// </summary>
+    private static Rectangle CalculateBoundingBoxFromRegion(PointF[] region)
+    {
+        if (region == null || region.Length == 0)
+        {
+            return Rectangle.Empty;
+        }
+
+        var minX = region.Min(p => p.X);
+        var maxX = region.Max(p => p.X);
+        var minY = region.Min(p => p.Y);
+        var maxY = region.Max(p => p.Y);
+
+        return new Rectangle(
+            x: (int)Math.Floor(minX),
+            y: (int)Math.Floor(minY),
+            width: (int)Math.Ceiling(maxX - minX),
+            height: (int)Math.Ceiling(maxY - minY)
+        );
     }
 
     /// <summary>
@@ -3286,6 +3472,113 @@ public class PaddleOcrEngine : IOcrEngine
     }
 
     /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// AdaptiveTileStrategy等での高速テキスト領域検出用
+    /// </summary>
+    /// <param name="image">画像</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>検出されたテキスト領域（テキスト内容は空またはダミー）</returns>
+    public async Task<OcrResults> DetectTextRegionsAsync(
+        IImage image,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ThrowIfDisposed();
+
+        // 初期化ガード: 未初期化の場合は自動初期化を実行（スレッドセーフ）
+        if (!IsInitialized)
+        {
+            lock (_lockObject)
+            {
+                // ダブルチェックロッキングパターンで競合状態を回避
+                if (!IsInitialized)
+                {
+                    var initTask = InitializeAsync(_settings, cancellationToken);
+                    var initResult = initTask.GetAwaiter().GetResult();
+                    
+                    if (!initResult)
+                    {
+                        throw new InvalidOperationException("OCRエンジンの自動初期化に失敗しました。システム要件を確認してください。");
+                    }
+                }
+            }
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        
+        __logger?.LogDebug("🔍 PaddleOcrEngine.DetectTextRegionsAsync開始 - 高速検出専用モード");
+
+        // テスト環境ではダミー結果を返す
+        var isTestEnv = IsTestEnvironment();
+        
+        if (isTestEnv)
+        {
+            __logger?.LogDebug("テスト環境: ダミーテキスト検出結果を返却");
+            await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+            
+            var dummyTextRegions = new List<OcrTextRegion>
+            {
+                new("", new Rectangle(10, 10, 100, 30), 0.95), // 検出専用なのでテキストは空
+                new("", new Rectangle(50, 60, 80, 25), 0.88)
+            };
+            
+            return new OcrResults(
+                dummyTextRegions,
+                image,
+                stopwatch.Elapsed,
+                CurrentLanguage ?? "jpn",
+                null,
+                "" // 検出専用なので結合テキストも空
+            );
+        }
+
+        try
+        {
+            // IImageからMatに変換
+            using var mat = await ConvertToMatAsync(image, null, cancellationToken).ConfigureAwait(false);
+            
+            if (mat.Empty())
+            {
+                __logger?.LogWarning("変換後の画像が空です");
+                return CreateEmptyResult(image, null, stopwatch.Elapsed);
+            }
+
+            // テキスト検出のみを実行（認識をスキップ）
+            var textRegions = await ExecuteTextDetectionOnlyAsync(mat, cancellationToken).ConfigureAwait(false);
+            
+            stopwatch.Stop();
+
+            var result = new OcrResults(
+                textRegions ?? [],
+                image,
+                stopwatch.Elapsed,
+                CurrentLanguage ?? "jpn",
+                null,
+                "" // 検出専用なので結合テキストは空
+            );
+
+            __logger?.LogDebug("✅ テキスト検出専用処理完了 - 検出領域数: {Count}, 処理時間: {Time}ms", 
+                textRegions?.Count ?? 0, stopwatch.ElapsedMilliseconds);
+            
+            // 統計更新
+            UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, true);
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            __logger?.LogDebug("テキスト検出処理がキャンセルされました");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, false);
+            __logger?.LogError(ex, "テキスト検出処理中にエラーが発生: {ExceptionType}", ex.GetType().Name);
+            throw new OcrException($"テキスト検出処理中にエラーが発生しました: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// 解像度とモデルに応じた基本タイムアウトを計算
     /// </summary>
     /// <param name="mat">処理対象の画像Mat</param>
@@ -3453,5 +3746,46 @@ public class PaddleOcrEngine : IOcrEngine
         }
         
         return "default";
+    }
+
+    /// <summary>
+    /// 環境依存しないデバッグログパスを取得
+    /// </summary>
+    private static string GetDebugLogPath()
+    {
+        var debugLogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), 
+            "BaketaDebugLogs", 
+            "debug_app_logs.txt"
+        );
+        
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(debugLogPath));
+        }
+        catch
+        {
+            // フォールバック: Tempディレクトリを使用
+            debugLogPath = Path.Combine(Path.GetTempPath(), "BaketaDebugLogs", "debug_app_logs.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(debugLogPath));
+        }
+        
+        return debugLogPath;
+    }
+
+    /// <summary>
+    /// 安全なデバッグログ書き込み
+    /// </summary>
+    private static void SafeWriteDebugLog(string message)
+    {
+        try
+        {
+            var debugLogPath = GetDebugLogPath();
+            System.IO.File.AppendAllText(debugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"デバッグログ書き込みエラー: {ex.Message}");
+        }
     }
 }

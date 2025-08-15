@@ -47,7 +47,8 @@ public class TranslationCompletedHandler(IEventAggregator eventAggregator) : IEv
                 displayArea: new Rectangle(0, 0, 400, 100), // 仮の位置と大きさ
                 originalText: eventData.SourceText,
                 sourceLanguage: eventData.SourceLanguage,
-                targetLanguage: eventData.TargetLanguage);
+                targetLanguage: eventData.TargetLanguage,
+                isTranslationResult: true);
                 
             await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);
         }

@@ -357,6 +357,28 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
         }
     }
 
+    /// <summary>
+    /// テキスト検出のみを実行（認識処理をスキップ）
+    /// </summary>
+    public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
+    {
+        var availableStrategy = _strategies.FirstOrDefault(s => s.IsAvailable);
+        if (availableStrategy != null)
+        {
+            try
+            {
+                return await availableStrategy.Engine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "フォールバック戦略での検出専用処理失敗: {StrategyName}", availableStrategy.Name);
+            }
+        }
+        
+        // すべて失敗した場合は空の結果を返す
+        return new OcrResults([], image, TimeSpan.Zero, "jpn", null, "");
+    }
+
     #endregion
 
     /// <summary>

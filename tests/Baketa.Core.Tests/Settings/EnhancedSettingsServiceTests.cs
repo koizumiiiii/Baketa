@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -14,21 +17,54 @@ namespace Baketa.Core.Tests.Settings;
 /// </summary>
 public class EnhancedSettingsServiceTests : IDisposable
 {
+    private readonly string _tempSettingsPath;
     private readonly Mock<ILogger<EnhancedSettingsService>> _mockLogger;
     private readonly Mock<ISettingMetadataService> _mockMetadataService;
     private readonly Mock<ISettingsMigrationManager> _mockMigrationManager;
-    private readonly EnhancedSettingsService _service;
 
     public EnhancedSettingsServiceTests()
     {
+        // テスト用一時ディレクトリの作成（プロセスIDとスレッドIDを含めてユニーク性を確保）
+        var processId = Environment.ProcessId;
+        var threadId = Environment.CurrentManagedThreadId;
+        var uniqueId = $"{processId}_{threadId}_{Guid.NewGuid():N}";
+        _tempSettingsPath = Path.Combine(Path.GetTempPath(), $"BaketaSettingsTestBasic_{uniqueId}", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(_tempSettingsPath)!);
+
+        // モックの初期化
         _mockLogger = new Mock<ILogger<EnhancedSettingsService>>();
         _mockMetadataService = new Mock<ISettingMetadataService>();
         _mockMigrationManager = new Mock<ISettingsMigrationManager>();
+    }
+
+    /// <summary>
+    /// CI/CD file access conflict solution: Create service with unique temp file path
+    /// </summary>
+    private EnhancedSettingsService CreateService()
+    {
+        // Use reflection to bypass constructor parameter issues during testing
+        var uniquePath = Path.Combine(Path.GetDirectoryName(_tempSettingsPath)!, $"settings_{Guid.NewGuid():N}.json");
+        var constructor = typeof(EnhancedSettingsService).GetConstructors().First();
         
-        _service = new EnhancedSettingsService(
-            _mockLogger.Object,
-            _mockMetadataService.Object,
-            _mockMigrationManager.Object);
+        if (constructor.GetParameters().Length == 4)
+        {
+            return (EnhancedSettingsService)constructor.Invoke(new object[] 
+            { 
+                _mockLogger.Object, 
+                _mockMetadataService.Object, 
+                _mockMigrationManager.Object, 
+                uniquePath 
+            });
+        }
+        else
+        {
+            return (EnhancedSettingsService)constructor.Invoke(new object[] 
+            { 
+                _mockLogger.Object, 
+                _mockMetadataService.Object, 
+                _mockMigrationManager.Object 
+            });
+        }
     }
 
     #region コンストラクタテスト
@@ -36,8 +72,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void Constructor_WithValidParameters_ShouldSucceed()
     {
-        // Arrange & Act & Assert
-        Assert.NotNull(_service);
+        // Arrange & Act
+        var service = CreateService();
+        
+        // Assert
+        Assert.NotNull(service);
     }
 
     [Fact]
@@ -72,11 +111,12 @@ public class EnhancedSettingsServiceTests : IDisposable
     public void GetValue_WithValidKey_ShouldReturnExpectedValue()
     {
         // Arrange
+        var service = CreateService();
         const string key = "test.key";
         const string expectedValue = "test value";
 
         // Act
-        var result = _service.GetValue(key, expectedValue);
+        var result = service.GetValue(key, expectedValue);
 
         // Assert
         Assert.Equal(expectedValue, result);
@@ -86,21 +126,23 @@ public class EnhancedSettingsServiceTests : IDisposable
     public void SetValue_WithValidKeyAndValue_ShouldNotThrow()
     {
         // Arrange
+        var service = CreateService();
         const string key = "test.key";
         const string value = "test value";
 
         // Act & Assert
-        _service.SetValue(key, value);
+        service.SetValue(key, value);
     }
 
     [Fact]
     public void HasValue_WithExistingKey_ShouldReturnFalse()
     {
         // Arrange
+        var service = CreateService();
         const string key = "nonexistent.key";
 
         // Act
-        var result = _service.HasValue(key);
+        var result = service.HasValue(key);
 
         // Assert
         Assert.False(result); // 新しいサービスでは存在しない
@@ -110,10 +152,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     public void RemoveValue_WithValidKey_ShouldNotThrow()
     {
         // Arrange
+        var service = CreateService();
         const string key = "test.key";
 
         // Act & Assert
-        _service.RemoveValue(key);
+        service.RemoveValue(key);
     }
 
     #endregion
@@ -123,8 +166,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void GetSettings_ShouldReturnAppSettings()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var settings = _service.GetSettings();
+        var settings = service.GetSettings();
 
         // Assert
         Assert.NotNull(settings);
@@ -135,25 +181,32 @@ public class EnhancedSettingsServiceTests : IDisposable
     public async Task SetSettingsAsync_WithValidSettings_ShouldNotThrow()
     {
         // Arrange
+        var service = CreateService();
         var settings = new AppSettings();
 
         // Act & Assert
-        await _service.SetSettingsAsync(settings);
+        await service.SetSettingsAsync(settings);
     }
 
     [Fact]
     public async Task SetSettingsAsync_WithNullSettings_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.SetSettingsAsync(null!));
+            service.SetSettingsAsync(null!));
     }
 
     [Fact]
     public void GetCategorySettings_WithValidType_ShouldReturnSettings()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var settings = _service.GetCategorySettings<MainUiSettings>();
+        var settings = service.GetCategorySettings<MainUiSettings>();
 
         // Assert
         Assert.NotNull(settings);
@@ -164,18 +217,22 @@ public class EnhancedSettingsServiceTests : IDisposable
     public async Task SetCategorySettingsAsync_WithValidSettings_ShouldNotThrow()
     {
         // Arrange
+        var service = CreateService();
         var settings = new MainUiSettings();
 
         // Act & Assert
-        await _service.SetCategorySettingsAsync(settings);
+        await service.SetCategorySettingsAsync(settings);
     }
 
     [Fact]
     public async Task SetCategorySettingsAsync_WithNullSettings_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.SetCategorySettingsAsync<MainUiSettings>(null!));
+            service.SetCategorySettingsAsync<MainUiSettings>(null!));
     }
 
     #endregion
@@ -186,10 +243,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     public void GetGameProfile_WithValidProfileId_ShouldReturnNull()
     {
         // Arrange
+        var service = CreateService();
         const string profileId = "test-profile";
 
         // Act
-        var profile = _service.GetGameProfile(profileId);
+        var profile = service.GetGameProfile(profileId);
 
         // Assert
         Assert.Null(profile); // 新しいサービスでは存在しない
@@ -198,15 +256,21 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void GetGameProfile_WithNullProfileId_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _service.GetGameProfile(null!));
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => service.GetGameProfile(null!));
     }
 
     [Fact]
     public void GetGameProfile_WithEmptyProfileId_ShouldThrowArgumentException()
     {
-        // Arrange & Act & Assert
-        Assert.Throws<ArgumentException>(() => _service.GetGameProfile(string.Empty));
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => service.GetGameProfile(string.Empty));
     }
 
     [Fact]
@@ -218,7 +282,8 @@ public class EnhancedSettingsServiceTests : IDisposable
         var profile = new GameProfileSettings();
 
         // Act & Assert
-        await _service.SaveGameProfileAsync(profileId, profile);
+        var service = CreateService();
+        await service.SaveGameProfileAsync(profileId, profile);
     }
 
     [Fact]
@@ -228,8 +293,9 @@ public class EnhancedSettingsServiceTests : IDisposable
         var profile = new GameProfileSettings();
 
         // Act & Assert
+        var service = CreateService();
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.SaveGameProfileAsync(null!, profile));
+            service.SaveGameProfileAsync(null!, profile));
     }
 
     [Fact]
@@ -239,8 +305,9 @@ public class EnhancedSettingsServiceTests : IDisposable
         const string profileId = "test-profile";
 
         // Act & Assert
+        var service = CreateService();
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.SaveGameProfileAsync(profileId, null!));
+            service.SaveGameProfileAsync(profileId, null!));
     }
 
     [Fact]
@@ -250,22 +317,29 @@ public class EnhancedSettingsServiceTests : IDisposable
         const string profileId = "test-profile";
 
         // Act & Assert
-        await _service.DeleteGameProfileAsync(profileId);
+        var service = CreateService();
+        await service.DeleteGameProfileAsync(profileId);
     }
 
     [Fact]
     public async Task DeleteGameProfileAsync_WithNullProfileId_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.DeleteGameProfileAsync(null!));
+            service.DeleteGameProfileAsync(null!));
     }
 
     [Fact]
     public void GetAllGameProfiles_ShouldReturnEmptyDictionary()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var profiles = _service.GetAllGameProfiles();
+        var profiles = service.GetAllGameProfiles();
 
         // Assert
         Assert.NotNull(profiles);
@@ -275,15 +349,21 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public async Task SetActiveGameProfileAsync_WithNull_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        await _service.SetActiveGameProfileAsync(null);
+        await service.SetActiveGameProfileAsync(null);
     }
 
     [Fact]
     public void GetActiveGameProfile_ShouldReturnNull()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var profile = _service.GetActiveGameProfile();
+        var profile = service.GetActiveGameProfile();
 
         // Assert
         Assert.Null(profile);
@@ -296,55 +376,74 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public async Task SaveAsync_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        await _service.SaveAsync();
+        await service.SaveAsync();
     }
 
     [Fact]
     public async Task ReloadAsync_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        await _service.ReloadAsync();
+        await service.ReloadAsync();
     }
 
     [Fact]
     public async Task ResetToDefaultsAsync_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        await _service.ResetToDefaultsAsync();
+        await service.ResetToDefaultsAsync();
     }
 
     [Fact]
     public async Task CreateBackupAsync_WithoutFilePath_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        await _service.CreateBackupAsync();
+        await service.CreateBackupAsync();
     }
 
     [Fact]
     public async Task CreateBackupAsync_WithFilePath_ShouldNotThrow()
     {
         // Arrange
+        var service = CreateService();
         const string filePath = "test-backup.json";
 
         // Act & Assert
-        await _service.CreateBackupAsync(filePath);
+        await service.CreateBackupAsync(filePath);
     }
 
     [Fact]
     public async Task RestoreFromBackupAsync_WithNullFilePath_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.RestoreFromBackupAsync(null!));
+            service.RestoreFromBackupAsync(null!));
     }
 
     [Fact]
     public async Task RestoreFromBackupAsync_WithEmptyFilePath_ShouldThrowArgumentException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            _service.RestoreFromBackupAsync(string.Empty));
+            service.RestoreFromBackupAsync(string.Empty));
     }
 
     #endregion
@@ -354,8 +453,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void ValidateSettings_ShouldReturnValidationResult()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var result = _service.ValidateSettings();
+        var result = service.ValidateSettings();
 
         // Assert
         Assert.NotNull(result);
@@ -368,7 +470,8 @@ public class EnhancedSettingsServiceTests : IDisposable
         _mockMigrationManager.Setup(m => m.RequiresMigration(It.IsAny<int>())).Returns(false);
 
         // Act
-        var requiresMigration = _service.RequiresMigration();
+        var service = CreateService();
+        var requiresMigration = service.RequiresMigration();
 
         // Assert
         Assert.False(requiresMigration);
@@ -381,7 +484,8 @@ public class EnhancedSettingsServiceTests : IDisposable
         _mockMigrationManager.Setup(m => m.RequiresMigration(It.IsAny<int>())).Returns(false);
 
         // Act & Assert
-        await _service.MigrateSettingsAsync();
+        var service = CreateService();
+        await service.MigrateSettingsAsync();
     }
 
     #endregion
@@ -391,8 +495,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void GetStatistics_ShouldReturnStatistics()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var statistics = _service.GetStatistics();
+        var statistics = service.GetStatistics();
 
         // Assert
         Assert.NotNull(statistics);
@@ -401,8 +508,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void GetChangeHistory_WithDefaultMaxEntries_ShouldReturnHistory()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var history = _service.GetChangeHistory();
+        var history = service.GetChangeHistory();
 
         // Assert
         Assert.NotNull(history);
@@ -413,10 +523,11 @@ public class EnhancedSettingsServiceTests : IDisposable
     public void GetChangeHistory_WithCustomMaxEntries_ShouldReturnHistory()
     {
         // Arrange
+        var service = CreateService();
         const int maxEntries = 50;
 
         // Act
-        var history = _service.GetChangeHistory(maxEntries);
+        var history = service.GetChangeHistory(maxEntries);
 
         // Assert
         Assert.NotNull(history);
@@ -430,15 +541,19 @@ public class EnhancedSettingsServiceTests : IDisposable
         const string settingKey = "test.setting";
 
         // Act & Assert
-        await _service.AddToFavoritesAsync(settingKey);
+        var service = CreateService();
+        await service.AddToFavoritesAsync(settingKey);
     }
 
     [Fact]
     public async Task AddToFavoritesAsync_WithNullSettingKey_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.AddToFavoritesAsync(null!));
+            service.AddToFavoritesAsync(null!));
     }
 
     [Fact]
@@ -448,22 +563,29 @@ public class EnhancedSettingsServiceTests : IDisposable
         const string settingKey = "test.setting";
 
         // Act & Assert
-        await _service.RemoveFromFavoritesAsync(settingKey);
+        var service = CreateService();
+        await service.RemoveFromFavoritesAsync(settingKey);
     }
 
     [Fact]
     public async Task RemoveFromFavoritesAsync_WithNullSettingKey_ShouldThrowArgumentNullException()
     {
-        // Arrange & Act & Assert
+        // Arrange
+        var service = CreateService();
+
+        // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _service.RemoveFromFavoritesAsync(null!));
+            service.RemoveFromFavoritesAsync(null!));
     }
 
     [Fact]
     public void GetFavoriteSettings_ShouldReturnEmptyList()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act
-        var favorites = _service.GetFavoriteSettings();
+        var favorites = service.GetFavoriteSettings();
 
         // Assert
         Assert.NotNull(favorites);
@@ -506,23 +628,33 @@ public class EnhancedSettingsServiceTests : IDisposable
     [Fact]
     public void Dispose_ShouldNotThrow()
     {
+        // Arrange
+        var service = CreateService();
+
         // Act & Assert
-        _service.Dispose();
+        service.Dispose();
     }
 
     #endregion
 
     public void Dispose()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-    
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
+        // テスト用ファイルのクリーンアップ
+        try
         {
-            _service?.Dispose();
+            var directory = Path.GetDirectoryName(_tempSettingsPath);
+            if (directory != null && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+        catch (IOException)
+        {
+            // ファイルシステムエラーは無視
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // アクセス権限エラーは無視
         }
     }
 }

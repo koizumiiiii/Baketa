@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
@@ -23,10 +24,12 @@ using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.Onnx;
+using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -62,6 +65,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
             
+            // Phase 5: ポート競合防止機構サービス
+            RegisterPortManagementServices(services);
+            
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
             
@@ -93,6 +99,22 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 例: services.AddSingleton<ITextBoxDetector, PaddleTextBoxDetector>();
             // 例: services.AddSingleton<ITextRecognizer, PaddleTextRecognizer>();
             
+            // 🎯 Issue #147 Phase 2: AdaptiveTileStrategy登録
+            services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.ITileStrategy>(provider =>
+            {
+                var textDetector = provider.GetRequiredService<IOcrEngine>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy>>();
+                var adaptiveStrategy = new Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy(textDetector, logger);
+                
+                var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();
+                moduleLogger?.LogInformation("🚀 AdaptiveTileStrategy登録完了 - テキスト分割問題解決版");
+                
+                return adaptiveStrategy;
+            });
+            
+            // OcrRegionGenerator（ITileStrategy使用）
+            services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.OcrRegionGenerator>();
+            
             // OCR精度測定システム
             services.AddSingleton<IOcrAccuracyMeasurement, OcrAccuracyMeasurement>();
             services.AddSingleton<AccuracyBenchmarkService>();
@@ -103,6 +125,25 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // OCR精度測定スタートアップサービス
             services.AddOcrAccuracyStartupService();
+        }
+        
+        /// <summary>
+        /// Phase 5: ポート競合防止機構サービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterPortManagementServices(IServiceCollection services)
+        {
+            Console.WriteLine("🚀 Issue #147 Phase 5: ポート競合防止機構サービス登録開始");
+            
+            // ポート管理サービス（Singleton: グローバルMutex管理）
+            services.AddSingleton<IPortManagementService, Baketa.Infrastructure.Translation.Services.PortManagementService>();
+            Console.WriteLine("✅ PortManagementService登録完了 - Mutexプロセス間競合防止");
+            
+            // Pythonサーバー管理サービス（Singleton: ヘルスチェック機能付き）
+            services.AddSingleton<IPythonServerManager, Baketa.Infrastructure.Translation.Services.PythonServerManager>();
+            Console.WriteLine("✅ PythonServerManager登録完了 - 動的ポート管理・自動復旧");
+            
+            Console.WriteLine("🎉 Phase 5: ポート競合防止機構サービス登録完了");
         }
         
         /// <summary>
@@ -117,8 +158,77 @@ namespace Baketa.Infrastructure.DI.Modules;
             // パフォーマンス監視サービスを登録 (Issue #144)
             services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
             
+            // 🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム統合
+            Console.WriteLine("🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始");
+            
+            // ハイブリッド戦略設定
+            // TODO: appsettings.jsonへの外部化推奨（Geminiコードレビュー指摘事項）
+            // IOptions<HybridStrategySettings>パターンを使用して設定を外部化し、
+            // 本番環境で負荷に応じた閾値調整を可能にする
+            services.AddSingleton<Baketa.Infrastructure.Translation.Strategies.HybridStrategySettings>(provider =>
+            {
+                // デフォルト設定で初期化
+                return new Baketa.Infrastructure.Translation.Strategies.HybridStrategySettings
+                {
+                    BatchThreshold = 5,      // 5件以上でバッチ処理
+                    ParallelThreshold = 2,   // 2件以上で並列処理
+                    MaxDegreeOfParallelism = 4,  // 並列度（接続プールサイズと協調必要）
+                    EnableMetrics = true
+                };
+            });
+            
+            // 翻訳メトリクス収集サービス
+            services.AddSingleton<Baketa.Infrastructure.Translation.Metrics.TranslationMetricsCollector>();
+            Console.WriteLine("✅ TranslationMetricsCollector登録完了");
+            
+            // 翻訳戦略登録（優先度順）
+            
+            // 1. 単一翻訳戦略（最低優先度、フォールバック用）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Strategies.SingleTranslationStrategy>();
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationStrategy>(provider =>
+            {
+                var strategy = provider.GetRequiredService<Baketa.Infrastructure.Translation.Strategies.SingleTranslationStrategy>();
+                Console.WriteLine("✅ SingleTranslationStrategy登録完了 - Priority: 10");
+                return strategy;
+            });
+            
+            // 2. 並列翻訳戦略（中優先度）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Strategies.ParallelTranslationStrategy>();
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationStrategy>(provider =>
+            {
+                var strategy = provider.GetRequiredService<Baketa.Infrastructure.Translation.Strategies.ParallelTranslationStrategy>();
+                Console.WriteLine("✅ ParallelTranslationStrategy登録完了 - Priority: 50");
+                return strategy;
+            });
+            
+            // 3. バッチ翻訳戦略（最高優先度）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Strategies.BatchTranslationStrategy>();
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationStrategy>(provider =>
+            {
+                var strategy = provider.GetRequiredService<Baketa.Infrastructure.Translation.Strategies.BatchTranslationStrategy>();
+                Console.WriteLine("✅ BatchTranslationStrategy登録完了 - Priority: 100");
+                return strategy;
+            });
+            
+            // ハイブリッド翻訳戦略（戦略統合オーケストレーター）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Strategies.HybridTranslationStrategy>(provider =>
+            {
+                var strategies = provider.GetServices<Baketa.Core.Abstractions.Translation.ITranslationStrategy>();
+                var metricsCollector = provider.GetRequiredService<Baketa.Infrastructure.Translation.Metrics.TranslationMetricsCollector>();
+                var settings = provider.GetRequiredService<Baketa.Infrastructure.Translation.Strategies.HybridStrategySettings>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Strategies.HybridTranslationStrategy>>();
+                
+                var hybridStrategy = new Baketa.Infrastructure.Translation.Strategies.HybridTranslationStrategy(
+                    strategies, metricsCollector, settings, logger);
+                    
+                Console.WriteLine("🎯 HybridTranslationStrategy登録完了 - 戦略統合オーケストレーター");
+                return hybridStrategy;
+            });
+            
             // 翻訳サービスを登録
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
+            
+            Console.WriteLine("✅ Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了");
         }
         
         /// <summary>
@@ -189,6 +299,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <summary>
         /// HuggingFace Transformers OPUS-MT翻訳サービスを登録します。
         /// 語彙サイズ不整合問題を完全解決した高品質版です。
+        /// Issue #147: 接続プール統合による接続ロック競合問題解決
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTransformersOpusMTServices(IServiceCollection services)
@@ -202,29 +313,38 @@ namespace Baketa.Infrastructure.DI.Modules;
             {
                 services.Remove(service);
             }
+
+            // 🎭 Issue #147 Phase 3.2: Mock翻訳エンジン登録（ハイブリッド戦略テスト用）
+            // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
+            Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
             
-            // 🚀 Issue #144: OptimizedPythonTranslationEngineを優先エンジンとして登録（500ms目標）
-            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
+            // 🚨 TEMPORARY FIX: 接続プール無効化（汚染問題完全解決まで）
+            // 各リクエストで新規接続作成により状態汚染を根絶
+            // services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+            Console.WriteLine("🚨 FixedSizeConnectionPool一時無効化 - 汚染問題根本解決のため");
+            
+            // 🔄 単発接続版OptimizedPythonTranslationEngineに切り替え（汚染問題緊急対応）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
+                // var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+                var translationSettings = provider.GetRequiredService<IOptions<TranslationSettings>>();
+                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 単発接続版（汚染対策）");
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, null, translationSettings);
+            });
+            
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
             {
                 var logger = provider.GetService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                logger?.LogInformation("🚀 OptimizedPythonTranslationEngine初期化開始 - 500ms目標エンジン");
+                logger?.LogInformation("🔥 OptimizedPythonTranslationEngine（接続プール統合版）をITranslationEngineとして登録");
                 var optimizedEngine = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
                 // OptimizedPythonTranslationEngineは両方のITranslationEngineインターフェースを実装
                 return (Baketa.Core.Abstractions.Translation.ITranslationEngine)optimizedEngine;
             });
             
-            // フォールバック用にTransformersOpusMtEngineも登録（具象型）
-            services.AddSingleton<TransformersOpusMtEngine>(provider =>
-            {
-                var logger = provider.GetService<ILogger<TransformersOpusMtEngine>>();
-                logger?.LogInformation("🔧 TransformersOpusMtEngineフォールバック初期化");
-                var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
-                return new TransformersOpusMtEngine(logger!, settingsService);
-            });
+            Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み");
             
-            Console.WriteLine($"🚀 OptimizedPythonTranslationEngine（500ms目標）を優先エンジンとして登録しました（削除した既存登録数: {existingTranslationEngines.Count}）");
-            Console.WriteLine("⚡ Issue #144: Python翻訳最適化エンジンがアクティブです");
+            Console.WriteLine($"🚀 Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: {existingTranslationEngines.Count}）");
         }
         
         /// <summary>

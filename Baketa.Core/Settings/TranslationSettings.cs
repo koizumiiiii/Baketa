@@ -34,7 +34,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultSourceLanguage { get; set; } = "en";
+    public string DefaultSourceLanguage { get; set; } = "ja";
     
     /// <summary>
     /// デフォルトターゲット言語
@@ -42,7 +42,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultTargetLanguage { get; set; } = "ja";
+    public string DefaultTargetLanguage { get; set; } = "en";
     
     /// <summary>
     /// 翻訳遅延時間（ミリ秒）
@@ -284,6 +284,63 @@ public sealed class TranslationSettings
         Description = "BitBltを優先して使用します（PrintWindowでテキスト検出に問題がある場合）")]
     public bool PreferLegacyCapture { get; set; }
     
+    // ✨ Issue #147: 接続プール設定（Python翻訳エンジン最適化）
+    
+    /// <summary>
+    /// 最大接続数。nullの場合は自動計算（CPU数/2）を使用します
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "最大接続数", 
+        Description = "Python翻訳エンジンの最大接続数（null=自動、CPU数/2で最適化）", 
+        MinValue = 1, 
+        MaxValue = 20)]
+    public int? MaxConnections { get; set; }
+    
+    /// <summary>
+    /// 最小接続数。接続プールの下限を設定します
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "最小接続数", 
+        Description = "Python翻訳エンジンの最小接続数", 
+        MinValue = 1, 
+        MaxValue = 5)]
+    public int MinConnections { get; set; } = 1;
+    
+    /// <summary>
+    /// 1接続あたりの最適なバッチサイズ
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "最適バッチサイズ", 
+        Description = "1つの接続で処理する最適なテキストバッチサイズ", 
+        MinValue = 1, 
+        MaxValue = 10)]
+    public int OptimalChunksPerConnection { get; set; } = 4;
+    
+    /// <summary>
+    /// 接続タイムアウト時間（ミリ秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "接続タイムアウト", 
+        Description = "Python翻訳エンジンへの接続タイムアウト時間", 
+        Unit = "ms", 
+        MinValue = 5000, 
+        MaxValue = 60000)]
+    public int ConnectionTimeoutMs { get; set; } = 30000;
+    
+    /// <summary>
+    /// 接続ヘルスチェック間隔（ミリ秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "ヘルスチェック間隔", 
+        Description = "接続プールのヘルスチェック実行間隔", 
+        Unit = "ms", 
+        MinValue = 10000, 
+        MaxValue = 300000)]
+    public int HealthCheckIntervalMs { get; set; } = 30000;
+
+    /// <summary>
+    /// 外部サーバー使用フラグ（trueの場合、独自プロセス起動を回避）
+    /// Issue #147: 既存サーバー利用のための設定
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "外部サーバー使用", 
+        Description = "既に起動しているPythonサーバーを使用します（開発/テスト時用）")]
+    public bool UseExternalServer { get; set; } = false;
+    
     /// <summary>
     /// 設定のクローンを作成します
     /// </summary>
@@ -326,7 +383,14 @@ public sealed class TranslationSettings
             ParagraphSeparationThreshold = ParagraphSeparationThreshold,
             PostTranslationCooldownSeconds = PostTranslationCooldownSeconds,
             UseTrueWindowCapture = UseTrueWindowCapture,
-            PreferLegacyCapture = PreferLegacyCapture
+            PreferLegacyCapture = PreferLegacyCapture,
+            // Issue #147: 接続プール設定のクローン
+            MaxConnections = MaxConnections,
+            MinConnections = MinConnections,
+            OptimalChunksPerConnection = OptimalChunksPerConnection,
+            ConnectionTimeoutMs = ConnectionTimeoutMs,
+            HealthCheckIntervalMs = HealthCheckIntervalMs,
+            UseExternalServer = UseExternalServer
         };
     }
 }
