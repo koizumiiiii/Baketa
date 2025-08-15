@@ -316,8 +316,10 @@ public sealed class AdaptiveTileStrategy : ITileStrategy
             return null; // 小さすぎる領域は除外
         }
 
-        // 巨大すぎる領域は分割（オーバーフロー防止でlong計算→int変換）
-        var maxArea = (int)Math.Min(int.MaxValue, (long)image.Width * image.Height * parameters.MaxRegionSizeRatio);
+        // 巨大すぎる領域は分割（オーバーフロー防止でlong計算→int変換、浮動小数点精度保持）
+        var imageArea = (long)image.Width * image.Height;
+        var scaledMaxArea = (long)(imageArea * parameters.MaxRegionSizeRatio); // 浮動小数点計算を分離
+        var maxArea = (int)Math.Min(int.MaxValue, scaledMaxArea);
         if (bounds.Width * bounds.Height > maxArea)
         {
             _logger?.LogDebug("巨大領域検出、分割実行: {Width}x{Height} → 最大面積制限: {MaxArea}", 
@@ -341,8 +343,10 @@ public sealed class AdaptiveTileStrategy : ITileStrategy
         var bounds = largeRegion.Bounds;
         var splitRegions = new List<TileRegion>();
         
-        // 最適な分割サイズを計算（オーバーフロー防止でlong計算→int変換）
-        var targetArea = (int)Math.Min(int.MaxValue, (long)image.Width * image.Height * parameters.MaxRegionSizeRatio * 0.7); // 余裕をもたせる
+        // 最適な分割サイズを計算（オーバーフロー防止でlong計算→int変換、浮動小数点精度保持）
+        var baseArea = (long)image.Width * image.Height;
+        var scaledArea = (long)(baseArea * parameters.MaxRegionSizeRatio * 0.7); // 浮動小数点計算を分離
+        var targetArea = (int)Math.Min(int.MaxValue, scaledArea); // 余裕をもたせる
         var targetSize = (int)Math.Sqrt(targetArea);
         
         // 水平・垂直分割数を計算
