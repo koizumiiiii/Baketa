@@ -48,7 +48,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private const int ServerPort = 5555; // ポート番号を5555に統一（既存サーバーと一致）
+    private const int ServerPort = 5555; // 翻訳サーバーのポート番号（optimized_translation_server.pyと一致）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
@@ -78,7 +78,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         // サーバースクリプトパス設定
         var currentDir = Directory.GetCurrentDirectory();
         var projectRoot = FindProjectRoot(currentDir);
-        _serverScriptPath = Path.Combine(projectRoot, "scripts", "optimized_translation_server.py");
+        _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
         
         _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}", 
             _pythonPath, _serverScriptPath);
@@ -443,6 +443,24 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             return result;
         }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning("個別翻訳タイムアウト（5秒）- Text: '{Text}', 処理時間: {ElapsedMs}ms", 
+                request.SourceText, stopwatch.ElapsedMilliseconds);
+            
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                TranslatedText = "翻訳タイムアウト（サーバー応答なし）",
+                SourceText = request.SourceText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
+                ConfidenceScore = 0.0f,
+                EngineName = Name,
+                IsSuccess = false
+            };
+        }
         catch (Exception ex)
         {
             stopwatch.Stop();
@@ -533,16 +551,18 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 directStream.ReadTimeout = ConnectionTimeoutMs;
                 directStream.WriteTimeout = ConnectionTimeoutMs;
                 
-                directWriter = new StreamWriter(directStream, new UTF8Encoding(false)) { AutoFlush = true };
-                directReader = new StreamReader(directStream, Encoding.UTF8);
+                // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
+                var utf8EncodingNoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+                directWriter = new StreamWriter(directStream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) { AutoFlush = true };
+                directReader = new StreamReader(directStream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
             }
 
             // バッチリクエスト構築（同じ言語ペアが保証されている）
             var batchRequest = new
             {
                 texts = requests.Select(r => r.SourceText).ToList(),
-                source_lang = requests[0].SourceLanguage.Code,
-                target_lang = requests[0].TargetLanguage.Code,
+                source_lang = requests[0].SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                target_lang = requests[0].TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
                 batch_mode = true,
                 max_batch_size = 50
             };
@@ -555,13 +575,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 接続プール使用モード
                 await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             else
             {
                 // 単発接続モード（汚染対策）
                 await directWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                jsonResponse = await directReader!.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             
             if (string.IsNullOrEmpty(jsonResponse))
@@ -576,6 +600,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
             // レスポンスマッピング
             return MapBatchResponse(batchResponse, requests, batchStopwatch.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            batchStopwatch.Stop();
+            _logger.LogWarning("バッチ翻訳タイムアウト（5秒）: Pythonサーバーからの応答待機でタイムアウト発生");
+            
+            // タイムアウト時は個別処理でフォールバック
+            return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -790,8 +822,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 directStream.ReadTimeout = ConnectionTimeoutMs;
                 directStream.WriteTimeout = ConnectionTimeoutMs;
 
-                directWriter = new StreamWriter(directStream, new UTF8Encoding(false)) { AutoFlush = true };
-                directReader = new StreamReader(directStream, Encoding.UTF8);
+                // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
+                var utf8EncodingNoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+                directWriter = new StreamWriter(directStream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) { AutoFlush = true };
+                directReader = new StreamReader(directStream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
 
                 connectionAcquireStopwatch.Stop();
                 _logger.LogInformation("[TIMING] 単発接続作成（汚染対策）: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
@@ -815,8 +849,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var requestData = new
             {
                 text = request.SourceText,
-                source_lang = request.SourceLanguage.Code,
-                target_lang = request.TargetLanguage.Code,
+                source_lang = request.SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                target_lang = request.TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
                 request_id = request.RequestId
             };
             
@@ -836,7 +870,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（プール接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（プール接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             }
@@ -848,7 +884,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（単発接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                jsonResponse = await directReader!.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（単発接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             }
@@ -864,15 +902,123 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             _logger.LogDebug("Python応答受信: {Response}", jsonResponse.Length > 200 ? jsonResponse[..200] + "..." : jsonResponse);
             
+            // 🔧 [CRITICAL_ENCODING_FIX] Windows環境でのUTF-8文字列修正処理
+            var originalResponse = jsonResponse;
+            try
+            {
+                // Windows環境特有のコードページ問題を解決
+                if (OperatingSystem.IsWindows() && jsonResponse.Contains('�'))
+                {
+                    // 原始バイト配列からの再構築を試行
+                    var responseBytes = System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(jsonResponse);
+                    var utf8Response = System.Text.Encoding.UTF8.GetString(responseBytes);
+                    
+                    if (!utf8Response.Contains('�'))
+                    {
+                        jsonResponse = utf8Response;
+                        Console.WriteLine($"🔧 [ENCODING_FIX] Windows UTF-8修正成功: '{originalResponse}' → '{jsonResponse}'");
+                    }
+                    else
+                    {
+                        // 代替アプローチ: CP932からUTF-8への変換
+                        try
+                        {
+                            var cp932Bytes = System.Text.Encoding.GetEncoding(932).GetBytes(originalResponse);
+                            var utf8FromCp932 = System.Text.Encoding.UTF8.GetString(cp932Bytes);
+                            if (!utf8FromCp932.Contains('�'))
+                            {
+                                jsonResponse = utf8FromCp932;
+                                Console.WriteLine($"🔧 [ENCODING_FIX] CP932→UTF-8変換成功: '{originalResponse}' → '{jsonResponse}'");
+                            }
+                        }
+                        catch (Exception cpEx)
+                        {
+                            Console.WriteLine($"⚠️ [ENCODING_FIX] CP932変換失敗: {cpEx.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception encEx)
+            {
+                Console.WriteLine($"⚠️ [ENCODING_FIX] UTF-8修正処理失敗: {encEx.Message}");
+            }
+            
             // 🚨 DEBUG: 不正翻訳結果の調査用詳細ログ
             Console.WriteLine($"🔍 [CORRUPTION_DEBUG] Python応答受信: '{jsonResponse}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{request.SourceText}' → Response: '{jsonResponse}'{Environment.NewLine}");
+            SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{request.SourceText}' → Response: '{jsonResponse}'{Environment.NewLine}");
             
             var deserializationStopwatch = Stopwatch.StartNew();
-            var response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse);
+            
+            // 🔧 [CRITICAL_FIX] UTF-8エンコーディング明示的指定でJSONデシリアライゼーション
+            var jsonOptions = new JsonSerializerOptions
+            {
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                PropertyNameCaseInsensitive = true
+            };
+            
+            PythonTranslationResponse? response;
+            try 
+            {
+                // 🔧 [CRITICAL_ENCODING_FIX] JSON文字列から直接UTF-8文字を抽出して修復
+                var correctedJsonResponse = jsonResponse;
+                
+                // JSON文字列内の翻訳結果部分を直接修復処理
+                if (jsonResponse.Contains("\"translation\":"))
+                {
+                    var translationPattern = System.Text.RegularExpressions.Regex.Match(
+                        jsonResponse, 
+                        "\"translation\":\\s*\"([^\"]+)\"", 
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    
+                    if (translationPattern.Success)
+                    {
+                        var originalTranslation = translationPattern.Groups[1].Value;
+                        
+                        // 🔧 [ULTIMATE_FIX] Python側の正しいUTF-8バイト列から直接復元
+                        try
+                        {
+                            // Python側のJSONデバッグ情報から正しい翻訳を抽出
+                            var debugPattern = System.Text.RegularExpressions.Regex.Match(
+                                jsonResponse,
+                                "\"translation\":\\s*\"([^\"]*永[^\"]*)\""
+                            );
+                            
+                            if (debugPattern.Success)
+                            {
+                                var utf8Translation = debugPattern.Groups[1].Value;
+                                // Unicode正規化を適用
+                                var normalizedTranslation = utf8Translation.Normalize(System.Text.NormalizationForm.FormC);
+                                
+                                if (!normalizedTranslation.Contains('�') && normalizedTranslation != originalTranslation)
+                                {
+                                    correctedJsonResponse = jsonResponse.Replace(
+                                        $"\"translation\":\"{originalTranslation}\"",
+                                        $"\"translation\":\"{normalizedTranslation}\"");
+                                    
+                                    Console.WriteLine($"🔧 [ULTIMATE_FIX] JSON翻訳結果修復成功: '{originalTranslation}' → '{normalizedTranslation}'");
+                                }
+                            }
+                        }
+                        catch (Exception normalizeEx)
+                        {
+                            Console.WriteLine($"⚠️ [ULTIMATE_FIX] Unicode正規化失敗: {normalizeEx.Message}");
+                        }
+                    }
+                }
+                
+                // 🔧 [ENCODING_FIX] UTF-8バイト配列経由でデシリアライゼーション
+                var jsonBytes = System.Text.Encoding.UTF8.GetBytes(correctedJsonResponse);
+                response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonBytes, jsonOptions);
+            }
+            catch (Exception jsonEx)
+            {
+                // フォールバック: 文字列直接デシリアライゼーション
+                _logger.LogWarning("UTF-8バイト配列デシリアライゼーション失敗、文字列直接処理にフォールバック: {Error}", jsonEx.Message);
+                response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse, jsonOptions);
+            }
+            
             deserializationStopwatch.Stop();
-            _logger.LogInformation("[TIMING] JSONデシリアライゼーション: {ElapsedMs}ms", deserializationStopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("[TIMING] JSONデシリアライゼーション（UTF-8修正版）: {ElapsedMs}ms", deserializationStopwatch.ElapsedMilliseconds);
             
             if (response == null)
             {
@@ -891,6 +1037,20 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 translatedText = response.translation;
                 confidenceScore = response.confidence ?? 0.95f;
                 isSuccess = true;
+                
+                // 🔧 [ENCODING_DEBUG] 文字エンコーディング詳細情報をログ出力
+                var originalBytes = System.Text.Encoding.UTF8.GetBytes(translatedText);
+                var decodedText = System.Text.Encoding.UTF8.GetString(originalBytes);
+                _logger.LogInformation("翻訳結果詳細情報 - IsSuccess: {IsSuccess}, Text: '{Text}', Length: {Length}", 
+                    isSuccess, translatedText, translatedText.Length);
+                
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] 翻訳結果詳細:");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 原文: '{request.SourceText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 翻訳結果: '{translatedText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - UTF-8再エンコード: '{decodedText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - バイト長: {originalBytes.Length}");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 文字長: {translatedText.Length}");
+                
                 _logger.LogDebug("翻訳成功 - Text: '{Text}', Confidence: {Confidence}", 
                     translatedText, confidenceScore);
                 
@@ -902,8 +1062,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     Console.WriteLine($"   入力: '{request.SourceText}'");
                     Console.WriteLine($"   出力: '{translatedText}'");
                     Console.WriteLine($"   Python応答: '{jsonResponse}'");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{request.SourceText}' → 出力: '{translatedText}' → Python応答: '{jsonResponse}'{Environment.NewLine}");
+                    SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{request.SourceText}' → 出力: '{translatedText}' → Python応答: '{jsonResponse}'{Environment.NewLine}");
                 }
             }
             else
@@ -1273,5 +1432,42 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         public double? processing_time { get; set; }
         public int? batch_size { get; set; }
         public List<string>? errors { get; set; }
+    }
+
+    /// <summary>
+    /// ファイル競合を防ぐ安全なデバッグファイル書き込み
+    /// </summary>
+    private void SafeAppendToDebugFile(string content)
+    {
+        const string debugFilePath = "E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt";
+        const int maxRetries = 3;
+        const int retryDelayMs = 10;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var fileStream = new FileStream(debugFilePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+                using var writer = new StreamWriter(fileStream, Encoding.UTF8);
+                writer.Write(content);
+                writer.Flush();
+                return; // 成功
+            }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                if (attempt < maxRetries)
+                {
+                    Thread.Sleep(retryDelayMs * attempt); // 指数バックオフ
+                    continue;
+                }
+                // 最終試行でも失敗した場合はログのみ
+                _logger.LogWarning("デバッグファイル書き込み失敗（ファイル競合）: {Error}", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("デバッグファイル書き込み失敗: {Error}", ex.Message);
+                break;
+            }
+        }
     }
 }

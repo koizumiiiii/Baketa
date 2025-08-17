@@ -158,6 +158,11 @@ namespace Baketa.Infrastructure.DI.Modules;
             // パフォーマンス監視サービスを登録 (Issue #144)
             services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
             
+            // 🚨 翻訳サーバー安定化: Python サーバーヘルスモニター（バックグラウンドサービス）
+            Console.WriteLine("🔍 [DI_DEBUG] PythonServerHealthMonitor登録開始");
+            services.AddHostedService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
+            Console.WriteLine("✅ [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能");
+            
             // 🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム統合
             Console.WriteLine("🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始");
             
