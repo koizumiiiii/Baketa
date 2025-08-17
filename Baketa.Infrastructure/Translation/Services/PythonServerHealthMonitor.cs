@@ -7,9 +7,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
+using Baketa.Core.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Translation.Services;
 
@@ -20,15 +20,18 @@ namespace Baketa.Infrastructure.Translation.Services;
 public class PythonServerHealthMonitor : IHostedService, IDisposable
 {
     private readonly ILogger<PythonServerHealthMonitor> _logger;
-    private readonly TranslationSettings _settings;
-    private readonly System.Threading.Timer? _healthCheckTimer;
+    private readonly ISettingsService _settingsService;
+    private System.Threading.Timer? _healthCheckTimer;
     private readonly SemaphoreSlim _restartLock = new(1, 1);
     
     private int _consecutiveFailures = 0;
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
-    private int _currentServerPort = 5555;
+    private int _currentServerPort = 5556;
+    
+    // 動的に取得した設定を保持
+    private TranslationSettings? _cachedSettings;
     
     // ヘルスチェック統計
     private long _totalHealthChecks = 0;
@@ -38,54 +41,52 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
 
     public PythonServerHealthMonitor(
         ILogger<PythonServerHealthMonitor> logger,
-        IOptions<TranslationSettings> settings)
+        ISettingsService settingsService)
     {
         Console.WriteLine("🔍 [HEALTH_MONITOR] コンストラクタ開始");
         
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] settings パラメータ: {settings?.GetType().Name ?? "null"}");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] settings.Value: {settings?.Value?.GetType().Name ?? "null"}");
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
         
-        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
-        
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] EnableServerAutoRestart設定値: {_settings.EnableServerAutoRestart}");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {_settings.HealthCheckIntervalMs}ms");
-        
-        if (_settings.EnableServerAutoRestart)
-        {
-            _healthCheckTimer = new System.Threading.Timer(
-                PerformHealthCheckCallback,
-                null,
-                TimeSpan.FromSeconds(10), // 初回は10秒後
-                TimeSpan.FromMilliseconds(_settings.HealthCheckIntervalMs));
-            
-            _logger.LogInformation("🔍 サーバーヘルスモニター開始 - 間隔: {IntervalMs}ms, 最大失敗回数: {MaxFailures}",
-                _settings.HealthCheckIntervalMs, _settings.MaxConsecutiveFailures);
-            Console.WriteLine("✅ [HEALTH_MONITOR] ヘルスチェックタイマー開始完了");
-        }
-        else
-        {
-            _logger.LogInformation("⚠️ サーバー自動再起動は無効化されています");
-            Console.WriteLine("⚠️ [HEALTH_MONITOR] サーバー自動再起動は無効化されています");
-        }
+        // 設定の遅延取得（StartAsync時に実際に取得）
+        Console.WriteLine("✅ [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("✅ PythonServerHealthMonitor開始");
         
-        if (_settings.EnableServerAutoRestart)
+        // 設定を動的に取得
+        var settings = await _settingsService.GetAsync<TranslationSettings>().ConfigureAwait(false);
+        if (settings == null)
         {
-            _logger.LogInformation("🔍 ヘルスチェック開始 - 間隔: {IntervalMs}ms", _settings.HealthCheckIntervalMs);
-            // タイマーは既にコンストラクタで開始されているので、ここでは状態確認のみ
+            _logger.LogWarning("⚠️ TranslationSettings が取得できません - デフォルト設定で動作");
+            Console.WriteLine("⚠️ [HEALTH_MONITOR] TranslationSettings が取得できません");
+            return;
+        }
+        
+        // 設定をキャッシュ
+        _cachedSettings = settings;
+        
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart={settings.EnableServerAutoRestart}");
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {settings.HealthCheckIntervalMs}ms");
+        
+        if (settings.EnableServerAutoRestart)
+        {
+            // ヘルスチェックタイマーを開始
+            var interval = TimeSpan.FromMilliseconds(settings.HealthCheckIntervalMs);
+            _healthCheckTimer = new System.Threading.Timer(PerformHealthCheckCallback, null, interval, interval);
+            
+            _logger.LogInformation("🔍 ヘルスチェック開始 - 間隔: {IntervalMs}ms", settings.HealthCheckIntervalMs);
+            Console.WriteLine("✅ [HEALTH_MONITOR] ヘルスチェック有効 - 自動監視開始");
         }
         else
         {
             _logger.LogWarning("⚠️ サーバー自動再起動は無効化されています");
+            Console.WriteLine("⚠️ [HEALTH_MONITOR] サーバー自動再起動は無効化されています");
         }
-        
-        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -119,9 +120,9 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
     {
         Console.WriteLine($"🔍 [HEALTH_MONITOR] ヘルスチェック実行開始 - {DateTime.Now:HH:mm:ss.fff}");
         
-        if (_disposed || !_settings.EnableServerAutoRestart)
+        if (_disposed || _cachedSettings == null || !_cachedSettings.EnableServerAutoRestart)
         {
-            Console.WriteLine($"⚠️ [HEALTH_MONITOR] スキップ - disposed:{_disposed}, enabled:{_settings.EnableServerAutoRestart}");
+            Console.WriteLine($"⚠️ [HEALTH_MONITOR] スキップ - disposed:{_disposed}, enabled:{_cachedSettings?.EnableServerAutoRestart ?? false}");
             return;
         }
 
@@ -152,11 +153,11 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
                 Interlocked.Increment(ref _totalFailures);
                 
                 _logger.LogWarning("🚨 サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
-                    _consecutiveFailures, _settings.MaxConsecutiveFailures, _currentServerPort);
-                Console.WriteLine($"🚨 [HEALTH_MONITOR] サーバーヘルスチェック失敗 ({_consecutiveFailures}/{_settings.MaxConsecutiveFailures}) - Port: {_currentServerPort}");
+                    _consecutiveFailures, _cachedSettings.MaxConsecutiveFailures, _currentServerPort);
+                Console.WriteLine($"🚨 [HEALTH_MONITOR] サーバーヘルスチェック失敗 ({_consecutiveFailures}/{_cachedSettings.MaxConsecutiveFailures}) - Port: {_currentServerPort}");
                 
                 // 最大失敗回数に達したら再起動
-                if (_consecutiveFailures >= _settings.MaxConsecutiveFailures)
+                if (_consecutiveFailures >= _cachedSettings.MaxConsecutiveFailures)
                 {
                     Console.WriteLine($"🔄 [HEALTH_MONITOR] 最大失敗回数到達 - 自動再起動開始");
                     _ = Task.Run(async () => await HandleServerFailureAsync());
@@ -245,7 +246,7 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             await TerminateExistingServerAsync();
             
             // バックオフ待機
-            await Task.Delay(_settings.RestartBackoffMs);
+            await Task.Delay(_cachedSettings?.RestartBackoffMs ?? 5000);
             
             // 新しいサーバー起動
             var restartSuccess = await StartNewServerAsync();
@@ -321,11 +322,11 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
         {
             var pythonPath = "py"; // Windows Python Launcher使用
             var serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-                @"..\..\..\..\scripts\optimized_translation_server.py");
+                @"..\..\..\..\scripts\opus_mt_persistent_server.py");
             
             if (!File.Exists(serverScriptPath))
             {
-                serverScriptPath = @"scripts\optimized_translation_server.py";
+                serverScriptPath = @"scripts\opus_mt_persistent_server.py";
             }
             
             var processInfo = new ProcessStartInfo
@@ -347,7 +348,7 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             
             // 起動完了待機（タイムアウト付き）
             var startupTask = WaitForServerStartupAsync();
-            var timeoutTask = Task.Delay(_settings.ServerStartupTimeoutMs);
+            var timeoutTask = Task.Delay(_cachedSettings?.ServerStartupTimeoutMs ?? 30000);
             
             var completedTask = await Task.WhenAny(startupTask, timeoutTask);
             
@@ -357,7 +358,7 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             }
             else
             {
-                _logger.LogError("❌ サーバー起動タイムアウト ({TimeoutMs}ms)", _settings.ServerStartupTimeoutMs);
+                _logger.LogError("❌ サーバー起動タイムアウト ({TimeoutMs}ms)", _cachedSettings?.ServerStartupTimeoutMs ?? 30000);
                 return false;
             }
         }
