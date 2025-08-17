@@ -16,8 +16,9 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// <summary>
 /// Python翻訳サーバーのヘルスチェック・自動再起動サービス
 /// Geminiフィードバック反映: C#側でPythonプロセスを監視・管理
+/// 🔧 [GEMINI_REVIEW] IAsyncDisposableパターン適用によるデッドロック防止
 /// </summary>
-public class PythonServerHealthMonitor : IHostedService, IDisposable
+public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 {
     private readonly ILogger<PythonServerHealthMonitor> _logger;
     private readonly ISettingsService _settingsService;
@@ -29,6 +30,10 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
     private bool _disposed = false;
     private Process? _managedServerProcess;
     private int _currentServerPort = 5556;
+    
+    // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
+    private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
+    private static readonly string LockFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.lock");
     
     // 動的に取得した設定を保持
     private TranslationSettings? _cachedSettings;
@@ -275,6 +280,9 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
     {
         try
         {
+            // 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルベースの既存プロセス終了
+            await TerminateExistingServersByPidFileAsync();
+            
             if (_managedServerProcess != null && !_managedServerProcess.HasExited)
             {
                 _managedServerProcess.Kill();
@@ -282,34 +290,205 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
                 _logger.LogInformation("🔄 既存サーバープロセス終了完了");
             }
             
-            // ポートを使用している可能性のあるプロセスの確認・終了
-            var processName = "python";
-            var processes = Process.GetProcessesByName(processName);
-            
-            foreach (var process in processes)
-            {
-                try
-                {
-                    var commandLine = process.MainModule?.FileName ?? "";
-                    if (commandLine.Contains("opus_mt_persistent_server") || 
-                        commandLine.Contains("optimized_translation_server"))
-                    {
-                        process.Kill();
-                        process.WaitForExit(2000);
-                        _logger.LogInformation("🔄 翻訳サーバープロセス終了: PID {ProcessId}", process.Id);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug("プロセス終了時にエラー (PID {ProcessId}): {Error}", process.Id, ex.Message);
-                }
-            }
+            // 🚨 [CRITICAL_FIX] Python翻訳サーバーの完全終了（プロセス重複防止）
+            await TerminateAllTranslationServerProcessesAsync();
             
             await Task.Delay(1000); // プロセス終了後の安定化待機
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "⚠️ 既存プロセス終了時にエラー");
+        }
+    }
+    
+    /// <summary>
+    /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルベースの既存プロセス終了
+    /// </summary>
+    private async Task TerminateExistingServersByPidFileAsync()
+    {
+        try
+        {
+            if (File.Exists(PidFilePath))
+            {
+                var pidText = await File.ReadAllTextAsync(PidFilePath).ConfigureAwait(false);
+                if (int.TryParse(pidText.Trim(), out var existingPid))
+                {
+                    try
+                    {
+                        var existingProcess = Process.GetProcessById(existingPid);
+                        if (!existingProcess.HasExited)
+                        {
+                            _logger.LogWarning("🔄 [PROCESS_DUPLICATION_PREVENTION] 既存のPython翻訳サーバー終了: PID {ProcessId}", existingPid);
+                            existingProcess.Kill();
+                            existingProcess.WaitForExit(3000);
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // プロセスが既に存在しない場合は正常
+                        _logger.LogDebug("PIDファイル内のプロセス (PID: {ProcessId}) は既に終了済み", existingPid);
+                    }
+                }
+                
+                // PIDファイル削除
+                File.Delete(PidFilePath);
+                _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル削除完了");
+            }
+            
+            // ロックファイルも削除
+            if (File.Exists(LockFilePath))
+            {
+                File.Delete(LockFilePath);
+                _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] ロックファイル削除完了");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ PIDファイルベースの既存プロセス終了時にエラー");
+        }
+    }
+    
+    /// <summary>
+    /// 🚨 [CRITICAL_FIX] 全てのPython翻訳サーバープロセスの完全終了
+    /// 🔧 [GEMINI_REVIEW] ポート使用状況ベースの確実なプロセス特定
+    /// </summary>
+    private async Task TerminateAllTranslationServerProcessesAsync()
+    {
+        try
+        {
+            // 🔧 [GEMINI_REVIEW] ポート5556を使用するプロセスIDを特定
+            var processIdsUsingPort = await GetProcessIdsUsingPortAsync(_currentServerPort);
+            var terminatedCount = 0;
+            
+            foreach (var pid in processIdsUsingPort)
+            {
+                try
+                {
+                    var process = Process.GetProcessById(pid);
+                    if (!process.HasExited && process.ProcessName.Equals("python", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning("🔄 [PROCESS_CLEANUP] ポート{Port}使用Python翻訳サーバープロセス終了: PID {ProcessId}", 
+                            _currentServerPort, process.Id);
+                        process.Kill();
+                        process.WaitForExit(2000);
+                        terminatedCount++;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // プロセスが既に存在しない場合は正常
+                    _logger.LogDebug("ポート使用プロセス (PID: {ProcessId}) は既に終了済み", pid);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug("プロセス終了時にエラー (PID {ProcessId}): {Error}", pid, ex.Message);
+                }
+            }
+            
+            // 🔧 [GEMINI_REVIEW] フォールバック: プロセス名ベースの確認（非推奨だが保険）
+            if (terminatedCount == 0)
+            {
+                await TerminateByProcessNameFallbackAsync();
+            }
+            
+            if (terminatedCount > 0)
+            {
+                _logger.LogInformation("✅ [PROCESS_CLEANUP] Python翻訳サーバープロセス終了完了: {Count}個", terminatedCount);
+                await Task.Delay(2000); // 複数プロセス終了後の安定化待機
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ 全Python翻訳サーバープロセス終了時にエラー");
+        }
+    }
+    
+    /// <summary>
+    /// 🔧 [GEMINI_REVIEW] 指定ポートを使用するプロセスIDを取得
+    /// </summary>
+    private async Task<List<int>> GetProcessIdsUsingPortAsync(int port)
+    {
+        var processIds = new List<int>();
+        
+        try
+        {
+            // netstat -ano コマンドでポート使用状況を取得
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                Arguments = "-ano",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var process = Process.Start(startInfo);
+            if (process != null)
+            {
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    if (line.Contains($":{port} ") && line.Contains("LISTENING"))
+                    {
+                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
+                        {
+                            processIds.Add(pid);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("ポート使用プロセス取得エラー: {Error}", ex.Message);
+        }
+        
+        return processIds;
+    }
+    
+    /// <summary>
+    /// 🔧 [GEMINI_REVIEW] フォールバック: プロセス名ベースの終了（非推奨）
+    /// </summary>
+    private async Task TerminateByProcessNameFallbackAsync()
+    {
+        try
+        {
+            var processes = Process.GetProcessesByName("python");
+            var terminatedCount = 0;
+            
+            foreach (var process in processes)
+            {
+                try
+                {
+                    // 簡易判定: Pythonプロセス全体から翻訳サーバーを推定
+                    _logger.LogWarning("🔄 [FALLBACK] Python프로세ス終了 (推定翻訳サーバー): PID {ProcessId}", process.Id);
+                    process.Kill();
+                    process.WaitForExit(2000);
+                    terminatedCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug("フォールバックプロセス終了時にエラー (PID {ProcessId}): {Error}", process.Id, ex.Message);
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+            
+            if (terminatedCount > 0)
+            {
+                _logger.LogInformation("✅ [FALLBACK] Python프로세ス終了完了: {Count}個", terminatedCount);
+                await Task.Delay(2000);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ フォールバックプロセス終了時にエラー");
         }
     }
 
@@ -320,13 +499,20 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
     {
         try
         {
+            // 🔧 [PROCESS_DUPLICATION_PREVENTION] 重複起動防止チェック
+            if (!await AcquireServerLockAsync())
+            {
+                _logger.LogWarning("⚠️ [PROCESS_DUPLICATION_PREVENTION] 他のサーバーインスタンスが既に動作中のため起動をスキップ");
+                return false;
+            }
+            
             var pythonPath = "py"; // Windows Python Launcher使用
             var serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-                @"..\..\..\..\scripts\opus_mt_persistent_server.py");
+                @"..\..\..\..\scripts\optimized_translation_server.py");
             
             if (!File.Exists(serverScriptPath))
             {
-                serverScriptPath = @"scripts\opus_mt_persistent_server.py";
+                serverScriptPath = @"scripts\optimized_translation_server.py";
             }
             
             var processInfo = new ProcessStartInfo
@@ -343,7 +529,10 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             _managedServerProcess = new Process { StartInfo = processInfo };
             _managedServerProcess.Start();
             
-            _logger.LogInformation("🚀 新しいサーバー起動開始 - PID: {ProcessId}, Port: {Port}",
+            // 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成
+            await CreatePidFileAsync(_managedServerProcess.Id);
+            
+            _logger.LogInformation("🚀 [PROCESS_DUPLICATION_PREVENTION] 新しいサーバー起動開始 - PID: {ProcessId}, Port: {Port}",
                 _managedServerProcess.Id, _currentServerPort);
             
             // 起動完了待機（タイムアウト付き）
@@ -354,19 +543,139 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             
             if (completedTask == startupTask)
             {
-                return await startupTask;
+                var success = await startupTask;
+                if (success)
+                {
+                    _logger.LogInformation("✅ [PROCESS_DUPLICATION_PREVENTION] サーバー起動成功 - PID: {ProcessId}", _managedServerProcess.Id);
+                }
+                return success;
             }
             else
             {
                 _logger.LogError("❌ サーバー起動タイムアウト ({TimeoutMs}ms)", _cachedSettings?.ServerStartupTimeoutMs ?? 30000);
+                await CleanupPidFileAsync(); // タイムアウト時のクリーンアップ
                 return false;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ サーバー起動エラー");
+            await CleanupPidFileAsync(); // エラー時のクリーンアップ
             return false;
         }
+    }
+    
+    /// <summary>
+    /// 🔧 [PROCESS_DUPLICATION_PREVENTION] サーバーロック取得
+    /// </summary>
+    private async Task<bool> AcquireServerLockAsync()
+    {
+        try
+        {
+            var lockFileDir = Path.GetDirectoryName(LockFilePath);
+            if (!Directory.Exists(lockFileDir))
+            {
+                Directory.CreateDirectory(lockFileDir!);
+            }
+            
+            // ロックファイルが存在する場合は既に他のインスタンスが動作中
+            if (File.Exists(LockFilePath))
+            {
+                // ロックファイルの内容をチェック（古いロックファイルかどうか）
+                var lockContent = await File.ReadAllTextAsync(LockFilePath).ConfigureAwait(false);
+                var lines = lockContent.Split('\n');
+                
+                if (lines.Length >= 2 && 
+                    int.TryParse(lines[0], out var lockedPid) &&
+                    DateTime.TryParse(lines[1], out var lockTime))
+                {
+                    // 1時間以上古いロックファイルは無効とみなす
+                    if (DateTime.UtcNow - lockTime > TimeSpan.FromHours(1))
+                    {
+                        _logger.LogWarning("⚠️ [PROCESS_DUPLICATION_PREVENTION] 古いロックファイルを削除: {LockFilePath}", LockFilePath);
+                        File.Delete(LockFilePath);
+                    }
+                    else
+                    {
+                        // プロセスが実際に動作中かチェック
+                        try
+                        {
+                            var lockProcess = Process.GetProcessById(lockedPid);
+                            if (!lockProcess.HasExited)
+                            {
+                                return false; // 他のインスタンスが動作中
+                            }
+                        }
+                        catch (ArgumentException)
+                        {
+                            // プロセスが存在しない場合はロックファイル削除
+                            File.Delete(LockFilePath);
+                        }
+                    }
+                }
+            }
+            
+            // ロックファイル作成
+            var newLockContent = $"{Environment.ProcessId}\n{DateTime.UtcNow:O}";
+            await File.WriteAllTextAsync(LockFilePath, newLockContent).ConfigureAwait(false);
+            
+            _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] サーバーロック取得成功: {LockFilePath}", LockFilePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ サーバーロック取得時にエラー: {LockFilePath}", LockFilePath);
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成
+    /// </summary>
+    private async Task CreatePidFileAsync(int processId)
+    {
+        try
+        {
+            var pidFileDir = Path.GetDirectoryName(PidFilePath);
+            if (!Directory.Exists(pidFileDir))
+            {
+                Directory.CreateDirectory(pidFileDir!);
+            }
+            
+            await File.WriteAllTextAsync(PidFilePath, processId.ToString()).ConfigureAwait(false);
+            _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成: {PidFilePath} (PID: {ProcessId})", PidFilePath, processId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ PIDファイル作成時にエラー: {PidFilePath}", PidFilePath);
+        }
+    }
+    
+    /// <summary>
+    /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルクリーンアップ
+    /// </summary>
+    private async Task CleanupPidFileAsync()
+    {
+        try
+        {
+            if (File.Exists(PidFilePath))
+            {
+                File.Delete(PidFilePath);
+                _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルクリーンアップ完了");
+            }
+            
+            if (File.Exists(LockFilePath))
+            {
+                File.Delete(LockFilePath);
+                _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] ロックファイルクリーンアップ完了");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ PIDファイルクリーンアップ時にエラー");
+        }
+        
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -408,13 +717,26 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
         };
     }
 
-    public void Dispose()
+    /// <summary>
+    /// 🔧 [GEMINI_REVIEW] IAsyncDisposableパターンによるデッドロック防止
+    /// </summary>
+    public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         
         _disposed = true;
         _healthCheckTimer?.Dispose();
         _restartLock?.Dispose();
+        
+        // 🔧 [GEMINI_REVIEW] 非同期クリーンアップによるデッドロック防止
+        try
+        {
+            await CleanupPidFileAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ DisposeAsync時のPIDファイルクリーンアップエラー");
+        }
         
         if (_managedServerProcess != null && !_managedServerProcess.HasExited)
         {
@@ -425,13 +747,24 @@ public class PythonServerHealthMonitor : IHostedService, IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "⚠️ Dispose時のプロセス終了エラー");
+                _logger.LogWarning(ex, "⚠️ DisposeAsync時のプロセス終了エラー");
             }
             finally
             {
                 _managedServerProcess?.Dispose();
             }
         }
+        
+        GC.SuppressFinalize(this);
+    }
+    
+    /// <summary>
+    /// 🔧 [GEMINI_REVIEW] 同期Disposeパターンの保持（後方互換性）
+    /// </summary>
+    public void Dispose()
+    {
+        // 🔧 [GEMINI_REVIEW] ConfigureAwait(false)によるデッドロック回避
+        DisposeAsync().ConfigureAwait(false).GetAwaiter().GetResult();
     }
 }
 
