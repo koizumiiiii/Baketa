@@ -30,7 +30,7 @@ public class StreamingTranslationService : IStreamingTranslationService
     private const int MaxParallelChunks = 2; // 並列処理数
     
     // 🚀 [DYNAMIC_TIMEOUT] 動的タイムアウト設定定数
-    private const int BaseTimeoutSeconds = 30; // 基本タイムアウト（秒）
+    private const int BaseTimeoutSeconds = 120; // 🔧 [TIMEOUT_TEST] 基本タイムアウト（秒）- 30秒→120秒に延長してタイムアウト原因を確定検証
     private const int TimeoutExtensionThreshold = 500; // タイムアウト延長を開始する文字数
     private const double TimeoutExtensionPercentage = 0.5; // 500文字ごとに50%延長
     private const int MaxTimeoutMultiplier = 10; // 最大10倍まで延長
@@ -105,32 +105,77 @@ public class StreamingTranslationService : IStreamingTranslationService
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] 進行状況初期化完了{Environment.NewLine}");
         }
         
+        Console.WriteLine($"🚨 [CRITICAL_DEBUG] lockブロック脱出、CreateChunks呼び出し直前");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] lockブロック脱出、CreateChunks呼び出し直前{Environment.NewLine}");
+        
+        Console.WriteLine($"🚨 [CRITICAL_DEBUG] results配列作成開始");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] results配列作成開始{Environment.NewLine}");
+        
         var results = new string[texts.Count];
+        
+        Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し開始 - OptimalChunkSize={OptimalChunkSize}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks呼び出し開始 - OptimalChunkSize={OptimalChunkSize}{Environment.NewLine}");
+        
         var chunks = CreateChunks(texts, OptimalChunkSize);
+        
+        Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し完了");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks呼び出し完了{Environment.NewLine}");
+        
+        Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks完了 - チャンク数: {chunks?.Count ?? 0}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks完了 - チャンク数: {chunks?.Count ?? 0}{Environment.NewLine}");
         
         Console.WriteLine($"📦 [STREAMING] {chunks.Count}個のチャンクに分割（各{OptimalChunkSize}アイテム）");
         
-        // チャンクごとに並列処理
+        // 🚀 [STREAMING_FIX] 正常なチャンク処理によるストリーミング翻訳を実行
+        Console.WriteLine($"🚀 [STREAMING_FIX] 通常のチャンク処理を実行 - 段階的結果表示");
+        
+        // 並列チャンク処理
         var semaphore = new SemaphoreSlim(MaxParallelChunks, MaxParallelChunks);
-        var tasks = new List<Task>();
         
-        foreach (var chunk in chunks)
+        Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync作成開始 - チャンク数: {chunks.Count}");
+        var processingTasks = chunks.Select(chunk => 
+            ProcessChunkAsync(chunk, sourceLanguage, targetLanguage, results, onChunkCompleted, semaphore, stopwatch, cancellationToken)
+        ).ToArray(); // 🔧 [HANGUP_FIX] ToArray()で即座に評価、遅延実行を回避
+        
+        Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync配列作成完了 - タスク数: {processingTasks.Length}");
+        
+        try
         {
-            var chunkTask = ProcessChunkAsync(
-                chunk,
-                sourceLanguage,
-                targetLanguage,
-                results,
-                onChunkCompleted,
-                semaphore,
-                stopwatch,
-                cancellationToken);
-            
-            tasks.Add(chunkTask);
+            Console.WriteLine($"🚨 [CHUNK_DEBUG] Task.WhenAll実行開始");
+            await Task.WhenAll(processingTasks).ConfigureAwait(false);
+            Console.WriteLine($"✅ [STREAMING_FIX] 全チャンク処理完了");
         }
-        
-        // すべてのチャンクの完了を待つ
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [STREAMING_FIX] チャンク処理エラー: {ex.Message}");
+            // エラー時は残りを直接処理
+            for (int i = 0; i < texts.Count; i++)
+            {
+                if (string.IsNullOrEmpty(results[i]))
+                {
+                    try
+                    {
+                        var translationResponse = await _translationService.TranslateAsync(texts[i], sourceLanguage, targetLanguage, null, cancellationToken).ConfigureAwait(false);
+                        results[i] = translationResponse.IsSuccess ? translationResponse.TranslatedText : texts[i];
+                        onChunkCompleted?.Invoke(i, results[i]);
+                    }
+                    catch
+                    {
+                        results[i] = texts[i];
+                        onChunkCompleted?.Invoke(i, results[i]);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            semaphore?.Dispose();
+        }
         
         stopwatch.Stop();
         _logger.LogInformation("✅ [STREAMING] バッチ翻訳完了 - 総時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
@@ -164,11 +209,60 @@ public class StreamingTranslationService : IStreamingTranslationService
         Stopwatch stopwatch,
         CancellationToken cancellationToken)
     {
-        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+        
+        Console.WriteLine($"🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前{Environment.NewLine}");
+        
+        // 🔧 [DEADLOCK_DEBUG] セマフォデッドロック調査のため詳細ログとタイムアウト追加
+        using var semaphoreTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 🔧 [EMERGENCY_FIX] セマフォ取得に60秒タイムアウト（Python翻訳サーバー重要処理対応）
+        using var semaphoreCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, semaphoreTimeout.Token);
         
         try
         {
+            Console.WriteLine($"🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}{Environment.NewLine}");
+            
+            await semaphore.WaitAsync(semaphoreCts.Token).ConfigureAwait(false);
+            
+            Console.WriteLine($"✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}{Environment.NewLine}");
+        }
+        catch (OperationCanceledException) when (semaphoreTimeout.Token.IsCancellationRequested)
+        {
+            Console.WriteLine($"⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト（60秒） - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト（60秒） - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            
+            // タイムアウト時はタイムアウトメッセージを返して処理を継続
+            for (int j = 0; j < chunk.Texts.Count; j++)
+            {
+                results[chunk.StartIndex + j] = "[セマフォ取得タイムアウト]";
+                onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
+            }
+            return; // early return でセマフォリリースをスキップ
+        }
+        
+        Console.WriteLine($"🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+        
+        try
+        {
+            Console.WriteLine($"🔧 [TRY_BLOCK] try ブロック開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [TRY_BLOCK] try ブロック開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            
             var chunkStopwatch = Stopwatch.StartNew();
+            Console.WriteLine($"🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            
             Console.WriteLine($"🚀 [STREAMING] チャンク処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
             
             // 🔥 [STREAMING + PARALLEL] チャンク全体を一度にバッチ翻訳で処理
