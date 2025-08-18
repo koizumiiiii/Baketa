@@ -15,6 +15,7 @@ using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Infrastructure.Translation.Local;
 
@@ -27,7 +28,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
     private readonly FixedSizeConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
-    private readonly TranslationSettings _translationSettings; // Issue #147: 設定管理
+    private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
@@ -48,37 +49,39 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private const int ServerPort = 5556; // 翻訳サーバーのポート番号（optimized_translation_server.pyと一致） // 翻訳サーバーのポート番号（optimized_translation_server.pyと一致）
+    private int _serverPort = 5556; // 動的ポート（デフォルト: OPUS-MT=5556, NLLB-200=5557）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
     
     // Python実行パス
     private readonly string _pythonPath;
-    private readonly string _serverScriptPath;
+    private string _serverScriptPath = string.Empty; // 動的設定のため読み取り専用を削除
     
-    public string Name => "OptimizedPythonTranslation";
+    public string Name => "NLLB200";
     public string Description => "高速化されたPython翻訳エンジン（500ms目標）";
     public bool RequiresNetwork => false;
 
     public OptimizedPythonTranslationEngine(
         ILogger<OptimizedPythonTranslationEngine> logger,
         FixedSizeConnectionPool? connectionPool,
-        IOptions<TranslationSettings> translationSettings,
+        IConfiguration configuration,
         IPythonServerManager? serverManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
-        _translationSettings = translationSettings?.Value ?? throw new ArgumentNullException(nameof(translationSettings));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
         
-        // サーバースクリプトパス設定
+        // プロジェクトルート検索
         var currentDir = Directory.GetCurrentDirectory();
         var projectRoot = FindProjectRoot(currentDir);
-        _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
+        
+        // 🎯 [NLLB-200] 動的ポート設定と動的スクリプトパス設定
+        ConfigureServerSettings(projectRoot);
         
         _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}", 
             _pythonPath, _serverScriptPath);
@@ -108,7 +111,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // Issue #147: 外部サーバー使用設定の確認
-            if (_translationSettings.UseExternalServer)
+            if (_configuration.GetValue<bool>("Translation:UseExternalServer", false))
             {
                 _logger.LogInformation("外部Pythonサーバー使用モード - プロセス起動をスキップ");
             }
@@ -228,13 +231,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     /// </summary>
     private async Task<bool> StartLegacyFixedPortServerAsync()
     {
-        _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", ServerPort);
+        _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", _serverPort);
         
         // 直接Python実行（PowerShell経由を排除）
         var processInfo = new ProcessStartInfo
         {
             FileName = _pythonPath,
-            Arguments = $"\"{_serverScriptPath}\" --port {ServerPort} --optimized",
+            Arguments = $"\"{_serverScriptPath}\" --port {_serverPort} --optimized",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -342,6 +345,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
+        // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
+        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始 - RequestId: {request.RequestId}");
+        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] SourceText: '{request.SourceText}', {request.SourceLanguage} → {request.TargetLanguage}");
+        
         var stopwatch = Stopwatch.StartNew();
         
         try
@@ -489,6 +501,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             stopwatch.Stop();
             _logger.LogError(ex, "翻訳エラー - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
+            // 🔥 [ERROR_DEBUG] 例外の詳細情報を出力
+            _logger.LogError("🔥 [ERROR_DEBUG] 例外詳細:");
+            _logger.LogError("🔥 [ERROR_DEBUG] - 例外タイプ: {ExceptionType}", ex.GetType().Name);
+            _logger.LogError("🔥 [ERROR_DEBUG] - 例外メッセージ: {Message}", ex.Message);
+            _logger.LogError("🔥 [ERROR_DEBUG] - スタックトレース: {StackTrace}", ex.StackTrace);
+            Console.WriteLine($"🔥 [ERROR_DEBUG] 翻訳エラー発生: {ex.GetType().Name} - {ex.Message}");
+            
             return new TranslationResponse
             {
                 RequestId = request.RequestId,
@@ -568,7 +587,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 🔄 単発接続でバッチ処理（汚染対策モード）
                 directClient = new TcpClient();
-                await directClient.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+                await directClient.ConnectAsync(ServerHost, _serverPort, cancellationToken).ConfigureAwait(false);
                 
                 directStream = directClient.GetStream();
                 directStream.ReadTimeout = ConnectionTimeoutMs;
@@ -852,7 +871,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 🔄 単発接続作成（汚染対策モード）
                 directClient = new TcpClient();
-                await directClient.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+                await directClient.ConnectAsync(ServerHost, _serverPort, cancellationToken).ConfigureAwait(false);
 
                 directStream = directClient.GetStream();
                 directStream.ReadTimeout = ConnectionTimeoutMs;
@@ -938,6 +957,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             _logger.LogDebug("Python応答受信: {Response}", jsonResponse.Length > 200 ? jsonResponse[..200] + "..." : jsonResponse);
             
+            // 🔥 [ENCODING_DEBUG] 受信したレスポンスの詳細バイト情報をログ出力
+            var responseBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse);
+            _logger.LogError("🔍 [ENCODING_DEBUG] 受信したレスポンス詳細:");
+            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス文字列: '{Response}'", jsonResponse);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス長: {Length}", jsonResponse.Length);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - UTF-8バイト: {Bytes}", Convert.ToHexString(responseBytes));
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] 受信したレスポンス: '{jsonResponse}'");
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] UTF-8バイト: {Convert.ToHexString(responseBytes)}");
+            
             // 🔧 [ENCODING_SIMPLIFIED] Windows環境エンコーディング修復処理を削除し、シンプルUTF-8処理に変更
             var originalResponse = jsonResponse;
             
@@ -973,6 +1001,20 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 throw new InvalidOperationException("レスポンスのデシリアライズに失敗しました");
             }
+            
+            // 🔥 [ENCODING_DEBUG] JSON解析後のレスポンス詳細情報をログ出力
+            _logger.LogError("🔍 [JSON_DEBUG] JSON解析後のレスポンス詳細:");
+            _logger.LogError("🔍 [JSON_DEBUG] - Success: {Success}", response.success);
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.translation ?? "null");
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.translation?.Length ?? 0);
+            if (response.translation != null)
+            {
+                var translationBytes = System.Text.Encoding.UTF8.GetBytes(response.translation);
+                _logger.LogError("🔍 [JSON_DEBUG] - Translation UTF-8バイト: {Bytes}", Convert.ToHexString(translationBytes));
+            }
+            _logger.LogError("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.confidence);
+            _logger.LogError("🔍 [JSON_DEBUG] - Error: '{Error}'", response.error ?? "null");
+            Console.WriteLine($"🔍 [JSON_DEBUG] Success: {response.success}, Translation: '{response.translation}', Length: {response.translation?.Length ?? 0}");
             
             var resultCreationStopwatch = Stopwatch.StartNew();
             
@@ -1177,7 +1219,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
         
         // 固定ポートモード
-        return ServerPort;
+        return _serverPort;
     }
 
     /// <summary>
@@ -1463,5 +1505,54 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 break;
             }
         }
+    }
+    
+    /// <summary>
+    /// 🎯 [NLLB-200] 設定に基づく動的ポート設定とスクリプトパス設定（IConfiguration版）
+    /// </summary>
+    private void ConfigureServerSettings(string projectRoot)
+    {
+        try
+        {
+            // 動的に設定を取得
+            var defaultEngineString = _configuration["Translation:DefaultEngine"];
+            var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+                ? parsedEngine 
+                : TranslationEngine.NLLB200;
+            
+            if (defaultEngine == TranslationEngine.NLLB200)
+            {
+                // NLLB-200設定から動的にポートとスクリプトパスを取得
+                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5557);
+                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                _logger.LogInformation("🎯 [NLLB-200] NLLB-200モード - ポート: {Port}, スクリプト: {Script}", 
+                    _serverPort, Path.GetFileName(_serverScriptPath));
+            }
+            else
+            {
+                // デフォルト設定から動的にポートとスクリプトパスを取得（従来のOPUS-MT）
+                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
+                _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
+                _logger.LogInformation("🔧 [OPUS-MT] OPUS-MTモード - ポート: {Port}, スクリプト: {Script}", 
+                    _serverPort, Path.GetFileName(_serverScriptPath));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（OPUS-MT）を使用");
+            _serverPort = 5556;
+            _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
+        }
+    }
+    
+    /// <summary>
+    /// 🎯 [DYNAMIC_CONFIG] 実行時設定取得
+    /// </summary>
+    private TranslationEngine GetCurrentTranslationEngine()
+    {
+        var defaultEngineString = _configuration["Translation:DefaultEngine"];
+        return Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+            ? parsedEngine 
+            : TranslationEngine.NLLB200;
     }
 }

@@ -1,0 +1,22 @@
+# Baketa NLLB-200 Translation Server Dependencies
+# Meta NLLB-200高品質多言語翻訳モデル用Pythonサーバー依存関係
+
+# Web Framework
+flask>=2.3.0
+
+# Machine Learning & NLP
+transformers>=4.30.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+
+# Optional: GPU support (uncomment if CUDA is available)
+# torch[cuda]>=2.0.0
+
+# Data Processing
+numpy>=1.24.0
+
+# Utility
+requests>=2.31.0
+
+# Development & Testing (optional)
+pytest>=7.0.0
