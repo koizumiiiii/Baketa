@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
 using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
@@ -35,6 +36,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<Baketa.Core.Abstractions.OCR.IOcrEngine> _ocrEngineMock;
     private readonly Mock<ITranslationEngineFactory> _translationEngineFactoryMock;
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
+    private readonly Mock<IEventAggregator> _eventAggregatorMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslationService;
@@ -53,6 +55,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _ocrEngineMock = new Mock<Baketa.Core.Abstractions.OCR.IOcrEngine>();
         _translationEngineFactoryMock = new Mock<ITranslationEngineFactory>();
         _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
+        _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
         _imageMock = new Mock<IImage>();
 
@@ -75,6 +78,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _ocrEngineMock.Object,
             _translationEngineFactoryMock.Object,
             _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
+            _eventAggregatorMock.Object,
             _loggerMock.Object);
     }
 

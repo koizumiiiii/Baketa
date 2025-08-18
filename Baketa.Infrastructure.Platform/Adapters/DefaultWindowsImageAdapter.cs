@@ -52,6 +52,102 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     }
 
     /// <summary>
+    /// Windows画像をコア画像に変換
+    /// </summary>
+    /// <param name="windowsImage">Windows画像</param>
+    /// <returns>コア画像インターフェース</returns>
+    public IImage AdaptToImage(IWindowsImage windowsImage)
+    {
+        return ToImage(windowsImage);
+    }
+    
+    /// <summary>
+    /// コア画像をWindows画像に変換（可能な場合）
+    /// </summary>
+    /// <param name="image">コア画像</param>
+    /// <returns>Windows画像、変換できない場合はnull</returns>
+    public IWindowsImage AdaptToWindowsImage(IImage image)
+    {
+        if (image is WindowsImageAdapter adapter)
+        {
+            return GetWindowsImage(adapter);
+        }
+        
+        throw new NotSupportedException("この画像タイプからWindowsImageへの変換はサポートされていません");
+    }
+    
+    /// <summary>
+    /// 非同期でWindows画像をコア画像に変換
+    /// </summary>
+    /// <param name="windowsImage">Windows画像</param>
+    /// <returns>コア画像インターフェース</returns>
+    public Task<IImage> AdaptToImageAsync(IWindowsImage windowsImage)
+    {
+        return Task.FromResult(AdaptToImage(windowsImage));
+    }
+    
+    /// <summary>
+    /// 非同期でコア画像をWindows画像に変換（可能な場合）
+    /// </summary>
+    /// <param name="image">コア画像</param>
+    /// <returns>Windows画像</returns>
+    public Task<IWindowsImage> AdaptToWindowsImageAsync(IImage image)
+    {
+        return Task.FromResult(AdaptToWindowsImage(image));
+    }
+
+    /// <summary>
+    /// アダプターがサポートする機能名
+    /// </summary>
+    public string FeatureName => "Windows画像変換アダプター";
+
+    /// <summary>
+    /// 特定の型変換をサポートするかどうか
+    /// </summary>
+    /// <typeparam name="TSource">ソース型</typeparam>
+    /// <typeparam name="TTarget">ターゲット型</typeparam>
+    /// <returns>サポートする場合はtrue</returns>
+    public bool SupportsConversion<TSource, TTarget>()
+    {
+        return (typeof(TSource) == typeof(IWindowsImage) && typeof(TTarget) == typeof(IImage)) ||
+               (typeof(TSource) == typeof(IImage) && typeof(TTarget) == typeof(IWindowsImage));
+    }
+
+    /// <summary>
+    /// 変換を試行
+    /// </summary>
+    /// <typeparam name="TSource">ソース型</typeparam>
+    /// <typeparam name="TTarget">ターゲット型</typeparam>
+    /// <param name="source">ソースオブジェクト</param>
+    /// <param name="target">変換結果（出力）</param>
+    /// <returns>変換成功時はtrue</returns>
+    public bool TryConvert<TSource, TTarget>(TSource source, out TTarget target) where TSource : class where TTarget : class
+    {
+        target = null!;
+        
+        try
+        {
+            if (source is IWindowsImage windowsImage && typeof(TTarget) == typeof(IImage))
+            {
+                target = (TTarget)(object)AdaptToImage(windowsImage);
+                return true;
+            }
+            
+            if (source is IImage image && typeof(TTarget) == typeof(IWindowsImage))
+            {
+                target = (TTarget)(object)AdaptToWindowsImage(image);
+                return true;
+            }
+        }
+        catch
+        {
+            // 変換失敗時はfalseを返す
+        }
+        
+        return false;
+    }
+
+    /// <summary>
     /// コアイメージ(IAdvancedImage)をWindowsネイティブイメージに変換します
     /// 最適化された変換処理を使用します
     /// </summary>

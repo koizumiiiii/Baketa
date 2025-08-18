@@ -144,33 +144,12 @@ public class StreamingTranslationService : IStreamingTranslationService
         
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync配列作成完了 - タスク数: {processingTasks.Length}");
         
+        // 🚀 [TRUE_BATCH_PROCESSING] バッチ翻訳により例外は各チャンク内で処理済み
         try
         {
             Console.WriteLine($"🚨 [CHUNK_DEBUG] Task.WhenAll実行開始");
             await Task.WhenAll(processingTasks).ConfigureAwait(false);
-            Console.WriteLine($"✅ [STREAMING_FIX] 全チャンク処理完了");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ [STREAMING_FIX] チャンク処理エラー: {ex.Message}");
-            // エラー時は残りを直接処理
-            for (int i = 0; i < texts.Count; i++)
-            {
-                if (string.IsNullOrEmpty(results[i]))
-                {
-                    try
-                    {
-                        var translationResponse = await _translationService.TranslateAsync(texts[i], sourceLanguage, targetLanguage, null, cancellationToken).ConfigureAwait(false);
-                        results[i] = translationResponse.IsSuccess ? translationResponse.TranslatedText : texts[i];
-                        onChunkCompleted?.Invoke(i, results[i]);
-                    }
-                    catch
-                    {
-                        results[i] = texts[i];
-                        onChunkCompleted?.Invoke(i, results[i]);
-                    }
-                }
-            }
+            Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] 全チャンク処理完了");
         }
         finally
         {
@@ -291,38 +270,29 @@ public class StreamingTranslationService : IStreamingTranslationService
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                 
-                // 🎯 Phase 2タスク3: エラーハンドリング統一 - 個別テキストのフォールバック処理
-                Console.WriteLine($"🔥 [STREAMING+ERROR_HANDLER] チャンク内フォールバック翻訳開始 - テキスト数: {chunkTexts.Count}");
+                // 🚀 [TRUE_BATCH_PROCESSING] 真のバッチ翻訳実装 - GPU最適化されたバッチ推論を活用
+                Console.WriteLine($"🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳開始 - テキスト数: {chunkTexts.Count}");
                 
-                // 各テキストを個別にフォールバック戦略付きで翻訳
-                var translationTasks = new List<Task<(int index, string result)>>();
+                // チャンク全体を一度にバッチ翻訳で処理（個別翻訳から真のバッチ推論へ移行）
+                var batchTranslationResults = await _translationService.TranslateBatchAsync(
+                    chunkTexts.AsReadOnly(),
+                    sourceLanguage,
+                    targetLanguage,
+                    null, // context
+                    combinedCts.Token).ConfigureAwait(false);
                 
+                Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] バッチ翻訳完了 - 結果数: {batchTranslationResults.Count}");
+                
+                // バッチ翻訳結果を個別インデックスに配置し、コールバック通知
                 for (int j = 0; j < chunkTexts.Count; j++)
                 {
                     var textIndex = chunk.StartIndex + j;
-                    var text = chunkTexts[j];
+                    var translationResult = j < batchTranslationResults.Count ? batchTranslationResults[j] : null;
+                    var translatedText = translationResult?.IsSuccess == true ? translationResult.TranslatedText : chunkTexts[j];
                     
-                    Console.WriteLine($"🔍 [TRANSLATE_DEBUG] TranslateTextWithFallbackAsync呼び出し - Index: {textIndex}, Text: '{text}', Lang: {sourceLanguage.Code} → {targetLanguage.Code}");
-                    
-                    var task = TranslateTextWithFallbackAsync(
-                        textIndex, 
-                        text, 
-                        sourceLanguage.Code, 
-                        targetLanguage.Code, 
-                        combinedCts.Token);
-                    
-                    translationTasks.Add(task);
-                }
-                
-                // すべてのテキストの翻訳完了を待機
-                var translatedResults = await Task.WhenAll(translationTasks).ConfigureAwait(false);
-                
-                // 結果を配置し、コールバック通知
-                foreach (var (index, result) in translatedResults)
-                {
-                    results[index] = result;
-                    Console.WriteLine($"📢 [STREAMING+ERROR_HANDLER] フォールバック翻訳完了通知 - インデックス: {index}");
-                    onChunkCompleted?.Invoke(index, result);
+                    results[textIndex] = translatedText;
+                    Console.WriteLine($"📢 [TRUE_BATCH_PROCESSING] バッチ翻訳完了通知 - インデックス: {textIndex}, 成功: {translationResult?.IsSuccess}");
+                    onChunkCompleted?.Invoke(textIndex, translatedText);
                 }
                 
                 // チャンク全体の進行状況更新
@@ -347,25 +317,25 @@ public class StreamingTranslationService : IStreamingTranslationService
             }
             catch (OperationCanceledException ex)
             {
-                _logger.LogWarning("🔥 [STREAMING+PARALLEL] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}", 
+                _logger.LogWarning("🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}", 
                     chunk.StartIndex, chunk.EndIndex, ex.Message);
                     
                 // エラー時はプレースホルダーを設定
                 for (int j = 0; j < chunk.Texts.Count; j++)
                 {
-                    results[chunk.StartIndex + j] = $"[翻訳タイムアウト] {chunk.Texts[j]}";
+                    results[chunk.StartIndex + j] = $"[バッチ翻訳タイムアウト] {chunk.Texts[j]}";
                     onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "🔥 [STREAMING+ERROR_HANDLER] チャンクフォールバック翻訳エラー - チャンク: {Start}-{End}", 
+                _logger.LogWarning(ex, "🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳エラー - チャンク: {Start}-{End}", 
                     chunk.StartIndex, chunk.EndIndex);
                     
                 // エラー時はプレースホルダーを設定
                 for (int j = 0; j < chunk.Texts.Count; j++)
                 {
-                    results[chunk.StartIndex + j] = $"[フォールバック翻訳エラー] {chunk.Texts[j]}";
+                    results[chunk.StartIndex + j] = $"[バッチ翻訳エラー] {chunk.Texts[j]}";
                     onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
                 }
             }
@@ -397,56 +367,6 @@ public class StreamingTranslationService : IStreamingTranslationService
         return chunks;
     }
     
-    /// <summary>
-    /// 🚨 [REGRESSION_FIX] 個別テキストの直接翻訳（エラーハンドリング統一無効化）
-    /// </summary>
-    private async Task<(int index, string result)> TranslateTextWithFallbackAsync(
-        int index,
-        string text,
-        string sourceLanguage,
-        string targetLanguage,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            // 直接ITranslationServiceを使用してシンプルに翻訳
-            var result = await _translationService.TranslateAsync(
-                text,
-                new Language { Code = sourceLanguage, DisplayName = sourceLanguage },
-                new Language { Code = targetLanguage, DisplayName = targetLanguage },
-                null,
-                cancellationToken).ConfigureAwait(false);
-            
-            var translatedText = result?.TranslatedText ?? text;
-            
-            // 🔍 [TRANSLATION_DEBUG] 翻訳結果の詳細ログ出力
-            Console.WriteLine($"🔍 [TRANSLATION_DEBUG] 翻訳結果 - Index: {index}, Source: '{text}', Result: '{translatedText}', Success: {result?.IsSuccess}");
-            
-            return (index, translatedText);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogDebug("🔄 翻訳キャンセル - インデックス: {Index}", index);
-            return (index, $"[翻訳キャンセル] {text}");
-        }
-        catch (Exception ex)
-        {
-            // 🚨 [CRITICAL_FIX] エラー時は原文ではなく適切なエラーメッセージを返す
-            _logger.LogError(ex, "💥 翻訳エラー - インデックス: {Index}, テキスト: '{Text}'", index, text);
-            Console.WriteLine($"💥 [TRANSLATION_ERROR] 翻訳エラー詳細 - Index: {index}, Text: '{text}', Error: {ex.GetType().Name} - {ex.Message}");
-            
-            // エラーの種類に応じて適切なメッセージを返す
-            string errorMessage = ex switch
-            {
-                TimeoutException => "[翻訳タイムアウト]",
-                OperationCanceledException => "[翻訳キャンセル]", 
-                HttpRequestException => "[通信エラー]",
-                _ => "[翻訳エラー]"
-            };
-            
-            return (index, errorMessage);
-        }
-    }
     
     private class ChunkInfo
     {

@@ -99,34 +99,16 @@ class OptimizedTranslationServer:
         except Exception as e:
             logger.error(f"日本語→英語モデルのロード失敗: {e}")
             
-        # 双方向翻訳用 NLLB-200モデル（英語↔日本語）
+        # 英語→日本語モデル
         try:
-            model_name_nllb = "facebook/nllb-200-distilled-600M"
-            logger.info(f"🔄 [MODEL_UPGRADE] 双方向翻訳NLLB-200: {model_name_nllb}モデルロード開始")
-            tokenizer_nllb = AutoTokenizer.from_pretrained(model_name_nllb)
-            model_nllb = AutoModelForSeq2SeqLM.from_pretrained(model_name_nllb).to(self.device)
-            model_nllb.eval()  # 評価モードに設定
-            
-            # 同じNLLBモデルを英語→日本語と日本語→英語の両方向で使用
-            self.models["en-ja"] = (model_nllb, tokenizer_nllb)
-            self.models["ja-en"] = (model_nllb, tokenizer_nllb)
-            logger.info("✅ 双方向翻訳モデル（NLLB-200）ロード完了 - 汚染問題解決")
+            model_name_en_ja = "Helsinki-NLP/opus-mt-en-jap"
+            tokenizer_en_ja = MarianTokenizer.from_pretrained(model_name_en_ja)
+            model_en_ja = MarianMTModel.from_pretrained(model_name_en_ja).to(self.device)
+            model_en_ja.eval()  # 評価モードに設定
+            self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
+            logger.info("英語→日本語モデルロード完了")
         except Exception as e:
-            logger.error(f"❌ NLLB-200モデルロード失敗: {e}")
-            # フォールバックとして従来モデルを試行
-            try:
-                logger.info("🔄 フォールバック: Helsinki-NLPモデルを試行")
-                # 英語→日本語
-                model_name_en_ja_fallback = "Helsinki-NLP/opus-mt-en-jap"
-                tokenizer_en_ja = MarianTokenizer.from_pretrained(model_name_en_ja_fallback)
-                model_en_ja = MarianMTModel.from_pretrained(model_name_en_ja_fallback).to(self.device)
-                model_en_ja.eval()
-                self.models["en-ja"] = (model_en_ja, tokenizer_en_ja)
-                
-                # 日本語→英語（既にロード済み）は変更なし
-                logger.warning("⚠️ フォールバック成功: Helsinki-NLPモデル使用（汚染リスクあり）")
-            except Exception as fallback_error:
-                logger.error(f"❌ フォールバックも失敗: {fallback_error}")
+            logger.error(f"英語→日本語モデルのロード失敗: {e}")
             
         load_time = time.time() - start_time
         logger.info(f"モデルロード完了 - 所要時間: {load_time:.2f}秒")
@@ -260,77 +242,23 @@ class OptimizedTranslationServer:
         self._cleanup_model_state_before_request(model)
         
         try:
-            # 🆕 NLLB-200モデル判定とBCP-47言語コード使用
-            is_nllb_model = "nllb" in str(type(tokenizer)).lower() or hasattr(tokenizer, 'lang_code_to_id')
+            # 🔄 [MarianMT] OPUS-MT翻訳処理
+            logger.info(f"🔄 [OPUS-MT] 翻訳実行: '{text[:30]}...' [{model_key}]")
             
-            # 🔍 [DEBUG] モデルキーと言語設定をログ出力
-            logger.info(f"🔍 [DEBUG] 翻訳要求 - model_key: '{model_key}', is_nllb_model: {is_nllb_model}, text: '{text[:50]}...'")
+            # トークナイズ
+            inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
-            if is_nllb_model:
-                # NLLB-200専用処理：BCP-47言語コードを使用
-                if model_key == "en-ja":
-                    src_lang_code = "eng_Latn"
-                    target_lang_code = "jpn_Jpan"
-                    logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (eng_Latn -> jpn_Jpan)")
-                elif model_key == "ja-en":
-                    src_lang_code = "jpn_Jpan"
-                    target_lang_code = "eng_Latn"
-                    logger.info(f"🌐 [NLLB-200] 高品質翻訳実行: '{text[:30]}...' (jpn_Jpan -> eng_Latn)")
-                else:
-                    logger.error(f"🚨 [ERROR] サポートされていないNLLBモデルキー: {model_key}")
-                    raise ValueError(f"Unsupported NLLB model key: {model_key}")
-                
-                # トークナイズ（NLLB-200は特別な処理が必要）
-                # ソース言語を指定してトークナイズ
-                tokenizer.src_lang = src_lang_code
-                inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                
-                # NLLB-200の場合、target言語のBOSトークンを強制
-                target_lang_bos_id = tokenizer.convert_tokens_to_ids(target_lang_code)
-                
-                # 推論実行
-                with torch.no_grad():
-                    if self.device.type == "cuda":
-                        with torch.cuda.amp.autocast():
-                            outputs = model.generate(
-                                **inputs, 
-                                max_length=512, 
-                                num_beams=4,  # NLLB-200では品質向上のためbeam_searchを使用
-                                early_stopping=True,
-                                forced_bos_token_id=target_lang_bos_id
-                            )
-                    else:
-                        outputs = model.generate(
-                            **inputs, 
-                            max_length=512, 
-                            num_beams=4, 
-                            early_stopping=True,
-                            forced_bos_token_id=target_lang_bos_id
-                        )
-                
-                # デコード
-                translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-                logger.info(f"✨ [NLLB-200] 高品質翻訳完了: '{translation[:50]}...'")
-                
-            else:
-                # 従来のMarianMTモデル処理
-                logger.info(f"🔄 [MarianMT] 従来モデル翻訳: '{text[:30]}...'")
-                
-                # トークナイズ
-                inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                
-                # 推論（高速化のためno_gradとhalf精度を使用）
-                with torch.no_grad():
-                    if self.device.type == "cuda":
-                        with torch.cuda.amp.autocast():
-                            outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
-                    else:
+            # 推論（高速化のためno_gradと最適化設定を使用）
+            with torch.no_grad():
+                if self.device.type == "cuda":
+                    with torch.cuda.amp.autocast():
                         outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
-                        
-                # デコード
-                translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                else:
+                    outputs = model.generate(**inputs, max_length=512, num_beams=1, early_stopping=True)
+                    
+            # デコード
+            translation = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
             # デバッグ: 翻訳結果をログ出力
             logger.info(f"Translation result: '{translation}' (type: {type(translation)})")
@@ -347,10 +275,10 @@ class OptimizedTranslationServer:
         start_time = time.time()
         
         try:
-            # 🚨 キャッシュ機能完全無効化 - 汚染問題根本解決
-            logger.info(f"🚀 [NO_CACHE] キャッシュなし新鮮翻訳実行: '{request.text[:30]}...'")
+            # 🚀 [OPUS-MT] 直接翻訳実行（キャッシュなし）
+            logger.info(f"🚀 [OPUS-MT] 翻訳実行: '{request.text[:30]}...'")
             
-            # キャッシュ関連のコードをすべて無効化
+            # キャッシュを使用せず直接翻訳実行
                 
             # 翻訳実行（別スレッドで）
             loop = asyncio.get_event_loop()
@@ -362,8 +290,8 @@ class OptimizedTranslationServer:
                 request.target_lang
             )
             
-            # ✅ キャッシュ機能完全無効化により汚染問題解決
-            logger.info(f"✅ [TRANSLATION_SUCCESS] 新鮮な翻訳完了: '{request.text[:30]}...' -> '{translation[:30]}...'")
+            # ✅ OPUS-MT翻訳完了
+            logger.info(f"✅ [OPUS-MT_SUCCESS] 翻訳完了: '{request.text[:30]}...' -> '{translation[:30]}...'")
             
             
             processing_time = (time.time() - start_time) * 1000  # ms

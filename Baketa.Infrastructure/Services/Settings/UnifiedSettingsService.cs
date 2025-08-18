@@ -286,9 +286,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         TranslationSettings appSettings)
     {
         var sourceLanguage = LanguageCodeConverter.ToLanguageCode(
-            userSettings.GetValueOrDefault("sourceLanguage")?.ToString() ?? "Japanese");
+            userSettings.GetValueOrDefault("sourceLanguage")?.ToString() ?? "English");
         var targetLanguage = LanguageCodeConverter.ToLanguageCode(
-            userSettings.GetValueOrDefault("targetLanguage")?.ToString() ?? "English");
+            userSettings.GetValueOrDefault("targetLanguage")?.ToString() ?? "Japanese");
 
         return new UnifiedTranslationSettings(
             GetBoolValue(userSettings, "autoDetectSourceLanguage", appSettings.AutoDetectSourceLanguage),

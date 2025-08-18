@@ -75,12 +75,18 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
                 Console.WriteLine($"🚀 [PHASE_2_2] 翻訳要求イベント準備: '{result.Text}'");
                 
                 // 翻訳設定から言語情報を取得
+                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] DefaultSourceLanguage: '{_appSettings.Translation.DefaultSourceLanguage}'");
+                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] DefaultTargetLanguage: '{_appSettings.Translation.DefaultTargetLanguage}'");
+                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] AutoDetectSourceLanguage: {_appSettings.Translation.AutoDetectSourceLanguage}");
+                
                 var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
                     ? "auto" 
                     : _appSettings.Translation.DefaultSourceLanguage;
                 
                 var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
 
+                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] sourceLanguageCode: '{sourceLanguageCode}'");
+                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] targetLanguageCode: '{targetLanguageCode}'");
                 Console.WriteLine($"🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage})");
 
                 // 翻訳要求イベントを発行

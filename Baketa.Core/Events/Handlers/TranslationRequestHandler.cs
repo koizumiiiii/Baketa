@@ -2,6 +2,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Translation.Common;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using System;
@@ -42,6 +43,48 @@ public class TranslationRequestHandler(
     
     // NULLチェック
     ArgumentNullException.ThrowIfNull(eventData);
+
+    // 🚀 [PHASE_0.2] 同言語検出フィルターによる早期終了処理
+    var sourceLanguage = ParseLanguage(eventData.SourceLanguage);
+    var targetLanguage = ParseLanguage(eventData.TargetLanguage);
+    
+    var tempRequest = TranslationRequest.Create(
+        eventData.OcrResult.Text,
+        sourceLanguage,
+        targetLanguage
+    );
+
+    if (tempRequest.ShouldSkipTranslation())
+    {
+        Console.WriteLine($"🚀 [PHASE_0.2] 同言語検出: '{eventData.SourceLanguage}' → '{eventData.TargetLanguage}' - 翻訳をスキップしています");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語検出: '{eventData.SourceLanguage}' → '{eventData.TargetLanguage}' - 翻訳をスキップしています{Environment.NewLine}");
+
+        _logger.LogInformation("翻訳スキップ: 同言語ペア検出 '{SourceLang}' → '{TargetLang}', テキスト: '{Text}'", 
+            eventData.SourceLanguage, eventData.TargetLanguage, eventData.OcrResult.Text);
+
+        // 🚫 [DUPLICATE_DISPLAY_FIX] 同言語の場合は翻訳結果を空文字で非表示にする
+        var skippedResult = string.Empty; // 重複表示防止：同言語では非表示
+
+        // 翻訳完了イベントを即座に発行（処理時間0ms）
+        var skipCompletedEvent = new TranslationWithBoundsCompletedEvent(
+            sourceText: eventData.OcrResult.Text,
+            translatedText: skippedResult, // 🚫 空文字で非表示設定
+            sourceLanguage: eventData.SourceLanguage,
+            targetLanguage: eventData.TargetLanguage,
+            bounds: eventData.OcrResult.Bounds,
+            confidence: 1.0f,
+            engineName: "Same Language Filter (Phase 0.2 - Hidden)");
+
+        Console.WriteLine($"🚀 [PHASE_0.2] 同言語スキップ完了 - 即座にTranslationWithBoundsCompletedEvent発行");
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語スキップ完了 - ID: {skipCompletedEvent.Id}{Environment.NewLine}");
+
+        await _eventAggregator.PublishAsync(skipCompletedEvent).ConfigureAwait(false);
+        
+        _logger.LogInformation("同言語翻訳スキップ完了: '{Original}' (スキップ処理時間: <1ms)", eventData.OcrResult.Text);
+        return; // 🚀 早期終了 - 以降の翻訳処理は実行されない
+    }
 
     // 🚀 [PHASE_2_3] BaketaExceptionHandler統合 - フォールバック戦略実装
     Console.WriteLine($"🚀 [PHASE_2_3] BaketaExceptionHandler統合開始: '{eventData.OcrResult.Text}'");
@@ -172,7 +215,7 @@ public class TranslationRequestHandler(
         {
             "ja" or "japanese" or "ja-jp" => Language.Japanese,
             "en" or "english" or "en-us" => Language.English,
-            "auto" => Language.English, // ✅ 重大バグ修正: autoの場合は英語想定（英→日翻訳が目的）
+            "auto" => Language.Auto, // 🚀 [CRITICAL_BUG_FIX] autoは正しくLanguage.Autoとして処理
             _ => Language.English // デフォルトは英語
         };
     }

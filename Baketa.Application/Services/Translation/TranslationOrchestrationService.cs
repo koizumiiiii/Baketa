@@ -13,6 +13,9 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using CoreOcrResult = Baketa.Core.Models.OCR.OcrResult;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Exceptions;
@@ -40,6 +43,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
     private readonly ITranslationEngineFactory _translationEngineFactory;
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -87,6 +91,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="ocrEngine">OCRエンジン</param>
     /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
     /// <param name="coordinateBasedTranslation">座標ベース翻訳サービス</param>
+    /// <param name="eventAggregator">イベント集約サービス</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
@@ -94,18 +99,21 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
+        IEventAggregator eventAggregator,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
         ArgumentNullException.ThrowIfNull(translationEngineFactory);
+        ArgumentNullException.ThrowIfNull(eventAggregator);
         
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
         _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
+        _eventAggregator = eventAggregator;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -1573,6 +1581,45 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し完了");
             
+            // 🚀 [OCR_TRANSLATION_BRIDGE_FIX] OCR完了イベントを発行して翻訳フローを開始
+            try
+            {
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OCR完了イベント発行開始: TextRegions数={ocrResults.TextRegions.Count}");
+                
+                // OCR結果をOcrResultsコレクションに変換
+                var ocrResultsList = ocrResults.TextRegions.Select(region => new CoreOcrResult(
+                    text: region.Text,
+                    bounds: region.Bounds,
+                    confidence: (float)region.Confidence)).ToList().AsReadOnly();
+
+                var ocrCompletedEvent = new OcrCompletedEvent(
+                    sourceImage: image,
+                    results: ocrResultsList,
+                    processingTime: ocrResults.ProcessingTime);
+
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
+                
+                // 🔧 [DUPLICATE_FIX] 重複表示修正: CoordinateBasedTranslationService使用時のみ無効化
+                if (_coordinateBasedTranslation == null)
+                {
+                    // CoordinateBasedTranslationServiceが無効な場合のみイベント発行
+                    await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                    Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent発行完了 - 翻訳フロー開始");
+                }
+                else
+                {
+                    Console.WriteLine($"🚫 [DUPLICATE_FIX] CoordinateBasedTranslationServiceが有効のため、OcrCompletedEvent発行をスキップ");
+                }
+                _logger?.LogInformation("🔥 [BRIDGE_FIX] OCR完了イベント発行完了: TextRegions数={Count}, ID={EventId}", 
+                    ocrResults.TextRegions.Count, ocrCompletedEvent.Id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OCR完了イベント発行エラー: {ex.GetType().Name} - {ex.Message}");
+                _logger?.LogError(ex, "🔥 [BRIDGE_FIX] OCR完了イベント発行中にエラーが発生");
+                // エラーが発生しても翻訳フローは継続（フォールバック）
+            }
+            
             DebugLogUtility.WriteLog($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions.Count}");
             DebugLogUtility.WriteLog($"⏱️ OCR処理時間: {ocrResults.ProcessingTime.TotalMilliseconds:F1}ms");
             DebugLogUtility.WriteLog($"🌐 OCR言語: {ocrResults.LanguageCode}");
@@ -1673,6 +1720,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 設定から言語ペアを取得
                     var sourceCode = settings.DefaultSourceLanguage ?? "ja";
                     var targetCode = settings.DefaultTargetLanguage ?? "en";
+                    
+                    // 🚨 [CRITICAL_DEBUG] 言語設定の実際の値をデバッグ出力
+                    DebugLogUtility.WriteLog($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultSourceLanguage='{settings.DefaultSourceLanguage}'");
+                    DebugLogUtility.WriteLog($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultTargetLanguage='{settings.DefaultTargetLanguage}'");
+                    DebugLogUtility.WriteLog($"🚨 [LANGUAGE_SETTINGS_DEBUG] sourceCode='{sourceCode}', targetCode='{targetCode}'");
                     
                     DebugLogUtility.WriteLog($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
                     

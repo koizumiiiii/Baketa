@@ -257,7 +257,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
         try
         {
             tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync("127.0.0.1", 5555, cancellationToken);
+            await tcpClient.ConnectAsync("127.0.0.1", 5556, cancellationToken);
             
             stream = tcpClient.GetStream();
             
@@ -265,8 +265,10 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
             stream.ReadTimeout = _settings.ConnectionTimeoutMs;
             stream.WriteTimeout = _settings.ConnectionTimeoutMs;
             
-            reader = new StreamReader(stream, System.Text.Encoding.UTF8, false, 8192, true);
-            writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false), 8192, true) 
+            // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
+            var utf8EncodingNoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+            reader = new StreamReader(stream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
+            writer = new StreamWriter(stream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) 
             { 
                 AutoFlush = false // パフォーマンス向上のため手動フラッシュ
             };

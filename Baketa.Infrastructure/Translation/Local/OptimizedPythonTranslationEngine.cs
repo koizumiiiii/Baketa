@@ -348,7 +348,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             // モデルロード完了まで待機（タイムアウト付き）
             _logger.LogDebug("翻訳リクエスト開始 - モデルロード待機中...");
-            using var modelLoadTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var modelLoadTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(120)); // 🔧 [TIMEOUT_TEST] 30秒→120秒に延長してタイムアウト原因を確定検証
             using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, modelLoadTimeout.Token);
             
             try
@@ -840,7 +840,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // Issue #147: 接続プールから接続を取得（接続ロック競合を解決）
                 // 🔧 [TIMEOUT_FIX] 接続プール取得に30秒タイムアウトを追加
-                using var poolTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                using var poolTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(120)); // 🔧 [TIMEOUT_TEST] 30秒→120秒に延長してタイムアウト原因を確定検証
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, poolTimeout.Token);
                 
                 _logger.LogDebug("🔌 接続プール取得開始...");
@@ -906,8 +906,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（プール接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                 jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（プール接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
@@ -920,8 +920,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（単発接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                 jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（単発接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
