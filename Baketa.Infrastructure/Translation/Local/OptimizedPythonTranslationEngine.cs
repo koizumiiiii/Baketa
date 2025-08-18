@@ -1301,10 +1301,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 try
                 {
-                    // 🔧 [SCRIPT_NAME_FIX] 正しいスクリプト名でチェック（opus_mt_persistent_server）
+                    // 🔧 [SCRIPT_NAME_FIX] NLLB-200翻訳サーバーのプロセス検出
                     var commandLine = GetProcessCommandLine(process);
                     
-                    if (commandLine?.Contains("opus_mt_persistent_server") == true || 
+                    if (commandLine?.Contains("nllb_translation_server") == true || 
                         commandLine?.Contains("optimized_translation_server") == true)
                     {
                         _logger.LogInformation("🚨 既存翻訳サーバープロセス発見: PID {ProcessId}, Command: {CommandLine}", 
@@ -1530,18 +1530,18 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             }
             else
             {
-                // デフォルト設定から動的にポートとスクリプトパスを取得（従来のOPUS-MT）
-                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
-                _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
-                _logger.LogInformation("🔧 [OPUS-MT] OPUS-MTモード - ポート: {Port}, スクリプト: {Script}", 
+                // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
+                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5557);
+                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                _logger.LogInformation("🔧 [NLLB-200] デフォルトモード - ポート: {Port}, スクリプト: {Script}", 
                     _serverPort, Path.GetFileName(_serverScriptPath));
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（OPUS-MT）を使用");
-            _serverPort = 5556;
-            _serverScriptPath = Path.Combine(projectRoot, "scripts", "opus_mt_persistent_server.py");
+            _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
+            _serverPort = 5557;
+            _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
         }
     }
     

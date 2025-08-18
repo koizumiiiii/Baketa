@@ -284,37 +284,7 @@ internal sealed partial class App : Avalonia.Application
                         // エラーが発生してもアプリケーションの起動は継続
                     }
                     
-                    // 🔥【CRITICAL FIX】OPUS-MT事前起動サービスを開始 - TranslationFlowModule例外の影響を受けない独立実行
-                    Console.WriteLine("🔥🔥🔥 OPUS-MT事前起動サービス処理開始 🔥🔥🔥");
-                    try
-                    {
-                        Console.WriteLine("🔍 OpusMtPrewarmService取得開始");
-                        var prewarmService = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.IOpusMtPrewarmService>();
-                        Console.WriteLine($"✅ OpusMtPrewarmService取得成功: {prewarmService.GetType().Name}");
-                        Console.WriteLine("🚀 バックグラウンドタスク作成開始");
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                Console.WriteLine("🚀 prewarmService.StartPrewarmingAsync() 呼び出し開始");
-                                await prewarmService.StartPrewarmingAsync().ConfigureAwait(false);
-                                Console.WriteLine("✅ prewarmService.StartPrewarmingAsync() 完了");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"⚠️ OpusMtPrewarmService開始エラー: {ex.Message}");
-                                _logger?.LogWarning(ex, "⚠️ OpusMtPrewarmService開始エラー: {Error}", ex.Message);
-                            }
-                        });
-                        Console.WriteLine("🚀 OpusMtPrewarmService開始要求完了");
-                        _logger?.LogInformation("🚀 OpusMtPrewarmService開始要求完了");
-                    }
-                    catch (Exception prewarmEx)
-                    {
-                        Console.WriteLine($"💥💥💥 OpusMtPrewarmService取得エラー: {prewarmEx.GetType().Name}: {prewarmEx.Message}");
-                        Console.WriteLine($"💥💥💥 スタックトレース: {prewarmEx.StackTrace}");
-                        _logger?.LogWarning(prewarmEx, "⚠️ OpusMtPrewarmService取得エラー: {Error}", prewarmEx.Message);
-                    }
+                    // OPUS-MT削除済み: NLLB-200統一により事前起動サービス不要
                     
                     // 🚨 PythonServerHealthMonitor の直接開始
                     Console.WriteLine("🔧 PythonServerHealthMonitor直接開始開始");

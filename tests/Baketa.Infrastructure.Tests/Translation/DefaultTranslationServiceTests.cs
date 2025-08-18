@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.Translation;
 
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -20,6 +21,7 @@ namespace Baketa.Infrastructure.Tests.Translation;
     {
         private readonly Mock<ILogger<DefaultTranslationService>> _loggerMock;
         private readonly Mock<ILogger<MockTranslationEngine>> _engineLoggerMock;
+        private readonly Mock<IConfiguration> _configurationMock;
         private readonly MockTranslationEngine _mockEngine1;
         private readonly MockTranslationEngine _mockEngine2;
         private readonly DefaultTranslationService _service;
@@ -28,6 +30,11 @@ namespace Baketa.Infrastructure.Tests.Translation;
         {
             _loggerMock = new Mock<ILogger<DefaultTranslationService>>();
             _engineLoggerMock = new Mock<ILogger<MockTranslationEngine>>();
+            _configurationMock = new Mock<IConfiguration>();
+            
+            // テストデフォルトエンジン設定（最初のエンジンが選択される）
+            _configurationMock.Setup(c => c["Translation:DefaultEngine"])
+                .Returns("MockTranslationEngine");
             
             // エンジン1: 標準のモックエンジン
             _mockEngine1 = new MockTranslationEngine(_engineLoggerMock.Object);
@@ -38,7 +45,8 @@ namespace Baketa.Infrastructure.Tests.Translation;
             // 翻訳サービスの作成
             _service = new DefaultTranslationService(
                 _loggerMock.Object,
-                new List<ITranslationEngine> { _mockEngine1, _mockEngine2 });
+                new List<ITranslationEngine> { _mockEngine1, _mockEngine2 },
+                _configurationMock.Object);
         }
         
         private bool _disposed;

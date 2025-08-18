@@ -105,10 +105,7 @@ namespace Baketa.UI;
                 System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
                 _ = Task.Run(PreInitializeOcrEngineAsync);
                 
-                // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップ開始（60秒→0秒削減）
-                Console.WriteLine("🔥 OPUS-MT事前ウォームアップ開始（バックグラウンド）");
-                System.Diagnostics.Debug.WriteLine("🔥 OPUS-MT事前ウォームアップ開始（バックグラウンド）");
-                _ = Task.Run(StartOpusMtPrewarmingAsync);
+                // OPUS-MT削除済み: NLLB-200統一により事前ウォームアップサービス不要
                 
                 appStartMeasurement.LogCheckpoint("Avalonia アプリケーション開始準備完了");
                 PerformanceLogger.LogPerformance("🎯 Avalonia アプリケーション開始");
@@ -403,54 +400,7 @@ namespace Baketa.UI;
             }
         }
         
-        /// <summary>
-        /// OPUS-MT翻訳エンジンの事前ウォームアップを開始
-        /// 🔥 [TCP_STABILIZATION] 60秒→0秒削減のための事前サーバー起動
-        /// </summary>
-        private static async Task StartOpusMtPrewarmingAsync()
-        {
-            try
-            {
-                Console.WriteLine("🔥 [PREWARMING] OPUS-MT事前ウォームアップ開始");
-                var timer = System.Diagnostics.Stopwatch.StartNew();
-                
-                // ServiceProviderが利用可能になるまで待機
-                while (ServiceProvider == null)
-                {
-                    await Task.Delay(100).ConfigureAwait(false);
-                    if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
-                    {
-                        Console.WriteLine("⚠️ [PREWARMING] ServiceProvider初期化タイムアウト - OPUS-MT事前ウォームアップを中止");
-                        return;
-                    }
-                }
-                
-                // OPUS-MTプリウォーミングサービスを取得して開始
-                var prewarmService = ServiceProvider.GetService<Baketa.Core.Abstractions.Translation.IOpusMtPrewarmService>();
-                if (prewarmService != null)
-                {
-                    Console.WriteLine("🔧 [PREWARMING] OpusMtPrewarmService取得成功 - ウォームアップ開始");
-                    
-                    // プリウォーミングを開始（バックグラウンドで実行）
-                    await prewarmService.StartPrewarmingAsync().ConfigureAwait(false);
-                    
-                    timer.Stop();
-                    Console.WriteLine($"✅ [PREWARMING] OPUS-MT事前ウォームアップ開始完了 - 開始時間: {timer.ElapsedMilliseconds}ms");
-                    System.Diagnostics.Debug.WriteLine($"✅ [PREWARMING] OPUS-MT事前ウォームアップ開始完了 - 開始時間: {timer.ElapsedMilliseconds}ms");
-                }
-                else
-                {
-                    timer.Stop();
-                    Console.WriteLine($"⚠️ [PREWARMING] OpusMtPrewarmServiceが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
-                    System.Diagnostics.Debug.WriteLine($"⚠️ [PREWARMING] OpusMtPrewarmServiceが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"💥 [PREWARMING] OPUS-MT事前ウォームアップエラー: {ex.Message}");
-            }
-        }
+        // OPUS-MT削除済み: StartOpusMtPrewarmingAsyncメソッドはNLLB-200統一により不要
         
         /// <summary>
         /// 基盤モジュール群（Core, Infrastructure, Platform）を登録します

@@ -178,10 +178,7 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
             
-            // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップサービス: 60秒→0秒削減
-            Console.WriteLine("🔍 [DI_DEBUG] OpusMtPrewarmService登録開始");
-            services.AddSingleton<TranslationAbstractions.IOpusMtPrewarmService, OpusMtPrewarmService>();
-            Console.WriteLine("✅ [DI_DEBUG] OpusMtPrewarmService登録完了");
+            // OPUS-MT削除済み: NLLB-200統一によりOpusMtPrewarmService不要
             
             // 翻訳関連のアプリケーションサービス（将来拡張）
             // 例: services.AddSingleton<ITranslationService, TranslationService>();

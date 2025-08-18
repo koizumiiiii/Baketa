@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -19,6 +20,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<FixedSizeConnectionPool>> _mockLogger;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly TranslationSettings _testSettings;
     private readonly IOptions<TranslationSettings> _testOptions;
     private FixedSizeConnectionPool? _connectionPool;
@@ -27,6 +29,10 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     {
         _output = output;
         _mockLogger = new Mock<ILogger<FixedSizeConnectionPool>>();
+        _mockConfiguration = new Mock<IConfiguration>();
+        
+        // IConfigurationのモック設定（デフォルトでNLLB-200）
+        _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("NLLB200");
         
         // テスト用設定
         _testSettings = new TranslationSettings
@@ -44,7 +50,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public void Constructor_ShouldInitializeCorrectly()
     {
         // Act
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
 
         // Assert
         Assert.NotNull(_connectionPool);
@@ -67,7 +73,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         var optionsWithNullMax = Options.Create(settingsWithNullMax);
 
         // Act
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, optionsWithNullMax);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, optionsWithNullMax);
 
         // Assert
         var metrics = _connectionPool.GetMetrics();
@@ -82,7 +88,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public async Task AcquireConnectionAsync_ShouldReturnConnection()
     {
         // Arrange
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
         using var cts = new CancellationTokenSource(10000); // 10秒タイムアウト
 
         // Act & Assert
@@ -100,7 +106,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public async Task GetMetrics_ShouldReturnCorrectInitialValues()
     {
         // Arrange
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
 
         // Act
         var metrics = _connectionPool.GetMetrics();
@@ -119,7 +125,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public void GetMetrics_AfterDispose_ShouldNotThrow()
     {
         // Arrange
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
 
         // Act
         _connectionPool.DisposeAsync().AsTask().Wait();
@@ -143,7 +149,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         var invalidOptions = Options.Create(invalidSettings);
 
         // Act
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, invalidOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, invalidOptions);
 
         // Assert
         var metrics = _connectionPool.GetMetrics();
@@ -156,7 +162,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public async Task DisposeAsync_ShouldCompleteWithoutException()
     {
         // Arrange
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
 
         // Act & Assert - 例外をスローしない
         await _connectionPool.DisposeAsync();
@@ -169,7 +175,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     public async Task AcquireConnectionAsync_AfterDispose_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _testOptions);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
         await _connectionPool.DisposeAsync();
 
         // Act & Assert
@@ -197,7 +203,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         var options = Options.Create(settings);
 
         // Act
-        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, options);
+        _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, options);
 
         // Assert
         var metrics = _connectionPool.GetMetrics();

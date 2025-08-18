@@ -8,7 +8,7 @@ using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -23,7 +23,7 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
     private readonly Mock<FixedSizeConnectionPool> _mockConnectionPool;
-    private readonly Mock<IOptions<TranslationSettings>> _mockTranslationSettings;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineTests(ITestOutputHelper output)
@@ -31,9 +31,9 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
         _mockConnectionPool = new Mock<FixedSizeConnectionPool>();
-        _mockTranslationSettings = new Mock<IOptions<TranslationSettings>>();
-        _mockTranslationSettings.Setup(x => x.Value).Returns(new TranslationSettings());
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockTranslationSettings.Object);
+        _mockConfiguration = new Mock<IConfiguration>();
+        _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("Local");
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockConfiguration.Object);
     }
 
     [Fact]
@@ -295,7 +295,7 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
     private readonly Mock<FixedSizeConnectionPool> _mockConnectionPool;
-    private readonly Mock<IOptions<TranslationSettings>> _mockTranslationSettings;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineIntegrationTests(ITestOutputHelper output)
@@ -303,9 +303,9 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
         _mockConnectionPool = new Mock<FixedSizeConnectionPool>();
-        _mockTranslationSettings = new Mock<IOptions<TranslationSettings>>();
-        _mockTranslationSettings.Setup(x => x.Value).Returns(new TranslationSettings());
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockTranslationSettings.Object);
+        _mockConfiguration = new Mock<IConfiguration>();
+        _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("Local");
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockConfiguration.Object);
     }
 
     [Fact(Skip = "Pythonサーバーが必要")]

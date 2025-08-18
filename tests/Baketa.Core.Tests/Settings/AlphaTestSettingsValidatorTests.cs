@@ -24,14 +24,14 @@ public class AlphaTestSettingsValidatorTests
     #region 翻訳エンジン検証テスト
 
     [Fact]
-    public void Validate_ValidLocalEngine_ShouldSucceed()
+    public void Validate_ValidNLLB200Engine_ShouldSucceed()
     {
         // Arrange
         var settings = new AppSettings
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local
+                DefaultEngine = TranslationEngine.NLLB200
             }
         };
 
@@ -76,7 +76,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             }
@@ -143,7 +143,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -168,7 +168,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -265,7 +265,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -310,7 +310,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -339,7 +339,7 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var translationSettings = new TranslationSettings
         {
-            DefaultEngine = TranslationEngine.Local,
+            DefaultEngine = TranslationEngine.NLLB200,
             DefaultSourceLanguage = "ja",
             DefaultTargetLanguage = "en"
         };

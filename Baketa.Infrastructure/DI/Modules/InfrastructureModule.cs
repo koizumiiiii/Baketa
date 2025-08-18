@@ -23,13 +23,14 @@ using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
-using Baketa.Infrastructure.Translation.Local.Onnx;
+// OPUS-MT ONNX実装削除済み
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -330,19 +331,24 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
             Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
             
-            // 🚨 TEMPORARY FIX: 接続プール無効化（汚染問題完全解決まで）
-            // 各リクエストで新規接続作成により状態汚染を根絶
-            // services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-            Console.WriteLine("🚨 FixedSizeConnectionPool一時無効化 - 汚染問題根本解決のため");
+            // ✅ FixedSizeConnectionPool登録（動的ポート対応版）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>>();
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                var options = provider.GetRequiredService<IOptions<TranslationSettings>>();
+                return new Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool(logger, configuration, options);
+            });
+            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
             
-            // 🔄 単発接続版OptimizedPythonTranslationEngineに切り替え（汚染問題緊急対応）
+            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                // var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-                var translationSettings = provider.GetRequiredService<IOptions<TranslationSettings>>();
-                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 単発接続版（汚染対策）");
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, null, translationSettings);
+                var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）");
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>

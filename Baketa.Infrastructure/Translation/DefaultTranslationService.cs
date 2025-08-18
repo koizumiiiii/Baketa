@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using TransModels = Baketa.Core.Translation.Models;
@@ -17,18 +18,22 @@ namespace Baketa.Infrastructure.Translation;
     {
         private readonly ILogger<DefaultTranslationService> _logger;
         private readonly List<ITranslationEngine> _availableEngines;
+        private readonly IConfiguration _configuration;
 
         /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="logger">ロガー</param>
         /// <param name="engines">利用可能な翻訳エンジンのコレクション</param>
+        /// <param name="configuration">設定サービス</param>
         public DefaultTranslationService(
             ILogger<DefaultTranslationService> logger,
-            IEnumerable<ITranslationEngine> engines)
+            IEnumerable<ITranslationEngine> engines,
+            IConfiguration configuration)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             
             Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
             _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
@@ -44,10 +49,10 @@ namespace Baketa.Infrastructure.Translation;
                 throw new ArgumentException("少なくとも1つの翻訳エンジンが必要です。", nameof(engines));
             }
 
-            // 最初のエンジンをデフォルトのアクティブエンジンとして設定
-            ActiveEngine = _availableEngines[0];
-            Console.WriteLine($"🔧 [DEBUG] アクティブエンジン設定: {ActiveEngine.Name} ({ActiveEngine.GetType().Name})");
-            _logger.LogInformation("アクティブエンジン設定: {Name} ({Type})", ActiveEngine.Name, ActiveEngine.GetType().Name);
+            // 設定から翻訳エンジンを選択
+            ActiveEngine = SelectEngineFromConfiguration();
+            Console.WriteLine($"🎯 [CONFIG] アクティブエンジン設定完了: {ActiveEngine.Name} ({ActiveEngine.GetType().Name})");
+            _logger.LogInformation("アクティブエンジン設定完了: {Name} ({Type})", ActiveEngine.Name, ActiveEngine.GetType().Name);
         }
 
         /// <summary>
@@ -60,6 +65,78 @@ namespace Baketa.Infrastructure.Translation;
         /// 現在アクティブな翻訳エンジンを取得します
         /// </summary>
         public ITranslationEngine ActiveEngine { get; private set; }
+
+        /// <summary>
+        /// 設定ファイルからデフォルトエンジンを選択します
+        /// </summary>
+        /// <returns>選択されたエンジン（設定にマッチしない場合は最初のエンジン）</returns>
+        private ITranslationEngine SelectEngineFromConfiguration()
+        {
+            var defaultEngineName = _configuration["Translation:DefaultEngine"];
+            
+            Console.WriteLine($"🔍 [CONFIG] appsettings.json設定読み込み: Translation:DefaultEngine = '{defaultEngineName}'");
+            _logger.LogInformation("設定からデフォルトエンジン読み込み: {DefaultEngine}", defaultEngineName);
+            
+            if (!string.IsNullOrEmpty(defaultEngineName))
+            {
+                // 設定されたエンジン名に基づいてマッチングを試行
+                var matchedEngine = FindEngineByName(defaultEngineName);
+                if (matchedEngine != null)
+                {
+                    Console.WriteLine($"✅ [CONFIG] 設定マッチ成功: {matchedEngine.Name} を使用");
+                    _logger.LogInformation("設定マッチ成功: {EngineName} を使用", matchedEngine.Name);
+                    return matchedEngine;
+                }
+                
+                Console.WriteLine($"⚠️ [CONFIG] 設定エンジン '{defaultEngineName}' が見つかりません。フォールバック実行");
+                _logger.LogWarning("設定エンジン '{DefaultEngine}' が見つかりません。フォールバックします", defaultEngineName);
+            }
+            
+            // フォールバック: 最初のエンジンを使用
+            var fallbackEngine = _availableEngines[0];
+            Console.WriteLine($"🔄 [FALLBACK] デフォルトエンジン選択: {fallbackEngine.Name}");
+            _logger.LogInformation("フォールバックでデフォルトエンジン選択: {EngineName}", fallbackEngine.Name);
+            return fallbackEngine;
+        }
+        
+        /// <summary>
+        /// エンジン名に基づいてマッチするエンジンを検索します
+        /// </summary>
+        /// <param name="engineName">検索するエンジン名</param>
+        /// <returns>マッチしたエンジン（見つからない場合はnull）</returns>
+        private ITranslationEngine? FindEngineByName(string engineName)
+        {
+            // 1. 完全一致検索
+            var exactMatch = _availableEngines.FirstOrDefault(e => 
+                string.Equals(e.Name, engineName, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null) 
+            {
+                Console.WriteLine($"📍 [MATCH] 完全一致: {exactMatch.Name}");
+                return exactMatch;
+            }
+            
+            // 2. 部分一致検索（NLLB-200 → 'NLLB' 含むエンジン）
+            var partialMatch = _availableEngines.FirstOrDefault(e => 
+                e.Name.Contains(engineName, StringComparison.OrdinalIgnoreCase) || 
+                engineName.Contains(e.Name, StringComparison.OrdinalIgnoreCase));
+            if (partialMatch != null) 
+            {
+                Console.WriteLine($"📍 [MATCH] 部分一致: {partialMatch.Name}");
+                return partialMatch;
+            }
+            
+            // 3. エンジンタイプ名による検索（OptimizedPythonTranslationEngine等）
+            var typeMatch = _availableEngines.FirstOrDefault(e => 
+                e.GetType().Name.Contains(engineName, StringComparison.OrdinalIgnoreCase));
+            if (typeMatch != null) 
+            {
+                Console.WriteLine($"📍 [MATCH] タイプ名一致: {typeMatch.GetType().Name}");
+                return typeMatch;
+            }
+            
+            Console.WriteLine($"❌ [MATCH] マッチ失敗: '{engineName}' に該当するエンジンが見つかりません");
+            return null;
+        }
 
         /// <summary>
         /// 指定された名前のエンジンをアクティブにします
