@@ -14,12 +14,13 @@ namespace Baketa.Infrastructure.Translation.Services;
 
 /// <summary>
 /// OPUS-MT翻訳エンジン事前ウォームアップサービス実装
+/// 🔧 [CRITICAL_FIX] OptimizedPythonTranslationEngine対応 + ポート5556修正
 /// 🔧 [TCP_STABILIZATION] 高優先タスク: 事前サーバー起動による60秒→0秒削減
 /// </summary>
 public class OpusMtPrewarmService : IOpusMtPrewarmService, IDisposable
 {
     private readonly ILogger<OpusMtPrewarmService> _logger;
-    private readonly TransformersOpusMtEngine _opusMtEngine;
+    private readonly OptimizedPythonTranslationEngine _opusMtEngine; // 🔧 [CRITICAL_FIX] 正しいエンジンタイプに修正
     private volatile bool _isPrewarmed;
     private volatile string _prewarmStatus = "未開始";
     private bool _disposed;
@@ -27,12 +28,12 @@ public class OpusMtPrewarmService : IOpusMtPrewarmService, IDisposable
     // 🚀 Python サーバープロセス管理
     private Process? _pythonServerProcess;
     private readonly string _scriptPath;
-    private const int ServerPort = 7860;
+    private const int ServerPort = 5556; // 🔧 [CRITICAL_FIX] 正しいポート番号に修正（7860→5556）
     private const string ServerHost = "127.0.0.1";
 
     public OpusMtPrewarmService(
         ILogger<OpusMtPrewarmService> logger,
-        TransformersOpusMtEngine opusMtEngine)
+        OptimizedPythonTranslationEngine opusMtEngine) // 🔧 [CRITICAL_FIX] 正しいエンジンタイプに修正
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _opusMtEngine = opusMtEngine ?? throw new ArgumentNullException(nameof(opusMtEngine));

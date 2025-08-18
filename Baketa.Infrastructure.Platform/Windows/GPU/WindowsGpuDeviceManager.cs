@@ -25,8 +25,9 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
+        // 🔧 [CRASH_FIX] セグメンテーションフォルト回避のため一時的にタイマー無効化
         // キャッシュリフレッシュタイマー（30秒間隔）
-        _cacheRefreshTimer = new Timer(RefreshCacheCallback, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        _cacheRefreshTimer = new Timer(RefreshCacheCallback, null, Timeout.Infinite, Timeout.Infinite);
         
         _logger.LogInformation("🎮 WindowsGpuDeviceManager初期化完了 - Multi-GPU管理開始");
     }

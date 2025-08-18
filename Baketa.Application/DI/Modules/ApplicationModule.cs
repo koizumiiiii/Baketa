@@ -152,11 +152,13 @@ namespace Baketa.Application.DI.Modules;
                     var settingsService = provider.GetRequiredService<ISettingsService>();
                     var ocrEngine = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
                     var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
+                    var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
                     Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入");
                     var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
                     Console.WriteLine($"✅ [DI_DEBUG] CoordinateBasedTranslationService取得成功: {coordinateBasedTranslation.GetType().Name}");
+                    Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                     
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                         captureService,
@@ -164,6 +166,7 @@ namespace Baketa.Application.DI.Modules;
                         ocrEngine,
                         translationEngineFactory,
                         coordinateBasedTranslation,
+                        eventAggregator,
                         logger);
                 }
                 catch (Exception ex)

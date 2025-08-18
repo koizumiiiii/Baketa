@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Baketa.Core.Abstractions.Events;
@@ -314,6 +315,35 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"💥💥💥 スタックトレース: {prewarmEx.StackTrace}");
                         _logger?.LogWarning(prewarmEx, "⚠️ OpusMtPrewarmService取得エラー: {Error}", prewarmEx.Message);
                     }
+                    
+                    // 🚨 PythonServerHealthMonitor の直接開始
+                    Console.WriteLine("🔧 PythonServerHealthMonitor直接開始開始");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var scope = serviceProvider.CreateScope();
+                            
+                            // PythonServerHealthMonitor を直接取得
+                            var healthMonitor = scope.ServiceProvider.GetService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
+                            if (healthMonitor != null)
+                            {
+                                Console.WriteLine($"✅ [HEALTH_MONITOR] PythonServerHealthMonitor取得成功");
+                                await healthMonitor.StartAsync(CancellationToken.None).ConfigureAwait(false);
+                                Console.WriteLine($"🎯 [HEALTH_MONITOR] PythonServerHealthMonitor開始完了");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"⚠️ [HEALTH_MONITOR] PythonServerHealthMonitor取得失敗");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"⚠️ [HEALTH_MONITOR] PythonServerHealthMonitor開始エラー: {ex.Message}");
+                            _logger?.LogWarning(ex, "⚠️ PythonServerHealthMonitor開始エラー: {Error}", ex.Message);
+                        }
+                    });
+                    Console.WriteLine("🚀 PythonServerHealthMonitor直接開始要求完了");
                     
                     // アプリケーション起動完了イベントをパブリッシュ（非ブロッキング）
                     _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());

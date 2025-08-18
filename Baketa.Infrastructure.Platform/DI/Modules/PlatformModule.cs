@@ -8,6 +8,8 @@ using Baketa.Infrastructure.Platform.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using IWindowsImageAdapter = Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowsImageAdapter;
+using DefaultWindowsImageAdapter = Baketa.Infrastructure.Platform.Adapters.DefaultWindowsImageAdapter;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
@@ -86,6 +88,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             // Windows画像処理関連の登録
             // 例: services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
             // 例: services.AddSingleton<IImageConverter, WindowsImageConverter>();
+            
+            // 🔧 [CAPTURE_FIX] WindowsImageAdapter登録は後で実装
+            // DIコンテナ型解決問題を回避するため、AdaptiveCaptureServiceで直接作成
             
             // OpenCV関連
             // 拡張メソッドを使用して登録

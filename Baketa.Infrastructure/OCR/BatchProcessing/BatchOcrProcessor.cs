@@ -321,7 +321,28 @@ public sealed class BatchOcrProcessor(
                 System.Console.WriteLine($"🚨 [BATCH-DEBUG] デバッグログエラー: {debugEx.Message}");
             }
             
-            return measurement.IsSuccessful ? batchResult : [];
+            // 🚨 [CRITICAL_RETURN_DEBUG] 戻り値デバッグログ
+            try
+            {
+                var returnMessage = $"🚨 [CRITICAL_RETURN_DEBUG] ProcessBatchAsync戻り値準備 - IsSuccessful={measurement.IsSuccessful}, Count={batchResult.Count}";
+                System.Console.WriteLine(returnMessage);
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {returnMessage}{Environment.NewLine}");
+                
+                var result = measurement.IsSuccessful ? batchResult : [];
+                
+                var finalMessage = $"🚨 [CRITICAL_RETURN_DEBUG] ProcessBatchAsync戻り直前 - 戻り値Count={result.Count}";
+                System.Console.WriteLine(finalMessage);
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {finalMessage}{Environment.NewLine}");
+                
+                return result;
+            }
+            catch (Exception returnEx)
+            {
+                System.Console.WriteLine($"🚨 [CRITICAL_RETURN_DEBUG] 戻り値エラー: {returnEx.Message}");
+                return [];
+            }
         }
         
         return await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
@@ -496,20 +517,42 @@ public sealed class BatchOcrProcessor(
             // 3. テキストチャンクのグルーピング
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-5] テキストチャンクのグルーピング開始");
+            // 🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync呼び出し前
+            Console.WriteLine($"🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync呼び出し前 - TextRegions数: {ocrResults.TextRegions.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync呼び出し前{Environment.NewLine}");
+            
             var groupingTimer = Stopwatch.StartNew();
             var initialTextChunks = await GroupTextIntoChunksAsync(ocrResults, windowHandle, cancellationToken).ConfigureAwait(false);
             groupingTimer.Stop();
             phaseTimers["TextGrouping"] = groupingTimer;
+            
+            // 🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync完了後
+            Console.WriteLine($"🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync完了 - チャンク数: {initialTextChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] GroupTextIntoChunksAsync完了 - チャンク数: {initialTextChunks.Count}{Environment.NewLine}");
+            
             Console.WriteLine($"🔥 [STAGE-5] チャンクグルーピング完了 - {stageTimer.ElapsedMilliseconds}ms, チャンク数: {initialTextChunks.Count}");
             
             // 4. 信頼度ベース再処理
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-6] 信頼度ベース再処理開始");
+            // 🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync呼び出し前
+            Console.WriteLine($"🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync呼び出し前 - 入力チャンク数: {initialTextChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync呼び出し前{Environment.NewLine}");
+            
             var reprocessTimer = Stopwatch.StartNew();
             var reprocessedChunks = await _confidenceReprocessor.ReprocessLowConfidenceChunksAsync(
                 initialTextChunks, image, cancellationToken).ConfigureAwait(false);
             reprocessTimer.Stop();
             phaseTimers["ConfidenceReprocessing"] = reprocessTimer;
+            
+            // 🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync完了後
+            Console.WriteLine($"🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync完了 - 出力チャンク数: {reprocessedChunks.Count}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] ReprocessLowConfidenceChunksAsync完了 - チャンク数: {reprocessedChunks.Count}{Environment.NewLine}");
+            
             Console.WriteLine($"🔥 [STAGE-6] 信頼度ベース再処理完了 - {stageTimer.ElapsedMilliseconds}ms, チャンク数: {reprocessedChunks.Count}");
             
             // 5. 普遍的誤認識修正 - 一時的に無効化してテスト

@@ -1842,44 +1842,60 @@ public class PaddleOcrEngine : IOcrEngine
                         // 一時的にMat.FromImageDataを使用してRGB24をデコード
                         processedMat = Mat.FromImageData(resultData, ImreadModes.Color);
                         
-                        // 失敗した場合のフォールバック: 手動Mat作成
+                        // 失敗した場合のフォールバック: より安全なMat作成
                         if (processedMat.Empty())
                         {
                             try
                             {
                                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 Mat.FromImageData失敗、手動作成開始（直接書き込み）{Environment.NewLine}");
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 Mat.FromImageData失敗、安全な代替作成開始（直接書き込み）{Environment.NewLine}");
                             }
                             catch { }
                             
-                            // 手動でMatを作成（より安全な方法）
-                            processedMat = new Mat(height, width, MatType.CV_8UC3);
-                            
-                            // ピクセル単位でのコピー（メモリ配置を考慮）
-                            unsafe
+                            // 🔧 [EMERGENCY_FIX] より安全なMat作成 - メモリ破損を防ぐ
+                            try
                             {
-                                byte* matDataPtr = (byte*)processedMat.DataPointer;
-                                fixed (byte* srcPtr = resultData)
+                                // 入力データの完全性チェック
+                                var expectedSize = width * height * 3; // RGB24
+                                if (resultData == null || resultData.Length < expectedSize)
                                 {
-                                    // RGB24の場合、stride計算を考慮してコピー
-                                    int srcStride = width * 3; // RGB24は3バイト/ピクセル
-                                    int dstStride = (int)processedMat.Step();
-                                    
-                                    for (int y = 0; y < height; y++)
+                                    throw new ArgumentException($"データサイズ不正: expected={expectedSize}, actual={resultData?.Length ?? 0}");
+                                }
+                                
+                                // より安全な直接Mat作成（unsafeコード回避）
+                                processedMat = new Mat(height, width, MatType.CV_8UC3);
+                                
+                                // データを安全にコピー
+                                var indexer = processedMat.GetUnsafeGenericIndexer<Vec3b>();
+                                for (int y = 0; y < height; y++)
+                                {
+                                    for (int x = 0; x < width; x++)
                                     {
-                                        byte* srcRow = srcPtr + (y * srcStride);
-                                        byte* dstRow = matDataPtr + (y * dstStride);
-                                        
-                                        // 行単位でコピー（BGR順序に変換）
-                                        for (int x = 0; x < width; x++)
+                                        int srcIndex = (y * width + x) * 3;
+                                        if (srcIndex + 2 < resultData.Length)
                                         {
                                             // RGB → BGR変換
-                                            dstRow[x * 3 + 0] = srcRow[x * 3 + 2]; // B ← R
-                                            dstRow[x * 3 + 1] = srcRow[x * 3 + 1]; // G ← G  
-                                            dstRow[x * 3 + 2] = srcRow[x * 3 + 0]; // R ← B
+                                            indexer[y, x] = new Vec3b(
+                                                resultData[srcIndex + 2], // B
+                                                resultData[srcIndex + 1], // G  
+                                                resultData[srcIndex + 0]  // R
+                                            );
                                         }
                                     }
                                 }
+                            }
+                            catch (Exception fallbackEx)
+                            {
+                                try
+                                {
+                                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 安全代替Mat作成失敗、空Mat返却（直接書き込み）: {fallbackEx.Message}{Environment.NewLine}");
+                                }
+                                catch { }
+                                
+                                // 最終フォールバック：空のMatを返す（クラッシュ回避）
+                                processedMat = new Mat();
+                                // 空のMat処理を継続
                             }
                         }
                         
@@ -3270,66 +3286,140 @@ public class PaddleOcrEngine : IOcrEngine
     /// </summary>
     private async Task<object> ExecuteOcrInSeparateTask(Mat processedMat, CancellationToken cancellationToken)
     {
-        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🚀 強化OCR実行開始 - Task.WhenAny版");
+        // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\ud83d\ude80 \u5f37\u5316OCR\u5b9f\u884c\u958b\u59cb - Task.WhenAny\u7248");
         
-        // 適応的タイムアウト設定 - 解像度とモデルに応じた最適化
-        var baseTimeout = CalculateBaseTimeout(processedMat);  // 動的タイムアウト計算
+        // \u9069\u5fdc\u7684\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u8a2d\u5b9a - \u89e3\u50cf\u5ea6\u3068\u30e2\u30c7\u30eb\u306b\u5fdc\u3058\u305f\u6700\u9069\u5316
+        var baseTimeout = CalculateBaseTimeout(processedMat);  // \u52d5\u7684\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u8a08\u7b97
         var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
-        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
+        // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog($"\u23f1\ufe0f \u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u8a2d\u5b9a: {adaptiveTimeout}\u79d2 (\u57fa\u672c={baseTimeout}, V4={_isV4ModelForCreation})");
         
-        // 現在のOCRキャンセレーション管理
+        // \u73fe\u5728\u306eOCR\u30ad\u30e3\u30f3\u30bb\u30ec\u30fc\u30b7\u30e7\u30f3\u7ba1\u7406
         _currentOcrCancellation?.Dispose();
         _currentOcrCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(adaptiveTimeout));
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _currentOcrCancellation.Token);
         
         var ocrTask = Task.Run(() =>
         {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🏃 OCRエンジン実行中 - 新分離タスク");
-            // Gemini推奨：Mat.Clone()でGCライフタイム問題を完全に排除
-            using var taskSafeMat = processedMat.Clone();
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 Mat: Size={taskSafeMat.Size()}, Channels={taskSafeMat.Channels()}, IsContinuous={taskSafeMat.IsContinuous()}");
+            // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\ud83c\udfc3 OCR\u30a8\u30f3\u30b8\u30f3\u5b9f\u884c\u4e2d - \u65b0\u5206\u96e2\u30bf\u30b9\u30af");
+            // \ud83d\udd27 [CRITICAL_FIX] Mat.Clone()\u3067\u30bb\u30b0\u30e1\u30f3\u30c6\u30fc\u30b7\u30e7\u30f3\u30d5\u30a9\u30eb\u30c8\u767a\u751f - \u76f4\u63a5\u30e1\u30a4\u30f3\u30b9\u30ec\u30c3\u30c9Mat\u3092\u4f7f\u7528
+            // using var taskSafeMat = processedMat.Clone(); // <- \u3053\u306e\u884c\u304c\u30af\u30e9\u30c3\u30b7\u30e5\u539f\u56e0
             
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🎯 PaddleOCR.Run()実行開始");
+            // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog($"\ud83d\udd0d Mat: Size={processedMat.Size()}, Channels={processedMat.Channels()}, IsContinuous={processedMat.IsContinuous()}");
+            
+            // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\ud83c\udfaf PaddleOCR.Run()\u5b9f\u884c\u958b\u59cb");
             if (_ocrEngine == null)
             {
-                throw new InvalidOperationException("OCRエンジンが初期化されていません");
+                throw new InvalidOperationException("OCR\u30a8\u30f3\u30b8\u30f3\u304c\u521d\u671f\u5316\u3055\u308c\u3066\u3044\u307e\u305b\u3093");
             }
             
-            // Mat状態の詳細確認
+            // Mat\u72b6\u614b\u306e\u8a73\u7d30\u78ba\u8a8d\uff08\u76f4\u63a5Mat\u3092\u4f7f\u7528\uff09
             try
             {
-                var matDetailsBeforeRun = $"Size={taskSafeMat.Size()}, Type={taskSafeMat.Type()}, Channels={taskSafeMat.Channels()}, Empty={taskSafeMat.Empty()}, IsContinuous={taskSafeMat.IsContinuous()}, Step={taskSafeMat.Step()}";
+                var matDetailsBeforeRun = $"Size={processedMat.Size()}, Type={processedMat.Type()}, Channels={processedMat.Channels()}, Empty={processedMat.Empty()}, IsContinuous={processedMat.IsContinuous()}, Step={processedMat.Step()}";
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 PaddleOCR.Run()実行前Mat詳細（直接書き込み）: {matDetailsBeforeRun}{Environment.NewLine}");
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83c\udfaf PaddleOCR.Run()\u5b9f\u884c\u524dMat\u8a73\u7d30\uff08\u76f4\u63a5Mat\u30fb\u4fee\u6b63\u7248\uff09: {matDetailsBeforeRun}{Environment.NewLine}");
             }
             catch { }
             
-            // 実行時言語ヒント適用（利用可能な場合）
-            // 実行時言語ヒントは削除: PaddleOCR v3.0.1では言語設定APIが存在しない
+            // \u5b9f\u884c\u6642\u8a00\u8a9e\u30d2\u30f3\u30c8\u9069\u7528\uff08\u5229\u7528\u53ef\u80fd\u306a\u5834\u5408\uff09
+            // \u5b9f\u884c\u6642\u8a00\u8a9e\u30d2\u30f3\u30c8\u306f\u524a\u9664: PaddleOCR v3.0.1\u3067\u306f\u8a00\u8a9e\u8a2d\u5b9aAPI\u304c\u5b58\u5728\u3057\u306a\u3044
             
             try
             {
-                var result = _ocrEngine.Run(taskSafeMat);
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ PaddleOCR.Run()完了 - 結果取得完了");
+                // \ud83d\udd27 [CRITICAL_FIX] \u76f4\u63a5\u30e1\u30a4\u30f3\u30b9\u30ec\u30c3\u30c9Mat\u3092\u4f7f\u7528\u3057\u3066Clone()\u56de\u907f
+                // 🔧 [MAT_SAFETY_CHECK] PaddleOCR実行前のMat安全性チェック
+                if (processedMat.Empty() || processedMat.Rows <= 0 || processedMat.Cols <= 0)
+                {
+                    throw new InvalidOperationException($"不正なMat状態: Empty={processedMat.Empty()}, Size={processedMat.Cols}x{processedMat.Rows}");
+                }
                 
-                // 成功時は連続失敗カウンタをリセット
+                // DataPointerチェックはunsafeコンテキスト問題のため一時的に無効化
+                // if (processedMat.DataPointer == IntPtr.Zero)
+                // {
+                //     throw new InvalidOperationException("MatのDataPointerがnullです");
+                // }
+                
+                // Matのタイプとチャンネル数をチェック
+                var matType = processedMat.Type();
+                var channels = processedMat.Channels();
+                if (channels != 3 || (matType != MatType.CV_8UC3))
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ 予期しないMat形式（直接書き込み）: Type={matType}, Channels={channels}, 継続実行{Environment.NewLine}");
+                }
+                
+                // 🛡️ [CRITICAL_MEMORY_PROTECTION] AccessViolationException回避策
+                // 連続失敗時は一時的にOCRを無効化
+                if (_consecutivePaddleFailures >= 3)
+                {
+                    throw new InvalidOperationException($"PaddleOCR連続失敗のため一時的に無効化中（失敗回数: {_consecutivePaddleFailures}）");
+                }
+                
+                // 🚨 [CRASH_PREVENTION] 大画像サイズ制限（WER_FAULT_SIGクラッシュ対策）
+                const int MAX_PIXELS = 1000000; // 100万ピクセル制限
+                var totalPixels = processedMat.Cols * processedMat.Rows;
+                if (totalPixels > MAX_PIXELS)
+                {
+                    _consecutivePaddleFailures++;
+                    throw new InvalidOperationException($"画像サイズが大きすぎます（{processedMat.Cols}x{processedMat.Rows}={totalPixels:N0}ピクセル > {MAX_PIXELS:N0}制限）。連続失敗: {_consecutivePaddleFailures}");
+                }
+                
+                object result;
+                try
+                {
+                    // メモリ破損防止: より厳格な制御
+                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                    var ocrTask = Task.Run(() => {
+                        // GCを強制実行してメモリを整理
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                        GC.Collect();
+                        
+                        return _ocrEngine.Run(processedMat);
+                    }, cts.Token);
+                    
+                    result = ocrTask.GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    _consecutivePaddleFailures++;
+                    throw new TimeoutException($"PaddleOCR実行がタイムアウトしました（8秒）。連続失敗: {_consecutivePaddleFailures}");
+                }
+                catch (AggregateException ex) when (ex.InnerException is AccessViolationException)
+                {
+                    _consecutivePaddleFailures++;
+                    throw new InvalidOperationException($"PaddleOCRメモリアクセス違反が発生しました。Mat: {processedMat.Cols}x{processedMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex.InnerException);
+                }
+                catch (AccessViolationException ex)
+                {
+                    _consecutivePaddleFailures++;
+                    throw new InvalidOperationException($"PaddleOCRネイティブライブラリでメモリ破損が発生しました。Mat: {processedMat.Cols}x{processedMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex);
+                }
+                catch (Exception ex)
+                {
+                    _consecutivePaddleFailures++;
+                    throw new InvalidOperationException($"PaddleOCR実行エラー: {ex.Message}。連続失敗: {_consecutivePaddleFailures}", ex);
+                }
+                // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog($"\u2705 PaddleOCR.Run()\u5b8c\u4e86 - \u7d50\u679c\u53d6\u5f97\u5b8c\u4e86");
+                
+                // \u6210\u529f\u6642\u306f\u9023\u7d9a\u5931\u6557\u30ab\u30a6\u30f3\u30bf\u3092\u30ea\u30bb\u30c3\u30c8
                 if (_consecutivePaddleFailures > 0)
                 {
                     try
                     {
                         System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCR連続失敗リセット（直接書き込み）: {_consecutivePaddleFailures} → 0{Environment.NewLine}");
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83d\udd04 PaddleOCR\u9023\u7d9a\u5931\u6557\u30ea\u30bb\u30c3\u30c8\uff08Mat.Clone\u56de\u907f\u7248\uff09: {_consecutivePaddleFailures} \u2192 0{Environment.NewLine}");
                     }
                     catch { }
                     _consecutivePaddleFailures = 0;
                 }
                 
-                // 成功時の詳細ログ
+                // \u6210\u529f\u6642\u306e\u8a73\u7d30\u30ed\u30b0
                 try
                 {
                     var resultInfo = result?.GetType().Name ?? "null";
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ PaddleOCR.Run()成功（直接書き込み）: 結果型={resultInfo}{Environment.NewLine}");
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u2705 PaddleOCR.Run()\u6210\u529f\uff08Mat.Clone\u56de\u907f\u7248\uff09: \u7d50\u679c\u578b={resultInfo}{Environment.NewLine}");
                 }
                 catch { }
                 
@@ -3337,7 +3427,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             catch (Exception paddleException)
             {
-                // PaddleOCR実行失敗時の詳細ログと統計更新
+                // PaddleOCR\u5b9f\u884c\u5931\u6557\u6642\u306e\u8a73\u7d30\u30ed\u30b0\u3068\u7d71\u8a08\u66f4\u65b0
                 _consecutivePaddleFailures++;
                 
                 try
@@ -3345,24 +3435,24 @@ public class PaddleOcrEngine : IOcrEngine
                     var exceptionDetails = $"Type={paddleException.GetType().Name}, Message={paddleException.Message}, Stack={paddleException.StackTrace?.Split('\n').FirstOrDefault()}";
                     
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCR.Run()失敗（直接書き込み）: {exceptionDetails}, 連続失敗数={_consecutivePaddleFailures}{Environment.NewLine}");
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u274c PaddleOCR.Run()\u5931\u6557\uff08Mat.Clone\u56de\u907f\u7248\uff09: {exceptionDetails}, \u9023\u7d9a\u5931\u6557\u6570={_consecutivePaddleFailures}{Environment.NewLine}");
                 }
                 catch { }
                 
-                // 連続3回失敗でエンジン再初期化を検討
+                // \u9023\u7d9a3\u56de\u5931\u6557\u3067\u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u691c\u8a0e
                 if (_consecutivePaddleFailures >= 3)
                 {
                     try
                     {
                         System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCR連続失敗({_consecutivePaddleFailures}回) - エンジン再初期化を実行（直接書き込み）{Environment.NewLine}");
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83d\udd04 PaddleOCR\u9023\u7d9a\u5931\u6557({_consecutivePaddleFailures}\u56de) - \u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u5b9f\u884c\uff08Mat.Clone\u56de\u907f\u7248\uff09{Environment.NewLine}");
                         
-                        // エンジン再初期化を別タスクで実行（現在のタスクは例外で終了）
+                        // \u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u5225\u30bf\u30b9\u30af\u3067\u5b9f\u884c\uff08\u73fe\u5728\u306e\u30bf\u30b9\u30af\u306f\u4f8b\u5916\u3067\u7d42\u4e86\uff09
                         _ = Task.Run(async () =>
                         {
                             try
                             {
-                                await Task.Delay(1000).ConfigureAwait(false); // 1秒待機
+                                await Task.Delay(1000).ConfigureAwait(false); // 1\u79d2\u5f85\u6a5f
                                 await ReinitializeEngineAsync().ConfigureAwait(false);
                             }
                             catch (Exception reinitException)
@@ -3370,7 +3460,7 @@ public class PaddleOcrEngine : IOcrEngine
                                 try
                                 {
                                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化失敗（直接書き込み）: {reinitException.Message}{Environment.NewLine}");
+                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u274c PaddleOCR\u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u5931\u6557\uff08Mat.Clone\u56de\u907f\u7248\uff09: {reinitException.Message}{Environment.NewLine}");
                                 }
                                 catch { }
                             }
@@ -3379,11 +3469,11 @@ public class PaddleOcrEngine : IOcrEngine
                     catch { }
                 }
                 
-                throw; // 元の例外を再スロー
+                throw; // \u5143\u306e\u4f8b\u5916\u3092\u518d\u30b9\u30ed\u30fc
             }
         }, combinedCts.Token);
 
-        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(adaptiveTimeout), cancellationToken); // 適応的タイムアウト
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(adaptiveTimeout), cancellationToken); // \u9069\u5fdc\u7684\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8
         
         var completedTask = await Task.WhenAny(ocrTask, timeoutTask).ConfigureAwait(false);
         
@@ -3393,13 +3483,13 @@ public class PaddleOcrEngine : IOcrEngine
             
             if (result == null)
             {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("⚠️ OCR処理結果がnull - エラー状態");
+                // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\u26a0\ufe0f OCR\u51e6\u7406\u7d50\u679c\u304cnull - \u30a8\u30e9\u30fc\u72b6\u614b");
                 throw new InvalidOperationException("OCR processing returned null result");
             }
             
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ OCR処理正常完了 - Task.WhenAny版");
+            // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\u2705 OCR\u51e6\u7406\u6b63\u5e38\u5b8c\u4e86 - Task.WhenAny\u7248");
             
-            // 成功時の統計更新とクリーンアップ
+            // \u6210\u529f\u6642\u306e\u7d71\u8a08\u66f4\u65b0\u3068\u30af\u30ea\u30fc\u30f3\u30a2\u30c3\u30d7
             _lastOcrTime = DateTime.UtcNow;
             _consecutiveTimeouts = 0;
             _currentOcrCancellation = null;
@@ -3409,12 +3499,12 @@ public class PaddleOcrEngine : IOcrEngine
         else
         {
             var modelVersion = _isV4ModelForCreation ? "V4" : "V5";
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⏰ {modelVersion}モデルOCR処理{adaptiveTimeout}秒タイムアウト");
+            // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog($"\u23f0 {modelVersion}\u30e2\u30c7\u30ebOCR\u51e6\u7406{adaptiveTimeout}\u79d2\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8");
             
-            // バックグラウンドタスクのキャンセルを要求
+            // \u30d0\u30c3\u30af\u30b0\u30e9\u30a6\u30f3\u30c9\u30bf\u30b9\u30af\u306e\u30ad\u30e3\u30f3\u30bb\u30eb\u3092\u8981\u6c42
             combinedCts.Cancel();
             
-            // バックグラウンドで完了する可能性があるため、少し待機してチェック
+            // \u30d0\u30c3\u30af\u30b0\u30e9\u30a6\u30f3\u30c9\u3067\u5b8c\u4e86\u3059\u308b\u53ef\u80fd\u6027\u304c\u3042\u308b\u305f\u3081\u3001\u5c11\u3057\u5f85\u6a5f\u3057\u3066\u30c1\u30a7\u30c3\u30af
             try
             {
                 await Task.Delay(2000, CancellationToken.None).ConfigureAwait(false);
@@ -3424,13 +3514,13 @@ public class PaddleOcrEngine : IOcrEngine
                     
                     if (lateResult == null)
                     {
-                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("⚠️ OCR遅延処理結果がnull - エラー状態");
+                        // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\u26a0\ufe0f OCR\u9045\u5ef6\u51e6\u7406\u7d50\u679c\u304cnull - \u30a8\u30e9\u30fc\u72b6\u614b");
                         throw new InvalidOperationException("OCR late processing returned null result");
                     }
                     
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ OCR処理がタイムアウト後に完了 - 結果を返します");
+                    // Note: static\u30e1\u30bd\u30c3\u30c9\u3067\u306f\u30ed\u30b0\u51fa\u529b\u4e0d\u53ef // _unifiedLoggingService?.WriteDebugLog("\u2705 OCR\u51e6\u7406\u304c\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u5f8c\u306b\u5b8c\u4e86 - \u7d50\u679c\u3092\u8fd4\u3057\u307e\u3059");
                     
-                    // 遅延完了時の統計更新とクリーンアップ
+                    // \u9045\u5ef6\u5b8c\u4e86\u6642\u306e\u7d71\u8a08\u66f4\u65b0\u3068\u30af\u30ea\u30fc\u30f3\u30a2\u30c3\u30d7
                     _lastOcrTime = DateTime.UtcNow;
                     _consecutiveTimeouts = Math.Max(0, _consecutiveTimeouts - 1);
                     _currentOcrCancellation = null;
@@ -3440,14 +3530,14 @@ public class PaddleOcrEngine : IOcrEngine
             }
             catch
             {
-                // 遅延チェックで例外が発生した場合は無視
+                // \u9045\u5ef6\u30c1\u30a7\u30c3\u30af\u3067\u4f8b\u5916\u304c\u767a\u751f\u3057\u305f\u5834\u5408\u306f\u7121\u8996
             }
             
-            // タイムアウト時の統計更新とクリーンアップ
+            // \u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u6642\u306e\u7d71\u8a08\u66f4\u65b0\u3068\u30af\u30ea\u30fc\u30f3\u30a2\u30c3\u30d7
             _consecutiveTimeouts++;
             _currentOcrCancellation = null;
             
-            throw new TimeoutException($"{modelVersion}モデルのOCR処理が{adaptiveTimeout}秒でタイムアウトしました");
+            throw new TimeoutException($"{modelVersion}\u30e2\u30c7\u30eb\u306eOCR\u51e6\u7406\u304c{adaptiveTimeout}\u79d2\u3067\u30bf\u30a4\u30e0\u30a2\u30a6\u30c8\u3057\u307e\u3057\u305f");
         }
     }
 

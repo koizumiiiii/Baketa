@@ -36,6 +36,23 @@ namespace Baketa.UI;
         [STAThread]
         public static void Main(string[] args)
         {
+            // 🔧 [CRITICAL_ENCODING_FIX] Windows環境でUTF-8コンソール出力を強制設定
+            try
+            {
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
+                Console.InputEncoding = System.Text.Encoding.UTF8;
+                
+                // Windows環境でのUTF-8モード有効化
+                Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+                Environment.SetEnvironmentVariable("DOTNET_SYSTEM_TEXT_ENCODING_USEUTF8", "true");
+                
+                Console.WriteLine("🔧 [ENCODING_INIT] UTF-8 console encoding configured successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ [ENCODING_INIT] Failed to configure UTF-8 console: {ex.Message}");
+            }
+            
             // 統一パフォーマンス測定システムを初期化
             PerformanceLogger.Initialize();
             PerformanceLogger.LogSystemInfo();

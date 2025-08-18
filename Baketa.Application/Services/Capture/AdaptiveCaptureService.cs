@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
 using System.Drawing;
 
 namespace Baketa.Application.Services.Capture;
@@ -315,9 +316,35 @@ public class AdaptiveCaptureService(
             if (result.Success && result.CapturedImages.Count > 0)
             {
                 var primaryImage = result.CapturedImages[0];
+                
+                // 🔧 [CAPTURE_FIX] IImage変換処理
+                IImage? imageInterface = null;
+                
+                if (primaryImage is IImage directImage)
+                {
+                    // 直接IImageの場合
+                    imageInterface = directImage;
+                    _logger.LogDebug("🔧 [CAPTURE_FIX] 直接IImage変換成功");
+                }
+                else if (primaryImage is IWindowsImage windowsImage)
+                {
+                    // WindowsImageの場合はアダプターを直接作成して変換
+                    var adapter = new Baketa.Infrastructure.Platform.Adapters.DefaultWindowsImageAdapter();
+                    imageInterface = adapter.ToImage(windowsImage);
+                    _logger.LogDebug("🔧 [CAPTURE_FIX] WindowsImageAdapter変換成功 - Type: {Type}", imageInterface?.GetType()?.Name ?? "null");
+                    // 🔧 [DISPOSE_FIX] adapter.Dispose()を削除 - WindowsImageの早期破棄を防ぐ
+                }
+                
+                if (imageInterface == null)
+                {
+                    _logger.LogWarning("🔧 [CAPTURE_FIX] IImage変換失敗 - Type: {Type}", 
+                        primaryImage?.GetType()?.Name ?? "null");
+                    return;
+                }
+                
                 var captureRegion = new Rectangle(0, 0, primaryImage.Width, primaryImage.Height);
                 var captureCompletedEvent = new CaptureCompletedEvent(
-                    primaryImage as IImage, 
+                    imageInterface, 
                     captureRegion, 
                     result.ProcessingTime);
                 
