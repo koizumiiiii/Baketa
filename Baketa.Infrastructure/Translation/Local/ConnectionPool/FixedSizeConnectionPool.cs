@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Settings;
 
 namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
@@ -17,6 +18,7 @@ namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 public sealed class FixedSizeConnectionPool : IAsyncDisposable
 {
     private readonly ILogger<FixedSizeConnectionPool> _logger;
+    private readonly IConfiguration _configuration;
     private readonly TranslationSettings _settings;
     private readonly Channel<PersistentConnection> _connectionChannel;
     private readonly SemaphoreSlim _poolSemaphore;
@@ -33,16 +35,19 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     /// 固定サイズ接続プールを初期化
     /// </summary>
     /// <param name="logger">ロガー</param>
+    /// <param name="configuration">設定サービス</param>
     /// <param name="options">翻訳設定オプション</param>
     public FixedSizeConnectionPool(
         ILogger<FixedSizeConnectionPool> logger,
+        IConfiguration configuration,
         IOptions<TranslationSettings> options)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _settings = options?.Value ?? throw new ArgumentNullException(nameof(options));
         
         // 接続数の計算
-        _maxConnections = _settings.MaxConnections ?? Environment.ProcessorCount / 2;
+        _maxConnections = _settings.MaxConnections ?? Math.Max(8, Environment.ProcessorCount / 2);  // 🔧 CONCURRENT_OPTIMIZATION: 最小8接続を保証
         _minConnections = _settings.MinConnections;
         
         if (_maxConnections < 1) _maxConnections = 1;
@@ -75,6 +80,24 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
         }
         
         _ = Task.Run(InitializeMinConnectionsAsync, _disposalCts.Token);
+    }
+
+    /// <summary>
+    /// 設定に基づいて動的にポート番号を取得
+    /// NLLB-200: 5557、その他: 5556（レガシー互換性）
+    /// </summary>
+    private int GetServerPort()
+    {
+        var defaultEngineString = _configuration["Translation:DefaultEngine"];
+        var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+            ? parsedEngine 
+            : TranslationEngine.NLLB200;
+
+        return defaultEngine switch
+        {
+            TranslationEngine.NLLB200 => 5557,
+            _ => 5556 // レガシー互換性のため維持
+        };
     }
 
     /// <summary>
@@ -257,7 +280,8 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
         try
         {
             tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync("127.0.0.1", 5556, cancellationToken);
+            var serverPort = GetServerPort();
+            await tcpClient.ConnectAsync("127.0.0.1", serverPort, cancellationToken);
             
             stream = tcpClient.GetStream();
             

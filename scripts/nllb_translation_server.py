@@ -90,7 +90,7 @@ class NllbTranslationServer:
         self.port = port
         self.model = None
         self.tokenizer = None
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.executor = ThreadPoolExecutor(max_workers=8)  # 🔧 CONCURRENT_OPTIMIZATION: 4→8で同時接続制限を緩和
         self.request_count = 0
         self.total_processing_time = 0.0
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

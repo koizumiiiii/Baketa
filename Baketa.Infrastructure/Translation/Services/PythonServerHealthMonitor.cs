@@ -29,7 +29,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
-    private int _currentServerPort = 5556;
+    private int _currentServerPort = 5556; // デフォルト（OPUS-MT）、NLLB-200は5557
     
     // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
     private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
@@ -507,12 +507,39 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             }
             
             var pythonPath = "py"; // Windows Python Launcher使用
-            var serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-                @"..\..\..\..\scripts\optimized_translation_server.py");
             
-            if (!File.Exists(serverScriptPath))
+            // 🎯 [NLLB-200] モデル設定に基づくサーバースクリプト選択
+            string serverScriptPath;
+            var defaultEngine = _cachedSettings?.DefaultEngine ?? TranslationEngine.NLLB200;
+            
+            if (defaultEngine == TranslationEngine.NLLB200)
             {
-                serverScriptPath = @"scripts\optimized_translation_server.py";
+                // NLLB-200サーバー使用
+                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
+                    @"..\..\..\..\scripts\nllb_translation_server.py");
+                    
+                if (!File.Exists(serverScriptPath))
+                {
+                    serverScriptPath = @"scripts\nllb_translation_server.py";
+                }
+                
+                // NLLB-200用のポート設定
+                _currentServerPort = 5557;
+                
+                _logger.LogInformation("🎯 [NLLB-200] NLLB-200高品質翻訳サーバーを起動: {ScriptPath} Port:{Port}", serverScriptPath, _currentServerPort);
+            }
+            else
+            {
+                // 従来のOPUS-MTサーバー使用
+                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
+                    @"..\..\..\..\scripts\optimized_translation_server.py");
+                    
+                if (!File.Exists(serverScriptPath))
+                {
+                    serverScriptPath = @"scripts\optimized_translation_server.py";
+                }
+                
+                _logger.LogInformation("🔧 [OPUS-MT] 従来の翻訳サーバーを起動: {ScriptPath}", serverScriptPath);
             }
             
             var processInfo = new ProcessStartInfo

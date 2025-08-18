@@ -18,8 +18,8 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini])]
-    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.Local;
+        ValidValues = [TranslationEngine.Gemini, TranslationEngine.NLLB200])]
+    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.NLLB200;
     
     /// <summary>
     /// ソース言語の自動検出
@@ -74,8 +74,8 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini])]
-    public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
+        ValidValues = [TranslationEngine.None, TranslationEngine.Gemini])]
+    public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Gemini;
     
     /// <summary>
     /// 翻訳タイムアウト時間
@@ -449,14 +449,14 @@ public enum TranslationEngine
     None,
     
     /// <summary>
-    /// ローカル翻訳（オフライン）
-    /// </summary>
-    Local,
-    
-    /// <summary>
     /// Google Gemini AI翻訳（クラウド）
     /// </summary>
     Gemini,
+    
+    /// <summary>
+    /// NLLB-200高品質多言語翻訳（ローカル）
+    /// </summary>
+    NLLB200,
     
 }
 
