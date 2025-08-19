@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Management;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     // パフォーマンスカウンター
     private PerformanceCounter? _cpuCounter;
     private PerformanceCounter? _memoryAvailableCounter;
-    private PerformanceCounter? _memoryCommittedCounter;
+    private readonly PerformanceCounter? _memoryCommittedCounter;
     private PerformanceCounter? _processCountCounter;
     private PerformanceCounter? _threadCountCounter;
     
@@ -392,7 +393,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                     "SELECT Name, AdapterRAM FROM Win32_VideoController WHERE AdapterRAM > 0");
                 
                 using var gpuCollection = _gpuSearcher.Get();
-                foreach (ManagementObject gpu in gpuCollection)
+                foreach (ManagementObject gpu in gpuCollection.Cast<ManagementObject>())
                 {
                     var gpuName = gpu["Name"]?.ToString();
                     if (!string.IsNullOrEmpty(gpuName))
@@ -533,7 +534,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
             using var collection = searcher.Get();
             
-            foreach (ManagementObject obj in collection)
+            foreach (ManagementObject obj in collection.Cast<ManagementObject>())
             {
                 if (obj["TotalPhysicalMemory"] is ulong totalBytes)
                 {

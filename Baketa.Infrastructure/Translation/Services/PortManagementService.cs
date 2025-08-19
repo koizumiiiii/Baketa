@@ -111,7 +111,7 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
         if (!await _semaphore.WaitAsync(_lockTimeout).ConfigureAwait(false))
         {
             logger.LogWarning("⚠️ アクティブポート取得時のセマフォ取得がタイムアウトしました");
-            return Array.Empty<int>();
+            return [];
         }
         
         try

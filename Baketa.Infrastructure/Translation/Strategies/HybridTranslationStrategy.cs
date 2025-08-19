@@ -24,7 +24,7 @@ public sealed class HybridTranslationStrategy : IDisposable
         HybridStrategySettings settings,
         ILogger<HybridTranslationStrategy> logger)
     {
-        _strategies = strategies.OrderByDescending(s => s.Priority).ToList();
+        _strategies = [..strategies.OrderByDescending(s => s.Priority)];
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -99,7 +99,7 @@ public sealed class HybridTranslationStrategy : IDisposable
     {
         if (texts == null || texts.Count == 0)
         {
-            return Array.Empty<TranslationResult>();
+            return [];
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -138,12 +138,12 @@ public sealed class HybridTranslationStrategy : IDisposable
             _metricsCollector.RecordError(ex, context);
             
             // 全件エラーとして返す
-            return texts.Select(t => new TranslationResult(
+            return [..texts.Select(t => new TranslationResult(
                 t,
                 string.Empty,
                 false,
                 $"バッチ翻訳エラー: {ex.Message}",
-                stopwatch.Elapsed)).ToList();
+                stopwatch.Elapsed))];
         }
     }
 

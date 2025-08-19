@@ -5,6 +5,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
@@ -608,11 +609,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         // 元の順序を保持するため、RequestIdでソート
         var responseMap = allResponses.ToDictionary(r => r.RequestId);
-        return requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
+        return [..requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
             ? response 
             : TranslationResponse.CreateError(req, 
                 new TranslationError { ErrorCode = "BATCH_PROCESSING_ERROR", Message = "Response not found" }, 
-                Name)).ToList();
+                Name))];
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> ProcessSingleBatchAsync(
@@ -761,11 +762,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         const string engineName = "OptimizedPythonTranslation";
         
-        if (!batchResponse.success || batchResponse.translations == null)
+        if (!batchResponse.Success || batchResponse.Translations == null)
         {
             // エラー時は全てFailureで返す
-            var errorMessage = batchResponse.errors?.FirstOrDefault() ?? "Unknown batch translation error";
-            return originalRequests.Select(req => 
+            var errorMessage = batchResponse.Errors?.FirstOrDefault() ?? "Unknown batch translation error";
+            return [..originalRequests.Select(req => 
             {
                 var error = new TranslationError
                 {
@@ -773,12 +774,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     Message = errorMessage
                 };
                 return TranslationResponse.CreateError(req, error, engineName);
-            }).ToList();
+            })];
         }
 
         var results = new List<TranslationResponse>();
-        var translations = batchResponse.translations;
-        var confidenceScores = batchResponse.confidence_scores ?? [];
+        var translations = batchResponse.Translations;
+        var confidenceScores = batchResponse.ConfidenceScores ?? [];
 
         for (int i = 0; i < originalRequests.Count && i < translations.Count; i++)
         {
@@ -1054,17 +1055,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             // 🔥 [ENCODING_DEBUG] JSON解析後のレスポンス詳細情報をログ出力
             _logger.LogError("🔍 [JSON_DEBUG] JSON解析後のレスポンス詳細:");
-            _logger.LogError("🔍 [JSON_DEBUG] - Success: {Success}", response.success);
-            _logger.LogError("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.translation ?? "null");
-            _logger.LogError("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.translation?.Length ?? 0);
-            if (response.translation != null)
+            _logger.LogError("🔍 [JSON_DEBUG] - Success: {Success}", response.Success);
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.Translation ?? "null");
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.Translation?.Length ?? 0);
+            if (response.Translation != null)
             {
-                var translationBytes = System.Text.Encoding.UTF8.GetBytes(response.translation);
+                var translationBytes = System.Text.Encoding.UTF8.GetBytes(response.Translation);
                 _logger.LogError("🔍 [JSON_DEBUG] - Translation UTF-8バイト: {Bytes}", Convert.ToHexString(translationBytes));
             }
-            _logger.LogError("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.confidence);
-            _logger.LogError("🔍 [JSON_DEBUG] - Error: '{Error}'", response.error ?? "null");
-            Console.WriteLine($"🔍 [JSON_DEBUG] Success: {response.success}, Translation: '{response.translation}', Length: {response.translation?.Length ?? 0}");
+            _logger.LogError("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.Confidence);
+            _logger.LogError("🔍 [JSON_DEBUG] - Error: '{Error}'", response.Error ?? "null");
+            Console.WriteLine($"🔍 [JSON_DEBUG] Success: {response.Success}, Translation: '{response.Translation}', Length: {response.Translation?.Length ?? 0}");
             
             var resultCreationStopwatch = Stopwatch.StartNew();
             
@@ -1073,10 +1074,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             float confidenceScore;
             bool isSuccess;
             
-            if (response.success && !string.IsNullOrEmpty(response.translation))
+            if (response.Success && !string.IsNullOrEmpty(response.Translation))
             {
-                translatedText = response.translation;
-                confidenceScore = response.confidence ?? 0.95f;
+                translatedText = response.Translation;
+                confidenceScore = response.Confidence ?? 0.95f;
                 isSuccess = true;
                 
                 // 🔧 [ENCODING_DEBUG] 文字エンコーディング詳細情報をログ出力
@@ -1112,7 +1113,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 confidenceScore = 0.0f;
                 isSuccess = false;
                 _logger.LogError("翻訳失敗 - Success: {Success}, Translation: '{Translation}', Error: '{Error}'", 
-                    response.success, response.translation ?? "null", response.error ?? "none");
+                    response.Success, response.Translation ?? "null", response.Error ?? "none");
             }
             
             var result = new TranslationResponse
@@ -1131,7 +1132,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             totalStopwatch.Stop();
             _logger.LogInformation("[TIMING] 合計処理時間（C#側）: {ElapsedMs}ms", totalStopwatch.ElapsedMilliseconds);
-            _logger.LogInformation("[TIMING] Python側処理時間: {PythonTimeMs}ms", (response.processing_time ?? 0) * 1000);
+            _logger.LogInformation("[TIMING] Python側処理時間: {PythonTimeMs}ms", (response.ProcessingTime ?? 0) * 1000);
             
             // 詳細ログ出力
             _logger.LogInformation("翻訳結果詳細 - IsSuccess: {IsSuccess}, Text: '{Text}', Length: {Length}", 
@@ -1503,21 +1504,41 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
     private class PythonTranslationResponse
     {
-        public bool success { get; set; }
-        public string? translation { get; set; }
-        public float? confidence { get; set; }
-        public string? error { get; set; }
-        public double? processing_time { get; set; }
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+        
+        [JsonPropertyName("translation")]
+        public string? Translation { get; set; }
+        
+        [JsonPropertyName("confidence")]
+        public float? Confidence { get; set; }
+        
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+        
+        [JsonPropertyName("processing_time")]
+        public double? ProcessingTime { get; set; }
     }
 
     private class PythonBatchResponse
     {
-        public bool success { get; set; }
-        public List<string>? translations { get; set; }
-        public List<float>? confidence_scores { get; set; }
-        public double? processing_time { get; set; }
-        public int? batch_size { get; set; }
-        public List<string>? errors { get; set; }
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+        
+        [JsonPropertyName("translations")]
+        public List<string>? Translations { get; set; }
+        
+        [JsonPropertyName("confidence_scores")]
+        public List<float>? ConfidenceScores { get; set; }
+        
+        [JsonPropertyName("processing_time")]
+        public double? ProcessingTime { get; set; }
+        
+        [JsonPropertyName("batch_size")]
+        public int? BatchSize { get; set; }
+        
+        [JsonPropertyName("errors")]
+        public List<string>? Errors { get; set; }
     }
 
     /// <summary>

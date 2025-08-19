@@ -9,21 +9,14 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 /// 大規模リクエスト（10件以上）をバッチ処理で高効率化
 /// Issue #147 Phase 3.2: Phase 2のバッチエンジンを活用
 /// </summary>
-public sealed class BatchTranslationStrategy : ITranslationStrategy
+public sealed class BatchTranslationStrategy(
+    ITranslationEngine translationEngine,
+    HybridStrategySettings settings,
+    ILogger<BatchTranslationStrategy> logger) : ITranslationStrategy
 {
-    private readonly ITranslationEngine _translationEngine;
-    private readonly HybridStrategySettings _settings;
-    private readonly ILogger<BatchTranslationStrategy> _logger;
-
-    public BatchTranslationStrategy(
-        ITranslationEngine translationEngine,
-        HybridStrategySettings settings,
-        ILogger<BatchTranslationStrategy> logger)
-    {
-        _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
+    private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    private readonly ILogger<BatchTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public int Priority => 100; // 最高優先度
 
@@ -44,7 +37,7 @@ public sealed class BatchTranslationStrategy : ITranslationStrategy
         _logger.LogDebug("🚀 バッチ戦略で単一翻訳実行 - テキスト長: {Length}文字", text.Length);
 
         var results = await ExecuteBatchAsync(
-            new[] { text }, sourceLanguage, targetLanguage, cancellationToken);
+            [text], sourceLanguage, targetLanguage, cancellationToken);
 
         return results.FirstOrDefault() ?? new TranslationResult(
             OriginalText: text,
@@ -166,12 +159,12 @@ public sealed class BatchTranslationStrategy : ITranslationStrategy
             _logger.LogError(ex, "バッチ翻訳戦略でエラーが発生しました");
 
             // 全件エラーとして返す
-            return texts.Select(t => new TranslationResult(
+            return [..texts.Select(t => new TranslationResult(
                 OriginalText: t,
                 TranslatedText: string.Empty,
                 Success: false,
                 ErrorMessage: $"バッチ処理エラー: {ex.Message}"
-            )).ToList();
+            ))];
         }
     }
 }

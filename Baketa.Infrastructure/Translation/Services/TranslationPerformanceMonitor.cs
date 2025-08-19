@@ -86,7 +86,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 Interlocked.Increment(ref _targetExceeded);
                 _logger.LogWarning(
                     "翻訳処理が目標を超過 - エンジン: {Engine}, 処理時間: {ElapsedMs}ms > {TargetMs}ms, テキスト: '{Text}'",
-                    engineName, elapsedMs, _targetLatencyMs, request.SourceText.Substring(0, Math.Min(50, request.SourceText.Length)));
+                    engineName, elapsedMs, _targetLatencyMs, request.SourceText[..Math.Min(50, request.SourceText.Length)]);
                 
                 // アラート発行（将来的には外部監視システムと連携）
                 await RaisePerformanceAlertAsync(engineName, elapsedMs).ConfigureAwait(false);

@@ -109,7 +109,7 @@ public sealed class MockGpuOcrEngine : IGpuOcrEngine
             GpuName = "Mock GPU Device RTX 4090",
             GpuDeviceId = 0,
             ComputeCapability = ComputeCapability.Compute89,
-            RecommendedProviders = new[] { ExecutionProvider.CUDA, ExecutionProvider.DirectML },
+            RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.DirectML],
             MaximumTexture2DDimension = 16384,
             DirectXFeatureLevel = DirectXFeatureLevel.D3D122
         };

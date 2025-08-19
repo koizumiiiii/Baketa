@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -366,19 +367,19 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         }
         
         // 異常な空白文字の連続パターンを検出
-        if (System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"(ぁ|ぃ|ぅ|ぇ|ぉ)\s*\1{3,}"))
+        if (RepeatingSmallKanaRegex().IsMatch(translatedText))
         {
             return true; // "ぁ ぁ ぁ ぁ ぁ ぁ ぁ" のようなパターン
         }
         
         // 非日本語文字の検出（デバナーガリー文字など）
-        if (System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"[\u0900-\u097F]")) // デバナーガリー文字
+        if (DevanagariRegex().IsMatch(translatedText)) // デバナーガリー文字
         {
             return true;
         }
         
         // ランダムな数字や記号のみの文字列（短い文字列は除外）
-        if (translatedText.Length > 5 && System.Text.RegularExpressions.Regex.IsMatch(translatedText, @"^[0-9\s\-\.~\p{P}]+$"))
+        if (translatedText.Length > 5 && RandomNumbersAndSymbolsRegex().IsMatch(translatedText))
         {
             return true; // "2473~928" のようなパターン（5文字以上のみ）
         }
@@ -434,4 +435,14 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         
         GC.SuppressFinalize(this);
     }
+
+    // GeneratedRegex methods for performance optimization
+    [GeneratedRegex(@"(ぁ|ぃ|ぅ|ぇ|ぉ)\s*\1{3,}")]
+    private static partial Regex RepeatingSmallKanaRegex();
+
+    [GeneratedRegex(@"[\u0900-\u097F]")]
+    private static partial Regex DevanagariRegex();
+
+    [GeneratedRegex(@"^[0-9\s\-\.~\p{P}]+$")]
+    private static partial Regex RandomNumbersAndSymbolsRegex();
 }
