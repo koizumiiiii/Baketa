@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
@@ -26,6 +27,7 @@ using Baketa.Infrastructure.Translation.Local;
 // OPUS-MT ONNX実装削除済み
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
+using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -153,6 +155,21 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTranslationServices(IServiceCollection services)
         {
+            // Phase2: サーキットブレーカー設定とサービス登録
+            Console.WriteLine("🔧 [PHASE2] サーキットブレーカー登録開始");
+            
+            // サーキットブレーカー設定
+            services.Configure<CircuitBreakerSettings>(options =>
+            {
+                options.FailureThreshold = 5;      // 5回失敗でサーキットオープン
+                options.TimeoutMs = 30000;         // 30秒タイムアウト
+                options.RecoveryTimeoutMs = 60000; // 60秒後に復旧テスト
+            });
+            
+            // 翻訳専用サーキットブレーカー登録
+            services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, TranslationCircuitBreaker>();
+            Console.WriteLine("✅ [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s");
+            
             // 翻訳エンジンファクトリーを登録
             services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();
             

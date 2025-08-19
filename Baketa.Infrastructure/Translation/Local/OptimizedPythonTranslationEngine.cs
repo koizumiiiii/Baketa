@@ -8,11 +8,14 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Models;
+using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +33,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly FixedSizeConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
     private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
+    private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
     
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
@@ -66,12 +70,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         ILogger<OptimizedPythonTranslationEngine> logger,
         FixedSizeConnectionPool? connectionPool,
         IConfiguration configuration,
-        IPythonServerManager? serverManager = null)
+        IPythonServerManager? serverManager = null,
+        ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
+        _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
@@ -442,15 +448,23 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // キャッシュチェック処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 常に新鮮な翻訳を実行");
             
-            // 🚨 [HANGUP_DEBUG] 永続接続で翻訳実行開始前デバッグ
-            _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 呼び出し直前");
-            Console.WriteLine($"🔥 [HANGUP_DEBUG] TranslateWithOptimizedServerAsync 呼び出し直前 - RequestId: {request.RequestId}");
-            
-            // 永続接続で翻訳実行
-            var result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
-            
-            _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 呼び出し完了");
-            Console.WriteLine($"🔥 [HANGUP_DEBUG] TranslateWithOptimizedServerAsync 呼び出し完了 - RequestId: {request.RequestId}");
+            // Phase2: サーキットブレーカーによる翻訳実行
+            TranslationResponse result;
+            if (_circuitBreaker != null)
+            {
+                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行開始");
+                result = await _circuitBreaker.ExecuteAsync(
+                    async ct => await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false), 
+                    cancellationToken).ConfigureAwait(false);
+                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行完了");
+            }
+            else
+            {
+                // サーキットブレーカー無効時は従来通り直接実行
+                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し開始");
+                result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
+                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し完了");
+            }
             
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
@@ -494,6 +508,42 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 ConfidenceScore = 0.0f,
                 EngineName = Name,
                 IsSuccess = false
+            };
+        }
+        catch (CircuitBreakerOpenException ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning("🚨 [CIRCUIT_BREAKER] サーキットブレーカーが開いています - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                TranslatedText = "翻訳サービスが一時的に利用できません（サーキットブレーカー開放中）",
+                SourceText = request.SourceText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
+                ConfidenceScore = 0.0f,
+                EngineName = Name,
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+        catch (TranslationTimeoutException ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning("⏱️ [CIRCUIT_BREAKER] 翻訳タイムアウト - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            return new TranslationResponse
+            {
+                RequestId = request.RequestId,
+                TranslatedText = "翻訳がタイムアウトしました",
+                SourceText = request.SourceText,
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
+                ConfidenceScore = 0.0f,
+                EngineName = Name,
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
             };
         }
         catch (Exception ex)
