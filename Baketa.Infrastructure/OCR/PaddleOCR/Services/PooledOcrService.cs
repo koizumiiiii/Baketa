@@ -162,13 +162,13 @@ public sealed class PooledOcrService : IOcrEngine
     public IReadOnlyList<string> GetAvailableLanguages()
     {
         ThrowIfDisposed();
-        return new[] { "jpn", "japanese" }; // 現在は日本語のみサポート
+        return ["jpn", "japanese"]; // 現在は日本語のみサポート
     }
 
     public IReadOnlyList<string> GetAvailableModels()
     {
         ThrowIfDisposed();
-        return new[] { "PaddleOCR-v4-jpn" }; // 利用可能なモデル名のリスト
+        return ["PaddleOCR-v4-jpn"]; // 利用可能なモデル名のリスト
     }
 
     public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default)
