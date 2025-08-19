@@ -10,21 +10,15 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// テキスト検出ベース適応的分割戦略
 /// PaddleOCR検出APIを活用したテキスト境界保護分割
 /// </summary>
-public sealed class AdaptiveTileStrategy : ITileStrategy
+public sealed class AdaptiveTileStrategy(
+    IOcrEngine textDetector,
+    ILogger<AdaptiveTileStrategy> logger) : ITileStrategy
 {
-    private readonly IOcrEngine _textDetector;
-    private readonly ILogger<AdaptiveTileStrategy> _logger;
+    private readonly IOcrEngine _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
+    private readonly ILogger<AdaptiveTileStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public string StrategyName => "AdaptiveTile";
     public TileStrategyParameters Parameters { get; set; } = new();
-
-    public AdaptiveTileStrategy(
-        IOcrEngine textDetector,
-        ILogger<AdaptiveTileStrategy> logger)
-    {
-        _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 適応的テキスト境界保護分割
@@ -53,7 +47,7 @@ public sealed class AdaptiveTileStrategy : ITileStrategy
 
             // Phase 2: バウンディングボックス統合
             var mergedRegions = MergeBoundingBoxes(
-                detectionResult.TextRegions.ToList(), Parameters);
+[..detectionResult.TextRegions], Parameters);
 
             _logger?.LogDebug("🔄 バウンディングボックス統合完了 - 統合領域数: {Count}", mergedRegions.Count);
 
@@ -161,14 +155,14 @@ public sealed class AdaptiveTileStrategy : ITileStrategy
         List<OcrTextRegion> regions, 
         TileStrategyParameters parameters)
     {
-        return regions.Where(region =>
+        return [..regions.Where(region =>
         {
             var area = region.Bounds.Width * region.Bounds.Height;
             var hasMinArea = area >= parameters.MinBoundingBoxArea;
             var hasMinConfidence = region.Confidence >= parameters.MinConfidenceThreshold;
             
             return hasMinArea && hasMinConfidence;
-        }).ToList();
+        })];
     }
 
     /// <summary>
@@ -288,10 +282,9 @@ public sealed class AdaptiveTileStrategy : ITileStrategy
             _logger?.LogWarning("領域数が制限を超過、信頼度順でトリミング: {Count} → {Max}",
                 validatedRegions.Count, options.MaxRegionCount);
 
-            validatedRegions = validatedRegions
+            validatedRegions = [..validatedRegions
                 .OrderByDescending(r => r.ConfidenceScore)
-                .Take(options.MaxRegionCount)
-                .ToList();
+                .Take(options.MaxRegionCount)];
         }
 
         return validatedRegions;

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
+using Baketa.Infrastructure.Tests.TestUtilities;
 
 namespace Baketa.Infrastructure.Tests.Translation.Local.ConnectionPool;
 
@@ -122,13 +123,13 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
     }
 
     [Fact]
-    public void GetMetrics_AfterDispose_ShouldNotThrow()
+    public async Task GetMetrics_AfterDispose_ShouldNotThrow()
     {
         // Arrange
         _connectionPool = new FixedSizeConnectionPool(_mockLogger.Object, _mockConfiguration.Object, _testOptions);
 
         // Act
-        _connectionPool.DisposeAsync().AsTask().Wait();
+        await AsyncTestHelper.SafeWaitAsync(_connectionPool.DisposeAsync().AsTask());
         var metrics = _connectionPool.GetMetrics();
 
         // Assert - 破棄後でもメトリクス取得は例外をスローしない

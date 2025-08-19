@@ -107,8 +107,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     /// <returns>永続接続インスタンス</returns>
     public async ValueTask<PersistentConnection> AcquireConnectionAsync(CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(FixedSizeConnectionPool));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         
         var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _disposalCts.Token);
@@ -443,26 +442,16 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
 /// <summary>
 /// 永続接続を表すクラス
 /// </summary>
-public sealed class PersistentConnection : IAsyncDisposable
+public sealed class PersistentConnection(string id, TcpClient tcpClient, NetworkStream stream,
+    StreamReader reader, StreamWriter writer) : IAsyncDisposable
 {
-    public string Id { get; }
-    public TcpClient TcpClient { get; }
-    public NetworkStream Stream { get; }
-    public StreamReader Reader { get; }
-    public StreamWriter Writer { get; }
-    public DateTime CreatedAt { get; }
+    public string Id { get; } = id ?? throw new ArgumentNullException(nameof(id));
+    public TcpClient TcpClient { get; } = tcpClient ?? throw new ArgumentNullException(nameof(tcpClient));
+    public NetworkStream Stream { get; } = stream ?? throw new ArgumentNullException(nameof(stream));
+    public StreamReader Reader { get; } = reader ?? throw new ArgumentNullException(nameof(reader));
+    public StreamWriter Writer { get; } = writer ?? throw new ArgumentNullException(nameof(writer));
+    public DateTime CreatedAt { get; } = DateTime.UtcNow;
     public bool IsDisposed { get; private set; }
-
-    public PersistentConnection(string id, TcpClient tcpClient, NetworkStream stream, 
-        StreamReader reader, StreamWriter writer)
-    {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
-        TcpClient = tcpClient ?? throw new ArgumentNullException(nameof(tcpClient));
-        Stream = stream ?? throw new ArgumentNullException(nameof(stream));
-        Reader = reader ?? throw new ArgumentNullException(nameof(reader));
-        Writer = writer ?? throw new ArgumentNullException(nameof(writer));
-        CreatedAt = DateTime.UtcNow;
-    }
 
     public async ValueTask DisposeAsync()
     {

@@ -535,7 +535,7 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
         var width = image.Width;
         
         // テンソルデータ準備 [batch_size, channels, height, width]
-        var tensor = new Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<float>(new[] { 1, 3, height, width });
+        var tensor = new Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<float>([1, 3, height, width]);
         
         // 正規化とチャンネル順序変換 (BGR → RGB, 0-255 → 0-1)
         for (int h = 0; h < height; h++)

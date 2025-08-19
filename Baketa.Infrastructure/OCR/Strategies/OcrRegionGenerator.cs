@@ -8,16 +8,10 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// OCR領域生成の統合管理クラス
 /// ITileStrategy を活用した領域生成・画像切り出し
 /// </summary>
-public sealed class OcrRegionGenerator
+public sealed class OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegionGenerator> logger)
 {
-    private readonly ITileStrategy _strategy;
-    private readonly ILogger<OcrRegionGenerator> _logger;
-
-    public OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegionGenerator> logger)
-    {
-        _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ITileStrategy _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+    private readonly ILogger<OcrRegionGenerator> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 画像から OCR 処理用の領域画像リストを生成

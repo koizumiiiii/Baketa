@@ -57,20 +57,20 @@ public class TranslationMetricsCollector : IDisposable
             _totalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
             
             // 戦略別統計を更新
-            if (!_strategyStats.ContainsKey(metrics.Strategy))
+            if (!_strategyStats.TryGetValue(metrics.Strategy, out var strategyStats))
             {
-                _strategyStats[metrics.Strategy] = new StrategyStats();
+                strategyStats = new StrategyStats();
+                _strategyStats[metrics.Strategy] = strategyStats;
             }
             
-            var stats = _strategyStats[metrics.Strategy];
-            stats.TotalCount++;
-            stats.TotalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
-            stats.TotalCharacters += metrics.TextLength;
+            strategyStats.TotalCount++;
+            strategyStats.TotalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
+            strategyStats.TotalCharacters += metrics.TextLength;
             
             if (metrics.Success)
-                stats.SuccessCount++;
+                strategyStats.SuccessCount++;
             else
-                stats.FailureCount++;
+                strategyStats.FailureCount++;
         }
         
         // 100件ごとに簡易ログ出力
@@ -102,9 +102,10 @@ public class TranslationMetricsCollector : IDisposable
             _totalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
             
             // 戦略別統計を更新
-            if (!_strategyStats.ContainsKey(metrics.Strategy))
+            if (!_strategyStats.TryGetValue(metrics.Strategy, out var strategyStats))
             {
-                _strategyStats[metrics.Strategy] = new StrategyStats();
+                strategyStats = new StrategyStats();
+                _strategyStats[metrics.Strategy] = strategyStats;
             }
             
             var stats = _strategyStats[metrics.Strategy];

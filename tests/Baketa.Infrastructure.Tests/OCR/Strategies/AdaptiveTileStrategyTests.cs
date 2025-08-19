@@ -6,6 +6,7 @@ using FluentAssertions;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Strategies;
+using Baketa.Infrastructure.Tests.TestUtilities;
 
 namespace Baketa.Infrastructure.Tests.OCR.Strategies;
 
@@ -266,8 +267,8 @@ public class AdaptiveTileStrategyTests
         var options = new TileGenerationOptions { DefaultTileSize = 1024 };
 
         // テキスト検出失敗をシミュレート（フォールバックテスト）
-        _mockOcrEngine.Setup(x => x.DetectTextRegionsAsync(It.IsAny<IAdvancedImage>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync((OcrResults?)null);
+        var emptyResult = MoqTestHelper.CreateTestOcrResults("", 0.0);
+        MoqTestHelper.SetupOcrEngineDetectTextRegionsAsync(_mockOcrEngine, emptyResult);
 
         // Act
         var result = await _strategy.GenerateRegionsAsync(smallImage.Object, options);
