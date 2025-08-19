@@ -982,23 +982,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 throw new InvalidOperationException("サーバーから空のレスポンスを受信しました");
             }
             
-            _logger.LogDebug("Python応答受信: {Response}", jsonResponse.Length > 200 ? jsonResponse[..200] + "..." : jsonResponse);
+            _logger.LogDebug("Python応答受信: {Response}", SanitizeForLogging(jsonResponse));
             
-            // 🔥 [ENCODING_DEBUG] 受信したレスポンスの詳細バイト情報をログ出力
+            // 🔥 [ENCODING_DEBUG] 受信したレスポンスの詳細バイト情報をログ出力（セキュリティ対策済み）
             var responseBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse);
+            var sanitizedResponse = SanitizeForLogging(jsonResponse);
             _logger.LogError("🔍 [ENCODING_DEBUG] 受信したレスポンス詳細:");
-            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス文字列: '{Response}'", jsonResponse);
-            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス長: {Length}", jsonResponse.Length);
-            _logger.LogError("🔍 [ENCODING_DEBUG] - UTF-8バイト: {Bytes}", Convert.ToHexString(responseBytes));
-            Console.WriteLine($"🔍 [ENCODING_DEBUG] 受信したレスポンス: '{jsonResponse}'");
-            Console.WriteLine($"🔍 [ENCODING_DEBUG] UTF-8バイト: {Convert.ToHexString(responseBytes)}");
+            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス文字列長: {Length}", jsonResponse.Length);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - UTF-8バイト長: {ByteLength}", responseBytes.Length);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - サニタイズ後レスポンス: {Response}", sanitizedResponse);
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] 受信したレスポンス長: {jsonResponse.Length}");
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] UTF-8バイト長: {responseBytes.Length}");
             
             // 🔧 [ENCODING_SIMPLIFIED] Windows環境エンコーディング修復処理を削除し、シンプルUTF-8処理に変更
             var originalResponse = jsonResponse;
             
-            // 🚨 DEBUG: 不正翻訳結果の調査用詳細ログ
-            Console.WriteLine($"🔍 [CORRUPTION_DEBUG] Python応答受信: '{jsonResponse}'");
-            SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{request.SourceText}' → Response: '{jsonResponse}'{Environment.NewLine}");
+            // 🚨 DEBUG: 不正翻訳結果の調査用詳細ログ（セキュリティ対策済み）
+            var sanitizedJsonResponse = SanitizeForLogging(jsonResponse);
+            var sanitizedSourceText = SanitizeForLogging(request.SourceText);
+            Console.WriteLine($"🔍 [CORRUPTION_DEBUG] Python応答受信長: {jsonResponse.Length}文字");
+            SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{sanitizedSourceText}' → Response: '{sanitizedJsonResponse}'{Environment.NewLine}");
             
             var deserializationStopwatch = Stopwatch.StartNew();
             
@@ -1077,10 +1080,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (suspiciousPatterns.Any(pattern => translatedText.Contains(pattern)))
                 {
                     Console.WriteLine($"🚨 [CORRUPTION_DETECTED] 不正翻訳結果検出!");
-                    Console.WriteLine($"   入力: '{request.SourceText}'");
-                    Console.WriteLine($"   出力: '{translatedText}'");
-                    Console.WriteLine($"   Python応答: '{jsonResponse}'");
-                    SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{request.SourceText}' → 出力: '{translatedText}' → Python応答: '{jsonResponse}'{Environment.NewLine}");
+                    Console.WriteLine($"   入力長: {request.SourceText.Length}文字");
+                    Console.WriteLine($"   出力長: {translatedText.Length}文字");
+                    Console.WriteLine($"   Python応答長: {jsonResponse.Length}文字");
+                    SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{sanitizedSourceText}' → 出力: '{SanitizeForLogging(translatedText)}' → Python応答: '{sanitizedJsonResponse}'{Environment.NewLine}");
                 }
             }
             else
@@ -1552,6 +1555,32 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// ログ出力用テキストサニタイズ - ログインジェクション攻撃対策
+    /// </summary>
+    /// <param name="input">サニタイズ対象の文字列</param>
+    /// <returns>サニタイズされた安全な文字列</returns>
+    private static string SanitizeForLogging(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "[empty]";
+
+        // 長すぎる文字列は切り詰める
+        const int maxLength = 200;
+        var sanitized = input.Length > maxLength ? input[..maxLength] + "..." : input;
+        
+        // ログインジェクション攻撃を防ぐため制御文字を除去
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[\r\n\t\x00-\x1F\x7F]", "");
+        
+        // 潜在的に危険な文字をエスケープ
+        sanitized = sanitized
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("'", "\\'");
+            
+        return sanitized;
     }
     
     /// <summary>
