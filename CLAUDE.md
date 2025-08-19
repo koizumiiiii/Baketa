@@ -61,17 +61,18 @@ dotnet run --project Baketa.UI
 dotnet run --project Baketa.UI --configuration Release
 ```
 
-### OPUS-MT Model Setup
-Before running translation features, download required models:
+### NLLB-200 Model Setup
+Before running translation features, ensure Python environment and models are ready:
 ```cmd
-# Download OPUS-MT models (Windows Command Prompt)
-.\scripts\download_opus_mt_models.ps1
+# Set up Python environment for NLLB-200
+pyenv global 3.10.9
+pip install -r requirements.txt
 
-# Verify model files
-.\scripts\verify_opus_mt_models.ps1
+# Download NLLB-200 model (automatic on first run)
+# Model: facebook/nllb-200-distilled-600M (~2.4GB)
 
-# Run SentencePiece tests
-.\scripts\run_sentencepiece_tests.ps1
+# Run NLLB-200 translation server tests
+py scripts/test_nllb_translation.py
 ```
 
 ### Python Environment Setup
@@ -129,7 +130,7 @@ where python
 
 2. **Baketa.Infrastructure**: Infrastructure layer (OCR, translation)
    - PaddleOCR integration
-   - Translation engines (OPUS-MT, Gemini, mock engines)
+   - Translation engines (NLLB-200, Gemini, mock engines)
    - Image processing pipelines
    - Settings persistence (JSON-based)
 
@@ -199,7 +200,7 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
 3. **OCR**: PaddleOCR PP-OCRv5 for text detection
-4. **Translation**: Multiple engines (OPUS-MT local, Gemini cloud)
+4. **Translation**: Multiple engines (NLLB-200 local, Gemini cloud)
 5. **Overlay Display**: Transparent Avalonia windows
 
 ### Native DLL Implementation Details
@@ -221,7 +222,7 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### Configuration Files
 - `appsettings.json`: Main application configuration
 - `appsettings.Development.json`: Development overrides
-- `appsettings.SentencePiece.json`: OPUS-MT model configuration
+- `appsettings.SentencePiece.json`: Legacy OPUS-MT model configuration (deprecated)
 
 ## Code Style and Standards
 
@@ -257,7 +258,7 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - **OCR Engine**: PaddleOCR PP-OCRv5 (native integration)
 - **Image Processing**: OpenCV (Windows wrapper)
 - **Screen Capture**: Windows Graphics Capture API (C++/WinRT native DLL)
-- **Translation**: OPUS-MT (local), Google Gemini (cloud)
+- **Translation**: NLLB-200 (Meta's multilingual model, local), Google Gemini (cloud)
 - **DI Container**: Microsoft.Extensions.DependencyInjection
 - **Logging**: Microsoft.Extensions.Logging
 
@@ -452,7 +453,8 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 
 ## Known Issues and Considerations
 
-- OPUS-MT models must be manually downloaded before first run
+- NLLB-200 models are downloaded automatically on first run (~2.4GB)
+- Python 3.10+ environment required for NLLB-200 translation server
 - OpenCV native dependencies are Windows-specific
 - Platform adapters use P/Invoke for Windows APIs
 - Game detection requires specific DPI awareness settings
