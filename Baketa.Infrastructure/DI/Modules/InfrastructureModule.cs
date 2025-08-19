@@ -9,6 +9,7 @@ using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
@@ -79,6 +80,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
+            
+            // Phase3: リソース監視システム
+            RegisterResourceMonitoringServices(services);
             
             // データ永続化
             RegisterPersistenceServices(services, environment);
@@ -463,6 +467,41 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             // 統一ログサービス（Singleton: アプリケーション全体で共有）
             services.AddSingleton<IBaketaLogger, BaketaLogger>();
+        }
+        
+        /// <summary>
+        /// Phase3: リソース監視システムを登録します
+        /// CPU・メモリ・GPU使用率をリアルタイム監視し、翻訳システムの動的最適化を支援
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterResourceMonitoringServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔧 [PHASE3] 動的リソース監視システム登録開始");
+            
+            // リソース監視設定（デフォルト値でシングルトン登録）
+            var defaultSettings = new Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings(
+                MonitoringIntervalMs: 5000,        // 5秒間隔で監視
+                HistoryRetentionMinutes: 60,       // 1時間分の履歴保持
+                CpuWarningThreshold: 85.0,         // CPU使用率85%で警告
+                MemoryWarningThreshold: 90.0,      // メモリ使用率90%で警告
+                GpuWarningThreshold: 95.0,         // GPU使用率95%で警告
+                EnableGpuMonitoring: true,         // GPU監視有効
+                EnableNetworkMonitoring: false,    // ネットワーク監視無効（将来実装）
+                EnableDiskMonitoring: false        // ディスク監視無効（将来実装）
+            );
+            
+            // 設定をシングルトンとして登録（IOptionsパターンとダイレクト参照の両方をサポート）
+            services.AddSingleton(defaultSettings);
+            services.AddSingleton<IOptions<Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings>>(
+                provider => Options.Create(defaultSettings));
+            Console.WriteLine("✅ [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分");
+            
+            // 注意: WindowsSystemResourceMonitorは Platform プロジェクトで登録される
+            // Infrastructure レイヤーでは抽象インターフェースのみ認識
+            // 実際の実装は PlatformModule で登録される予定
+            Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます");
+            
+            Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
         }
 
         /// <summary>
