@@ -489,12 +489,11 @@ public class InPlaceTranslationOverlayManager(
                     CombinedBounds = eventData.DisplayArea,
                     CombinedText = eventData.OriginalText ?? string.Empty, // 元テキスト（表示には使用しない）
                     SourceWindowHandle = IntPtr.Zero, // OverlayUpdateEventからは取得できない
-                    DetectedLanguage = eventData.SourceLanguage ?? "en"
+                    DetectedLanguage = eventData.SourceLanguage ?? "en",
+                    // 🚫 [TRANSLATION_ONLY] 翻訳結果のみ設定（OCR結果は表示しない）
+                    TranslatedText = eventData.IsTranslationResult ? eventData.Text : string.Empty
                 };
-                
-                // 🚫 [TRANSLATION_ONLY] 翻訳結果のみ設定（OCR結果は表示しない）
-                textChunk.TranslatedText = eventData.IsTranslationResult ? eventData.Text : string.Empty;
-                
+
                 Console.WriteLine($"🔍 [TRANSLATION_FILTER] IsTranslationResult: {eventData.IsTranslationResult}, Text: '{eventData.Text}'");
                 Console.WriteLine($"🔍 [TRANSLATION_FILTER] TranslatedText設定: '{textChunk.TranslatedText}'");
                 

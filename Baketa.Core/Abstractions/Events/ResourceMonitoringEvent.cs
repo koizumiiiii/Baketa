@@ -6,81 +6,66 @@ namespace Baketa.Core.Abstractions.Events;
 /// リソース監視関連イベント
 /// システムリソース状況の変化や警告をイベントアグリゲーターを通じて通知
 /// </summary>
-public sealed class ResourceMonitoringEvent : IEvent
+/// <remarks>
+/// リソース監視イベントコンストラクタ
+/// </remarks>
+/// <param name="eventType">イベント種別</param>
+/// <param name="currentMetrics">現在のリソースメトリクス</param>
+/// <param name="message">イベントメッセージ</param>
+/// <param name="previousMetrics">前回のリソースメトリクス</param>
+/// <param name="warning">警告情報</param>
+public sealed class ResourceMonitoringEvent(
+    ResourceMonitoringEventType eventType,
+    ResourceMetrics currentMetrics,
+    string message,
+    ResourceMetrics? previousMetrics = null,
+    ResourceWarning? warning = null) : IEvent
 {
     /// <inheritdoc />
-    public Guid Id { get; }
-    
+    public Guid Id { get; } = Guid.NewGuid();
+
     /// <inheritdoc />
-    public DateTime Timestamp { get; }
-    
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
+
     /// <inheritdoc />
-    public string Name { get; }
-    
+    public string Name { get; } = eventType switch
+    {
+        ResourceMonitoringEventType.MetricsChanged => "ResourceMetricsChanged",
+        ResourceMonitoringEventType.WarningRaised => "ResourceWarningRaised",
+        ResourceMonitoringEventType.MonitoringStarted => "ResourceMonitoringStarted",
+        ResourceMonitoringEventType.MonitoringStopped => "ResourceMonitoringStopped",
+        ResourceMonitoringEventType.MonitoringError => "ResourceMonitoringError",
+        _ => "ResourceMonitoringUnknown"
+    };
+
     /// <inheritdoc />
-    public string Category { get; }
-    
+    public string Category { get; } = "ResourceMonitoring";
+
     /// <summary>
     /// リソース監視イベントの種別
     /// </summary>
-    public ResourceMonitoringEventType EventType { get; }
-    
+    public ResourceMonitoringEventType EventType { get; } = eventType;
+
     /// <summary>
     /// 現在のリソースメトリクス
     /// </summary>
-    public ResourceMetrics CurrentMetrics { get; }
-    
+    public ResourceMetrics CurrentMetrics { get; } = currentMetrics;
+
     /// <summary>
     /// 前回のリソースメトリクス（変更イベントの場合）
     /// </summary>
-    public ResourceMetrics? PreviousMetrics { get; }
-    
+    public ResourceMetrics? PreviousMetrics { get; } = previousMetrics;
+
     /// <summary>
     /// 警告情報（警告イベントの場合）
     /// </summary>
-    public ResourceWarning? Warning { get; }
-    
+    public ResourceWarning? Warning { get; } = warning;
+
     /// <summary>
     /// イベントメッセージ
     /// </summary>
-    public string Message { get; }
-    
-    /// <summary>
-    /// リソース監視イベントコンストラクタ
-    /// </summary>
-    /// <param name="eventType">イベント種別</param>
-    /// <param name="currentMetrics">現在のリソースメトリクス</param>
-    /// <param name="message">イベントメッセージ</param>
-    /// <param name="previousMetrics">前回のリソースメトリクス</param>
-    /// <param name="warning">警告情報</param>
-    public ResourceMonitoringEvent(
-        ResourceMonitoringEventType eventType,
-        ResourceMetrics currentMetrics,
-        string message,
-        ResourceMetrics? previousMetrics = null,
-        ResourceWarning? warning = null)
-    {
-        Id = Guid.NewGuid();
-        Timestamp = DateTime.UtcNow;
-        EventType = eventType;
-        CurrentMetrics = currentMetrics;
-        Message = message;
-        PreviousMetrics = previousMetrics;
-        Warning = warning;
-        
-        Name = eventType switch
-        {
-            ResourceMonitoringEventType.MetricsChanged => "ResourceMetricsChanged",
-            ResourceMonitoringEventType.WarningRaised => "ResourceWarningRaised",
-            ResourceMonitoringEventType.MonitoringStarted => "ResourceMonitoringStarted",
-            ResourceMonitoringEventType.MonitoringStopped => "ResourceMonitoringStopped",
-            ResourceMonitoringEventType.MonitoringError => "ResourceMonitoringError",
-            _ => "ResourceMonitoringUnknown"
-        };
-        
-        Category = "ResourceMonitoring";
-    }
-    
+    public string Message { get; } = message;
+
     /// <summary>
     /// リソースメトリクス変更イベント作成
     /// </summary>

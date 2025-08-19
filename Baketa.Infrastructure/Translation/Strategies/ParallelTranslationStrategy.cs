@@ -10,21 +10,14 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 /// 中規模リクエスト（2-10件）を並列処理
 /// Issue #147 Phase 3.2
 /// </summary>
-public sealed class ParallelTranslationStrategy : ITranslationStrategy
+public sealed class ParallelTranslationStrategy(
+    ITranslationEngine translationEngine,
+    HybridStrategySettings settings,
+    ILogger<ParallelTranslationStrategy> logger) : ITranslationStrategy
 {
-    private readonly ITranslationEngine _translationEngine;
-    private readonly HybridStrategySettings _settings;
-    private readonly ILogger<ParallelTranslationStrategy> _logger;
-
-    public ParallelTranslationStrategy(
-        ITranslationEngine translationEngine,
-        HybridStrategySettings settings,
-        ILogger<ParallelTranslationStrategy> logger)
-    {
-        _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
+    private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    private readonly ILogger<ParallelTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public int Priority => 50; // 中優先度
 
@@ -163,12 +156,12 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
             _logger.LogError(ex, "並列翻訳でエラーが発生しました");
 
             // 全件エラーとして返す
-            return texts.Select(t => new TranslationResult(
+            return [..texts.Select(t => new TranslationResult(
                 OriginalText: t,
                 TranslatedText: string.Empty,
                 Success: false,
                 ErrorMessage: $"並列処理エラー: {ex.Message}"
-            )).ToList();
+            ))];
         }
     }
 }

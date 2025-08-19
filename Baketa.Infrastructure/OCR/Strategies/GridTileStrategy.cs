@@ -9,17 +9,10 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// 固定グリッド分割戦略（既存ロジック互換）
 /// 従来のBatchOcrProcessorロジックを抽出・実装
 /// </summary>
-public sealed class GridTileStrategy : ITileStrategy
+public sealed class GridTileStrategy(ILogger<GridTileStrategy>? logger = null) : ITileStrategy
 {
-    private readonly ILogger<GridTileStrategy>? _logger;
-
     public string StrategyName => "GridTile";
     public TileStrategyParameters Parameters { get; set; } = new();
-
-    public GridTileStrategy(ILogger<GridTileStrategy>? logger = null)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 固定グリッドによるタイル分割
@@ -33,7 +26,7 @@ public sealed class GridTileStrategy : ITileStrategy
         var tileSize = Parameters.TileSize ?? options.DefaultTileSize;
         var regions = new List<TileRegion>();
 
-        _logger?.LogDebug("🔍 GridTileStrategy開始 - 画像: {Width}x{Height}, タイルサイズ: {TileSize}", 
+        logger?.LogDebug("🔍 GridTileStrategy開始 - 画像: {Width}x{Height}, タイルサイズ: {TileSize}", 
             image.Width, image.Height, tileSize);
 
         // 画像サイズがタイルサイズより小さい場合はそのまま使用
@@ -50,7 +43,7 @@ public sealed class GridTileStrategy : ITileStrategy
 
             regions.Add(singleRegion);
 
-            _logger?.LogDebug("🔍 単一タイル使用 - サイズ: {Width}x{Height}", image.Width, image.Height);
+            logger?.LogDebug("🔍 単一タイル使用 - サイズ: {Width}x{Height}", image.Width, image.Height);
             
             // デバッグキャプチャ
             if (options.EnableDebugCapture)
@@ -65,7 +58,7 @@ public sealed class GridTileStrategy : ITileStrategy
         var tilesX = (int)Math.Ceiling((double)image.Width / tileSize);
         var tilesY = (int)Math.Ceiling((double)image.Height / tileSize);
 
-        _logger?.LogInformation("🔥 GridTile分割開始 - 元画像: {Width}x{Height}, タイル: {TilesX}x{TilesY} = {Total}個", 
+        logger?.LogInformation("🔥 GridTile分割開始 - 元画像: {Width}x{Height}, タイル: {TilesX}x{TilesY} = {Total}個", 
             image.Width, image.Height, tilesX, tilesY, tilesX * tilesY);
 
         // グリッド分割実行
@@ -99,12 +92,12 @@ public sealed class GridTileStrategy : ITileStrategy
 
                 regions.Add(region);
 
-                _logger?.LogTrace("🔍 グリッドタイル生成: {RegionId}, 位置: ({X},{Y}), サイズ: {Width}x{Height}", 
+                logger?.LogTrace("🔍 グリッドタイル生成: {RegionId}, 位置: ({X},{Y}), サイズ: {Width}x{Height}", 
                     regionId, startX, startY, width, height);
             }
         }
 
-        _logger?.LogInformation("✅ GridTile分割完了 - 生成領域数: {Count}", regions.Count);
+        logger?.LogInformation("✅ GridTile分割完了 - 生成領域数: {Count}", regions.Count);
 
         // デバッグキャプチャ
         if (options.EnableDebugCapture)
@@ -148,15 +141,15 @@ public sealed class GridTileStrategy : ITileStrategy
                 
                 await CreateAnnotatedImageAsync(imageBytes, regions, image.Width, image.Height, annotatedPath).ConfigureAwait(false);
                 
-                _logger?.LogDebug("🎯 GridTile デバッグ画像保存完了: {AnnotatedFile}", annotatedFilename);
+                logger?.LogDebug("🎯 GridTile デバッグ画像保存完了: {AnnotatedFile}", annotatedFilename);
             }
 
-            _logger?.LogDebug("🎯 GridTile デバッグキャプチャ完了: {OriginalFile}, 領域数: {Count}", 
+            logger?.LogDebug("🎯 GridTile デバッグキャプチャ完了: {OriginalFile}, 領域数: {Count}", 
                 originalFilename, regions.Count);
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "GridTile デバッグキャプチャ保存エラー");
+            logger?.LogWarning(ex, "GridTile デバッグキャプチャ保存エラー");
         }
     }
 
@@ -218,11 +211,11 @@ public sealed class GridTileStrategy : ITileStrategy
             // 注釈付き画像保存
             annotatedBitmap.Save(outputPath, System.Drawing.Imaging.ImageFormat.Png);
             
-            _logger?.LogTrace("🎯 GridTile 注釈描画完了 - {Count}個のグリッド", regions.Count);
+            logger?.LogTrace("🎯 GridTile 注釈描画完了 - {Count}個のグリッド", regions.Count);
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "GridTile 注釈描画エラー");
+            logger?.LogWarning(ex, "GridTile 注釈描画エラー");
         }
     }
 }

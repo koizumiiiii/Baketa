@@ -105,6 +105,10 @@ namespace Baketa.UI;
                 System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
                 _ = Task.Run(PreInitializeOcrEngineAsync);
                 
+                // Phase4: 統合GPU最適化システム初期化
+                Console.WriteLine("🎯 Phase4: 統合GPU最適化システム初期化開始");
+                _ = Task.Run(InitializeUnifiedGpuSystemAsync);
+                
                 // OPUS-MT削除済み: NLLB-200統一により事前ウォームアップサービス不要
                 
                 appStartMeasurement.LogCheckpoint("Avalonia アプリケーション開始準備完了");
@@ -343,6 +347,62 @@ namespace Baketa.UI;
         }
         
         /// <summary>
+        /// Phase4: 統合GPU最適化システムを初期化
+        /// </summary>
+        private static async Task InitializeUnifiedGpuSystemAsync()
+        {
+            try
+            {
+                Console.WriteLine("🎯 統合GPU最適化システム初期化開始");
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                
+                // ServiceProviderが利用可能になるまで待機
+                while (ServiceProvider == null)
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                    if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
+                    {
+                        Console.WriteLine("⚠️ ServiceProvider初期化タイムアウト - 統合GPU初期化を中止");
+                        return;
+                    }
+                }
+                
+                // UnifiedGpuInitializerサービスを取得して初期化
+                var gpuInitializer = ServiceProvider.GetService<Baketa.Infrastructure.DI.UnifiedGpuInitializer>();
+                if (gpuInitializer != null)
+                {
+                    Console.WriteLine("🔧 UnifiedGpuInitializer取得成功 - 初期化開始");
+                    
+                    try
+                    {
+                        await gpuInitializer.InitializeAsync().ConfigureAwait(false);
+                        timer.Stop();
+                        
+                        Console.WriteLine($"✅ 統合GPU最適化システム初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
+                        System.Diagnostics.Debug.WriteLine($"✅ 統合GPU最適化システム初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
+                    }
+                    catch (Exception gpuEx)
+                    {
+                        timer.Stop();
+                        Console.WriteLine($"⚠️ 統合GPU最適化システム初期化部分的失敗（続行）: {gpuEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
+                        System.Diagnostics.Debug.WriteLine($"⚠️ 統合GPU最適化システム初期化部分的失敗（続行）: {gpuEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
+                    }
+                }
+                else
+                {
+                    timer.Stop();
+                    Console.WriteLine($"⚠️ UnifiedGpuInitializerサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                    System.Diagnostics.Debug.WriteLine($"⚠️ UnifiedGpuInitializerサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"💥 統合GPU最適化システム初期化エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"💥 統合GPU最適化システム初期化エラー: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
         /// OCRエンジンを事前初期化してメイン処理を高速化
         /// </summary>
         private static async Task PreInitializeOcrEngineAsync()
@@ -554,5 +614,11 @@ namespace Baketa.UI;
             var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
             paddleOcrModule.RegisterServices(services);
             Console.WriteLine("✅ PaddleOcrModule登録完了");
+            
+            // Phase 4: 統合GPU最適化モジュールの登録
+            Console.WriteLine("🎯 Phase4: UnifiedGpuModule登録開始");
+            var unifiedGpuModule = new Baketa.Infrastructure.DI.UnifiedGpuModule();
+            unifiedGpuModule.RegisterServices(services);
+            Console.WriteLine("✅ Phase4: UnifiedGpuModule登録完了");
         }
     }

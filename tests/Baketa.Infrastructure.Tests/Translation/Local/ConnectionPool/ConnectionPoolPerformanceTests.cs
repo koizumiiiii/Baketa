@@ -22,15 +22,9 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.ConnectionPool;
 /// 接続ロック競合問題解決の効果を測定
 /// </summary>
 [Collection("Performance")]
-public class ConnectionPoolPerformanceTests : IAsyncDisposable
+public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDisposable
 {
-    private readonly ITestOutputHelper _output;
     private ServiceProvider? _serviceProvider;
-
-    public ConnectionPoolPerformanceTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public async Task ConnectionPool_ParallelAcquisition_ShouldScaleBetterThanSerial()
@@ -79,10 +73,10 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         // Assert - 並列処理時間を記録（接続プールの効果確認）
         var averageParallelTime = parallelStopwatch.ElapsedMilliseconds / (double)concurrentRequests;
 
-        _output.WriteLine($"📊 接続プール並列性能測定");
-        _output.WriteLine($"🔸 並列リクエスト数: {concurrentRequests}");
-        _output.WriteLine($"🔸 総処理時間: {parallelStopwatch.ElapsedMilliseconds}ms");
-        _output.WriteLine($"🔸 平均リクエスト時間: {averageParallelTime:F2}ms");
+        output.WriteLine($"📊 接続プール並列性能測定");
+        output.WriteLine($"🔸 並列リクエスト数: {concurrentRequests}");
+        output.WriteLine($"🔸 総処理時間: {parallelStopwatch.ElapsedMilliseconds}ms");
+        output.WriteLine($"🔸 平均リクエスト時間: {averageParallelTime:F2}ms");
 
         // 並列処理では時間がリニアに増加しないことを確認
         var worstCaseLinearTime = concurrentRequests * 1000; // 1秒 × 10回 = 10秒
@@ -90,7 +84,7 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
             $"並列処理時間 {parallelStopwatch.ElapsedMilliseconds}ms が線形時間 {worstCaseLinearTime}ms より短い必要があります");
 
         var metrics = connectionPool.GetMetrics();
-        _output.WriteLine($"🔸 接続プールメトリクス - Max: {metrics.MaxConnections}, Available: {metrics.AvailableConnections}");
+        output.WriteLine($"🔸 接続プールメトリクス - Max: {metrics.MaxConnections}, Available: {metrics.AvailableConnections}");
     }
 
     [Fact]
@@ -154,17 +148,17 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         }
 
         // Assert - 結果の分析とレポート
-        _output.WriteLine($"📊 接続プール設定別性能比較");
+        output.WriteLine($"📊 接続プール設定別性能比較");
         foreach (var (label, elapsedMs, throughput) in results)
         {
-            _output.WriteLine($"🔸 {label}: {elapsedMs}ms, スループット: {throughput:F2} req/sec");
+            output.WriteLine($"🔸 {label}: {elapsedMs}ms, スループット: {throughput:F2} req/sec");
         }
 
         // より多い接続数がより良い並列性能を提供することを確認
         var singleConnectionTime = results.First(r => r.Label == "シングル接続").ElapsedMs;
         var quadConnectionTime = results.First(r => r.Label == "クアッド接続").ElapsedMs;
 
-        _output.WriteLine($"📈 性能改善 - シングル: {singleConnectionTime}ms → クアッド: {quadConnectionTime}ms");
+        output.WriteLine($"📈 性能改善 - シングル: {singleConnectionTime}ms → クアッド: {quadConnectionTime}ms");
     }
 
     [Fact]
@@ -177,7 +171,7 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
 
         // Act - メトリクス追跡の精度テスト
         var initialMetrics = connectionPool.GetMetrics();
-        _output.WriteLine($"🔢 初期メトリクス - Active: {initialMetrics.ActiveConnections}, Total: {initialMetrics.TotalConnectionsCreated}");
+        output.WriteLine($"🔢 初期メトリクス - Active: {initialMetrics.ActiveConnections}, Total: {initialMetrics.TotalConnectionsCreated}");
 
         // 複数の接続取得・返却をシミュレート
         const int operationCount = 3;
@@ -190,21 +184,21 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
                 var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
                 
                 var acquireMetrics = connectionPool.GetMetrics();
-                _output.WriteLine($"🔗 接続取得 {i+1} - Active: {acquireMetrics.ActiveConnections}, Total: {acquireMetrics.TotalConnectionsCreated}");
+                output.WriteLine($"🔗 接続取得 {i+1} - Active: {acquireMetrics.ActiveConnections}, Total: {acquireMetrics.TotalConnectionsCreated}");
 
                 await connectionPool.ReleaseConnectionAsync(connection);
                 
                 var releaseMetrics = connectionPool.GetMetrics();
-                _output.WriteLine($"🔓 接続返却 {i+1} - Active: {releaseMetrics.ActiveConnections}, Available: {releaseMetrics.AvailableConnections}");
+                output.WriteLine($"🔓 接続返却 {i+1} - Active: {releaseMetrics.ActiveConnections}, Available: {releaseMetrics.AvailableConnections}");
             }
             catch (Exception ex)
             {
-                _output.WriteLine($"⚠️  接続操作 {i+1} 失敗: {ex.Message}");
+                output.WriteLine($"⚠️  接続操作 {i+1} 失敗: {ex.Message}");
             }
         }
 
         var finalMetrics = connectionPool.GetMetrics();
-        _output.WriteLine($"🏁 最終メトリクス - Active: {finalMetrics.ActiveConnections}, Total: {finalMetrics.TotalConnectionsCreated}");
+        output.WriteLine($"🏁 最終メトリクス - Active: {finalMetrics.ActiveConnections}, Total: {finalMetrics.TotalConnectionsCreated}");
 
         // Assert - メトリクスの一貫性確認
         Assert.True(finalMetrics.TotalConnectionsCreated >= 0);
@@ -267,15 +261,15 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         var maxTaskTime = taskTimes.Max();
         var minTaskTime = taskTimes.Min();
 
-        _output.WriteLine($"📊 スケーラビリティテスト - Max:{maxConnections}, Min:{minConnections}");
-        _output.WriteLine($"🔸 総処理時間: {stopwatch.ElapsedMilliseconds}ms");
-        _output.WriteLine($"🔸 リクエスト数: {requestCount}");
-        _output.WriteLine($"🔸 平均タスク時間: {averageTaskTime:F2}ms");
-        _output.WriteLine($"🔸 最大タスク時間: {maxTaskTime}ms");
-        _output.WriteLine($"🔸 最小タスク時間: {minTaskTime}ms");
+        output.WriteLine($"📊 スケーラビリティテスト - Max:{maxConnections}, Min:{minConnections}");
+        output.WriteLine($"🔸 総処理時間: {stopwatch.ElapsedMilliseconds}ms");
+        output.WriteLine($"🔸 リクエスト数: {requestCount}");
+        output.WriteLine($"🔸 平均タスク時間: {averageTaskTime:F2}ms");
+        output.WriteLine($"🔸 最大タスク時間: {maxTaskTime}ms");
+        output.WriteLine($"🔸 最小タスク時間: {minTaskTime}ms");
 
         var metrics = connectionPool.GetMetrics();
-        _output.WriteLine($"🔸 最終メトリクス - Active: {metrics.ActiveConnections}, Utilization: {metrics.ConnectionUtilization:P1}");
+        output.WriteLine($"🔸 最終メトリクス - Active: {metrics.ActiveConnections}, Utilization: {metrics.ConnectionUtilization:P1}");
 
         // パフォーマンス要件の確認
         Assert.True(averageTaskTime < 5000, $"平均タスク時間 {averageTaskTime:F2}ms は5秒未満である必要があります");
@@ -325,14 +319,14 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         var averageTimePerRequest = stopwatch.ElapsedMilliseconds / (double)requests.Count;
 
         // Assert - パフォーマンス要件の確認
-        _output.WriteLine($"🚀 接続プール統合パフォーマンステスト結果");
-        _output.WriteLine($"🔸 並列リクエスト数: {requests.Count}");
-        _output.WriteLine($"🔸 総処理時間: {stopwatch.ElapsedMilliseconds}ms");
-        _output.WriteLine($"🔸 平均処理時間: {averageTimePerRequest:F2}ms/件");
-        _output.WriteLine($"🔸 成功率: {successCount}/{requests.Count} ({successCount * 100.0 / requests.Count:F1}%)");
+        output.WriteLine($"🚀 接続プール統合パフォーマンステスト結果");
+        output.WriteLine($"🔸 並列リクエスト数: {requests.Count}");
+        output.WriteLine($"🔸 総処理時間: {stopwatch.ElapsedMilliseconds}ms");
+        output.WriteLine($"🔸 平均処理時間: {averageTimePerRequest:F2}ms/件");
+        output.WriteLine($"🔸 成功率: {successCount}/{requests.Count} ({successCount * 100.0 / requests.Count:F1}%)");
 
         var metrics = connectionPool.GetMetrics();
-        _output.WriteLine($"🔸 接続プール利用率: {metrics.ConnectionUtilization:P1}");
+        output.WriteLine($"🔸 接続プール利用率: {metrics.ConnectionUtilization:P1}");
 
         // Issue #147の目標: 接続ロック競合による2.7-8.5秒の遅延を大幅に削減
         Assert.True(averageTimePerRequest < 1000, 
@@ -342,7 +336,7 @@ public class ConnectionPoolPerformanceTests : IAsyncDisposable
         Assert.True(averageTimePerRequest < 500, 
             $"接続ロック競合問題解決により、平均処理時間 {averageTimePerRequest:F2}ms は500ms未満である必要があります");
 
-        _output.WriteLine($"✅ Issue #147 目標達成 - 接続ロック競合問題解決による大幅な性能向上を確認");
+        output.WriteLine($"✅ Issue #147 目標達成 - 接続ロック競合問題解決による大幅な性能向上を確認");
     }
 
     /// <summary>

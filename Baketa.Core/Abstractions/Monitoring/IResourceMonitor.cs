@@ -66,40 +66,25 @@ public interface IResourceMonitor : IInitializable, IDisposable
 /// <summary>
 /// リソースメトリクス変化イベント引数
 /// </summary>
-public sealed class ResourceMetricsChangedEventArgs : EventArgs
+public sealed class ResourceMetricsChangedEventArgs(ResourceMetrics currentMetrics, ResourceMetrics? previousMetrics = null) : EventArgs
 {
-    public ResourceMetrics CurrentMetrics { get; }
-    public ResourceMetrics? PreviousMetrics { get; }
-    public DateTime Timestamp { get; }
-    
-    public ResourceMetricsChangedEventArgs(ResourceMetrics currentMetrics, ResourceMetrics? previousMetrics = null)
-    {
-        CurrentMetrics = currentMetrics;
-        PreviousMetrics = previousMetrics;
-        Timestamp = DateTime.UtcNow;
-    }
+    public ResourceMetrics CurrentMetrics { get; } = currentMetrics;
+    public ResourceMetrics? PreviousMetrics { get; } = previousMetrics;
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
 }
 
 /// <summary>
 /// リソース警告イベント引数
 /// </summary>
-public sealed class ResourceWarningEventArgs : EventArgs
+public sealed class ResourceWarningEventArgs(
+    ResourceWarningType warningType,
+    string message,
+    ResourceMetrics currentMetrics) : EventArgs
 {
-    public ResourceWarningType WarningType { get; }
-    public string Message { get; }
-    public ResourceMetrics CurrentMetrics { get; }
-    public DateTime Timestamp { get; }
-    
-    public ResourceWarningEventArgs(
-        ResourceWarningType warningType, 
-        string message, 
-        ResourceMetrics currentMetrics)
-    {
-        WarningType = warningType;
-        Message = message;
-        CurrentMetrics = currentMetrics;
-        Timestamp = DateTime.UtcNow;
-    }
+    public ResourceWarningType WarningType { get; } = warningType;
+    public string Message { get; } = message;
+    public ResourceMetrics CurrentMetrics { get; } = currentMetrics;
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
 }
 
 /// <summary>

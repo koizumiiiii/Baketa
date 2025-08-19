@@ -814,8 +814,18 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     /// </summary>
     public void Dispose()
     {
-        // 🔧 [GEMINI_REVIEW] ConfigureAwait(false)によるデッドロック回避
-        DisposeAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+        // CA2012対応：ValueTaskを直接同期的に待機
+        var disposeTask = DisposeAsync();
+        if (disposeTask.IsCompleted)
+        {
+            // 既に完了している場合はGetAwaiter().GetResult()でOK
+            disposeTask.GetAwaiter().GetResult();
+        }
+        else
+        {
+            // 未完了の場合はAsTask()でTask変換してから待機
+            disposeTask.AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
     }
 }
 

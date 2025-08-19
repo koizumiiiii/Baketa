@@ -9,18 +9,12 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 /// 1件ずつ順次処理を行う基本戦略
 /// Issue #147 Phase 3.2
 /// </summary>
-public sealed class SingleTranslationStrategy : ITranslationStrategy
+public sealed class SingleTranslationStrategy(
+    ITranslationEngine translationEngine,
+    ILogger<SingleTranslationStrategy> logger) : ITranslationStrategy
 {
-    private readonly ITranslationEngine _translationEngine;
-    private readonly ILogger<SingleTranslationStrategy> _logger;
-
-    public SingleTranslationStrategy(
-        ITranslationEngine translationEngine,
-        ILogger<SingleTranslationStrategy> logger)
-    {
-        _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
+    private readonly ILogger<SingleTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public int Priority => 10; // 最低優先度（フォールバック用）
 

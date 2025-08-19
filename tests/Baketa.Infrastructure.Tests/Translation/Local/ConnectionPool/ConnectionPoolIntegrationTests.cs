@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Configuration;
+using Baketa.Infrastructure.Tests.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,15 +18,9 @@ namespace Baketa.Infrastructure.Tests.Translation.Local.ConnectionPool;
 /// 接続プール統合テストクラス（Issue #147）
 /// DIコンテナとの統合、設定の読み込み、ライフサイクル管理をテスト
 /// </summary>
-public class ConnectionPoolIntegrationTests : IAsyncDisposable
+public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDisposable
 {
-    private readonly ITestOutputHelper _output;
     private ServiceProvider? _serviceProvider;
-
-    public ConnectionPoolIntegrationTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public async Task DI_Integration_ShouldResolveConnectionPoolCorrectly()
@@ -46,9 +41,9 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         Assert.NotNull(options.Value);
 
         var metrics = connectionPool.GetMetrics();
-        _output.WriteLine($"MaxConnections: {metrics.MaxConnections}");
-        _output.WriteLine($"MinConnections: {metrics.MinConnections}");
-        _output.WriteLine($"AvailableConnections: {metrics.AvailableConnections}");
+        output.WriteLine($"MaxConnections: {metrics.MaxConnections}");
+        output.WriteLine($"MinConnections: {metrics.MinConnections}");
+        output.WriteLine($"AvailableConnections: {metrics.AvailableConnections}");
 
         Assert.True(metrics.MaxConnections >= 1);
         Assert.True(metrics.MinConnections >= 1);
@@ -68,9 +63,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
             ["Translation:HealthCheckIntervalMs"] = "60000"
         };
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configurationData)
-            .Build();
+        var configuration = ConfigurationTestHelper.CreateTestConfiguration(configurationData);
 
         var services = CreateServiceCollection(configuration);
         _serviceProvider = services.BuildServiceProvider();
@@ -107,7 +100,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         var metrics = connectionPool.GetMetrics();
         Assert.NotNull(metrics);
         
-        _output.WriteLine("ServiceProvider disposed successfully");
+        output.WriteLine("ServiceProvider disposed successfully");
     }
 
     [Fact]
@@ -124,7 +117,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         // Assert - シングルトンとして登録されているため、同じインスタンスが返される
         Assert.Same(connectionPool1, connectionPool2);
         
-        _output.WriteLine("Singleton behavior confirmed");
+        output.WriteLine("Singleton behavior confirmed");
     }
 
     [Fact]
@@ -143,8 +136,8 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         Assert.True(currentOptions.MaxConnections >= 1 || currentOptions.MaxConnections == null);
         Assert.True(currentOptions.MinConnections >= 1);
         
-        _output.WriteLine($"Current MaxConnections: {currentOptions.MaxConnections}");
-        _output.WriteLine($"Current MinConnections: {currentOptions.MinConnections}");
+        output.WriteLine($"Current MaxConnections: {currentOptions.MaxConnections}");
+        output.WriteLine($"Current MinConnections: {currentOptions.MinConnections}");
     }
 
     [Theory]
@@ -167,9 +160,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
             configurationData["Translation:MaxConnections"] = maxConnections.ToString();
         }
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configurationData)
-            .Build();
+        var configuration = ConfigurationTestHelper.CreateTestConfiguration(configurationData);
 
         var services = CreateServiceCollection(configuration);
         _serviceProvider = services.BuildServiceProvider();
@@ -194,8 +185,8 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         Assert.Equal(minConnections, metrics.MinConnections);
         Assert.True(metrics.MinConnections <= metrics.MaxConnections);
 
-        _output.WriteLine($"Test case - MaxConnections: {maxConnections}, MinConnections: {minConnections}");
-        _output.WriteLine($"Result - MaxConnections: {metrics.MaxConnections}, MinConnections: {metrics.MinConnections}");
+        output.WriteLine($"Test case - MaxConnections: {maxConnections}, MinConnections: {minConnections}");
+        output.WriteLine($"Result - MaxConnections: {metrics.MaxConnections}, MinConnections: {metrics.MinConnections}");
     }
 
     [Fact]
@@ -210,9 +201,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
             ["Translation:HealthCheckIntervalMs"] = "-5000"
         };
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configurationData)
-            .Build();
+        var configuration = ConfigurationTestHelper.CreateTestConfiguration(configurationData);
 
         var services = CreateServiceCollection(configuration);
         _serviceProvider = services.BuildServiceProvider();
@@ -225,7 +214,7 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         Assert.True(metrics.MinConnections >= 1); // 最小値に調整される
         Assert.True(metrics.MinConnections <= metrics.MaxConnections); // 論理的整合性を保つ
 
-        _output.WriteLine($"Error handling - MaxConnections: {metrics.MaxConnections}, MinConnections: {metrics.MinConnections}");
+        output.WriteLine($"Error handling - MaxConnections: {metrics.MaxConnections}, MinConnections: {metrics.MinConnections}");
     }
 
     [Fact(Skip = "Pythonサーバーが必要なため統合テスト環境でのみ実行")]
@@ -247,11 +236,11 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
             var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
             await connectionPool.ReleaseConnectionAsync(connection);
             
-            _output.WriteLine("✅ 接続プール統合テスト成功 - Pythonサーバーとの接続確認完了");
+            output.WriteLine("✅ 接続プール統合テスト成功 - Pythonサーバーとの接続確認完了");
         }
         catch (Exception ex)
         {
-            _output.WriteLine($"❌ 接続プール統合テスト失敗: {ex.Message}");
+            output.WriteLine($"❌ 接続プール統合テスト失敗: {ex.Message}");
             throw;
         }
     }
@@ -278,16 +267,14 @@ public class ConnectionPoolIntegrationTests : IAsyncDisposable
         else
         {
             // デフォルト設定
-            var defaultConfig = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string>
+            var defaultConfig = ConfigurationTestHelper.CreateTestConfiguration(new Dictionary<string, string>
                 {
                     ["Translation:MaxConnections"] = "", // null (自動計算)
                     ["Translation:MinConnections"] = "1",
                     ["Translation:OptimalChunksPerConnection"] = "4",
                     ["Translation:ConnectionTimeoutMs"] = "30000",
                     ["Translation:HealthCheckIntervalMs"] = "30000"
-                })
-                .Build();
+                });
             services.AddSingleton<IConfiguration>(defaultConfig);
         }
 

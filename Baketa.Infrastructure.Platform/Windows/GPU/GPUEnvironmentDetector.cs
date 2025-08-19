@@ -35,10 +35,10 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
             var featureLevel = await Task.Run(() => GetDirectXFeatureLevel()).ConfigureAwait(false);
             
             // 2. 利用可能なGPUアダプター情報取得
-            var gpuInfo = await Task.Run(() => GetPrimaryGpuInfo()).ConfigureAwait(false);
+            var (Name, MemoryMB, IsIntegrated) = await Task.Run(() => GetPrimaryGpuInfo()).ConfigureAwait(false);
             
             // 3. GPU種別判定（統合/専用）
-            var isIntegrated = DetermineIfIntegratedGpu(gpuInfo.Name);
+            var isIntegrated = DetermineIfIntegratedGpu(Name);
             var isDedicated = !isIntegrated;
             
             // 4. テクスチャサイズ制限確認
@@ -59,19 +59,19 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
             // GPU環境情報を構築
             var info = new GpuEnvironmentInfo
             {
-                GpuName = gpuInfo.Name,
+                GpuName = Name,
                 GpuDeviceId = 0,
                 IsIntegratedGpu = isIntegrated,
                 IsDedicatedGpu = isDedicated,
-                SupportsCuda = isDedicated && gpuInfo.Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
+                SupportsCuda = isDedicated && Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
                 SupportsOpenCL = true, // 多くの現代GPUで対応
                 SupportsDirectML = true, // Windows 10+で対応
-                SupportsOpenVINO = gpuInfo.Name.Contains("Intel", StringComparison.OrdinalIgnoreCase),
-                SupportsTensorRT = isDedicated && gpuInfo.Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
-                AvailableMemoryMB = gpuInfo.MemoryMB,
+                SupportsOpenVINO = Name.Contains("Intel", StringComparison.OrdinalIgnoreCase),
+                SupportsTensorRT = isDedicated && Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase),
+                AvailableMemoryMB = MemoryMB,
                 MaximumTexture2DDimension = maxTextureSize,
                 DirectXFeatureLevel = featureLevel,
-                ComputeCapability = DetermineComputeCapability(gpuInfo.Name),
+                ComputeCapability = DetermineComputeCapability(Name),
                 RecommendedProviders = recommendedProviders
             };
             
