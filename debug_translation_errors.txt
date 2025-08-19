@@ -539,3 +539,13 @@
 2025-08-18 23:53:05.446 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳タイムアウト（サーバー応答なし）
 2025-08-18 23:53:11.947 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳タイムアウト（サーバー応答なし）
 2025-08-18 23:53:13.005 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳タイムアウト（サーバー応答なし）
+2025-08-19 20:18:19.906 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.914 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.914 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.914 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.914 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.929 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.929 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.929 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.932 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
+2025-08-19 20:18:19.932 エラー詳細: IsSuccess=False, Error=null, ErrorType=, TranslatedText=翻訳エラーが発生しました
