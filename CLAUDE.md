@@ -488,6 +488,30 @@ This project defines sub-agents responsible for specific areas of expertise to i
 - **即座利用可能**: APIクォータ・ネットワーク問題に影響されない
 - **包括的カバレッジ**: アーキテクチャ〜セキュリティまで全領域
 
+### **🔍 検索ツール使用方針**
+
+**優先順位**:
+1. **Serena MCP**: 意味的検索・シンボル解析が必要な場合
+2. **ripgrep (`rg`)**: テキストパターン検索・Serenaが不要な場合
+3. **grep/find**: 使用非推奨（ripgrepが圧倒的に高速・賢い）
+
+**ripgrep使用例**:
+```bash
+# クラス使用箇所検索
+rg "TranslationEngine" -t cs
+
+# 複雑なパターン検索
+rg "class \w+ : \w*ITranslationEngine" -t cs
+
+# ファイル種別指定検索
+rg "appsettings" -t cs -t json -t csproj
+
+# 除外パターン付き検索
+rg "TODO|FIXME" -t cs --glob="!*Test*"
+```
+
+**⚠️ 重要**: `grep` `find` の代わりに常に `rg` を使用すること。速度が10-50倍向上し、より賢い除外・ファイル種別判定を行う。
+
 ### **🎯 Serena MCP優先戦略 (MCP-First Strategy)**
 
 **基本方針**: 大規模コードベース（1,300+テストケース）での効率化のため、Serena MCPを主要ツールとして活用し、サブエージェントと連携する。
