@@ -8,6 +8,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
 using Baketa.Core.Services;
+using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +24,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 {
     private readonly ILogger<PythonServerHealthMonitor> _logger;
     private readonly ISettingsService _settingsService;
+    private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase2: サーキットブレーカー連携
     private System.Threading.Timer? _healthCheckTimer;
     private readonly SemaphoreSlim _restartLock = new(1, 1);
     
@@ -46,14 +49,17 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
     public PythonServerHealthMonitor(
         ILogger<PythonServerHealthMonitor> logger,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
     {
         Console.WriteLine("🔍 [HEALTH_MONITOR] コンストラクタ開始");
         
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _circuitBreaker = circuitBreaker; // Phase2: サーキットブレーカー連携（オプション）
         
         Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
+        Console.WriteLine($"🔧 [PHASE2] サーキットブレーカー連携: {(_circuitBreaker != null ? "有効" : "無効")}");
         
         // 設定の遅延取得（StartAsync時に実際に取得）
         Console.WriteLine("✅ [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
@@ -151,6 +157,14 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 
                 _consecutiveFailures = 0;
                 _lastSuccessfulCheck = DateTime.UtcNow;
+                
+                // Phase2: サーキットブレーカー統計情報ログ
+                if (_circuitBreaker != null)
+                {
+                    var stats = _circuitBreaker.GetStats();
+                    _logger.LogDebug("🔧 [PHASE2] サーキットブレーカー統計 - State: {State}, FailureRate: {FailureRate:P2}, TotalExecutions: {TotalExecutions}", 
+                        _circuitBreaker.State, stats.FailureRate, stats.TotalExecutions);
+                }
             }
             else
             {
@@ -260,6 +274,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             {
                 _logger.LogInformation("✅ サーバー自動再起動成功 - Port: {Port}", _currentServerPort);
                 _consecutiveFailures = 0; // 成功時はカウンターリセット
+                
+                // Phase2: サーキットブレーカーのリセット
+                if (_circuitBreaker != null)
+                {
+                    _circuitBreaker.Reset();
+                    _logger.LogInformation("🔧 [PHASE2] サーキットブレーカーをリセット - サーバー復旧完了");
+                }
             }
             else
             {
@@ -740,7 +761,10 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             LastSuccessfulCheck = _lastSuccessfulCheck,
             LastRestartAttempt = _lastRestartAttempt,
             IsRestartInProgress = _isRestartInProgress,
-            CurrentServerPort = _currentServerPort
+            CurrentServerPort = _currentServerPort,
+            // Phase2: サーキットブレーカー統計情報
+            CircuitBreakerState = _circuitBreaker?.State,
+            CircuitBreakerStats = _circuitBreaker?.GetStats()
         };
     }
 
@@ -810,4 +834,8 @@ public record HealthMonitorStats
     
     public double FailureRate => TotalHealthChecks > 0 ? (double)TotalFailures / TotalHealthChecks : 0.0;
     public TimeSpan TimeSinceLastSuccess => DateTime.UtcNow - LastSuccessfulCheck;
+    
+    // Phase2: サーキットブレーカー統計情報
+    public CircuitBreakerState? CircuitBreakerState { get; init; }
+    public CircuitBreakerStats? CircuitBreakerStats { get; init; }
 }
