@@ -393,33 +393,23 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (!File.Exists(_serverScriptPath))
                 {
                     _logger.LogWarning("サーバースクリプトが見つかりません: {ScriptPath}", _serverScriptPath);
-                    return new TranslationResponse
-                    {
-                        RequestId = request.RequestId,
-                        TranslatedText = "翻訳エラーが発生しました",
-                        SourceText = request.SourceText,
-                        SourceLanguage = request.SourceLanguage,
-                        TargetLanguage = request.TargetLanguage,
-                        ConfidenceScore = 0.0f,
-                        EngineName = Name,
-                        IsSuccess = false
-                    };
+                    var error = TranslationError.Create(
+                        TranslationError.ServiceUnavailable, 
+                        $"翻訳サーバースクリプトが見つかりません: {_serverScriptPath}",
+                        false, 
+                        TranslationErrorType.ServiceUnavailable);
+                    return TranslationResponse.CreateError(request, error, Name);
                 }
                 
                 var initResult = await InitializeAsync().ConfigureAwait(false);
                 if (!initResult)
                 {
-                    return new TranslationResponse
-                    {
-                        RequestId = request.RequestId,
-                        TranslatedText = "翻訳エラーが発生しました",
-                        SourceText = request.SourceText,
-                        SourceLanguage = request.SourceLanguage,
-                        TargetLanguage = request.TargetLanguage,
-                        ConfidenceScore = 0.0f,
-                        EngineName = Name,
-                        IsSuccess = false
-                    };
+                    var error = TranslationError.Create(
+                        TranslationError.ServiceUnavailable, 
+                        "翻訳サーバーの初期化に失敗しました",
+                        true, 
+                        TranslationErrorType.ServiceUnavailable);
+                    return TranslationResponse.CreateError(request, error, Name);
                 }
             }
 
@@ -432,17 +422,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             bool isSupported = await SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
             if (!isSupported)
             {
-                return new TranslationResponse
-                {
-                    RequestId = request.RequestId,
-                    TranslatedText = $"言語ペア {request.SourceLanguage.Code}-{request.TargetLanguage.Code} はサポートされていません",
-                    SourceText = request.SourceText,
-                    SourceLanguage = request.SourceLanguage,
-                    TargetLanguage = request.TargetLanguage,
-                    ConfidenceScore = 0.0f,
-                    EngineName = Name,
-                    IsSuccess = false
-                };
+                var error = TranslationError.Create(
+                    TranslationError.UnsupportedLanguagePair, 
+                    $"言語ペア {request.SourceLanguage.Code}-{request.TargetLanguage.Code} はサポートされていません",
+                    false, 
+                    TranslationErrorType.UnsupportedLanguage);
+                return TranslationResponse.CreateError(request, error, Name);
             }
             
             // 🚨 CACHE_DISABLED: キャッシュ機能完全無効化 - 汚染問題根本解決
@@ -516,36 +501,30 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             stopwatch.Stop();
             _logger.LogWarning("🚨 [CIRCUIT_BREAKER] サーキットブレーカーが開いています - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
-            return new TranslationResponse
-            {
-                RequestId = request.RequestId,
-                TranslatedText = "翻訳サービスが一時的に利用できません（サーキットブレーカー開放中）",
-                SourceText = request.SourceText,
-                SourceLanguage = request.SourceLanguage,
-                TargetLanguage = request.TargetLanguage,
-                ConfidenceScore = 0.0f,
-                EngineName = Name,
-                IsSuccess = false,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
+            var error = TranslationError.FromException(
+                TranslationError.ServiceUnavailable, 
+                "翻訳サービスが一時的に利用できません（サーキットブレーカー開放中）",
+                ex,
+                true, 
+                TranslationErrorType.ServiceUnavailable);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
         }
         catch (TranslationTimeoutException ex)
         {
             stopwatch.Stop();
             _logger.LogWarning("⏱️ [CIRCUIT_BREAKER] 翻訳タイムアウト - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
-            return new TranslationResponse
-            {
-                RequestId = request.RequestId,
-                TranslatedText = "翻訳がタイムアウトしました",
-                SourceText = request.SourceText,
-                SourceLanguage = request.SourceLanguage,
-                TargetLanguage = request.TargetLanguage,
-                ConfidenceScore = 0.0f,
-                EngineName = Name,
-                IsSuccess = false,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
+            var error = TranslationError.FromException(
+                TranslationError.TimeoutError, 
+                "翻訳がタイムアウトしました",
+                ex,
+                true, 
+                TranslationErrorType.Timeout);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
         }
         catch (Exception ex)
         {
@@ -559,18 +538,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             _logger.LogError("🔥 [ERROR_DEBUG] - スタックトレース: {StackTrace}", ex.StackTrace);
             Console.WriteLine($"🔥 [ERROR_DEBUG] 翻訳エラー発生: {ex.GetType().Name} - {ex.Message}");
             
-            return new TranslationResponse
-            {
-                RequestId = request.RequestId,
-                TranslatedText = "翻訳エラーが発生しました",
-                SourceText = request.SourceText,
-                SourceLanguage = request.SourceLanguage,
-                TargetLanguage = request.TargetLanguage,
-                ConfidenceScore = 0.0f,
-                EngineName = Name,
-                IsSuccess = false,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
+            var error = TranslationError.FromException(
+                TranslationError.InternalError, 
+                "翻訳エラーが発生しました",
+                ex,
+                false, 
+                TranslationErrorType.Exception);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
         }
     }
 
