@@ -15,6 +15,7 @@ namespace Baketa.Core.Tests.Settings;
 /// <summary>
 /// EnhancedSettingsServiceの単体テスト
 /// </summary>
+[Collection("FileAccess")]
 public class EnhancedSettingsServiceTests : IDisposable
 {
     private readonly string _tempSettingsPath;
