@@ -277,7 +277,7 @@ namespace Baketa.Core.Translation;
 
             // 🚨 [BASE_CLASS_DEBUG] 基底クラスのTranslateBatchAsyncが実行されている
             Console.WriteLine($"🚨 [BASE_CLASS_DEBUG] TranslationEngineBase.TranslateBatchAsync実行 - テキスト数: {requests.Count}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            System.IO.File.AppendAllText($"E:\\dev\\Baketa\\debug_app_logs_{Environment.ProcessId}_{Environment.CurrentManagedThreadId}.txt", 
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BASE_CLASS_DEBUG] TranslationEngineBase.TranslateBatchAsync実行 - テキスト数: {requests.Count}{Environment.NewLine}");
 
             // 各リクエストを並行して処理

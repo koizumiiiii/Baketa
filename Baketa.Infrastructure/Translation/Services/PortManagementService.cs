@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// </summary>
 public class PortManagementService(ILogger<PortManagementService> logger) : IPortManagementService
 {
-    private readonly string _portRegistryFile = Path.Combine(Environment.CurrentDirectory, "translation_ports.json");
+    private readonly string _portRegistryFile = Path.Combine(Environment.CurrentDirectory, $"translation_ports_{Environment.ProcessId}.json");
     private readonly SemaphoreSlim _semaphore = new(1, 1); // SemaphoreSlim使用でスレッドセーフ性確保
     private readonly TimeSpan _lockTimeout = TimeSpan.FromSeconds(10);
     private bool _disposed;
