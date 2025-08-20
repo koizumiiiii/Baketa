@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Settings;
 
 namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
@@ -14,9 +15,10 @@ namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 /// 固定サイズ接続プール実装（Issue #147: Phase 1）
 /// Channel&lt;T&gt;ベースの高性能接続管理によりOptimizedPythonTranslationEngineの接続ロック競合を解決
 /// </summary>
-public sealed class FixedSizeConnectionPool : IAsyncDisposable
+public sealed class FixedSizeConnectionPool : IConnectionPool
 {
     private readonly ILogger<FixedSizeConnectionPool> _logger;
+    private readonly IConfiguration _configuration;
     private readonly TranslationSettings _settings;
     private readonly Channel<PersistentConnection> _connectionChannel;
     private readonly SemaphoreSlim _poolSemaphore;
@@ -28,21 +30,29 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     private int _activeConnections;
     private int _totalConnectionsCreated;
     private bool _disposed;
+    
+    /// <summary>
+    /// アクティブな接続数を取得する
+    /// </summary>
+    public int ActiveConnections => _activeConnections;
 
     /// <summary>
     /// 固定サイズ接続プールを初期化
     /// </summary>
     /// <param name="logger">ロガー</param>
+    /// <param name="configuration">設定サービス</param>
     /// <param name="options">翻訳設定オプション</param>
     public FixedSizeConnectionPool(
         ILogger<FixedSizeConnectionPool> logger,
+        IConfiguration configuration,
         IOptions<TranslationSettings> options)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _settings = options?.Value ?? throw new ArgumentNullException(nameof(options));
         
         // 接続数の計算
-        _maxConnections = _settings.MaxConnections ?? Environment.ProcessorCount / 2;
+        _maxConnections = _settings.MaxConnections ?? Math.Max(8, Environment.ProcessorCount / 2);  // 🔧 CONCURRENT_OPTIMIZATION: 最小8接続を保証
         _minConnections = _settings.MinConnections;
         
         if (_maxConnections < 1) _maxConnections = 1;
@@ -78,14 +88,31 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     }
 
     /// <summary>
+    /// 設定に基づいて動的にポート番号を取得
+    /// NLLB-200: 5557、その他: 5556（レガシー互換性）
+    /// </summary>
+    private int GetServerPort()
+    {
+        var defaultEngineString = _configuration["Translation:DefaultEngine"];
+        var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+            ? parsedEngine 
+            : TranslationEngine.NLLB200;
+
+        return defaultEngine switch
+        {
+            TranslationEngine.NLLB200 => 5557,
+            _ => 5556 // レガシー互換性のため維持
+        };
+    }
+
+    /// <summary>
     /// 接続プールから接続を取得
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>永続接続インスタンス</returns>
-    public async ValueTask<PersistentConnection> AcquireConnectionAsync(CancellationToken cancellationToken = default)
+    public async Task<PersistentConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(FixedSizeConnectionPool));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         
         var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _disposalCts.Token);
@@ -141,7 +168,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     /// 接続を接続プールに返却
     /// </summary>
     /// <param name="connection">返却する接続</param>
-    public async ValueTask ReleaseConnectionAsync(PersistentConnection connection)
+    public async Task ReturnConnectionAsync(PersistentConnection connection, CancellationToken cancellationToken = default)
     {
         if (_disposed || connection == null)
         {
@@ -257,7 +284,8 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
         try
         {
             tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync("127.0.0.1", 5555, cancellationToken);
+            var serverPort = GetServerPort();
+            await tcpClient.ConnectAsync("127.0.0.1", serverPort, cancellationToken);
             
             stream = tcpClient.GetStream();
             
@@ -265,8 +293,10 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
             stream.ReadTimeout = _settings.ConnectionTimeoutMs;
             stream.WriteTimeout = _settings.ConnectionTimeoutMs;
             
-            reader = new StreamReader(stream, System.Text.Encoding.UTF8, false, 8192, true);
-            writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false), 8192, true) 
+            // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
+            var utf8EncodingNoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+            reader = new StreamReader(stream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
+            writer = new StreamWriter(stream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) 
             { 
                 AutoFlush = false // パフォーマンス向上のため手動フラッシュ
             };
@@ -358,9 +388,10 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     }
 
     /// <summary>
-    /// 定期的なヘルスチェック実行
+    /// すべての接続のヘルスチェックを実行する
     /// </summary>
-    private async void PerformHealthCheck(object? state)
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    public async Task PerformHealthCheckAsync(CancellationToken cancellationToken = default)
     {
         if (_disposed) return;
 
@@ -372,11 +403,20 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
                 metrics.ActiveConnections, metrics.QueuedConnections, metrics.ConnectionUtilization);
 
             // 不健全な接続の削除（実装は将来の拡張として残す）
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "ヘルスチェック中にエラーが発生");
         }
+    }
+
+    /// <summary>
+    /// 定期的なヘルスチェック実行
+    /// </summary>
+    private async void PerformHealthCheck(object? state)
+    {
+        await PerformHealthCheckAsync(_disposalCts.Token);
     }
 
     /// <summary>
@@ -417,26 +457,16 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
 /// <summary>
 /// 永続接続を表すクラス
 /// </summary>
-public sealed class PersistentConnection : IAsyncDisposable
+public sealed class PersistentConnection(string id, TcpClient tcpClient, NetworkStream stream,
+    StreamReader reader, StreamWriter writer) : IAsyncDisposable
 {
-    public string Id { get; }
-    public TcpClient TcpClient { get; }
-    public NetworkStream Stream { get; }
-    public StreamReader Reader { get; }
-    public StreamWriter Writer { get; }
-    public DateTime CreatedAt { get; }
+    public string Id { get; } = id ?? throw new ArgumentNullException(nameof(id));
+    public TcpClient TcpClient { get; } = tcpClient ?? throw new ArgumentNullException(nameof(tcpClient));
+    public NetworkStream Stream { get; } = stream ?? throw new ArgumentNullException(nameof(stream));
+    public StreamReader Reader { get; } = reader ?? throw new ArgumentNullException(nameof(reader));
+    public StreamWriter Writer { get; } = writer ?? throw new ArgumentNullException(nameof(writer));
+    public DateTime CreatedAt { get; } = DateTime.UtcNow;
     public bool IsDisposed { get; private set; }
-
-    public PersistentConnection(string id, TcpClient tcpClient, NetworkStream stream, 
-        StreamReader reader, StreamWriter writer)
-    {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
-        TcpClient = tcpClient ?? throw new ArgumentNullException(nameof(tcpClient));
-        Stream = stream ?? throw new ArgumentNullException(nameof(stream));
-        Reader = reader ?? throw new ArgumentNullException(nameof(reader));
-        Writer = writer ?? throw new ArgumentNullException(nameof(writer));
-        CreatedAt = DateTime.UtcNow;
-    }
 
     public async ValueTask DisposeAsync()
     {

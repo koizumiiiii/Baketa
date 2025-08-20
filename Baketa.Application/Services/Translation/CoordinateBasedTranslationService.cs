@@ -93,34 +93,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     {
         try
         {
-            // 統一設定サービスから翻訳設定を取得
+            // 🚨 [SETTINGS_BASED_ONLY] 設定ファイルの値のみを使用（動的言語検出削除）
             var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
             
+            // 🚨 [SIMPLIFIED] AutoDetectSourceLanguage削除 - 常に設定ファイルの値を使用
+            var sourceLanguageCode = translationSettings.DefaultSourceLanguage;
             var targetLanguageCode = translationSettings.DefaultTargetLanguage;
             
-            // 🚀 [DYNAMIC_LANGUAGE_DETECTION] OCRテキストが提供された場合は動的言語検出
-            if (!string.IsNullOrEmpty(ocrText))
-            {
-                var detectedLanguage = DetectLanguageFromText(ocrText);
-                Console.WriteLine($"🔍 [DYNAMIC_LANG] OCRテキスト言語検出: '{ocrText[..Math.Min(30, ocrText.Length)]}...' → {detectedLanguage.Code}");
-                
-                // 検出された言語に基づいてターゲット言語を決定
-                var dynamicTargetLanguage = detectedLanguage.Equals(Language.Japanese) ? Language.English : Language.Japanese;
-                
-                Console.WriteLine($"🎯 [DYNAMIC_LANG] 動的言語ペア設定: {detectedLanguage.Code} → {dynamicTargetLanguage.Code}");
-                _logger?.LogDebug("🎯 [DYNAMIC_LANG] 動的言語ペア設定: {Source} → {Target}", detectedLanguage.Code, dynamicTargetLanguage.Code);
-                
-                return (detectedLanguage, dynamicTargetLanguage);
-            }
+            Console.WriteLine($"🔍 [SETTINGS_BASED] 設定ファイルベースの言語ペア: {sourceLanguageCode} → {targetLanguageCode}");
             
-            // OCRテキストが提供されない場合は従来の設定ベース処理
-            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
-                ? "auto" 
-                : translationSettings.DefaultSourceLanguage;
-            
-            Console.WriteLine($"🎯 [UNIFIED_SETTINGS] AutoDetect={translationSettings.AutoDetectSourceLanguage}, Source='{sourceLanguageCode}', Target='{targetLanguageCode}'");
-            _logger?.LogDebug("🎯 [UNIFIED_SETTINGS] AutoDetect={AutoDetect}, Source='{Source}', Target='{Target}'", 
-                translationSettings.AutoDetectSourceLanguage, sourceLanguageCode, targetLanguageCode);
+            _logger?.LogDebug("🔍 [SETTINGS_BASED] 設定ファイルベースの言語ペア: {Source} → {Target}", sourceLanguageCode, targetLanguageCode);
 
             // Language enumに変換（統一ユーティリティ使用）
             var sourceLanguage = LanguageCodeConverter.ToLanguageEnum(sourceLanguageCode, Language.Japanese);
@@ -139,38 +121,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
     }
     
-    /// <summary>
-    /// テキストから言語を動的検出
-    /// </summary>
-    /// <param name="text">検出対象のテキスト</param>
-    /// <returns>検出された言語</returns>
-    private Language DetectLanguageFromText(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            Console.WriteLine($"🔍 [LANG_DETECT] 空テキストのため日本語をデフォルトに設定");
-            return Language.Japanese;
-        }
-        
-        // 簡単な言語検出ロジック：ASCII文字の比率で判定
-        var totalChars = text.Length;
-        var asciiChars = text.Count(c => c >= 32 && c <= 126); // 印刷可能ASCII文字
-        var asciiRatio = (double)asciiChars / totalChars;
-        
-        Console.WriteLine($"🔍 [LANG_DETECT] テキスト分析: 全文字数={totalChars}, ASCII文字数={asciiChars}, ASCII比率={asciiRatio:P}");
-        
-        // ASCII文字が70%以上であれば英語、それ以外は日本語と判定
-        if (asciiRatio >= 0.7)
-        {
-            Console.WriteLine($"🔍 [LANG_DETECT] 英語テキストと判定 (ASCII比率: {asciiRatio:P})");
-            return Language.English;
-        }
-        else
-        {
-            Console.WriteLine($"🔍 [LANG_DETECT] 日本語テキストと判定 (ASCII比率: {asciiRatio:P})");
-            return Language.Japanese;
-        }
-    }
 
     /// <summary>
     /// 座標ベース翻訳処理を実行
@@ -384,8 +334,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
                                 
-                                // 🔥 [STREAMING] 即座にオーバーレイ表示を更新（Stop時は確実に中断）
-                                // 🛠️ [FIX] 適切なキャンセレーション処理でStop時の表示を防ぐ
+                                // 🚀 [STREAMING_OVERLAY_FIX] 翻訳完了時に即座にオーバーレイ表示
                                 if (!cancellationToken.IsCancellationRequested)
                                 {
                                     Task.Run(async () =>
@@ -397,8 +346,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                             
                                             if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
                                             {
-                                                // 🚫 翻訳アプリケーションとして、OCR結果（原文）は表示せず翻訳結果のみ表示
-                                                Console.WriteLine($"🚫 [TRANSLATION_ONLY] OCR結果初期表示をスキップ - チャンク {chunk.ChunkId} (翻訳結果のみ表示)");
+                                                Console.WriteLine($"🎯 [STREAMING_OVERLAY] 翻訳結果オーバーレイ表示開始 - チャンク {chunk.ChunkId}: '{translatedText}'");
+                                                
+                                                // 翻訳結果のオーバーレイ表示を実行
+                                                await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken)
+                                                    .ConfigureAwait(false);
+                                                    
+                                                Console.WriteLine($"✅ [STREAMING_OVERLAY] オーバーレイ表示完了 - チャンク {chunk.ChunkId}");
                                             }
                                         }
                                         catch (OperationCanceledException)
@@ -754,8 +708,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 _logger?.LogDebug("🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
                 
                 var timeoutSetupStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                // 10秒タイムアウトを設定
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                // 🔧 [EMERGENCY_FIX] 60秒タイムアウトを設定（Python翻訳サーバー重要処理対応）
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                 timeoutSetupStopwatch.Stop();
                 _logger?.LogInformation("[TIMING] タイムアウト設定: {ElapsedMs}ms", timeoutSetupStopwatch.ElapsedMilliseconds);
@@ -811,9 +765,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
             {
-                Console.WriteLine($"⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠");
+                Console.WriteLine($"⏰ [VERIFICATION] バッチ翻訳が60秒でタイムアウト - Python翻訳サーバー処理時間が60秒を超過");
                 // 🔥 [FILE_CONFLICT_FIX_28] ファイルアクセス競合回避のためILogger使用
-                _logger?.LogWarning("⏰ [VERIFICATION] バッチ翻訳が10秒でタイムアウト - これがハング問題の証拠");
+                _logger?.LogWarning("⏰ [VERIFICATION] バッチ翻訳が60秒でタイムアウト - Python翻訳サーバー処理時間が60秒を超過");
             }
             catch (Exception ex)
             {
@@ -876,94 +830,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         return results;
     }
 
-    /// <summary>
-    /// TransformersOpusMtEngineの取得を試行
-    /// </summary>
-    private bool TryGetTransformersOpusMtEngine(out TransformersOpusMtEngine? engine)
-    {
-        engine = null;
-        
-        try
-        {
-            _logger?.LogInformation("🔍 [BATCH_DEBUG] TryGetTransformersOpusMtEngine開始 - _translationService型: {ServiceType}", _processingFacade.TranslationService.GetType().Name);
-            
-            // 直接TransformersOpusMtEngineのインスタンスかチェック
-            if (_processingFacade.TranslationService is TransformersOpusMtEngine directEngine)
-            {
-                _logger?.LogInformation("✅ [BATCH_DEBUG] 直接キャストで取得成功");
-                engine = directEngine;
-                return true;
-            }
-            _logger?.LogInformation("❌ [BATCH_DEBUG] 直接キャスト失敗");
-
-            // 🚀 [Phase 2.1] Service Locator除去: ファサード経由でTransformersOpusMtEngineを取得
-            // 注意: ServiceProvider直接アクセスを除去し、ファサード経由でアクセス
-            if (_processingFacade.TranslationService is TransformersOpusMtEngine transformersEngine)
-            {
-                _logger?.LogInformation("✅ [BATCH_DEBUG] ファサード経由で取得成功: {EngineType}", transformersEngine.GetType().Name);
-                engine = transformersEngine;
-                return true;
-            }
-            _logger?.LogInformation("❌ [BATCH_DEBUG] ファサード経由での取得失敗");
-
-            // リフレクションを使ってDefaultTranslationServiceから探索
-            var serviceType = _processingFacade.TranslationService.GetType();
-            _logger?.LogInformation("🔍 [BATCH_DEBUG] リフレクション探索開始 - 対象型: {ServiceType}", serviceType.Name);
-            
-            // DefaultTranslationServiceの_availableEnginesフィールドを確認
-            var availableEnginesField = serviceType.GetField("_availableEngines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (availableEnginesField != null)
-            {
-                _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesフィールド発見");
-                if (availableEnginesField.GetValue(_processingFacade.TranslationService) is IEnumerable<object> availableEngines)
-                {
-                    _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesの中身を探索中...");
-                    var engineList = availableEngines.ToList();
-                    _logger?.LogInformation("🔍 [BATCH_DEBUG] _availableEnginesエンジン数: {Count}", engineList.Count);
-                    
-                    for (int i = 0; i < engineList.Count; i++)
-                    {
-                        var eng = engineList[i];
-                        _logger?.LogInformation("🔍 [BATCH_DEBUG] エンジン[{Index}]: {EngineType}", i, eng?.GetType().Name);
-                    }
-                    
-                    var transformersEngineFromList = engineList.OfType<TransformersOpusMtEngine>().FirstOrDefault();
-                    if (transformersEngineFromList != null)
-                    {
-                        _logger?.LogInformation("✅ [BATCH_DEBUG] リフレクション経由で取得成功: {EngineType}", transformersEngineFromList.GetType().Name);
-                        engine = transformersEngineFromList;
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                _logger?.LogInformation("❌ [BATCH_DEBUG] _availableEnginesフィールドが見つかりません");
-            }
-            
-            // 従来の_enginesフィールドも確認（CompositeTranslationService用）
-            var enginesField = serviceType.GetField("_engines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (enginesField?.GetValue(_processingFacade.TranslationService) is IEnumerable<object> engines)
-            {
-                _logger?.LogInformation("🔍 [BATCH_DEBUG] _enginesフィールドから探索成功");
-                var transformersEngineFromList = engines.OfType<TransformersOpusMtEngine>().FirstOrDefault();
-                if (transformersEngineFromList != null)
-                {
-                    _logger?.LogInformation("✅ [BATCH_DEBUG] _enginesフィールドから取得成功");
-                    engine = transformersEngineFromList;
-                    return true;
-                }
-            }
-
-            _logger?.LogWarning("❌ [BATCH_DEBUG] TransformersOpusMtEngineが見つかりませんでした - サービス型: {ServiceType}", serviceType.Name);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "💥 [BATCH_DEBUG] TransformersOpusMtEngine取得中にエラー");
-            return false;
-        }
-    }
+    // OPUS-MT削除済み: TransformersOpusMtEngine関連機能はNLLB-200統一により不要
     
     /// <summary>
     /// インプレース翻訳オーバーレイ表示

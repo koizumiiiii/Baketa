@@ -103,7 +103,7 @@ public sealed class AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTransla
                 Logger.LogInformation("翻訳エンジンを変更: {OldEngine} → {NewEngine}", 
                     oldSettings.Translation.DefaultEngine, newSettings.Translation.DefaultEngine);
                 
-                // αテストではOPUS-MTのみなので実際のエンジン切り替えは不要
+                // αテストではNLLB-200のみなので実際のエンジン切り替えは不要
                 // ただし設定変更を記録
                 await Task.Delay(50).ConfigureAwait(false); // 設定適用のシミュレート
                 

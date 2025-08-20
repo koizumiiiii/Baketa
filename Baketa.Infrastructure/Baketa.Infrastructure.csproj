@@ -51,7 +51,7 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 		</PackageReference>
 		
-		<!-- PaddleOCR パッケージ -->
+		<!-- PaddleOCR パッケージ - 3.0.1統一 (runtime: 3.1.0.54強制) -->
 		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
 		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
 		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />

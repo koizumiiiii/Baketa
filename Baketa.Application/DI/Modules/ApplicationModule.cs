@@ -152,11 +152,13 @@ namespace Baketa.Application.DI.Modules;
                     var settingsService = provider.GetRequiredService<ISettingsService>();
                     var ocrEngine = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
                     var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
+                    var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
                     Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入");
                     var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
                     Console.WriteLine($"✅ [DI_DEBUG] CoordinateBasedTranslationService取得成功: {coordinateBasedTranslation.GetType().Name}");
+                    Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                     
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                         captureService,
@@ -164,6 +166,7 @@ namespace Baketa.Application.DI.Modules;
                         ocrEngine,
                         translationEngineFactory,
                         coordinateBasedTranslation,
+                        eventAggregator,
                         logger);
                 }
                 catch (Exception ex)
@@ -175,10 +178,7 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<Baketa.Application.Services.Translation.ITranslationOrchestrationService>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationOrchestrationService>());
             
-            // 🔥 [TCP_STABILIZATION] OPUS-MT事前ウォームアップサービス: 60秒→0秒削減
-            Console.WriteLine("🔍 [DI_DEBUG] OpusMtPrewarmService登録開始");
-            services.AddSingleton<TranslationAbstractions.IOpusMtPrewarmService, OpusMtPrewarmService>();
-            Console.WriteLine("✅ [DI_DEBUG] OpusMtPrewarmService登録完了");
+            // OPUS-MT削除済み: NLLB-200統一によりOpusMtPrewarmService不要
             
             // 翻訳関連のアプリケーションサービス（将来拡張）
             // 例: services.AddSingleton<ITranslationService, TranslationService>();

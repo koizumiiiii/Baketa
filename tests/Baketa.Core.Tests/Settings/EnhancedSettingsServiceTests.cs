@@ -15,6 +15,7 @@ namespace Baketa.Core.Tests.Settings;
 /// <summary>
 /// EnhancedSettingsServiceの単体テスト
 /// </summary>
+[Collection("FileAccess")]
 public class EnhancedSettingsServiceTests : IDisposable
 {
     private readonly string _tempSettingsPath;
@@ -48,22 +49,22 @@ public class EnhancedSettingsServiceTests : IDisposable
         
         if (constructor.GetParameters().Length == 4)
         {
-            return (EnhancedSettingsService)constructor.Invoke(new object[] 
-            { 
+            return (EnhancedSettingsService)constructor.Invoke(
+            [
                 _mockLogger.Object, 
                 _mockMetadataService.Object, 
                 _mockMigrationManager.Object, 
                 uniquePath 
-            });
+            ]);
         }
         else
         {
-            return (EnhancedSettingsService)constructor.Invoke(new object[] 
-            { 
+            return (EnhancedSettingsService)constructor.Invoke(
+            [
                 _mockLogger.Object, 
                 _mockMetadataService.Object, 
                 _mockMigrationManager.Object 
-            });
+            ]);
         }
     }
 

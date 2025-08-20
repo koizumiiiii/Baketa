@@ -103,6 +103,15 @@ public class InPlaceTranslationOverlayManager(
         Console.WriteLine($"🔍 [DISPLAY_DEBUG] CombinedText: '{textChunk.CombinedText}'");
         Console.WriteLine($"🔍 [DISPLAY_DEBUG] TranslatedText: '{textChunk.TranslatedText}'");
         Console.WriteLine($"🔍 [DISPLAY_DEBUG] CanShowInPlace: {textChunk.CanShowInPlace()}");
+        Console.WriteLine($"🔍 [DISPLAY_DEBUG] Bounds: X={textChunk.CombinedBounds.X}, Y={textChunk.CombinedBounds.Y}, W={textChunk.CombinedBounds.Width}, H={textChunk.CombinedBounds.Height}");
+        
+        // 🚫 [TRANSLATION_ONLY] 翻訳結果がない場合は表示しない（翻訳アプリとして当然の動作）
+        if (string.IsNullOrEmpty(textChunk.TranslatedText))
+        {
+            Console.WriteLine($"🚫 [TRANSLATION_ONLY] 翻訳結果が空のため表示をスキップ - ChunkId: {textChunk.ChunkId}");
+            _logger.LogDebug("翻訳結果が空のため表示をスキップ - ChunkId: {ChunkId}", textChunk.ChunkId);
+            return;
+        }
         
         if (!textChunk.CanShowInPlace())
         {
@@ -448,6 +457,14 @@ public class InPlaceTranslationOverlayManager(
             return;
         }
 
+        // 🚫 [DUPLICATE_DISPLAY_FIX] 空文字の翻訳結果は表示しない（同言語スキップなど）
+        if (string.IsNullOrWhiteSpace(eventData.Text))
+        {
+            Console.WriteLine($"🚫 [EMPTY_TEXT_SKIP] 空文字の翻訳結果をスキップ - Text: '{eventData.Text}' (非表示設定)");
+            _logger.LogDebug("空文字の翻訳結果をスキップ: Text={Text}", eventData.Text);
+            return;
+        }
+
         try
         {
             Console.WriteLine($"🎯 [OVERLAY] 翻訳結果オーバーレイ処理開始 - Text: '{eventData.Text}', Area: {eventData.DisplayArea}");
@@ -470,13 +487,15 @@ public class InPlaceTranslationOverlayManager(
                     ChunkId = eventData.GetHashCode(), // イベントデータのハッシュをチャンクIDとして使用
                     TextResults = [], // 空のリスト（OverlayUpdateEventからは個別結果が得られない）
                     CombinedBounds = eventData.DisplayArea,
-                    CombinedText = eventData.OriginalText ?? eventData.Text, // 元テキストまたは翻訳テキスト
+                    CombinedText = eventData.OriginalText ?? string.Empty, // 元テキスト（表示には使用しない）
                     SourceWindowHandle = IntPtr.Zero, // OverlayUpdateEventからは取得できない
-                    DetectedLanguage = eventData.SourceLanguage ?? "en"
+                    DetectedLanguage = eventData.SourceLanguage ?? "en",
+                    // 🚫 [TRANSLATION_ONLY] 翻訳結果のみ設定（OCR結果は表示しない）
+                    TranslatedText = eventData.IsTranslationResult ? eventData.Text : string.Empty
                 };
-                
-                // TranslatedTextは分離されたプロパティなので別途設定
-                textChunk.TranslatedText = eventData.Text;
+
+                Console.WriteLine($"🔍 [TRANSLATION_FILTER] IsTranslationResult: {eventData.IsTranslationResult}, Text: '{eventData.Text}'");
+                Console.WriteLine($"🔍 [TRANSLATION_FILTER] TranslatedText設定: '{textChunk.TranslatedText}'");
                 
                 // 🎯 翻訳結果のみ表示（OCR結果は事前にフィルタリング済み）
                 Console.WriteLine($"🎯 [TRANSLATION] 翻訳結果表示 - Area: {eventData.DisplayArea}");

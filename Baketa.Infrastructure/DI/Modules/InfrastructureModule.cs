@@ -8,6 +8,8 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
@@ -23,13 +25,15 @@ using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
-using Baketa.Infrastructure.Translation.Local.Onnx;
+// OPUS-MT ONNX実装削除済み
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
+using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -76,6 +80,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
+            
+            // Phase3: リソース監視システム
+            RegisterResourceMonitoringServices(services);
             
             // データ永続化
             RegisterPersistenceServices(services, environment);
@@ -152,11 +159,38 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTranslationServices(IServiceCollection services)
         {
+            // Phase2: サーキットブレーカー設定とサービス登録
+            Console.WriteLine("🔧 [PHASE2] サーキットブレーカー登録開始");
+            
+            // サーキットブレーカー設定
+            services.Configure<CircuitBreakerSettings>(options =>
+            {
+                options.FailureThreshold = 5;      // 5回失敗でサーキットオープン
+                options.TimeoutMs = 30000;         // 30秒タイムアウト
+                options.RecoveryTimeoutMs = 60000; // 60秒後に復旧テスト
+            });
+            
+            // 翻訳専用サーキットブレーカー登録
+            services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, TranslationCircuitBreaker>();
+            Console.WriteLine("✅ [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s");
+            
             // 翻訳エンジンファクトリーを登録
             services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();
             
             // パフォーマンス監視サービスを登録 (Issue #144)
             services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
+            
+            // 🚨 翻訳サーバー安定化: Python サーバーヘルスモニター（バックグラウンドサービス）
+            Console.WriteLine("🔍 [DI_DEBUG] PythonServerHealthMonitor登録開始");
+            
+            // シングルトンとしても登録（直接取得のため）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
+            
+            // HostedServiceとしても登録
+            services.AddHostedService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>(provider => 
+                provider.GetRequiredService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>());
+            
+            Console.WriteLine("✅ [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能");
             
             // 🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム統合
             Console.WriteLine("🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始");
@@ -318,19 +352,18 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
             Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
             
-            // 🚨 TEMPORARY FIX: 接続プール無効化（汚染問題完全解決まで）
-            // 各リクエストで新規接続作成により状態汚染を根絶
-            // services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-            Console.WriteLine("🚨 FixedSizeConnectionPool一時無効化 - 汚染問題根本解決のため");
+            // ✅ FixedSizeConnectionPool登録（動的ポート対応版）
+            services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
             
-            // 🔄 単発接続版OptimizedPythonTranslationEngineに切り替え（汚染問題緊急対応）
+            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                // var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-                var translationSettings = provider.GetRequiredService<IOptions<TranslationSettings>>();
-                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 単発接続版（汚染対策）");
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, null, translationSettings);
+                var connectionPool = provider.GetRequiredService<IConnectionPool>();
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）");
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
@@ -428,6 +461,41 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             // 統一ログサービス（Singleton: アプリケーション全体で共有）
             services.AddSingleton<IBaketaLogger, BaketaLogger>();
+        }
+        
+        /// <summary>
+        /// Phase3: リソース監視システムを登録します
+        /// CPU・メモリ・GPU使用率をリアルタイム監視し、翻訳システムの動的最適化を支援
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterResourceMonitoringServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔧 [PHASE3] 動的リソース監視システム登録開始");
+            
+            // リソース監視設定（デフォルト値でシングルトン登録）
+            var defaultSettings = new Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings(
+                MonitoringIntervalMs: 5000,        // 5秒間隔で監視
+                HistoryRetentionMinutes: 60,       // 1時間分の履歴保持
+                CpuWarningThreshold: 85.0,         // CPU使用率85%で警告
+                MemoryWarningThreshold: 90.0,      // メモリ使用率90%で警告
+                GpuWarningThreshold: 95.0,         // GPU使用率95%で警告
+                EnableGpuMonitoring: true,         // GPU監視有効
+                EnableNetworkMonitoring: false,    // ネットワーク監視無効（将来実装）
+                EnableDiskMonitoring: false        // ディスク監視無効（将来実装）
+            );
+            
+            // 設定をシングルトンとして登録（IOptionsパターンとダイレクト参照の両方をサポート）
+            services.AddSingleton(defaultSettings);
+            services.AddSingleton<IOptions<Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings>>(
+                provider => Options.Create(defaultSettings));
+            Console.WriteLine("✅ [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分");
+            
+            // 注意: WindowsSystemResourceMonitorは Platform プロジェクトで登録される
+            // Infrastructure レイヤーでは抽象インターフェースのみ認識
+            // 実際の実装は PlatformModule で登録される予定
+            Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます");
+            
+            Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
         }
 
         /// <summary>

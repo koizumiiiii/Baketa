@@ -153,8 +153,7 @@ namespace Baketa.UI.DI.Modules;
             // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
             services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
             
-            // OPUS-MT事前起動サービス（バックグラウンドサーバー初期化）
-            // IOpusMtPrewarmServiceはApplicationModuleで登録済み
+            // OPUS-MT削除済み: NLLB-200統一により事前起動サービス不要
             
             
             // オーバーレイ関連サービス

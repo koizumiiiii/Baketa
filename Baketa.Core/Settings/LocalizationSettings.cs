@@ -22,7 +22,7 @@ public sealed class LocalizationSettings
     [SettingMetadata(SettingLevel.Basic, "Localization", "翻訳元言語", 
         Description = "自動検出時のフォールバック言語", 
         ValidValues = ["ja", "en", "zh", "ko", "auto"])]
-    public string DefaultSourceLanguage { get; set; } = "ja";
+    public string DefaultSourceLanguage { get; set; } = "en";
     
     /// <summary>
     /// デフォルトの翻訳先言語
@@ -30,7 +30,7 @@ public sealed class LocalizationSettings
     [SettingMetadata(SettingLevel.Basic, "Localization", "翻訳先言語", 
         Description = "翻訳の出力言語", 
         ValidValues = ["ja", "en", "zh-cn", "zh-tw", "ko"])]
-    public string DefaultTargetLanguage { get; set; } = "en";
+    public string DefaultTargetLanguage { get; set; } = "ja";
     
     /// <summary>
     /// 日付・時刻の表示形式

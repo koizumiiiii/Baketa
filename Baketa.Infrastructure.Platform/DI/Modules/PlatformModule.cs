@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
@@ -8,6 +9,8 @@ using Baketa.Infrastructure.Platform.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using IWindowsImageAdapter = Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowsImageAdapter;
+using DefaultWindowsImageAdapter = Baketa.Infrastructure.Platform.Adapters.DefaultWindowsImageAdapter;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
@@ -43,6 +46,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
                 
                 // GPU環境検出サービス（Issue #143対応）
                 RegisterGpuServices(services);
+                
+                // Phase3: リソース監視サービス（Windows固有実装）
+                RegisterResourceMonitoringServices(services);
                 
                 // その他のWindows固有サービス
                 RegisterWindowsServices(services);
@@ -86,6 +92,9 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             // Windows画像処理関連の登録
             // 例: services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
             // 例: services.AddSingleton<IImageConverter, WindowsImageConverter>();
+            
+            // 🔧 [CAPTURE_FIX] WindowsImageAdapter登録は後で実装
+            // DIコンテナ型解決問題を回避するため、AdaptiveCaptureServiceで直接作成
             
             // OpenCV関連
             // 拡張メソッドを使用して登録
@@ -159,12 +168,30 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
         }
         
         /// <summary>
+        /// Phase3: Windows固有のリソース監視サービスを登録します
+        /// PerformanceCounterとWMIを使用したシステムリソース監視
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterResourceMonitoringServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔧 [PHASE3 Platform] Windows リソース監視サービス登録開始");
+            
+            // Windows固有リソース監視実装を登録
+            services.AddSingleton<Baketa.Core.Abstractions.Monitoring.IResourceMonitor,
+                Baketa.Infrastructure.Platform.Windows.Monitoring.WindowsSystemResourceMonitor>();
+            Console.WriteLine("✅ [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合");
+            
+            Console.WriteLine("🎉 [PHASE3 Platform] Windows リソース監視サービス登録完了");
+        }
+        
+        /// <summary>
         /// このモジュールが依存する他のモジュールの型を取得します。
         /// </summary>
         /// <returns>依存モジュールの型のコレクション</returns>
         public override IEnumerable<Type> GetDependentModules()
         {
             yield return typeof(CoreModule);
-            // InfrastructureModuleはまだ使用できないため、直接CoreModuleに依存
+            // Phase3: ResourceMonitoringSettingsの依存のためInfrastructureModuleに依存
+            yield return typeof(Baketa.Infrastructure.DI.Modules.InfrastructureModule);
         }
     }

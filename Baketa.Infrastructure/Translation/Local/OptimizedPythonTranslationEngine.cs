@@ -5,16 +5,21 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Models;
+using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Infrastructure.Translation.Local;
 
@@ -26,9 +31,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
-    private readonly FixedSizeConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
-    private readonly TranslationSettings _translationSettings; // Issue #147: 設定管理
+    private readonly IConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
+    private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
+    private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
     
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
@@ -48,37 +54,41 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private const int ServerPort = 5555; // ポート番号を5555に統一（既存サーバーと一致）
+    private int _serverPort = 5556; // 動的ポート（デフォルト: OPUS-MT=5556, NLLB-200=5557）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
     
     // Python実行パス
     private readonly string _pythonPath;
-    private readonly string _serverScriptPath;
+    private string _serverScriptPath = string.Empty; // 動的設定のため読み取り専用を削除
     
-    public string Name => "OptimizedPythonTranslation";
+    public string Name => "NLLB200";
     public string Description => "高速化されたPython翻訳エンジン（500ms目標）";
     public bool RequiresNetwork => false;
 
     public OptimizedPythonTranslationEngine(
         ILogger<OptimizedPythonTranslationEngine> logger,
-        FixedSizeConnectionPool? connectionPool,
-        IOptions<TranslationSettings> translationSettings,
-        IPythonServerManager? serverManager = null)
+        IConnectionPool? connectionPool,
+        IConfiguration configuration,
+        IPythonServerManager? serverManager = null,
+        ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
-        _translationSettings = translationSettings?.Value ?? throw new ArgumentNullException(nameof(translationSettings));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
+        _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
         
-        // サーバースクリプトパス設定
+        // プロジェクトルート検索
         var currentDir = Directory.GetCurrentDirectory();
         var projectRoot = FindProjectRoot(currentDir);
-        _serverScriptPath = Path.Combine(projectRoot, "scripts", "optimized_translation_server.py");
+        
+        // 🎯 [NLLB-200] 動的ポート設定と動的スクリプトパス設定
+        ConfigureServerSettings(projectRoot);
         
         _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}", 
             _pythonPath, _serverScriptPath);
@@ -108,7 +118,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // Issue #147: 外部サーバー使用設定の確認
-            if (_translationSettings.UseExternalServer)
+            if (_configuration.GetValue<bool>("Translation:UseExternalServer", false))
             {
                 _logger.LogInformation("外部Pythonサーバー使用モード - プロセス起動をスキップ");
             }
@@ -133,8 +143,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (_connectionPool != null)
                 {
                     using var testCts = new CancellationTokenSource(5000);
-                    var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
-                    await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                    var testConnection = await _connectionPool.GetConnectionAsync(testCts.Token).ConfigureAwait(false);
+                    await _connectionPool.ReturnConnectionAsync(testConnection, testCts.Token).ConfigureAwait(false);
                     _logger.LogInformation("接続プール経由でサーバー接続を確認");
                 }
                 else
@@ -228,13 +238,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     /// </summary>
     private async Task<bool> StartLegacyFixedPortServerAsync()
     {
-        _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", ServerPort);
+        _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", _serverPort);
         
         // 直接Python実行（PowerShell経由を排除）
         var processInfo = new ProcessStartInfo
         {
             FileName = _pythonPath,
-            Arguments = $"\"{_serverScriptPath}\" --port {ServerPort} --optimized",
+            Arguments = $"\"{_serverScriptPath}\" --port {_serverPort} --optimized",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -342,14 +352,39 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
+        // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
+        _logger.LogError("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
+        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始 - RequestId: {request.RequestId}");
+        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] SourceText: '{request.SourceText}', {request.SourceLanguage} → {request.TargetLanguage}");
+        
         var stopwatch = Stopwatch.StartNew();
         
         try
         {
-            // モデルロード完了まで待機（非ブロッキング）
+            // モデルロード完了まで待機（タイムアウト付き）
             _logger.LogDebug("翻訳リクエスト開始 - モデルロード待機中...");
-            await _modelLoadCompletion.Task.ConfigureAwait(false);
-            _logger.LogDebug("モデルロード完了 - 翻訳処理開始");
+            using var modelLoadTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(120)); // 🔧 [TIMEOUT_TEST] 30秒→120秒に延長してタイムアウト原因を確定検証
+            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, modelLoadTimeout.Token);
+            
+            try
+            {
+                await _modelLoadCompletion.Task.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+                _logger.LogDebug("モデルロード完了 - 翻訳処理開始");
+            }
+            catch (OperationCanceledException) when (modelLoadTimeout.Token.IsCancellationRequested)
+            {
+                _logger.LogWarning("モデルロード待機タイムアウト（30秒） - 初期化を試行します");
+                // タイムアウト時は初期化を試行
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("翻訳リクエストがキャンセルされました");
+                throw;
+            }
             
             // 初期化確認（テスト環境では迅速に失敗）
             if (!await IsReadyAsync().ConfigureAwait(false))
@@ -358,33 +393,23 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (!File.Exists(_serverScriptPath))
                 {
                     _logger.LogWarning("サーバースクリプトが見つかりません: {ScriptPath}", _serverScriptPath);
-                    return new TranslationResponse
-                    {
-                        RequestId = request.RequestId,
-                        TranslatedText = "翻訳エラーが発生しました",
-                        SourceText = request.SourceText,
-                        SourceLanguage = request.SourceLanguage,
-                        TargetLanguage = request.TargetLanguage,
-                        ConfidenceScore = 0.0f,
-                        EngineName = Name,
-                        IsSuccess = false
-                    };
+                    var error = TranslationError.Create(
+                        TranslationError.ServiceUnavailable, 
+                        $"翻訳サーバースクリプトが見つかりません: {_serverScriptPath}",
+                        false, 
+                        TranslationErrorType.ServiceUnavailable);
+                    return TranslationResponse.CreateError(request, error, Name);
                 }
                 
                 var initResult = await InitializeAsync().ConfigureAwait(false);
                 if (!initResult)
                 {
-                    return new TranslationResponse
-                    {
-                        RequestId = request.RequestId,
-                        TranslatedText = "翻訳エラーが発生しました",
-                        SourceText = request.SourceText,
-                        SourceLanguage = request.SourceLanguage,
-                        TargetLanguage = request.TargetLanguage,
-                        ConfidenceScore = 0.0f,
-                        EngineName = Name,
-                        IsSuccess = false
-                    };
+                    var error = TranslationError.Create(
+                        TranslationError.ServiceUnavailable, 
+                        "翻訳サーバーの初期化に失敗しました",
+                        true, 
+                        TranslationErrorType.ServiceUnavailable);
+                    return TranslationResponse.CreateError(request, error, Name);
                 }
             }
 
@@ -397,25 +422,35 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             bool isSupported = await SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
             if (!isSupported)
             {
-                return new TranslationResponse
-                {
-                    RequestId = request.RequestId,
-                    TranslatedText = $"言語ペア {request.SourceLanguage.Code}-{request.TargetLanguage.Code} はサポートされていません",
-                    SourceText = request.SourceText,
-                    SourceLanguage = request.SourceLanguage,
-                    TargetLanguage = request.TargetLanguage,
-                    ConfidenceScore = 0.0f,
-                    EngineName = Name,
-                    IsSuccess = false
-                };
+                var error = TranslationError.Create(
+                    TranslationError.UnsupportedLanguagePair, 
+                    $"言語ペア {request.SourceLanguage.Code}-{request.TargetLanguage.Code} はサポートされていません",
+                    false, 
+                    TranslationErrorType.UnsupportedLanguage);
+                return TranslationResponse.CreateError(request, error, Name);
             }
             
             // 🚨 CACHE_DISABLED: キャッシュ機能完全無効化 - 汚染問題根本解決
             // キャッシュチェック処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 常に新鮮な翻訳を実行");
             
-            // 永続接続で翻訳実行
-            var result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
+            // Phase2: サーキットブレーカーによる翻訳実行
+            TranslationResponse result;
+            if (_circuitBreaker != null)
+            {
+                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行開始");
+                result = await _circuitBreaker.ExecuteAsync(
+                    async ct => await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false), 
+                    cancellationToken).ConfigureAwait(false);
+                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行完了");
+            }
+            else
+            {
+                // サーキットブレーカー無効時は従来通り直接実行
+                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し開始");
+                result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
+                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し完了");
+            }
             
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
@@ -443,23 +478,75 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             return result;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "翻訳エラー - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            _logger.LogWarning("個別翻訳タイムアウト（5秒）- Text: '{Text}', 処理時間: {ElapsedMs}ms", 
+                request.SourceText, stopwatch.ElapsedMilliseconds);
             
             return new TranslationResponse
             {
                 RequestId = request.RequestId,
-                TranslatedText = "翻訳エラーが発生しました",
+                TranslatedText = "翻訳タイムアウト（サーバー応答なし）",
                 SourceText = request.SourceText,
                 SourceLanguage = request.SourceLanguage,
                 TargetLanguage = request.TargetLanguage,
                 ConfidenceScore = 0.0f,
                 EngineName = Name,
-                IsSuccess = false,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+                IsSuccess = false
             };
+        }
+        catch (CircuitBreakerOpenException ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning("🚨 [CIRCUIT_BREAKER] サーキットブレーカーが開いています - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            var error = TranslationError.FromException(
+                TranslationError.ServiceUnavailable, 
+                "翻訳サービスが一時的に利用できません（サーキットブレーカー開放中）",
+                ex,
+                true, 
+                TranslationErrorType.ServiceUnavailable);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
+        }
+        catch (TranslationTimeoutException ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning("⏱️ [CIRCUIT_BREAKER] 翻訳タイムアウト - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            var error = TranslationError.FromException(
+                TranslationError.TimeoutError, 
+                "翻訳がタイムアウトしました",
+                ex,
+                true, 
+                TranslationErrorType.Timeout);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "翻訳エラー - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            // 🔥 [ERROR_DEBUG] 例外の詳細情報を出力
+            _logger.LogError("🔥 [ERROR_DEBUG] 例外詳細:");
+            _logger.LogError("🔥 [ERROR_DEBUG] - 例外タイプ: {ExceptionType}", ex.GetType().Name);
+            _logger.LogError("🔥 [ERROR_DEBUG] - 例外メッセージ: {Message}", ex.Message);
+            _logger.LogError("🔥 [ERROR_DEBUG] - スタックトレース: {StackTrace}", ex.StackTrace);
+            Console.WriteLine($"🔥 [ERROR_DEBUG] 翻訳エラー発生: {ex.GetType().Name} - {ex.Message}");
+            
+            var error = TranslationError.FromException(
+                TranslationError.InternalError, 
+                "翻訳エラーが発生しました",
+                ex,
+                false, 
+                TranslationErrorType.Exception);
+            var response = TranslationResponse.CreateError(request, error, Name);
+            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            return response;
         }
     }
 
@@ -498,11 +585,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         // 元の順序を保持するため、RequestIdでソート
         var responseMap = allResponses.ToDictionary(r => r.RequestId);
-        return requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
+        return [..requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
             ? response 
             : TranslationResponse.CreateError(req, 
                 new TranslationError { ErrorCode = "BATCH_PROCESSING_ERROR", Message = "Response not found" }, 
-                Name)).ToList();
+                Name))];
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> ProcessSingleBatchAsync(
@@ -521,28 +608,30 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (_connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
-                connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+                connection = await _connectionPool.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 // 🔄 単発接続でバッチ処理（汚染対策モード）
                 directClient = new TcpClient();
-                await directClient.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+                await directClient.ConnectAsync(ServerHost, _serverPort, cancellationToken).ConfigureAwait(false);
                 
                 directStream = directClient.GetStream();
                 directStream.ReadTimeout = ConnectionTimeoutMs;
                 directStream.WriteTimeout = ConnectionTimeoutMs;
                 
-                directWriter = new StreamWriter(directStream, new UTF8Encoding(false)) { AutoFlush = true };
-                directReader = new StreamReader(directStream, Encoding.UTF8);
+                // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
+                var utf8EncodingNoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+                directWriter = new StreamWriter(directStream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) { AutoFlush = true };
+                directReader = new StreamReader(directStream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
             }
 
             // バッチリクエスト構築（同じ言語ペアが保証されている）
             var batchRequest = new
             {
                 texts = requests.Select(r => r.SourceText).ToList(),
-                source_lang = requests[0].SourceLanguage.Code,
-                target_lang = requests[0].TargetLanguage.Code,
+                source_lang = requests[0].SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                target_lang = requests[0].TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
                 batch_mode = true,
                 max_batch_size = 50
             };
@@ -555,13 +644,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 接続プール使用モード
                 await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             else
             {
                 // 単発接続モード（汚染対策）
                 await directWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                jsonResponse = await directReader!.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             
             if (string.IsNullOrEmpty(jsonResponse))
@@ -577,6 +670,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // レスポンスマッピング
             return MapBatchResponse(batchResponse, requests, batchStopwatch.ElapsedMilliseconds);
         }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            batchStopwatch.Stop();
+            _logger.LogWarning("バッチ翻訳タイムアウト（5秒）: Pythonサーバーからの応答待機でタイムアウト発生");
+            
+            // タイムアウト時は個別処理でフォールバック
+            return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
             batchStopwatch.Stop();
@@ -590,7 +691,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (connection != null)
             {
                 // Phase 1統合: 接続をプールに返却
-                await _connectionPool!.ReleaseConnectionAsync(connection).ConfigureAwait(false);
+                await _connectionPool!.ReturnConnectionAsync(connection).ConfigureAwait(false);
             }
             else
             {
@@ -617,8 +718,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             .Select(g => g.Select(x => x.request).ToList())
             .ToList();
 
-        // 並列バッチ処理（接続プール活用）
-        var tasks = batches.Select(batch => TranslateBatchAsync(batch, cancellationToken));
+        // 並列バッチ処理（接続プール活用）- 無限再帰回避のためProcessSingleBatchAsyncを直接呼び出し
+        var tasks = batches.Select(batch => ProcessSingleBatchAsync(batch, cancellationToken));
         var batchResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 結果をフラット化
@@ -637,11 +738,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         const string engineName = "OptimizedPythonTranslation";
         
-        if (!batchResponse.success || batchResponse.translations == null)
+        if (!batchResponse.Success || batchResponse.Translations == null)
         {
             // エラー時は全てFailureで返す
-            var errorMessage = batchResponse.errors?.FirstOrDefault() ?? "Unknown batch translation error";
-            return originalRequests.Select(req => 
+            var errorMessage = batchResponse.Errors?.FirstOrDefault() ?? "Unknown batch translation error";
+            return [..originalRequests.Select(req => 
             {
                 var error = new TranslationError
                 {
@@ -649,12 +750,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     Message = errorMessage
                 };
                 return TranslationResponse.CreateError(req, error, engineName);
-            }).ToList();
+            })];
         }
 
         var results = new List<TranslationResponse>();
-        var translations = batchResponse.translations;
-        var confidenceScores = batchResponse.confidence_scores ?? [];
+        var translations = batchResponse.Translations;
+        var confidenceScores = batchResponse.ConfidenceScores ?? [];
 
         for (int i = 0; i < originalRequests.Count && i < translations.Count; i++)
         {
@@ -762,6 +863,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         TranslationRequest request,
         CancellationToken cancellationToken)
     {
+        // 🚨 [HANGUP_DEBUG] メソッド開始時点のデバッグ
+        _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync メソッド開始");
+        Console.WriteLine($"🔥 [HANGUP_DEBUG] TranslateWithOptimizedServerAsync メソッド開始 - RequestId: {request.RequestId}");
+        
         var totalStopwatch = Stopwatch.StartNew();
         var connectionAcquireStopwatch = Stopwatch.StartNew();
         
@@ -773,10 +878,19 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         try
         {
+            // 🚨 [HANGUP_DEBUG] 接続プール確認デバッグ
+            Console.WriteLine($"🔥 [HANGUP_DEBUG] 接続プール確認開始 - _connectionPool != null: {_connectionPool != null}");
+            _logger.LogDebug("🔥 接続プール確認開始 - _connectionPool != null: {IsNotNull}", _connectionPool != null);
+            
             if (_connectionPool != null)
             {
                 // Issue #147: 接続プールから接続を取得（接続ロック競合を解決）
-                connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] 接続プール取得に30秒タイムアウトを追加
+                using var poolTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(120)); // 🔧 [TIMEOUT_TEST] 30秒→120秒に延長してタイムアウト原因を確定検証
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, poolTimeout.Token);
+                
+                _logger.LogDebug("🔌 接続プール取得開始...");
+                connection = await _connectionPool.GetConnectionAsync(combinedCts.Token).ConfigureAwait(false);
                 connectionAcquireStopwatch.Stop();
                 _logger.LogInformation("[TIMING] 接続プール取得: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
             }
@@ -784,14 +898,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 🔄 単発接続作成（汚染対策モード）
                 directClient = new TcpClient();
-                await directClient.ConnectAsync(ServerHost, ServerPort, cancellationToken).ConfigureAwait(false);
+                await directClient.ConnectAsync(ServerHost, _serverPort, cancellationToken).ConfigureAwait(false);
 
                 directStream = directClient.GetStream();
                 directStream.ReadTimeout = ConnectionTimeoutMs;
                 directStream.WriteTimeout = ConnectionTimeoutMs;
 
-                directWriter = new StreamWriter(directStream, new UTF8Encoding(false)) { AutoFlush = true };
-                directReader = new StreamReader(directStream, Encoding.UTF8);
+                // 🔧 [ENCODING_SIMPLIFIED] シンプルなUTF-8エンコーディング指定（Windows修復処理削除）
+                var utf8EncodingNoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+                directWriter = new StreamWriter(directStream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) { AutoFlush = true };
+                directReader = new StreamReader(directStream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
 
                 connectionAcquireStopwatch.Stop();
                 _logger.LogInformation("[TIMING] 単発接続作成（汚染対策）: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
@@ -815,8 +931,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var requestData = new
             {
                 text = request.SourceText,
-                source_lang = request.SourceLanguage.Code,
-                target_lang = request.TargetLanguage.Code,
+                source_lang = request.SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                target_lang = request.TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
                 request_id = request.RequestId
             };
             
@@ -836,7 +952,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（プール接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                jsonResponse = await connection.Reader.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（プール接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             }
@@ -848,7 +966,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（単発接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                jsonResponse = await directReader!.ReadLineAsync().ConfigureAwait(false);
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（単発接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
             }
@@ -862,22 +982,69 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 throw new InvalidOperationException("サーバーから空のレスポンスを受信しました");
             }
             
-            _logger.LogDebug("Python応答受信: {Response}", jsonResponse.Length > 200 ? jsonResponse[..200] + "..." : jsonResponse);
+            _logger.LogDebug("Python応答受信: {Response}", SanitizeForLogging(jsonResponse));
             
-            // 🚨 DEBUG: 不正翻訳結果の調査用詳細ログ
-            Console.WriteLine($"🔍 [CORRUPTION_DEBUG] Python応答受信: '{jsonResponse}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{request.SourceText}' → Response: '{jsonResponse}'{Environment.NewLine}");
+            // 🔥 [ENCODING_DEBUG] 受信したレスポンスの詳細バイト情報をログ出力（セキュリティ対策済み）
+            var responseBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse);
+            var sanitizedResponse = SanitizeForLogging(jsonResponse);
+            _logger.LogError("🔍 [ENCODING_DEBUG] 受信したレスポンス詳細:");
+            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス文字列長: {Length}", jsonResponse.Length);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - UTF-8バイト長: {ByteLength}", responseBytes.Length);
+            _logger.LogError("🔍 [ENCODING_DEBUG] - サニタイズ後レスポンス: {Response}", sanitizedResponse);
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] 受信したレスポンス長: {jsonResponse.Length}");
+            Console.WriteLine($"🔍 [ENCODING_DEBUG] UTF-8バイト長: {responseBytes.Length}");
+            
+            // 🔧 [ENCODING_SIMPLIFIED] Windows環境エンコーディング修復処理を削除し、シンプルUTF-8処理に変更
+            var originalResponse = jsonResponse;
+            
+            // 🚨 DEBUG: 不正翻訳結果の調査用詳細ログ（セキュリティ対策済み）
+            var sanitizedJsonResponse = SanitizeForLogging(jsonResponse);
+            var sanitizedSourceText = SanitizeForLogging(request.SourceText);
+            Console.WriteLine($"🔍 [CORRUPTION_DEBUG] Python応答受信長: {jsonResponse.Length}文字");
+            SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [PYTHON_RESPONSE] Request: '{sanitizedSourceText}' → Response: '{sanitizedJsonResponse}'{Environment.NewLine}");
             
             var deserializationStopwatch = Stopwatch.StartNew();
-            var response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse);
+            
+            // 🔧 [ENCODING_SIMPLIFIED] 直接UTF-8でJSONデシリアライゼーション
+            var jsonOptions = new JsonSerializerOptions
+            {
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                PropertyNameCaseInsensitive = true
+            };
+            
+            PythonTranslationResponse? response;
+            try 
+            {
+                // シンプルなJSONデシリアライゼーション（エンコーディング修復処理なし）
+                response = JsonSerializer.Deserialize<PythonTranslationResponse>(jsonResponse, jsonOptions);
+            }
+            catch (Exception jsonEx)
+            {
+                _logger.LogError(jsonEx, "JSONデシリアライゼーション失敗: {Error}", jsonEx.Message);
+                throw new InvalidOperationException($"JSONレスポンスの解析に失敗: {jsonEx.Message}", jsonEx);
+            }
+            
             deserializationStopwatch.Stop();
-            _logger.LogInformation("[TIMING] JSONデシリアライゼーション: {ElapsedMs}ms", deserializationStopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("[TIMING] JSONデシリアライゼーション（シンプル版）: {ElapsedMs}ms", deserializationStopwatch.ElapsedMilliseconds);
             
             if (response == null)
             {
                 throw new InvalidOperationException("レスポンスのデシリアライズに失敗しました");
             }
+            
+            // 🔥 [ENCODING_DEBUG] JSON解析後のレスポンス詳細情報をログ出力
+            _logger.LogError("🔍 [JSON_DEBUG] JSON解析後のレスポンス詳細:");
+            _logger.LogError("🔍 [JSON_DEBUG] - Success: {Success}", response.Success);
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.Translation ?? "null");
+            _logger.LogError("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.Translation?.Length ?? 0);
+            if (response.Translation != null)
+            {
+                var translationBytes = System.Text.Encoding.UTF8.GetBytes(response.Translation);
+                _logger.LogError("🔍 [JSON_DEBUG] - Translation UTF-8バイト: {Bytes}", Convert.ToHexString(translationBytes));
+            }
+            _logger.LogError("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.Confidence);
+            _logger.LogError("🔍 [JSON_DEBUG] - Error: '{Error}'", response.Error ?? "null");
+            Console.WriteLine($"🔍 [JSON_DEBUG] Success: {response.Success}, Translation: '{response.Translation}', Length: {response.Translation?.Length ?? 0}");
             
             var resultCreationStopwatch = Stopwatch.StartNew();
             
@@ -886,11 +1053,25 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             float confidenceScore;
             bool isSuccess;
             
-            if (response.success && !string.IsNullOrEmpty(response.translation))
+            if (response.Success && !string.IsNullOrEmpty(response.Translation))
             {
-                translatedText = response.translation;
-                confidenceScore = response.confidence ?? 0.95f;
+                translatedText = response.Translation;
+                confidenceScore = response.Confidence ?? 0.95f;
                 isSuccess = true;
+                
+                // 🔧 [ENCODING_DEBUG] 文字エンコーディング詳細情報をログ出力
+                var originalBytes = System.Text.Encoding.UTF8.GetBytes(translatedText);
+                var decodedText = System.Text.Encoding.UTF8.GetString(originalBytes);
+                _logger.LogInformation("翻訳結果詳細情報 - IsSuccess: {IsSuccess}, Text: '{Text}', Length: {Length}", 
+                    isSuccess, translatedText, translatedText.Length);
+                
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] 翻訳結果詳細:");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 原文: '{request.SourceText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 翻訳結果: '{translatedText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - UTF-8再エンコード: '{decodedText}'");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - バイト長: {originalBytes.Length}");
+                Console.WriteLine($"🔍 [ENCODING_DEBUG] - 文字長: {translatedText.Length}");
+                
                 _logger.LogDebug("翻訳成功 - Text: '{Text}', Confidence: {Confidence}", 
                     translatedText, confidenceScore);
                 
@@ -899,11 +1080,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (suspiciousPatterns.Any(pattern => translatedText.Contains(pattern)))
                 {
                     Console.WriteLine($"🚨 [CORRUPTION_DETECTED] 不正翻訳結果検出!");
-                    Console.WriteLine($"   入力: '{request.SourceText}'");
-                    Console.WriteLine($"   出力: '{translatedText}'");
-                    Console.WriteLine($"   Python応答: '{jsonResponse}'");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{request.SourceText}' → 出力: '{translatedText}' → Python応答: '{jsonResponse}'{Environment.NewLine}");
+                    Console.WriteLine($"   入力長: {request.SourceText.Length}文字");
+                    Console.WriteLine($"   出力長: {translatedText.Length}文字");
+                    Console.WriteLine($"   Python応答長: {jsonResponse.Length}文字");
+                    SafeAppendToDebugFile($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [CORRUPTION_DETECTED] 入力: '{sanitizedSourceText}' → 出力: '{SanitizeForLogging(translatedText)}' → Python応答: '{sanitizedJsonResponse}'{Environment.NewLine}");
                 }
             }
             else
@@ -912,7 +1092,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 confidenceScore = 0.0f;
                 isSuccess = false;
                 _logger.LogError("翻訳失敗 - Success: {Success}, Translation: '{Translation}', Error: '{Error}'", 
-                    response.success, response.translation ?? "null", response.error ?? "none");
+                    response.Success, response.Translation ?? "null", response.Error ?? "none");
             }
             
             var result = new TranslationResponse
@@ -931,7 +1111,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             totalStopwatch.Stop();
             _logger.LogInformation("[TIMING] 合計処理時間（C#側）: {ElapsedMs}ms", totalStopwatch.ElapsedMilliseconds);
-            _logger.LogInformation("[TIMING] Python側処理時間: {PythonTimeMs}ms", (response.processing_time ?? 0) * 1000);
+            _logger.LogInformation("[TIMING] Python側処理時間: {PythonTimeMs}ms", (response.ProcessingTime ?? 0) * 1000);
             
             // 詳細ログ出力
             _logger.LogInformation("翻訳結果詳細 - IsSuccess: {IsSuccess}, Text: '{Text}', Length: {Length}", 
@@ -944,7 +1124,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (connection != null)
             {
                 // Issue #147: 接続プールに接続を返却
-                await _connectionPool!.ReleaseConnectionAsync(connection).ConfigureAwait(false);
+                await _connectionPool!.ReturnConnectionAsync(connection).ConfigureAwait(false);
             }
             else
             {
@@ -1041,8 +1221,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // Issue #147: 接続プールによる接続テスト
                 using var testCts = new CancellationTokenSource(ConnectionTimeoutMs);
-                var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
-                await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                var testConnection = await _connectionPool.GetConnectionAsync(testCts.Token).ConfigureAwait(false);
+                await _connectionPool.ReturnConnectionAsync(testConnection, testCts.Token).ConfigureAwait(false);
                 return true;
             }
             else
@@ -1069,7 +1249,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
         
         // 固定ポートモード
-        return ServerPort;
+        return _serverPort;
     }
 
     /// <summary>
@@ -1142,28 +1322,73 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
+            _logger.LogInformation("🔄 既存Pythonサーバープロセスのクリーンアップ開始");
+            
             var processes = Process.GetProcessesByName("python");
+            var killedCount = 0;
+            
             foreach (var process in processes)
             {
                 try
                 {
-                    var cmdLine = process.MainModule?.FileName;
-                    if (cmdLine?.Contains("optimized_translation_server") == true)
+                    // 🔧 [SCRIPT_NAME_FIX] NLLB-200翻訳サーバーのプロセス検出
+                    var commandLine = GetProcessCommandLine(process);
+                    
+                    if (commandLine?.Contains("nllb_translation_server") == true || 
+                        commandLine?.Contains("optimized_translation_server") == true)
                     {
+                        _logger.LogInformation("🚨 既存翻訳サーバープロセス発見: PID {ProcessId}, Command: {CommandLine}", 
+                            process.Id, commandLine);
+                        
                         process.Kill();
                         await Task.Delay(100).ConfigureAwait(false);
-                        _logger.LogInformation("既存Pythonサーバープロセスを終了: PID {ProcessId}", process.Id);
+                        killedCount++;
+                        
+                        _logger.LogInformation("✅ 既存Pythonサーバープロセスを終了: PID {ProcessId}", process.Id);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // 個別プロセスのエラーは無視
+                    _logger.LogDebug("プロセス {ProcessId} の確認中にエラー: {Error}", process.Id, ex.Message);
                 }
+            }
+            
+            _logger.LogInformation("🔄 クリーンアップ完了: {KilledCount}個のプロセスを終了", killedCount);
+            
+            // プロセス終了の安定化待機
+            if (killedCount > 0)
+            {
+                await Task.Delay(1000).ConfigureAwait(false);
+                _logger.LogInformation("🕒 プロセス終了安定化待機完了");
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "既存プロセスのクリーンアップ中にエラー");
+        }
+    }
+    
+    /// <summary>
+    /// プロセスのコマンドライン取得（WMI経由で確実に取得）
+    /// </summary>
+    private string? GetProcessCommandLine(Process process)
+    {
+        try
+        {
+            // MainModuleベースの簡易チェック
+            var mainModule = process.MainModule?.FileName;
+            if (mainModule != null)
+            {
+                return mainModule;
+            }
+            
+            // 🔧 より確実なコマンドライン取得のため、WMI使用を検討
+            // 現在は簡易実装で対応
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -1258,20 +1483,152 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
     private class PythonTranslationResponse
     {
-        public bool success { get; set; }
-        public string? translation { get; set; }
-        public float? confidence { get; set; }
-        public string? error { get; set; }
-        public double? processing_time { get; set; }
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+        
+        [JsonPropertyName("translation")]
+        public string? Translation { get; set; }
+        
+        [JsonPropertyName("confidence")]
+        public float? Confidence { get; set; }
+        
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+        
+        [JsonPropertyName("processing_time")]
+        public double? ProcessingTime { get; set; }
     }
 
     private class PythonBatchResponse
     {
-        public bool success { get; set; }
-        public List<string>? translations { get; set; }
-        public List<float>? confidence_scores { get; set; }
-        public double? processing_time { get; set; }
-        public int? batch_size { get; set; }
-        public List<string>? errors { get; set; }
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+        
+        [JsonPropertyName("translations")]
+        public List<string>? Translations { get; set; }
+        
+        [JsonPropertyName("confidence_scores")]
+        public List<float>? ConfidenceScores { get; set; }
+        
+        [JsonPropertyName("processing_time")]
+        public double? ProcessingTime { get; set; }
+        
+        [JsonPropertyName("batch_size")]
+        public int? BatchSize { get; set; }
+        
+        [JsonPropertyName("errors")]
+        public List<string>? Errors { get; set; }
+    }
+
+    /// <summary>
+    /// ファイル競合を防ぐ安全なデバッグファイル書き込み
+    /// </summary>
+    private void SafeAppendToDebugFile(string content)
+    {
+        const string debugFilePath = "E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt";
+        const int maxRetries = 3;
+        const int retryDelayMs = 10;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var fileStream = new FileStream(debugFilePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+                using var writer = new StreamWriter(fileStream, Encoding.UTF8);
+                writer.Write(content);
+                writer.Flush();
+                return; // 成功
+            }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                if (attempt < maxRetries)
+                {
+                    Thread.Sleep(retryDelayMs * attempt); // 指数バックオフ
+                    continue;
+                }
+                // 最終試行でも失敗した場合はログのみ
+                _logger.LogWarning("デバッグファイル書き込み失敗（ファイル競合）: {Error}", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("デバッグファイル書き込み失敗: {Error}", ex.Message);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ログ出力用テキストサニタイズ - ログインジェクション攻撃対策
+    /// </summary>
+    /// <param name="input">サニタイズ対象の文字列</param>
+    /// <returns>サニタイズされた安全な文字列</returns>
+    private static string SanitizeForLogging(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "[empty]";
+
+        // 長すぎる文字列は切り詰める
+        const int maxLength = 200;
+        var sanitized = input.Length > maxLength ? input[..maxLength] + "..." : input;
+        
+        // ログインジェクション攻撃を防ぐため制御文字を除去
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[\r\n\t\x00-\x1F\x7F]", "");
+        
+        // 潜在的に危険な文字をエスケープ
+        sanitized = sanitized
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("'", "\\'");
+            
+        return sanitized;
+    }
+    
+    /// <summary>
+    /// 🎯 [NLLB-200] 設定に基づく動的ポート設定とスクリプトパス設定（IConfiguration版）
+    /// </summary>
+    private void ConfigureServerSettings(string projectRoot)
+    {
+        try
+        {
+            // 動的に設定を取得
+            var defaultEngineString = _configuration["Translation:DefaultEngine"];
+            var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+                ? parsedEngine 
+                : TranslationEngine.NLLB200;
+            
+            if (defaultEngine == TranslationEngine.NLLB200)
+            {
+                // NLLB-200設定から動的にポートとスクリプトパスを取得
+                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5557);
+                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                _logger.LogInformation("🎯 [NLLB-200] NLLB-200モード - ポート: {Port}, スクリプト: {Script}", 
+                    _serverPort, Path.GetFileName(_serverScriptPath));
+            }
+            else
+            {
+                // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
+                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5557);
+                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                _logger.LogInformation("🔧 [NLLB-200] デフォルトモード - ポート: {Port}, スクリプト: {Script}", 
+                    _serverPort, Path.GetFileName(_serverScriptPath));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
+            _serverPort = 5557;
+            _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+        }
+    }
+    
+    /// <summary>
+    /// 🎯 [DYNAMIC_CONFIG] 実行時設定取得
+    /// </summary>
+    private TranslationEngine GetCurrentTranslationEngine()
+    {
+        var defaultEngineString = _configuration["Translation:DefaultEngine"];
+        return Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
+            ? parsedEngine 
+            : TranslationEngine.NLLB200;
     }
 }

@@ -208,6 +208,88 @@ namespace Baketa.Core.Translation.Common;
         }
         
         /// <summary>
+        /// 同言語ペアかどうかを判定します（翻訳をスキップすべきかの判定）
+        /// Issue #147 Phase 0.2 拡張: auto言語の賢い判定
+        /// </summary>
+        /// <param name="languagePair">言語ペア</param>
+        /// <returns>同言語ペアの場合はtrue（翻訳スキップ推奨）</returns>
+        public static bool IsSameLanguagePair(this Models.LanguagePair languagePair)
+        {
+            ArgumentNullException.ThrowIfNull(languagePair);
+            ArgumentNullException.ThrowIfNull(languagePair.SourceLanguage);
+            ArgumentNullException.ThrowIfNull(languagePair.TargetLanguage);
+
+            // 言語コードの正規化（大文字小文字無視、トリム）
+            var sourceCode = languagePair.SourceLanguage.Code?.Trim();
+            var targetCode = languagePair.TargetLanguage.Code?.Trim();
+
+            if (string.IsNullOrEmpty(sourceCode) || string.IsNullOrEmpty(targetCode))
+            {
+                return false; // 不明な言語は翻訳を試行
+            }
+
+            // 1. 厳密な同言語判定
+            if (string.Equals(sourceCode, targetCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // 🚀 [ISSUE_147_PHASE_0_2_ENHANCED] auto言語の賢い判定
+            // 2. auto → 具体的言語のパターン判定
+            if (string.Equals(sourceCode, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                // autoが検出される可能性の高い言語が対象言語と同じ場合はスキップ
+                // 実際のユースケース: 英語テキストでauto→en翻訳要求 = 無意味
+                var commonAutoDetectedLanguages = new[] { "en", "ja", "zh", "zh-hans", "zh-hant" };
+                
+                if (commonAutoDetectedLanguages.Contains(targetCode, StringComparer.OrdinalIgnoreCase))
+                {
+                    // auto-en, auto-ja など、自動検出の結果と対象言語が同じになる可能性が高い
+                    return true;
+                }
+            }
+
+            // 3. 具体的言語 → auto のパターン判定
+            if (string.Equals(targetCode, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                // 「en → auto」のような逆方向も無意味
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 翻訳をスキップすべきかどうかを判定します
+        /// </summary>
+        /// <param name="translationRequest">翻訳リクエスト</param>
+        /// <returns>翻訳をスキップすべき場合はtrue</returns>
+        public static bool ShouldSkipTranslation(this Models.TranslationRequest translationRequest)
+        {
+            ArgumentNullException.ThrowIfNull(translationRequest);
+
+            // 1. 同言語ペアの場合はスキップ
+            var languagePair = translationRequest.LanguagePair;
+            if (languagePair.IsSameLanguagePair())
+            {
+                return true;
+            }
+
+            // 2. 空のテキストの場合はスキップ
+            if (string.IsNullOrWhiteSpace(translationRequest.SourceText))
+            {
+                return true;
+            }
+
+            // 将来拡張: 他のスキップ条件をここに追加
+            // - 文字数制限チェック
+            // - 特定の文字パターン除外
+            // - ユーザー設定によるフィルタリング
+
+            return false;
+        }
+
+        /// <summary>
         /// 言語文字列から言語コードを取得する拡張メソッド
         /// </summary>
         /// <param name="languageString">言語文字列</param>

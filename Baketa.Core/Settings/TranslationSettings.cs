@@ -18,8 +18,8 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳エンジン", 
         Description = "使用する翻訳エンジン", 
-        ValidValues = [TranslationEngine.Local, TranslationEngine.Gemini])]
-    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.Local;
+        ValidValues = [TranslationEngine.Gemini, TranslationEngine.NLLB200])]
+    public TranslationEngine DefaultEngine { get; set; } = TranslationEngine.NLLB200;
     
     /// <summary>
     /// ソース言語の自動検出
@@ -34,7 +34,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳元言語", 
         Description = "自動検出無効時のデフォルト翻訳元言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultSourceLanguage { get; set; } = "ja";
+    public string DefaultSourceLanguage { get; set; } = "en";
     
     /// <summary>
     /// デフォルトターゲット言語
@@ -42,7 +42,7 @@ public sealed class TranslationSettings
     [SettingMetadata(SettingLevel.Basic, "Translation", "翻訳先言語", 
         Description = "翻訳先の言語", 
         ValidValues = ["ja", "en"])]
-    public string DefaultTargetLanguage { get; set; } = "en";
+    public string DefaultTargetLanguage { get; set; } = "ja";
     
     /// <summary>
     /// 翻訳遅延時間（ミリ秒）
@@ -74,8 +74,8 @@ public sealed class TranslationSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "フォールバックエンジン", 
         Description = "メインエンジンが失敗した時に使用するエンジン", 
-        ValidValues = [TranslationEngine.None, TranslationEngine.Local, TranslationEngine.Gemini])]
-    public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Local;
+        ValidValues = [TranslationEngine.None, TranslationEngine.Gemini])]
+    public TranslationEngine FallbackEngine { get; set; } = TranslationEngine.Gemini;
     
     /// <summary>
     /// 翻訳タイムアウト時間
@@ -341,6 +341,44 @@ public sealed class TranslationSettings
         Description = "既に起動しているPythonサーバーを使用します（開発/テスト時用）")]
     public bool UseExternalServer { get; set; } = false;
     
+    // 🚨 サーバー監視・自動再起動設定（安定化対応）
+    
+    /// <summary>
+    /// サーバー自動再起動の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "自動再起動", 
+        Description = "翻訳サーバーの自動監視・再起動を有効にします")]
+    public bool EnableServerAutoRestart { get; set; } = true;
+    
+    /// <summary>
+    /// 最大連続失敗回数（この回数だけ連続で失敗すると再起動）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "最大連続失敗回数", 
+        Description = "サーバー再起動を実行する連続失敗回数", 
+        MinValue = 1, 
+        MaxValue = 10)]
+    public int MaxConsecutiveFailures { get; set; } = 3;
+    
+    /// <summary>
+    /// 再起動バックオフ時間（ミリ秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "再起動バックオフ時間", 
+        Description = "サーバー再起動後の待機時間", 
+        Unit = "ms", 
+        MinValue = 1000, 
+        MaxValue = 60000)]
+    public int RestartBackoffMs { get; set; } = 5000;
+    
+    /// <summary>
+    /// サーバー起動タイムアウト（ミリ秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "起動タイムアウト", 
+        Description = "サーバー起動時のタイムアウト時間", 
+        Unit = "ms", 
+        MinValue = 5000, 
+        MaxValue = 120000)]
+    public int ServerStartupTimeoutMs { get; set; } = 30000;
+    
     /// <summary>
     /// 設定のクローンを作成します
     /// </summary>
@@ -390,7 +428,12 @@ public sealed class TranslationSettings
             OptimalChunksPerConnection = OptimalChunksPerConnection,
             ConnectionTimeoutMs = ConnectionTimeoutMs,
             HealthCheckIntervalMs = HealthCheckIntervalMs,
-            UseExternalServer = UseExternalServer
+            UseExternalServer = UseExternalServer,
+            // サーバー監視・自動再起動設定のクローン
+            EnableServerAutoRestart = EnableServerAutoRestart,
+            MaxConsecutiveFailures = MaxConsecutiveFailures,
+            RestartBackoffMs = RestartBackoffMs,
+            ServerStartupTimeoutMs = ServerStartupTimeoutMs
         };
     }
 }
@@ -406,14 +449,14 @@ public enum TranslationEngine
     None,
     
     /// <summary>
-    /// ローカル翻訳（オフライン）
-    /// </summary>
-    Local,
-    
-    /// <summary>
     /// Google Gemini AI翻訳（クラウド）
     /// </summary>
     Gemini,
+    
+    /// <summary>
+    /// NLLB-200高品質多言語翻訳（ローカル）
+    /// </summary>
+    NLLB200,
     
 }
 

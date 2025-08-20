@@ -388,10 +388,7 @@ public class EnsembleOcrEngine(
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(EnsembleOcrEngine));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
         
         var availableEngine = _engines.FirstOrDefault()?.Engine;
         if (availableEngine == null)

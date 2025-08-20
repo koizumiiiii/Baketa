@@ -62,18 +62,18 @@
                        FontSize="14"
                        Foreground="{StaticResource TextBrush}"/>
             
-            <RadioButton Content="ローカル翻訳（OPUS-MT）"
+            <RadioButton Content="オフライン翻訳"
                          IsChecked="{Binding UseLocalEngine}"
                          FontSize="13"
                          Foreground="{StaticResource TextBrush}"/>
             
-            <RadioButton Content="クラウド翻訳（Gemini API）"
+            <RadioButton Content="AI翻訳"
                          IsChecked="{Binding !UseLocalEngine}"
                          IsEnabled="{Binding IsCloudTranslationEnabled}"
                          FontSize="13"
                          Foreground="{StaticResource DisabledBrush}"/>
             
-            <TextBlock Text="※ αテストではローカル翻訳のみ利用可能"
+            <TextBlock Text="※ αテストではオフライン翻訳のみ利用可能"
                        FontSize="11"
                        Foreground="{StaticResource DisabledBrush}"
                        Margin="0,8,0,0"/>

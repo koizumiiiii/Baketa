@@ -5,8 +5,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Factories;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
-using Baketa.Infrastructure.Translation.Local.Onnx;
-using Baketa.Infrastructure.Translation.Local.SentencePiece;
+// OPUS-MT ONNX実装とSentencePiece削除済み
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CoreTranslationAbstractions = Baketa.Core.Translation.Abstractions;
@@ -30,8 +29,7 @@ namespace Baketa.Infrastructure.Translation;
             // ITranslationEngineFactoryを登録（TranslationOrchestrationServiceで必要）
             services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
-            // OPUS-MT TransformersエンジンをデフォルトとしてITranslationEngineに登録
-            // TransformersOpusMtEngineは既にInfrastructureModuleで登録済み
+            // OPUS-MT削除済み: NLLB-200エンジンがデフォルト翻訳エンジン
 
             // フォールバック用のMockエンジンも登録（開発・テスト用）
             services.AddSingleton<MockTranslationEngine>();

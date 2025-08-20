@@ -35,6 +35,8 @@
 		<!-- <PackageReference Include="Win32" Version="1.0.3" /> -->
 		<!-- GPU環境検出用パッケージ（Issue #143対応） -->
 		<PackageReference Include="System.Management" Version="8.0.0" />
+		<!-- Phase3: リソース監視用パフォーマンスカウンター -->
+		<PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
 	</ItemGroup>
 
 	<!-- ネイティブDLLの自動コピー -->

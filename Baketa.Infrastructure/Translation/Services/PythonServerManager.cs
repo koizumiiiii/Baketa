@@ -390,7 +390,7 @@ public class PythonServerManager(
         
         try
         {
-            Task.WaitAll(stopTasks.ToArray(), TimeSpan.FromSeconds(10));
+            Task.WaitAll([..stopTasks], TimeSpan.FromSeconds(10));
         }
         catch (Exception ex)
         {
