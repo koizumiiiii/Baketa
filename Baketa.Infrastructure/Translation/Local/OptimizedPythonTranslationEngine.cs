@@ -31,7 +31,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
-    private readonly FixedSizeConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
+    private readonly IConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
     private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
@@ -69,7 +69,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
     public OptimizedPythonTranslationEngine(
         ILogger<OptimizedPythonTranslationEngine> logger,
-        FixedSizeConnectionPool? connectionPool,
+        IConnectionPool? connectionPool,
         IConfiguration configuration,
         IPythonServerManager? serverManager = null,
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
@@ -143,8 +143,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 if (_connectionPool != null)
                 {
                     using var testCts = new CancellationTokenSource(5000);
-                    var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
-                    await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                    var testConnection = await _connectionPool.GetConnectionAsync(testCts.Token).ConfigureAwait(false);
+                    await _connectionPool.ReturnConnectionAsync(testConnection, testCts.Token).ConfigureAwait(false);
                     _logger.LogInformation("接続プール経由でサーバー接続を確認");
                 }
                 else
@@ -608,7 +608,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (_connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
-                connection = await _connectionPool.AcquireConnectionAsync(cancellationToken).ConfigureAwait(false);
+                connection = await _connectionPool.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -691,7 +691,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (connection != null)
             {
                 // Phase 1統合: 接続をプールに返却
-                await _connectionPool!.ReleaseConnectionAsync(connection).ConfigureAwait(false);
+                await _connectionPool!.ReturnConnectionAsync(connection).ConfigureAwait(false);
             }
             else
             {
@@ -718,8 +718,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             .Select(g => g.Select(x => x.request).ToList())
             .ToList();
 
-        // 並列バッチ処理（接続プール活用）
-        var tasks = batches.Select(batch => TranslateBatchAsync(batch, cancellationToken));
+        // 並列バッチ処理（接続プール活用）- 無限再帰回避のためProcessSingleBatchAsyncを直接呼び出し
+        var tasks = batches.Select(batch => ProcessSingleBatchAsync(batch, cancellationToken));
         var batchResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 結果をフラット化
@@ -890,7 +890,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, poolTimeout.Token);
                 
                 _logger.LogDebug("🔌 接続プール取得開始...");
-                connection = await _connectionPool.AcquireConnectionAsync(combinedCts.Token).ConfigureAwait(false);
+                connection = await _connectionPool.GetConnectionAsync(combinedCts.Token).ConfigureAwait(false);
                 connectionAcquireStopwatch.Stop();
                 _logger.LogInformation("[TIMING] 接続プール取得: {ElapsedMs}ms", connectionAcquireStopwatch.ElapsedMilliseconds);
             }
@@ -1124,7 +1124,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (connection != null)
             {
                 // Issue #147: 接続プールに接続を返却
-                await _connectionPool!.ReleaseConnectionAsync(connection).ConfigureAwait(false);
+                await _connectionPool!.ReturnConnectionAsync(connection).ConfigureAwait(false);
             }
             else
             {
@@ -1221,8 +1221,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // Issue #147: 接続プールによる接続テスト
                 using var testCts = new CancellationTokenSource(ConnectionTimeoutMs);
-                var testConnection = await _connectionPool.AcquireConnectionAsync(testCts.Token).ConfigureAwait(false);
-                await _connectionPool.ReleaseConnectionAsync(testConnection).ConfigureAwait(false);
+                var testConnection = await _connectionPool.GetConnectionAsync(testCts.Token).ConfigureAwait(false);
+                await _connectionPool.ReturnConnectionAsync(testConnection, testCts.Token).ConfigureAwait(false);
                 return true;
             }
             else

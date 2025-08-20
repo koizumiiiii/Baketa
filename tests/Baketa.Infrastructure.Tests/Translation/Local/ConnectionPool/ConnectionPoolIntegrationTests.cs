@@ -233,8 +233,8 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
         
         try
         {
-            var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
-            await connectionPool.ReleaseConnectionAsync(connection);
+            var connection = await connectionPool.GetConnectionAsync(cts.Token);
+            await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
             
             output.WriteLine("✅ 接続プール統合テスト成功 - Pythonサーバーとの接続確認完了");
         }

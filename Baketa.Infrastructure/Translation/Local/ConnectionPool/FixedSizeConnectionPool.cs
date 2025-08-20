@@ -15,7 +15,7 @@ namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 /// 固定サイズ接続プール実装（Issue #147: Phase 1）
 /// Channel&lt;T&gt;ベースの高性能接続管理によりOptimizedPythonTranslationEngineの接続ロック競合を解決
 /// </summary>
-public sealed class FixedSizeConnectionPool : IAsyncDisposable
+public sealed class FixedSizeConnectionPool : IConnectionPool
 {
     private readonly ILogger<FixedSizeConnectionPool> _logger;
     private readonly IConfiguration _configuration;
@@ -30,6 +30,11 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     private int _activeConnections;
     private int _totalConnectionsCreated;
     private bool _disposed;
+    
+    /// <summary>
+    /// アクティブな接続数を取得する
+    /// </summary>
+    public int ActiveConnections => _activeConnections;
 
     /// <summary>
     /// 固定サイズ接続プールを初期化
@@ -105,7 +110,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>永続接続インスタンス</returns>
-    public async ValueTask<PersistentConnection> AcquireConnectionAsync(CancellationToken cancellationToken = default)
+    public async Task<PersistentConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         
@@ -163,7 +168,7 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     /// 接続を接続プールに返却
     /// </summary>
     /// <param name="connection">返却する接続</param>
-    public async ValueTask ReleaseConnectionAsync(PersistentConnection connection)
+    public async Task ReturnConnectionAsync(PersistentConnection connection, CancellationToken cancellationToken = default)
     {
         if (_disposed || connection == null)
         {
@@ -383,9 +388,10 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
     }
 
     /// <summary>
-    /// 定期的なヘルスチェック実行
+    /// すべての接続のヘルスチェックを実行する
     /// </summary>
-    private async void PerformHealthCheck(object? state)
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    public async Task PerformHealthCheckAsync(CancellationToken cancellationToken = default)
     {
         if (_disposed) return;
 
@@ -397,11 +403,20 @@ public sealed class FixedSizeConnectionPool : IAsyncDisposable
                 metrics.ActiveConnections, metrics.QueuedConnections, metrics.ConnectionUtilization);
 
             // 不健全な接続の削除（実装は将来の拡張として残す）
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "ヘルスチェック中にエラーが発生");
         }
+    }
+
+    /// <summary>
+    /// 定期的なヘルスチェック実行
+    /// </summary>
+    private async void PerformHealthCheck(object? state)
+    {
+        await PerformHealthCheckAsync(_disposalCts.Token);
     }
 
     /// <summary>

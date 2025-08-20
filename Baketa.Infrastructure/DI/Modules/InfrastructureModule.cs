@@ -353,20 +353,14 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
             
             // ✅ FixedSizeConnectionPool登録（動的ポート対応版）
-            services.AddSingleton<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>(provider =>
-            {
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>>();
-                var configuration = provider.GetRequiredService<IConfiguration>();
-                var options = provider.GetRequiredService<IOptions<TranslationSettings>>();
-                return new Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool(logger, configuration, options);
-            });
+            services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
             Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
             
             // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                var connectionPool = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+                var connectionPool = provider.GetRequiredService<IConnectionPool>();
                 var configuration = provider.GetRequiredService<IConfiguration>();
                 logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）");
                 return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration);
