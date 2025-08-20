@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Utilities;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
 
@@ -105,11 +106,11 @@ public class InPlaceTranslationOverlayManager(
         Console.WriteLine($"🔍 [DISPLAY_DEBUG] CanShowInPlace: {textChunk.CanShowInPlace()}");
         Console.WriteLine($"🔍 [DISPLAY_DEBUG] Bounds: X={textChunk.CombinedBounds.X}, Y={textChunk.CombinedBounds.Y}, W={textChunk.CombinedBounds.Width}, H={textChunk.CombinedBounds.Height}");
         
-        // 🚫 [TRANSLATION_ONLY] 翻訳結果がない場合は表示しない（翻訳アプリとして当然の動作）
-        if (string.IsNullOrEmpty(textChunk.TranslatedText))
+        // 🚫 [TRANSLATION_ONLY] 失敗・エラー結果の表示を包括的に防止
+        if (!TranslationValidator.IsValid(textChunk.TranslatedText, textChunk.CombinedText))
         {
-            Console.WriteLine($"🚫 [TRANSLATION_ONLY] 翻訳結果が空のため表示をスキップ - ChunkId: {textChunk.ChunkId}");
-            _logger.LogDebug("翻訳結果が空のため表示をスキップ - ChunkId: {ChunkId}", textChunk.ChunkId);
+            Console.WriteLine($"🚫 [TRANSLATION_ONLY] 無効な翻訳結果のため表示をスキップ - ChunkId: {textChunk.ChunkId}, 結果: '{textChunk.TranslatedText}'");
+            _logger.LogDebug("無効な翻訳結果のため表示をスキップ - ChunkId: {ChunkId}, 結果: {Result}", textChunk.ChunkId, textChunk.TranslatedText ?? "null");
             return;
         }
         
@@ -511,6 +512,7 @@ public class InPlaceTranslationOverlayManager(
             _logger.LogError(ex, "OverlayUpdateEvent処理中にエラーが発生: {Error}", ex.Message);
         }
     }
+
 
     /// <summary>
     /// リソースを解放

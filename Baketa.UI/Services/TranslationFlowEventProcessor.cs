@@ -265,11 +265,17 @@ public class TranslationFlowEventProcessor :
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
-            // 2. 🚨 [STOP_FIX] すべてのインプレースオーバーレイを非表示
+            // 2. 🚨 [STOP_FIX] すべてのインプレースオーバーレイを非表示・リセット
             Console.WriteLine("🛑 [Stop機能] すべてのインプレースオーバーレイを非表示中...");
             await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
             Console.WriteLine("✅ [Stop機能] すべてのインプレースオーバーレイ非表示完了");
-            _logger.LogInformation("🚀 Stop機能: すべてのインプレースオーバーレイ非表示完了");
+            
+            // 🔄 [STOP_FIX] オーバーレイマネージャーを完全リセット
+            Console.WriteLine("🔄 [Stop機能] オーバーレイマネージャーリセット中...");
+            await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
+            Console.WriteLine("✅ [Stop機能] オーバーレイマネージャーリセット完了");
+            
+            _logger.LogInformation("🚀 Stop機能: すべてのインプレースオーバーレイ非表示・リセット完了");
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
@@ -441,6 +447,14 @@ public class TranslationFlowEventProcessor :
                         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🛑 翻訳結果表示をキャンセル - Stop済み");
                         return;
                     }
+                    
+                    // 🛡️ [INVALID_RESULT_PROTECTION] 失敗・エラー結果の表示を包括的に防止
+                    if (!TranslationValidator.IsValid(result.TranslatedText, result.OriginalText))
+                    {
+                        Console.WriteLine($"🚫 [TranslationFlowEventProcessor] 無効な翻訳結果のため表示をスキップ: '{result.TranslatedText}'");
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚫 無効な翻訳結果のため表示をスキップ: '{result.TranslatedText}'");
+                        return;
+                    }
                     DebugLogUtility.WriteLog($"📝 継続的翻訳結果受信:");
                     DebugLogUtility.WriteLog($"   📖 オリジナル: '{result.OriginalText}'");
                     DebugLogUtility.WriteLog($"   🌐 翻訳結果: '{result.TranslatedText}'");
@@ -573,6 +587,7 @@ public class TranslationFlowEventProcessor :
         
         GC.SuppressFinalize(this);
     }
+
 
     // LanguageSettingsChangedEvent処理は削除済み - SettingsViewModel削除に伴い不要
 }

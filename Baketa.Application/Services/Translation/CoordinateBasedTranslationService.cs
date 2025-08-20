@@ -527,13 +527,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                         DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
                         DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
                         
-                        // 🛡️ [ERROR_PROTECTION] エラー結果や空文字列はオーバーレイ表示しない
-                        // 🚫 [TRANSLATION_ONLY] 翻訳結果がない場合（原文のみの場合）は表示しない
-                        var hasValidTranslation = !string.IsNullOrEmpty(chunk.TranslatedText) && 
-                                                 !chunk.TranslatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase) &&
-                                                 !chunk.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal) &&
-                                                 !chunk.TranslatedText.Equals("翻訳エラーが発生しました", StringComparison.Ordinal) &&
-                                                 chunk.TranslatedText != chunk.CombinedText; // 翻訳結果が原文と同じ場合も表示しない
+                        // 🛡️ [ERROR_PROTECTION] 失敗・エラー結果の表示を包括的に防止
+                        var hasValidTranslation = TranslationValidator.IsValid(chunk.TranslatedText, chunk.CombinedText);
                         
                         DebugLogUtility.WriteLog($"   翻訳結果: '{chunk.TranslatedText}'");
                         DebugLogUtility.WriteLog($"   原文: '{chunk.CombinedText}'");
@@ -832,6 +827,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
     // OPUS-MT削除済み: TransformersOpusMtEngine関連機能はNLLB-200統一により不要
     
+    
     /// <summary>
     /// インプレース翻訳オーバーレイ表示
     /// </summary>
@@ -850,10 +846,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 // 各TextChunkを個別にインプレース表示
                 foreach (var textChunk in textChunks)
                 {
-                    // 🚫 [TRANSLATION_ONLY] 翻訳結果がない、または原文と同じ場合は表示しない
-                    var hasValidTranslation = !string.IsNullOrEmpty(textChunk.TranslatedText) && 
-                                             textChunk.TranslatedText != textChunk.CombinedText &&
-                                             !textChunk.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal);
+                    // 🚫 [TRANSLATION_ONLY] 失敗・エラー結果の表示を包括的に防止
+                    var hasValidTranslation = TranslationValidator.IsValid(textChunk.TranslatedText, textChunk.CombinedText);
                     
                     if (hasValidTranslation)
                     {
