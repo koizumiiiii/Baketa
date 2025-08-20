@@ -59,12 +59,12 @@ public abstract class AlphaTestValidationRuleBase : IValidationRule
 
 /// <summary>
 /// αテスト翻訳エンジン検証ルール
-/// OPUS-MTエンジンのみ許可
+/// NLLB-200エンジンのみ許可
 /// </summary>
 public sealed class AlphaTestTranslationEngineRule : AlphaTestValidationRuleBase
 {
     public override string PropertyPath => "DefaultEngine";
-    public override string Description => "翻訳エンジン選択（αテストではOPUS-MTのみ）";
+    public override string Description => "翻訳エンジン選択（αテストではNLLB-200のみ）";
 
     public override SettingValidationResult Validate(object? value, ValidationContext context)
     {

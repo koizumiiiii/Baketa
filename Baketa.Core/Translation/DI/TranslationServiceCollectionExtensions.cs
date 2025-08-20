@@ -68,7 +68,7 @@ namespace Baketa.Core.Translation.DI;
             services.AddHttpClient();
             
             // プロダクション用翻訳エンジン
-            // Local: OPUS-MT翻訳エンジン
+            // Local: NLLB-200翻訳エンジン
             // Gemini: Google Gemini AI翻訳エンジン
             
             // 注意: DummyEngineとSimpleEngineはテスト用のため、プロダクションコードでは使用しない

@@ -55,8 +55,8 @@ public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDi
                 try
                 {
                     using var cts = new CancellationTokenSource(1000); // 短いタイムアウト
-                    var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
-                    await connectionPool.ReleaseConnectionAsync(connection);
+                    var connection = await connectionPool.GetConnectionAsync(cts.Token);
+                    await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
                     return TimeSpan.Zero;
                 }
                 catch (Exception)
@@ -114,7 +114,7 @@ public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDi
                 .Build();
 
             var services = CreateServiceCollection(configuration);
-            using var serviceProvider = services.BuildServiceProvider();
+            await using var serviceProvider = services.BuildServiceProvider();
             var connectionPool = serviceProvider.GetRequiredService<FixedSizeConnectionPool>();
 
             // Act - 設定ごとの性能測定
@@ -127,9 +127,9 @@ public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDi
                     try
                     {
                         using var cts = new CancellationTokenSource(2000);
-                        var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
+                        var connection = await connectionPool.GetConnectionAsync(cts.Token);
                         await Task.Delay(10, cts.Token); // 短い処理をシミュレート
-                        await connectionPool.ReleaseConnectionAsync(connection);
+                        await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
                     }
                     catch (Exception)
                     {
@@ -181,12 +181,12 @@ public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDi
             try
             {
                 using var cts = new CancellationTokenSource(1000);
-                var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
+                var connection = await connectionPool.GetConnectionAsync(cts.Token);
                 
                 var acquireMetrics = connectionPool.GetMetrics();
                 output.WriteLine($"🔗 接続取得 {i+1} - Active: {acquireMetrics.ActiveConnections}, Total: {acquireMetrics.TotalConnectionsCreated}");
 
-                await connectionPool.ReleaseConnectionAsync(connection);
+                await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
                 
                 var releaseMetrics = connectionPool.GetMetrics();
                 output.WriteLine($"🔓 接続返却 {i+1} - Active: {releaseMetrics.ActiveConnections}, Available: {releaseMetrics.AvailableConnections}");
@@ -239,9 +239,9 @@ public class ConnectionPoolPerformanceTests(ITestOutputHelper output) : IAsyncDi
                 try
                 {
                     using var cts = new CancellationTokenSource(2000);
-                    var connection = await connectionPool.AcquireConnectionAsync(cts.Token);
+                    var connection = await connectionPool.GetConnectionAsync(cts.Token);
                     await Task.Delay(50, cts.Token); // 50ms の作業をシミュレート
-                    await connectionPool.ReleaseConnectionAsync(connection);
+                    await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
                     taskStopwatch.Stop();
                     return taskStopwatch.ElapsedMilliseconds;
                 }
