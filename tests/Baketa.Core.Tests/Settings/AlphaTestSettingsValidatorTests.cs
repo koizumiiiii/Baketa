@@ -61,7 +61,7 @@ public class AlphaTestSettingsValidatorTests
         // Assert
         result.IsValid.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
-        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("Local (OPUS-MT)"));
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("NLLB200"));
     }
 
     #endregion
