@@ -45,12 +45,10 @@ public sealed class ConfidenceBasedReprocessor(
         // 直接ファイル書き込みで信頼度ベース再処理開始を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DIRECT] ConfidenceBasedReprocessor - 信頼度ベース再処理開始: {textChunks.Count}個のチャンク分析{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             // 設定情報をログ出力
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚙️ [DIRECT] 再処理設定: Threshold={_settings.ReprocessingThreshold:F3}, MinTextLength={_settings.MinimumTextLengthForReprocessing}, MinRegion=({_settings.MinimumRegionSize.Width}x{_settings.MinimumRegionSize.Height}){Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
             
             // 各チャンクの信頼度を詳細ログ出力
             for (int i = 0; i < textChunks.Count; i++)
@@ -58,8 +56,7 @@ public sealed class ConfidenceBasedReprocessor(
                 var chunk = textChunks[i];
                 var avgConfidence = chunk.TextResults.Count > 0 ? chunk.TextResults.Average(tr => tr.Confidence) : 0.0f;
                 var minThreshold = _settings?.ReprocessingThreshold ?? 0.5f;
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 [DIRECT] チャンク[{i}]: Text='{chunk.CombinedText}' | AvgConfidence={avgConfidence:F3} | Threshold={minThreshold:F3} | 再処理対象={(avgConfidence < minThreshold ? "YES" : "NO")}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
             }
         }
         catch (Exception fileEx)
@@ -72,8 +69,7 @@ public sealed class ConfidenceBasedReprocessor(
 
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] チャンク処理ループ開始: {textChunks.Count}個のチャンクを処理{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -92,8 +88,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // ShouldReprocessの詳細ログ
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DIRECT] ShouldReprocess判定開始: チャンク#{chunk.ChunkId}, 信頼度={averageConfidence:F3}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -104,8 +99,7 @@ public sealed class ConfidenceBasedReprocessor(
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 [DIRECT] ShouldReprocess判定結果: チャンク#{chunk.ChunkId}, 結果={shouldReprocess}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -120,8 +114,7 @@ public sealed class ConfidenceBasedReprocessor(
                     // 直接ファイル書き込みで低信頼度チャンク再処理を記録
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DIRECT] 低信頼度チャンク#{chunk.ChunkId}を再処理: 信頼度={averageConfidence:F3}, テキスト='{chunk.CombinedText}'{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch (Exception fileEx)
                     {
@@ -131,8 +124,7 @@ public sealed class ConfidenceBasedReprocessor(
                     // 非同期で再処理を実行
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 [DIRECT] タスク作成開始: チャンク#{chunk.ChunkId}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch (Exception fileEx)
                     {
@@ -144,8 +136,7 @@ public sealed class ConfidenceBasedReprocessor(
                     
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] タスク追加完了: チャンク#{chunk.ChunkId} | 現在のタスク数={reprocessingTasks.Count}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch (Exception fileEx)
                     {
@@ -163,8 +154,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] チャンク#{chunk.ChunkId}処理中に例外発生: {ex.Message}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -178,8 +168,7 @@ public sealed class ConfidenceBasedReprocessor(
         
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] チャンク処理ループ完了: 再処理チャンク数={reprocessingTasks.Count}, 通常チャンク数={reprocessedChunks.Count}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -189,8 +178,7 @@ public sealed class ConfidenceBasedReprocessor(
         // 再処理タスクの完了を待機
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] 再処理タスク数確認: {reprocessingTasks.Count}個{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -203,8 +191,7 @@ public sealed class ConfidenceBasedReprocessor(
             
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DIRECT] Task.WhenAll開始: {reprocessingTasks.Count}個の並列処理{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -217,8 +204,7 @@ public sealed class ConfidenceBasedReprocessor(
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] Task.WhenAll完了: {reprocessedResults.Length}個の結果を取得{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -232,8 +218,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // キャンセレーション発生時は部分的な結果を取得
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] Task.WhenAllキャンセル検出: 完了したタスクの結果を回収{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -261,8 +246,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] 再処理対象なし: 全{textChunks.Count}チャンクが閾値{_settings?.ReprocessingThreshold:F3}以上の信頼度{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -292,8 +276,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 直接ファイル書き込みで再処理開始を記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DIRECT] チャンク#{originalChunk.ChunkId}の個別再処理開始: '{originalChunk.CombinedText}' (信頼度={originalChunk.AverageConfidence:F3}){Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -313,8 +296,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 直接ファイル書き込みで拡張領域をログ出力
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📐 [DIRECT] 拡張領域計算: 元領域=({originalChunk.CombinedBounds.X},{originalChunk.CombinedBounds.Y},{originalChunk.CombinedBounds.Width},{originalChunk.CombinedBounds.Height}) → 拡張領域=({expandedBounds.X},{expandedBounds.Y},{expandedBounds.Width},{expandedBounds.Height}){Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 → 拡張領域=({expandedBounds.X},{expandedBounds.Y},{expandedBounds.Width},{expandedBounds.Height}){Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -331,8 +313,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 設定変更をログ出力
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚙️ [DIRECT] OCR設定変更: DetectionThreshold={originalSettings.DetectionThreshold:F3}→{enhancedSettings.DetectionThreshold:F3}, UseLanguageModel={originalSettings.UseLanguageModel}→{enhancedSettings.UseLanguageModel}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -346,8 +327,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // 直接ファイル書き込みでOCR再実行開始をログ出力
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] OCR再実行開始: RecognizeAsync呼び出し{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -361,15 +341,13 @@ public sealed class ConfidenceBasedReprocessor(
                 // 直接ファイル書き込みでOCR再実行結果をログ出力
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 [DIRECT] OCR再実行結果: HasText={reprocessedResults.HasText}, TextRegions数={reprocessedResults.TextRegions.Count}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     
                     if (reprocessedResults.HasText && reprocessedResults.TextRegions.Count > 0)
                     {
                         foreach (var region in reprocessedResults.TextRegions.Take(3)) // 最初の3個のみログ出力
                         {
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 [DIRECT] 検出テキスト: '{region.Text}' (信頼度={region.Confidence:F3}){Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
                         }
                     }
                 }
@@ -384,8 +362,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // 結果をログ出力
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] チャンク#{originalChunk.ChunkId}再処理完了: '{originalChunk.CombinedText}' → '{improvedChunk.CombinedText}' (信頼度={originalChunk.AverageConfidence:F3}→{improvedChunk.AverageConfidence:F3}){Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
                 }
                 catch (Exception fileEx)
                 {
@@ -402,8 +379,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // OCR処理中の例外をログ出力
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] OCR再実行中に例外発生: {ocrEx.Message}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -423,8 +399,7 @@ public sealed class ConfidenceBasedReprocessor(
                     // 設定復元をログ出力
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔙 [DIRECT] OCR設定復元完了{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch (Exception fileEx)
                     {
@@ -442,8 +417,7 @@ public sealed class ConfidenceBasedReprocessor(
             // キャンセレーション例外は正常な処理として扱う
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] チャンク#{originalChunk.ChunkId}再処理がキャンセル: 元のチャンクを返します{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -458,8 +432,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 直接ファイル書き込みで全体例外をログ出力
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DIRECT] チャンク#{originalChunk.ChunkId}再処理で全体例外発生: {ex.Message}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -478,8 +451,7 @@ public sealed class ConfidenceBasedReprocessor(
     {
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔎 [DIRECT] ShouldReprocess内部開始: チャンク#{chunk.ChunkId}, 信頼度={averageConfidence:F3}, 閾値={_settings.ReprocessingThreshold:F3}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -491,8 +463,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] 再処理不要（信頼度十分）: {averageConfidence:F3} >= {_settings.ReprocessingThreshold:F3}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -506,8 +477,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] テキスト長チェック不合格: {chunk.CombinedText.Length} < {_settings.MinimumTextLengthForReprocessing}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -524,8 +494,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] 領域サイズチェック不合格: ({chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height}) < ({_settings.MinimumRegionSize.Width}x{_settings.MinimumRegionSize.Height}){Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 < ({_settings.MinimumRegionSize.Width}x{_settings.MinimumRegionSize.Height}){Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -542,8 +511,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] ノイズチェック不合格: テキスト='{chunk.CombinedText}'{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -556,8 +524,7 @@ public sealed class ConfidenceBasedReprocessor(
 
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] ShouldReprocess全チェック合格: チャンク#{chunk.ChunkId}, 再処理対象=true{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -697,10 +664,8 @@ public sealed class ConfidenceBasedReprocessor(
 
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DIRECT] 【Phase 2】OCR設定最適化: DetectionThreshold={currentSettings.DetectionThreshold:F3}→{enhancedSettings.DetectionThreshold:F3}, RecognitionThreshold={currentSettings.RecognitionThreshold:F3}→{enhancedSettings.RecognitionThreshold:F3}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     └─ 拡張設定: UseLanguageModel={enhancedSettings.UseLanguageModel}, MaxDetections={enhancedSettings.MaxDetections}, UseDirectionClassification={enhancedSettings.UseDirectionClassification}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -868,8 +833,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 初期化ログを記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DIRECT] OCRエンジン初期化状態確認: IsInitialized={isInitialized}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -881,8 +845,7 @@ public sealed class ConfidenceBasedReprocessor(
                 // 初期化が必要な場合は実行
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DIRECT] OCRエンジン初期化開始: InitializeAsync呼び出し{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -893,8 +856,7 @@ public sealed class ConfidenceBasedReprocessor(
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] OCRエンジン初期化完了: Success={initSuccess}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -917,8 +879,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 初期化エラーをログ記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [DIRECT] OCRエンジン初期化エラー: {ex.Message}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {

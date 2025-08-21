@@ -59,8 +59,7 @@ public class MainOverlayViewModel : ViewModelBase
         // 直接ファイル書き込みでも記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel初期化完了{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -399,10 +398,8 @@ public class MainOverlayViewModel : ViewModelBase
         
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {initMessage1}{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {initMessage2}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception ex)
         {
@@ -724,8 +721,7 @@ public class MainOverlayViewModel : ViewModelBase
             // 直接ファイル書き込みでイベント発行を記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel - StartTranslationRequestEvent発行開始: EventID={startTranslationEvent.Id}, Window={selectedWindow.Title}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -736,8 +732,7 @@ public class MainOverlayViewModel : ViewModelBase
             
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] MainOverlayViewModel - StartTranslationRequestEvent発行完了: EventID={startTranslationEvent.Id}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {

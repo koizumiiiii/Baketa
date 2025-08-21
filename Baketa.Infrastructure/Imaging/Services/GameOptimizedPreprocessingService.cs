@@ -108,8 +108,7 @@ public sealed class GameOptimizedPreprocessingService(
             // 🔍 Phase 3診断: 直接ファイル出力で確実にログを残す
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎮 [PHASE3-START] ゲーム最適化前処理開始: プロファイル={profile.Name}, サイズ={image.Width}x{image.Height}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -125,8 +124,7 @@ public sealed class GameOptimizedPreprocessingService(
             // 🔍 Phase 3診断: 完了ログも直接ファイル出力
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [PHASE3-END] ゲーム最適化前処理完了: プロファイル={profile.Name}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {

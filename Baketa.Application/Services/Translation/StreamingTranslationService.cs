@@ -58,76 +58,63 @@ public class StreamingTranslationService : IStreamingTranslationService
         // 🚨 [CRITICAL_DEBUG] メソッド開始の即座ログ出力
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] TranslateBatchWithStreamingAsync開始 - テキスト数: {texts?.Count ?? 0}");
         Console.WriteLine($"🔍 [LANGUAGE_DEBUG] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName})");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] TranslateBatchWithStreamingAsync開始 - テキスト数: {texts?.Count ?? 0}{Environment.NewLine}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [LANGUAGE_DEBUG] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName}){Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 → Target={targetLanguage?.Code}({targetLanguage?.DisplayName}){Environment.NewLine}");
             
         if (texts == null || texts.Count == 0)
         {
             var textsStatus = texts == null ? "null" : "empty";
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] テキストリスト空のため早期リターン - texts={textsStatus}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] テキストリスト空のため早期リターン - texts={textsStatus}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             return [];
         }
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Stopwatch開始前");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] Stopwatch開始前{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
         var stopwatch = Stopwatch.StartNew();
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Logger情報出力前");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] Logger情報出力前{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
         _logger.LogInformation("🔥 [STREAMING] バッチ翻訳開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🔥 [STREAMING] バッチ翻訳開始 - テキスト数: {texts.Count}");
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] 進行状況初期化前");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] 進行状況初期化前{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         // 進行状況初期化
         lock (_progressLock)
         {
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] lockブロック内部に到達");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] lockブロック内部に到達{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 
             _progress.TotalChunks = texts.Count;
             _progress.CompletedChunks = 0;
             _progress.CurrentChunkIndex = 0;
             
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] 進行状況初期化完了");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] 進行状況初期化完了{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] lockブロック脱出、CreateChunks呼び出し直前");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] lockブロック脱出、CreateChunks呼び出し直前{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] results配列作成開始");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] results配列作成開始{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         var results = new string[texts.Count];
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し開始 - OptimalChunkSize={OptimalChunkSize}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks呼び出し開始 - OptimalChunkSize={OptimalChunkSize}{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         var chunks = CreateChunks(texts, OptimalChunkSize);
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し完了");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks呼び出し完了{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks完了 - チャンク数: {chunks?.Count ?? 0}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CRITICAL_DEBUG] CreateChunks完了 - チャンク数: {chunks?.Count ?? 0}{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         Console.WriteLine($"📦 [STREAMING] {chunks.Count}個のチャンクに分割（各{OptimalChunkSize}アイテム）");
         
@@ -189,12 +176,10 @@ public class StreamingTranslationService : IStreamingTranslationService
         CancellationToken cancellationToken)
     {
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         Console.WriteLine($"🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         // 🔧 [DEADLOCK_DEBUG] セマフォデッドロック調査のため詳細ログとタイムアウト追加
         using var semaphoreTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 🔧 [EMERGENCY_FIX] セマフォ取得に60秒タイムアウト（Python翻訳サーバー重要処理対応）
@@ -203,20 +188,17 @@ public class StreamingTranslationService : IStreamingTranslationService
         try
         {
             Console.WriteLine($"🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             await semaphore.WaitAsync(semaphoreCts.Token).ConfigureAwait(false);
             
             Console.WriteLine($"✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (OperationCanceledException) when (semaphoreTimeout.Token.IsCancellationRequested)
         {
             Console.WriteLine($"⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト（60秒） - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト（60秒） - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             // タイムアウト時はタイムアウトメッセージを返して処理を継続
             for (int j = 0; j < chunk.Texts.Count; j++)
@@ -228,19 +210,16 @@ public class StreamingTranslationService : IStreamingTranslationService
         }
         
         Console.WriteLine($"🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
         try
         {
             Console.WriteLine($"🔧 [TRY_BLOCK] try ブロック開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [TRY_BLOCK] try ブロック開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             var chunkStopwatch = Stopwatch.StartNew();
             Console.WriteLine($"🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             Console.WriteLine($"🚀 [STREAMING] チャンク処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
             

@@ -86,14 +86,12 @@ public class SimpleSettingsViewModel : ViewModelBase
         // デバッグファイルログにも記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}, ISettingsService: {_settingsService?.GetType().Name ?? "NULL"}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name ?? "NULL"}, ISettingsService: {_settingsService?.GetType().Name ?? "NULL"}{Environment.NewLine}");
         }
         catch { }
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_INIT] TranslationOrchestrationService: {_translationOrchestrationService?.GetType().Name ?? "NULL"}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name ?? "NULL"}{Environment.NewLine}");
         }
         catch { }
         
@@ -302,8 +300,7 @@ public class SimpleSettingsViewModel : ViewModelBase
             {
                 try
                 {
-                    System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [APPLY_BUTTON_STATE] ApplyCommand.CanExecute={canExecute}, HasChanges={HasChanges}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 Console.WriteLine($"🔍 [APPLY_BUTTON_STATE] ApplyCommand.CanExecute={canExecute}, HasChanges={HasChanges}");
@@ -349,8 +346,7 @@ public class SimpleSettingsViewModel : ViewModelBase
                         // 🚨 CRITICAL DEBUG: プロパティ変更検出ログ
                         try
                         {
-                            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [PROPERTY_CHANGED] HasChanges=true設定: UseLocalEngine={UseLocalEngine}, SourceLanguage={SourceLanguage}{Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                         }
                         catch { }
                         
@@ -411,8 +407,7 @@ public class SimpleSettingsViewModel : ViewModelBase
             // 🚨 CRITICAL DEBUG: ExecuteApplyAsync実行確認
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [APPLY_BUTTON] ExecuteApplyAsync実行開始: SourceLanguage='{SourceLanguage}'{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
 
@@ -447,8 +442,7 @@ public class SimpleSettingsViewModel : ViewModelBase
                     
                     try
                     {
-                        System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SETVALUE_BEFORE] SetValue呼び出し前: key='UI:TranslationLanguage', value='{SourceLanguage}', beforeValue='{beforeValue}'{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -462,8 +456,7 @@ public class SimpleSettingsViewModel : ViewModelBase
                     
                     try
                     {
-                        System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SETVALUE_AFTER] SetValue呼び出し直後: afterSetValue='{afterSetValue}'{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -478,8 +471,7 @@ public class SimpleSettingsViewModel : ViewModelBase
                     // ファイルログにも記録
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [SIMPLE_SETTINGS_SAVE] 保存: '{SourceLanguage}', 確認: '{savedValue}'{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                 }

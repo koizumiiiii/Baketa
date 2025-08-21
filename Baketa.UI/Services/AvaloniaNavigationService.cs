@@ -132,8 +132,7 @@ internal sealed class AvaloniaNavigationService(
             Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始");
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -142,8 +141,7 @@ internal sealed class AvaloniaNavigationService(
             Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name ?? "null"}{Environment.NewLine}");
             }
             catch { }
             var settingsWindow = new SimpleSettingsView

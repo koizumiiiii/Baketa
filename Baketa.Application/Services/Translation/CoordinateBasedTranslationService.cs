@@ -958,8 +958,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         {
             _logger?.LogError(ex, "OCR完了イベントの発行に失敗しました");
             Console.WriteLine($"🔥 [ERROR] PublishOcrCompletedEventAsync例外: {ex.GetType().Name} - {ex.Message}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] PublishOcrCompletedEventAsync例外: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name} - {ex.Message}{Environment.NewLine}");
         }
     }
 

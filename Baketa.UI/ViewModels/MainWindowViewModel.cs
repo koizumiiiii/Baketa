@@ -310,8 +310,7 @@ namespace Baketa.UI.ViewModels;
                     // 詳細デバッグログ
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔒 [MAIN_TRANSLATION_STATE] IsActive={isActive}, CanOpenSettings={CanOpenSettings}, IsTranslationInProgress={IsTranslationInProgress}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                 });

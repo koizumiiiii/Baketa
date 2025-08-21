@@ -465,8 +465,7 @@ public class PaddleOcrEngine : IOcrEngine
                     // 直接ファイル書き込みでOCR結果の詳細を記録
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📍 [DIRECT] OCR結果[{i}]: Text='{region.Text}' | Bounds=({region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}) | Confidence={region.Confidence:F3}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 | Confidence={region.Confidence:F3}{Environment.NewLine}");
                     }
                     catch (Exception fileEx)
                     {
@@ -1791,8 +1790,7 @@ public class PaddleOcrEngine : IOcrEngine
                 // 🔍 直接書き込みログで前処理結果サイズを確認
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 Phase3前処理結果（直接書き込み）: ProcessedImageサイズ={preprocessingResult.ProcessedImage.Width}x{preprocessingResult.ProcessedImage.Height}, resultDataサイズ={resultData.Length}, Format={preprocessingResult.ProcessedImage.Format}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -1804,8 +1802,7 @@ public class PaddleOcrEngine : IOcrEngine
                     var isRgba32 = (actualFormat == rgba32Format);
                     var expectedBytes = preprocessingResult.ProcessedImage.Width * preprocessingResult.ProcessedImage.Height * 4;
                     
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 フォーマット比較（直接書き込み）: actual={actualFormat}, expected={rgba32Format}, isRgba32={isRgba32}, expectedBytes={expectedBytes}, actualBytes={resultData.Length}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -1816,8 +1813,7 @@ public class PaddleOcrEngine : IOcrEngine
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 RGB24条件判定（直接書き込み）: actual={currentFormat}({(int)currentFormat}), target={targetFormat}({(int)targetFormat}), isMatch={isMatch}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化currentFormat}), target={targetFormat}({(int)targetFormat}), isMatch={isMatch}{Environment.NewLine}");
                 }
                 catch { }
                 
@@ -1825,8 +1821,7 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 RGB24フォーマット処理（直接書き込み）: 手動Mat作成開始{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -1847,8 +1842,7 @@ public class PaddleOcrEngine : IOcrEngine
                         {
                             try
                             {
-                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 Mat.FromImageData失敗、安全な代替作成開始（直接書き込み）{Environment.NewLine}");
+                                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                             }
                             catch { }
                             
@@ -1888,8 +1882,7 @@ public class PaddleOcrEngine : IOcrEngine
                             {
                                 try
                                 {
-                                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 安全代替Mat作成失敗、空Mat返却（直接書き込み）: {fallbackEx.Message}{Environment.NewLine}");
+                                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                                 }
                                 catch { }
                                 
@@ -1903,8 +1896,7 @@ public class PaddleOcrEngine : IOcrEngine
                         try
                         {
                             var matInfo = $"サイズ={processedMat.Width}x{processedMat.Height}, Type={processedMat.Type()}, Channels={processedMat.Channels()}, IsContinuous={processedMat.IsContinuous()}, Step={processedMat.Step()}";
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 RGB24手動Mat作成完了（直接書き込み）: {matInfo}{Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                         }
                         catch { }
                     }
@@ -1912,8 +1904,7 @@ public class PaddleOcrEngine : IOcrEngine
                     {
                         try
                         {
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ RGB24手動Mat作成失敗（直接書き込み）: {ex.Message}{Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                         }
                         catch { }
                         
@@ -1925,8 +1916,7 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 その他フォーマット処理（直接書き込み）: Mat.FromImageData使用, Format={preprocessingResult.ProcessedImage.Format}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -1936,8 +1926,7 @@ public class PaddleOcrEngine : IOcrEngine
                 // 🔍 直接書き込みログでMat変換後サイズを確認
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 Mat変換後（直接書き込み）: processedMatサイズ={processedMat.Width}x{processedMat.Height}, Empty={processedMat.Empty()}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
                 }
                 catch { }
                 
@@ -3054,8 +3043,7 @@ public class PaddleOcrEngine : IOcrEngine
     {
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 PaddleOCRエンジン再初期化開始（直接書き込み）{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             // 現在のエンジンを安全に廃棄
             lock (_lockObject)
@@ -3077,19 +3065,16 @@ public class PaddleOcrEngine : IOcrEngine
             if (success)
             {
                 _consecutivePaddleFailures = 0; // 再初期化成功時はカウンタリセット
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ PaddleOCRエンジン再初期化成功（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             else
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化失敗（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
         }
         catch (Exception ex)
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ PaddleOCRエンジン再初期化例外（直接書き込み）: {ex.Message}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
     }
 
@@ -3316,8 +3301,7 @@ public class PaddleOcrEngine : IOcrEngine
             try
             {
                 var matDetailsBeforeRun = $"Size={processedMat.Size()}, Type={processedMat.Type()}, Channels={processedMat.Channels()}, Empty={processedMat.Empty()}, IsContinuous={processedMat.IsContinuous()}, Step={processedMat.Step()}";
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83c\udfaf PaddleOCR.Run()\u5b9f\u884c\u524dMat\u8a73\u7d30\uff08\u76f4\u63a5Mat\u30fb\u4fee\u6b63\u7248\uff09: {matDetailsBeforeRun}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化\u5b9f\u884c\u524dMat\u8a73\u7d30\uff08\u76f4\u63a5Mat\u30fb\u4fee\u6b63\u7248\uff09: {matDetailsBeforeRun}{Environment.NewLine}");
             }
             catch { }
             
@@ -3344,8 +3328,7 @@ public class PaddleOcrEngine : IOcrEngine
                 var channels = processedMat.Channels();
                 if (channels != 3 || (matType != MatType.CV_8UC3))
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ 予期しないMat形式（直接書き込み）: Type={matType}, Channels={channels}, 継続実行{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 
                 // 🛡️ [CRITICAL_MEMORY_PROTECTION] AccessViolationException回避策
@@ -3407,8 +3390,7 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83d\udd04 PaddleOCR\u9023\u7d9a\u5931\u6557\u30ea\u30bb\u30c3\u30c8\uff08Mat.Clone\u56de\u907f\u7248\uff09: {_consecutivePaddleFailures} \u2192 0{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     _consecutivePaddleFailures = 0;
@@ -3418,8 +3400,7 @@ public class PaddleOcrEngine : IOcrEngine
                 try
                 {
                     var resultInfo = result?.GetType().Name ?? "null";
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u2705 PaddleOCR.Run()\u6210\u529f\uff08Mat.Clone\u56de\u907f\u7248\uff09: \u7d50\u679c\u578b={resultInfo}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化\u6210\u529f\uff08Mat.Clone\u56de\u907f\u7248\uff09: \u7d50\u679c\u578b={resultInfo}{Environment.NewLine}");
                 }
                 catch { }
                 
@@ -3434,8 +3415,7 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     var exceptionDetails = $"Type={paddleException.GetType().Name}, Message={paddleException.Message}, Stack={paddleException.StackTrace?.Split('\n').FirstOrDefault()}";
                     
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u274c PaddleOCR.Run()\u5931\u6557\uff08Mat.Clone\u56de\u907f\u7248\uff09: {exceptionDetails}, \u9023\u7d9a\u5931\u6557\u6570={_consecutivePaddleFailures}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化\u5931\u6557\uff08Mat.Clone\u56de\u907f\u7248\uff09: {exceptionDetails}, \u9023\u7d9a\u5931\u6557\u6570={_consecutivePaddleFailures}{Environment.NewLine}");
                 }
                 catch { }
                 
@@ -3444,8 +3424,7 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \ud83d\udd04 PaddleOCR\u9023\u7d9a\u5931\u6557({_consecutivePaddleFailures}\u56de) - \u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u5b9f\u884c\uff08Mat.Clone\u56de\u907f\u7248\uff09{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 - \u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u5b9f\u884c\uff08Mat.Clone\u56de\u907f\u7248\uff09{Environment.NewLine}");
                         
                         // \u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u3092\u5225\u30bf\u30b9\u30af\u3067\u5b9f\u884c\uff08\u73fe\u5728\u306e\u30bf\u30b9\u30af\u306f\u4f8b\u5916\u3067\u7d42\u4e86\uff09
                         _ = Task.Run(async () =>
@@ -3459,8 +3438,7 @@ public class PaddleOcrEngine : IOcrEngine
                             {
                                 try
                                 {
-                                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} \u274c PaddleOCR\u30a8\u30f3\u30b8\u30f3\u518d\u521d\u671f\u5316\u5931\u6557\uff08Mat.Clone\u56de\u907f\u7248\uff09: {reinitException.Message}{Environment.NewLine}");
+                                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                                 }
                                 catch { }
                             }

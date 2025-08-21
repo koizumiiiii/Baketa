@@ -35,8 +35,8 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
     {
         // デバッグログ: ハンドラー呼び出し確認
         Console.WriteLine($"🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}{Environment.NewLine}");
+        // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+        //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandler.HandleAsync 呼び出し開始: Results={eventData?.Results?.Count ?? 0}{Environment.NewLine}");
         
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);
@@ -64,8 +64,8 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
         
         // 🚀 [PHASE_2_2_OPTIMIZATION] バッチ並列翻訳処理実装
         Console.WriteLine($"🚀 [PHASE_2_2] 並列翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト{Environment.NewLine}");
+        // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+        //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行開始: {eventData.Results.Count}個のテキスト{Environment.NewLine}");
         
         // 各テキスト領域に対して翻訳要求イベントを並列で発行
         var translationTasks = eventData.Results.Select(async result =>
@@ -104,8 +104,8 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
             catch (Exception ex)
             {
                 Console.WriteLine($"🔥 [ERROR] 並列翻訳要求でエラー: '{result.Text}' - {ex.GetType().Name}: {ex.Message}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] 並列翻訳要求でエラー: '{result.Text}' - {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+                // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] 並列翻訳要求でエラー: '{result.Text}' - {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                 return false; // 失敗
             }
         });
@@ -118,7 +118,7 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
         var failureCount = results.Length - successCount;
         
         Console.WriteLine($"🚀 [PHASE_2_2] 並列翻訳要求イベント発行完了 - 成功: {successCount}, 失敗: {failureCount}");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行完了 - 成功: {successCount}, 失敗: {failureCount}{Environment.NewLine}");
+        // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+        //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_2] 並列翻訳要求イベント発行完了 - 成功: {successCount}, 失敗: {failureCount}{Environment.NewLine}");
     }
     }

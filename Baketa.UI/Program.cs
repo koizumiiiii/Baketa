@@ -100,6 +100,11 @@ namespace Baketa.UI;
                 // DIコンテナの初期化
                 ConfigureServices();
                 
+                // 🩺 診断システム直接初期化 - OnFrameworkInitializationCompleted代替
+                Console.WriteLine("🚨🚨🚨 [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ 🚨🚨🚨");
+                InitializeDiagnosticSystemDirectly();
+                Console.WriteLine("🚨🚨🚨 [MAIN_DIAGNOSTIC] 診断システム直接初期化完了！ 🚨🚨🚨");
+                
                 // OCRエンジン事前初期化（バックグラウンド）
                 Console.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
                 System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
@@ -142,6 +147,80 @@ namespace Baketa.UI;
                 .LogToTrace()
                 .UseReactiveUI();
                 
+        /// <summary>
+        /// 診断システムを直接初期化します - OnFrameworkInitializationCompleted代替
+        /// </summary>
+        private static void InitializeDiagnosticSystemDirectly()
+        {
+            try
+            {
+                Console.WriteLine("🔍🔍🔍 [DIRECT_DEBUG] IDiagnosticCollectionService解決試行中... 🔍🔍🔍");
+                var diagnosticCollectionService = ServiceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                if (diagnosticCollectionService != null)
+                {
+                    Console.WriteLine($"✅✅✅ [DIRECT_SUCCESS] IDiagnosticCollectionService解決成功: {diagnosticCollectionService.GetType().Name} ✅✅✅");
+                    
+                    // 診断システムを開始
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Console.WriteLine("🩺 [DIRECT_DEBUG] 診断データ収集開始中...");
+                            await diagnosticCollectionService.StartCollectionAsync().ConfigureAwait(false);
+                            Console.WriteLine("✅ 診断データ収集開始完了");
+                        }
+                        catch (Exception diagEx)
+                        {
+                            Console.WriteLine($"⚠️ 診断システム開始エラー: {diagEx.Message}");
+                            Console.WriteLine($"⚠️ エラーの詳細: {diagEx}");
+                        }
+                    });
+                    
+                    // テストイベント発行
+                    var eventAggregator = ServiceProvider.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+                    if (eventAggregator != null)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(3000).ConfigureAwait(false); // 3秒待機
+                            try
+                            {
+                                var testEvent = new Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent
+                                {
+                                    Stage = "DirectInitialization",
+                                    IsSuccess = true,
+                                    ProcessingTimeMs = 100,
+                                    Severity = Baketa.Core.Events.Diagnostics.DiagnosticSeverity.Information
+                                };
+                                
+                                await eventAggregator.PublishAsync(testEvent).ConfigureAwait(false);
+                                Console.WriteLine("🧪 診断テストイベント発行完了（直接初期化版）");
+                                
+                                // 手動レポート生成テスト
+                                await Task.Delay(2000).ConfigureAwait(false);
+                                var reportPath = await diagnosticCollectionService.GenerateReportAsync("direct_init_test").ConfigureAwait(false);
+                                Console.WriteLine($"🧪 手動レポート生成完了（直接初期化版）: {reportPath}");
+                            }
+                            catch (Exception testEx)
+                            {
+                                Console.WriteLine($"🧪 診断テストエラー（直接初期化版）: {testEx.Message}");
+                            }
+                        });
+                    }
+                    
+                    Console.WriteLine("🩺 診断システム直接初期化非同期開始完了");
+                }
+                else
+                {
+                    Console.WriteLine("🚨❌❌❌ [DIRECT_ERROR] IDiagnosticCollectionServiceが見つかりません！ ❌❌❌🚨");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 [DIRECT_ERROR] 診断システム直接初期化エラー: {ex.Message}");
+            }
+        }
+        
         /// <summary>
         /// DIコンテナを構成します。
         /// </summary>
@@ -193,6 +272,12 @@ namespace Baketa.UI;
                     builder.SetMinimumLevel(LogLevel.Information);
                 }
             });
+            
+            // 🩺 DiagnosticModuleの最優先登録 - 診断レポートシステム即座有効化
+            Console.WriteLine("🩺 [FIRST] DiagnosticModule最優先登録開始");
+            var diagnosticModule = new Baketa.Infrastructure.DI.Modules.DiagnosticModule();
+            diagnosticModule.RegisterServices(services);
+            Console.WriteLine("✅ [FIRST] DiagnosticModule最優先登録完了");
             
             // 🚀 Phase 2-1: 段階的DI簡素化 - ステップ1: 基盤モジュール群の統合
             Console.WriteLine("🔧 Phase 2-1: 基盤モジュール群登録開始");
@@ -317,6 +402,31 @@ namespace Baketa.UI;
                     System.Console.WriteLine($"  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)");
                 }
             }
+            
+            // 🩺 診断サービス登録確認
+            System.Console.WriteLine("=== 🩺 Diagnostic Services Registration Debug ===");
+            var diagnosticCollectionServices = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Services.IDiagnosticCollectionService));
+            System.Console.WriteLine($"IDiagnosticCollectionService registrations count: {diagnosticCollectionServices.Count()}");
+            
+            foreach (var service in diagnosticCollectionServices)
+            {
+                System.Console.WriteLine($"  - ServiceType: {service.ServiceType.Name}");
+                System.Console.WriteLine($"  - ImplementationType: {service.ImplementationType?.Name ?? "Factory"}");
+                System.Console.WriteLine($"  - Lifetime: {service.Lifetime}");
+                System.Console.WriteLine($"  - ImplementationFactory: {(service.ImplementationFactory != null ? "Yes" : "No")}");
+            }
+            
+            var diagnosticReportGenerators = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Services.IDiagnosticReportGenerator));
+            System.Console.WriteLine($"IDiagnosticReportGenerator registrations count: {diagnosticReportGenerators.Count()}");
+            
+            var backgroundTaskQueues = services.Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Services.IBackgroundTaskQueue));
+            System.Console.WriteLine($"IBackgroundTaskQueue registrations count: {backgroundTaskQueues.Count()}");
+            
+            var diagnosticEventProcessors = services.Where(s => 
+                s.ServiceType == typeof(Baketa.Core.Abstractions.Events.IEventProcessor<Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent>));
+            System.Console.WriteLine($"DiagnosticEventProcessor registrations count: {diagnosticEventProcessors.Count()}");
+            
+            System.Console.WriteLine("=== 🩺 End Diagnostic Services Debug ===");
         }
         
         /// <summary>

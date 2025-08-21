@@ -836,8 +836,7 @@ public sealed class BatchOcrProcessor(
             // 🔍 画像サイズを詳細ログ
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCRエンジンRecognizeAsync直前（直接書き込み）: 画像サイズ={image.Width}x{image.Height}, Format={image.Format}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             

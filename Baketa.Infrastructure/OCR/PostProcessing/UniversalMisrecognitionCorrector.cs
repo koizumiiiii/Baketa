@@ -47,15 +47,13 @@ public sealed partial class UniversalMisrecognitionCorrector
         // 直接ファイル書き込みで誤認識修正開始を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DIRECT] UniversalMisrecognitionCorrector - 誤認識修正開始: {textChunks.Count}個のチャンク処理{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             // 処理前の各チャンクの詳細ログ出力
             for (int i = 0; i < textChunks.Count; i++)
             {
                 var chunk = textChunks[i];
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 [DIRECT] 修正前チャンク[{i}]: Text='{chunk.CombinedText}' | ChunkId={chunk.ChunkId} | Language={chunk.DetectedLanguage ?? "unknown"}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
         }
         catch (Exception fileEx)
@@ -84,15 +82,13 @@ public sealed partial class UniversalMisrecognitionCorrector
         // 修正完了結果をファイルログに記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] UniversalMisrecognitionCorrector - 誤認識修正完了: 総修正数={totalCorrections}件{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             // 修正後の各チャンクの詳細ログ出力
             for (int i = 0; i < correctedChunks.Count; i++)
             {
                 var chunk = correctedChunks[i];
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 [DIRECT] 修正後チャンク[{i}]: Text='{chunk.CombinedText}' | ChunkId={chunk.ChunkId}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
         }
         catch (Exception fileEx)
@@ -138,34 +134,28 @@ public sealed partial class UniversalMisrecognitionCorrector
         // 【Phase 2ログ強化】修正処理の詳細ログ記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [DIRECT] 修正処理詳細 - ChunkId={originalChunk.ChunkId}: '{originalText}' → '{finalCorrected}' | 修正数={correctionCount}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
             if (correctionCount > 0)
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}   └─ 修正ステップ: Basic={basicCount}, Context={contextCount}, Pattern={patternCount}, Language={languageCount}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 
                 // 各段階の変化をログ出力
                 if (basicCount > 0)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Basic修正: '{originalText}' → '{basicCorrected}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 if (contextCount > 0)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Context修正: '{basicCorrected}' → '{contextCorrected}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 if (patternCount > 0)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Pattern修正: '{contextCorrected}' → '{patternCorrected}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 if (languageCount > 0)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}     🔸 Language修正: '{patternCorrected}' → '{finalCorrected}'{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
             }
         }

@@ -214,8 +214,7 @@ namespace Baketa.UI.ViewModels;
                         // 翻訳開始イベントを発行（ログ追加）
                         try
                         {
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行開始: {selectedWindow.Title}{Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                         }
                         catch (Exception fileEx)
                         {
@@ -226,8 +225,7 @@ namespace Baketa.UI.ViewModels;
                         
                         try
                         {
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DIRECT] HomeViewModel - StartTranslationRequestEvent発行完了: {selectedWindow.Title}{Environment.NewLine}");
+                            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                         }
                         catch (Exception fileEx)
                         {

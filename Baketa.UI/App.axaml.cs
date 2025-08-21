@@ -63,15 +63,101 @@ internal sealed partial class App : Avalonia.Application
             
             // イベント集約器を取得
             _eventAggregator = Program.ServiceProvider?.GetService<IEventAggregator>();
+            
+            // 🩺 診断システム即座初期化 - App.Initialize段階での確実初期化
+            Console.WriteLine("🚨🚨🚨 [APP_INIT] App.Initialize段階での診断システム初期化開始！ 🚨🚨🚨");
+            InitializeDiagnosticSystemInAppInitialize();
+        }
+
+        /// <summary>
+        /// App.Initialize段階での診断システム初期化
+        /// </summary>
+        private void InitializeDiagnosticSystemInAppInitialize()
+        {
+            try
+            {
+                Console.WriteLine("🔍🔍🔍 [APP_INIT_DEBUG] Program.ServiceProvider確認中... 🔍🔍🔍");
+                if (Program.ServiceProvider == null)
+                {
+                    Console.WriteLine("🚨❌ [APP_INIT_ERROR] Program.ServiceProviderがnull！ ❌🚨");
+                    return;
+                }
+                
+                Console.WriteLine("🔍🔍🔍 [APP_INIT_DEBUG] IDiagnosticCollectionService解決試行中... 🔍🔍🔍");
+                var diagnosticCollectionService = Program.ServiceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                if (diagnosticCollectionService != null)
+                {
+                    Console.WriteLine($"✅✅✅ [APP_INIT_SUCCESS] IDiagnosticCollectionService解決成功: {diagnosticCollectionService.GetType().Name} ✅✅✅");
+                    
+                    // 診断システムを即座に開始
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Console.WriteLine("🩺 [APP_INIT_DEBUG] 診断データ収集開始中...");
+                            await diagnosticCollectionService.StartCollectionAsync().ConfigureAwait(false);
+                            Console.WriteLine("✅ [APP_INIT] 診断データ収集開始完了");
+                        }
+                        catch (Exception diagEx)
+                        {
+                            Console.WriteLine($"⚠️ [APP_INIT] 診断システム開始エラー: {diagEx.Message}");
+                        }
+                    });
+                    
+                    // テストイベント発行（即座実行）
+                    if (_eventAggregator != null)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(2000).ConfigureAwait(false); // 2秒待機
+                            try
+                            {
+                                var testEvent = new Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent
+                                {
+                                    Stage = "AppInitialize",
+                                    IsSuccess = true,
+                                    ProcessingTimeMs = 50,
+                                    Severity = Baketa.Core.Events.Diagnostics.DiagnosticSeverity.Information
+                                };
+                                
+                                await _eventAggregator.PublishAsync(testEvent).ConfigureAwait(false);
+                                Console.WriteLine("🧪 [APP_INIT] 診断テストイベント発行完了");
+                                
+                                // 手動レポート生成テスト
+                                await Task.Delay(1000).ConfigureAwait(false);
+                                var reportPath = await diagnosticCollectionService.GenerateReportAsync("app_init_test").ConfigureAwait(false);
+                                Console.WriteLine($"🧪 [APP_INIT] 手動レポート生成完了: {reportPath}");
+                            }
+                            catch (Exception testEx)
+                            {
+                                Console.WriteLine($"🧪 [APP_INIT] 診断テストエラー: {testEx.Message}");
+                            }
+                        });
+                    }
+                    
+                    Console.WriteLine("🩺 [APP_INIT] 診断システム初期化非同期開始完了");
+                }
+                else
+                {
+                    Console.WriteLine("🚨❌❌❌ [APP_INIT_ERROR] IDiagnosticCollectionServiceが見つかりません！ ❌❌❌🚨");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 [APP_INIT_ERROR] 診断システム初期化エラー: {ex.Message}");
+                Console.WriteLine($"🚨 [APP_INIT_ERROR] スタックトレース: {ex.StackTrace}");
+            }
         }
 
         public override void OnFrameworkInitializationCompleted()
         {
+            Console.WriteLine("🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨");
             Console.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
             System.Diagnostics.Debug.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
             
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                Console.WriteLine("🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨");
                 // 未監視タスク例外のハンドラーを登録（早期登録）
                 // TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
                 
@@ -158,6 +244,93 @@ internal sealed partial class App : Avalonia.Application
                             }
                         });
                         Console.WriteLine("🔥 EventHandlerInitializationService非同期実行開始");
+                        
+                        // 🩺 診断システム開始 - 診断レポート機能を有効化
+                        Console.WriteLine("🚨🚨🚨 [CRITICAL] 診断システム開始処理 - 重要ポイント！ 🚨🚨🚨");
+                        try
+                        {
+                            Console.WriteLine("🔍🔍🔍 [CRITICAL_DEBUG] IDiagnosticCollectionService解決試行中... 🔍🔍🔍");
+                            var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                            if (diagnosticCollectionService != null)
+                            {
+                                Console.WriteLine($"✅✅✅ [CRITICAL_SUCCESS] IDiagnosticCollectionService解決成功: {diagnosticCollectionService.GetType().Name} ✅✅✅");
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        Console.WriteLine("🩺 [DEBUG] 診断データ収集開始中...");
+                                        await diagnosticCollectionService.StartCollectionAsync().ConfigureAwait(false);
+                                        Console.WriteLine("✅ 診断データ収集開始完了");
+                                    }
+                                    catch (Exception diagEx)
+                                    {
+                                        Console.WriteLine($"⚠️ 診断システム開始エラー: {diagEx.Message}");
+                                        Console.WriteLine($"⚠️ エラーの詳細: {diagEx}");
+                                        _logger?.LogWarning(diagEx, "診断システム開始エラー");
+                                    }
+                                });
+                                Console.WriteLine("🩺 診断システム非同期開始完了");
+                            }
+                            else
+                            {
+                                Console.WriteLine("🚨❌❌❌ [CRITICAL_ERROR] IDiagnosticCollectionServiceが見つかりません！ ❌❌❌🚨");
+                                Console.WriteLine("🚨❌ [CRITICAL_DEBUG] DiagnosticModuleのDI登録に問題がある可能性があります ❌🚨");
+                            }
+                            
+                            // 🧪 診断システム動作テスト - テストイベント発行
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(5000).ConfigureAwait(false); // 5秒待機してから発行
+                                try
+                                {
+                                    var testEvent = new Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent
+                                    {
+                                        Stage = "ApplicationStartup",
+                                        IsSuccess = true,
+                                        ProcessingTimeMs = 1000,
+                                        Metrics = new Dictionary<string, object>
+                                        {
+                                            ["TestEventType"] = "StartupTest",
+                                            ["Version"] = "1.0.0"
+                                        },
+                                        Severity = Baketa.Core.Events.Diagnostics.DiagnosticSeverity.Information
+                                    };
+                                    
+                                    await _eventAggregator.PublishAsync(testEvent).ConfigureAwait(false);
+                                    Console.WriteLine("🧪 診断テストイベント発行完了");
+                                    
+                                    // 追加のテストレポート生成
+                                    await Task.Delay(2000).ConfigureAwait(false);
+                                    try
+                                    {
+                                        var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                                        if (diagnosticCollectionService != null)
+                                        {
+                                            Console.WriteLine("🧪 手動レポート生成テスト開始");
+                                            var reportPath = await diagnosticCollectionService.GenerateReportAsync("manual_test").ConfigureAwait(false);
+                                            Console.WriteLine($"🧪 手動レポート生成完了: {reportPath}");
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine("🧪 IDiagnosticCollectionServiceが見つからないため手動レポート生成をスキップ");
+                                        }
+                                    }
+                                    catch (Exception manualEx)
+                                    {
+                                        Console.WriteLine($"🧪 手動レポート生成エラー: {manualEx.Message}");
+                                    }
+                                }
+                                catch (Exception testEx)
+                                {
+                                    Console.WriteLine($"🧪 診断テストイベント発行エラー: {testEx.Message}");
+                                }
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ 診断システム初期化エラー: {ex.Message}");
+                            _logger?.LogError(ex, "診断システム初期化エラー");
+                        }
                     }
                     catch (Exception eventAggregatorEx)
                     {

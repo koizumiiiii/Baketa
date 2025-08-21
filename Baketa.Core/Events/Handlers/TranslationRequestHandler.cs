@@ -38,8 +38,8 @@ public class TranslationRequestHandler(
     public async Task HandleAsync(TranslationRequestEvent eventData)
 {
     Console.WriteLine($"🎯 [DEBUG] ⭐⭐⭐ TranslationRequestHandler.HandleAsync 呼び出された！ ⭐⭐⭐");
-    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ⭐⭐⭐ TranslationRequestHandler.HandleAsync 呼び出された！ ⭐⭐⭐{Environment.NewLine}");
+    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [DEBUG] ⭐⭐⭐ TranslationRequestHandler.HandleAsync 呼び出された！ ⭐⭐⭐{Environment.NewLine}");
     
     // NULLチェック
     ArgumentNullException.ThrowIfNull(eventData);
@@ -57,8 +57,8 @@ public class TranslationRequestHandler(
     if (tempRequest.ShouldSkipTranslation())
     {
         Console.WriteLine($"🚀 [PHASE_0.2] 同言語検出: '{eventData.SourceLanguage}' → '{eventData.TargetLanguage}' - 翻訳をスキップしています");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語検出: '{eventData.SourceLanguage}' → '{eventData.TargetLanguage}' - 翻訳をスキップしています{Environment.NewLine}");
+        // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+        //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語検出: '{eventData.SourceLanguage}' → '{eventData.TargetLanguage}' - 翻訳をスキップしています{Environment.NewLine}");
 
         _logger.LogInformation("翻訳スキップ: 同言語ペア検出 '{SourceLang}' → '{TargetLang}', テキスト: '{Text}'", 
             eventData.SourceLanguage, eventData.TargetLanguage, eventData.OcrResult.Text);
@@ -77,8 +77,8 @@ public class TranslationRequestHandler(
             engineName: "Same Language Filter (Phase 0.2 - Hidden)");
 
         Console.WriteLine($"🚀 [PHASE_0.2] 同言語スキップ完了 - 即座にTranslationWithBoundsCompletedEvent発行");
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語スキップ完了 - ID: {skipCompletedEvent.Id}{Environment.NewLine}");
+        // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+        //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_0.2] 同言語スキップ完了 - ID: {skipCompletedEvent.Id}{Environment.NewLine}");
 
         await _eventAggregator.PublishAsync(skipCompletedEvent).ConfigureAwait(false);
         
@@ -88,8 +88,8 @@ public class TranslationRequestHandler(
 
     // 🚀 [PHASE_2_3] BaketaExceptionHandler統合 - フォールバック戦略実装
     Console.WriteLine($"🚀 [PHASE_2_3] BaketaExceptionHandler統合開始: '{eventData.OcrResult.Text}'");
-    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_3] BaketaExceptionHandler統合開始: '{eventData.OcrResult.Text}'{Environment.NewLine}");
+    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_3] BaketaExceptionHandler統合開始: '{eventData.OcrResult.Text}'{Environment.NewLine}");
 
     // プライマリ翻訳処理とフォールバック戦略
     var translationResult = await BaketaExceptionHandler.HandleWithFallbackAsync(
@@ -143,8 +143,8 @@ public class TranslationRequestHandler(
         fallback: async () =>
         {
             Console.WriteLine($"🔄 [PHASE_2_3] フォールバック処理開始: '{eventData.OcrResult.Text}'");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [PHASE_2_3] フォールバック処理開始{Environment.NewLine}");
+            // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [PHASE_2_3] フォールバック処理開始{Environment.NewLine}");
             
             _logger.LogWarning("プライマリ翻訳が失敗、フォールバック処理を実行中: '{Text}'", eventData.OcrResult.Text);
             
@@ -155,8 +155,8 @@ public class TranslationRequestHandler(
         onError: async (ex) =>
         {
             Console.WriteLine($"🔥 [PHASE_2_3] エラー処理実行: {ex.GetType().Name} - {ex.Message}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [PHASE_2_3] エラー処理実行: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
+            // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [PHASE_2_3] エラー処理実行: {ex.GetType().Name} - {ex.Message}{Environment.NewLine}");
             
             _logger.LogError(ex, "翻訳要求処理中にエラーが発生: '{Text}'", eventData.OcrResult.Text);
             
@@ -174,8 +174,8 @@ public class TranslationRequestHandler(
         }).ConfigureAwait(false);
 
     Console.WriteLine($"🚀 [PHASE_2_3] BaketaExceptionHandler処理完了: '{translationResult}'");
-    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_3] BaketaExceptionHandler処理完了: '{translationResult}'{Environment.NewLine}");
+    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_3] BaketaExceptionHandler処理完了: '{translationResult}'{Environment.NewLine}");
 
     _logger.LogInformation("翻訳完了: '{Original}' → '{Translated}'", 
         eventData.OcrResult.Text, translationResult);

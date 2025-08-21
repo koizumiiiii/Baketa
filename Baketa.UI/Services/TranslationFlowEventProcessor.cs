@@ -81,8 +81,7 @@ public class TranslationFlowEventProcessor :
         // 確実にログを記録するため、ファイル直接書き込みを最優先で実行
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [DIRECT] TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -357,8 +356,7 @@ public class TranslationFlowEventProcessor :
         try
         {
             Console.WriteLine($"🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [TranslationFlowEventProcessor] SettingsChangedEvent処理開始{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             _logger.LogInformation("設定変更を適用中");
 
             // AR風オーバーレイ設定は新ARシステムで自動管理（設定変更は直接適用される）

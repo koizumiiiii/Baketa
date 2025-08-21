@@ -289,8 +289,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // バックグラウンドタスクで自動翻訳を実行
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始前（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始前（直接書き込み）{Environment.NewLine}");
+                // 診断システム実装により debug_app_logs.txt への出力を無効化
             }
             catch { }
             
@@ -299,8 +300,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部開始（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部開始（直接書き込み）{Environment.NewLine}");
+                    // 診断システム実装により debug_app_logs.txt への出力を無効化
                 }
                 catch { }
                 
@@ -308,8 +310,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync呼び出し直前（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -319,8 +320,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync正常完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                 }
@@ -328,8 +328,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 ExecuteAutomaticTranslationLoopAsync例外（直接書き込み）: {ex.Message}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -340,8 +339,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部終了（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -350,8 +348,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始後（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -360,8 +357,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: tryブロック後の実行確認
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask直前{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
 
@@ -370,8 +366,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: Task.CompletedTask後
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask完了{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
         }
@@ -400,10 +395,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 直接ファイル書き込みで停止処理開始を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 [DIRECT] TranslationOrchestrationService - 自動翻訳停止開始{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 停止前OCRエンジン状態: IsInitialized={_ocrEngine.IsInitialized}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -461,8 +454,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 直接ファイル書き込みで状態リセットを記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] TranslationOrchestrationService - 状態リセット完了: 前回テキスト='{oldLastText}' → ''、翻訳アクティブ=false{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -694,16 +686,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // ファイルログに記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TRANSLATION_SETTINGS_DEBUG] Source='{sourceLanguageFromFile}'→'{sourceLanguageCode}', Target='{targetLanguageFromFile}'→'{targetLanguageCode}'{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
         
         Console.WriteLine($"🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode})");
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode}){Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
         }
         catch { }
         
@@ -776,8 +766,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 緊急デバッグ: メソッド開始確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync開始（直接書き込み）{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
         
@@ -805,8 +794,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 緊急デバッグ: ループ実行確認
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 自動翻訳ループ実行中（直接書き込み） - キャンセル: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -834,8 +822,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 自動翻訳を実行
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync開始（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -843,8 +830,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
 
@@ -898,8 +884,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 緊急デバッグ: ExecuteAutomaticTranslationStepAsync開始確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 ExecuteAutomaticTranslationStepAsync内部開始（直接書き込み）{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
         
@@ -925,8 +910,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: クールダウン中の直接書き込み
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏳ 翻訳完了後のクールダウン中（直接書き込み）: ID={translationId}, 残り{remainingCooldown:F1}秒{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -937,8 +921,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 緊急デバッグ: クールダウン通過確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ クールダウン通過（直接書き込み）: ID={translationId}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
         
@@ -1040,8 +1023,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: ExecuteTranslationAsync呼び出し前
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -1054,8 +1036,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 緊急デバッグ: ExecuteTranslationAsync完了
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理完了（直接書き込み）: ID={translationId}, IsCoordinateBasedMode={result?.IsCoordinateBasedMode}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -1190,8 +1171,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 🚨 CRITICAL DEBUG: ExecuteSingleTranslationAsync呼び出し確認
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             Console.WriteLine($"🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}");
         }
         catch { }
@@ -1253,8 +1233,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 🚨 CRITICAL DEBUG: ExecuteTranslationAsync呼び出し確認
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             Console.WriteLine($"🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}");
         }
         catch { }
@@ -1262,8 +1241,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成前
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成開始{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
         
@@ -1275,8 +1253,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成完了
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成完了{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
 
@@ -1289,30 +1266,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 🚨 CRITICAL DEBUG: try文開始直後
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] try文開始直後{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
             // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し直前
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し直前{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
             // 🚨 CRITICAL DEBUG: 座標ベース翻訳チェック（直接ファイル書き込み）
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] 座標ベース翻訳チェック開始{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -1326,8 +1297,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し完了
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し完了{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             DebugLogUtility.WriteLog($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
@@ -1341,8 +1311,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: 座標ベース翻訳条件確認
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳条件確認（直接書き込み）: coordinateAvailable={coordinateAvailable}, hasWindowHandle={hasWindowHandle}, isAdvancedImage={isAdvancedImage}, overallCondition={overallCondition}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
             
@@ -1362,8 +1331,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 緊急デバッグ: 座標ベース翻訳実行開始
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳処理実行開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
                 
@@ -1375,8 +1343,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -1389,8 +1356,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                     
@@ -1707,8 +1673,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 🚨 CRITICAL DEBUG: originalTextの内容を確認
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [OCR_RESULT] originalText='{originalText}', Length={originalText?.Length ?? -1}, IsNullOrWhiteSpace={string.IsNullOrWhiteSpace(originalText)}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
             }
             catch { }
             

@@ -42,8 +42,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
         // 直接ファイル書き込みでテキスト結合開始を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [DIRECT] JapaneseTextMerger - テキスト結合開始: 領域数={textRegions.Count}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -59,8 +58,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
             // 直接ファイル書き込みでテキスト結合の詳細を記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔤 [DIRECT] TextMerger入力[{i}]: Text='{region.Text}' | Bounds=({region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}) | Confidence={region.Confidence:F3}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 | Confidence={region.Confidence:F3}{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -83,8 +81,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
         // 直接ファイル書き込みで行グループ化結果を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📑 [DIRECT] 行グループ化結果: {lines.Count}行に分割{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -101,8 +98,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
             // 直接ファイル書き込みで行詳細を記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📑 [DIRECT] 行{i + 1}: {line.Count}個のリージョン - {lineTexts}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
@@ -127,8 +123,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
                 // 直接ファイル書き込みで行結合判定を記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔗 [DIRECT] 行結合判定[行{i + 1}]: 前行='{result.ToString().Replace("\n", "\\n")}' 現行='{lineText}' 結合={shouldMerge}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Replace("\n", "\\n")}' 現行='{lineText}' 結合={shouldMerge}{Environment.NewLine}");
                 }
                 catch (Exception fileEx)
                 {
@@ -162,8 +157,7 @@ public sealed class JapaneseTextMerger(ILogger<JapaneseTextMerger> logger) : ITe
         // 直接ファイル書き込みで最終結果を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [DIRECT] テキスト結合完了: 元の行数={lines.Count}, 結果='{mergedText.Replace("\n", "\\n")}'{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}'{Environment.NewLine}");
         }
         catch (Exception fileEx)
         {
