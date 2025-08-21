@@ -623,6 +623,137 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 </PropertyGroup>
 ```
 
+### Character Encoding Standards
+
+#### **Prohibited Characters and Symbols**
+**⚠️ IMPORTANT**: The following characters and symbols are prohibited in C# code as they can cause encoding errors
+
+##### **1. Emojis and Unicode Decorative Characters**
+```csharp
+// ❌ PROHIBITED: Using emojis
+// TODO: Implement retry mechanism 🔄
+// WARNING: Performance critical section ⚡
+// SUCCESS: Operation completed ✅
+
+// ✅ RECOMMENDED: ASCII character descriptions
+// TODO: Implement retry mechanism
+// WARNING: Performance critical section
+// SUCCESS: Operation completed
+```
+
+##### **2. Special Unicode Symbols**
+- Arrow symbols: `→ ← ↑ ↓ ⇒ ⇐ ⇑ ⇓`
+- Check marks: `✓ ✗ ☑ ☒`
+- Decorative symbols: `★ ☆ ♦ ♠ ♣ ♥`
+- Mathematical symbols: `∞ ≠ ≤ ≥ ∑ ∏`
+- Greek letters: `α β γ δ λ π`
+
+##### **3. Full-width Characters and Symbols**
+```csharp
+// ❌ PROHIBITED: Using full-width symbols
+var result = DoSomething（param）；
+var message = "エラーが発生しました。";
+
+// ✅ RECOMMENDED: Half-width symbols and English comments
+var result = DoSomething(param);
+// Error occurred during processing
+var message = "エラーが発生しました。"; // Japanese allowed only in string literals
+```
+
+##### **4. Control Characters and Invisible Characters**
+- BOM (Byte Order Mark): `U+FEFF`
+- Zero-Width Space: `U+200B`
+- Non-breaking Space: `U+00A0`
+- Other non-ASCII whitespace characters
+
+#### **Permitted Japanese Usage Locations**
+
+##### **✅ Allowed Locations**
+```csharp
+// 1. String literals (user-facing messages)
+public const string ErrorMessage = "翻訳処理中にエラーが発生しました。";
+public string GetLocalizedMessage() => "設定が保存されました。";
+
+// 2. Resource files (.resx)
+// Resources.ja.resx: "ButtonText" = "実行"
+
+// 3. JSON configuration files
+// appsettings.ja.json: { "Messages": { "Success": "成功しました" } }
+```
+
+##### **❌ Prohibited Locations**
+```csharp
+// 1. Variable names, method names, class names
+public class 翻訳サービス { } // ❌ PROHIBITED
+public void 実行処理() { } // ❌ PROHIBITED
+private string 結果 = ""; // ❌ PROHIBITED
+
+// 2. Code comments (for code understanding)
+// この関数は翻訳を実行します // ❌ PROHIBITED (English preferred)
+// This function executes translation // ✅ RECOMMENDED
+
+// 3. Namespace and assembly names
+namespace Baketa.翻訳.Core; // ❌ PROHIBITED
+```
+
+#### **Encoding Configuration and Validation**
+
+##### **Project File Configuration**
+```xml
+<PropertyGroup>
+  <OutputEncoding>utf-8</OutputEncoding>
+  <FileEncoding>utf-8</FileEncoding>
+  <RunCodeAnalysis>true</RunCodeAnalysis>
+  <CodeAnalysisRuleSet>charset.ruleset</CodeAnalysisRuleSet>
+</PropertyGroup>
+```
+
+##### **Recommended File Encoding**
+- **C# source files**: UTF-8 (without BOM)
+- **Configuration files**: UTF-8 (without BOM)
+- **Resource files**: UTF-8 (with BOM - Visual Studio standard)
+
+##### **Encoding Error Validation Methods**
+```bash
+# File encoding check (PowerShell)
+Get-ChildItem -Recurse -Include "*.cs" | ForEach-Object {
+    $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+    if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        Write-Host "BOM detected: $($_.FullName)"
+    }
+}
+
+# Problem character search (using ripgrep)
+rg "[^\x00-\x7F]" --type cs --color always
+rg "[\u{1F000}-\u{1F6FF}]" --type cs  # Emoji detection
+rg "[→←↑↓✓✗★☆]" --type cs           # Decorative symbol detection
+```
+
+#### **Implementation Best Practices**
+
+##### **Alternative Expression Patterns**
+```csharp
+// ❌ Using emojis and decorative symbols
+// Loading... ⏳
+// Success! ✅
+// Error ❌
+// Arrow → Direction
+
+// ✅ ASCII character alternatives
+// Loading... (processing)
+// Success: Operation completed
+// Error: Operation failed
+// Arrow: Direction indicator
+```
+
+##### **Code Review Checklist**
+- [ ] No emojis or decorative Unicode characters in comments
+- [ ] All variable and method names use ASCII characters only
+- [ ] No Japanese characters outside of string literals
+- [ ] File encoding is set to UTF-8 (without BOM)
+
+**Following these character encoding standards prevents build errors, runtime errors, and internationalization issues, ensuring project stability.**
+
 ## 最終リマインダー：常に根本原因を考える / Final Reminder: Always Think Root Cause
 
 コードを書く前に、自分自身に問いかけてください：
