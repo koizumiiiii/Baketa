@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
@@ -88,6 +89,33 @@ public class InPlaceTranslationOverlayManager(
     {
         ArgumentNullException.ThrowIfNull(textChunk);
         
+        var sessionId = Guid.NewGuid().ToString("N")[..8];
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // 📊 [DIAGNOSTIC] オーバーレイ表示開始イベント
+        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "Overlay",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = sessionId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"オーバーレイ表示開始: ChunkId={textChunk.ChunkId}, テキスト長={textChunk.TranslatedText?.Length ?? 0}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "ChunkId", textChunk.ChunkId },
+                { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
+                { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
+                { "BoundsX", textChunk.CombinedBounds.X },
+                { "BoundsY", textChunk.CombinedBounds.Y },
+                { "BoundsWidth", textChunk.CombinedBounds.Width },
+                { "BoundsHeight", textChunk.CombinedBounds.Height },
+                { "CanShowInPlace", textChunk.CanShowInPlace() },
+                { "IsInitialized", _isInitialized },
+                { "IsDisposed", _disposed }
+            }
+        }).ConfigureAwait(false);
+        
         // STOP押下後の表示を防ぐためのキャンセレーションチェック
         cancellationToken.ThrowIfCancellationRequested();
         
@@ -137,9 +165,61 @@ public class InPlaceTranslationOverlayManager(
                 // 新規インプレースオーバーレイを作成・表示
                 await CreateAndShowNewInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
             }
+
+            // 📊 [DIAGNOSTIC] オーバーレイ表示成功イベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "Overlay",
+                IsSuccess = true,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Information,
+                Message = $"オーバーレイ表示成功: ChunkId={textChunk.ChunkId}, 処理時間={stopwatch.ElapsedMilliseconds}ms",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "ChunkId", textChunk.ChunkId },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
+                    { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
+                    { "BoundsArea", textChunk.CombinedBounds.Width * textChunk.CombinedBounds.Height },
+                    { "ActiveOverlaysCount", _activeOverlays.Count },
+                    { "IsUpdate", _activeOverlays.ContainsKey(textChunk.ChunkId) },
+                    { "DisplayType", "InPlace" }
+                }
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            // 📊 [DIAGNOSTIC] オーバーレイ表示失敗イベント
+            try
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "Overlay",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"オーバーレイ表示失敗: ChunkId={textChunk.ChunkId}, エラー={ex.GetType().Name}: {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "ChunkId", textChunk.ChunkId },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "ErrorType", ex.GetType().Name },
+                        { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
+                        { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
+                        { "IsInitialized", _isInitialized },
+                        { "IsDisposed", _disposed },
+                        { "ActiveOverlaysCount", _activeOverlays.Count }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
+
             _logger.LogError(ex, "インプレース表示エラー - ChunkId: {ChunkId}", textChunk.ChunkId);
             throw;
         }

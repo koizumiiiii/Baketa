@@ -32,7 +32,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
-    private int _currentServerPort = 5556; // デフォルト（OPUS-MT）、NLLB-200は5557
+    private int _currentServerPort = 5556; // デフォルト（OPUS-MT）、NLLB-200は5556
     
     // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
     private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
@@ -545,7 +545,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 }
                 
                 // NLLB-200用のポート設定
-                _currentServerPort = 5557;
+                _currentServerPort = 5556;
                 
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200高品質翻訳サーバーを起動: {ScriptPath} Port:{Port}", serverScriptPath, _currentServerPort);
             }

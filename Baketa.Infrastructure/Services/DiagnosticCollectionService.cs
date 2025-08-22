@@ -51,6 +51,7 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
         _isCollecting = true;
         _flushTimer.Change(FlushIntervalMs, FlushIntervalMs);
         
+        Console.WriteLine("🩺 [DIAGNOSTIC_COLLECTION] 診断データ収集開始 - IsCollecting=true");
         _logger.LogInformation("診断データ収集開始");
         
         return Task.CompletedTask;
@@ -67,26 +68,37 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
         _logger.LogInformation("診断データ収集停止");
     }
 
-    public Task CollectDiagnosticAsync(PipelineDiagnosticEvent diagnosticEvent, CancellationToken cancellationToken = default)
+    public async Task CollectDiagnosticAsync(PipelineDiagnosticEvent diagnosticEvent, CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] CollectDiagnosticAsync呼び出し - Stage: {diagnosticEvent.Stage}, IsCollecting: {_isCollecting}, Disposed: {_disposed}");
+        
         if (!_isCollecting || _disposed)
-            return Task.CompletedTask;
-
-        // メイン処理をブロックしないようバックグラウンドで処理
-        _backgroundQueue.QueueBackgroundWorkItem(async token =>
         {
-            await ProcessDiagnosticEventAsync(diagnosticEvent, token).ConfigureAwait(false);
-        });
+            Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 収集スキップ - IsCollecting: {_isCollecting}, Disposed: {_disposed}");
+            return;
+        }
 
-        return Task.CompletedTask;
+        // 🔧 CRITICAL FIX: イベントを即座に蓄積（バックグラウンド処理ではなく同期処理）
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積開始 - Stage: {diagnosticEvent.Stage}");
+        
+        // 即座に蓄積処理を実行
+        await ProcessDiagnosticEventAsync(diagnosticEvent, cancellationToken).ConfigureAwait(false);
+        
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積完了 - Stage: {diagnosticEvent.Stage}");
     }
 
     public async Task<string> GenerateReportAsync(string reportType = "diagnostic", CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] GenerateReportAsync開始 - reportType: {reportType}, IsCollecting: {_isCollecting}");
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ExtractAllEvents呼び出し前 - キューサイズ: {_diagnosticEvents.Count}");
+        
         var events = ExtractAllEvents();
+        
+        Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ExtractAllEvents完了 - 取得イベント数: {events.Count}");
         
         if (!events.Any())
         {
+            Console.WriteLine("🩺 [DIAGNOSTIC_COLLECTION] 警告: 生成する診断イベントがありません");
             _logger.LogWarning("生成する診断イベントがありません");
             return string.Empty;
         }
@@ -111,12 +123,22 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     {
         try
         {
+            Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ProcessDiagnosticEventAsync開始 - Stage: {diagnosticEvent.Stage}, 現在キューサイズ: {_diagnosticEvents.Count}");
+            
             _diagnosticEvents.Enqueue(diagnosticEvent);
+            
+            Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] イベント追加完了 - 新キューサイズ: {_diagnosticEvents.Count}");
 
-            // メモリ制限チェック
+            // メモリ制限チェック - バックグラウンドでフラッシュ実行
             if (_diagnosticEvents.Count > MaxEventsInMemory)
             {
-                await FlushEventsAsync(cancellationToken).ConfigureAwait(false);
+                Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] メモリ制限到達 - バックグラウンドフラッシュ実行: {_diagnosticEvents.Count} > {MaxEventsInMemory}");
+                
+                // フラッシュ処理はバックグラウンドで実行（パフォーマンスを保持）
+                _backgroundQueue.QueueBackgroundWorkItem(async token =>
+                {
+                    await FlushEventsAsync(token).ConfigureAwait(false);
+                });
             }
 
             // 重要度が高い場合は即座にコンソール出力（ファイル出力は診断レポートで一元化）
@@ -135,6 +157,7 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ [DIAGNOSTIC_COLLECTION] ProcessDiagnosticEventAsyncエラー: {ex.Message}");
             _logger.LogError(ex, "診断イベント処理エラー");
         }
     }

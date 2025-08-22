@@ -2,6 +2,7 @@
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
@@ -588,6 +589,47 @@ public class MainOverlayViewModel : ViewModelBase
         DebugLogUtility.WriteLog($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+
+        // 🔧 診断レポート生成（StartまたはStop操作時）
+        // Start時とStop時の両方で診断レポートを生成
+        {
+            try
+            {
+                var diagnosticService = _serviceProvider.GetService<IDiagnosticCollectionService>();
+                if (diagnosticService != null)
+                {
+                    var operation = IsTranslationActive ? "Stop" : "Start";
+                    DebugLogUtility.WriteLog($"📊 診断レポート生成開始（ExecuteStartStopAsync {operation}操作時）");
+                    Console.WriteLine($"📊 診断レポート生成開始（ExecuteStartStopAsync {operation}操作時）");
+                    var reportPath = await diagnosticService.GenerateReportAsync($"execute_{operation.ToLower()}_button_pressed").ConfigureAwait(false);
+                    
+                    if (!string.IsNullOrEmpty(reportPath))
+                    {
+                        DebugLogUtility.WriteLog($"✅ 診断レポート生成成功: {reportPath}");
+                        Console.WriteLine($"📊 診断レポート生成完了: {reportPath}");
+                        Logger?.LogInformation("診断レポート生成完了: {ReportPath}", reportPath);
+                    }
+                    else
+                    {
+                        DebugLogUtility.WriteLog("⚠️ 診断レポート生成：データなし");
+                        Console.WriteLine("⚠️ 診断レポート生成：蓄積されたデータがありません");
+                        Logger?.LogWarning("診断レポート生成：蓄積されたデータなし");
+                    }
+                }
+                else
+                {
+                    DebugLogUtility.WriteLog("❌ 診断サービス取得失敗：DIに登録されていません");
+                    Console.WriteLine("❌ 診断サービス取得失敗：DIに登録されていません");
+                    Logger?.LogError("診断サービスが取得できませんでした");
+                }
+            }
+            catch (Exception diagEx)
+            {
+                DebugLogUtility.WriteLog($"❌ 診断レポート生成エラー: {diagEx.Message}");
+                Console.WriteLine($"❌ 診断レポート生成エラー: {diagEx.Message}");
+                Logger?.LogError(diagEx, "診断レポート生成中にエラーが発生しました");
+            }
+        }
         
         try
         {
@@ -625,6 +667,42 @@ public class MainOverlayViewModel : ViewModelBase
         DebugLogUtility.WriteLog("🚀 StartTranslationAsync開始");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
         Logger?.LogInformation("🚀 翻訳ワークフローを開始");
+
+        // 🔧 診断レポート生成（Startボタン押下時）
+        try
+        {
+            var diagnosticService = _serviceProvider.GetService<IDiagnosticCollectionService>();
+            if (diagnosticService != null)
+            {
+                DebugLogUtility.WriteLog("📊 診断レポート生成開始（Start押下時）");
+                var reportPath = await diagnosticService.GenerateReportAsync("start_button_pressed").ConfigureAwait(false);
+                
+                if (!string.IsNullOrEmpty(reportPath))
+                {
+                    DebugLogUtility.WriteLog($"✅ 診断レポート生成成功: {reportPath}");
+                    Console.WriteLine($"📊 診断レポート生成完了: {reportPath}");
+                    Logger?.LogInformation("診断レポート生成完了: {ReportPath}", reportPath);
+                }
+                else
+                {
+                    DebugLogUtility.WriteLog("⚠️ 診断レポート生成：データなし");
+                    Console.WriteLine("⚠️ 診断レポート生成：蓄積されたデータがありません");
+                    Logger?.LogWarning("診断レポート生成：蓄積されたデータなし");
+                }
+            }
+            else
+            {
+                DebugLogUtility.WriteLog("❌ 診断サービス取得失敗：DIに登録されていません");
+                Console.WriteLine("❌ 診断サービスが利用できません");
+                Logger?.LogError("診断サービスが取得できませんでした");
+            }
+        }
+        catch (Exception diagEx)
+        {
+            DebugLogUtility.WriteLog($"❌ 診断レポート生成エラー: {diagEx.Message}");
+            Console.WriteLine($"❌ 診断レポート生成エラー: {diagEx.Message}");
+            Logger?.LogError(diagEx, "診断レポート生成中にエラーが発生しました");
+        }
 
         try
         {

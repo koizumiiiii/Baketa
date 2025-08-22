@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
@@ -54,6 +55,7 @@ public sealed class PaddleOcrEngineFactory(
                 
                 // 🔥 重要: シングルトンパターンを無効化するため、直接インスタンス作成
                 var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
@@ -62,6 +64,7 @@ public sealed class PaddleOcrEngineFactory(
                     ocrPostProcessor, 
                     gpuMemoryManager,
                     unifiedSettingsService,
+                    eventAggregator,
                     unifiedLoggingService,
                     engineLogger);
             }
@@ -154,8 +157,9 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IOcrPostProcessor ocrPostProcessor,
     IGpuMemoryManager gpuMemoryManager,
     IUnifiedSettingsService unifiedSettingsService,
+    IEventAggregator eventAggregator,
     IUnifiedLoggingService? unifiedLoggingService = null,
-    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger)
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger)
 {
 
     /// <summary>

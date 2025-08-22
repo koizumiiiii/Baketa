@@ -5,6 +5,8 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Factories;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
+using Baketa.Infrastructure.Translation.Cloud;
+using Baketa.Infrastructure.Translation.Local;
 // OPUS-MT ONNX実装とSentencePiece削除済み
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,10 +31,21 @@ namespace Baketa.Infrastructure.Translation;
             // ITranslationEngineFactoryを登録（TranslationOrchestrationServiceで必要）
             services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
-            // OPUS-MT削除済み: NLLB-200エンジンがデフォルト翻訳エンジン
+            // ✨ 実際のAI翻訳エンジンを登録（優先順位順）
+            
+            // 1. NLLB-200エンジン（ローカル、最優先）
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, OptimizedPythonTranslationEngine>();
+            
+            // 2. ONNXエンジン（ローカル、第2優先）
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, OnnxTranslationEngine>();
+            
+            // 3. Geminiエンジン（クラウド、第3優先）
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, GeminiTranslationEngine>();
 
-            // フォールバック用のMockエンジンも登録（開発・テスト用）
+#if DEBUG
+            // 開発環境でのみMockエンジンを登録（デバッグ・テスト用）
             services.AddSingleton<MockTranslationEngine>();
+#endif
 
             // 翻訳サービスを登録
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();

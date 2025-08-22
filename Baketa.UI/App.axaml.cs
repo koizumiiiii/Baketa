@@ -49,24 +49,29 @@ internal sealed partial class App : Avalonia.Application
 
         public override void Initialize()
         {
+            Console.WriteLine("🔥🔥🔥 [INIT_DEBUG] App.Initialize() 開始 - ServiceProvider状態確認 🔥🔥🔥");
+            Console.WriteLine($"[INIT_DEBUG] Program.ServiceProvider == null: {Program.ServiceProvider == null}");
+            
             AvaloniaXamlLoader.Load(this);
             
-            _logger = Program.ServiceProvider?.GetService<ILogger<App>>();
-            if (_logger != null)
+            // ServiceProviderが利用可能になってからサービスを取得
+            if (Program.ServiceProvider != null)
             {
-                _logInitializing(_logger, null);
+                Console.WriteLine("[INIT_DEBUG] ServiceProvider利用可能 - サービス取得中");
+                _logger = Program.ServiceProvider.GetService<ILogger<App>>();
+                _eventAggregator = Program.ServiceProvider.GetService<IEventAggregator>();
+                
+                if (_logger != null)
+                {
+                    _logInitializing(_logger, null);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[INIT_DEBUG] ServiceProvider未利用可能 - 診断システム初期化は後で実行");
             }
             
-            // 未処理例外ハンドラーを設定
-            // AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            // System.Threading.Tasks.TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
-            
-            // イベント集約器を取得
-            _eventAggregator = Program.ServiceProvider?.GetService<IEventAggregator>();
-            
-            // 🩺 診断システム即座初期化 - App.Initialize段階での確実初期化
-            Console.WriteLine("🚨🚨🚨 [APP_INIT] App.Initialize段階での診断システム初期化開始！ 🚨🚨🚨");
-            InitializeDiagnosticSystemInAppInitialize();
+            Console.WriteLine("🔥🔥🔥 [INIT_DEBUG] App.Initialize() 完了 🔥🔥🔥");
         }
 
         /// <summary>
@@ -299,25 +304,45 @@ internal sealed partial class App : Avalonia.Application
                                     await _eventAggregator.PublishAsync(testEvent).ConfigureAwait(false);
                                     Console.WriteLine("🧪 診断テストイベント発行完了");
                                     
-                                    // 追加のテストレポート生成
+                                    // 追加のテストレポート生成 - 詳細デバッグ付き
+                                    Console.WriteLine("🔍 [診断レポート] 2秒待機開始");
                                     await Task.Delay(2000).ConfigureAwait(false);
+                                    Console.WriteLine("🔍 [診断レポート] 2秒待機完了 - サービス取得開始");
+                                    
                                     try
                                     {
+                                        Console.WriteLine("🔍 [診断レポート] IDiagnosticCollectionService取得試行中...");
                                         var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                                        
                                         if (diagnosticCollectionService != null)
                                         {
+                                            Console.WriteLine($"✅ [診断レポート] IDiagnosticCollectionService取得成功: {diagnosticCollectionService.GetType().Name}");
                                             Console.WriteLine("🧪 手動レポート生成テスト開始");
+                                            
                                             var reportPath = await diagnosticCollectionService.GenerateReportAsync("manual_test").ConfigureAwait(false);
                                             Console.WriteLine($"🧪 手動レポート生成完了: {reportPath}");
+                                            
+                                            // Reports ディレクトリの内容確認
+                                            var reportsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "Reports");
+                                            if (Directory.Exists(reportsDir))
+                                            {
+                                                var files = Directory.GetFiles(reportsDir, "*.json");
+                                                Console.WriteLine($"📁 [診断レポート] Reports ディレクトリ内ファイル数: {files.Length}");
+                                                foreach (var file in files.Take(3))
+                                                {
+                                                    Console.WriteLine($"📄 [診断レポート] ファイル: {Path.GetFileName(file)}");
+                                                }
+                                            }
                                         }
                                         else
                                         {
-                                            Console.WriteLine("🧪 IDiagnosticCollectionServiceが見つからないため手動レポート生成をスキップ");
+                                            Console.WriteLine("❌ [診断レポート] IDiagnosticCollectionServiceがnull - サービス登録を確認してください");
                                         }
                                     }
                                     catch (Exception manualEx)
                                     {
-                                        Console.WriteLine($"🧪 手動レポート生成エラー: {manualEx.Message}");
+                                        Console.WriteLine($"❌ [診断レポート] 手動レポート生成エラー: {manualEx.Message}");
+                                        Console.WriteLine($"❌ [診断レポート] スタックトレース: {manualEx.StackTrace}");
                                     }
                                 }
                                 catch (Exception testEx)

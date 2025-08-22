@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
@@ -299,8 +300,9 @@ public sealed class PaddleOcrModule : IServiceModule
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
                 var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
                 var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger);
             }
             
             bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
@@ -319,8 +321,9 @@ public sealed class PaddleOcrModule : IServiceModule
                 logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
                 var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
                 var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, unifiedLoggingService, logger);
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger);
             }
         });
         

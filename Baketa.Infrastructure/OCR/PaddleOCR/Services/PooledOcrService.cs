@@ -209,26 +209,54 @@ public sealed class PooledOcrService : IOcrEngine
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
 
-        _logger.LogDebug("🔍 PooledOcrService: DetectTextRegionsAsync実行");
+        _logger.LogDebug("🔍 PooledOcrService: DetectTextRegionsAsync実行（効率的な検出専用実装）");
 
-        // プールから一時的にエンジンを取得して検出専用処理を実行
-        // TODO: 実際のプール実装時により効率的な方法に改善
-        
-        // 現在は基本実装として、RecognizeAsyncでテキスト部分を空にする方式を採用
-        var fullResult = await RecognizeAsync(image, null, cancellationToken);
-        
-        var detectionOnlyRegions = fullResult.TextRegions.Select(region => 
-            new OcrTextRegion("", region.Bounds, region.Confidence, region.Contour, region.Direction))
-            .ToList();
+        var engine = _enginePool.Get();
+        if (engine == null)
+        {
+            _logger.LogError("❌ PooledOcrService: 検出専用エンジンインスタンスをプールから取得できませんでした");
+            throw new InvalidOperationException("OCR検出専用エンジンプールからインスタンスを取得できませんでした");
+        }
 
-        return new OcrResults(
-            detectionOnlyRegions,
-            image,
-            fullResult.ProcessingTime,
-            fullResult.LanguageCode,
-            fullResult.RegionOfInterest,
-            ""
-        );
+        try
+        {
+            _logger.LogDebug("🔄 PooledOcrService: 検出専用エンジンプールから取得 - 型: {EngineType}, Hash: {EngineHash}", 
+                engine.GetType().Name, engine.GetHashCode());
+            
+            var startTime = DateTime.UtcNow;
+            
+            // ✅ 効率的な検出専用処理: 認識処理をスキップしてリソースを大幅節約
+            var results = await engine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+            
+            var duration = DateTime.UtcNow - startTime;
+            
+            _logger.LogDebug("✅ PooledOcrService: 効率的検出専用処理完了 - 処理時間: {Duration}ms, 結果数: {ResultCount}", 
+                duration.TotalMilliseconds, results.TextRegions.Count);
+            
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ PooledOcrService: 検出専用処理でエラーが発生 - エンジン: {EngineType}", 
+                engine.GetType().Name);
+            throw;
+        }
+        finally
+        {
+            // エンジンをプールに返却
+            try
+            {
+                _enginePool.Return(engine);
+                _logger.LogDebug("♻️ PooledOcrService: 検出専用エンジンをプールに返却 - Hash: {EngineHash}", 
+                    engine.GetHashCode());
+            }
+            catch (Exception returnEx)
+            {
+                _logger.LogWarning(returnEx, "⚠️ PooledOcrService: 検出専用エンジン返却時にエラー - Hash: {EngineHash}", 
+                    engine.GetHashCode());
+                // 返却エラーは処理を中断しない
+            }
+        }
     }
 
     public async Task<bool> SwitchLanguageAsync(string language, CancellationToken _ = default)

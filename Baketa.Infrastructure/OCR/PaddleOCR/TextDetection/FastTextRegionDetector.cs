@@ -1,15 +1,21 @@
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.Imaging;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
 
 /// <summary>
-/// 高速テキスト領域検出器 - 適応的キャプチャシステム用の軽量実装
+/// 高速テキスト領域検出器 - PaddleOCRベースの実際の検出実装（ROI修正版）
 /// </summary>
-public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logger = null) : ITextRegionDetector, IDisposable
+public sealed class FastTextRegionDetector(
+    ILogger<FastTextRegionDetector>? logger = null, 
+    Baketa.Core.Abstractions.OCR.IOcrEngine? ocrEngine = null,
+    Baketa.Core.Abstractions.Factories.IImageFactory? imageFactory = null) : ITextRegionDetector, IDisposable
 {
     private TextDetectionConfig _config = new();
     private bool _disposed;
@@ -23,15 +29,18 @@ public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logg
         
         try
         {
-            logger?.LogDebug("高速テキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
+            logger?.LogDebug("🔍 PaddleOCRベーステキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
             
-            // CPU負荷を軽減するため非同期で実行
-            return await Task.Run(() => DetectRegionsInternal(image)).ConfigureAwait(false);
+            // 実際のPaddleOCRエンジンを使用した検出（認識スキップで高速化）
+            return await DetectRegionsWithPaddleOCRAsync(image).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "テキスト領域検出中にエラーが発生");
-            return [];
+            logger?.LogError(ex, "❌ PaddleOCRベーステキスト領域検出でエラーが発生");
+            
+            // フォールバック: エラー時のみ軽量検出を使用
+            logger?.LogWarning("⚠️ フォールバック: 軽量グリッド検出を実行");
+            return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
         }
     }
 
@@ -44,12 +53,12 @@ public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logg
         
         if (showDebugInfo && logger != null)
         {
-            logger.LogInformation("検出されたテキスト領域数: {Count}", regions.Count);
+            logger.LogInformation("✅ 検出されたテキスト領域数: {Count} (PaddleOCRベース)", regions.Count);
             for (int i = 0; i < regions.Count; i++)
             {
                 var rect = regions[i];
-                logger.LogDebug("領域{Index}: ({X},{Y}) サイズ={Width}x{Height}", 
-                    i, rect.X, rect.Y, rect.Width, rect.Height);
+                logger.LogDebug("🔍 領域{Index}: ({X},{Y}) サイズ={Width}x{Height}, アスペクト比={AspectRatio:F2}", 
+                    i, rect.X, rect.Y, rect.Width, rect.Height, (double)rect.Width / rect.Height);
             }
         }
         
@@ -73,42 +82,94 @@ public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logg
     public TextDetectionConfig GetCurrentConfig() => _config;
 
     /// <summary>
-    /// 内部検出ロジック - 軽量エッジベース検出
+    /// 実際のPaddleOCRエンジンを使用したテキスト領域検出（根本修正）
     /// </summary>
-    private List<Rectangle> DetectRegionsInternal(IWindowsImage image)
+    private async Task<IList<Rectangle>> DetectRegionsWithPaddleOCRAsync(IWindowsImage image)
+    {
+        if (ocrEngine == null)
+        {
+            logger?.LogWarning("⚠️ OCRエンジンが注入されていません - フォールバック検出を実行");
+            return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
+        }
+
+        Baketa.Core.Abstractions.Imaging.IImage? convertedImage = null;
+        try
+        {
+            // IWindowsImage → IImage 変換（バイト配列経由）
+            if (imageFactory != null)
+            {
+                var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
+                convertedImage = await imageFactory.CreateFromBytesAsync(imageBytes).ConfigureAwait(false);
+            }
+            else
+            {
+                logger?.LogWarning("⚠️ IImageFactoryが注入されていません - フォールバックへ");
+                return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
+            }
+            
+            // PaddleOCRの検出専用機能を使用（認識処理をスキップして高速化）
+            var ocrResults = await ocrEngine.DetectTextRegionsAsync(convertedImage).ConfigureAwait(false);
+            
+            if (ocrResults?.TextRegions == null || ocrResults.TextRegions.Count == 0)
+            {
+                logger?.LogDebug("🔍 PaddleOCR検出結果が空 - フォールバックなし");
+                return [];
+            }
+
+            // OcrTextRegionからRectangleに変換し、設定に基づくフィルタリングを適用
+            var filteredRegions = ocrResults.TextRegions
+                .Where(region => IsRegionValid(region.Bounds))
+                .Select(region => region.Bounds)
+                .ToList();
+
+            // 近接領域の統合（既存ロジックを活用）
+            var mergedRegions = MergeNearbyRegions(filteredRegions);
+
+            logger?.LogInformation("✅ PaddleOCRベーステキスト領域検出完了: {OriginalCount}個 → フィルタ後{FilteredCount}個 → 統合後{MergedCount}個", 
+                ocrResults.TextRegions.Count, filteredRegions.Count, mergedRegions.Count);
+
+            return mergedRegions;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "❌ PaddleOCR検出処理中にエラー");
+            throw;
+        }
+        finally
+        {
+            // 変換された画像のリソース解放
+            convertedImage?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// 軽量フォールバック検出（エラー時のみ使用）
+    /// </summary>
+    private List<Rectangle> DetectRegionsLightweightFallback(IWindowsImage image)
     {
         var regions = new List<Rectangle>();
         
         try
         {
-            // 簡素化されたテキスト領域検出アルゴリズム
-            // ROI処理のため高速性を優先
+            logger?.LogDebug("⚡ 軽量フォールバック検出実行 - グリッドベース分析");
             
             var width = image.Width;
             var height = image.Height;
             
-            // グリッドベースでのサンプリング検出（パフォーマンス重視）
-            var gridSizeX = Math.Max(1, width / 20);  // 横20分割
-            var gridSizeY = Math.Max(1, height / 15); // 縦15分割
+            // グリッドベースでのサンプリング検出（フォールバック用）
+            // 元の実装より密度を下げて高速化
+            var gridSizeX = Math.Max(1, width / 12);  // 横12分割（元20→12）
+            var gridSizeY = Math.Max(1, height / 10); // 縦10分割（元15→10）
             
-            for (int y = 0; y < height - gridSizeY; y += gridSizeY / 2)
+            for (int y = 0; y < height - gridSizeY; y += gridSizeY)
             {
-                for (int x = 0; x < width - gridSizeX; x += gridSizeX / 2)
+                for (int x = 0; x < width - gridSizeX; x += gridSizeX)
                 {
                     var rect = new Rectangle(x, y, gridSizeX, gridSizeY);
                     
-                    // 最小サイズフィルタリング
-                    if (rect.Width >= _config.MinTextWidth && 
-                        rect.Height >= _config.MinTextHeight &&
-                        rect.Width * rect.Height >= _config.MinTextArea)
+                    if (IsRegionValid(rect))
                     {
-                        // アスペクト比チェック
-                        float aspectRatio = (float)rect.Width / rect.Height;
-                        if (aspectRatio >= _config.MinAspectRatio && 
-                            aspectRatio <= _config.MaxAspectRatio)
-                        {
-                            regions.Add(rect);
-                        }
+                        regions.Add(rect);
                     }
                 }
             }
@@ -116,14 +177,37 @@ public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logg
             // 近接領域の統合
             regions = MergeNearbyRegions(regions);
             
-            logger?.LogDebug("テキスト領域検出完了: {Count}個の領域を検出", regions.Count);
+            logger?.LogDebug("⚡ 軽量フォールバック検出完了: {Count}個の領域を検出（緊急用）", regions.Count);
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "テキスト領域検出処理中にエラー");
+            logger?.LogError(ex, "❌ フォールバック検出処理中にもエラー");
         }
         
         return regions;
+    }
+
+    /// <summary>
+    /// 領域の妥当性チェック（設定ベース）
+    /// </summary>
+    private bool IsRegionValid(Rectangle rect)
+    {
+        // 最小サイズフィルタリング
+        if (rect.Width < _config.MinTextWidth || 
+            rect.Height < _config.MinTextHeight ||
+            rect.Width * rect.Height < _config.MinTextArea)
+        {
+            return false;
+        }
+
+        // アスペクト比チェック
+        float aspectRatio = (float)rect.Width / rect.Height;
+        if (aspectRatio < _config.MinAspectRatio || aspectRatio > _config.MaxAspectRatio)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -185,7 +269,7 @@ public sealed class FastTextRegionDetector(ILogger<FastTextRegionDetector>? logg
     {
         if (_disposed) return;
         
-        logger?.LogDebug("FastTextRegionDetector をクリーンアップ");
+        logger?.LogDebug("🧹 FastTextRegionDetector をクリーンアップ（PaddleOCRベース版）");
         _disposed = true;
     }
 }

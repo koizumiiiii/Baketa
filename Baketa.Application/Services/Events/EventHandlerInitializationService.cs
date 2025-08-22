@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Handlers;
+using Baketa.Core.Events.Diagnostics;
 
 namespace Baketa.Application.Services.Events;
 
@@ -100,6 +101,20 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}");
                 // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}{Environment.NewLine}");
+            }
+
+            // DiagnosticEventProcessorの登録
+            try
+            {
+                var diagnosticEventProcessor = _serviceProvider.GetRequiredService<IEventProcessor<PipelineDiagnosticEvent>>();
+                eventAggregator.Subscribe<PipelineDiagnosticEvent>(diagnosticEventProcessor);
+                _logger.LogInformation("DiagnosticEventProcessorを登録しました");
+                Console.WriteLine("🔥 [DEBUG] DiagnosticEventProcessorを登録しました");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DiagnosticEventProcessorの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] DiagnosticEventProcessorの登録失敗: {ex.Message}");
             }
 
             _logger.LogInformation("🔥 イベントハンドラー初期化が完了しました");

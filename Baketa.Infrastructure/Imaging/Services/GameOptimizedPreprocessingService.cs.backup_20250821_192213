@@ -36,15 +36,7 @@ public sealed class GameOptimizedPreprocessingService(
             EnableColorMasking = true,
             AdaptiveBlockSize = 19,        // より大きなブロックで文字の連続性を保持
             AdaptiveC = 6.0,               // より緩い閾値で文字の細部保持
-            ColorMaskingStrength = 0.7f,
-            // ✨ OCR精度向上機能（標準設定）
-            EnableContrastEnhancement = true,
-            ContrastLimit = 2.0,
-            EnableNoiseReduction = true,
-            NoiseReductionStrength = 3.0,
-            EnableSharpening = true,
-            SharpeningStrength = 0.8,
-            EnableEdgeEnhancement = false    // 標準では軽量化のため無効
+            ColorMaskingStrength = 0.7f
         },
         ["darkbackground"] = new GameScreenProfile
         {
@@ -55,16 +47,7 @@ public sealed class GameOptimizedPreprocessingService(
             AdaptiveC = 9.0,         // 適度な閾値調整で文字結合促進
             ColorMaskingStrength = 0.85f,
             PreBlurEnabled = true,
-            PreBlurKernelSize = 3,
-            // ✨ OCR精度向上機能（暗い背景用）
-            EnableContrastEnhancement = true,
-            ContrastLimit = 3.0,     // 暗い背景では強めのコントラスト強化
-            EnableNoiseReduction = true,
-            NoiseReductionStrength = 4.0,  // 暗い背景のノイズ除去を強化
-            EnableSharpening = true,
-            SharpeningStrength = 1.0,
-            EnableEdgeEnhancement = true,   // 暗い背景ではエッジ強化有効
-            EdgeKernelSize = 3
+            PreBlurKernelSize = 3
         },
         ["lightbackground"] = new GameScreenProfile
         {
@@ -75,16 +58,7 @@ public sealed class GameOptimizedPreprocessingService(
             AdaptiveC = 4.0,             // より弱い閾値調整
             ColorMaskingStrength = 0.5f,
             PostMorphEnabled = true,
-            MorphKernelSize = 2,
-            // ✨ OCR精度向上機能（明るい背景用）
-            EnableContrastEnhancement = true,
-            ContrastLimit = 1.5,     // 明るい背景では穏やかなコントラスト強化
-            EnableNoiseReduction = false,  // 明るい背景ではノイズ除去不要
-            NoiseReductionStrength = 2.0,
-            EnableSharpening = true,
-            SharpeningStrength = 0.6,   // 明るい背景では控えめなシャープニング
-            EnableEdgeEnhancement = false,  // 明るい背景ではエッジ強化不要
-            EdgeKernelSize = 3
+            MorphKernelSize = 2
         },
         ["highcontrast"] = new GameScreenProfile
         {
@@ -96,16 +70,7 @@ public sealed class GameOptimizedPreprocessingService(
             ColorMaskingStrength = 0.6f,
             PostMorphEnabled = true,
             MorphKernelSize = 1,
-            MorphIterations = 1,         // モルフォロジー処理を軽減
-            // ✨ OCR精度向上機能（高コントラスト用）
-            EnableContrastEnhancement = false,  // 高コントラストではコントラスト強化不要
-            ContrastLimit = 1.0,
-            EnableNoiseReduction = false,  // 高コントラストではノイズ除去不要
-            NoiseReductionStrength = 2.0,
-            EnableSharpening = false,      // 高コントラストではシャープニング不要
-            SharpeningStrength = 0.5,
-            EnableEdgeEnhancement = false,  // 高コントラストではエッジ強化不要
-            EdgeKernelSize = 3
+            MorphIterations = 1          // モルフォロジー処理を軽減
         },
         ["anime"] = new GameScreenProfile
         {
@@ -118,16 +83,7 @@ public sealed class GameOptimizedPreprocessingService(
             PreBlurEnabled = false,        // アニメ調は鮮明さを保持
             PostMorphEnabled = true,
             MorphKernelSize = 1,           // より軽いモルフォロジー処理
-            MorphIterations = 1,
-            // ✨ OCR精度向上機能（アニメ調用）
-            EnableContrastEnhancement = true,
-            ContrastLimit = 2.5,     // アニメ調ではバランス重視のコントラスト強化
-            EnableNoiseReduction = true,
-            NoiseReductionStrength = 2.5,  // アニメ調では軽めのノイズ除去
-            EnableSharpening = true,
-            SharpeningStrength = 1.2,      // アニメ調では鮮明さのためシャープニング強化
-            EnableEdgeEnhancement = true,   // アニメ調ではエッジ強化有効
-            EdgeKernelSize = 3
+            MorphIterations = 1
         }
     };
 
@@ -152,7 +108,8 @@ public sealed class GameOptimizedPreprocessingService(
             // 🔍 Phase 3診断: 直接ファイル出力で確実にログを残す
             try
             {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎮 [PHASE3-START] ゲーム最適化前処理開始: プロファイル={profile.Name}, サイズ={image.Width}x{image.Height}{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -168,7 +125,8 @@ public sealed class GameOptimizedPreprocessingService(
             // 🔍 Phase 3診断: 完了ログも直接ファイル出力
             try
             {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [PHASE3-END] ゲーム最適化前処理完了: プロファイル={profile.Name}{Environment.NewLine}");
             }
             catch (Exception fileEx)
             {
@@ -283,94 +241,9 @@ public sealed class GameOptimizedPreprocessingService(
                     _imagePool.Statistics.HitRate);
             }
 
-            // ✨ Step 3: OCR精度向上処理（新機能）
-            
-            // Step 3a: コントラスト強化 (CLAHE) - TODO: OpenCvContrastEnhancementFilter実装後に有効化
-            if (false) // profile.EnableContrastEnhancement) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ コントラスト強化適用中（CLAHE使用）...");
-                
-                try
-                {
-                    // var contrastFilter = CreateContrastEnhancementFilter(profile);
-                    // var enhancedImage = await contrastFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = enhancedImage;
-                    
-                    _logger.LogDebug("✅ コントラスト強化完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ コントラスト強化でエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3b: ノイズ除去 (バイラテラルフィルター) - TODO: OpenCvNoiseReductionFilter実装後に有効化
-            if (false) // profile.EnableNoiseReduction) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ ノイズ除去適用中（バイラテラルフィルター使用）...");
-                
-                try
-                {
-                    // var noiseReductionFilter = CreateNoiseReductionFilter(profile);
-                    // var denoisedImage = await noiseReductionFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = denoisedImage;
-                    
-                    _logger.LogDebug("✅ ノイズ除去完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ ノイズ除去でエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3c: シャープニング - TODO: OpenCvSharpeningFilter実装後に有効化
-            if (false) // profile.EnableSharpening) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ シャープニング適用中...");
-                
-                try
-                {
-                    // var sharpeningFilter = CreateSharpeningFilter(profile);
-                    // var sharpenedImage = await sharpeningFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = sharpenedImage;
-                    
-                    _logger.LogDebug("✅ シャープニング完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ シャープニングでエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3d: エッジ強化 - TODO: OpenCvEdgeEnhancementFilter実装後に有効化
-            if (false) // profile.EnableEdgeEnhancement) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ エッジ強化適用中...");
-                
-                try
-                {
-                    // var edgeEnhancementFilter = CreateEdgeEnhancementFilter(profile);
-                    // var edgeEnhancedImage = await edgeEnhancementFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = edgeEnhancedImage;
-                    
-                    _logger.LogDebug("✅ エッジ強化完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ エッジ強化でエラーが発生、スキップして続行");
-                }
-            }
-
             _logger.LogInformation("🎮 ゲーム最適化処理完了: ColorMasking={ColorMasking}, AdaptiveThreshold={AdaptiveThreshold}, " +
-                "OCR精度向上={ContrastEnhancement}/{NoiseReduction}/{Sharpening}/{EdgeEnhancement}, " +
                 "PoolObjectsUsed={PoolObjectsUsed}, MemoryEfficiency={MemoryEfficiency:P1}",
                 profile.EnableColorMasking, profile.EnableAdaptiveThreshold, 
-                profile.EnableContrastEnhancement, profile.EnableNoiseReduction, 
-                profile.EnableSharpening, profile.EnableEdgeEnhancement,
                 pooledImages.Count, _imagePool.Statistics.HitRate);
 
             return currentImage;
@@ -468,74 +341,6 @@ public sealed class GameOptimizedPreprocessingService(
         return filter;
     }
 
-    // TODO: OpenCVフィルタークラス実装後に有効化
-    /*
-    /// <summary>
-    /// コントラスト強化フィルターを作成 (CLAHE)
-    /// </summary>
-    /// <param name="profile">プロファイル</param>
-    /// <returns>設定済みフィルター</returns>
-    private OpenCvContrastEnhancementFilter CreateContrastEnhancementFilter(GameScreenProfile profile)
-    {
-        var filter = new OpenCvContrastEnhancementFilter(_logger as ILogger<OpenCvContrastEnhancementFilter>);
-        
-        filter.SetParameter("ContrastLimit", profile.ContrastLimit);
-        filter.SetParameter("TileGridSize", 8); // 8x8 tiles for CLAHE
-        filter.SetParameter("EnableDetailedLogging", true);
-        
-        return filter;
-    }
-
-    /// <summary>
-    /// ノイズ除去フィルターを作成 (バイラテラルフィルター)
-    /// </summary>
-    /// <param name="profile">プロファイル</param>
-    /// <returns>設定済みフィルター</returns>
-    private OpenCvNoiseReductionFilter CreateNoiseReductionFilter(GameScreenProfile profile)
-    {
-        var filter = new OpenCvNoiseReductionFilter(_logger as ILogger<OpenCvNoiseReductionFilter>);
-        
-        filter.SetParameter("D", 9); // フィルターサイズ
-        filter.SetParameter("SigmaColor", profile.NoiseReductionStrength * 20); // 色の違いに対する感度
-        filter.SetParameter("SigmaSpace", profile.NoiseReductionStrength * 20); // 位置の違いに対する感度
-        filter.SetParameter("EnableDetailedLogging", true);
-        
-        return filter;
-    }
-
-    /// <summary>
-    /// シャープニングフィルターを作成
-    /// </summary>
-    /// <param name="profile">プロファイル</param>
-    /// <returns>設定済みフィルター</returns>
-    private OpenCvSharpeningFilter CreateSharpeningFilter(GameScreenProfile profile)
-    {
-        var filter = new OpenCvSharpeningFilter(_logger as ILogger<OpenCvSharpeningFilter>);
-        
-        filter.SetParameter("SharpeningStrength", profile.SharpeningStrength);
-        filter.SetParameter("KernelSize", 3); // 3x3 カーネル
-        filter.SetParameter("EnableDetailedLogging", true);
-        
-        return filter;
-    }
-
-    /// <summary>
-    /// エッジ強化フィルターを作成
-    /// </summary>
-    /// <param name="profile">プロファイル</param>
-    /// <returns>設定済みフィルター</returns>
-    private OpenCvEdgeEnhancementFilter CreateEdgeEnhancementFilter(GameScreenProfile profile)
-    {
-        var filter = new OpenCvEdgeEnhancementFilter(_logger as ILogger<OpenCvEdgeEnhancementFilter>);
-        
-        filter.SetParameter("KernelSize", profile.EdgeKernelSize);
-        filter.SetParameter("EdgeThreshold", 50.0); // エッジ検出閾値
-        filter.SetParameter("EnableDetailedLogging", true);
-        
-        return filter;
-    }
-    */
-
     /// <summary>
     /// プロファイルを取得
     /// </summary>
@@ -588,30 +393,4 @@ public class GameScreenProfile
     
     /// <summary>モルフォロジー反復回数</summary>
     public int MorphIterations { get; set; } = 1;
-    
-    // ✨ OCR精度向上のための新機能
-    
-    /// <summary>コントラスト強化有効（CLAHE）</summary>
-    public bool EnableContrastEnhancement { get; set; }
-    
-    /// <summary>コントラスト強化制限値</summary>
-    public double ContrastLimit { get; set; } = 2.0;
-    
-    /// <summary>ノイズ除去有効（バイラテラルフィルター）</summary>
-    public bool EnableNoiseReduction { get; set; }
-    
-    /// <summary>ノイズ除去強度</summary>
-    public double NoiseReductionStrength { get; set; } = 5.0;
-    
-    /// <summary>シャープニング有効</summary>
-    public bool EnableSharpening { get; set; }
-    
-    /// <summary>シャープニング強度</summary>
-    public double SharpeningStrength { get; set; } = 1.0;
-    
-    /// <summary>エッジ強化有効</summary>
-    public bool EnableEdgeEnhancement { get; set; }
-    
-    /// <summary>エッジ強化カーネルサイズ</summary>
-    public int EdgeKernelSize { get; set; } = 3;
 }

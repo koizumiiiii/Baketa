@@ -32,6 +32,9 @@ public sealed class PipelineDiagnosticEvent : IEvent
     /// <summary>エラーメッセージ（失敗時）</summary>
     public string? ErrorMessage { get; init; }
     
+    /// <summary>診断メッセージ（成功・失敗時共通）</summary>
+    public string? Message { get; init; }
+    
     /// <summary>詳細メトリクス（品質スコア、リソース使用量等）</summary>
     public Dictionary<string, object> Metrics { get; init; } = [];
     

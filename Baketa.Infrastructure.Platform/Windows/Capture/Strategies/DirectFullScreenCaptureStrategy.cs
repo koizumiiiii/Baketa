@@ -5,6 +5,9 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Diagnostics;
 using System;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
@@ -16,16 +19,19 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
 {
     private readonly ILogger<DirectFullScreenCaptureStrategy> _logger;
     private readonly IWindowsCapturer _windowsCapturer;
+    private readonly IEventAggregator _eventAggregator;
 
     public string StrategyName => "DirectFullScreen";
     public int Priority => 100; // 最高優先度（統合GPUでは最も効率的）
 
     public DirectFullScreenCaptureStrategy(
         ILogger<DirectFullScreenCaptureStrategy> logger,
-        IWindowsCapturer windowsCapturer)
+        IWindowsCapturer windowsCapturer,
+        IEventAggregator eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     }
 
     public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
@@ -83,11 +89,28 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
     public async Task<CaptureStrategyResult> ExecuteCaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var sessionId = Guid.NewGuid().ToString("N")[..8];
         var result = new CaptureStrategyResult
         {
             StrategyName = StrategyName,
             Metrics = new CaptureMetrics()
         };
+
+        // 📊 [DIAGNOSTIC] 画面キャプチャ開始イベント
+        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "ScreenCapture",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = sessionId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"DirectFullScreen画面キャプチャ開始: HWND=0x{hwnd.ToInt64():X}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "Strategy", StrategyName },
+                { "HWND", $"0x{hwnd.ToInt64():X}" }
+            }
+        }).ConfigureAwait(false);
 
         try
         {
@@ -106,12 +129,49 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
 
                 _logger.LogInformation("DirectFullScreenキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms", 
                     capturedImage.Width, capturedImage.Height, stopwatch.ElapsedMilliseconds);
+
+                // 📊 [DIAGNOSTIC] 画面キャプチャ成功イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "ScreenCapture",
+                    IsSuccess = true,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Information,
+                    Message = $"DirectFullScreen画面キャプチャ成功: {capturedImage.Width}x{capturedImage.Height}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "Strategy", StrategyName },
+                        { "ImageWidth", capturedImage.Width },
+                        { "ImageHeight", capturedImage.Height },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "FrameCount", 1 },
+                        { "PerformanceCategory", "HighPerformance" }
+                    }
+                }).ConfigureAwait(false);
             }
             else
             {
                 result.Success = false;
                 result.ErrorMessage = "キャプチャイメージの取得に失敗";
                 _logger.LogWarning("DirectFullScreenキャプチャ失敗: イメージが null");
+
+                // 📊 [DIAGNOSTIC] 画面キャプチャ失敗イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "ScreenCapture",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = result.ErrorMessage,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"DirectFullScreen画面キャプチャ失敗: イメージが null",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "Strategy", StrategyName },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
+                    }
+                }).ConfigureAwait(false);
             }
         }
         catch (TDRException ex)
@@ -119,6 +179,26 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             _logger.LogWarning(ex, "DirectFullScreen キャプチャでTDRを検出");
             result.Success = false;
             result.ErrorMessage = $"GPU タイムアウト: {ex.Message}";
+
+            // 📊 [DIAGNOSTIC] TDRエラーイベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Critical,
+                Message = $"DirectFullScreen画面キャプチャでTDR検出: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", "TDR" },
+                    { "TDRCode", ex.Data.Contains("ErrorCode") ? ex.Data["ErrorCode"] : "Unknown" }
+                }
+            }).ConfigureAwait(false);
+
             throw; // TDR例外は上位層で特別に処理する必要がある
         }
         catch (GPUConstraintException ex)
@@ -126,12 +206,50 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             _logger.LogWarning(ex, "DirectFullScreen キャプチャでGPU制約を検出");
             result.Success = false;
             result.ErrorMessage = $"GPU制約: {ex.Message}";
+
+            // 📊 [DIAGNOSTIC] GPU制約エラーイベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Warning,
+                Message = $"DirectFullScreen画面キャプチャでGPU制約検出: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", "GPUConstraint" },
+                    { "RequestedSize", ex.Data.Contains("RequestedSize") ? ex.Data["RequestedSize"] : "Unknown" },
+                    { "MaxSize", ex.Data.Contains("MaxSize") ? ex.Data["MaxSize"] : "Unknown" }
+                }
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "DirectFullScreenキャプチャ中にエラー");
             result.Success = false;
             result.ErrorMessage = ex.Message;
+
+            // 📊 [DIAGNOSTIC] 一般エラーイベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Error,
+                Message = $"DirectFullScreen画面キャプチャ中にエラー: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", ex.GetType().Name }
+                }
+            }).ConfigureAwait(false);
         }
         finally
         {

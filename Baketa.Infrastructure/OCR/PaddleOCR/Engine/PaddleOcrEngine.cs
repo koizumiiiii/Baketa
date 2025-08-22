@@ -3,6 +3,9 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Extensions;
 using Baketa.Core.Utilities;
 using Baketa.Core.Performance;
@@ -28,6 +31,8 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -51,6 +56,7 @@ public class PaddleOcrEngine : IOcrEngine
     private readonly IUnifiedSettingsService __unifiedSettingsService;
     private readonly IUnifiedLoggingService? _unifiedLoggingService;
     private readonly ILogger<PaddleOcrEngine>? __logger;
+    private readonly IEventAggregator __eventAggregator;
 
     public PaddleOcrEngine(
         IModelPathResolver _modelPathResolver,
@@ -59,6 +65,7 @@ public class PaddleOcrEngine : IOcrEngine
         IOcrPostProcessor _ocrPostProcessor,
         IGpuMemoryManager _gpuMemoryManager,
         IUnifiedSettingsService _unifiedSettingsService,
+        IEventAggregator _eventAggregator,
         IUnifiedLoggingService? unifiedLoggingService = null,
         ILogger<PaddleOcrEngine>? _logger = null)
     {
@@ -68,6 +75,7 @@ public class PaddleOcrEngine : IOcrEngine
         __ocrPostProcessor = _ocrPostProcessor ?? throw new ArgumentNullException(nameof(_ocrPostProcessor));
         __gpuMemoryManager = _gpuMemoryManager ?? throw new ArgumentNullException(nameof(_gpuMemoryManager));
         __unifiedSettingsService = _unifiedSettingsService ?? throw new ArgumentNullException(nameof(_unifiedSettingsService));
+        __eventAggregator = _eventAggregator ?? throw new ArgumentNullException(nameof(_eventAggregator));
         _unifiedLoggingService = unifiedLoggingService;
         __logger = _logger;
         
@@ -352,6 +360,31 @@ public class PaddleOcrEngine : IOcrEngine
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
         
+        var stopwatch = Stopwatch.StartNew();
+        var sessionId = Guid.NewGuid().ToString("N")[..8];
+
+        // 📊 [DIAGNOSTIC] OCR処理開始イベント
+        await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "OCR",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = sessionId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"OCR処理開始: エンジン={EngineName}, 画像サイズ={image.Width}x{image.Height}, ROI={regionOfInterest?.ToString() ?? "なし"}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "Engine", EngineName },
+                { "EngineVersion", EngineVersion },
+                { "ImageWidth", image.Width },
+                { "ImageHeight", image.Height },
+                { "HasROI", regionOfInterest.HasValue },
+                { "ROI", regionOfInterest?.ToString() ?? "なし" },
+                { "Language", CurrentLanguage ?? "jpn" },
+                { "IsInitialized", IsInitialized }
+            }
+        }).ConfigureAwait(false);
+        
         // 初期化ガード: 未初期化の場合は自動初期化を実行（スレッドセーフ）
         if (!IsInitialized)
         {
@@ -374,8 +407,6 @@ public class PaddleOcrEngine : IOcrEngine
                 }
             }
         }
-
-        var stopwatch = Stopwatch.StartNew();
         
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PaddleOcrEngine.RecognizeAsync開始:");
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ 初期化状態: {IsInitialized}");
@@ -536,6 +567,31 @@ public class PaddleOcrEngine : IOcrEngine
                 postProcessedText
             );
             
+            // 📊 [DIAGNOSTIC] OCR処理成功イベント
+            await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "OCR",
+                IsSuccess = true,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Information,
+                Message = $"OCR処理成功: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Engine", EngineName },
+                    { "EngineVersion", EngineVersion },
+                    { "TextRegionCount", result.TextRegions.Count },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "Language", CurrentLanguage ?? "jpn" },
+                    { "ImageWidth", image.Width },
+                    { "ImageHeight", image.Height },
+                    { "HasROI", regionOfInterest.HasValue },
+                    { "MergedTextLength", postProcessedText?.Length ?? 0 },
+                    { "HighConfidenceRegions", result.TextRegions.Count(r => r.Confidence > 0.8) },
+                    { "AverageConfidence", result.TextRegions.Any() ? result.TextRegions.Average(r => r.Confidence) : 0.0 }
+                }
+            }).ConfigureAwait(false);
+            
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ OCR処理完了: 検出テキスト数={result.TextRegions.Count}, 処理時間={stopwatch.ElapsedMilliseconds}ms");
             __logger?.LogDebug("OCR処理完了 - 検出されたテキスト数: {Count}, 処理時間: {ElapsedMs}ms", 
                 result.TextRegions.Count, stopwatch.ElapsedMilliseconds);
@@ -551,6 +607,38 @@ public class PaddleOcrEngine : IOcrEngine
         {
             stopwatch.Stop();
             UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, false);
+
+            // 📊 [DIAGNOSTIC] OCR処理失敗イベント
+            try
+            {
+                await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "OCR",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"OCR処理失敗: {ex.GetType().Name}: {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "Engine", EngineName },
+                        { "EngineVersion", EngineVersion },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "Language", CurrentLanguage ?? "jpn" },
+                        { "ImageWidth", image.Width },
+                        { "ImageHeight", image.Height },
+                        { "HasROI", regionOfInterest.HasValue },
+                        { "ErrorType", ex.GetType().Name },
+                        { "IsInitialized", IsInitialized }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
+
             __logger?.LogError(ex, "OCR処理中にエラーが発生: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"OCR処理中にエラーが発生しました: {ex.Message}", ex);
         }
@@ -3343,8 +3431,23 @@ public class PaddleOcrEngine : IOcrEngine
                 var totalPixels = processedMat.Cols * processedMat.Rows;
                 if (totalPixels > MAX_PIXELS)
                 {
-                    _consecutivePaddleFailures++;
-                    throw new InvalidOperationException($"画像サイズが大きすぎます（{processedMat.Cols}x{processedMat.Rows}={totalPixels:N0}ピクセル > {MAX_PIXELS:N0}制限）。連続失敗: {_consecutivePaddleFailures}");
+                    // ✨ [OCR_ACCURACY_IMPROVEMENT] 画像リサイズによる制限対応
+                    _unifiedLoggingService?.WriteDebugLog($"🎯 [IMAGE_RESIZE] 大画像検出 - リサイズ実行: {processedMat.Cols}x{processedMat.Rows}={totalPixels:N0} > {MAX_PIXELS:N0}制限");
+                    
+                    // アスペクト比を保持してリサイズ
+                    var scale = Math.Sqrt((double)MAX_PIXELS / totalPixels);
+                    var newWidth = (int)(processedMat.Cols * scale);
+                    var newHeight = (int)(processedMat.Rows * scale);
+                    
+                    using var resizedMat = new Mat();
+                    Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
+                    
+                    // 元のMatを破棄してリサイズ後のものに置き換え
+                    processedMat.Dispose();
+                    processedMat = resizedMat.Clone();
+                    
+                    var finalPixels = processedMat.Cols * processedMat.Rows;
+                    _unifiedLoggingService?.WriteDebugLog($"✅ [IMAGE_RESIZE] リサイズ完了: {newWidth}x{newHeight}={finalPixels:N0}ピクセル (縮小率: {scale:F3})");
                 }
                 
                 object result;

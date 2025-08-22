@@ -5,6 +5,8 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.Diagnostics;
 using System.Drawing;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
@@ -18,6 +20,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
     private readonly ITextRegionDetector _textDetector;
     private readonly NativeWindowsCaptureWrapper _nativeWrapper;
     private readonly Baketa.Core.Abstractions.Factories.IWindowsImageFactory _imageFactory;
+    private readonly IEventAggregator _eventAggregator;
 
     public string StrategyName => "ROIBased";
     public int Priority => 50; // 中優先度（専用GPU環境で効率的）
@@ -26,12 +29,14 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
         ILogger<ROIBasedCaptureStrategy> logger,
         ITextRegionDetector textDetector,
         NativeWindowsCaptureWrapper nativeWrapper,
-        Baketa.Core.Abstractions.Factories.IWindowsImageFactory imageFactory)
+        Baketa.Core.Abstractions.Factories.IWindowsImageFactory imageFactory,
+        IEventAggregator eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
         _nativeWrapper = nativeWrapper ?? throw new ArgumentNullException(nameof(nativeWrapper));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     }
 
     public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
@@ -79,7 +84,8 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
     public async Task<CaptureStrategyResult> ExecuteCaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var sessionId = Guid.NewGuid().ToString("N");
+        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = new CaptureStrategyResult
         {
             StrategyName = StrategyName,
@@ -88,10 +94,30 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
         try
         {
-            _logger.LogInformation("ROIBasedキャプチャ開始: ウィンドウ=0x{Hwnd:X}", hwnd.ToInt64());
+            _logger.LogInformation("ROIBasedキャプチャ開始: ウィンドウ=0x{Hwnd:X}, セッション={SessionId}", hwnd.ToInt64(), sessionId);
 
             // Phase 1: 低解像度スキャン
+            var phase1Stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var lowResImage = await CaptureLowResolutionAsync(hwnd, options.ROIScaleFactor).ConfigureAwait(false);
+            phase1Stopwatch.Stop();
+
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ROI_LowResCapture",
+                IsSuccess = lowResImage != null,
+                ProcessingTimeMs = phase1Stopwatch.ElapsedMilliseconds,
+                ErrorMessage = lowResImage == null ? "低解像度スキャンに失敗" : null,
+                SessionId = sessionId,
+                Severity = lowResImage == null ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                Metrics = new Dictionary<string, object>
+                {
+                    { "ROIStage", "LowResCapture" },
+                    { "ROIProcessingStrategy", StrategyName },
+                    { "ScaleFactor", options.ROIScaleFactor },
+                    { "InputImageSize", lowResImage != null ? $"{lowResImage.Width}x{lowResImage.Height}" : "N/A" }
+                }
+            }).ConfigureAwait(false);
+
             if (lowResImage == null)
             {
                 result.Success = false;
@@ -100,32 +126,124 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             }
 
             // Phase 2: テキスト領域検出
+            var phase2Stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var textRegions = await _textDetector.DetectTextRegionsAsync(lowResImage).ConfigureAwait(false);
+            phase2Stopwatch.Stop();
+
+            // テキスト領域検出の品質評価
+            var regionSizes = textRegions.Select(r => r.Width * r.Height).ToList();
+            var aspectRatios = textRegions.Select(r => (double)r.Width / r.Height).ToList();
+
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ROI_TextDetection",
+                IsSuccess = textRegions.Count > 0,
+                ProcessingTimeMs = phase2Stopwatch.ElapsedMilliseconds,
+                ErrorMessage = textRegions.Count == 0 ? "テキスト領域が検出されませんでした" : null,
+                SessionId = sessionId,
+                Severity = textRegions.Count == 0 ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
+                Metrics = new Dictionary<string, object>
+                {
+                    { "ROIStage", "TextDetection" },
+                    { "DetectedRegionCount", textRegions.Count },
+                    { "AverageRegionSize", regionSizes.Count > 0 ? regionSizes.Average() : 0 },
+                    { "MinRegionSize", regionSizes.Count > 0 ? regionSizes.Min() : 0 },
+                    { "MaxRegionSize", regionSizes.Count > 0 ? regionSizes.Max() : 0 },
+                    { "AverageAspectRatio", aspectRatios.Count > 0 ? aspectRatios.Average() : 0 },
+                    { "TextDetectorType", _textDetector.GetType().Name },
+                    { "DetectionConfig", _textDetector.GetCurrentConfig()?.ToString() ?? "N/A" }
+                }
+            }).ConfigureAwait(false);
+
             result.TextRegions = textRegions;
 
             // Phase 3: 高解像度部分キャプチャ
+            var phase3Stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions).ConfigureAwait(false);
+            phase3Stopwatch.Stop();
+
+            // キャプチャ結果の品質評価
+            var validRegionCount = highResImages.Count;
+            var regionAccuracy = textRegions.Count > 0 ? (double)validRegionCount / textRegions.Count : 0;
+
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ROI_HighResCapture",
+                IsSuccess = highResImages.Count > 0,
+                ProcessingTimeMs = phase3Stopwatch.ElapsedMilliseconds,
+                ErrorMessage = highResImages.Count == 0 ? "高解像度キャプチャに失敗" : null,
+                SessionId = sessionId,
+                Severity = highResImages.Count == 0 ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                Metrics = new Dictionary<string, object>
+                {
+                    { "ROIStage", "HighResCapture" },
+                    { "ValidRegionCount", validRegionCount },
+                    { "RegionAccuracy", regionAccuracy },
+                    { "SuccessfulCaptureCount", highResImages.Count },
+                    { "FailedCaptureCount", textRegions.Count - highResImages.Count },
+                    { "CapturedImageSizes", highResImages.Select(img => $"{img.Width}x{img.Height}").ToArray() }
+                }
+            }).ConfigureAwait(false);
             
             result.Success = highResImages.Count > 0;
             result.Images = highResImages;
-            result.Metrics.ActualCaptureTime = stopwatch.Elapsed;
+            result.Metrics.ActualCaptureTime = totalStopwatch.Elapsed;
             result.Metrics.FrameCount = highResImages.Count;
             result.Metrics.PerformanceCategory = "Balanced";
 
-            _logger.LogInformation("ROIBasedキャプチャ完了: {RegionCount}個の領域, 処理時間={ProcessingTime}ms", 
-                textRegions.Count, stopwatch.ElapsedMilliseconds);
+            // 全体の処理結果サマリー
+            totalStopwatch.Stop();
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ROI_Complete",
+                IsSuccess = result.Success,
+                ProcessingTimeMs = totalStopwatch.ElapsedMilliseconds,
+                ErrorMessage = !result.Success ? "ROI処理全体が失敗" : null,
+                SessionId = sessionId,
+                Severity = !result.Success ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                Metrics = new Dictionary<string, object>
+                {
+                    { "TotalRegionsDetected", textRegions.Count },
+                    { "ValidRegionsExtracted", validRegionCount },
+                    { "OverallAccuracy", regionAccuracy },
+                    { "Phase1TimeMs", phase1Stopwatch.ElapsedMilliseconds },
+                    { "Phase2TimeMs", phase2Stopwatch.ElapsedMilliseconds },
+                    { "Phase3TimeMs", phase3Stopwatch.ElapsedMilliseconds },
+                    { "TotalTimeMs", totalStopwatch.ElapsedMilliseconds }
+                }
+            }).ConfigureAwait(false);
+
+            _logger.LogInformation("ROIBasedキャプチャ完了: {RegionCount}個の領域, 処理時間={ProcessingTime}ms, 精度={Accuracy:F2}", 
+                textRegions.Count, totalStopwatch.ElapsedMilliseconds, regionAccuracy);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ROIBasedキャプチャ中にエラー");
+            
+            // エラー時の診断イベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ROI_Error",
+                IsSuccess = false,
+                ProcessingTimeMs = totalStopwatch.ElapsedMilliseconds,
+                ErrorMessage = ex.Message,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Error,
+                Metrics = new Dictionary<string, object>
+                {
+                    { "ExceptionType", ex.GetType().Name },
+                    { "StackTrace", ex.StackTrace ?? "N/A" }
+                }
+            }).ConfigureAwait(false);
+            
             result.Success = false;
             result.ErrorMessage = ex.Message;
         }
         finally
         {
             result.CompletionTime = DateTime.Now;
-            result.Metrics.TotalProcessingTime = stopwatch.Elapsed;
-            stopwatch.Stop();
+            result.Metrics.TotalProcessingTime = totalStopwatch.Elapsed;
+            totalStopwatch.Stop();
         }
 
         return result;

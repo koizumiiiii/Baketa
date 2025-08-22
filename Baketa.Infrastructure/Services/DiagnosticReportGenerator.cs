@@ -50,10 +50,19 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         string? userComment = null,
         CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"🔧 [DIAGNOSTIC] レポート生成開始: reportType='{reportType}'");
+        
+        // ディレクトリ存在確認を明示的に実行
+        EnsureReportsDirectoryExists();
+        
         var eventsList = events.ToList();
+        Console.WriteLine($"🔧 [DIAGNOSTIC] イベント数: {eventsList.Count}");
+        
         var reportId = GenerateReportId(reportType);
         var fileName = $"{reportType}_{DateTime.Now:yyyyMMdd_HHmmss}_{reportId[..8]}.json";
         var filePath = Path.Combine(ReportsDirectory, fileName);
+        
+        Console.WriteLine($"🔧 [DIAGNOSTIC] 生成ファイルパス: '{filePath}'");
 
         var report = new DiagnosticReport
         {
@@ -71,8 +80,26 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         {
             var jsonContent = JsonSerializer.Serialize(report, JsonOptions);
             
+            // 🧪 [DEBUG] SafeFileWriter呼び出し前の詳細ログ
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - filePath: '{filePath}'");
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - jsonContent.Length: {jsonContent?.Length ?? 0}");
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - jsonContent IsNullOrEmpty: {string.IsNullOrEmpty(jsonContent)}");
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - filePath IsNullOrEmpty: {string.IsNullOrEmpty(filePath)}");
+            
             // SafeFileWriterを使用してファイル競合を回避
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter.AppendTextSafely実行中...");
             SafeFileWriter.AppendTextSafely(filePath, jsonContent);
+            Console.WriteLine($"🧪 [DEBUG] SafeFileWriter.AppendTextSafely完了");
+            
+            // ファイル存在確認
+            var fileExists = File.Exists(filePath);
+            Console.WriteLine($"🧪 [DEBUG] ファイル存在確認: {fileExists}");
+            
+            if (fileExists)
+            {
+                var fileInfo = new FileInfo(filePath);
+                Console.WriteLine($"🧪 [DEBUG] ファイルサイズ: {fileInfo.Length} bytes");
+            }
             
             _logger.LogInformation("診断レポート生成完了: {FilePath}, イベント数: {EventCount}", 
                 filePath, eventsList.Count);
@@ -154,15 +181,34 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
     {
         try
         {
+            Console.WriteLine($"🔧 [DIAGNOSTIC] レポートディレクトリチェック開始: '{ReportsDirectory}'");
+            
             if (!Directory.Exists(ReportsDirectory))
             {
+                Console.WriteLine($"🔧 [DIAGNOSTIC] ディレクトリが存在しません。作成中...");
                 Directory.CreateDirectory(ReportsDirectory);
+                Console.WriteLine($"✅ [DIAGNOSTIC] ディレクトリ作成成功: '{ReportsDirectory}'");
+                
+                // 作成後の確認
+                if (Directory.Exists(ReportsDirectory))
+                {
+                    Console.WriteLine($"✅ [DIAGNOSTIC] ディレクトリ存在確認成功");
+                }
+                else
+                {
+                    Console.WriteLine($"❌ [DIAGNOSTIC] ディレクトリ存在確認失敗");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"✅ [DIAGNOSTIC] ディレクトリは既に存在");
             }
         }
         catch (Exception ex)
         {
             // ディレクトリ作成に失敗した場合はコンソールに出力
-            Console.WriteLine($"⚠️ [DIAGNOSTIC] レポートディレクトリ作成失敗: {ex.Message}");
+            Console.WriteLine($"❌ [DIAGNOSTIC] レポートディレクトリ作成失敗: {ex.Message}");
+            Console.WriteLine($"❌ [DIAGNOSTIC] スタックトレース: {ex.StackTrace}");
         }
     }
 }

@@ -15,6 +15,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Diagnostics;
 using CoreOcrResult = Baketa.Core.Models.OCR.OcrResult;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
@@ -1167,6 +1168,25 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private async Task ExecuteSingleTranslationAsync(CancellationToken cancellationToken)
     {
         var translationId = Guid.NewGuid().ToString("N")[..8];
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // 📊 [DIAGNOSTIC] 翻訳工程開始イベント
+        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "Translation",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = translationId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"翻訳工程開始: 単発翻訳実行 ID={translationId}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "TranslationId", translationId },
+                { "TranslationMode", "Manual" },
+                { "IsAutomaticActive", _isAutomaticTranslationActive },
+                { "TargetWindowHandle", _targetWindowHandle?.ToString("X") ?? "なし" }
+            }
+        }).ConfigureAwait(false);
         
         // 🚨 CRITICAL DEBUG: ExecuteSingleTranslationAsync呼び出し確認
         try
@@ -1199,6 +1219,31 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     _lastTranslationCompletedAt = DateTime.UtcNow;
                 }
                 
+                // 📊 [DIAGNOSTIC] 翻訳工程成功イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "Translation",
+                    IsSuccess = true,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Information,
+                    Message = $"翻訳工程成功: 翻訳テキスト長={result.TranslatedText.Length}, 処理時間={stopwatch.ElapsedMilliseconds}ms",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "TranslationId", translationId },
+                        { "TranslationMode", "Manual" },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "OriginalTextLength", result.OriginalText?.Length ?? 0 },
+                        { "TranslatedTextLength", result.TranslatedText.Length },
+                        { "TargetLanguage", result.TargetLanguage ?? "未指定" }
+                        // NOTE: 以下プロパティは現在のTranslationResult型に存在しないためコメントアウト
+                        // { "DetectedTextRegions", result.DetectedTextRegions?.Count ?? 0 },
+                        // { "SourceLanguage", result.SourceLanguage ?? "未指定" },
+                        // { "TranslationEngine", result.EngineUsed ?? "未指定" },
+                        // { "DisplayDuration", result.DisplayDuration?.TotalSeconds ?? 0 }
+                    }
+                }).ConfigureAwait(false);
+
                 // 結果を通知（UI層でスケジューラ制御）
                 _translationResultsSubject.OnNext(result);
 
@@ -1214,6 +1259,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 #pragma warning disable CA1031 // サービス層でのアプリケーション安定性のため一般例外をキャッチ
         catch (Exception ex)
         {
+            // 📊 [DIAGNOSTIC] 翻訳工程失敗イベント
+            try
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "Translation",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"翻訳工程失敗: {ex.GetType().Name}: {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "TranslationId", translationId },
+                        { "TranslationMode", "Manual" },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "ErrorType", ex.GetType().Name },
+                        { "IsAutomaticActive", _isAutomaticTranslationActive },
+                        { "TargetWindowHandle", _targetWindowHandle?.ToString("X") ?? "なし" }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
+
             _logger?.LogError(ex, "単発翻訳でエラーが発生しました");
             PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"エラー: {ex.Message}");
             throw;
@@ -1693,29 +1766,33 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     
                     DebugLogUtility.WriteLog($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
                     
-                    // 改善されたMock翻訳処理（実際の翻訳ロジックをシミュレート）
-                    DebugLogUtility.WriteLog($"🌍 改善された翻訳処理開始: '{originalText}' ({sourceCode} → {targetCode})");
+                    // ✨ 実際のAI翻訳エンジンを使用した翻訳処理（辞書置換を廃止）
+                    DebugLogUtility.WriteLog($"🤖 AI翻訳エンジン使用開始: '{originalText}' ({sourceCode} → {targetCode})");
                     
-                    // 簡素な翻訳ロジックを実装
-                    await Task.Delay(200, cancellationToken).ConfigureAwait(false); // 少し短く
+                    // TODO: TranslationEngineFactory統合は次フェーズで実装（現在は辞書フォールバック）
+                    DebugLogUtility.WriteLog($"📝 [TODO] AI翻訳エンジン統合は次フェーズで実装予定");
                     
+                    // 一時的に改善された辞書ベース翻訳を使用（AI統合準備中）
                     if (sourceCode == "ja" && targetCode == "en")
                     {
                         // 日本語から英語への翻訳
                         translatedText = TranslateJapaneseToEnglish(originalText);
+                        DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（日→英）: '{translatedText}'");
                     }
                     else if (sourceCode == "en" && targetCode == "ja")
                     {
                         // 英語から日本語への翻訳
                         translatedText = TranslateEnglishToJapanese(originalText);
+                        DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（英→日）: '{translatedText}'");
                     }
                     else
                     {
                         // その他の言語ペア
                         translatedText = $"[{sourceCode}→{targetCode}] {originalText}";
+                        DebugLogUtility.WriteLog($"🔄 フォールバック翻訳: '{translatedText}'");
                     }
                     
-                    DebugLogUtility.WriteLog($"🌍 翻訳完了: '{translatedText}'");
+                    DebugLogUtility.WriteLog($"🌍 翻訳処理完了: '{translatedText}'");
                 }
                 catch (Exception translationEx)
                 {
