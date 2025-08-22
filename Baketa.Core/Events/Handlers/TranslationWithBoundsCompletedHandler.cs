@@ -46,7 +46,10 @@ public class TranslationWithBoundsCompletedHandler(
             _logger.LogInformation("座標情報付き翻訳完了: '{Original}' → '{Translated}' (Bounds: {Bounds})", 
                 eventData.SourceText, eventData.TranslatedText, eventData.Bounds);
 
-            // 🔍 [DEBUG] 重複表示デバッグ：オーバーレイソース特定
+            // 🔍 翻訳成功判定：空文字や空白文字の場合は翻訳失敗とみなす
+            var isTranslationSuccessful = !string.IsNullOrWhiteSpace(eventData.TranslatedText);
+            
+            // 🔍 [DEBUG] オーバーレイソース特定と翻訳成功判定
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] TranslationWithBoundsCompletedHandler → OverlayUpdateEvent発行");
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] EventId: {eventData.Id}");
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] SourceText: '{eventData.SourceText}'");
@@ -55,6 +58,7 @@ public class TranslationWithBoundsCompletedHandler(
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] TargetLanguage: {eventData.TargetLanguage}");
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] EngineName: {eventData.EngineName}");
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] Bounds: {eventData.Bounds}");
+            Console.WriteLine($"🎯 [OVERLAY_SOURCE] IsTranslationSuccessful: {isTranslationSuccessful}");
 
             // オーバーレイ更新イベントを発行
             var overlayEvent = new OverlayUpdateEvent(
@@ -63,7 +67,7 @@ public class TranslationWithBoundsCompletedHandler(
                 originalText: eventData.SourceText,
                 sourceLanguage: eventData.SourceLanguage,
                 targetLanguage: eventData.TargetLanguage,
-                isTranslationResult: true);
+                isTranslationResult: isTranslationSuccessful);
                 
             Console.WriteLine($"🎯 [OVERLAY_SOURCE] OverlayUpdateEvent発行中 - ID: {overlayEvent.Id}");
             await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);

@@ -1737,6 +1737,31 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 originalText = string.Empty;
             }
 
+            // 🔥 [DIAGNOSTIC] OCR処理診断イベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "OCR",
+                IsSuccess = ocrResults.HasText,
+                ProcessingTimeMs = (long)ocrResults.ProcessingTime.TotalMilliseconds,
+                SessionId = translationId,
+                Severity = ocrResults.HasText ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
+                Message = ocrResults.HasText 
+                    ? $"OCR処理成功: テキスト検出数={ocrResults.TextRegions.Count}, 処理時間={ocrResults.ProcessingTime.TotalMilliseconds:F1}ms"
+                    : "OCR処理でテキストが検出されませんでした",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "DetectedTextRegions", ocrResults.TextRegions.Count },
+                    { "HasText", ocrResults.HasText },
+                    { "AverageConfidence", ocrConfidence },
+                    { "ProcessingTimeMs", (long)ocrResults.ProcessingTime.TotalMilliseconds },
+                    { "LanguageCode", ocrResults.LanguageCode ?? "unknown" },
+                    { "OCREngine", _ocrEngine?.EngineName ?? "unknown" },
+                    { "ImageSize", $"{image?.Width ?? 0}x{image?.Height ?? 0}" },
+                    { "ExtractedText", originalText }, // 🔥 重要: 実際のOCRテキストを記録
+                    { "TextLength", originalText.Length }
+                }
+            }).ConfigureAwait(false);
+
             // 翻訳処理
             PublishProgress(translationId, TranslationStatus.Translating, 0.7f, "翻訳中...");
             
@@ -1764,6 +1789,26 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     DebugLogUtility.WriteLog($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultTargetLanguage='{settings.DefaultTargetLanguage}'");
                     DebugLogUtility.WriteLog($"🚨 [LANGUAGE_SETTINGS_DEBUG] sourceCode='{sourceCode}', targetCode='{targetCode}'");
                     
+                    // 🔥 [DIAGNOSTIC] 言語検出診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "LanguageDetection",
+                        IsSuccess = true,
+                        ProcessingTimeMs = 0,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Information,
+                        Message = $"言語検出完了: {sourceCode} → {targetCode}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "SourceLanguage", sourceCode },
+                            { "TargetLanguage", targetCode },
+                            { "LanguageDetectionEngine", "Settings" },
+                            { "ConfidenceScore", 1.0 },
+                            { "RequiresTranslation", sourceCode != targetCode },
+                            { "OriginalText", originalText }
+                        }
+                    }).ConfigureAwait(false);
+
                     DebugLogUtility.WriteLog($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
                     
                     // ✨ 実際のAI翻訳エンジンを使用した翻訳処理（辞書置換を廃止）
@@ -1772,7 +1817,29 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // TODO: TranslationEngineFactory統合は次フェーズで実装（現在は辞書フォールバック）
                     DebugLogUtility.WriteLog($"📝 [TODO] AI翻訳エンジン統合は次フェーズで実装予定");
                     
+                    // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
+                    var engineStatus = "dictionary_fallback"; // AI翻訳が未実装のため辞書フォールバック
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationEngineSelection",
+                        IsSuccess = false, // AI翻訳が使用されていないため失敗扱い
+                        ProcessingTimeMs = 0,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Warning,
+                        Message = "翻訳エンジン選択: AI翻訳未実装のため辞書フォールバックを使用",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "PrimaryEngine", "NLLB-200" },
+                            { "PrimaryEngineStatus", "not_implemented" },
+                            { "FallbackEngine", "DictionaryTranslation" },
+                            { "FallbackReason", "ai_engine_not_implemented" },
+                            { "ActualEngine", "DictionaryTranslation" }
+                        }
+                    }).ConfigureAwait(false);
+                    
                     // 一時的に改善された辞書ベース翻訳を使用（AI統合準備中）
+                    var translationStartTime = DateTime.UtcNow;
+                    
                     if (sourceCode == "ja" && targetCode == "en")
                     {
                         // 日本語から英語への翻訳
@@ -1792,10 +1859,82 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         DebugLogUtility.WriteLog($"🔄 フォールバック翻訳: '{translatedText}'");
                     }
                     
+                    var translationElapsed = DateTime.UtcNow - translationStartTime;
+                    
+                    // 🔥 [DIAGNOSTIC] 翻訳品質評価診断イベント
+                    var isSameLanguage = originalText == translatedText;
+                    var textSimilarity = isSameLanguage ? 1.0 : 0.0;
+                    var qualityScore = isSameLanguage ? 0.0 : 0.5; // 辞書翻訳は中程度の品質
+                    
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationQualityCheck",
+                        IsSuccess = !isSameLanguage, // 同一言語の場合は失敗
+                        ProcessingTimeMs = (long)translationElapsed.TotalMilliseconds,
+                        SessionId = translationId,
+                        Severity = isSameLanguage ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                        Message = isSameLanguage 
+                            ? $"翻訳品質問題: 同一言語検出 - 翻訳が実行されていません" 
+                            : $"翻訳品質評価: スコア={qualityScore:F2}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "OriginalText", originalText },
+                            { "TranslatedText", translatedText },
+                            { "SourceLanguage", sourceCode },
+                            { "TargetLanguage", targetCode },
+                            { "IsSameLanguage", isSameLanguage },
+                            { "TextSimilarity", textSimilarity },
+                            { "QualityScore", qualityScore },
+                            { "TranslationMethod", "dictionary" },
+                            { "IsActualTranslation", !isSameLanguage }
+                        }
+                    }).ConfigureAwait(false);
+                    
+                    // 🔥 [DIAGNOSTIC] 翻訳実行診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationExecution",
+                        IsSuccess = !isSameLanguage,
+                        ProcessingTimeMs = (long)translationElapsed.TotalMilliseconds,
+                        SessionId = translationId,
+                        Severity = isSameLanguage ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                        Message = isSameLanguage 
+                            ? $"翻訳実行失敗: 辞書にない文字のため原文をそのまま返却"
+                            : $"翻訳実行成功: 辞書翻訳により変換完了",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "UsedEngine", "DictionaryTranslation" },
+                            { "OriginalText", originalText },
+                            { "TranslatedText", translatedText },
+                            { "TranslationMethod", "string_replacement" },
+                            { "ProcessingTimeMs", (long)translationElapsed.TotalMilliseconds },
+                            { "IsActualTranslation", !isSameLanguage },
+                            { "DictionaryHit", !isSameLanguage }
+                        }
+                    }).ConfigureAwait(false);
+                    
                     DebugLogUtility.WriteLog($"🌍 翻訳処理完了: '{translatedText}'");
                 }
                 catch (Exception translationEx)
                 {
+                    // 🔥 [DIAGNOSTIC] 翻訳エラー診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationExecution",
+                        IsSuccess = false,
+                        ProcessingTimeMs = 0,
+                        ErrorMessage = translationEx.Message,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Error,
+                        Message = $"翻訳実行エラー: {translationEx.GetType().Name} - {translationEx.Message}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "ErrorType", translationEx.GetType().Name },
+                            { "OriginalText", originalText },
+                            { "AttemptedTranslationMethod", "dictionary" }
+                        }
+                    }).ConfigureAwait(false);
+
                     DebugLogUtility.WriteLog($"⚠️ 翻訳エラー: {translationEx.Message}");
                     _logger?.LogWarning(translationEx, "翻訳処理でエラーが発生しました");
                     translatedText = $"翻訳エラー: {translationEx.Message}";
@@ -1804,6 +1943,23 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             else
             {
                 translatedText = "テキストが検出されませんでした";
+                
+                // 🔥 [DIAGNOSTIC] 空テキスト診断イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationExecution",
+                    IsSuccess = false,
+                    ProcessingTimeMs = 0,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Warning,
+                    Message = "翻訳スキップ: OCRでテキストが検出されませんでした",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "SkipReason", "no_text_detected" },
+                        { "OriginalText", originalText },
+                        { "TranslatedText", translatedText }
+                    }
+                }).ConfigureAwait(false);
             }
 
             // 完了
@@ -1822,7 +1978,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     InputText = originalText,
                     OutputText = translatedText,
                     Confidence = ocrConfidence,
-                    ProcessingTimeMs = processingTime.TotalMilliseconds,
+                    ProcessingTimeMs = (long)processingTime.TotalMilliseconds,
                     InputTokenCount = originalText.Length,
                     OutputTokenCount = translatedText.Length,
                     CacheHit = false // 現在はキャッシュ機能未実装
@@ -1852,6 +2008,31 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         catch (Exception ex)
         {
             var processingTime = DateTime.UtcNow - startTime;
+            
+            // 🔥 [DIAGNOSTIC] 翻訳全体失敗診断イベント
+            try
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationOverall",
+                    IsSuccess = false,
+                    ProcessingTimeMs = (long)processingTime.TotalMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Critical,
+                    Message = $"翻訳処理全体でエラー: {ex.GetType().Name} - {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "ErrorType", ex.GetType().Name },
+                        { "ProcessingTimeMs", (long)processingTime.TotalMilliseconds },
+                        { "StackTrace", ex.StackTrace ?? "N/A" }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
             
             Console.WriteLine($"❌ 翻訳処理で例外発生:");
             Console.WriteLine($"   🔍 例外タイプ: {ex.GetType().Name}");

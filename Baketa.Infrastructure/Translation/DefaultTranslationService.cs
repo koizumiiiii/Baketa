@@ -4,6 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +22,7 @@ namespace Baketa.Infrastructure.Translation;
         private readonly ILogger<DefaultTranslationService> _logger;
         private readonly List<ITranslationEngine> _availableEngines;
         private readonly IConfiguration _configuration;
+        private readonly IEventAggregator? _eventAggregator;
 
         /// <summary>
         /// コンストラクタ
@@ -26,14 +30,17 @@ namespace Baketa.Infrastructure.Translation;
         /// <param name="logger">ロガー</param>
         /// <param name="engines">利用可能な翻訳エンジンのコレクション</param>
         /// <param name="configuration">設定サービス</param>
+        /// <param name="eventAggregator">イベント集約（オプション）</param>
         public DefaultTranslationService(
             ILogger<DefaultTranslationService> logger,
             IEnumerable<ITranslationEngine> engines,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEventAggregator? eventAggregator = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _availableEngines = engines?.ToList() ?? throw new ArgumentNullException(nameof(engines));
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _eventAggregator = eventAggregator;
             
             Console.WriteLine($"🔧 [DEBUG] DefaultTranslationService作成 - エンジン数: {_availableEngines.Count}");
             _logger.LogInformation("DefaultTranslationService作成 - エンジン数: {Count}", _availableEngines.Count);
@@ -241,6 +248,31 @@ namespace Baketa.Infrastructure.Translation;
 
             _logger.LogInformation("バッチ翻訳開始 - テキスト数: {Count}, エンジン: {Engine}", texts.Count, ActiveEngine.Name);
 
+            var translationStart = DateTime.UtcNow;
+            var translationId = Guid.NewGuid().ToString("N")[..12];
+            
+            // 🔥 [DIAGNOSTIC] 翻訳実行開始診断イベント
+            if (_eventAggregator != null)
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationEngineExecution",
+                    IsSuccess = true,
+                    ProcessingTimeMs = 0,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Information,
+                    Message = $"DefaultTranslationService バッチ翻訳開始: {ActiveEngine.Name}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "EngineName", ActiveEngine.Name },
+                        { "TextCount", texts.Count },
+                        { "SourceLanguage", sourceLang.Code },
+                        { "TargetLanguage", targetLang.Code },
+                        { "TranslationServiceType", "DefaultTranslationService" }
+                    }
+                }).ConfigureAwait(false);
+            }
+
             // リクエスト作成
             var transRequests = new List<TransModels.TranslationRequest>();
             foreach (var text in texts)
@@ -259,6 +291,67 @@ namespace Baketa.Infrastructure.Translation;
                 .ConfigureAwait(false);
                 
             _logger.LogInformation("バッチ翻訳完了 - 結果数: {Count}", result?.Count ?? 0);
+
+            // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント
+            if (_eventAggregator != null && result != null)
+            {
+                var translationEnd = DateTime.UtcNow;
+                var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
+                var successCount = result.Count(r => r.IsSuccess);
+                var sameLanguageCount = 0;
+                var sameLanguageFailures = new List<string>();
+
+                // 翻訳品質チェック: 改良された診断ロジック
+                for (int i = 0; i < Math.Min(texts.Count, result.Count); i++)
+                {
+                    if (i < result.Count && result[i].IsSuccess && !string.IsNullOrEmpty(result[i].TranslatedText))
+                    {
+                        var originalText = texts[i];
+                        var translatedText = result[i].TranslatedText;
+                        
+                        // 改良された翻訳失敗検出ロジック
+                        var isSameText = originalText.Trim().Equals(translatedText.Trim(), StringComparison.OrdinalIgnoreCase);
+                        if (isSameText)
+                        {
+                            sameLanguageCount++;
+                            sameLanguageFailures.Add($"{originalText} -> {translatedText} (default service)");
+                            Console.WriteLine($"🚨 [DEFAULT_SERVICE_DIAGNOSTIC] 翻訳失敗検出: '{originalText}' -> '{translatedText}'");
+                        }
+                    }
+                }
+
+                var qualityIsGood = sameLanguageCount == 0;
+
+                // 翻訳完了診断イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationQualityCheck",
+                    IsSuccess = qualityIsGood,
+                    ProcessingTimeMs = (long)translationDuration,
+                    SessionId = translationId,
+                    Severity = qualityIsGood ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
+                    Message = qualityIsGood 
+                        ? $"DefaultTranslationService翻訳品質良好: 全{successCount}件成功（改良された診断検証済み）"
+                        : $"DefaultTranslationService翻訳品質問題: {sameLanguageCount}件翻訳失敗検出（改良された診断使用）",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "TotalTexts", texts.Count },
+                        { "SuccessCount", successCount },
+                        { "FailureCount", result.Count - successCount },
+                        { "SameLanguageCount", sameLanguageCount },
+                        { "QualityScore", qualityIsGood ? 1.0 : (double)(successCount - sameLanguageCount) / successCount },
+                        { "ProcessingTimeMs", translationDuration },
+                        { "EngineName", ActiveEngine.Name },
+                        { "TranslationServiceType", "DefaultTranslationService" },
+                        { "DetectionMethod", "EnhancedTextComparison" },
+                        { "FailureDetails", sameLanguageFailures.Count > 0 ? sameLanguageFailures.Take(3) : new List<string>() },
+                        { "IsTextComparisonBased", true }
+                    }
+                }).ConfigureAwait(false);
+
+                Console.WriteLine($"🔍 [DEFAULT_TRANSLATION_QUALITY] DefaultTranslationService品質診断: 成功{successCount}/{result.Count}, 同一結果{sameLanguageCount}件");
+            }
+
             return result!;
         }
     }
