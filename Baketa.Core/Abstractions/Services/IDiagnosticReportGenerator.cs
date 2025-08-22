@@ -55,4 +55,43 @@ public sealed class DiagnosticReport
     
     /// <summary>ユーザー確認済みフラグ</summary>
     public bool IsReviewed { get; init; }
+    
+    /// <summary>ROI画像情報リスト</summary>
+    public List<RoiImageInfo> RoiImages { get; init; } = [];
+}
+
+/// <summary>
+/// ROI画像情報
+/// </summary>
+public sealed class RoiImageInfo
+{
+    /// <summary>ROI画像ID</summary>
+    public required string ImageId { get; init; }
+    
+    /// <summary>ROI画像ファイルパス</summary>
+    public required string FilePath { get; init; }
+    
+    /// <summary>関連テキスト</summary>
+    public string? DetectedText { get; init; }
+    
+    /// <summary>OCR信頼度</summary>
+    public double Confidence { get; init; }
+    
+    /// <summary>画像サイズ（幅）</summary>
+    public int Width { get; init; }
+    
+    /// <summary>画像サイズ（高さ）</summary>
+    public int Height { get; init; }
+    
+    /// <summary>画像形式</summary>
+    public string Format { get; init; } = "png";
+    
+    /// <summary>OCRタイル情報</summary>
+    public string? TileId { get; init; }
+    
+    /// <summary>画像生成時刻</summary>
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    
+    /// <summary>関連診断イベントID</summary>
+    public string? RelatedEventId { get; init; }
 }

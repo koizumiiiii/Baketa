@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
@@ -119,6 +121,135 @@ public sealed class ImageDiagnosticsSaver : IDisposable
 
         return await SaveDiagnosticImageAsync(originalImage, $"result_{operationId}", metadata)
             .ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// バイト配列を受け取ってROI画像を保存
+    /// </summary>
+    public async Task SaveResultImageAsync(
+        byte[] imageBytes,
+        string filePath,
+        string operationId)
+    {
+        ArgumentNullException.ThrowIfNull(imageBytes);
+        ArgumentNullException.ThrowIfNull(filePath);
+        ArgumentNullException.ThrowIfNull(operationId);
+        
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        
+        try
+        {
+            // ディレクトリが存在しない場合は作成
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
+            _logger?.LogTrace("ROI画像保存完了: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "ROI画像保存失敗: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+            throw;
+        }
+    }
+    
+    /// <summary>
+    /// 検出されたテキスト領域を赤枠で囲んだ全体画像を保存
+    /// </summary>
+    public async Task SaveAnnotatedFullImageAsync(
+        byte[] originalImageBytes,
+        IEnumerable<OcrTextRegion> textRegions,
+        string filePath,
+        string operationId)
+    {
+        ArgumentNullException.ThrowIfNull(originalImageBytes);
+        ArgumentNullException.ThrowIfNull(textRegions);
+        ArgumentNullException.ThrowIfNull(filePath);
+        ArgumentNullException.ThrowIfNull(operationId);
+        
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        
+        try
+        {
+            // ディレクトリが存在しない場合は作成
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            // 元画像に赤枠を描画
+            var annotatedImageBytes = await CreateAnnotatedImageAsync(originalImageBytes, textRegions).ConfigureAwait(false);
+            
+            await File.WriteAllBytesAsync(filePath, annotatedImageBytes).ConfigureAwait(false);
+            _logger?.LogTrace("赤枠付きROI画像保存完了: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "赤枠付きROI画像保存失敗: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+            throw;
+        }
+    }
+    
+    /// <summary>
+    /// 画像に検出されたテキスト領域を赤枠で囲んだ注釈画像を作成
+    /// </summary>
+    private async Task<byte[]> CreateAnnotatedImageAsync(byte[] originalImageBytes, IEnumerable<OcrTextRegion> textRegions)
+    {
+        return await Task.Run(() =>
+        {
+            using var memoryStream = new MemoryStream(originalImageBytes);
+            using var originalBitmap = new System.Drawing.Bitmap(memoryStream);
+            using var annotatedBitmap = new System.Drawing.Bitmap(originalBitmap.Width, originalBitmap.Height);
+            using var graphics = System.Drawing.Graphics.FromImage(annotatedBitmap);
+            
+            // 高品質描画設定
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+            
+            // 元画像を描画
+            graphics.DrawImage(originalBitmap, 0, 0);
+            
+            // テキスト領域に赤枠を描画
+            using var redPen = new System.Drawing.Pen(System.Drawing.Color.Red, 3.0f);
+            using var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.Red);
+            using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 255, 255, 255));
+            using var font = new System.Drawing.Font("Arial", 12, System.Drawing.FontStyle.Bold);
+            
+            foreach (var region in textRegions)
+            {
+                // 赤い境界線を描画
+                graphics.DrawRectangle(redPen, region.Bounds);
+                
+                // 信頼度とテキスト情報を描画
+                var confidence = $"{region.Confidence:F2}";
+                var displayText = string.IsNullOrWhiteSpace(region.Text) ? "?" : 
+                                 region.Text.Length > 10 ? region.Text[..10] + "..." : region.Text;
+                var label = $"{confidence} | {displayText}";
+                
+                var textSize = graphics.MeasureString(label, font);
+                var textRect = new System.Drawing.RectangleF(
+                    region.Bounds.X, 
+                    Math.Max(0, region.Bounds.Y - textSize.Height - 2), 
+                    textSize.Width + 4, 
+                    textSize.Height + 2);
+                
+                // 背景を描画
+                graphics.FillRectangle(backgroundBrush, textRect);
+                
+                // テキストを描画
+                graphics.DrawString(label, font, textBrush, textRect.X + 2, textRect.Y + 1);
+            }
+            
+            // 注釈付き画像をバイト配列に変換
+            using var outputStream = new MemoryStream();
+            annotatedBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
+            return outputStream.ToArray();
+        }).ConfigureAwait(false);
     }
 
     /// <summary>

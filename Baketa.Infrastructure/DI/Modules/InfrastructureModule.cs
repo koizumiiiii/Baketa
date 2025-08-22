@@ -110,10 +110,12 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.ITileStrategy>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.GridTileStrategy>>();
-                var gridStrategy = new Baketa.Infrastructure.OCR.Strategies.GridTileStrategy(logger);
+                var advancedOptions = provider.GetService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AdvancedSettings>>();
+                var diagnosticsSaver = provider.GetService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
+                var gridStrategy = new Baketa.Infrastructure.OCR.Strategies.GridTileStrategy(logger, advancedOptions, diagnosticsSaver);
                 
                 var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();
-                moduleLogger?.LogInformation("⚡ GridTileStrategy登録完了 - 高速処理モード（AdaptiveTile→Grid置換によるパフォーマンス最適化）");
+                moduleLogger?.LogInformation("⚡ GridTileStrategy登録完了 - ROI画像出力対応（AdaptiveTile→Grid置換によるパフォーマンス最適化）");
                 
                 return gridStrategy;
             });

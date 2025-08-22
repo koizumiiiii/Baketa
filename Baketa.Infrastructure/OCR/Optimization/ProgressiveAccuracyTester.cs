@@ -106,8 +106,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             
             DebugLogUtility.WriteLog($"   ✅ {methodName} 前処理完了: {preprocessingTime}ms");
             
-            // デバッグ用画像保存
-            var debugImagePath = SaveDebugImage(processedImage, methodName);
+            // 前処理完了
             
             // OCR実行
             DebugLogUtility.WriteLog($"   🤖 {methodName} OCR実行開始");
@@ -130,7 +129,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
                 RecognizedText = recognizedText,
                 TextRegionCount = textRegionCount,
                 AverageConfidence = avgConfidence,
-                DebugImagePath = debugImagePath,
+                DebugImagePath = string.Empty,
                 Success = true
             };
         }
@@ -379,25 +378,6 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         }
     }
 
-    /// <summary>
-    /// デバッグ画像保存
-    /// </summary>
-    private string SaveDebugImage(Mat image, string methodName)
-    {
-        try
-        {
-            var fileName = $"debug_optimization_{methodName.Replace(" ", "_").Replace("（", "_").Replace("）", "_")}.png";
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
-            Cv2.ImWrite(filePath, image);
-            DebugLogUtility.WriteLog($"      💾 デバッグ画像保存: {fileName}");
-            return filePath;
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"      ⚠️ デバッグ画像保存失敗: {ex.Message}");
-            return string.Empty;
-        }
-    }
 
     /// <summary>
     /// OCR実行（既存システム利用）

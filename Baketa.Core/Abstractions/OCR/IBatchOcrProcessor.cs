@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Services;
 
 namespace Baketa.Core.Abstractions.OCR;
 
@@ -44,6 +45,19 @@ public interface IBatchOcrProcessor
     /// メモリ効率化のため
     /// </summary>
     Task ClearCacheAsync();
+    
+    /// <summary>
+    /// 現在セッションで収集されたROI画像情報を取得
+    /// 診断レポート統合用
+    /// </summary>
+    /// <returns>ROI画像情報のリスト</returns>
+    IReadOnlyList<RoiImageInfo> GetCurrentSessionRoiImages();
+    
+    /// <summary>
+    /// ROI画像情報をクリア
+    /// 新セッション開始時用
+    /// </summary>
+    void ClearRoiImageInfo();
 }
 
 /// <summary>

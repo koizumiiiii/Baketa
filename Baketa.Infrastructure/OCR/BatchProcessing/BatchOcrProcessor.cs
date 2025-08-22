@@ -3,18 +3,23 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Performance;
 using Baketa.Core.Logging;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.Strategies;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
@@ -209,11 +214,17 @@ public sealed class BatchOcrProcessor(
     IPerformanceOrchestrator? performanceOrchestrator = null,
     IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
     ILogger<BatchOcrProcessor>? logger = null,
-    OcrRegionGenerator? regionGenerator = null) : IBatchOcrProcessor, IDisposable
+    OcrRegionGenerator? regionGenerator = null,
+    IOptions<AdvancedSettings>? advancedOptions = null,
+    ImageDiagnosticsSaver? diagnosticsSaver = null) : IBatchOcrProcessor, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
     private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
     private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
+    private readonly AdvancedSettings _advancedSettings = advancedOptions?.Value ?? new();
+    
+    // ROI画像情報収集用（診断レポート統合）
+    private readonly ConcurrentBag<RoiImageInfo> _currentSessionRoiImages = new();
     private readonly ILogger<BatchOcrProcessor>? _logger = logger;
     private readonly OcrRegionGenerator? _regionGenerator = regionGenerator;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor = new(
@@ -443,6 +454,22 @@ public sealed class BatchOcrProcessor(
                     var ocrEngineResult = ocrEngineExecution.Complete();
                     tileTimer.Stop();
                     Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms (エンジン:{ocrEngineResult.Duration.TotalMilliseconds:F1}ms), 検出領域数: {result.TextRegions?.Count ?? 0}");
+                    
+                    // ROI画像保存（OCR成功時）
+                    if (_advancedSettings.EnableRoiImageOutput && diagnosticsSaver != null && result.TextRegions?.Count > 0)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await SaveTileRoiImagesAsync(tile.Image, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
+                            }
+                            catch (Exception roiEx)
+                            {
+                                _logger?.LogWarning(roiEx, "ROI画像保存エラー - Tile {TileIndex}", index);
+                            }
+                        }, cancellationToken);
+                    }
                     
                     return new TileOcrResult
                     {
@@ -1802,8 +1829,7 @@ public sealed class BatchOcrProcessor(
         // 画像サイズがタイルサイズより小さい場合はそのまま使用
         if (image.Width <= optimalTileSize && image.Height <= optimalTileSize)
         {
-            // デバッグキャプチャ: 分割なしの場合でもデバッグ画像を保存
-            await SaveDebugCaptureWithTilesAsync(image, [], "no-split").ConfigureAwait(false);
+            // 分割なしの場合はそのままタイル化
             
             return [new ImageTile
             {
@@ -1864,126 +1890,11 @@ public sealed class BatchOcrProcessor(
 
         Console.WriteLine($"🔥 [TILE-SPLIT] 画像分割完了 - {tiles.Count}個のタイルを作成");
         
-        // デバッグキャプチャ: タイル分割の可視化画像を保存
-        await SaveDebugCaptureWithTilesAsync(image, tileRectangles, $"split-{tilesX}x{tilesY}").ConfigureAwait(false);
+        // タイル分割完了
         
         return tiles;
     }
 
-    /// <summary>
-    /// デバッグ用にタイル境界線を描画した画像を保存
-    /// </summary>
-    private static async Task SaveDebugCaptureWithTilesAsync(IAdvancedImage image, List<Rectangle> tileRectangles, string suffix)
-    {
-        try
-        {
-            // デバッグキャプチャが有効かチェック
-            var debugCapturePath = "E:\\dev\\Baketa\\debug_captures";
-            if (!System.IO.Directory.Exists(debugCapturePath))
-            {
-                System.IO.Directory.CreateDirectory(debugCapturePath);
-            }
-
-            // 元画像のバイト配列を取得
-            var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
-            
-            // タイムスタンプ付きファイル名を生成
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
-            
-            // 元画像を保存
-            var originalFilename = $"tile-debug-original_{timestamp}_{suffix}_{image.Width}x{image.Height}.png";
-            var originalPath = System.IO.Path.Combine(debugCapturePath, originalFilename);
-            await System.IO.File.WriteAllBytesAsync(originalPath, imageBytes).ConfigureAwait(false);
-
-            // タイル境界線を描画した画像を作成
-            if (tileRectangles.Count > 0)
-            {
-                var annotatedFilename = $"tile-debug-annotated_{timestamp}_{suffix}_{image.Width}x{image.Height}.png";
-                var annotatedPath = System.IO.Path.Combine(debugCapturePath, annotatedFilename);
-                
-                await CreateAnnotatedTileImageAsync(imageBytes, tileRectangles, image.Width, image.Height, annotatedPath).ConfigureAwait(false);
-                
-                Console.WriteLine($"🎯 [DEBUG-CAPTURE] 注釈付き画像保存完了: {annotatedFilename}");
-            }
-            
-            Console.WriteLine($"🎯 [DEBUG-CAPTURE] デバッグ画像保存完了: {originalFilename}");
-            Console.WriteLine($"   - パス: {originalPath}");
-            Console.WriteLine($"   - タイル数: {tileRectangles.Count}");
-            Console.WriteLine($"   - 画像サイズ: {image.Width}x{image.Height}");
-            
-            // ログファイルにも記録
-            var logMessage = $"🎯 [DEBUG-CAPTURE] {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} デバッグ画像保存: {originalFilename}, タイル数: {tileRectangles.Count}";
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", $"{logMessage}{Environment.NewLine}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"🚨 [DEBUG-CAPTURE] デバッグ画像保存エラー: {ex.Message}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEBUG-CAPTURE] エラー: {ex.Message}{Environment.NewLine}");
-        }
-    }
-
-    /// <summary>
-    /// タイル境界線を描画した注釈付き画像を作成
-    /// </summary>
-    private static async Task CreateAnnotatedTileImageAsync(byte[] imageBytes, List<Rectangle> tileRectangles, int width, int height, string outputPath)
-    {
-        try
-        {
-            using var memoryStream = new System.IO.MemoryStream(imageBytes);
-            using var originalBitmap = new System.Drawing.Bitmap(memoryStream);
-            using var annotatedBitmap = new System.Drawing.Bitmap(originalBitmap);
-            using var graphics = System.Drawing.Graphics.FromImage(annotatedBitmap);
-            
-            // 高品質な描画設定
-            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            
-            // タイル境界線を描画（赤色、太い線）
-            using var tilePen = new System.Drawing.Pen(System.Drawing.Color.Red, 3.0f);
-            using var tileDashPen = new System.Drawing.Pen(System.Drawing.Color.Yellow, 2.0f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
-            
-            for (int i = 0; i < tileRectangles.Count; i++)
-            {
-                var rect = tileRectangles[i];
-                
-                // タイル境界を赤い実線で描画
-                graphics.DrawRectangle(tilePen, rect);
-                
-                // タイル番号を描画
-                var tileNumberText = $"Tile-{i}";
-                using var font = new System.Drawing.Font("Arial", 16, System.Drawing.FontStyle.Bold);
-                using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Red);
-                using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 255, 255, 255)); // 半透明白
-                
-                var textSize = graphics.MeasureString(tileNumberText, font);
-                var textRect = new System.Drawing.RectangleF(rect.X + 5, rect.Y + 5, textSize.Width + 4, textSize.Height + 2);
-                
-                // 背景を描画
-                graphics.FillRectangle(backgroundBrush, textRect);
-                
-                // テキストを描画
-                graphics.DrawString(tileNumberText, font, brush, rect.X + 7, rect.Y + 6);
-                
-                // タイル情報をコンソールに出力
-                Console.WriteLine($"🎯 [TILE-{i}] 境界: ({rect.X},{rect.Y}) {rect.Width}x{rect.Height}");
-            }
-            
-            // 全体の境界を黄色い破線で描画
-            graphics.DrawRectangle(tileDashPen, 0, 0, width - 1, height - 1);
-            
-            // 注釈付き画像を保存
-            annotatedBitmap.Save(outputPath, System.Drawing.Imaging.ImageFormat.Png);
-            
-            Console.WriteLine($"🎯 [DEBUG-ANNOTATION] タイル境界線描画完了 - {tileRectangles.Count}個のタイル");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"🚨 [DEBUG-ANNOTATION] 注釈描画エラー: {ex.Message}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [DEBUG-ANNOTATION] エラー: {ex.Message}{Environment.NewLine}");
-        }
-    }
 
     /// <summary>
     /// タイル結果をマージして単一のOCR結果に統合
@@ -2037,6 +1948,219 @@ public sealed class BatchOcrProcessor(
             null, // regionOfInterest
             null  // mergedText
         );
+    }
+    
+    /// <summary>
+    /// タイルROI画像保存（BatchOcrProcessor用）
+    /// 設定に応じて赤枠付き全体画像と個別切り抜き画像を保存
+    /// </summary>
+    private async Task SaveTileRoiImagesAsync(IAdvancedImage tileImage, OcrResults ocrResult, string tileId, Point tileOffset)
+    {
+        try
+        {
+            if (diagnosticsSaver == null || ocrResult.TextRegions == null) return;
+            
+            // ROI画像保存パスの決定
+            var outputPath = !string.IsNullOrWhiteSpace(_advancedSettings.RoiImageOutputPath) 
+                ? _advancedSettings.RoiImageOutputPath 
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
+            
+            // ディレクトリ作成
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+            
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
+            var extension = _advancedSettings.RoiImageFormat switch
+            {
+                RoiImageFormat.Jpeg => "jpg",
+                RoiImageFormat.Bmp => "bmp",
+                _ => "png"
+            };
+            
+            var tileImageBytes = await tileImage.ToByteArrayAsync().ConfigureAwait(false);
+            if (tileImageBytes == null || tileImageBytes.Length == 0) return;
+            
+            // 設定に応じてROI画像を保存
+            switch (_advancedSettings.RoiSaveMode)
+            {
+                case RoiSaveMode.AnnotatedFullImage:
+                    await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    break;
+                    
+                case RoiSaveMode.IndividualRegions:
+                    await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    break;
+                    
+                case RoiSaveMode.Both:
+                    await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "OCR-ROI画像保存エラー - タイル: {TileId}", tileId);
+        }
+    }
+    
+    /// <summary>
+    /// 赤枠付き全体画像のみ保存
+    /// </summary>
+    private async Task SaveAnnotatedFullImageOnly(byte[] tileImageBytes, IReadOnlyList<OcrTextRegion> textRegions, string tileId, string timestamp, string extension, string outputPath)
+    {
+        var filename = $"roi-annotated-{tileId}_{timestamp}.{extension}";
+        var filePath = Path.Combine(outputPath, filename);
+        
+        await diagnosticsSaver!.SaveAnnotatedFullImageAsync(
+            tileImageBytes,
+            textRegions,
+            filePath,
+            $"OCR-Annotated-{tileId}").ConfigureAwait(false);
+        
+        // 診断レポート用ROI画像情報を収集
+        var roiImageInfo = new RoiImageInfo
+        {
+            ImageId = $"OCR-Annotated-{tileId}",
+            FilePath = filePath,
+            DetectedText = $"{textRegions.Count}個のテキスト領域を検出",
+            Confidence = textRegions.Count > 0 ? textRegions.Average(r => r.Confidence) : 0.0,
+            Width = 0, // 全体画像のサイズは後で設定可能
+            Height = 0,
+            Format = _advancedSettings.RoiImageFormat.ToString().ToLowerInvariant(),
+            TileId = tileId,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        _currentSessionRoiImages.Add(roiImageInfo);
+        
+        _logger?.LogTrace("💾 赤枠付きROI画像保存完了: {Filename}, 検出領域数: {Count}", filename, textRegions.Count);
+    }
+    
+    /// <summary>
+    /// 個別切り抜き画像のみ保存
+    /// </summary>
+    private async Task SaveIndividualRegionsOnly(byte[] tileImageBytes, IReadOnlyList<OcrTextRegion> textRegions, string tileId, string timestamp, string extension, string outputPath)
+    {
+        for (int i = 0; i < textRegions.Count; i++)
+        {
+            var textRegion = textRegions[i];
+            if (textRegion.Bounds.Width <= 0 || textRegion.Bounds.Height <= 0) continue;
+            
+            // タイル内相対座標でROI領域を切り出し
+            var roiImageBytes = await ExtractOcrRoiImageAsync(tileImageBytes, textRegion.Bounds).ConfigureAwait(false);
+            if (roiImageBytes == null || roiImageBytes.Length == 0) continue;
+            
+            // ファイル名生成
+            var confidence = textRegion.Confidence;
+            var text = textRegion.Text?.Replace("\n", "").Replace("\r", "") ?? "unknown";
+            text = string.Concat(text.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c))).Trim();
+            if (text.Length > 20) text = text[..20]; // ファイル名制限
+            
+            var filename = $"roi-individual-{tileId}-{i}_{confidence:F2}_{text}_{timestamp}.{extension}";
+            var safeFilename = string.Concat(filename.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+            var filePath = Path.Combine(outputPath, safeFilename);
+            
+            // ROI画像保存（診断情報付き）
+            await diagnosticsSaver!.SaveResultImageAsync(
+                roiImageBytes, 
+                filePath, 
+                $"OCR-Individual-{tileId}-{i}").ConfigureAwait(false);
+            
+            // 診断レポート用ROI画像情報を収集
+            var roiImageInfo = new RoiImageInfo
+            {
+                ImageId = $"OCR-Individual-{tileId}-{i}",
+                FilePath = filePath,
+                DetectedText = textRegion.Text,
+                Confidence = confidence,
+                Width = textRegion.Bounds.Width,
+                Height = textRegion.Bounds.Height,
+                Format = _advancedSettings.RoiImageFormat.ToString().ToLowerInvariant(),
+                TileId = tileId,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            _currentSessionRoiImages.Add(roiImageInfo);
+            
+            _logger?.LogTrace("💾 個別ROI画像保存完了: {Filename}, テキスト: {Text}, 信頼度: {Confidence:F2}", 
+                safeFilename, textRegion.Text, confidence);
+        }
+    }
+    
+    /// <summary>
+    /// OCR検出領域からROI画像抽出
+    /// </summary>
+    private async Task<byte[]?> ExtractOcrRoiImageAsync(byte[] tileImageBytes, Rectangle boundingBox)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                if (tileImageBytes == null || tileImageBytes.Length == 0) return null;
+                
+                // タイル画像からROI領域を切り出し
+                using var memoryStream = new MemoryStream(tileImageBytes);
+                using var tileBitmap = new System.Drawing.Bitmap(memoryStream);
+                
+                // 境界チェック
+                var actualBounds = new Rectangle(
+                    Math.Max(0, boundingBox.X),
+                    Math.Max(0, boundingBox.Y),
+                    Math.Min(boundingBox.Width, tileBitmap.Width - Math.Max(0, boundingBox.X)),
+                    Math.Min(boundingBox.Height, tileBitmap.Height - Math.Max(0, boundingBox.Y))
+                );
+                
+                if (actualBounds.Width <= 0 || actualBounds.Height <= 0) return null;
+                
+                using var roiBitmap = new System.Drawing.Bitmap(actualBounds.Width, actualBounds.Height);
+                using var graphics = System.Drawing.Graphics.FromImage(roiBitmap);
+                
+                // 高品質描画設定
+                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                
+                // ROI領域を切り出し
+                var destRect = new Rectangle(0, 0, actualBounds.Width, actualBounds.Height);
+                graphics.DrawImage(tileBitmap, destRect, actualBounds, GraphicsUnit.Pixel);
+                
+                // ROI画像をバイト配列に変換
+                using var outputStream = new MemoryStream();
+                var imageFormat = _advancedSettings.RoiImageFormat switch
+                {
+                    RoiImageFormat.Jpeg => System.Drawing.Imaging.ImageFormat.Jpeg,
+                    RoiImageFormat.Bmp => System.Drawing.Imaging.ImageFormat.Bmp,
+                    _ => System.Drawing.Imaging.ImageFormat.Png
+                };
+                
+                roiBitmap.Save(outputStream, imageFormat);
+                return outputStream.ToArray();
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "OCR-ROI画像抽出エラー");
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// 現在セッションで収集されたROI画像情報を取得
+    /// </summary>
+    public IReadOnlyList<RoiImageInfo> GetCurrentSessionRoiImages()
+    {
+        return _currentSessionRoiImages.ToList().AsReadOnly();
+    }
+    
+    /// <summary>
+    /// ROI画像情報をクリア（新セッション開始時）
+    /// </summary>
+    public void ClearRoiImageInfo()
+    {
+        _currentSessionRoiImages.Clear();
+        _logger?.LogDebug("ROI画像情報をクリアしました");
     }
 
 

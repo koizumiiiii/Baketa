@@ -2,6 +2,7 @@ using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ namespace Baketa.Infrastructure.Services;
 public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
 {
     private readonly ILogger<DiagnosticReportGenerator> _logger;
+    private readonly IBatchOcrProcessor? _batchOcrProcessor;
     private static readonly string ReportsDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
         "Baketa", "Reports");
@@ -26,9 +28,12 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public DiagnosticReportGenerator(ILogger<DiagnosticReportGenerator> logger)
+    public DiagnosticReportGenerator(
+        ILogger<DiagnosticReportGenerator> logger,
+        IBatchOcrProcessor? batchOcrProcessor = null)
     {
         _logger = logger;
+        _batchOcrProcessor = batchOcrProcessor;
         EnsureReportsDirectoryExists();
     }
 
@@ -64,6 +69,22 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         
         Console.WriteLine($"🔧 [DIAGNOSTIC] 生成ファイルパス: '{filePath}'");
 
+        // ROI画像情報を収集
+        var roiImages = new List<RoiImageInfo>();
+        if (_batchOcrProcessor != null)
+        {
+            try
+            {
+                var currentRoiImages = _batchOcrProcessor.GetCurrentSessionRoiImages();
+                roiImages.AddRange(currentRoiImages);
+                Console.WriteLine($"🔧 [DIAGNOSTIC] ROI画像情報統合: {roiImages.Count}個");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "ROI画像情報の取得に失敗しました");
+            }
+        }
+
         var report = new DiagnosticReport
         {
             ReportId = reportId,
@@ -73,7 +94,8 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
             PipelineEvents = eventsList,
             UserComment = userComment,
             ReportType = reportType,
-            IsReviewed = false
+            IsReviewed = false,
+            RoiImages = roiImages
         };
 
         try

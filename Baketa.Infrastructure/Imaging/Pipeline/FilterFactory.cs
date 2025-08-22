@@ -41,6 +41,16 @@ namespace Baketa.Infrastructure.Imaging.Pipeline;
             // テキスト検出フィルター
             _filterTypes["TextRegionDetectionFilter"] = typeof(TextRegionDetectionFilter);
             
+            // 既存のOpenCVフィルター
+            _filterTypes["OpenCvAdaptiveThresholdFilter"] = typeof(OpenCvAdaptiveThresholdFilter);
+            _filterTypes["OpenCvColorBasedMaskingFilter"] = typeof(OpenCvColorBasedMaskingFilter);
+            
+            // 新しいOpenCVフィルター（OCR最適化用）
+            _filterTypes["OpenCvContrastEnhancementFilter"] = typeof(OpenCvContrastEnhancementFilter);
+            _filterTypes["OpenCvNoiseReductionFilter"] = typeof(OpenCvNoiseReductionFilter);
+            _filterTypes["OpenCvSharpeningFilter"] = typeof(OpenCvSharpeningFilter);
+            _filterTypes["OpenCvEdgeEnhancementFilter"] = typeof(OpenCvEdgeEnhancementFilter);
+            
             // 他のフィルターはここに追加
             // TODO: フィルターの自動検出または明示的な登録
         }

@@ -1,7 +1,10 @@
 using System.Drawing;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
 namespace Baketa.Infrastructure.OCR.Strategies;
 
@@ -9,8 +12,13 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// 固定グリッド分割戦略（既存ロジック互換）
 /// 従来のBatchOcrProcessorロジックを抽出・実装
 /// </summary>
-public sealed class GridTileStrategy(ILogger<GridTileStrategy>? logger = null) : ITileStrategy
+public sealed class GridTileStrategy(
+    ILogger<GridTileStrategy>? logger = null,
+    IOptions<AdvancedSettings>? advancedOptions = null,
+    ImageDiagnosticsSaver? diagnosticsSaver = null) : ITileStrategy
 {
+    private readonly AdvancedSettings _advancedSettings = advancedOptions?.Value ?? new();
+    
     public string StrategyName => "GridTile";
     public TileStrategyParameters Parameters { get; set; } = new();
 
@@ -94,6 +102,12 @@ public sealed class GridTileStrategy(ILogger<GridTileStrategy>? logger = null) :
 
                 logger?.LogTrace("🔍 グリッドタイル生成: {RegionId}, 位置: ({X},{Y}), サイズ: {Width}x{Height}", 
                     regionId, startX, startY, width, height);
+                
+                // ROI画像出力（設定が有効な場合）
+                if (_advancedSettings.EnableRoiImageOutput && diagnosticsSaver != null)
+                {
+                    await SaveRoiImageAsync(image, region, regionId).ConfigureAwait(false);
+                }
             }
         }
 
@@ -216,6 +230,100 @@ public sealed class GridTileStrategy(ILogger<GridTileStrategy>? logger = null) :
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "GridTile 注釈描画エラー");
+        }
+    }
+    
+    /// <summary>
+    /// ROI画像保存（GridTileStrategy用）
+    /// </summary>
+    private async Task SaveRoiImageAsync(IAdvancedImage sourceImage, TileRegion region, string regionId)
+    {
+        try
+        {
+            if (diagnosticsSaver == null) return;
+            
+            // ROIタイル画像を抽出
+            var roiImageBytes = await ExtractRoiImageAsync(sourceImage, region).ConfigureAwait(false);
+            if (roiImageBytes == null || roiImageBytes.Length == 0) return;
+            
+            // ROI画像保存パスの決定
+            var outputPath = !string.IsNullOrWhiteSpace(_advancedSettings.RoiImageOutputPath) 
+                ? _advancedSettings.RoiImageOutputPath 
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
+            
+            // ディレクトリ作成
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+            
+            // ファイル名生成
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
+            var extension = _advancedSettings.RoiImageFormat switch
+            {
+                RoiImageFormat.Jpeg => "jpg",
+                RoiImageFormat.Bmp => "bmp",
+                _ => "png"
+            };
+            var filename = $"roi-{regionId}_{timestamp}_{region.Bounds.Width}x{region.Bounds.Height}.{extension}";
+            var filePath = Path.Combine(outputPath, filename);
+            
+            // ROI画像保存
+            await diagnosticsSaver.SaveResultImageAsync(
+                roiImageBytes, 
+                filePath, 
+                $"ROI-{regionId}").ConfigureAwait(false);
+            
+            logger?.LogTrace("💾 ROI画像保存完了: {Filename}, 領域: {RegionId}", filename, regionId);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "ROI画像保存エラー - 領域: {RegionId}", regionId);
+        }
+    }
+    
+    /// <summary>
+    /// ROI画像抽出（指定領域のみを切り出し）
+    /// </summary>
+    private async Task<byte[]?> ExtractRoiImageAsync(IAdvancedImage sourceImage, TileRegion region)
+    {
+        try
+        {
+            // 元画像をバイト配列に変換
+            var sourceBytes = await sourceImage.ToByteArrayAsync().ConfigureAwait(false);
+            if (sourceBytes == null || sourceBytes.Length == 0) return null;
+            
+            // 元画像からROI領域を切り出し
+            using var memoryStream = new MemoryStream(sourceBytes);
+            using var sourceBitmap = new System.Drawing.Bitmap(memoryStream);
+            using var roiBitmap = new System.Drawing.Bitmap(region.Bounds.Width, region.Bounds.Height);
+            using var graphics = System.Drawing.Graphics.FromImage(roiBitmap);
+            
+            // 高品質描画設定
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+            
+            // ROI領域を切り出し
+            var destRect = new Rectangle(0, 0, region.Bounds.Width, region.Bounds.Height);
+            graphics.DrawImage(sourceBitmap, destRect, region.Bounds, GraphicsUnit.Pixel);
+            
+            // ROI画像をバイト配列に変換
+            using var outputStream = new MemoryStream();
+            var imageFormat = _advancedSettings.RoiImageFormat switch
+            {
+                RoiImageFormat.Jpeg => System.Drawing.Imaging.ImageFormat.Jpeg,
+                RoiImageFormat.Bmp => System.Drawing.Imaging.ImageFormat.Bmp,
+                _ => System.Drawing.Imaging.ImageFormat.Png
+            };
+            
+            roiBitmap.Save(outputStream, imageFormat);
+            return outputStream.ToArray();
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "ROI画像抽出エラー");
+            return null;
         }
     }
 }

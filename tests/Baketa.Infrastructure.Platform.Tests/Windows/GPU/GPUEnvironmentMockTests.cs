@@ -9,6 +9,7 @@ using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Infrastructure.Platform.Tests.Windows.GPU;
 
@@ -95,7 +96,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         var integratedGPUEnv = CreateMockIntegratedGpu();
         var windowHandle = new IntPtr(0x12345);
 
@@ -112,7 +114,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         var dedicatedGPUEnv = CreateMockDedicatedGPU();
         var windowHandle = new IntPtr(0x12345);
 
@@ -129,7 +132,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         var lowEndGPUEnv = CreateMockLowEndIntegratedGPU();
         var windowHandle = new IntPtr(0x12345);
 
@@ -149,7 +153,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         
         var gpuEnv = new GpuEnvironmentInfo
         {
@@ -183,7 +188,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         var validWindowHandle = new IntPtr(0x12345);
 
         // Act
@@ -203,7 +209,8 @@ public class GPUEnvironmentMockTests
         // Arrange
         var mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
         var mockCapturer = new Mock<IWindowsCapturer>();
-        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object);
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
         var invalidWindowHandle = IntPtr.Zero;
 
         // Act

@@ -612,8 +612,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     #endregion
 
-    #endregion
-
     #region プライベートメソッド
 
     /// <summary>
@@ -1542,16 +1540,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // デバッグ用: キャプチャした画像を保存
                 if (image != null)
                 {
-                    try
-                    {
-                        var debugImagePath = Path.Combine(Directory.GetCurrentDirectory(), $"debug_captured_{translationId}.png");
-                        await SaveImageForDebugAsync(image, debugImagePath).ConfigureAwait(false);
-                        DebugLogUtility.WriteLog($"🖼️ デバッグ用画像保存: {debugImagePath}");
-                    }
-                    catch (Exception saveEx)
-                    {
-                        DebugLogUtility.WriteLog($"⚠️ デバッグ画像保存エラー: {saveEx.Message}");
-                    }
+                    // 画像キャプチャ完了
                 }
                 
                 // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}{Environment.NewLine}");
@@ -2253,31 +2242,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     #endregion
 
-    #region デバッグ用メソッド
-
-    /// <summary>
-    /// デバッグ用に画像を保存します
-    /// </summary>
-    /// <param name="image">保存する画像</param>
-    /// <param name="filePath">保存先ファイルパス</param>
-    private async Task SaveImageForDebugAsync(IImage image, string filePath)
-    {
-        try
-        {
-            // IImageからバイト配列に変換
-            byte[] imageBytes = await ConvertImageToBytesAsync(image).ConfigureAwait(false);
-            
-            // ファイルに保存
-            await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
-            
-            DebugLogUtility.WriteLog($"✅ デバッグ画像保存完了: {filePath} (サイズ: {imageBytes.Length} bytes)");
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"❌ デバッグ画像保存エラー: {ex.Message}");
-            throw;
-        }
-    }
 
     /// <summary>
     /// IImageをバイト配列に変換します

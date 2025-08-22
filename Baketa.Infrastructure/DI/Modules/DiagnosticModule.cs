@@ -4,8 +4,10 @@ using Baketa.Core.DI;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Infrastructure.Events.Processors;
 using Baketa.Infrastructure.Services;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.IO;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -28,6 +30,15 @@ public sealed class DiagnosticModule : ServiceModuleBase
         services.AddSingleton<IDiagnosticReportGenerator, DiagnosticReportGenerator>();
         services.AddSingleton<IDiagnosticCollectionService, DiagnosticCollectionService>();
         Console.WriteLine("🔍 [DIAGNOSTIC] DiagnosticServices登録完了");
+        
+        // ROI画像診断保存サービス
+        services.AddSingleton<ImageDiagnosticsSaver>(serviceProvider =>
+        {
+            var outputDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
+            var logger = serviceProvider.GetService<Microsoft.Extensions.Logging.ILogger<ImageDiagnosticsSaver>>();
+            return new ImageDiagnosticsSaver(outputDirectory, logger);
+        });
+        Console.WriteLine("🔍 [DIAGNOSTIC] ImageDiagnosticsSaver登録完了");
 
         // イベントプロセッサー登録
         services.AddScoped<IEventProcessor<PipelineDiagnosticEvent>, Baketa.Infrastructure.Events.Processors.DiagnosticEventProcessor>();

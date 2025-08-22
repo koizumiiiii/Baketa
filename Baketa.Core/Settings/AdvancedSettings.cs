@@ -199,6 +199,45 @@ public sealed class AdvancedSettings
     [SettingMetadata(SettingLevel.Debug, "Advanced", "カスタム設定パス", 
         Description = "カスタム設定ファイルのパス（開発者向け）")]
     public string CustomConfigPath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// ROI画像出力の有効化
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Advanced", "ROI画像出力", 
+        Description = "OCR処理でROI（関心領域）画像を診断用に保存します")]
+    public bool EnableRoiImageOutput { get; set; } = true;
+    
+    /// <summary>
+    /// ROI画像保存モード
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Advanced", "ROI保存モード", 
+        Description = "ROI画像の保存方式を選択します", 
+        ValidValues = [RoiSaveMode.AnnotatedFullImage, RoiSaveMode.IndividualRegions, RoiSaveMode.Both])]
+    public RoiSaveMode RoiSaveMode { get; set; } = RoiSaveMode.AnnotatedFullImage;
+    
+    /// <summary>
+    /// ROI画像保存パス
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Advanced", "ROI画像保存パス", 
+        Description = "ROI画像を保存するディレクトリパス（空の場合はデフォルトパス）")]
+    public string RoiImageOutputPath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// ROI画像の品質設定
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Advanced", "ROI画像品質", 
+        Description = "ROI画像の保存品質（1-100）", 
+        MinValue = 1, 
+        MaxValue = 100)]
+    public int RoiImageQuality { get; set; } = 95;
+    
+    /// <summary>
+    /// ROI画像の保存形式
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Advanced", "ROI画像形式", 
+        Description = "ROI画像の保存形式", 
+        ValidValues = [RoiImageFormat.Png, RoiImageFormat.Jpeg, RoiImageFormat.Bmp])]
+    public RoiImageFormat RoiImageFormat { get; set; } = RoiImageFormat.Png;
 }
 
 /// <summary>
@@ -277,4 +316,46 @@ public enum RetryStrategy
     /// カスタム
     /// </summary>
     Custom
+}
+
+/// <summary>
+/// ROI画像保存形式
+/// </summary>
+public enum RoiImageFormat
+{
+    /// <summary>
+    /// PNG形式（可逆圧縮、透明度サポート）
+    /// </summary>
+    Png,
+    
+    /// <summary>
+    /// JPEG形式（非可逆圧縮、高圧縮率）
+    /// </summary>
+    Jpeg,
+    
+    /// <summary>
+    /// BMP形式（無圧縮、高品質）
+    /// </summary>
+    Bmp
+}
+
+/// <summary>
+/// ROI画像保存モード
+/// </summary>
+public enum RoiSaveMode
+{
+    /// <summary>
+    /// 赤枠付き全体画像のみ保存
+    /// </summary>
+    AnnotatedFullImage,
+    
+    /// <summary>
+    /// 個別テキスト領域の切り抜き画像のみ保存
+    /// </summary>
+    IndividualRegions,
+    
+    /// <summary>
+    /// 両方保存（赤枠付き全体画像＋個別切り抜き画像）
+    /// </summary>
+    Both
 }
