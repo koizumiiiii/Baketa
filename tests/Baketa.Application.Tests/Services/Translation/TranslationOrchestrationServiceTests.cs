@@ -79,6 +79,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _translationEngineFactoryMock.Object,
             _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
             _eventAggregatorMock.Object,
+            null, // translationDictionaryService（テスト用にnull）
             _loggerMock.Object);
     }
 

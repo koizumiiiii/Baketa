@@ -45,6 +45,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ITranslationEngineFactory _translationEngineFactory;
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
     private readonly IEventAggregator _eventAggregator;
+    private readonly ITranslationDictionaryService? _translationDictionaryService;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -93,6 +94,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
     /// <param name="coordinateBasedTranslation">座標ベース翻訳サービス</param>
     /// <param name="eventAggregator">イベント集約サービス</param>
+    /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
@@ -101,6 +103,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
         IEventAggregator eventAggregator,
+        ITranslationDictionaryService? translationDictionaryService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -115,6 +118,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
         _eventAggregator = eventAggregator;
+        _translationDictionaryService = translationDictionaryService;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -1831,14 +1835,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     
                     if (sourceCode == "ja" && targetCode == "en")
                     {
-                        // 日本語から英語への翻訳
-                        translatedText = TranslateJapaneseToEnglish(originalText);
+                        // 日本語から英語への翻訳（新辞書サービス優先）
+                        translatedText = await TranslateWithDictionaryServiceAsync(originalText, sourceCode, targetCode);
                         DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（日→英）: '{translatedText}'");
                     }
                     else if (sourceCode == "en" && targetCode == "ja")
                     {
-                        // 英語から日本語への翻訳
-                        translatedText = TranslateEnglishToJapanese(originalText);
+                        // 英語から日本語への翻訳（新辞書サービス優先）
+                        translatedText = await TranslateWithDictionaryServiceAsync(originalText, sourceCode, targetCode);
                         DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（英→日）: '{translatedText}'");
                     }
                     else
@@ -2085,7 +2089,49 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     /// <summary>
-    /// 日本語から英語への基本的な翻訳
+    /// 辞書サービスを使用した翻訳（フォールバック付き）
+    /// </summary>
+    private async Task<string> TranslateWithDictionaryServiceAsync(string text, string sourceLanguage, string targetLanguage)
+    {
+        // 新しい辞書サービスを優先して使用
+        if (_translationDictionaryService != null)
+        {
+            try
+            {
+                var translatedText = await _translationDictionaryService.TranslateAsync(text, sourceLanguage, targetLanguage);
+                
+                // 翻訳が成功した場合（元のテキストと異なる場合）
+                if (!string.Equals(text, translatedText, StringComparison.Ordinal))
+                {
+                    _logger?.LogTrace("📚 辞書サービス翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})", 
+                        text, translatedText, sourceLanguage, targetLanguage);
+                    return translatedText;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "⚠️ 辞書サービス翻訳でエラー - ハードコードフォールバック使用: '{Text}'", text);
+            }
+        }
+
+        // フォールバック: 既存のハードコード翻訳を使用
+        if (sourceLanguage == "ja" && targetLanguage == "en")
+        {
+            _logger?.LogTrace("🔄 ハードコード翻訳フォールバック（日→英）: '{Text}'", text);
+            return TranslateJapaneseToEnglish(text);
+        }
+        else if (sourceLanguage == "en" && targetLanguage == "ja")
+        {
+            _logger?.LogTrace("🔄 ハードコード翻訳フォールバック（英→日）: '{Text}'", text);
+            return TranslateEnglishToJapanese(text);
+        }
+
+        // 対応していない言語ペア
+        return text;
+    }
+
+    /// <summary>
+    /// 日本語から英語への基本的な翻訳（フォールバック用）
     /// </summary>
     private static string TranslateJapaneseToEnglish(string text)
     {
