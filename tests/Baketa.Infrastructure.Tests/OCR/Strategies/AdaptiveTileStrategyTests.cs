@@ -110,8 +110,8 @@ public class AdaptiveTileStrategyTests
         result.Should().NotBeEmpty();
         result.Should().AllSatisfy(region => 
         {
-            region.RegionType.Should().Be(TileRegionType.Fallback);
-            region.RegionId.Should().StartWith("fallback-");
+            region.RegionType.Should().Be(TileRegionType.Composite);
+            region.RegionId.Should().StartWith("fullscreen-");
         });
     }
 
@@ -132,7 +132,7 @@ public class AdaptiveTileStrategyTests
         // Assert
         result.Should().NotBeEmpty();
         result.Should().AllSatisfy(region => 
-            region.RegionType.Should().Be(TileRegionType.Fallback));
+            region.RegionType.Should().Be(TileRegionType.Composite));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class AdaptiveTileStrategyTests
         // Assert
         result.Should().NotBeEmpty();
         result.Should().AllSatisfy(region => 
-            region.RegionType.Should().Be(TileRegionType.Fallback));
+            region.RegionType.Should().Be(TileRegionType.Composite));
 
         // 警告ログ確認（例外は内部でキャッチされWarningになる）
         _mockLogger.Verify(
@@ -275,7 +275,7 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().HaveCount(1);
-        result[0].RegionId.Should().Be("fallback-single");
+        result[0].RegionId.Should().StartWith("fullscreen-");
         result[0].Bounds.Should().Be(new Rectangle(0, 0, 500, 300));
     }
 }

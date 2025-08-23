@@ -392,6 +392,11 @@ public class OcrEngineSettings
     public bool EnablePreprocessing { get; set; } = true;
 
     /// <summary>
+    /// ハイブリッドモードを有効にするか（V3高速検出 + V5高精度認識）
+    /// </summary>
+    public bool EnableHybridMode { get; set; }
+
+    /// <summary>
     /// 設定の妥当性を検証する
     /// </summary>
     /// <returns>妥当性チェック結果</returns>
@@ -445,7 +450,8 @@ public class OcrEngineSettings
             EnableMultiThread = EnableMultiThread,
             WorkerCount = WorkerCount,
             UseLanguageModel = UseLanguageModel,
-            EnablePreprocessing = EnablePreprocessing
+            EnablePreprocessing = EnablePreprocessing,
+            EnableHybridMode = EnableHybridMode
         };
     }
 }

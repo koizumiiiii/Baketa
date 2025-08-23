@@ -645,7 +645,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 // 接続プール使用モード
                 await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
                 // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             else
@@ -653,7 +653,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 // 単発接続モード（汚染対策）
                 await directWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
                 // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             
@@ -673,7 +673,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
             batchStopwatch.Stop();
-            _logger.LogWarning("バッチ翻訳タイムアウト（5秒）: Pythonサーバーからの応答待機でタイムアウト発生");
+            _logger.LogWarning("バッチ翻訳タイムアウト（30秒）: Pythonサーバーからの応答待機でタイムアウト発生");
             
             // タイムアウト時は個別処理でフォールバック
             return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);

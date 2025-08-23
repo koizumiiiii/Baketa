@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.OCR;
@@ -168,6 +169,81 @@ public sealed class PaddleOcrModule : IServiceModule
             return new TestCaseGenerator(logger);
         });
         
+        // ハイブリッドOCR設定（appsettings.jsonから読み込み）
+        services.AddSingleton<HybridOcrSettings>(serviceProvider =>
+        {
+            var configuration = serviceProvider.GetService<IConfiguration>();
+            
+            // デフォルト値
+            var fastDetectionModel = PaddleOcrModelVersion.V3;
+            var highQualityModel = PaddleOcrModelVersion.V5;
+            var imageQualityThreshold = 0.6;
+            var regionCountThreshold = 5;
+            var fastDetectionTimeoutMs = 500;
+            var highQualityTimeoutMs = 3000;
+            
+            if (configuration != null)
+            {
+                var hybridSection = configuration.GetSection("OCR:HybridStrategy");
+                if (hybridSection.Exists())
+                {
+                    // FastDetectionModelをV3とV5からマッピング
+                    var fastModel = hybridSection["FastDetectionModel"];
+                    if (fastModel == "V3")
+                        fastDetectionModel = PaddleOcrModelVersion.V3;
+                    else if (fastModel == "V5")
+                        fastDetectionModel = PaddleOcrModelVersion.V5;
+                        
+                    // HighQualityModelをV3とV5からマッピング
+                    var highQualityModelStr = hybridSection["HighQualityModel"];
+                    if (highQualityModelStr == "V3")
+                        highQualityModel = PaddleOcrModelVersion.V3;
+                    else if (highQualityModelStr == "V5")
+                        highQualityModel = PaddleOcrModelVersion.V5;
+                    
+                    // 数値設定を読み込み
+                    if (double.TryParse(hybridSection["ImageQualityThreshold"], out var qualityThreshold))
+                        imageQualityThreshold = qualityThreshold;
+                        
+                    if (int.TryParse(hybridSection["RegionCountThreshold"], out var regionThreshold))
+                        regionCountThreshold = regionThreshold;
+                        
+                    if (int.TryParse(hybridSection["FastDetectionTimeoutMs"], out var fastTimeout))
+                        fastDetectionTimeoutMs = fastTimeout;
+                        
+                    if (int.TryParse(hybridSection["HighQualityTimeoutMs"], out var highTimeout))
+                        highQualityTimeoutMs = highTimeout;
+                        
+                    Console.WriteLine($"✅ ハイブリッドOCR設定をappsettings.jsonから読み込み完了 - FastModel: {fastDetectionModel}, HighQualityModel: {highQualityModel}");
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ appsettings.json OCR:HybridStrategy セクションが見つかりません - デフォルト値を使用");
+                }
+            }
+            
+            // オブジェクト初期化子で設定を作成
+            return new HybridOcrSettings
+            {
+                FastDetectionModel = fastDetectionModel,
+                HighQualityModel = highQualityModel,
+                ImageQualityThreshold = imageQualityThreshold,
+                RegionCountThreshold = regionCountThreshold,
+                FastDetectionTimeoutMs = fastDetectionTimeoutMs,
+                HighQualityTimeoutMs = highQualityTimeoutMs
+            };
+        });
+        
+        // ハイブリッドPaddleOCRサービス
+        services.AddSingleton<HybridPaddleOcrService>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetService<ILogger<HybridPaddleOcrService>>() ?? 
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridPaddleOcrService>.Instance;
+            var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
+            var hybridSettings = serviceProvider.GetRequiredService<HybridOcrSettings>();
+            return new HybridPaddleOcrService(logger, eventAggregator, hybridSettings);
+        });
+        
         // Phase 1ベンチマークランナー
         services.AddSingleton<Phase1BenchmarkRunner>(serviceProvider =>
         {
@@ -271,6 +347,79 @@ public sealed class PaddleOcrModule : IServiceModule
             return new EnsembleBenchmark(logger, testCaseGenerator);
         });
         
+        // OCRエンジン設定（appsettings.jsonから読み込み）
+        services.AddSingleton<OcrEngineSettings>(serviceProvider =>
+        {
+            var configuration = serviceProvider.GetService<IConfiguration>();
+            var settings = new OcrEngineSettings();
+            
+            if (configuration != null)
+            {
+                Console.WriteLine($"🔍 [CONFIG_DEBUG] Configuration available: {configuration != null}");
+                
+                // 全設定セクションをデバッグ出力
+                foreach (var section in configuration.GetChildren())
+                {
+                    Console.WriteLine($"🔍 [CONFIG_DEBUG] Top-level section: {section.Key}");
+                    if (section.Key == "OCR")
+                    {
+                        foreach (var ocrChild in section.GetChildren())
+                        {
+                            Console.WriteLine($"🔍 [CONFIG_DEBUG] OCR child: {ocrChild.Key}");
+                        }
+                    }
+                }
+                
+                var ocrSection = configuration.GetSection("OCR:PaddleOCR");
+                Console.WriteLine($"🔍 [CONFIG_DEBUG] OCR:PaddleOCR section exists: {ocrSection.Exists()}");
+                Console.WriteLine($"🔍 [CONFIG_DEBUG] EnableHybridMode raw value: '{ocrSection["EnableHybridMode"]}'");
+                
+                // 別の方法でもアクセステスト
+                var ocrSectionAlt = configuration.GetSection("OCR").GetSection("PaddleOCR");
+                Console.WriteLine($"🔍 [CONFIG_DEBUG] Alternative access OCR.PaddleOCR exists: {ocrSectionAlt.Exists()}");
+                Console.WriteLine($"🔍 [CONFIG_DEBUG] Alternative EnableHybridMode: '{ocrSectionAlt["EnableHybridMode"]}'");
+                
+                if (ocrSection.Exists())
+                {
+                    // 基本設定を読み込み
+                    settings.Language = ocrSection["Language"] ?? "jpn";
+                    
+                    if (double.TryParse(ocrSection["DetectionThreshold"], out var detectionThreshold))
+                        settings.DetectionThreshold = detectionThreshold;
+                        
+                    if (double.TryParse(ocrSection["RecognitionThreshold"], out var recognitionThreshold))
+                        settings.RecognitionThreshold = recognitionThreshold;
+                        
+                    if (bool.TryParse(ocrSection["UseGpu"], out var useGpu))
+                        settings.UseGpu = useGpu;
+                        
+                    if (bool.TryParse(ocrSection["EnableMultiThread"], out var enableMultiThread))
+                        settings.EnableMultiThread = enableMultiThread;
+                        
+                    if (int.TryParse(ocrSection["WorkerCount"], out var workerCount))
+                        settings.WorkerCount = workerCount;
+                        
+                    if (bool.TryParse(ocrSection["UseLanguageModel"], out var useLanguageModel))
+                        settings.UseLanguageModel = useLanguageModel;
+                        
+                    if (bool.TryParse(ocrSection["EnablePreprocessing"], out var enablePreprocessing))
+                        settings.EnablePreprocessing = enablePreprocessing;
+                        
+                    // ★ 重要：EnableHybridModeを読み込み
+                    if (bool.TryParse(ocrSection["EnableHybridMode"], out var enableHybridMode))
+                        settings.EnableHybridMode = enableHybridMode;
+                        
+                    Console.WriteLine($"✅ OCRエンジン設定をappsettings.jsonから読み込み完了 - EnableHybridMode: {settings.EnableHybridMode}, Language: {settings.Language}");
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ appsettings.json OCR:PaddleOCR セクションが見つかりません - デフォルト値を使用");
+                }
+            }
+            
+            return settings;
+        });
+
         // OCRエンジン（IOcrEngineインターフェース準拠）
         services.AddSingleton<IOcrEngine>(serviceProvider =>
         {
@@ -287,44 +436,42 @@ public sealed class PaddleOcrModule : IServiceModule
             string? envValue = Environment.GetEnvironmentVariable("BAKETA_FORCE_PRODUCTION_OCR");
             bool forceProduction = envValue == "true";
             
-            // 🚨 緊急OCRハング対策：環境変数が設定されていない場合はSafeエンジンを使用
+            // 🎯 高機能版OCR構成：環境変数が設定されていない場合も高機能版エンジンを使用
             if (string.IsNullOrEmpty(envValue))
             {
-                Console.WriteLine("🔄 緊急OCRハング対策：環境変数が設定されていないため、SafePaddleOcrEngineを使用");
-                forceProduction = false; // 🚨 緊急対策：ハング防止のため安全エンジンを使用
+                Console.WriteLine("🎯 高機能版OCR構成：環境変数が設定されていないため、高機能版PaddleOcrEngineを使用");
+                forceProduction = true; // 🎯 高機能版：V3+V5ハイブリッド戦略エンジンを使用
             }
             Console.WriteLine($"📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '{envValue}' (強制本番モード: {forceProduction})");
             if (forceProduction)
             {
                 Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
+                
+                // OCR設定からハイブリッドモードを確認
+                var ocrSettings = serviceProvider.GetService<OcrEngineSettings>();
+                bool enableHybridMode = ocrSettings?.EnableHybridMode ?? false;
+                
+                Console.WriteLine($"🔍 ハイブリッドモード設定: {enableHybridMode}");
+                logger?.LogInformation($"ハイブリッドモード設定: {enableHybridMode}");
+                
                 var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
                 var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
                 var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
+                
+                // PaddleOcrEngineは内部でハイブリッドモード処理を行います
                 return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger);
             }
             
-            bool isAlphaTestOrDevelopment = IsAlphaTestOrDevelopmentEnvironment();
-            Console.WriteLine($"🔍 環境判定結果: isAlphaTestOrDevelopment = {isAlphaTestOrDevelopment}");
-            
-            if (isAlphaTestOrDevelopment)
-            {
-                Console.WriteLine("✅ αテスト・開発・WSL環境検出 - SafePaddleOcrEngineを使用");
-                Console.WriteLine("💡 ヒント: 実際のOCRを使用するには環境変数 BAKETA_FORCE_PRODUCTION_OCR=true を設定してください");
-                logger?.LogInformation("αテスト・開発・WSL環境検出 - SafePaddleOcrEngineを使用");
-                return new SafePaddleOcrEngine(modelPathResolver, logger, skipRealInitialization: true);
-            }
-            else
-            {
-                Console.WriteLine("✅ 本番環境検出 - PaddleOcrEngineを使用");
-                logger?.LogInformation("本番環境検出 - PaddleOcrEngineを使用");
-                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-                var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
-                var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger);
-            }
+            // 🎯 高機能版構成：常に最適化されたPaddleOcrEngineを使用
+            Console.WriteLine("✅ 高機能版OCR構成 - 最適化PaddleOcrEngineを使用");
+            logger?.LogInformation("高機能版OCR構成 - 最適化PaddleOcrEngineを使用");
+            return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, 
+                serviceProvider.GetRequiredService<IGpuMemoryManager>(),
+                serviceProvider.GetRequiredService<IUnifiedSettingsService>(), 
+                serviceProvider.GetRequiredService<IEventAggregator>(),
+                serviceProvider.GetService<IUnifiedLoggingService>(), logger);
         });
         
         // 🚀 シングルトン統一: PaddleOcrEngineは常にIOcrEngineと同じインスタンスを返す
@@ -340,11 +487,9 @@ public sealed class PaddleOcrModule : IServiceModule
                 return paddleEngine;
             }
             
-            // SafePaddleOcrEngineが使用されている場合はnullを返す（型安全性を保つ）
-            Console.WriteLine("⚠️ PaddleOcrEngine要求: SafePaddleOcrEngineが使用中のため、PaddleOcrEngineインスタンスは利用不可");
-            // 実際にはSafePaddleOcrEngineなので、PaddleOcrEngineとしてキャストするのは型安全性に問題がある
-            // 代わりに適切なエラーハンドリングまたはnull返却を推奨
-            throw new InvalidOperationException("現在SafePaddleOcrEngineが使用されているため、PaddleOcrEngineインスタンスは利用できません。");
+            // 高機能版構成では常にPaddleOcrEngineが使用される
+            Console.WriteLine("⚠️ PaddleOcrEngine要求: 期待されるPaddleOcrEngineインスタンスが見つかりません");
+            throw new InvalidOperationException("高機能版OCR構成でPaddleOcrEngineインスタンスが取得できませんでした。");
         });
         
         // 🚀 Step 1: OCRエンジンプール化実装（Gemini推奨アプローチ）

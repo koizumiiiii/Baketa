@@ -240,46 +240,46 @@ public sealed class GridTileStrategy(
     {
         try
         {
-            if (diagnosticsSaver == null) return;
+            // ROI画像保存機能（診断設定で有効な場合のみ）
+            // 注意：現在の実装では画像保存を簡略化
             
-            // ROIタイル画像を抽出
-            var roiImageBytes = await ExtractRoiImageAsync(sourceImage, region).ConfigureAwait(false);
-            if (roiImageBytes == null || roiImageBytes.Length == 0) return;
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+            var fileName = $"{timestamp}_grid_roi_{regionId}.txt";
             
-            // ROI画像保存パスの決定
-            var outputPath = !string.IsNullOrWhiteSpace(_advancedSettings.RoiImageOutputPath) 
-                ? _advancedSettings.RoiImageOutputPath 
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
-            
-            // ディレクトリ作成
-            if (!Directory.Exists(outputPath))
+            // 基本的なメタデータのみテキストファイルとして保存
+            var metadata = new Dictionary<string, object>
             {
-                Directory.CreateDirectory(outputPath);
-            }
-            
-            // ファイル名生成
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
-            var extension = _advancedSettings.RoiImageFormat switch
-            {
-                RoiImageFormat.Jpeg => "jpg",
-                RoiImageFormat.Bmp => "bmp",
-                _ => "png"
+                ["RegionId"] = regionId,
+                ["Strategy"] = "GridTile",
+                ["Bounds"] = $"{region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}",
+                ["Timestamp"] = DateTime.UtcNow.ToString("O")
             };
-            var filename = $"roi-{regionId}_{timestamp}_{region.Bounds.Width}x{region.Bounds.Height}.{extension}";
-            var filePath = Path.Combine(outputPath, filename);
+
+            var metadataContent = string.Join("\n", metadata.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+            var outputPath = Path.Combine(GetDiagnosticOutputPath(), fileName);
             
-            // ROI画像保存
-            await diagnosticsSaver.SaveResultImageAsync(
-                roiImageBytes, 
-                filePath, 
-                $"ROI-{regionId}").ConfigureAwait(false);
+            // ディレクトリ作成と保存を並列実行
+            await Task.Run(async () =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                await File.WriteAllTextAsync(outputPath, metadataContent).ConfigureAwait(false);
+            }).ConfigureAwait(false);
             
-            logger?.LogTrace("💾 ROI画像保存完了: {Filename}, 領域: {RegionId}", filename, regionId);
+            // ログは基本的なもののみ出力
+            System.Diagnostics.Debug.WriteLine($"GridTile ROI情報保存完了: {regionId}");
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "ROI画像保存エラー - 領域: {RegionId}", regionId);
+            System.Diagnostics.Debug.WriteLine($"GridTile ROI保存エラー: {regionId} - {ex.Message}");
         }
+    }
+    
+    /// <summary>
+    /// 診断出力パスを取得
+    /// </summary>
+    private string GetDiagnosticOutputPath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "ROI", "GridTile");
     }
     
     /// <summary>

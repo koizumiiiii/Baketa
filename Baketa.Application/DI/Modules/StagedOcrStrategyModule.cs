@@ -1,11 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.ObjectPool;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Application.Services;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 using System;
 using System.Collections.Generic;
 
@@ -24,36 +28,42 @@ public sealed class StagedOcrStrategyModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     public override void RegisterServices(IServiceCollection services)
     {
-        // 🚨 DEBUG: モジュール実行確認
-        Console.WriteLine("🚀 StagedOcrStrategyModule.RegisterServices 実行中！");
-        // 🔥 Geminiの推奨アプローチ: IHostedServiceによるバックグラウンド初期化
-        services.AddSingleton<OcrEngineInitializerService>();
-        services.AddHostedService<OcrEngineInitializerService>(provider => 
-            provider.GetRequiredService<OcrEngineInitializerService>());
+        // 🎯 高機能版OCRスタック構成
+        Console.WriteLine("🚀 HighPerformanceOcrModule.RegisterServices 実行中！");
         
-        // 🚀 高速エンジン（即座に利用可能）をファクトリー登録
+        // ⚡ 高機能版PaddleOcrEngineを直接登録（V3+V5ハイブリッド戦略）
         services.AddTransient<IOcrEngine>(provider =>
         {
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PaddleOcrEngine>>();
             var modelPathResolver = provider.GetRequiredService<IModelPathResolver>();
+            var factory = provider.GetRequiredService<IPaddleOcrEngineFactory>();
             
-            // SafePaddleOcrEngineは5ms初期化で即座に利用可能
-            return new SafePaddleOcrEngine(modelPathResolver, logger, skipRealInitialization: false);
+            // HybridPaddleOcrServiceを使用（V3高速検出 + V5高精度認識）
+            return factory.CreateAsync().GetAwaiter().GetResult();
         });
         
-        // ⚡ CompositeOcrEngine（段階的戦略の中核）をシングルトン登録
-        services.AddSingleton<CompositeOcrEngine>(provider =>
+        // 🏊 PooledOcrService（並列処理対応）をシングルトン登録
+        services.AddSingleton<PooledOcrService>(provider =>
         {
-            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CompositeOcrEngine>>();
-            var fastEngine = provider.GetRequiredService<IOcrEngine>();
-            var heavyEngineService = provider.GetRequiredService<OcrEngineInitializerService>();
+            var enginePool = provider.GetRequiredService<ObjectPool<IOcrEngine>>();
+            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PooledOcrService>>();
             
-            return new CompositeOcrEngine(logger, fastEngine, heavyEngineService);
+            return new PooledOcrService(enginePool, logger);
         });
         
-        // 🎯 メインのIOcrEngineとしてCompositeOcrEngineを登録
+        // 💾 CachedOcrEngine（最上位キャッシュ層）をシングルトン登録
+        services.AddSingleton<CachedOcrEngine>(provider =>
+        {
+            var pooledService = provider.GetRequiredService<PooledOcrService>();
+            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
+            var cacheService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.IAdvancedOcrCacheService>();
+            
+            return new CachedOcrEngine(pooledService, cacheService, logger);
+        });
+        
+        // 🎯 メインのIOcrEngineとしてCachedOcrEngineを登録
         services.AddSingleton<IOcrEngine>(provider => 
-            provider.GetRequiredService<CompositeOcrEngine>());
+            provider.GetRequiredService<CachedOcrEngine>());
     }
     
     /// <summary>

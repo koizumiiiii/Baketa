@@ -229,20 +229,47 @@ namespace Baketa.UI;
             Console.WriteLine("🔍 ConfigureServices開始");
             System.Diagnostics.Debug.WriteLine("🔍 ConfigureServices開始");
             
-            // 環境の検出
-            var environment = Debugger.IsAttached 
-                ? BaketaEnvironment.Development 
-                : BaketaEnvironment.Production;
+            // 環境の検出（強制的にDevelopment環境を使用してOCR設定を確保）
+            var debuggerAttached = Debugger.IsAttached;
+            var environment = BaketaEnvironment.Development; // 🔧 OCR設定確保のためDevelopmentに固定
             
-            Console.WriteLine($"🌍 環境: {environment}");
+            Console.WriteLine($"🌍 Debugger.IsAttached: {debuggerAttached}");
+            Console.WriteLine($"🌍 環境: {environment} (OCR設定確保のため強制Development)");
             System.Diagnostics.Debug.WriteLine($"🌍 環境: {environment}");
             
             // 設定ファイルの読み込み
+            var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            var currentDirectory = Directory.GetCurrentDirectory();
+            
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Base Directory: {baseDirectory}");
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Current Directory: {currentDirectory}");
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] appsettings.json exists in BaseDirectory: {File.Exists(Path.Combine(baseDirectory, "appsettings.json"))}");
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] appsettings.json exists in CurrentDirectory: {File.Exists(Path.Combine(currentDirectory, "appsettings.json"))}");
+            
+            // appsettings.jsonが存在するディレクトリを優先して使用
+            var configBasePath = File.Exists(Path.Combine(currentDirectory, "appsettings.json")) 
+                ? currentDirectory 
+                : baseDirectory;
+                
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Selected config base path: {configBasePath}");
+            
+            var environmentConfigFile = $"appsettings.{(environment == BaketaEnvironment.Development ? "Development" : "Production")}.json";
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file: {environmentConfigFile}");
+            Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file exists: {File.Exists(Path.Combine(configBasePath, environmentConfigFile))}");
+            
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(configBasePath)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{(environment == BaketaEnvironment.Development ? "Development" : "Production")}.json", optional: true, reloadOnChange: true)
+                .AddJsonFile(environmentConfigFile, optional: true, reloadOnChange: true)
                 .Build();
+            
+            // 設定内容の詳細デバッグ
+            Console.WriteLine($"🔍 [CONFIG_DETAILED] All configuration keys:");
+            foreach (var kvp in configuration.AsEnumerable())
+            {
+                if (kvp.Key.Contains("OCR"))
+                    Console.WriteLine($"🔍 [CONFIG_DETAILED] {kvp.Key} = {kvp.Value}");
+            }
             
             // DIコンテナの構成
             var services = new ServiceCollection();
@@ -254,6 +281,8 @@ namespace Baketa.UI;
             services.Configure<Baketa.Core.Settings.AppSettings>(configuration);
             services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
                 configuration.GetSection("TranslationEngineStatus"));
+            services.Configure<Baketa.Core.Settings.RoiDiagnosticsSettings>(
+                configuration.GetSection("DiagnosticsSettings"));
             
             // ロギングの設定
             services.AddLogging(builder => 
@@ -539,11 +568,16 @@ namespace Baketa.UI;
                 {
                     Console.WriteLine("🔧 OCRエンジンサービス取得成功 - 初期化開始");
                     
-                    // OCRエンジンを事前初期化（初期化処理のみ実行）
+                    // OCRエンジンを事前初期化（appsettings.jsonから読み込んだ設定を使用）
                     try
                     {
-                        // OCRエンジンの初期化のみ実行（ダミー画像処理は省略してシンプルに）
-                        await ocrService.InitializeAsync().ConfigureAwait(false);
+                        // appsettings.jsonから読み込まれた設定を取得
+                        var ocrSettings = ServiceProvider.GetService<Baketa.Core.Abstractions.OCR.OcrEngineSettings>();
+                        
+                        // OCRエンジンの初期化（設定を明示的に渡す）
+                        await ocrService.InitializeAsync(ocrSettings).ConfigureAwait(false);
+                        
+                        Console.WriteLine($"🔧 OCR設定適用完了 - EnableHybridMode: {ocrSettings?.EnableHybridMode ?? false}");
                         timer.Stop();
                         
                         Console.WriteLine($"✅ OCRエンジン事前初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");

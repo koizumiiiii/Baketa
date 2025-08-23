@@ -84,6 +84,9 @@ public sealed record TileGenerationOptions
 
     /// <summary>最大領域数制限</summary>
     public int MaxRegionCount { get; init; } = 20;
+    
+    /// <summary>最大タイルサイズ</summary>
+    public int MaxTileSize { get; init; } = 1024;
 }
 
 /// <summary>
@@ -94,11 +97,11 @@ public sealed class TileStrategyParameters
     /// <summary>タイルサイズ (GridTileStrategy用)</summary>
     public int? TileSize { get; set; }
 
-    /// <summary>ノイズ除去: 最小面積閾値</summary>
-    public int MinBoundingBoxArea { get; set; } = 100;
+    /// <summary>ノイズ除去: 最小面積閾値 - TextDetectionConfigと一致</summary>
+    public int MinBoundingBoxArea { get; set; } = 16;  // TextDetectionConfig.MinTextAreaと一致（100→16）
 
-    /// <summary>ノイズ除去: 最小信頼度閾値</summary>
-    public double MinConfidenceThreshold { get; set; } = 0.3;
+    /// <summary>ノイズ除去: 最小信頼度閾値 - より寛容に調整</summary>
+    public double MinConfidenceThreshold { get; set; } = 0.1;  // より寛容に（0.3→0.1）
 
     /// <summary>行グループ化: Y座標許容範囲</summary>
     public int LineGroupingYTolerance { get; set; } = 10;
@@ -109,6 +112,6 @@ public sealed class TileStrategyParameters
     /// <summary>ROI最大サイズ制限 (画像比率)</summary>
     public double MaxRegionSizeRatio { get; set; } = 0.8;
 
-    /// <summary>ROI最小サイズ制限</summary>
-    public Size MinRegionSize { get; set; } = new(50, 20);
+    /// <summary>ROI最小サイズ制限 - より小さなテキストに対応</summary>
+    public Size MinRegionSize { get; set; } = new(8, 8);  // より小さな領域を許可（50×20→8×8）
 }

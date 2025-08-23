@@ -46,7 +46,7 @@ public sealed class PaddleOcrEngineFactory(
             
             IOcrEngine engine;
             
-            // 🔥 プール化環境では実際のOCRを使用（SafePaddleOcrEngineは空結果を返すため）
+            // 🔥 プール化環境では実際のOCRを使用（高機能版で統一）
             _logger.LogDebug("🏊 プール化環境でのエンジン選択 - 環境変数: '{EnvValue}', 強制本番: {ForceProduction}", envValue ?? "null", forceProduction);
             
             if (forceProduction || true) // 🚨 緊急修正: プール化では常に実際のOCRエンジンを使用
@@ -70,8 +70,20 @@ public sealed class PaddleOcrEngineFactory(
             }
             else
             {
-                _logger.LogDebug("🔒 SafePaddleOcrEngine作成（開発・テスト環境）");
-                engine = new SafePaddleOcrEngine(modelPathResolver, engineLogger, skipRealInitialization: false);
+                _logger.LogDebug("🔒 高機能版PaddleOcrEngine作成（全環境対応）");
+                var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+                var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
+                var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
+                engine = new NonSingletonPaddleOcrEngine(
+                    modelPathResolver, 
+                    ocrPreprocessingService, 
+                    textMerger, 
+                    ocrPostProcessor, 
+                    gpuMemoryManager,
+                    unifiedSettingsService,
+                    eventAggregator,
+                    unifiedLoggingService,
+                    engineLogger);
             }
             
             _logger.LogDebug("🔧 PaddleOcrEngineFactory: エンジン初期化開始 - 型: {EngineType}", engine.GetType().Name);

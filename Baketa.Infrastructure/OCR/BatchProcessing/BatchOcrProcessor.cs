@@ -237,6 +237,7 @@ public sealed class BatchOcrProcessor(
     private readonly UniversalMisrecognitionCorrector _misrecognitionCorrector = new(
         logger as ILogger<UniversalMisrecognitionCorrector> ?? 
         Microsoft.Extensions.Logging.Abstractions.NullLogger<UniversalMisrecognitionCorrector>.Instance);
+    private readonly ImageDiagnosticsSaver? _diagnosticsSaver = diagnosticsSaver;
     
     private BatchOcrOptions _options = new();
     private readonly ConcurrentQueue<ProcessingMetric> _processingHistory = new();
@@ -455,20 +456,32 @@ public sealed class BatchOcrProcessor(
                     tileTimer.Stop();
                     Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms (エンジン:{ocrEngineResult.Duration.TotalMilliseconds:F1}ms), 検出領域数: {result.TextRegions?.Count ?? 0}");
                     
-                    // ROI画像保存（OCR成功時）
-                    if (_advancedSettings.EnableRoiImageOutput && diagnosticsSaver != null && result.TextRegions?.Count > 0)
+                    // ROI画像保存（OCR成功時）- 詳細デバッグログ付き
+                    Console.WriteLine($"🔍 [TILE-{index}] ROI画像保存条件チェック:");
+                    Console.WriteLine($"  - EnableRoiImageOutput: {_advancedSettings.EnableRoiImageOutput}");
+                    Console.WriteLine($"  - _diagnosticsSaver != null: {_diagnosticsSaver != null}");
+                    Console.WriteLine($"  - TextRegions?.Count: {result.TextRegions?.Count ?? 0}");
+                    
+                    if (_advancedSettings.EnableRoiImageOutput && _diagnosticsSaver != null && result.TextRegions?.Count > 0)
                     {
+                        Console.WriteLine($"✅ [TILE-{index}] ROI画像保存条件満了 - SaveTileRoiImagesAsync実行開始");
                         _ = Task.Run(async () =>
                         {
                             try
                             {
                                 await SaveTileRoiImagesAsync(tile.Image, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
+                                Console.WriteLine($"✅ [TILE-{index}] SaveTileRoiImagesAsync実行完了");
                             }
                             catch (Exception roiEx)
                             {
+                                Console.WriteLine($"❌ [TILE-{index}] ROI画像保存エラー: {roiEx.Message}");
                                 _logger?.LogWarning(roiEx, "ROI画像保存エラー - Tile {TileIndex}", index);
                             }
                         }, cancellationToken);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"❌ [TILE-{index}] ROI画像保存条件不満足 - スキップ");
                     }
                     
                     return new TileOcrResult
@@ -1958,17 +1971,35 @@ public sealed class BatchOcrProcessor(
     {
         try
         {
-            if (diagnosticsSaver == null || ocrResult.TextRegions == null) return;
+            Console.WriteLine($"🎯 SaveTileRoiImagesAsync開始 - tileId: {tileId}");
+            Console.WriteLine($"  - _diagnosticsSaver != null: {_diagnosticsSaver != null}");
+            Console.WriteLine($"  - ocrResult.TextRegions != null: {ocrResult.TextRegions != null}");
+            Console.WriteLine($"  - TextRegions.Count: {ocrResult.TextRegions?.Count ?? 0}");
+            
+            if (_diagnosticsSaver == null || ocrResult.TextRegions == null) 
+            {
+                Console.WriteLine($"❌ SaveTileRoiImagesAsync早期リターン - tileId: {tileId}");
+                return;
+            }
             
             // ROI画像保存パスの決定
             var outputPath = !string.IsNullOrWhiteSpace(_advancedSettings.RoiImageOutputPath) 
                 ? _advancedSettings.RoiImageOutputPath 
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
             
+            Console.WriteLine($"📁 ROI画像保存パス: {outputPath}");
+            Console.WriteLine($"📁 RoiSaveMode: {_advancedSettings.RoiSaveMode}");
+            
             // ディレクトリ作成
             if (!Directory.Exists(outputPath))
             {
+                Console.WriteLine($"📁 ディレクトリが存在しません。作成中: {outputPath}");
                 Directory.CreateDirectory(outputPath);
+                Console.WriteLine($"✅ ディレクトリ作成完了: {Directory.Exists(outputPath)}");
+            }
+            else
+            {
+                Console.WriteLine($"✅ ディレクトリは既に存在: {outputPath}");
             }
             
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
@@ -1983,21 +2014,29 @@ public sealed class BatchOcrProcessor(
             if (tileImageBytes == null || tileImageBytes.Length == 0) return;
             
             // 設定に応じてROI画像を保存
+            Console.WriteLine($"🖼️ ROI画像保存処理開始 - Mode: {_advancedSettings.RoiSaveMode}");
             switch (_advancedSettings.RoiSaveMode)
             {
                 case RoiSaveMode.AnnotatedFullImage:
+                    Console.WriteLine($"🖼️ 赤枠付き全体画像保存実行");
                     await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    Console.WriteLine($"✅ 赤枠付き全体画像保存完了");
                     break;
                     
                 case RoiSaveMode.IndividualRegions:
+                    Console.WriteLine($"🖼️ 個別切り抜き画像保存実行");
                     await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    Console.WriteLine($"✅ 個別切り抜き画像保存完了");
                     break;
                     
                 case RoiSaveMode.Both:
+                    Console.WriteLine($"🖼️ 赤枠付き全体画像＋個別切り抜き画像保存実行");
                     await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
                     await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                    Console.WriteLine($"✅ 両方の画像保存完了");
                     break;
             }
+            Console.WriteLine($"🎯 SaveTileRoiImagesAsync完了 - tileId: {tileId}");
         }
         catch (Exception ex)
         {
@@ -2013,7 +2052,7 @@ public sealed class BatchOcrProcessor(
         var filename = $"roi-annotated-{tileId}_{timestamp}.{extension}";
         var filePath = Path.Combine(outputPath, filename);
         
-        await diagnosticsSaver!.SaveAnnotatedFullImageAsync(
+        await _diagnosticsSaver!.SaveAnnotatedFullImageAsync(
             tileImageBytes,
             textRegions,
             filePath,
@@ -2063,7 +2102,7 @@ public sealed class BatchOcrProcessor(
             var filePath = Path.Combine(outputPath, safeFilename);
             
             // ROI画像保存（診断情報付き）
-            await diagnosticsSaver!.SaveResultImageAsync(
+            await _diagnosticsSaver!.SaveResultImageAsync(
                 roiImageBytes, 
                 filePath, 
                 $"OCR-Individual-{tileId}-{i}").ConfigureAwait(false);

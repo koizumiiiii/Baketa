@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Application.Services;
 using Baketa.Application.Services.Cache;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,17 +32,12 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         services.AddSingleton<IAdvancedOcrCacheService, AdvancedOcrCacheService>();
         Console.WriteLine("✅ IAdvancedOcrCacheService登録完了");
         
-        // 🎯 Step3: キャッシュ対応OCRエンジンを最終IOcrEngine実装として登録
-        // Step2のCompositeOcrEngineをベースエンジンとして使用
+        // 🎯 高機能版: キャッシュ対応OCRエンジンを最終IOcrEngine実装として登録
+        // PooledOcrServiceをベースエンジンとして使用
         services.AddSingleton<CachedOcrEngine>(provider =>
         {
-            // Step2のCompositeOcrEngineを取得
-            var baseEngine = provider.GetServices<IOcrEngine>()
-                .FirstOrDefault(e => e.GetType().Name.Contains("Composite"));
-
-            // フォールバック: 最初に登録されたOCRエンジンを使用
-            baseEngine ??= provider.GetServices<IOcrEngine>().First();
-
+            // 高機能版のPooledOcrServiceを取得
+            var baseEngine = provider.GetRequiredService<PooledOcrService>();
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
             

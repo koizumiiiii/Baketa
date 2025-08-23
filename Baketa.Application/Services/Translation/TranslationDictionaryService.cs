@@ -122,6 +122,36 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         if (HasAnyTranslations(settings.EnglishToJapanese))
             supportedPairs.Add(("en", "ja"));
 
+        // 言語コード正規化でサポートされている全バリエーションを追加
+        var normalizer = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.GetSupportedLanguageCodes();
+        var additionalPairs = new List<(string, string)>();
+        
+        foreach (var sourceCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
+        {
+            foreach (var targetCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
+            {
+                if (sourceCode != targetCode)
+                {
+                    var normalizedSource = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(sourceCode);
+                    var normalizedTarget = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(targetCode);
+                    
+                    // 基本ペアとして既にサポートしている場合のみ追加
+                    if ((normalizedSource == "ja" && normalizedTarget == "en" && HasAnyTranslations(settings.JapaneseToEnglish)) ||
+                        (normalizedSource == "en" && normalizedTarget == "ja" && HasAnyTranslations(settings.EnglishToJapanese)))
+                    {
+                        if (!supportedPairs.Contains((sourceCode, targetCode)) && 
+                            !additionalPairs.Contains((sourceCode, targetCode)))
+                        {
+                            additionalPairs.Add((sourceCode, targetCode));
+                        }
+                    }
+                }
+            }
+        }
+        
+        supportedPairs.AddRange(additionalPairs);
+        _logger.LogTrace("📚 サポート言語ペア数: {Count} (正規化バリエーション含む)", supportedPairs.Count);
+        
         return supportedPairs.AsReadOnly();
     }
 
@@ -174,13 +204,17 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
 
     private TranslationDictionary? GetTranslationDictionary(CommonTranslationsSettings settings, string sourceLanguage, string targetLanguage)
     {
-        var sourceLang = sourceLanguage.ToLowerInvariant();
-        var targetLang = targetLanguage.ToLowerInvariant();
+        // 言語コードを正規化
+        var normalizedSource = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(sourceLanguage);
+        var normalizedTarget = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(targetLanguage);
 
-        return (sourceLang, targetLang) switch
+        _logger.LogTrace("📚 言語コード正規化: {OriginalSource} -> {NormalizedSource}, {OriginalTarget} -> {NormalizedTarget}", 
+            sourceLanguage, normalizedSource, targetLanguage, normalizedTarget);
+
+        return (normalizedSource, normalizedTarget) switch
         {
-            ("ja" or "jpn" or "japanese", "en" or "eng" or "english") => settings.JapaneseToEnglish,
-            ("en" or "eng" or "english", "ja" or "jpn" or "japanese") => settings.EnglishToJapanese,
+            ("ja", "en") => settings.JapaneseToEnglish,
+            ("en", "ja") => settings.EnglishToJapanese,
             _ => null
         };
     }

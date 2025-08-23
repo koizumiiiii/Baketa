@@ -79,16 +79,16 @@ public class AdaptiveCaptureResult
 
 /// <summary>
 /// テキスト検出設定
-/// 完全なフレーズ認識を促進する最適化された設定
+/// 完全なフレーズ認識を促進する最適化された設定（根本原因修正版）
 /// </summary>
 public class TextDetectionConfig
 {
-    public int MinTextWidth { get; set; } = 8;   // より小さなテキストも検出
-    public int MinTextHeight { get; set; } = 6;  // より小さなテキストも検出
-    public int MinTextArea { get; set; } = 60;   // より小さな領域も対象に
-    public float MinAspectRatio { get; set; } = 0.05f;  // より幅広い形状に対応
-    public float MaxAspectRatio { get; set; } = 30.0f;  // 長いテキストライン対応
-    public int EdgeDetectionThreshold { get; set; } = 30;  // より低い閾値で広範囲検出
-    public int NoiseReductionLevel { get; set; } = 2;   // ノイズ除去を軽減してテキスト保持
-    public float MergeDistanceThreshold { get; set; } = 70.0f;  // より遠い領域も結合
+    public int MinTextWidth { get; set; } = 4;   // より小さなテキストも検出（8→4）
+    public int MinTextHeight { get; set; } = 4;  // より小さなテキストも検出（6→4）
+    public int MinTextArea { get; set; } = 16;   // より小さな領域も対象に（60→16、4×4の一貫性）
+    public float MinAspectRatio { get; set; } = 0.02f;  // より幅広い形状に対応（0.05→0.02）
+    public float MaxAspectRatio { get; set; } = 50.0f;  // 長いテキストライン対応（30→50）
+    public int EdgeDetectionThreshold { get; set; } = 20;  // より低い閾値で広範囲検出（30→20）
+    public int NoiseReductionLevel { get; set; } = 1;   // ノイズ除去を最小限に（2→1）
+    public float MergeDistanceThreshold { get; set; } = 100.0f;  // より遠い領域も結合（70→100）
 }

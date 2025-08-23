@@ -106,18 +106,19 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 例: services.AddSingleton<ITextBoxDetector, PaddleTextBoxDetector>();
             // 例: services.AddSingleton<ITextRecognizer, PaddleTextRecognizer>();
             
-            // 🔥 [PERFORMANCE_FIX] GridTileStrategyに戻す（AdaptiveTileStrategyは32.66秒→パフォーマンス悪化のため無効化）
+            // 🚀 [ROI_OPTIMIZATION] AdaptiveTileStrategyに切り替え（テキスト検出ベース→1枚全体ROI画像生成対応）
             services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.ITileStrategy>(provider =>
             {
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.GridTileStrategy>>();
+                var ocrEngine = provider.GetRequiredService<IOcrEngine>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy>>();
                 var advancedOptions = provider.GetService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AdvancedSettings>>();
-                var diagnosticsSaver = provider.GetService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
-                var gridStrategy = new Baketa.Infrastructure.OCR.Strategies.GridTileStrategy(logger, advancedOptions, diagnosticsSaver);
+                var diagnosticsSaver = provider.GetRequiredService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
+                var adaptiveStrategy = new Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy(ocrEngine, logger, advancedOptions, diagnosticsSaver);
                 
                 var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();
-                moduleLogger?.LogInformation("⚡ GridTileStrategy登録完了 - ROI画像出力対応（AdaptiveTile→Grid置換によるパフォーマンス最適化）");
+                moduleLogger?.LogInformation("🎯 AdaptiveTileStrategy登録完了 - 高速テキスト検出→ROIベース認識（ROI画像保存機能付き）");
                 
-                return gridStrategy;
+                return adaptiveStrategy;
             });
             
             // OcrRegionGenerator（ITileStrategy使用）
@@ -399,13 +400,19 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
             Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
             
+            // 🚀 プール化×GPU最適化統合オーケストレーター（最終フェーズ）
+            services.AddSingleton<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>();
+            services.AddHostedService<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>(provider =>
+                provider.GetRequiredService<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>());
+            Console.WriteLine("🚀 PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム");
+            
             // 翻訳精度検証システム（デバッグビルドのみ）
             // TODO: 翻訳精度検証システムは将来実装予定
             // #if DEBUG
             // services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
             // #endif
             
-            Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了");
+            Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）");
         }
         
         /// <summary>
@@ -507,6 +514,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             yield return typeof(CoreModule);
             yield return typeof(ObjectPoolModule);
+            yield return typeof(DiagnosticModule);
         }
         
         /// <summary>

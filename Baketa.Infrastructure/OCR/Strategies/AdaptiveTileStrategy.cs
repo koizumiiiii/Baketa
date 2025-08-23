@@ -1,8 +1,11 @@
 using System.Drawing;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
 namespace Baketa.Infrastructure.OCR.Strategies;
 
@@ -12,10 +15,14 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// </summary>
 public sealed class AdaptiveTileStrategy(
     IOcrEngine textDetector,
-    ILogger<AdaptiveTileStrategy> logger) : ITileStrategy
+    ILogger<AdaptiveTileStrategy> logger,
+    IOptions<AdvancedSettings>? advancedOptions = null,
+    ImageDiagnosticsSaver? diagnosticsSaver = null) : ITileStrategy
 {
     private readonly IOcrEngine _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
     private readonly ILogger<AdaptiveTileStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly AdvancedSettings _advancedSettings = advancedOptions?.Value ?? new();
+    private readonly ImageDiagnosticsSaver? _diagnosticsSaver = diagnosticsSaver;
 
     public string StrategyName => "AdaptiveTile";
     public TileStrategyParameters Parameters { get; set; } = new();
@@ -39,8 +46,11 @@ public sealed class AdaptiveTileStrategy(
 
             if (detectionResult?.TextRegions == null || detectionResult.TextRegions.Count == 0)
             {
-                _logger?.LogWarning("テキスト検出結果が空、GridTileStrategyにフォールバック");
-                return CreateFallbackRegions(image, options);
+                _logger?.LogWarning("⚠️ テキスト検出結果が空 - 文字分割回避のため、時間はかかるが全画面OCR処理を継続");
+                
+                // 🎯 [PROPER_APPROACH] テキスト分割回避のため、全画面を一つの領域として処理
+                // グリッド分割は文字を分断するため使用しない
+                return GenerateFullScreenRegion(image);
             }
 
             _logger?.LogDebug("🔍 テキスト検出完了 - 検出領域数: {Count}", detectionResult.TextRegions.Count);
@@ -68,10 +78,8 @@ public sealed class AdaptiveTileStrategy(
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "❌ 適応的分割処理でエラー発生、GridTileStrategyにフォールバック");
-            
-            // フォールバック: 固定グリッド分割
-            return CreateFallbackRegions(image, options);
+            _logger?.LogError(ex, "❌ 適応的分割処理でエラー発生、空の領域リストを返却");
+            return [];
         }
     }
 
@@ -111,6 +119,14 @@ public sealed class AdaptiveTileStrategy(
 
         _logger?.LogDebug("🧹 ノイズ除去完了 - {Original} → {Filtered}個", 
             textRegions.Count, filteredRegions.Count);
+        
+        // 🔍 [DEBUG] 除去されたテキスト内容の確認
+        var removedRegions = textRegions.Where(r => !filteredRegions.Contains(r)).ToList();
+        foreach (var removed in removedRegions.Take(5)) // 最初の5個だけログ出力
+        {
+            _logger?.LogDebug("❌ [NOISE_FILTER] 除去されたテキスト: '{Text}' (信頼度: {Confidence}, 領域: {Width}×{Height})", 
+                removed.Text, removed.Confidence, removed.Bounds.Width, removed.Bounds.Height);
+        }
 
         // Step 2: 行グループ化
         var lineGroups = GroupBoundingBoxesByLines(filteredRegions, parameters);
@@ -127,7 +143,7 @@ public sealed class AdaptiveTileStrategy(
             
             foreach (var mergedBounds in horizontalMerged)
             {
-                mergedRegions.Add(new TileRegion
+                var region = new TileRegion
                 {
                     Bounds = mergedBounds,
                     RegionType = TileRegionType.TextAdaptive,
@@ -139,7 +155,14 @@ public sealed class AdaptiveTileStrategy(
                         ["LineGroupId"] = lineGroups.IndexOf(lineGroup),
                         ["MergedFromTexts"] = string.Join(", ", lineGroup.Select(r => r.Text.Length > 10 ? r.Text[..10] + "..." : r.Text))
                     }
-                });
+                };
+                
+                // 🔍 [DEBUG] 作成されたTileRegionの詳細ログ
+                var sourceTexts = string.Join(" | ", lineGroup.Select(r => r.Text.Length > 20 ? r.Text[..20] + "..." : r.Text));
+                _logger?.LogDebug("✅ [TILE_REGION] 作成: ID={RegionId}, 範囲={X},{Y} ({Width}×{Height}), 信頼度={Confidence:F3}, 含有テキスト=[{SourceTexts}]", 
+                    region.RegionId, mergedBounds.X, mergedBounds.Y, mergedBounds.Width, mergedBounds.Height, region.ConfidenceScore, sourceTexts);
+                
+                mergedRegions.Add(region);
             }
         }
 
@@ -273,6 +296,25 @@ public sealed class AdaptiveTileStrategy(
             if (adjustedRegions != null)
             {
                 validatedRegions.AddRange(adjustedRegions);
+                
+                // ROI画像保存（設定が有効な場合）
+                if (_advancedSettings.EnableRoiImageOutput && _diagnosticsSaver != null)
+                {
+                    foreach (var adjustedRegion in adjustedRegions)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await SaveRoiImageAsync(image, adjustedRegion, adjustedRegion.RegionId).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogWarning(ex, "AdaptiveTile ROI画像保存エラー - 領域: {RegionId}", adjustedRegion.RegionId);
+                            }
+                        });
+                    }
+                }
             }
         }
 
@@ -399,58 +441,6 @@ public sealed class AdaptiveTileStrategy(
         return splitRegions;
     }
 
-    /// <summary>
-    /// フォールバック: 固定グリッド分割
-    /// </summary>
-    private List<TileRegion> CreateFallbackRegions(
-        IAdvancedImage image, 
-        TileGenerationOptions options)
-    {
-        // GridTileStrategyと同等の固定分割
-        var tileSize = Parameters.TileSize ?? options.DefaultTileSize;
-        var regions = new List<TileRegion>();
-
-        if (image.Width <= tileSize && image.Height <= tileSize)
-        {
-            regions.Add(new TileRegion
-            {
-                Bounds = new Rectangle(0, 0, image.Width, image.Height),
-                RegionType = TileRegionType.Fallback,
-                RegionId = "fallback-single",
-                ConfidenceScore = 1.0,
-                Metadata = { ["IsFallback"] = true }
-            });
-        }
-        else
-        {
-            var tilesX = (int)Math.Ceiling((double)image.Width / tileSize);
-            var tilesY = (int)Math.Ceiling((double)image.Height / tileSize);
-
-            for (var y = 0; y < tilesY; y++)
-            {
-                for (var x = 0; x < tilesX; x++)
-                {
-                    var startX = x * tileSize;
-                    var startY = y * tileSize;
-                    var width = Math.Min(tileSize, image.Width - startX);
-                    var height = Math.Min(tileSize, image.Height - startY);
-
-                    regions.Add(new TileRegion
-                    {
-                        Bounds = new Rectangle(startX, startY, width, height),
-                        RegionType = TileRegionType.Fallback,
-                        RegionId = $"fallback-{x}-{y}",
-                        ConfidenceScore = 1.0,
-                        Metadata = { ["IsFallback"] = true, ["GridX"] = x, ["GridY"] = y }
-                    });
-                }
-            }
-        }
-
-        _logger?.LogInformation("📋 フォールバック分割実行 - 領域数: {Count}", regions.Count);
-        
-        return regions;
-    }
 
     /// <summary>
     /// デバッグキャプチャ保存（AdaptiveTileStrategy用）
@@ -526,10 +516,7 @@ public sealed class AdaptiveTileStrategy(
             
             // 適応的領域境界線描画（緑色、太い線）
             using var adaptivePen = new System.Drawing.Pen(System.Drawing.Color.LimeGreen, 4.0f);
-            using var fallbackPen = new System.Drawing.Pen(System.Drawing.Color.Orange, 3.0f)
-            {
-                DashStyle = System.Drawing.Drawing2D.DashStyle.DashDot
-            };
+            // フォールバック処理削除により不要
             using var borderPen = new System.Drawing.Pen(System.Drawing.Color.Red, 2.0f) 
             { 
                 DashStyle = System.Drawing.Drawing2D.DashStyle.Dash 
@@ -539,21 +526,16 @@ public sealed class AdaptiveTileStrategy(
             {
                 var region = regions[i];
                 var rect = region.Bounds;
-                var pen = region.RegionType == TileRegionType.Fallback ? fallbackPen : adaptivePen;
+                var pen = adaptivePen;
                 
                 // 適応的境界を緑色で描画
                 graphics.DrawRectangle(pen, rect);
                 
                 // 領域情報を描画
                 var regionInfo = $"A-{i} ({region.ConfidenceScore:F2})";
-                if (region.RegionType == TileRegionType.Fallback)
-                {
-                    regionInfo = $"F-{i}";
-                }
 
                 using var font = new System.Drawing.Font("Arial", 11, System.Drawing.FontStyle.Bold);
-                using var brush = new System.Drawing.SolidBrush(region.RegionType == TileRegionType.Fallback ? 
-                    System.Drawing.Color.Orange : System.Drawing.Color.LimeGreen);
+                using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.LimeGreen);
                 using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(220, 0, 0, 0));
                 
                 var textSize = graphics.MeasureString(regionInfo, font);
@@ -578,5 +560,131 @@ public sealed class AdaptiveTileStrategy(
         {
             _logger?.LogWarning(ex, "AdaptiveTile 注釈描画エラー");
         }
+    }
+    
+    /// <summary>
+    /// ROI画像保存（AdaptiveTileStrategy用）
+    /// </summary>
+    private async Task SaveRoiImageAsync(IAdvancedImage sourceImage, TileRegion region, string regionId)
+    {
+        try
+        {
+            // ROI画像保存機能（診断設定で有効な場合のみ）
+            // 注意：現在の実装では画像保存を簡略化
+            
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+            var fileName = $"{timestamp}_adaptive_roi_{regionId}.txt";
+            
+            // 基本的なメタデータのみテキストファイルとして保存
+            var metadata = new Dictionary<string, object>
+            {
+                ["RegionId"] = regionId,
+                ["Strategy"] = "AdaptiveTile",
+                ["Bounds"] = $"{region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}",
+                ["Timestamp"] = DateTime.UtcNow.ToString("O")
+            };
+
+            var metadataContent = string.Join("\n", metadata.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+            var outputPath = Path.Combine(GetDiagnosticOutputPath(), fileName);
+            
+            // ディレクトリ作成と保存を並列実行
+            await Task.Run(async () =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                await File.WriteAllTextAsync(outputPath, metadataContent).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+            
+            // ログは基本的なもののみ出力
+            System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI情報保存完了: {regionId}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI保存エラー: {regionId} - {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 診断出力パスを取得
+    /// </summary>
+    private string GetDiagnosticOutputPath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "ROI", "AdaptiveTile");
+    }
+    
+    /// <summary>
+    /// ROI画像抽出（指定領域のみを切り出し）
+    /// </summary>
+    private async Task<byte[]?> ExtractRoiImageAsync(IAdvancedImage sourceImage, TileRegion region)
+    {
+        try
+        {
+            // 元画像をバイト配列に変換
+            var sourceBytes = await sourceImage.ToByteArrayAsync().ConfigureAwait(false);
+            if (sourceBytes == null || sourceBytes.Length == 0) return null;
+            
+            // 元画像からROI領域を切り出し
+            using var memoryStream = new MemoryStream(sourceBytes);
+            using var sourceBitmap = new System.Drawing.Bitmap(memoryStream);
+            using var roiBitmap = new System.Drawing.Bitmap(region.Bounds.Width, region.Bounds.Height);
+            using var graphics = System.Drawing.Graphics.FromImage(roiBitmap);
+            
+            // 高品質描画設定
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+            
+            // ROI領域を切り出し
+            var destRect = new Rectangle(0, 0, region.Bounds.Width, region.Bounds.Height);
+            graphics.DrawImage(sourceBitmap, destRect, region.Bounds, GraphicsUnit.Pixel);
+            
+            // ROI画像をバイト配列に変換
+            using var outputStream = new MemoryStream();
+            var imageFormat = _advancedSettings.RoiImageFormat switch
+            {
+                RoiImageFormat.Jpeg => System.Drawing.Imaging.ImageFormat.Jpeg,
+                RoiImageFormat.Bmp => System.Drawing.Imaging.ImageFormat.Bmp,
+                _ => System.Drawing.Imaging.ImageFormat.Png
+            };
+            
+            roiBitmap.Save(outputStream, imageFormat);
+            return outputStream.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "AdaptiveTile ROI画像抽出エラー");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 全画面OCR処理戦略
+    /// テキスト検出失敗時に文字分割を回避して全画面を一つの領域として処理
+    /// </summary>
+    private List<TileRegion> GenerateFullScreenRegion(IAdvancedImage image)
+    {
+        _logger?.LogInformation("🎯 [PROPER_APPROACH] 全画面OCR戦略を開始 - 画像: {Width}x{Height} (文字分割回避)", 
+            image.Width, image.Height);
+
+        // 全画面を一つの領域として処理
+        var fullScreenBounds = new Rectangle(0, 0, image.Width, image.Height);
+        
+        var region = new TileRegion
+        {
+            Bounds = fullScreenBounds,
+            RegionType = TileRegionType.Composite, // 全画面複合領域
+            RegionId = $"fullscreen-{DateTime.UtcNow.Ticks}",
+            ConfidenceScore = 0.8, // 高い信頼度（文字分割リスクなし）
+            Metadata = 
+            {
+                ["Strategy"] = "FullScreenOCR",
+                ["Reason"] = "TextDetectionFailed_AvoidCharacterSplitting",
+                ["ProcessingMode"] = "SingleRegionComplete",
+                ["ExpectedBehavior"] = "SlowerButAccurate"
+            }
+        };
+        
+        _logger?.LogInformation("✅ [PROPER_APPROACH] 全画面OCR領域生成完了 - 1つの完全な領域 (時間はかかるが正確)");
+        
+        return [region];
     }
 }

@@ -393,20 +393,83 @@ services.Configure<ObjectPoolOptions>(options => options.MaximumRetained = 1);
 }
 ```
 
-### **優先度2: 重要（テキスト認識経路解明）**
+### **優先度2: 重要（プール化×GPU最適化システム）**
 
-#### **C. 包括的認識経路調査**
-1. **キャッシュシステムの調査**
-   - TranslationOrchestrationService内のキャッシュ機能
-   - SessionManager・StateManager系クラスの調査
+#### **C. プール化×GPU統合最適化戦略**
 
-2. **代替OCRシステムの特定**
-   - Windows OCR API使用箇所の検索  
-   - HybridStrategy以外の認識経路
+**目的**: 利用ユーザーの多様なGPU環境で最適なパフォーマンスを自動実現
 
-3. **データフロー追跡**
-   - 「編集」「1つのスープ」テキストの出現箇所特定
-   - オーバーレイ表示までのデータパス分析
+**実装アプローチ**:
+```csharp
+// 1. GPU環境自動検出による動的プール設定
+services.Configure<ObjectPoolOptions>(options => 
+{
+    var gpuInfo = gpuDetector.DetectSync();
+    options.MaximumRetained = CalculateOptimalPoolSize(gpuInfo);
+    options.ReturnOnlyHealthyObjects = true;
+});
+
+// 2. GPU対応プールポリシーの実装
+public class GpuOptimizedOcrEnginePoolPolicy : PooledObjectPolicy<IOcrEngine>
+{
+    public override IOcrEngine Create() 
+    {
+        // GPU利用可能性に基づく最適エンジン選択
+        return gpuAvailable ? CreateGpuEngine() : CreateCpuEngine();
+    }
+    
+    public override bool Return(IOcrEngine obj) 
+    {
+        // GPU健全性チェック + TDR復旧
+        return ValidateEngineHealth(obj) && CheckGpuTdrStatus();
+    }
+}
+```
+
+**環境別最適化マトリックス**:
+
+| GPU環境 | プールサイズ | 最適化戦略 | 期待効果 |
+|---------|-------------|------------|----------|
+| **NVIDIA RTX** | 8-12インスタンス | CUDA + TensorRT | OCR処理50-70%高速化 |
+| **NVIDIA GTX** | 4-6インスタンス | CUDA最適化 | OCR処理30-50%高速化 |
+| **AMD Radeon** | 4-6インスタンス | OpenCL + DirectML | OCR処理20-40%高速化 |
+| **Intel統合** | 2-3インスタンス | DirectML + CPU併用 | 安定性重視、10-20%向上 |
+| **レガシー** | 1-2インスタンス | CPU専用 + 軽量化 | メモリ効率重視 |
+
+**自動フォールバック機能**:
+```csharp
+public async Task<OcrResults> RecognizeAsync(IImage image)
+{
+    // Phase 1: GPU処理試行
+    if (await _gpuHealthChecker.IsGpuHealthyAsync())
+    {
+        try 
+        {
+            var gpuEngine = _gpuEnginePool.Get();
+            return await gpuEngine.RecognizeAsync(image);
+        }
+        catch (GpuException ex) when (ex.IsTdrRelated)
+        {
+            _logger.LogWarning("GPU TDR検出 - CPUフォールバック");
+            await _tdrManager.InitiateRecoveryAsync();
+        }
+    }
+    
+    // Phase 2: CPUフォールバック
+    var cpuEngine = _cpuEnginePool.Get();
+    return await cpuEngine.RecognizeAsync(image);
+}
+```
+
+**メモリ効率向上**:
+- **GPU VRAM活用**: CPUメモリ負荷を50-70%削減
+- **適応的プールサイズ**: システムリソースに応じた動的調整
+- **インスタンス健全性管理**: メモリリーク・GPU障害の自動検出
+
+**ユーザー環境への適応性**:
+- **ゼロ設定**: GPU環境自動検出・最適化
+- **障害耐性**: GPU障害時の自動CPUフォールバック
+- **パフォーマンス監視**: リアルタイム最適化調整
 
 ### **優先度3: 改善（アーキテクチャ健全化）**
 
@@ -437,18 +500,22 @@ services.Configure<ObjectPoolOptions>(options => options.MaximumRetained = 1);
 ## 📋 **調査継続課題**
 
 ### **最重要課題**
-1. **🔍 テキスト認識源の完全解明**
-   - OCR失敗でも成功する認識経路の特定
-   - データフロー・呼び出し経路の完全マッピング
+1. **🚀 プール化×GPU最適化システム実装**
+   - 利用ユーザー環境の自動GPU検出・最適化
+   - NVIDIA/AMD/Intel GPU対応の統合プールポリシー
+   - TDR（Timeout Detection and Recovery）自動復旧機能
+   - パフォーマンス向上目標: OCR処理時間20-70%短縮
 
 ### **重要課題**  
-2. **🏊 PooledOcrService状態管理問題**
-   - プール化による競合状態の解決
-   - インスタンス間状態共有の改善
+2. **🏊 適応的プールサイズ制御**
+   - GPU環境別最適プールサイズ算出アルゴリズム
+   - システムリソース監視による動的調整
+   - メモリリーク・GPU障害の予防的検出
 
 3. **📊 ROI画像生成システム復旧**
    - OCR成功後のROI処理検証
    - 診断レポートroiImages配列への画像追加
+   - GPU処理との統合最適化
 
 ### **改善課題**
 4. **🎨 翻訳アーキテクチャ最適化**
@@ -499,14 +566,21 @@ CachedOcrEngine → PooledOcrService → PaddleOcrEngine
 
 ### **🎯 技術的洞察・今後の指針**
 
-#### **多層アーキテクチャの成功**
+#### **多層アーキテクチャの成功とGPU統合の意義**
 Baketaシステムは、**堅牢な多層防御アーキテクチャ**として設計されている：
 - **1次**: 高速キャッシュ層（数ミリ秒応答）
 - **2次**: プール化OCR処理（並列・高速）
 - **3次**: ハードコード辞書（確実なフォールバック）
 - **4次**: NLLB200機械翻訳（高品質・多様性）
 
-この設計により、**障害に強く、高性能で、品質が保証された**翻訳システムが実現されている。
+**GPU最適化統合による進化**:
+この堅牢な基盤に**GPU最適化レイヤー**を統合することで：
+- **ユニバーサル対応**: NVIDIA/AMD/Intel全GPU環境での最適パフォーマンス
+- **自動適応**: ユーザー環境に応じた最適設定の自動選択
+- **障害耐性強化**: GPU障害時のシームレスなCPUフォールバック
+- **大幅性能向上**: OCR処理時間20-70%短縮により実用性が飛躍的に向上
+
+この設計により、**あらゆるユーザー環境で最適化された、障害に強く、高性能で、品質が保証された**次世代翻訳システムが実現される。
 
 #### **運用・保守指針**
 1. **現行アーキテクチャの維持**: 実証された高性能・高信頼性

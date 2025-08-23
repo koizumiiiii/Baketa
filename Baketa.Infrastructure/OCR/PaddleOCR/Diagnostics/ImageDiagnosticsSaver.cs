@@ -149,9 +149,35 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
             _logger?.LogTrace("ROI画像保存完了: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
         }
+        catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException)
+        {
+            _logger?.LogWarning("ROI画像保存失敗: {Path}, 理由: {Reason}", 
+                filePath, ex.GetType().Name);
+            
+            // フォールバック先への保存を試行
+            await TrySaveToFallbackLocationAsync(imageBytes, filePath, operationId).ConfigureAwait(false);
+        }
+        catch (IOException ioEx) when (ioEx.Message.Contains("being used by another process"))
+        {
+            _logger?.LogWarning("ファイルロック検出 - リトライ試行: {FilePath}", filePath);
+            
+            // 短時間待機してリトライ
+            await Task.Delay(100).ConfigureAwait(false);
+            await RetryImageSaveAsync(imageBytes, filePath, operationId, maxRetries: 3).ConfigureAwait(false);
+        }
+        catch (OutOfMemoryException memEx)
+        {
+            _logger?.LogError(memEx, "メモリ不足でROI画像保存失敗: サイズ={ImageSize}KB", imageBytes.Length / 1024);
+            
+            // 圧縮して再試行
+            await SaveCompressedImageAsync(imageBytes, filePath, operationId).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "ROI画像保存失敗: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+            _logger?.LogError(ex, "予期しないROI画像保存エラー: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
+            
+            // 最終フォールバック: メタデータのみ保存
+            await SaveErrorMetadataAsync(filePath, operationId, ex).ConfigureAwait(false);
             throw;
         }
     }
@@ -214,23 +240,21 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             // 元画像を描画
             graphics.DrawImage(originalBitmap, 0, 0);
             
-            // テキスト領域に赤枠を描画
+            // 描画リソース準備
             using var redPen = new System.Drawing.Pen(System.Drawing.Color.Red, 3.0f);
             using var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.Red);
             using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 255, 255, 255));
             using var font = new System.Drawing.Font("Arial", 12, System.Drawing.FontStyle.Bold);
             
-            foreach (var region in textRegions)
+            // テキスト領域の並列描画準備（座標計算を並列化）
+            var regionTasks = textRegions.AsParallel().Select(region =>
             {
-                // 赤い境界線を描画
-                graphics.DrawRectangle(redPen, region.Bounds);
-                
-                // 信頼度とテキスト情報を描画
                 var confidence = $"{region.Confidence:F2}";
                 var displayText = string.IsNullOrWhiteSpace(region.Text) ? "?" : 
                                  region.Text.Length > 10 ? region.Text[..10] + "..." : region.Text;
                 var label = $"{confidence} | {displayText}";
                 
+                // テキストサイズ計算（スレッドセーフでない可能性があるため事前計算）
                 var textSize = graphics.MeasureString(label, font);
                 var textRect = new System.Drawing.RectangleF(
                     region.Bounds.X, 
@@ -238,11 +262,20 @@ public sealed class ImageDiagnosticsSaver : IDisposable
                     textSize.Width + 4, 
                     textSize.Height + 2);
                 
+                return new { Region = region, Label = label, TextRect = textRect };
+            }).ToList();
+
+            // 描画は順次実行（GDI+のスレッドセーフティ問題対応）
+            foreach (var item in regionTasks)
+            {
+                // 赤い境界線を描画
+                graphics.DrawRectangle(redPen, item.Region.Bounds);
+                
                 // 背景を描画
-                graphics.FillRectangle(backgroundBrush, textRect);
+                graphics.FillRectangle(backgroundBrush, item.TextRect);
                 
                 // テキストを描画
-                graphics.DrawString(label, font, textBrush, textRect.X + 2, textRect.Y + 1);
+                graphics.DrawString(item.Label, font, textBrush, item.TextRect.X + 2, item.TextRect.Y + 1);
             }
             
             // 注釈付き画像をバイト配列に変換
@@ -396,6 +429,131 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             fileName = fileName.Replace(invalidChar, '_');
         }
         return fileName;
+    }
+
+    /// <summary>
+    /// フォールバック先への画像保存試行
+    /// </summary>
+    private async Task TrySaveToFallbackLocationAsync(byte[] imageBytes, string originalPath, string operationId)
+    {
+        var fallbackLocations = new[]
+        {
+            Path.Combine(Path.GetTempPath(), "Baketa", "ROI", "Fallback"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Baketa", "ROI", "Fallback"),
+            Path.Combine(Path.GetDirectoryName(originalPath) ?? string.Empty, "Fallback")
+        };
+
+        foreach (var fallbackDir in fallbackLocations)
+        {
+            try
+            {
+                Directory.CreateDirectory(fallbackDir);
+                var fallbackPath = Path.Combine(fallbackDir, $"fallback_{operationId}_{Path.GetFileName(originalPath)}");
+                
+                await File.WriteAllBytesAsync(fallbackPath, imageBytes).ConfigureAwait(false);
+                _logger?.LogInformation("フォールバック保存成功: {FallbackPath}", fallbackPath);
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogTrace("フォールバック保存失敗: {FallbackDir} - {Error}", fallbackDir, ex.Message);
+            }
+        }
+        
+        _logger?.LogWarning("全てのフォールバック保存が失敗: {OperationId}", operationId);
+    }
+
+    /// <summary>
+    /// リトライ機能付き画像保存
+    /// </summary>
+    private async Task RetryImageSaveAsync(byte[] imageBytes, string filePath, string operationId, int maxRetries)
+    {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
+                _logger?.LogInformation("リトライ保存成功: {FilePath} (試行: {Attempt}/{MaxRetries})", 
+                    filePath, attempt, maxRetries);
+                return;
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                var delay = attempt * 200; // 200ms, 400ms, 600ms...
+                _logger?.LogDebug("リトライ待機: {Delay}ms (試行: {Attempt}/{MaxRetries})", delay, attempt, maxRetries);
+                await Task.Delay(delay).ConfigureAwait(false);
+            }
+        }
+        
+        _logger?.LogError("最大リトライ回数に達しました: {FilePath} (試行回数: {MaxRetries})", filePath, maxRetries);
+        throw new IOException($"ファイル保存に{maxRetries}回失敗しました: {filePath}");
+    }
+
+    /// <summary>
+    /// 圧縮画像保存
+    /// </summary>
+    private async Task SaveCompressedImageAsync(byte[] imageBytes, string filePath, string operationId)
+    {
+        try
+        {
+            using var originalStream = new MemoryStream(imageBytes);
+            using var originalBitmap = new System.Drawing.Bitmap(originalStream);
+            using var compressedStream = new MemoryStream();
+            
+            // JPEG形式で品質50%に圧縮
+            var jpegEncoder = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
+                .First(codec => codec.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+            
+            var encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
+            encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(
+                System.Drawing.Imaging.Encoder.Quality, 50L);
+            
+            originalBitmap.Save(compressedStream, jpegEncoder, encoderParams);
+            var compressedBytes = compressedStream.ToArray();
+            
+            var compressedPath = Path.ChangeExtension(filePath, ".jpg");
+            await File.WriteAllBytesAsync(compressedPath, compressedBytes).ConfigureAwait(false);
+            
+            _logger?.LogInformation("圧縮画像保存成功: {CompressedPath} (元サイズ: {OriginalSize}KB → 圧縮後: {CompressedSize}KB)", 
+                compressedPath, imageBytes.Length / 1024, compressedBytes.Length / 1024);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "圧縮画像保存も失敗: {OperationId}", operationId);
+            
+            // 最後の手段：テキスト情報のみ保存
+            await SaveErrorMetadataAsync(filePath, operationId, ex).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// エラー時のメタデータ保存
+    /// </summary>
+    private async Task SaveErrorMetadataAsync(string originalPath, string operationId, Exception exception)
+    {
+        try
+        {
+            var errorMetadata = new Dictionary<string, object>
+            {
+                ["OperationId"] = operationId,
+                ["OriginalPath"] = originalPath,
+                ["ErrorType"] = exception.GetType().Name,
+                ["ErrorMessage"] = exception.Message,
+                ["Timestamp"] = DateTime.UtcNow.ToString("O"),
+                ["MachineName"] = Environment.MachineName,
+                ["ProcessId"] = Environment.ProcessId
+            };
+
+            var metadataJson = JsonSerializer.Serialize(errorMetadata, s_jsonOptions);
+            var errorMetadataPath = Path.ChangeExtension(originalPath, ".error.json");
+            
+            await File.WriteAllTextAsync(errorMetadataPath, metadataJson).ConfigureAwait(false);
+            _logger?.LogInformation("エラーメタデータ保存完了: {ErrorMetadataPath}", errorMetadataPath);
+        }
+        catch (Exception metaEx)
+        {
+            _logger?.LogError(metaEx, "エラーメタデータ保存も失敗: {OperationId}", operationId);
+        }
     }
 
     public void Dispose()

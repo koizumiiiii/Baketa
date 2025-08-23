@@ -31,11 +31,23 @@ public sealed class DiagnosticModule : ServiceModuleBase
         services.AddSingleton<IDiagnosticCollectionService, DiagnosticCollectionService>();
         Console.WriteLine("🔍 [DIAGNOSTIC] DiagnosticServices登録完了");
         
-        // ROI画像診断保存サービス
+        // ROI画像診断保存サービス（設定ベース）
         services.AddSingleton<ImageDiagnosticsSaver>(serviceProvider =>
         {
-            var outputDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
+            var roiOptionsAccessor = serviceProvider.GetService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.RoiDiagnosticsSettings>>();
+            var roiSettings = roiOptionsAccessor?.Value;
+            
+            Console.WriteLine($"🔍 [DIAGNOSTIC] IOptions<RoiDiagnosticsSettings>取得結果: {(roiOptionsAccessor != null ? "成功" : "失敗")}");
+            Console.WriteLine($"🔍 [DIAGNOSTIC] RoiDiagnosticsSettings値: {(roiSettings != null ? "存在" : "null")}");
             var logger = serviceProvider.GetService<Microsoft.Extensions.Logging.ILogger<ImageDiagnosticsSaver>>();
+            
+            // 設定が取得できない場合はフォールバック
+            var outputDirectory = roiSettings?.GetExpandedOutputPath() ?? 
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "ROI", "Images");
+            
+            Console.WriteLine($"🔍 [DIAGNOSTIC] ROI画像出力パス: {outputDirectory}");
+            Console.WriteLine($"🔍 [DIAGNOSTIC] ROI画像出力有効: {roiSettings?.EnableRoiImageOutput ?? true}");
+            
             return new ImageDiagnosticsSaver(outputDirectory, logger);
         });
         Console.WriteLine("🔍 [DIAGNOSTIC] ImageDiagnosticsSaver登録完了");

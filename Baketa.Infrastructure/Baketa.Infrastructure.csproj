@@ -31,12 +31,16 @@
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
 		
 		<!-- OpenCV Sharp パッケージ - 重要: PaddleOCRで使用 -->
-		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
-		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
 		
 		<!-- ONNX Runtime パッケージ -->
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.1" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
+		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
+		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />
+		<PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.1.0.54" />
+		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
+		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
 		<!-- GPU環境検出・テンソル処理用パッケージ（Issue #143対応） -->
 		<PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.17.1" />
@@ -52,11 +56,6 @@
 		</PackageReference>
 		
 		<!-- PaddleOCR パッケージ - 3.0.1統一 (runtime: 3.1.0.54強制) -->
-		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.1.0.54" />
-		<PackageReference Include="Sdcb.PaddleOCR.Models.Online" Version="3.0.1" />
 		
 		<!-- Supabase Authentication パッケージ -->
 		<PackageReference Include="supabase-csharp" Version="0.16.2" />
