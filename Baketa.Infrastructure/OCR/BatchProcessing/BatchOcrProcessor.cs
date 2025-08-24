@@ -289,6 +289,10 @@ public sealed class BatchOcrProcessor(
             System.Console.WriteLine($"🚨 [BATCH-DEBUG] ファイル出力エラー: {ex.Message}");
         }
         
+        // 🔍 UltraThink: 入力画像の型を記録
+        Console.WriteLine($"🔍 [PROCESS-BATCH] 入力画像型: {image.GetType().Name} ({image.GetType().FullName})");
+        Console.WriteLine($"🔍 [PROCESS-BATCH] 入力画像サイズ: {image.Width}x{image.Height}, Format: {image.Format}");
+        
         // パフォーマンス分析機能付きで実行
         if (_performanceAnalyzer != null)
         {
@@ -402,12 +406,28 @@ public sealed class BatchOcrProcessor(
 
             // ⚡ Phase 0: 新しい並列化アプローチ
             stageTimer.Restart();
+            
+            // 🔍 UltraThink: 408→409行目間異常フロー調査
+            Console.WriteLine($"🔍 [ULTRA-DEBUG] 408行目完了 - stageTimer.Restart()実行済み");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ULTRA-DEBUG] 408行目完了{Environment.NewLine}");
+            
+            Console.WriteLine($"🔍 [ULTRA-DEBUG] 409行目実行直前 - 実行フロー確認");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ULTRA-DEBUG] 409行目実行直前{Environment.NewLine}");
+            
             Console.WriteLine($"🔥 [STAGE-1] 並列OCR開始 - 画像サイズ: {image.Width}x{image.Height}");
+            
+            Console.WriteLine($"🔍 [ULTRA-DEBUG] 409行目実行完了 - STAGE-1ログ出力済み");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ULTRA-DEBUG] 409行目実行完了{Environment.NewLine}");
             
             // 画像を最適サイズのタイルに分割
             var optimalTileSize = _options.TileSize; // 設定可能なタイルサイズ
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-2] タイル分割開始 - 目標サイズ: {optimalTileSize}x{optimalTileSize}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [STAGE-2] タイル分割開始 - 目標サイズ: {optimalTileSize}x{optimalTileSize}{Environment.NewLine}");
             
             using var tileGenerationMeasurement = new Core.Performance.PerformanceMeasurement(
                 Core.Performance.MeasurementType.ImageTileGeneration, 
@@ -426,6 +446,8 @@ public sealed class BatchOcrProcessor(
             
             var tileResult = tileGenerationMeasurement.Complete();
             Console.WriteLine($"🔥 [STAGE-2] タイル分割完了 - {tileResult.Duration.TotalMilliseconds:F1}ms, {tiles.Count}個のタイル");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [STAGE-2] タイル分割完了 - {tileResult.Duration.TotalMilliseconds:F1}ms, {tiles.Count}個のタイル{Environment.NewLine}");
             
             // タイル分割時間を記録
             var tileStopwatch = new Stopwatch();
@@ -438,6 +460,8 @@ public sealed class BatchOcrProcessor(
             // 並列度制御付きOCR実行
             stageTimer.Restart();
             Console.WriteLine($"🔥 [STAGE-3] 並列OCR実行開始 - タイル数: {tiles.Count}, 並列度: {Environment.ProcessorCount}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [STAGE-3] 並列OCR実行開始 - タイル数: {tiles.Count}, 並列度: {Environment.ProcessorCount}{Environment.NewLine}");
             using var semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
             var parallelOcrTimer = Stopwatch.StartNew();
             
@@ -471,11 +495,18 @@ public sealed class BatchOcrProcessor(
                         if (_roiDiagnosticsSettings.EnableRoiImageOutput && _diagnosticsSaver != null && result.TextRegions?.Count > 0)
                         {
                             Console.WriteLine($"✅ [TILE-{index}] ROI画像保存条件満了 - SaveTileRoiImagesAsync実行開始");
+                            
+                            // 🔧 Geminiフィードバック対応: リソース管理問題解決のため画像バイト配列を事前取得
+                            var imageBytes = await tile.Image.ToByteArrayAsync().ConfigureAwait(false);
+                            var imageSize = new System.Drawing.Size(tile.Image.Width, tile.Image.Height);
+                            
+                            Console.WriteLine($"🔧 [TILE-{index}] 画像バイト配列取得完了 - サイズ: {imageBytes.Length:N0}bytes, 解像度: {imageSize.Width}x{imageSize.Height}");
+                            
                             _ = Task.Run(async () =>
                             {
                                 try
                                 {
-                                    await SaveTileRoiImagesAsync(tile.Image, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
+                                    await SaveTileRoiImagesAsync(imageBytes, imageSize, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
                                     Console.WriteLine($"✅ [TILE-{index}] SaveTileRoiImagesAsync実行完了");
                                 }
                                 catch (Exception roiEx)
@@ -1931,9 +1962,16 @@ public sealed class BatchOcrProcessor(
                 
                 var extractTimer = Stopwatch.StartNew();
                 Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し開始 - 位置: ({startX},{startY}), サイズ: {width}x{height}");
+                
+                // 🔍 UltraThink: 入力画像の型を特定
+                Console.WriteLine($"🔍 [DEBUG-TILE-{tileIndex}] 入力画像型: {image.GetType().Name} ({image.GetType().FullName})");
 
                 var croppedImage = await image.ExtractRegionAsync(tileRectangle).ConfigureAwait(false);
                 extractTimer.Stop();
+                
+                // 🔍 UltraThink: 切り出し後の画像型を特定
+                Console.WriteLine($"🔍 [DEBUG-TILE-{tileIndex}] 切り出し画像型: {croppedImage.GetType().Name} ({croppedImage.GetType().FullName})");
+                Console.WriteLine($"🔍 [DEBUG-TILE-{tileIndex}] 切り出し画像サイズ: {croppedImage.Width}x{croppedImage.Height}");
                 
                 Console.WriteLine($"🔥 [TILE-{tileIndex}] 画像切り出し完了 - 実行時間: {extractTimer.ElapsedMilliseconds}ms");
                 
@@ -2020,7 +2058,7 @@ public sealed class BatchOcrProcessor(
     /// タイルROI画像保存（BatchOcrProcessor用）
     /// 設定に応じて赤枠付き全体画像と個別切り抜き画像を保存
     /// </summary>
-    private async Task SaveTileRoiImagesAsync(IAdvancedImage tileImage, OcrResults ocrResult, string tileId, Point tileOffset)
+    private async Task SaveTileRoiImagesAsync(byte[] imageBytes, System.Drawing.Size imageSize, OcrResults ocrResult, string tileId, Point tileOffset)
     {
         try
         {
@@ -2029,11 +2067,15 @@ public sealed class BatchOcrProcessor(
             Console.WriteLine($"  - ocrResult.TextRegions != null: {ocrResult.TextRegions != null}");
             Console.WriteLine($"  - TextRegions.Count: {ocrResult.TextRegions?.Count ?? 0}");
             
-            // 🔍 重要: 実際のIAdvancedImage実装クラスを特定
-            var imageTypeName = tileImage?.GetType()?.Name ?? "null";
-            var imageFullTypeName = tileImage?.GetType()?.FullName ?? "null";
-            Console.WriteLine($"🔍 [DEBUG] 実際のIAdvancedImage実装: {imageTypeName} ({imageFullTypeName})");
-            Console.WriteLine($"🔍 [DEBUG] Image サイズ: {tileImage?.Width ?? 0}x{tileImage?.Height ?? 0}");
+            // 🔧 Geminiフィードバック対応: バイト配列ベースの安全な画像処理
+            Console.WriteLine($"🔧 [DEBUG] 画像データ: バイト配列 {imageBytes?.Length ?? 0:N0}bytes");
+            Console.WriteLine($"🔧 [DEBUG] 画像サイズ: {imageSize.Width}x{imageSize.Height}");
+            
+            if (imageBytes == null || imageBytes.Length == 0)
+            {
+                Console.WriteLine($"❌ 無効な画像バイト配列 - tileId: {tileId}");
+                return;
+            }
             
             if (_diagnosticsSaver == null || ocrResult.TextRegions == null) 
             {
@@ -2075,17 +2117,33 @@ public sealed class BatchOcrProcessor(
                 _ => "png"
             };
             
-            // 🔍 重要: ToByteArrayAsync呼び出し前後でデバッグ情報追加
-            Console.WriteLine($"🔍 [DEBUG] ToByteArrayAsync呼び出し前 - Image: {imageTypeName}");
-            var tileImageBytes = await tileImage.ToByteArrayAsync().ConfigureAwait(false);
-            Console.WriteLine($"🔍 [DEBUG] ToByteArrayAsync呼び出し後 - バイト配列サイズ: {tileImageBytes?.Length ?? 0} bytes");
+            // 🔧 バイト配列ベースの実装: 事前取得した画像データを使用
+            Console.WriteLine($"🔍 [DEBUG] 事前取得画像バイト配列検証");
+            Console.WriteLine($"🔍 [DEBUG] 画像サイズ: {imageSize.Width}x{imageSize.Height}");
             
-            if (tileImageBytes == null || tileImageBytes.Length == 0) 
+            Console.WriteLine($"🔍 [DEBUG] バイト配列サイズ: {imageBytes?.Length ?? 0} bytes");
+            
+            // 🔬 バイト配列の内容検証
+            if (imageBytes != null && imageBytes.Length > 0) 
             {
-                Console.WriteLine($"❌ [ERROR] ToByteArrayAsyncが空のバイト配列を返しました！Image実装: {imageTypeName}");
-                Console.WriteLine($"❌ [ERROR] この問題はSimpleImageWrapperの不完全な実装が原因の可能性があります");
+                // 最初の16バイトをダンプして実際のデータがあるかチェック
+                var hexDump = string.Join(" ", imageBytes.Take(Math.Min(16, imageBytes.Length)).Select(b => b.ToString("X2")));
+                Console.WriteLine($"🔍 [DEBUG] バイト配列先頭16バイト: {hexDump}");
+                
+                // 全バイトが0かどうかチェック
+                var allZero = imageBytes.All(b => b == 0);
+                Console.WriteLine($"🔍 [DEBUG] 全バイトが0: {allZero}");
+            }
+            
+            if (imageBytes == null || imageBytes.Length == 0) 
+            {
+                Console.WriteLine($"❌ [CRITICAL] 事前取得した画像バイト配列が無効です！");
+                Console.WriteLine($"❌ [CRITICAL] ROI画像保存失敗の根本原因です");
                 return;
             }
+            
+            // 🔧 事前取得したバイト配列を使用
+            var tileImageBytes = imageBytes;
             
             // RoiDiagnosticsSettingsに基づいてROI画像を保存
             Console.WriteLine($"🖼️ ROI画像保存処理開始 - EnableAnnotatedImages: {_roiDiagnosticsSettings.EnableAnnotatedImages}");

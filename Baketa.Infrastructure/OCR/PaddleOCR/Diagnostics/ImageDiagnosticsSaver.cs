@@ -137,46 +137,141 @@ public sealed class ImageDiagnosticsSaver : IDisposable
         
         ObjectDisposedException.ThrowIf(_disposed, this);
         
+        // 🔍 [ULTRADEBUG] 保存処理開始時の詳細ログ
+        Console.WriteLine($"🔍 [ROI-SAVE-START] 操作ID: {operationId}");
+        Console.WriteLine($"🔍 [ROI-SAVE-START] ファイルパス: {filePath}");
+        Console.WriteLine($"🔍 [ROI-SAVE-START] バイト配列サイズ: {imageBytes.Length:N0} bytes ({imageBytes.Length / 1024.0:F2} KB)");
+        Console.WriteLine($"🔍 [ROI-SAVE-START] バイト配列ハッシュ: {imageBytes.Take(16).Select(b => b.ToString("X2")).Aggregate((a, b) => a + b)}...");
+        
         try
         {
             // ディレクトリが存在しない場合は作成
             var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            Console.WriteLine($"🔍 [ROI-DIR] ディレクトリパス: {directory}");
+            
+            if (!string.IsNullOrEmpty(directory))
             {
-                Directory.CreateDirectory(directory);
+                Console.WriteLine($"🔍 [ROI-DIR] ディレクトリ存在チェック: {Directory.Exists(directory)}");
+                
+                if (!Directory.Exists(directory))
+                {
+                    Console.WriteLine($"🔍 [ROI-DIR] ディレクトリを作成中...");
+                    Directory.CreateDirectory(directory);
+                    Console.WriteLine($"🔍 [ROI-DIR] ディレクトリ作成完了: {Directory.Exists(directory)}");
+                }
             }
             
-            await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
+            Console.WriteLine($"🔍 [ROI-FILE] ファイル書き込み開始...");
+            var writeStart = DateTime.Now;
+            
+            try
+            {
+                // ファイル書き込み詳細モニタリング
+                using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    Console.WriteLine($"🔍 [ROI-STREAM] FileStream作成成功 - パス: {filePath}");
+                    Console.WriteLine($"🔍 [ROI-STREAM] FileStream設定 - Mode=Create, Access=Write, Share=None");
+                    
+                    await fileStream.WriteAsync(imageBytes, 0, imageBytes.Length).ConfigureAwait(false);
+                    Console.WriteLine($"🔍 [ROI-STREAM] WriteAsync完了 - 書き込みバイト数: {imageBytes.Length:N0}");
+                    
+                    await fileStream.FlushAsync().ConfigureAwait(false);
+                    Console.WriteLine($"🔍 [ROI-STREAM] FlushAsync完了");
+                    
+                    Console.WriteLine($"🔍 [ROI-STREAM] FileStream詳細 - CanRead={fileStream.CanRead}, CanWrite={fileStream.CanWrite}, Position={fileStream.Position}, Length={fileStream.Length}");
+                }
+                
+                Console.WriteLine($"🔍 [ROI-STREAM] FileStreamクローズ完了 - using文終了");
+            }
+            catch (Exception streamEx)
+            {
+                Console.WriteLine($"💥 [ROI-STREAM] FileStream操作エラー: {streamEx.GetType().Name} - {streamEx.Message}");
+                throw;
+            }
+            
+            var writeEnd = DateTime.Now;
+            Console.WriteLine($"🔍 [ROI-FILE] ファイル書き込み完了 - 経過時間: {(writeEnd - writeStart).TotalMilliseconds:F2}ms");
+            
+            // 即座のファイル状態確認
+            Console.WriteLine($"🔍 [ROI-IMMEDIATE] 即座の確認開始...");
+            var immediateExists = File.Exists(filePath);
+            var immediateSize = immediateExists ? new FileInfo(filePath).Length : 0;
+            Console.WriteLine($"🔍 [ROI-IMMEDIATE] 書き込み直後の存在: {immediateExists}");
+            Console.WriteLine($"🔍 [ROI-IMMEDIATE] 書き込み直後のサイズ: {immediateSize:N0} bytes");
+            
+            // 100ms待機後の再確認
+            Console.WriteLine($"🔍 [ROI-WAIT] 100ms待機中...");
+            await Task.Delay(100).ConfigureAwait(false);
+            
+            var delayedExists = File.Exists(filePath);
+            var delayedSize = delayedExists ? new FileInfo(filePath).Length : 0;
+            Console.WriteLine($"🔍 [ROI-WAIT] 100ms後の存在: {delayedExists}");
+            Console.WriteLine($"🔍 [ROI-WAIT] 100ms後のサイズ: {delayedSize:N0} bytes");
+            
+            // ファイル詳細情報
+            if (immediateExists)
+            {
+                var fileInfo = new FileInfo(filePath);
+                Console.WriteLine($"🔍 [ROI-DETAILS] 作成時刻: {fileInfo.CreationTime:yyyy-MM-dd HH:mm:ss.fff}");
+                Console.WriteLine($"🔍 [ROI-DETAILS] 更新時刻: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss.fff}");
+                Console.WriteLine($"🔍 [ROI-DETAILS] アクセス時刻: {fileInfo.LastAccessTime:yyyy-MM-dd HH:mm:ss.fff}");
+                Console.WriteLine($"🔍 [ROI-DETAILS] 読み取り専用: {fileInfo.IsReadOnly}");
+                Console.WriteLine($"🔍 [ROI-DETAILS] 属性: {fileInfo.Attributes}");
+            }
+            
+            // ディレクトリ全体のファイル数確認
+            var parentDirectory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
+            {
+                var allFiles = Directory.GetFiles(parentDirectory, "*.png").Length;
+                Console.WriteLine($"🔍 [ROI-DIR-COUNT] ディレクトリ内PNGファイル数: {allFiles}");
+            }
+            
+            // 最終確認用
+            var fileExists = delayedExists;
+            var fileSize = delayedSize;
+            Console.WriteLine($"🔍 [ROI-VERIFY] 最終存在確認: {fileExists}");
+            Console.WriteLine($"🔍 [ROI-VERIFY] 最終ファイルサイズ: {fileSize:N0} bytes");
+            
             _logger?.LogTrace("ROI画像保存完了: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
         }
         catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException)
         {
+            Console.WriteLine($"💥 [ROI-ERROR] ディレクトリ/権限エラー: {ex.GetType().Name} - {ex.Message}");
             _logger?.LogWarning("ROI画像保存失敗: {Path}, 理由: {Reason}", 
                 filePath, ex.GetType().Name);
             
             // フォールバック先への保存を試行
+            Console.WriteLine($"🔄 [ROI-FALLBACK] フォールバック保存を試行中...");
             await TrySaveToFallbackLocationAsync(imageBytes, filePath, operationId).ConfigureAwait(false);
         }
         catch (IOException ioEx) when (ioEx.Message.Contains("being used by another process"))
         {
+            Console.WriteLine($"💥 [ROI-ERROR] ファイルロックエラー: {ioEx.Message}");
             _logger?.LogWarning("ファイルロック検出 - リトライ試行: {FilePath}", filePath);
             
             // 短時間待機してリトライ
             await Task.Delay(100).ConfigureAwait(false);
+            Console.WriteLine($"🔄 [ROI-RETRY] リトライ保存を試行中...");
             await RetryImageSaveAsync(imageBytes, filePath, operationId, maxRetries: 3).ConfigureAwait(false);
         }
         catch (OutOfMemoryException memEx)
         {
+            Console.WriteLine($"💥 [ROI-ERROR] メモリ不足エラー: サイズ={imageBytes.Length / 1024}KB - {memEx.Message}");
             _logger?.LogError(memEx, "メモリ不足でROI画像保存失敗: サイズ={ImageSize}KB", imageBytes.Length / 1024);
             
             // 圧縮して再試行
+            Console.WriteLine($"🔄 [ROI-COMPRESS] 圧縮保存を試行中...");
             await SaveCompressedImageAsync(imageBytes, filePath, operationId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"💥 [ROI-ERROR] 予期しないエラー: {ex.GetType().Name} - {ex.Message}");
+            Console.WriteLine($"💥 [ROI-ERROR] スタックトレース: {ex.StackTrace}");
             _logger?.LogError(ex, "予期しないROI画像保存エラー: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
             
             // 最終フォールバック: メタデータのみ保存
+            Console.WriteLine($"🔄 [ROI-METADATA] エラーメタデータ保存を試行中...");
             await SaveErrorMetadataAsync(filePath, operationId, ex).ConfigureAwait(false);
             throw;
         }
@@ -443,23 +538,35 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             Path.Combine(Path.GetDirectoryName(originalPath) ?? string.Empty, "Fallback")
         };
 
+        Console.WriteLine($"🔄 [FALLBACK] フォールバック保存開始: {fallbackLocations.Length}箇所を試行");
+
         foreach (var fallbackDir in fallbackLocations)
         {
             try
             {
+                Console.WriteLine($"🔄 [FALLBACK] 試行中: {fallbackDir}");
                 Directory.CreateDirectory(fallbackDir);
                 var fallbackPath = Path.Combine(fallbackDir, $"fallback_{operationId}_{Path.GetFileName(originalPath)}");
                 
+                Console.WriteLine($"🔄 [FALLBACK] ファイル書き込み: {fallbackPath}");
                 await File.WriteAllBytesAsync(fallbackPath, imageBytes).ConfigureAwait(false);
+                
+                // 書き込み確認
+                var fallbackExists = File.Exists(fallbackPath);
+                var fallbackSize = fallbackExists ? new FileInfo(fallbackPath).Length : 0;
+                Console.WriteLine($"✅ [FALLBACK] 保存成功: 存在={fallbackExists}, サイズ={fallbackSize:N0}bytes");
+                
                 _logger?.LogInformation("フォールバック保存成功: {FallbackPath}", fallbackPath);
                 return;
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"💥 [FALLBACK] 失敗: {fallbackDir} - {ex.GetType().Name}: {ex.Message}");
                 _logger?.LogTrace("フォールバック保存失敗: {FallbackDir} - {Error}", fallbackDir, ex.Message);
             }
         }
         
+        Console.WriteLine($"💥 [FALLBACK] 全てのフォールバック保存が失敗: {operationId}");
         _logger?.LogWarning("全てのフォールバック保存が失敗: {OperationId}", operationId);
     }
 
