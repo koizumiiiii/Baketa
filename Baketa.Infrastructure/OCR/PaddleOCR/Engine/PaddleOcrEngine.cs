@@ -1388,7 +1388,10 @@ public class PaddleOcrEngine : IOcrEngine
                     {
                         try
                         {
-                            return new Mat(mat, rect);
+                            // 🛡️ [MEMORY_FIX] ROI用の新しいMatを作成し、元のmatを安全にDispose
+                            var roiMat = new Mat(mat, rect);
+                            mat.Dispose(); // 元のmatを解放
+                            return roiMat;
                         }
                         catch (Exception ex)
                         {
@@ -1430,6 +1433,7 @@ public class PaddleOcrEngine : IOcrEngine
 
     /// <summary>
     /// テスト用のダミーMatを作成
+    /// ⚠️ [MEMORY_WARNING] 呼び出し側でusingまたはDisposeによる適切な管理が必要
     /// </summary>
     private static Mat CreateDummyMat()
     {
@@ -1469,6 +1473,7 @@ public class PaddleOcrEngine : IOcrEngine
 
         // OpenCvSharpのMatからbyte[]に直接変換
         // BGR形式の場合はRGB形式に変換
+        // ✅ [MEMORY_SAFE] 新しいMatを作成する場合、finally文で適切にDispose処理済み
         Mat rgbMat = mat.Channels() == 3 ? new Mat() : mat;
         if (mat.Channels() == 3)
         {
@@ -1671,6 +1676,7 @@ public class PaddleOcrEngine : IOcrEngine
                                 }
                                 
                                 // より安全な直接Mat作成（unsafeコード回避）
+                                // ⚠️ [MEMORY_CRITICAL] このprocessedMatは呼び出し元で適切に管理される必要がある
                                 processedMat = new Mat(height, width, MatType.CV_8UC3);
                                 
                                 // データを安全にコピー
@@ -1701,6 +1707,7 @@ public class PaddleOcrEngine : IOcrEngine
                                 catch { }
                                 
                                 // 最終フォールバック：空のMatを返す（クラッシュ回避）
+                                // ⚠️ [MEMORY_CRITICAL] この空のprocessedMatも呼び出し元で適切に管理される必要がある
                                 processedMat = new Mat();
                                 // 空のMat処理を継続
                             }
@@ -4411,10 +4418,11 @@ public class PaddleOcrEngine : IOcrEngine
                 __logger?.LogDebug("🔧 [MAT_FIX] Resizing: {OldWidth}x{OldHeight} → {NewWidth}x{NewHeight}",
                     width, height, newWidth, newHeight);
                 
+                // ✅ [MEMORY_SAFE] 新しいMatを作成し、古いMatを適切にDispose
                 var resizedMat = new Mat();
                 Cv2.Resize(fixedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
-                fixedMat.Dispose();
-                fixedMat = resizedMat;
+                fixedMat.Dispose(); // 古いMatを解放
+                fixedMat = resizedMat; // 新しいMatに置き換え
                 wasModified = true;
                 
                 // 更新されたサイズ情報
@@ -4427,6 +4435,7 @@ public class PaddleOcrEngine : IOcrEngine
             {
                 __logger?.LogDebug("🔧 [MAT_FIX] Converting channels: {Channels} → 3", channels);
                 
+                // ✅ [MEMORY_SAFE] チャンネル変換用のMatを作成し、適切にDispose管理
                 var convertedMat = new Mat();
                 try 
                 {
@@ -4443,14 +4452,15 @@ public class PaddleOcrEngine : IOcrEngine
                     else
                     {
                         // その他の場合はグレースケール経由でBGRに変換
+                        // ✅ [MEMORY_SAFE] 一時的なgrayMatは適切にDispose
                         var grayMat = new Mat();
                         Cv2.CvtColor(fixedMat, grayMat, ColorConversionCodes.BGR2GRAY);
                         Cv2.CvtColor(grayMat, convertedMat, ColorConversionCodes.GRAY2BGR);
-                        grayMat.Dispose();
+                        grayMat.Dispose(); // 一時的なMatを解放
                     }
                     
-                    fixedMat.Dispose();
-                    fixedMat = convertedMat;
+                    fixedMat.Dispose(); // 古いMatを解放
+                    fixedMat = convertedMat; // 新しいMatに置き換え
                     channels = 3;
                     wasModified = true;
                 }
@@ -4468,12 +4478,13 @@ public class PaddleOcrEngine : IOcrEngine
             {
                 __logger?.LogDebug("🔧 [MAT_FIX] Converting type: {Type} → CV_8UC3", fixedMat.Type());
                 
+                // ✅ [MEMORY_SAFE] データ型変換用のMatを作成し、適切にDispose管理
                 var convertedMat = new Mat();
                 try 
                 {
                     fixedMat.ConvertTo(convertedMat, MatType.CV_8UC3);
-                    fixedMat.Dispose();
-                    fixedMat = convertedMat;
+                    fixedMat.Dispose(); // 古いMatを解放
+                    fixedMat = convertedMat; // 新しいMatに置き換え
                     wasModified = true;
                 }
                 catch (Exception ex)

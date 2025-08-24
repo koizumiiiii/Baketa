@@ -496,8 +496,8 @@ public sealed class PaddleOcrModule : IServiceModule
             throw new InvalidOperationException("高機能版OCR構成でPaddleOcrEngineインスタンスが取得できませんでした。");
         });
         
-        // 🚀 Step 1: OCRエンジンプール化実装（Gemini推奨アプローチ）
-        RegisterOcrEnginePooling(services);
+        // 🏭 安定性改善戦略: ファクトリパターン実装（Immutable OCR Engine Pattern）
+        RegisterOcrEngineFactory(services);
         
         // HttpClient設定（HttpClientFactoryが利用可能な場合）
         if (services.Any(s => s.ServiceType == typeof(IHttpClientFactory)))
@@ -622,36 +622,19 @@ public sealed class PaddleOcrModule : IServiceModule
     }
 
     /// <summary>
-    /// OCRエンジンプール化システムを登録（Step 1実装）
-    /// 14秒→5-8秒への性能向上を目標とした根本的解決策
+    /// OCRエンジンファクトリシステムを登録（安定性改善戦略）
+    /// プール化によるメモリリークと状態汚染を根本的に解決
     /// </summary>
-    private static void RegisterOcrEnginePooling(IServiceCollection services)
+    private static void RegisterOcrEngineFactory(IServiceCollection services)
     {
-        Console.WriteLine("🚀 Step 1: OCRエンジンプール化システム登録開始");
+        Console.WriteLine("🏭 安定性改善: OCRエンジンファクトリシステム登録開始");
         
         // 1. OCRエンジンファクトリー登録
         services.AddSingleton<IPaddleOcrEngineFactory, PaddleOcrEngineFactory>();
-        Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了");
+        Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了（ファクトリパターン）");
         
-        // 2. プールポリシー登録
-        services.AddSingleton<PaddleOcrEnginePoolPolicy>();
-        Console.WriteLine("✅ PaddleOcrEnginePoolPolicy登録完了");
-        
-        // 3. ObjectPoolの設定
-        services.AddSingleton<ObjectPool<IOcrEngine>>(serviceProvider =>
-        {
-            var policy = serviceProvider.GetRequiredService<PaddleOcrEnginePoolPolicy>();
-            var provider = serviceProvider.GetRequiredService<ObjectPoolProvider>();
-            
-            // プール設定：最大プールサイズ、並列度に基づいて調整
-            var pool = provider.Create(policy);
-            
-            Console.WriteLine("🏊 ObjectPool<IOcrEngine>初期化完了 - プール化OCRシステム開始");
-            return pool;
-        });
-        
-        // 4. プール化OCRサービス登録（既存IOcrEngineを置き換え）
-        // 既存のシングルトン登録を削除し、プール化サービスで置き換え
+        // 2. ファクトリベースのIOcrEngine登録を遅延実行
+        // 既存のシングルトンIOcrEngine登録を置き換え
         var existingOcrEngineDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IOcrEngine));
         if (existingOcrEngineDescriptor != null)
         {
@@ -659,14 +642,43 @@ public sealed class PaddleOcrModule : IServiceModule
             Console.WriteLine("🔄 既存IOcrEngineシングルトン登録を削除");
         }
         
-        services.AddSingleton<IOcrEngine, PooledOcrService>();
-        Console.WriteLine("✅ PooledOcrService登録完了 - IOcrEngineをプール化実装に置き換え");
+        // 3. ファクトリベースのIOcrEngine登録（非ブロッキング版）
+        // デッドロック回避のため、直接インスタンス生成を行う
+        services.AddTransient<IOcrEngine>(serviceProvider =>
+        {
+            // 🔥 重要: デッドロック回避のため、直接インスタンス生成を実行
+            // PaddleOcrEngineFactory.CreateAsync()の実装を直接実行し、同期待機を回避
+            
+            var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
+            var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
+            var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
+            var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
+            var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
+            var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
+            var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
+            var ocrSettings = serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
+            var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
+            var engineLogger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
+            
+            // 直接NonSingletonPaddleOcrEngineを作成（デッドロック回避）
+            var engine = new NonSingletonPaddleOcrEngine(
+                modelPathResolver, 
+                ocrPreprocessingService, 
+                textMerger, 
+                ocrPostProcessor, 
+                gpuMemoryManager,
+                unifiedSettingsService,
+                eventAggregator,
+                ocrSettings,
+                unifiedLoggingService,
+                engineLogger);
+            
+            Console.WriteLine("🆕 新しいOCRエンジンインスタンス作成: {0}（非ブロッキング）", engine.GetType().Name);
+            return engine;
+        });
+        Console.WriteLine("✅ IOcrEngineファクトリベース登録完了");
         
-        // 5. ObjectPoolProviderを登録（Microsoft.Extensions.ObjectPoolのデフォルト実装）
-        services.AddSingleton<ObjectPoolProvider, DefaultObjectPoolProvider>();
-        Console.WriteLine("✅ DefaultObjectPoolProvider登録完了");
-        
-        Console.WriteLine("🎉 Step 1: OCRエンジンプール化システム登録完了");
-        Console.WriteLine("📊 予想効果: 14-18秒 → 5-8秒（並列競合解消）");
+        Console.WriteLine("🎉 安定性改善: OCRエンジンファクトリシステム登録完了");
+        Console.WriteLine("📊 期待効果: PaddlePredictor run failed エラー根絶 + メモリリーク防止");
     }
 }
