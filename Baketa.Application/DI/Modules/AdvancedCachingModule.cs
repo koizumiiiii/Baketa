@@ -32,22 +32,25 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         services.AddSingleton<IAdvancedOcrCacheService, AdvancedOcrCacheService>();
         Console.WriteLine("✅ IAdvancedOcrCacheService登録完了");
         
-        // 🎯 高機能版: キャッシュ対応OCRエンジンを最終IOcrEngine実装として登録
-        // PooledOcrServiceをベースエンジンとして使用
+        // ❌ 旧プール化システム依存の機能を一時的に無効化
+        // CachedOcrEngineはPooledOcrServiceに依存しているため、
+        // 新しいファクトリシステムとの整合性確保まで無効化
+        
+        /*
+        // 🏭 将来実装: ファクトリパターン対応CachedOcrEngine
+        // 現在のCachedOcrEngineは固定IOcrEngineベースなので、
+        // ファクトリパターンに対応するにはアーキテクチャ変更が必要
         services.AddSingleton<CachedOcrEngine>(provider =>
         {
-            // 高機能版のPooledOcrServiceを取得
-            var baseEngine = provider.GetRequiredService<PooledOcrService>();
+            // 新しいファクトリシステムから基本IOcrEngineを取得
+            var baseEngine = provider.GetRequiredService<IOcrEngine>();
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
             
-            Console.WriteLine($"🔄 CachedOcrEngine作成中... ベースエンジン: {baseEngine.GetType().Name}");
+            Console.WriteLine($"🏭 CachedOcrEngine作成中... 新ファクトリシステム対応");
             return new CachedOcrEngine(baseEngine, cacheService, logger);
         });
-        
-        // 最終的にCachedOcrEngineをメインのIOcrEngineとして登録
-        services.AddSingleton<IOcrEngine>(provider => 
-            provider.GetRequiredService<CachedOcrEngine>());
+        */
         
         Console.WriteLine("✅ Step3: 高度キャッシング戦略登録完了");
         Console.WriteLine("🎯 期待効果: キャッシュヒット時 数ミリ秒応答");
@@ -59,10 +62,13 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
     /// <returns>依存モジュールの型のコレクション</returns>
     public override IEnumerable<Type> GetDependentModules()
     {
-        // Step2の段階的OCR戦略に依存
-        yield return typeof(StagedOcrStrategyModule);
+        // ❌ 旧プール化システム依存を除去
+        // yield return typeof(StagedOcrStrategyModule);
         
-        // インフラストラクチャモジュールに依存
+        // インフラストラクチャモジュールに依存（新ファクトリシステム）
         yield return typeof(Baketa.Infrastructure.DI.Modules.InfrastructureModule);
+        
+        // 🏭 新しいPaddleOcrModuleに依存（ファクトリシステム）
+        yield return typeof(Baketa.Infrastructure.DI.PaddleOcrModule);
     }
 }

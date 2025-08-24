@@ -23,6 +23,7 @@ using Baketa.Infrastructure.OCR.Strategies;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
+using Baketa.Core.Utilities;
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
 
@@ -217,12 +218,14 @@ public sealed class BatchOcrProcessor(
     ILogger<BatchOcrProcessor>? logger = null,
     OcrRegionGenerator? regionGenerator = null,
     IOptions<AdvancedSettings>? advancedOptions = null,
+    IOptions<RoiDiagnosticsSettings>? roiDiagnosticsOptions = null,
     ImageDiagnosticsSaver? diagnosticsSaver = null) : IBatchOcrProcessor, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
     private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
     private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
     private readonly AdvancedSettings _advancedSettings = advancedOptions?.Value ?? new();
+    private readonly RoiDiagnosticsSettings _roiDiagnosticsSettings = roiDiagnosticsOptions?.Value ?? new();
     
     // ROI画像情報収集用（診断レポート統合）
     private readonly ConcurrentBag<RoiImageInfo> _currentSessionRoiImages = new();
@@ -440,80 +443,83 @@ public sealed class BatchOcrProcessor(
             
             var ocrTasks = tiles.Select(async (tile, index) =>
             {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try
+                // 🔧 [SEMAPHORE_FIX] SemaphoreSlimExtensionsによる堅牢なリソース管理（Geminiレビュー対応）
+                using (await semaphore.WaitAsyncDisposable(cancellationToken).ConfigureAwait(false))
                 {
-                    var tileTimer = Stopwatch.StartNew();
-                    Console.WriteLine($"🔥 [TILE-{index}] OCR開始 - 実際のタイルサイズ: {tile.Image.Width}x{tile.Image.Height}");
-                    
-                    // 各タイルでOCR実行（詳細時間測定）
-                    using var ocrEngineExecution = new Core.Performance.PerformanceMeasurement(
-                        Core.Performance.MeasurementType.OcrEngineExecution, 
-                        $"PaddleOCR実行 - Tile{index}, サイズ:{tile.Image.Width}x{tile.Image.Height}");
+                    try
+                    {
+                        var tileTimer = Stopwatch.StartNew();
+                        Console.WriteLine($"🔥 [TILE-{index}] OCR開始 - 実際のタイルサイズ: {tile.Image.Width}x{tile.Image.Height}");
                         
-                    var result = await _ocrEngine.RecognizeAsync(tile.Image, null, cancellationToken).ConfigureAwait(false);
-                    
-                    var ocrEngineResult = ocrEngineExecution.Complete();
-                    tileTimer.Stop();
-                    Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms (エンジン:{ocrEngineResult.Duration.TotalMilliseconds:F1}ms), 検出領域数: {result.TextRegions?.Count ?? 0}");
-                    
-                    // ROI画像保存（OCR成功時）- 詳細デバッグログ付き
-                    Console.WriteLine($"🔍 [TILE-{index}] ROI画像保存条件チェック:");
-                    Console.WriteLine($"  - EnableRoiImageOutput: {_advancedSettings.EnableRoiImageOutput}");
-                    Console.WriteLine($"  - _diagnosticsSaver != null: {_diagnosticsSaver != null}");
-                    Console.WriteLine($"  - TextRegions?.Count: {result.TextRegions?.Count ?? 0}");
-                    
-                    if (_advancedSettings.EnableRoiImageOutput && _diagnosticsSaver != null && result.TextRegions?.Count > 0)
-                    {
-                        Console.WriteLine($"✅ [TILE-{index}] ROI画像保存条件満了 - SaveTileRoiImagesAsync実行開始");
-                        _ = Task.Run(async () =>
+                        // 各タイルでOCR実行（詳細時間測定）
+                        using var ocrEngineExecution = new Core.Performance.PerformanceMeasurement(
+                            Core.Performance.MeasurementType.OcrEngineExecution, 
+                            $"PaddleOCR実行 - Tile{index}, サイズ:{tile.Image.Width}x{tile.Image.Height}");
+                            
+                        var result = await _ocrEngine.RecognizeAsync(tile.Image, null, cancellationToken).ConfigureAwait(false);
+                        
+                        var ocrEngineResult = ocrEngineExecution.Complete();
+                        tileTimer.Stop();
+                        Console.WriteLine($"🔥 [TILE-{index}] OCR完了 - {tileTimer.ElapsedMilliseconds}ms (エンジン:{ocrEngineResult.Duration.TotalMilliseconds:F1}ms), 検出領域数: {result.TextRegions?.Count ?? 0}");
+                        
+                        // ROI画像保存（OCR成功時）- 詳細デバッグログ付き
+                        Console.WriteLine($"🔍 [TILE-{index}] ROI画像保存条件チェック:");
+                        Console.WriteLine($"  - EnableRoiImageOutput: {_roiDiagnosticsSettings.EnableRoiImageOutput}");
+                        Console.WriteLine($"  - _diagnosticsSaver != null: {_diagnosticsSaver != null}");
+                        Console.WriteLine($"  - TextRegions?.Count: {result.TextRegions?.Count ?? 0}");
+                        
+                        if (_roiDiagnosticsSettings.EnableRoiImageOutput && _diagnosticsSaver != null && result.TextRegions?.Count > 0)
                         {
-                            try
+                            Console.WriteLine($"✅ [TILE-{index}] ROI画像保存条件満了 - SaveTileRoiImagesAsync実行開始");
+                            _ = Task.Run(async () =>
                             {
-                                await SaveTileRoiImagesAsync(tile.Image, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
-                                Console.WriteLine($"✅ [TILE-{index}] SaveTileRoiImagesAsync実行完了");
-                            }
-                            catch (Exception roiEx)
-                            {
-                                Console.WriteLine($"❌ [TILE-{index}] ROI画像保存エラー: {roiEx.Message}");
-                                _logger?.LogWarning(roiEx, "ROI画像保存エラー - Tile {TileIndex}", index);
-                            }
-                        }, cancellationToken);
+                                try
+                                {
+                                    await SaveTileRoiImagesAsync(tile.Image, result, $"tile-{index}", tile.Offset).ConfigureAwait(false);
+                                    Console.WriteLine($"✅ [TILE-{index}] SaveTileRoiImagesAsync実行完了");
+                                }
+                                catch (Exception roiEx)
+                                {
+                                    Console.WriteLine($"❌ [TILE-{index}] ROI画像保存エラー: {roiEx.Message}");
+                                    _logger?.LogWarning(roiEx, "ROI画像保存エラー - Tile {TileIndex}", index);
+                                }
+                            }, cancellationToken);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"❌ [TILE-{index}] ROI画像保存条件不満足 - スキップ");
+                        }
+                        
+                        return new TileOcrResult
+                        {
+                            TileIndex = index,
+                            TileOffset = tile.Offset,
+                            Result = result,
+                            ProcessingTime = tileTimer.Elapsed
+                        };
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ [TILE-{index}] ROI画像保存条件不満足 - スキップ");
+                        _logger?.LogError(ex, "🚨 タイルOCR処理に失敗 - Tile Index: {TileIndex}, Offset: ({X},{Y})", index, tile.Offset.X, tile.Offset.Y);
+                        Console.WriteLine($"🚨 [TILE-{index}] OCR失敗 - エラー: {ex.Message}");
+                        
+                        // エラー時は空の結果を返すことで処理を継続
+                        var dummyImage = new SimpleImageWrapper(tile.Width, tile.Height);
+                        return new TileOcrResult
+                        {
+                            TileIndex = index,
+                            TileOffset = tile.Offset,
+                            Result = new OcrResults([], dummyImage, TimeSpan.Zero, "jpn"),
+                            ProcessingTime = TimeSpan.Zero
+                        };
                     }
-                    
-                    return new TileOcrResult
+                    finally
                     {
-                        TileIndex = index,
-                        TileOffset = tile.Offset,
-                        Result = result,
-                        ProcessingTime = tileTimer.Elapsed
-                    };
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "🚨 タイルOCR処理に失敗 - Tile Index: {TileIndex}, Offset: ({X},{Y})", index, tile.Offset.X, tile.Offset.Y);
-                    Console.WriteLine($"🚨 [TILE-{index}] OCR失敗 - エラー: {ex.Message}");
-                    
-                    // エラー時は空の結果を返すことで処理を継続
-                    var dummyImage = new SimpleImageWrapper(tile.Width, tile.Height);
-                    return new TileOcrResult
-                    {
-                        TileIndex = index,
-                        TileOffset = tile.Offset,
-                        Result = new OcrResults([], dummyImage, TimeSpan.Zero, "jpn"),
-                        ProcessingTime = TimeSpan.Zero
-                    };
-                }
-                finally
-                {
-                    semaphore.Release();
-                    // タイル画像のリソース解放
-                    tile.Image?.Dispose();
-                }
+                        // 🔧 [FIXED] semaphore.Release() は不要 - usingパターンで自動リリース
+                        // タイル画像のリソース解放
+                        tile.Image?.Dispose();
+                    }
+                } // 🔧 [FIXED] usingブロック終了時に自動的にsemaphore.Release()が実行される
             }).ToArray();
             
             // 全タイルのOCR完了を待機
@@ -2023,19 +2029,23 @@ public sealed class BatchOcrProcessor(
             Console.WriteLine($"  - ocrResult.TextRegions != null: {ocrResult.TextRegions != null}");
             Console.WriteLine($"  - TextRegions.Count: {ocrResult.TextRegions?.Count ?? 0}");
             
+            // 🔍 重要: 実際のIAdvancedImage実装クラスを特定
+            var imageTypeName = tileImage?.GetType()?.Name ?? "null";
+            var imageFullTypeName = tileImage?.GetType()?.FullName ?? "null";
+            Console.WriteLine($"🔍 [DEBUG] 実際のIAdvancedImage実装: {imageTypeName} ({imageFullTypeName})");
+            Console.WriteLine($"🔍 [DEBUG] Image サイズ: {tileImage?.Width ?? 0}x{tileImage?.Height ?? 0}");
+            
             if (_diagnosticsSaver == null || ocrResult.TextRegions == null) 
             {
                 Console.WriteLine($"❌ SaveTileRoiImagesAsync早期リターン - tileId: {tileId}");
                 return;
             }
             
-            // ROI画像保存パスの決定
-            var outputPath = !string.IsNullOrWhiteSpace(_advancedSettings.RoiImageOutputPath) 
-                ? _advancedSettings.RoiImageOutputPath 
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Baketa", "ROI");
+            // ROI画像保存パスの決定（RoiDiagnosticsSettingsを使用）
+            var outputPath = _roiDiagnosticsSettings.GetExpandedOutputPath();
             
             Console.WriteLine($"📁 ROI画像保存パス: {outputPath}");
-            Console.WriteLine($"📁 RoiSaveMode: {_advancedSettings.RoiSaveMode}");
+            Console.WriteLine($"📁 EnableRoiImageOutput: {_roiDiagnosticsSettings.EnableRoiImageOutput}");
             
             // ディレクトリ作成
             if (!Directory.Exists(outputPath))
@@ -2049,45 +2059,55 @@ public sealed class BatchOcrProcessor(
                 Console.WriteLine($"✅ ディレクトリは既に存在: {outputPath}");
             }
             
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
-            var extension = _advancedSettings.RoiImageFormat switch
+            // ROI画像保存が無効な場合は早期リターン
+            if (!_roiDiagnosticsSettings.EnableRoiImageOutput)
             {
-                RoiImageFormat.Jpeg => "jpg",
-                RoiImageFormat.Bmp => "bmp",
+                Console.WriteLine($"❌ ROI画像保存が無効のためスキップ");
+                return;
+            }
+            
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
+            var extension = _roiDiagnosticsSettings.RoiImageFormat.ToLower() switch
+            {
+                "jpeg" => "jpg",
+                "jpg" => "jpg",
+                "bmp" => "bmp",
                 _ => "png"
             };
             
+            // 🔍 重要: ToByteArrayAsync呼び出し前後でデバッグ情報追加
+            Console.WriteLine($"🔍 [DEBUG] ToByteArrayAsync呼び出し前 - Image: {imageTypeName}");
             var tileImageBytes = await tileImage.ToByteArrayAsync().ConfigureAwait(false);
-            if (tileImageBytes == null || tileImageBytes.Length == 0) return;
+            Console.WriteLine($"🔍 [DEBUG] ToByteArrayAsync呼び出し後 - バイト配列サイズ: {tileImageBytes?.Length ?? 0} bytes");
             
-            // 設定に応じてROI画像を保存
-            Console.WriteLine($"🖼️ ROI画像保存処理開始 - Mode: {_advancedSettings.RoiSaveMode}");
-            switch (_advancedSettings.RoiSaveMode)
+            if (tileImageBytes == null || tileImageBytes.Length == 0) 
             {
-                case RoiSaveMode.AnnotatedFullImage:
-                    Console.WriteLine($"🖼️ 赤枠付き全体画像保存実行");
-                    await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
-                    Console.WriteLine($"✅ 赤枠付き全体画像保存完了");
-                    break;
-                    
-                case RoiSaveMode.IndividualRegions:
-                    Console.WriteLine($"🖼️ 個別切り抜き画像保存実行");
-                    await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
-                    Console.WriteLine($"✅ 個別切り抜き画像保存完了");
-                    break;
-                    
-                case RoiSaveMode.Both:
-                    Console.WriteLine($"🖼️ 赤枠付き全体画像＋個別切り抜き画像保存実行");
-                    await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
-                    await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
-                    Console.WriteLine($"✅ 両方の画像保存完了");
-                    break;
+                Console.WriteLine($"❌ [ERROR] ToByteArrayAsyncが空のバイト配列を返しました！Image実装: {imageTypeName}");
+                Console.WriteLine($"❌ [ERROR] この問題はSimpleImageWrapperの不完全な実装が原因の可能性があります");
+                return;
             }
+            
+            // RoiDiagnosticsSettingsに基づいてROI画像を保存
+            Console.WriteLine($"🖼️ ROI画像保存処理開始 - EnableAnnotatedImages: {_roiDiagnosticsSettings.EnableAnnotatedImages}");
+            
+            // 常に注釈付き画像と個別領域を保存（診断情報として有用）
+            if (_roiDiagnosticsSettings.EnableAnnotatedImages)
+            {
+                Console.WriteLine($"🖼️ 赤枠付き全体画像保存実行");
+                await SaveAnnotatedFullImageOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+                Console.WriteLine($"✅ 赤枠付き全体画像保存完了");
+            }
+            
+            // 個別領域の保存
+            Console.WriteLine($"🖼️ 個別切り抜き画像保存実行");
+            await SaveIndividualRegionsOnly(tileImageBytes, ocrResult.TextRegions, tileId, timestamp, extension, outputPath).ConfigureAwait(false);
+            Console.WriteLine($"✅ 個別切り抜き画像保存完了");
             Console.WriteLine($"🎯 SaveTileRoiImagesAsync完了 - tileId: {tileId}");
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "OCR-ROI画像保存エラー - タイル: {TileId}", tileId);
+            Console.WriteLine($"❌ [ERROR] SaveTileRoiImagesAsyncでエラー発生: {ex.Message}");
         }
     }
     

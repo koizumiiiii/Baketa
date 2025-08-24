@@ -10,6 +10,7 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.Translation;
@@ -182,292 +183,285 @@ public class StreamingTranslationService : IStreamingTranslationService
         CancellationToken cancellationToken)
     {
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
         Console.WriteLine($"🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前");
-        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         
-        // 🔧 [DEADLOCK_DEBUG] セマフォデッドロック調査のため詳細ログとタイムアウト追加
-        using var semaphoreTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 🔧 [EMERGENCY_FIX] セマフォ取得に60秒タイムアウト（Python翻訳サーバー重要処理対応）
+        // 🔧 [SEMAPHORE_FIX] usingパターンによるセマフォデッドロック完全解決
+        using var semaphoreTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var semaphoreCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, semaphoreTimeout.Token);
         
         try
         {
             Console.WriteLine($"🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}");
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
-            await semaphore.WaitAsync(semaphoreCts.Token).ConfigureAwait(false);
+            // 🔧 [CRITICAL_FIX] SemaphoreSlimExtensionsによる堅牢なリソース管理（Gemini推奨）
+            var semaphoreScope = await semaphore.WaitAsyncDisposableWithTimeout(TimeSpan.FromSeconds(60), semaphoreCts.Token).ConfigureAwait(false);
+            
+            if (semaphoreScope == null)
+            {
+                // タイムアウト時の処理
+                Console.WriteLine($"⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト(60秒) - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+                
+                for (int j = 0; j < chunk.Texts.Count; j++)
+                {
+                    results[chunk.StartIndex + j] = "[セマフォ取得タイムアウト]";
+                    onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
+                }
+                return; // 🔧 [FIXED] セマフォが取得されていないので、リリース不要で安全にreturn
+            }
             
             Console.WriteLine($"✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}");
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        }
-        catch (OperationCanceledException) when (semaphoreTimeout.Token.IsCancellationRequested)
-        {
-            Console.WriteLine($"⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト（60秒） - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             
-            // タイムアウト時はタイムアウトメッセージを返して処理を継続
-            for (int j = 0; j < chunk.Texts.Count; j++)
+            // 🔧 [FIXED] usingパターンで自動的にセマフォが解放されるため、安全に処理を実行
+            using (semaphoreScope)
             {
-                results[chunk.StartIndex + j] = "[セマフォ取得タイムアウト]";
-                onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
-            }
-            return; // early return でセマフォリリースをスキップ
-        }
-        
-        Console.WriteLine($"🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
-        try
-        {
-            Console.WriteLine($"🔧 [TRY_BLOCK] try ブロック開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            
-            var chunkStopwatch = Stopwatch.StartNew();
-            Console.WriteLine($"🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            
-            Console.WriteLine($"🚀 [STREAMING] チャンク処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-            
-            // 🔥 [STREAMING + PARALLEL] チャンク全体を一度にバッチ翻訳で処理
-            if (cancellationToken.IsCancellationRequested)
-                return;
+                Console.WriteLine($"🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
                 
-            try
-            {
-                // 🚀 [DYNAMIC_TIMEOUT] テキスト量に応じた動的タイムアウト実装（Geminiレビュー対応）
-                var chunkTexts = chunk.Texts;
-                var totalTextLength = chunkTexts.Sum(t => t.Length);
+                var chunkStopwatch = Stopwatch.StartNew();
+                Console.WriteLine($"🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
+                Console.WriteLine($"🚀 [STREAMING] チャンク処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
                 
-                // 期待する計算: 基本30秒 + 500文字を超える部分について500文字ごとに15秒（50%）を加算
-                var timeoutSeconds = BaseTimeoutSeconds;
-                if (totalTextLength > TimeoutExtensionThreshold)
-                {
-                    var excessCharacters = totalTextLength - TimeoutExtensionThreshold;
-                    var extensionChunks = Math.Ceiling((double)excessCharacters / TimeoutExtensionThreshold); // 浮動小数点計算
-                    var maxExtensionChunks = Math.Min(extensionChunks, MaxTimeoutMultiplier - 1); // 最大9回延長（10倍まで）
+                // 🔥 [STREAMING + PARALLEL] チャンク全体を一度にバッチ翻訳で処理
+                if (cancellationToken.IsCancellationRequested)
+                    return;
                     
-                    timeoutSeconds += (int)(BaseTimeoutSeconds * TimeoutExtensionPercentage * maxExtensionChunks);
-                }
-                
-                Console.WriteLine($"⏰ [STREAMING+TIMEOUT] 動的タイムアウト設定 - チャンク文字数: {totalTextLength}, タイムアウト: {timeoutSeconds}秒");
-                
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-                
-                // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 言語検出
-                var translationId = Guid.NewGuid().ToString("N")[..8];
-                var translationStart = DateTime.UtcNow;
-                
-                if (_eventAggregator != null)
+                try
                 {
-                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-                    {
-                        Stage = "LanguageDetection",
-                        IsSuccess = true,
-                        ProcessingTimeMs = 0,
-                        SessionId = translationId,
-                        Severity = DiagnosticSeverity.Information,
-                        Message = $"言語検出完了: {sourceLanguage.Code} → {targetLanguage.Code}",
-                        Metrics = new Dictionary<string, object>
-                        {
-                            { "SourceLanguage", sourceLanguage.Code },
-                            { "TargetLanguage", targetLanguage.Code },
-                            { "TextCount", chunkTexts.Count },
-                            { "TotalTextLength", totalTextLength }
-                        }
-                    }).ConfigureAwait(false);
+                    // 🚀 [DYNAMIC_TIMEOUT] テキスト量に応じた動的タイムアウト実装（Geminiレビュー対応）
+                    var chunkTexts = chunk.Texts;
+                    var totalTextLength = chunkTexts.Sum(t => t.Length);
                     
-                    // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
-                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    // 期待する計算: 基本30秒 + 500文字を超える部分について500文字ごとに15秒（50%）を加算
+                    var timeoutSeconds = BaseTimeoutSeconds;
+                    if (totalTextLength > TimeoutExtensionThreshold)
                     {
-                        Stage = "TranslationEngineSelection",
-                        IsSuccess = true,
-                        ProcessingTimeMs = 0,
-                        SessionId = translationId,
-                        Severity = DiagnosticSeverity.Information,
-                        Message = $"ストリーミング翻訳エンジン使用: {_translationService.GetType().Name}",
-                        Metrics = new Dictionary<string, object>
-                        {
-                            { "EngineName", _translationService.GetType().Name },
-                            { "EngineType", "StreamingBatch" },
-                            { "ChunkSize", chunkTexts.Count },
-                            { "TimeoutSeconds", timeoutSeconds }
-                        }
-                    }).ConfigureAwait(false);
-                }
-                
-                // 🚀 [TRUE_BATCH_PROCESSING] 真のバッチ翻訳実装 - GPU最適化されたバッチ推論を活用
-                Console.WriteLine($"🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳開始 - テキスト数: {chunkTexts.Count}");
-                
-                // チャンク全体を一度にバッチ翻訳で処理（個別翻訳から真のバッチ推論へ移行）
-                var batchTranslationResults = await _translationService.TranslateBatchAsync(
-                    chunkTexts.AsReadOnly(),
-                    sourceLanguage,
-                    targetLanguage,
-                    null, // context
-                    combinedCts.Token).ConfigureAwait(false);
-                
-                Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] バッチ翻訳完了 - 結果数: {batchTranslationResults.Count}");
-                
-                // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 翻訳実行結果
-                var translationEnd = DateTime.UtcNow;
-                var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
-                var successCount = batchTranslationResults.Count(r => r.IsSuccess);
-                var sameLanguageCount = 0;
-                
-                // 🔍 翻訳品質チェック: 高精度言語比較による翻訳失敗検出
-                var sameLanguageFailures = new List<string>();
-                for (int qualityCheck = 0; qualityCheck < Math.Min(chunkTexts.Count, batchTranslationResults.Count); qualityCheck++)
-                {
-                    var originalText = chunkTexts[qualityCheck];
-                    var translatedText = batchTranslationResults[qualityCheck]?.TranslatedText;
+                        var excessCharacters = totalTextLength - TimeoutExtensionThreshold;
+                        var extensionChunks = Math.Ceiling((double)excessCharacters / TimeoutExtensionThreshold); // 浮動小数点計算
+                        var maxExtensionChunks = Math.Min(extensionChunks, MaxTimeoutMultiplier - 1); // 最大9回延長（10倍まで）
+                        
+                        timeoutSeconds += (int)(BaseTimeoutSeconds * TimeoutExtensionPercentage * maxExtensionChunks);
+                    }
                     
-                    if (!string.IsNullOrEmpty(translatedText))
+                    Console.WriteLine($"⏰ [STREAMING+TIMEOUT] 動的タイムアウト設定 - チャンク文字数: {totalTextLength}, タイムアウト: {timeoutSeconds}秒");
+                    
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                    using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                    
+                    // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 言語検出
+                    var translationId = Guid.NewGuid().ToString("N")[..8];
+                    var translationStart = DateTime.UtcNow;
+                    
+                    if (_eventAggregator != null)
                     {
-                        try
+                        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
-                            // 言語検出による高精度比較（現在の実装では単純文字列比較を使用）
-                            // TODO: 言語検出APIが利用可能になった場合に実装予定
-                            // var originalLangTask = languageDetectionService.DetectLanguageAsync(originalText, combinedCts.Token);
-                            // var translatedLangTask = languageDetectionService.DetectLanguageAsync(translatedText, combinedCts.Token);
-                            
-                            // フォールバック: 文字列比較による翻訳失敗検出
-                            var isSameText = originalText.Trim().Equals(translatedText.Trim(), StringComparison.OrdinalIgnoreCase);
-                            
-                            // 改良された翻訳失敗検出ロジック
-                            if (isSameText)
+                            Stage = "LanguageDetection",
+                            IsSuccess = true,
+                            ProcessingTimeMs = 0,
+                            SessionId = translationId,
+                            Severity = DiagnosticSeverity.Information,
+                            Message = $"言語検出完了: {sourceLanguage.Code} → {targetLanguage.Code}",
+                            Metrics = new Dictionary<string, object>
                             {
-                                sameLanguageCount++;
-                                sameLanguageFailures.Add($"{originalText} -> {translatedText} (text comparison)");
-                                Console.WriteLine($"🚨 [ENHANCED_DIAGNOSTIC] 翻訳失敗検出（文字列一致）: '{originalText}' -> '{translatedText}'");
+                                { "SourceLanguage", sourceLanguage.Code },
+                                { "TargetLanguage", targetLanguage.Code },
+                                { "TextCount", chunkTexts.Count },
+                                { "TotalTextLength", totalTextLength }
                             }
-                        }
-                        catch (Exception langDetectEx)
+                        }).ConfigureAwait(false);
+                        
+                        // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
+                        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
-                            // 言語検出に失敗した場合はフォールバックとして文字列比較を使用
-                            if (originalText == translatedText)
+                            Stage = "TranslationEngineSelection",
+                            IsSuccess = true,
+                            ProcessingTimeMs = 0,
+                            SessionId = translationId,
+                            Severity = DiagnosticSeverity.Information,
+                            Message = $"ストリーミング翻訳エンジン使用: {_translationService.GetType().Name}",
+                            Metrics = new Dictionary<string, object>
                             {
-                                sameLanguageCount++;
-                                sameLanguageFailures.Add($"{originalText} -> {translatedText} (fallback: text comparison)");
-                                Console.WriteLine($"🚨 [FALLBACK_DIAGNOSTIC] 文字列比較で同一検出: '{originalText}' (言語検出エラー: {langDetectEx.Message})");
+                                { "EngineName", _translationService.GetType().Name },
+                                { "EngineType", "StreamingBatch" },
+                                { "ChunkSize", chunkTexts.Count },
+                                { "TimeoutSeconds", timeoutSeconds }
+                            }
+                        }).ConfigureAwait(false);
+                    }
+                    
+                    // 🚀 [TRUE_BATCH_PROCESSING] 真のバッチ翻訳実装 - GPU最適化されたバッチ推論を活用
+                    Console.WriteLine($"🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳開始 - テキスト数: {chunkTexts.Count}");
+                    
+                    // チャンク全体を一度にバッチ翻訳で処理（個別翻訳から真のバッチ推論へ移行）
+                    var batchTranslationResults = await _translationService.TranslateBatchAsync(
+                        chunkTexts.AsReadOnly(),
+                        sourceLanguage,
+                        targetLanguage,
+                        null, // context
+                        combinedCts.Token).ConfigureAwait(false);
+                    
+                    Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] バッチ翻訳完了 - 結果数: {batchTranslationResults.Count}");
+                    
+                    // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 翻訳実行結果
+                    var translationEnd = DateTime.UtcNow;
+                    var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
+                    var successCount = batchTranslationResults.Count(r => r.IsSuccess);
+                    var sameLanguageCount = 0;
+                    
+                    // 🔍 翻訳品質チェック: 高精度言語比較による翻訳失敗検出
+                    var sameLanguageFailures = new List<string>();
+                    for (int qualityCheck = 0; qualityCheck < Math.Min(chunkTexts.Count, batchTranslationResults.Count); qualityCheck++)
+                    {
+                        var originalText = chunkTexts[qualityCheck];
+                        var translatedText = batchTranslationResults[qualityCheck]?.TranslatedText;
+                        
+                        if (!string.IsNullOrEmpty(translatedText))
+                        {
+                            try
+                            {
+                                // 言語検出による高精度比較（現在の実装では単純文字列比較を使用）
+                                // TODO: 言語検出APIが利用可能になった場合に実装予定
+                                // var originalLangTask = languageDetectionService.DetectLanguageAsync(originalText, combinedCts.Token);
+                                // var translatedLangTask = languageDetectionService.DetectLanguageAsync(translatedText, combinedCts.Token);
+                                
+                                // フォールバック: 文字列比較による翻訳失敗検出
+                                var isSameText = originalText.Trim().Equals(translatedText.Trim(), StringComparison.OrdinalIgnoreCase);
+                                
+                                // 改良された翻訳失敗検出ロジック
+                                if (isSameText)
+                                {
+                                    sameLanguageCount++;
+                                    sameLanguageFailures.Add($"{originalText} -> {translatedText} (text comparison)");
+                                    Console.WriteLine($"🚨 [ENHANCED_DIAGNOSTIC] 翻訳失敗検出（文字列一致）: '{originalText}' -> '{translatedText}'");
+                                }
+                            }
+                            catch (Exception langDetectEx)
+                            {
+                                // 言語検出に失敗した場合はフォールバックとして文字列比較を使用
+                                if (originalText == translatedText)
+                                {
+                                    sameLanguageCount++;
+                                    sameLanguageFailures.Add($"{originalText} -> {translatedText} (fallback: text comparison)");
+                                    Console.WriteLine($"🚨 [FALLBACK_DIAGNOSTIC] 文字列比較で同一検出: '{originalText}' (言語検出エラー: {langDetectEx.Message})");
+                                }
                             }
                         }
                     }
-                }
-                
-                if (_eventAggregator != null)
-                {
-                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    
+                    if (_eventAggregator != null)
                     {
-                        Stage = "TranslationExecution",
-                        IsSuccess = successCount > 0,
-                        ProcessingTimeMs = (long)translationDuration,
-                        SessionId = translationId,
-                        Severity = successCount == 0 ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
-                        Message = $"ストリーミング翻訳実行完了: 成功{successCount}/{batchTranslationResults.Count}",
-                        Metrics = new Dictionary<string, object>
+                        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
-                            { "TotalTexts", chunkTexts.Count },
-                            { "SuccessCount", successCount },
-                            { "FailureCount", batchTranslationResults.Count - successCount },
-                            { "ProcessingTimeMs", translationDuration },
-                            { "EngineName", _translationService.GetType().Name }
-                        }
-                    }).ConfigureAwait(false);
-                    
-                    // 🔥 [DIAGNOSTIC] 翻訳品質チェック診断イベント
-                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-                    {
-                        Stage = "TranslationQualityCheck",
-                        IsSuccess = sameLanguageCount == 0,
-                        ProcessingTimeMs = 0,
-                        SessionId = translationId,
-                        Severity = sameLanguageCount > 0 ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
-                        Message = sameLanguageCount > 0 
-                            ? $"翻訳品質警告: {sameLanguageCount}件の翻訳失敗検出（改良された診断ロジック）" 
-                            : "翻訳品質チェック成功: 正常な翻訳結果（改良された診断検証済み）",
-                        Metrics = new Dictionary<string, object>
+                            Stage = "TranslationExecution",
+                            IsSuccess = successCount > 0,
+                            ProcessingTimeMs = (long)translationDuration,
+                            SessionId = translationId,
+                            Severity = successCount == 0 ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                            Message = $"ストリーミング翻訳実行完了: 成功{successCount}/{batchTranslationResults.Count}",
+                            Metrics = new Dictionary<string, object>
+                            {
+                                { "TotalTexts", chunkTexts.Count },
+                                { "SuccessCount", successCount },
+                                { "FailureCount", batchTranslationResults.Count - successCount },
+                                { "ProcessingTimeMs", translationDuration },
+                                { "EngineName", _translationService.GetType().Name }
+                            }
+                        }).ConfigureAwait(false);
+                        
+                        // 🔥 [DIAGNOSTIC] 翻訳品質チェック診断イベント
+                        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
-                            { "TotalTexts", chunkTexts.Count },
-                            { "SameLanguageCount", sameLanguageCount },
-                            { "QualityScore", sameLanguageCount == 0 ? 1.0 : 1.0 - ((double)sameLanguageCount / chunkTexts.Count) },
-                            { "SourceLanguage", sourceLanguage.Code },
-                            { "TargetLanguage", targetLanguage.Code },
-                            { "DetectionMethod", "EnhancedTextComparison" },
-                            { "FailureDetails", sameLanguageFailures.Count > 0 ? sameLanguageFailures.Take(5) : new List<string>() },
-                            { "IsTextComparisonBased", true }
-                        }
-                    }).ConfigureAwait(false);
-                }
-                
-                // 🔥 [DIAGNOSTIC] 翻訳結果の詳細ログ出力
-                Console.WriteLine($"🔍 [TRANSLATION_QUALITY] 翻訳品質診断: 成功{successCount}/{batchTranslationResults.Count}, 同一結果{sameLanguageCount}件");
-                
-                // バッチ翻訳結果を個別インデックスに配置し、コールバック通知
-                for (int j = 0; j < chunkTexts.Count; j++)
-                {
-                    var textIndex = chunk.StartIndex + j;
-                    var translationResult = j < batchTranslationResults.Count ? batchTranslationResults[j] : null;
-                    var translatedText = translationResult?.IsSuccess == true ? translationResult.TranslatedText : chunkTexts[j];
+                            Stage = "TranslationQualityCheck",
+                            IsSuccess = sameLanguageCount == 0,
+                            ProcessingTimeMs = 0,
+                            SessionId = translationId,
+                            Severity = sameLanguageCount > 0 ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
+                            Message = sameLanguageCount > 0 
+                                ? $"翻訳品質警告: {sameLanguageCount}件の翻訳失敗検出（改良された診断ロジック）" 
+                                : "翻訳品質チェック成功: 正常な翻訳結果（改良された診断検証済み）",
+                            Metrics = new Dictionary<string, object>
+                            {
+                                { "TotalTexts", chunkTexts.Count },
+                                { "SameLanguageCount", sameLanguageCount },
+                                { "QualityScore", sameLanguageCount == 0 ? 1.0 : 1.0 - ((double)sameLanguageCount / chunkTexts.Count) },
+                                { "SourceLanguage", sourceLanguage.Code },
+                                { "TargetLanguage", targetLanguage.Code },
+                                { "DetectionMethod", "EnhancedTextComparison" },
+                                { "FailureDetails", sameLanguageFailures.Count > 0 ? sameLanguageFailures.Take(5) : new List<string>() },
+                                { "IsTextComparisonBased", true }
+                            }
+                        }).ConfigureAwait(false);
+                    }
                     
-                    results[textIndex] = translatedText;
-                    Console.WriteLine($"📢 [TRUE_BATCH_PROCESSING] バッチ翻訳完了通知 - インデックス: {textIndex}, 成功: {translationResult?.IsSuccess}");
-                    onChunkCompleted?.Invoke(textIndex, translatedText);
-                }
-                
-                // チャンク全体の進行状況更新
-                lock (_progressLock)
-                {
-                    _progress.CompletedChunks += chunkTexts.Count;
-                    _progress.CurrentChunkIndex = chunk.EndIndex;
+                    // 🔥 [DIAGNOSTIC] 翻訳結果の詳細ログ出力
+                    Console.WriteLine($"🔍 [TRANSLATION_QUALITY] 翻訳品質診断: 成功{successCount}/{batchTranslationResults.Count}, 同一結果{sameLanguageCount}件");
                     
-                    // 推定残り時間計算
-                    if (_progress.CompletedChunks > 0)
+                    // バッチ翻訳結果を個別インデックスに配置し、コールバック通知
+                    for (int j = 0; j < chunkTexts.Count; j++)
                     {
-                        var avgTimePerChunk = stopwatch.ElapsedMilliseconds / _progress.CompletedChunks;
-                        var remainingChunks = _progress.TotalChunks - _progress.CompletedChunks;
-                        _progress.EstimatedRemainingMs = avgTimePerChunk * remainingChunks;
+                        var textIndex = chunk.StartIndex + j;
+                        var translationResult = j < batchTranslationResults.Count ? batchTranslationResults[j] : null;
+                        var translatedText = translationResult?.IsSuccess == true ? translationResult.TranslatedText : chunkTexts[j];
+                        
+                        results[textIndex] = translatedText;
+                        Console.WriteLine($"📢 [TRUE_BATCH_PROCESSING] バッチ翻訳完了通知 - インデックス: {textIndex}, 成功: {translationResult?.IsSuccess}");
+                        onChunkCompleted?.Invoke(textIndex, translatedText);
+                    }
+                    
+                    // チャンク全体の進行状況更新
+                    lock (_progressLock)
+                    {
+                        _progress.CompletedChunks += chunkTexts.Count;
+                        _progress.CurrentChunkIndex = chunk.EndIndex;
+                        
+                        // 推定残り時間計算
+                        if (_progress.CompletedChunks > 0)
+                        {
+                            var avgTimePerChunk = stopwatch.ElapsedMilliseconds / _progress.CompletedChunks;
+                            var remainingChunks = _progress.TotalChunks - _progress.CompletedChunks;
+                            _progress.EstimatedRemainingMs = avgTimePerChunk * remainingChunks;
+                        }
+                    }
+                    
+                    var currentProgress = GetProgress();
+                    Console.WriteLine($"✨ [STREAMING+PARALLEL] チャンク完了 [{chunk.StartIndex}-{chunk.EndIndex}] - " +
+                                    $"進行率: {currentProgress.ProgressPercentage:F1}% - " +
+                                    $"テキスト数: {chunkTexts.Count}");
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _logger.LogWarning("🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}", 
+                        chunk.StartIndex, chunk.EndIndex, ex.Message);
+                        
+                    // エラー時はプレースホルダーを設定
+                    for (int j = 0; j < chunk.Texts.Count; j++)
+                    {
+                        results[chunk.StartIndex + j] = $"[バッチ翻訳タイムアウト] {chunk.Texts[j]}";
+                        onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳エラー - チャンク: {Start}-{End}", 
+                        chunk.StartIndex, chunk.EndIndex);
+                        
+                    // エラー時はプレースホルダーを設定
+                    for (int j = 0; j < chunk.Texts.Count; j++)
+                    {
+                        results[chunk.StartIndex + j] = $"[バッチ翻訳エラー] {chunk.Texts[j]}";
+                        onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
                     }
                 }
                 
-                var currentProgress = GetProgress();
-                Console.WriteLine($"✨ [STREAMING+PARALLEL] チャンク完了 [{chunk.StartIndex}-{chunk.EndIndex}] - " +
-                                $"進行率: {currentProgress.ProgressPercentage:F1}% - " +
-                                $"テキスト数: {chunkTexts.Count}");
-            }
-            catch (OperationCanceledException ex)
-            {
-                _logger.LogWarning("🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}", 
-                    chunk.StartIndex, chunk.EndIndex, ex.Message);
-                    
-                // エラー時はプレースホルダーを設定
-                for (int j = 0; j < chunk.Texts.Count; j++)
-                {
-                    results[chunk.StartIndex + j] = $"[バッチ翻訳タイムアウト] {chunk.Texts[j]}";
-                    onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳エラー - チャンク: {Start}-{End}", 
-                    chunk.StartIndex, chunk.EndIndex);
-                    
-                // エラー時はプレースホルダーを設定
-                for (int j = 0; j < chunk.Texts.Count; j++)
-                {
-                    results[chunk.StartIndex + j] = $"[バッチ翻訳エラー] {chunk.Texts[j]}";
-                    onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
-                }
-            }
-            
-            chunkStopwatch.Stop();
-            Console.WriteLine($"⏱️ [STREAMING] チャンク処理完了 - 処理時間: {chunkStopwatch.ElapsedMilliseconds}ms");
+                chunkStopwatch.Stop();
+                Console.WriteLine($"⏱️ [STREAMING] チャンク処理完了 - 処理時間: {chunkStopwatch.ElapsedMilliseconds}ms");
+            } // 🔧 [FIXED] usingブロックここで自動的にsemaphore.Release()が実行される
         }
-        finally
+        catch (OperationCanceledException)
         {
-            semaphore.Release();
+            // キャンセル時の処理（セマフォは自動で解放される）
+            Console.WriteLine($"⚠️ [CHUNK_DEBUG] チャンク処理キャンセル - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
         }
+        // 🔧 [FIXED] finally句は不要 - usingパターンで自動リソース管理
     }
     
     private List<ChunkInfo> CreateChunks(IList<string> texts, int chunkSize)
