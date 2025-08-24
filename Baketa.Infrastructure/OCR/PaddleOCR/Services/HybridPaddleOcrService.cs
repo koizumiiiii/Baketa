@@ -112,152 +112,167 @@ public sealed class HybridPaddleOcrService : IDisposable
     /// <summary>
     /// V3エンジン初期化（高速検出用）
     /// </summary>
-    private async Task InitializeV3EngineAsync(CancellationToken cancellationToken)
+    /// <summary>
+/// V5エンジン初期化（高速検出用）- V3からV5に統一
+/// </summary>
+private async Task InitializeV3EngineAsync(CancellationToken cancellationToken)
+{
+    await Task.Run(() =>
     {
-        await Task.Run(() =>
+        _logger.LogDebug("⚡ V5エンジン初期化中（高速検出用・V3から統一）");
+        _v3Engine = new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Mkldnn())
         {
-            _logger.LogDebug("⚡ V3エンジン初期化中（高速検出用）");
-            _v3Engine = new PaddleOcrAll(LocalFullModels.ChineseV3, PaddleDevice.Mkldnn())
-            {
-                AllowRotateDetection = true,
-                Enable180Classification = false
-            };
-            _logger.LogDebug("✅ V3エンジン初期化完了");
-        }, cancellationToken).ConfigureAwait(false);
-    }
+            AllowRotateDetection = true,
+            Enable180Classification = false // 高速検出では回転分類を無効化
+        };
+        _logger.LogDebug("✅ V5エンジン初期化完了（高速検出用）");
+    }, cancellationToken).ConfigureAwait(false);
+}
 
     /// <summary>
     /// V5エンジン初期化（高精度認識用）
     /// </summary>
-    private async Task InitializeV5EngineAsync(CancellationToken cancellationToken)
+    /// <summary>
+/// V5エンジン初期化（高精度認識用）- V5統一継続
+/// </summary>
+private async Task InitializeV5EngineAsync(CancellationToken cancellationToken)
+{
+    await Task.Run(() =>
     {
-        await Task.Run(() =>
+        _logger.LogDebug("🎯 V5エンジン初期化中（高精度認識用・統一完了）");
+        _v5Engine = new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Mkldnn())
         {
-            _logger.LogDebug("🎯 V5エンジン初期化中（高精度認識用）");
-            _v5Engine = new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Mkldnn())
-            {
-                AllowRotateDetection = true,
-                Enable180Classification = true
-            };
-            _logger.LogDebug("✅ V5エンジン初期化完了");
-        }, cancellationToken).ConfigureAwait(false);
-    }
+            AllowRotateDetection = true,
+            Enable180Classification = true // 高精度認識では全機能を有効化
+        };
+        _logger.LogDebug("✅ V5エンジン初期化完了（高精度認識用）");
+    }, cancellationToken).ConfigureAwait(false);
+}
 
     /// <summary>
     /// 高速検出実行（V3）
     /// </summary>
-    private async Task<IReadOnlyList<OcrTextRegion>> ExecuteFastDetectionAsync(
-        Mat image, 
-        string sessionId, 
-        CancellationToken cancellationToken)
+    /// <summary>
+/// 高速検出実行（V5統一）
+/// </summary>
+private async Task<IReadOnlyList<OcrTextRegion>> ExecuteFastDetectionAsync(
+    Mat image, 
+    string sessionId, 
+    CancellationToken cancellationToken)
+{
+    if (_v3Engine == null)
+        throw new InvalidOperationException("V5エンジン（高速用）が初期化されていません");
+
+    _logger.LogDebug("⚡ V5高速検出実行 - SessionId: {SessionId}", sessionId);
+    
+    var result = await Task.Run(() =>
     {
-        if (_v3Engine == null)
-            throw new InvalidOperationException("V3エンジンが初期化されていません");
-
-        _logger.LogDebug("⚡ V3高速検出実行 - SessionId: {SessionId}", sessionId);
+        using var timeoutCts = new CancellationTokenSource(_settings.FastDetectionTimeoutMs);
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         
-        var result = await Task.Run(() =>
-        {
-            using var timeoutCts = new CancellationTokenSource(_settings.FastDetectionTimeoutMs);
-            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            
-            return _v3Engine.Run(image);
-        }, cancellationToken).ConfigureAwait(false);
+        return _v3Engine.Run(image);
+    }, cancellationToken).ConfigureAwait(false);
 
-        return ConvertPaddleOcrResult(result, "V3_Fast");
-    }
+    return ConvertPaddleOcrResult(result, "V5_Fast");
+}
 
     /// <summary>
     /// 高精度認識実行（V5）
     /// </summary>
-    private async Task<IReadOnlyList<OcrTextRegion>> ExecuteHighQualityAsync(
-        Mat image, 
-        string sessionId, 
-        CancellationToken cancellationToken)
+    /// <summary>
+/// 高精度認識実行（V5統一）
+/// </summary>
+private async Task<IReadOnlyList<OcrTextRegion>> ExecuteHighQualityAsync(
+    Mat image, 
+    string sessionId, 
+    CancellationToken cancellationToken)
+{
+    if (_v5Engine == null)
+        throw new InvalidOperationException("V5エンジン（高精度用）が初期化されていません");
+
+    _logger.LogDebug("🎯 V5高精度認識実行 - SessionId: {SessionId}", sessionId);
+    
+    var result = await Task.Run(() =>
     {
-        if (_v5Engine == null)
-            throw new InvalidOperationException("V5エンジンが初期化されていません");
-
-        _logger.LogDebug("🎯 V5高精度認識実行 - SessionId: {SessionId}", sessionId);
+        using var timeoutCts = new CancellationTokenSource(_settings.HighQualityTimeoutMs);
+        using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         
-        var result = await Task.Run(() =>
-        {
-            using var timeoutCts = new CancellationTokenSource(_settings.HighQualityTimeoutMs);
-            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            
-            return _v5Engine.Run(image);
-        }, cancellationToken).ConfigureAwait(false);
+        return _v5Engine.Run(image);
+    }, cancellationToken).ConfigureAwait(false);
 
-        return ConvertPaddleOcrResult(result, "V5_Quality");
-    }
+    return ConvertPaddleOcrResult(result, "V5_Quality");
+}
 
     /// <summary>
     /// ハイブリッドパイプライン実行（V3検出 → V5認識）
     /// </summary>
-    private async Task<IReadOnlyList<OcrTextRegion>> ExecuteHybridPipelineAsync(
-        Mat image, 
-        string sessionId, 
-        CancellationToken cancellationToken)
+    /// <summary>
+/// ハイブリッドパイプライン実行（V5検出 → V5認識）- V5完全統一
+/// </summary>
+private async Task<IReadOnlyList<OcrTextRegion>> ExecuteHybridPipelineAsync(
+    Mat image, 
+    string sessionId, 
+    CancellationToken cancellationToken)
+{
+    _logger.LogDebug("🔄 V5統一ハイブリッドパイプライン実行 - SessionId: {SessionId}", sessionId);
+    
+    // Phase 1: V5で高速検出（設定を高速化）
+    var fastRegions = await ExecuteFastDetectionAsync(image, sessionId, cancellationToken);
+    
+    if (fastRegions.Count == 0)
     {
-        _logger.LogDebug("🔄 ハイブリッドパイプライン実行 - SessionId: {SessionId}", sessionId);
-        
-        // Phase 1: V3で高速検出
-        var fastRegions = await ExecuteFastDetectionAsync(image, sessionId, cancellationToken);
-        
-        if (fastRegions.Count == 0)
-        {
-            _logger.LogWarning("⚠️ V3高速検出で領域が見つからない - V5にフォールバック");
-            return await ExecuteHighQualityAsync(image, sessionId, cancellationToken);
-        }
-
-        if (fastRegions.Count < _settings.RegionCountThreshold)
-        {
-            _logger.LogDebug("📏 検出領域数が閾値未満({Count} < {Threshold}) - V5全画面処理", 
-                fastRegions.Count, _settings.RegionCountThreshold);
-            return await ExecuteHighQualityAsync(image, sessionId, cancellationToken);
-        }
-
-        // Phase 2: 検出されたROIでV5高精度認識
-        _logger.LogDebug("🎯 V5高精度認識をROI({Count}領域)で実行", fastRegions.Count);
-        var qualityRegions = new List<OcrTextRegion>();
-
-        foreach (var region in fastRegions)
-        {
-            try
-            {
-                var roi = ExtractROI(image, region.Bounds);
-                if (roi.Empty()) continue;
-
-                var roiResults = await ExecuteHighQualityAsync(roi, sessionId, cancellationToken);
-                
-                // 座標をオリジナル画像に合わせて調整
-                foreach (var roiResult in roiResults)
-                {
-                    var adjustedBounds = new System.Drawing.Rectangle(
-                        roiResult.Bounds.X + region.Bounds.X,
-                        roiResult.Bounds.Y + region.Bounds.Y,
-                        roiResult.Bounds.Width,
-                        roiResult.Bounds.Height
-                    );
-                    
-                    qualityRegions.Add(new OcrTextRegion(
-                        roiResult.Text,
-                        adjustedBounds,
-                        roiResult.Confidence
-                    ));
-                }
-                
-                roi.Dispose();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "⚠️ ROI処理でエラー発生 - 領域をスキップ: {Bounds}", region.Bounds);
-            }
-        }
-
-        _logger.LogInformation("✅ ハイブリッドパイプライン完了 - 最終結果: {Count}領域", qualityRegions.Count);
-        return qualityRegions;
+        _logger.LogWarning("⚠️ V5高速検出で領域が見つからない - V5高精度にフォールバック");
+        return await ExecuteHighQualityAsync(image, sessionId, cancellationToken);
     }
+
+    if (fastRegions.Count < _settings.RegionCountThreshold)
+    {
+        _logger.LogDebug("📏 検出領域数が閾値未満({Count} < {Threshold}) - V5全画面処理", 
+            fastRegions.Count, _settings.RegionCountThreshold);
+        return await ExecuteHighQualityAsync(image, sessionId, cancellationToken);
+    }
+
+    // Phase 2: 検出されたROIでV5高精度認識
+    _logger.LogDebug("🎯 V5高精度認識をROI({Count}領域)で実行", fastRegions.Count);
+    var qualityRegions = new List<OcrTextRegion>();
+
+    foreach (var region in fastRegions)
+    {
+        try
+        {
+            var roi = ExtractROI(image, region.Bounds);
+            if (roi.Empty()) continue;
+
+            var roiResults = await ExecuteHighQualityAsync(roi, sessionId, cancellationToken);
+            
+            // 座標をオリジナル画像に合わせて調整
+            foreach (var roiResult in roiResults)
+            {
+                var adjustedBounds = new System.Drawing.Rectangle(
+                    roiResult.Bounds.X + region.Bounds.X,
+                    roiResult.Bounds.Y + region.Bounds.Y,
+                    roiResult.Bounds.Width,
+                    roiResult.Bounds.Height
+                );
+                
+                qualityRegions.Add(new OcrTextRegion(
+                    roiResult.Text,
+                    adjustedBounds,
+                    roiResult.Confidence
+                ));
+            }
+            
+            roi.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ ROI処理でエラー発生 - 領域をスキップ: {Bounds}", region.Bounds);
+        }
+    }
+
+    _logger.LogInformation("✅ V5統一ハイブリッドパイプライン完了 - 最終結果: {Count}領域", qualityRegions.Count);
+    return qualityRegions;
+}
 
     /// <summary>
     /// 適応的実行（画像品質に基づく自動選択）

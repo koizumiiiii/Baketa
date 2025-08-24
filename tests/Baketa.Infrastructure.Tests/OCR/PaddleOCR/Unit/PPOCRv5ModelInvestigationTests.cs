@@ -128,27 +128,27 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
         
         try
         {
-            // V4モデル調査
-            output.WriteLine("1. V4モデル調査（参照用）");
-            var japanV4 = LocalFullModels.JapanV4;
-            var englishV4 = LocalFullModels.EnglishV4;
-            var chineseV4 = LocalFullModels.ChineseV4;
+            // V5統一モデル調査（旧V4から移行）
+            output.WriteLine("1. V5統一モデル調査（旧V4から統一移行）");
+            var japanV5 = LocalFullModels.ChineseV5; // V5統一モデル
+            var englishV5 = LocalFullModels.ChineseV5; // V5統一モデル
+            var chineseV5 = LocalFullModels.ChineseV5;
             
-            output.WriteLine($"   JapanV4: {japanV4 != null}");
-            output.WriteLine($"   EnglishV4: {englishV4 != null}");
-            output.WriteLine($"   ChineseV4: {chineseV4 != null}");
+            output.WriteLine($"   JapanV5（V5統一）: {japanV5 != null}");
+            output.WriteLine($"   EnglishV5（V5統一）: {englishV5 != null}");
+            output.WriteLine($"   ChineseV5: {chineseV5 != null}");
             
             // V5モデル調査
             output.WriteLine("\n2. V5モデル調査");
             try
             {
-                var chineseV5 = LocalFullModels.ChineseV5;
+                // 既にchineseV5は上で定義済みなので削除
                 output.WriteLine($"   ChineseV5: {chineseV5 != null}");
                 
-                if (chineseV5 != null && japanV4 != null)
+                if (chineseV5 != null && japanV5 != null)
                 {
-                    output.WriteLine("\n3. V4とV5の詳細比較");
-                    CompareModels(japanV4, "JapanV4", chineseV5, "ChineseV5");
+                    output.WriteLine("\n3. V5統一モデルの詳細比較");
+                    CompareModels(japanV5, "JapanV5（V5統一）", chineseV5, "ChineseV5");
                 }
             }
             catch (Exception v5Ex)

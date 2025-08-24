@@ -101,7 +101,7 @@ public class PaddleOcrEngine : IOcrEngine
     private QueuedPaddleOcrAll? _queuedEngine;
     private OcrEngineSettings _settings = new();
     private bool _disposed;
-    private bool _isV4ModelForCreation; // V4モデル検出結果保存用
+    private bool _isV4ModelForCreation; // V5統一により廃止予定・互換性のため保持
     
     // スレッドセーフティ対策：スレッドごとにOCRエンジンを保持
     private static readonly ThreadLocal<PaddleOcrAll?> _threadLocalOcrEngine = new(() => null);
@@ -1026,27 +1026,27 @@ public class PaddleOcrEngine : IOcrEngine
             
             var selectedModel = language.ToLowerInvariant() switch
             {
-                "jpn" or "ja" => LocalFullModels.JapanV4,
-                "eng" or "en" => LocalFullModels.EnglishV4,
-                "chs" or "zh" or "chi" => LocalFullModels.ChineseV4,
-                _ => LocalFullModels.JapanV4 // デフォルトは日本語V4
+                "jpn" or "ja" => LocalFullModels.ChineseV5, // V5多言語モデル統一
+                "eng" or "en" => LocalFullModels.ChineseV5, // V5多言語モデル統一
+                "chs" or "zh" or "chi" => LocalFullModels.ChineseV5, // V5多言語モデル統一
+                _ => LocalFullModels.ChineseV5 // デフォルトもV5統一
             };
             
             if (selectedModel != null)
             {
-                __logger?.LogInformation("LocalFullModelsモデル選択成功: {Language} → V4モデル", language);
+                __logger?.LogInformation("LocalFullModelsモデル選択成功: {Language} → V5統一モデル", language);
                 return await Task.FromResult(selectedModel).ConfigureAwait(false);
             }
             
             // フォールバック: 万が一選択に失敗した場合
-            __logger?.LogWarning("モデル選択失敗。デフォルトの日本語V4モデルを使用");
-            return await Task.FromResult(LocalFullModels.JapanV4).ConfigureAwait(false);
+            __logger?.LogWarning("モデル選択失敗。デフォルトのV5統一モデルを使用");
+            return await Task.FromResult(LocalFullModels.ChineseV5).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            __logger?.LogError(ex, "LocalFullModelsモデル準備エラー: {ExceptionType} - デフォルトモデルを使用", ex.GetType().Name);
-            // 最終的なフォールバック
-            return await Task.FromResult(LocalFullModels.JapanV4).ConfigureAwait(false);
+            __logger?.LogError(ex, "LocalFullModelsモデル準備エラー: {ExceptionType} - V5統一モデルを使用", ex.GetType().Name);
+            // 最終的なフォールバック（V5統一）
+            return await Task.FromResult(LocalFullModels.ChineseV5).ConfigureAwait(false);
         }
     }
 
@@ -1167,9 +1167,9 @@ public class PaddleOcrEngine : IOcrEngine
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 V4モデル取得中...");
                 improvedModel = language switch
                 {
-                    "jpn" => LocalFullModels.JapanV4, // V4モデル再テスト
-                    "eng" => LocalFullModels.EnglishV4,
-                    _ => LocalFullModels.JapanV4
+                    "jpn" => LocalFullModels.ChineseV5, // V5統一モデル
+                    "eng" => LocalFullModels.ChineseV5, // V5統一モデル
+                    _ => LocalFullModels.ChineseV5 // V5統一モデル
                 };
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ V4モデル取得成功: {improvedModel?.GetType()?.Name ?? "null"}");
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル完全型名: {improvedModel?.GetType()?.FullName ?? "null"}");
@@ -1546,9 +1546,9 @@ public class PaddleOcrEngine : IOcrEngine
         // OCR実行
         object result;
         
-        // V4モデル対応: 初期化時と同じ検出ロジックを使用
-        var isV4Model = _isV4ModelForCreation; // 初期化時に設定された値を使用
-        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 V4モデル検出結果: {isV4Model} (初期化時設定値)");
+        // V5統一モデル対応: 初期化時と同じ検出ロジックを使用
+        var isV4Model = _isV4ModelForCreation; // V5統一により常にfalse
+        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 V5統一モデル検出結果: V5統一対応完了");
         
         // Phase 3: GameOptimizedPreprocessingService を使用した前処理
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🎮 [PHASE3] ゲーム最適化前処理サービス開始: {mat.Width}x{mat.Height}");
