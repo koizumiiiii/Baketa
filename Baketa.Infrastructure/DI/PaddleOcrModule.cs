@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Dependency;
@@ -22,7 +23,6 @@ using Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 using Baketa.Infrastructure.OCR.Ensemble;
 using Baketa.Infrastructure.OCR.Ensemble.Strategies;
 using System.IO;
-using Microsoft.Extensions.ObjectPool;
 using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 using Baketa.Infrastructure.OCR.PaddleOCR.Pool;
 using Baketa.Infrastructure.OCR.PaddleOCR.Services;
@@ -627,58 +627,40 @@ public sealed class PaddleOcrModule : IServiceModule
     /// </summary>
     private static void RegisterOcrEngineFactory(IServiceCollection services)
     {
-        Console.WriteLine("🏭 安定性改善: OCRエンジンファクトリシステム登録開始");
+        Console.WriteLine("🏊 パフォーマンス改善: OCRエンジンオブジェクトプーリング登録開始");
         
-        // 1. OCRエンジンファクトリー登録
+        // 1. OCRエンジンファクトリー登録（プールで使用）
         services.AddSingleton<IPaddleOcrEngineFactory, PaddleOcrEngineFactory>();
-        Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了（ファクトリパターン）");
+        Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了（プール用ファクトリ）");
         
-        // 2. ファクトリベースのIOcrEngine登録を遅延実行
-        // 既存のシングルトンIOcrEngine登録を置き換え
+        // 2. 既存のIOcrEngine登録をクリア
         var existingOcrEngineDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IOcrEngine));
         if (existingOcrEngineDescriptor != null)
         {
             services.Remove(existingOcrEngineDescriptor);
-            Console.WriteLine("🔄 既存IOcrEngineシングルトン登録を削除");
+            Console.WriteLine("🔄 既存のIOcrEngine Transient登録を削除");
         }
-        
-        // 3. ファクトリベースのIOcrEngine登録（非ブロッキング版）
-        // デッドロック回避のため、直接インスタンス生成を行う
-        services.AddTransient<IOcrEngine>(serviceProvider =>
+
+        // 3. プーリングポリシーを登録
+        services.AddSingleton<IPooledObjectPolicy<IOcrEngine>, PaddleOcrEnginePoolPolicy>();
+        Console.WriteLine("✅ IPooledObjectPolicy<IOcrEngine>の登録完了");
+
+        // 4. Microsoft.Extensions.ObjectPoolのプロバイダーを登録
+        services.AddSingleton<ObjectPoolProvider, DefaultObjectPoolProvider>();
+        Console.WriteLine("✅ DefaultObjectPoolProviderの登録完了");
+
+        // 5. ObjectPool<IOcrEngine>を登録
+        services.AddSingleton(serviceProvider =>
         {
-            // 🔥 重要: デッドロック回避のため、直接インスタンス生成を実行
-            // PaddleOcrEngineFactory.CreateAsync()の実装を直接実行し、同期待機を回避
-            
-            var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
-            var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
-            var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
-            var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
-            var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-            var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
-            var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-            var ocrSettings = serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
-            var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
-            var engineLogger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-            
-            // 直接NonSingletonPaddleOcrEngineを作成（デッドロック回避）
-            var engine = new NonSingletonPaddleOcrEngine(
-                modelPathResolver, 
-                ocrPreprocessingService, 
-                textMerger, 
-                ocrPostProcessor, 
-                gpuMemoryManager,
-                unifiedSettingsService,
-                eventAggregator,
-                ocrSettings,
-                unifiedLoggingService,
-                engineLogger);
-            
-            Console.WriteLine("🆕 新しいOCRエンジンインスタンス作成: {0}（非ブロッキング）", engine.GetType().Name);
-            return engine;
+            var provider = serviceProvider.GetRequiredService<ObjectPoolProvider>();
+            var policy = serviceProvider.GetRequiredService<IPooledObjectPolicy<IOcrEngine>>();
+            var pool = provider.Create(policy);
+            Console.WriteLine("🏊 ObjectPool<IOcrEngine>インスタンス作成完了");
+            return pool;
         });
-        Console.WriteLine("✅ IOcrEngineファクトリベース登録完了");
+        Console.WriteLine("✅ ObjectPool<IOcrEngine>の登録完了");
         
-        Console.WriteLine("🎉 安定性改善: OCRエンジンファクトリシステム登録完了");
-        Console.WriteLine("📊 期待効果: PaddlePredictor run failed エラー根絶 + メモリリーク防止");
+        Console.WriteLine("🎉 OCRエンジンオブジェクトプーリングの登録が完了しました");
+        Console.WriteLine("📊 期待効果: AccessViolationException根絶 + パフォーマンス大幅向上");
     }
 }

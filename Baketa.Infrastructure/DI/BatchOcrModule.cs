@@ -24,5 +24,11 @@ public sealed class BatchOcrModule : ServiceModuleBase
     public override IEnumerable<Type> GetDependentModules()
     {
         yield return typeof(DiagnosticModule);
+        
+        // 🏭 重要: 新しいファクトリシステムに依存
+        yield return typeof(PaddleOcrModule);
+        
+        // インフラストラクチャモジュールにも依存
+        yield return typeof(InfrastructureModule);
     }
 }
