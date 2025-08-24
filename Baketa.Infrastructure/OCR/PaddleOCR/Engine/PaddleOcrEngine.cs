@@ -101,7 +101,7 @@ public class PaddleOcrEngine : IOcrEngine
     private QueuedPaddleOcrAll? _queuedEngine;
     private OcrEngineSettings _settings = new();
     private bool _disposed;
-    private bool _isV4ModelForCreation; // V5統一により廃止予定・互換性のため保持
+    // V5統一完了 - 旧false /* V5統一により常にfalse */フィールドは完全削除済み
     
     // スレッドセーフティ対策：スレッドごとにOCRエンジンを保持
     private static readonly ThreadLocal<PaddleOcrAll?> _threadLocalOcrEngine = new(() => null);
@@ -1546,8 +1546,8 @@ public class PaddleOcrEngine : IOcrEngine
         // OCR実行
         object result;
         
-        // V5統一モデル対応: 初期化時と同じ検出ロジックを使用
-        var isV4Model = _isV4ModelForCreation; // V5統一により常にfalse
+        // V5統一モデル対応完了: 全てV5統一により分岐処理不要
+        var isV5Unified = true; // V5統一完了
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 V5統一モデル検出結果: V5統一対応完了");
         
         // Phase 3: GameOptimizedPreprocessingService を使用した前処理
@@ -3474,7 +3474,7 @@ public class PaddleOcrEngine : IOcrEngine
             // 適応的タイムアウト設定 - 解像度とモデルに応じた最適化
             var baseTimeout = CalculateBaseTimeout(processedMat);  // 動的タイムアウト計算
             var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
-            __logger?.LogDebug($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={_isV4ModelForCreation})");
+            __logger?.LogDebug($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={false /* V5統一により常にfalse */})");
         
             // 現在のOCRキャンセレーション管理
             _currentOcrCancellation?.Dispose();
@@ -3723,7 +3723,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             else
             {
-                var modelVersion = _isV4ModelForCreation ? "V4" : "V5";
+                var modelVersion = "V5"; // V5統一完了
                 __logger?.LogWarning("⏰ {ModelVersion}モデルOCR処理{Timeout}秒タイムアウト", modelVersion, adaptiveTimeout);
             
                 // バックグラウンドタスクのキャンセルを要求
@@ -3953,7 +3953,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             else
             {
-                var modelVersion = _isV4ModelForCreation ? "V4" : "V5";
+                var modelVersion = "V5"; // V5統一完了
                 __logger?.LogWarning("⏰ {ModelVersion}モデルOCR処理{Timeout}秒タイムアウト（最適化）", modelVersion, adaptiveTimeout);
             
                 // バックグラウンドタスクのキャンセルを要求
@@ -4109,7 +4109,7 @@ public class PaddleOcrEngine : IOcrEngine
         if (mat == null || mat.Empty())
         {
             __logger?.LogWarning("⚠️ Mat is null or empty in CalculateBaseTimeout - using default timeout");
-            return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+            return 30; // V5統一タイムアウト
         }
 
         // Mat基本プロパティの安全な取得（AccessViolationException & ObjectDisposedException回避）
@@ -4120,7 +4120,7 @@ public class PaddleOcrEngine : IOcrEngine
             if (mat.IsDisposed)
             {
                 __logger?.LogWarning("⚠️ Mat is disposed in CalculateBaseTimeout - using default timeout");
-                return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+                return 30; // V5統一タイムアウト
             }
             
             width = mat.Width;   // 内部でmat.get_Cols()を呼び出し
@@ -4129,28 +4129,28 @@ public class PaddleOcrEngine : IOcrEngine
         catch (ObjectDisposedException ex)
         {
             __logger?.LogError(ex, "🚨 [MAT_DISPOSED] ObjectDisposedException in Mat.Width/Height access");
-            return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+            return 30; // V5統一タイムアウト
         }
         catch (AccessViolationException ex)
         {
             __logger?.LogError(ex, "🚨 AccessViolationException in Mat.Width/Height access - Mat may be corrupted or disposed");
-            return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+            return 30; // V5統一タイムアウト
         }
         catch (Exception ex)
         {
             __logger?.LogError(ex, "⚠️ Unexpected exception in Mat property access: {ExceptionType}", ex.GetType().Name);
-            return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+            return 30; // V5統一タイムアウト
         }
 
         // 有効なサイズかチェック
         if (width <= 0 || height <= 0)
         {
             __logger?.LogWarning("⚠️ Invalid Mat dimensions: {Width}x{Height} - using default timeout", width, height);
-            return _isV4ModelForCreation ? 25 : 30; // デフォルトタイムアウト
+            return 30; // V5統一タイムアウト
         }
 
         var pixelCount = (long)width * height; // オーバーフロー防止のためlong使用
-        var isV4Model = _isV4ModelForCreation;
+        var isV4Model = false /* V5統一により常にfalse */;
         
         // 解像度ベースのタイムアウト計算
         int baseTimeout = isV4Model ? 25 : 30; // V4=25秒, V5=30秒（初期値を延長）
@@ -4177,17 +4177,17 @@ public class PaddleOcrEngine : IOcrEngine
     catch (ObjectDisposedException ex)
     {
         __logger?.LogError(ex, "🚨 [MAT_LIFECYCLE] Mat disposed during CalculateBaseTimeout - using default timeout");
-        return _isV4ModelForCreation ? 25 : 30; // フォールバック
+        return false /* V5統一により常にfalse */ ? 25 : 30; // フォールバック
     }
     catch (AccessViolationException ex)
     {
         __logger?.LogError(ex, "🚨 AccessViolationException in CalculateBaseTimeout - using default timeout");
-        return _isV4ModelForCreation ? 25 : 30; // フォールバック
+        return false /* V5統一により常にfalse */ ? 25 : 30; // フォールバック
     }
     catch (Exception ex)
     {
         __logger?.LogError(ex, "🚨 Unexpected error in CalculateBaseTimeout - using default timeout");
-        return _isV4ModelForCreation ? 25 : 30; // フォールバック
+        return false /* V5統一により常にfalse */ ? 25 : 30; // フォールバック
     }
 }
 
@@ -4550,7 +4550,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             
             // システム状態情報
-            info.Add($"Is V4 Model: {_isV4ModelForCreation}");
+            info.Add($"Is V4 Model: {false /* V5統一により常にfalse */}");
             info.Add($"Last OCR Time: {_lastOcrTime}");
             info.Add($"Consecutive Timeouts: {_consecutiveTimeouts}");
             
@@ -4651,7 +4651,7 @@ public class PaddleOcrEngine : IOcrEngine
         try
         {
             // 1. 明示的なV5フラグをチェック
-            if (!_isV4ModelForCreation)
+            if (!false /* V5統一により常にfalse */)
             {
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 初期化時V5フラグ検出: true");
                 return true;

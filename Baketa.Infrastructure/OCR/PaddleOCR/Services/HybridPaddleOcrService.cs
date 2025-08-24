@@ -42,7 +42,7 @@ public sealed class HybridPaddleOcrService : IDisposable
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("🚀 ハイブリッドPaddleOCR初期化開始 - V3(高速) + V5(高精度)");
+        _logger.LogInformation("🚀 V5統一PaddleOCR初期化開始 - V5(高速・高精度統一)");
         
         try
         {
