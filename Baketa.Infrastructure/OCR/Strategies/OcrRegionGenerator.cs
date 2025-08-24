@@ -23,8 +23,8 @@ public sealed class OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegion
     {
         try
         {
-            _logger?.LogInformation("🎯 OCR領域生成開始 - 戦略: {Strategy}, 画像: {Width}x{Height}",
-                _strategy.StrategyName, sourceImage.Width, sourceImage.Height);
+            _logger?.LogInformation("🎯 OCR領域生成開始 - 戦略: {Strategy}, 画像: {Width}x{Height}, 戦略クラス: {StrategyType}",
+                _strategy.StrategyName, sourceImage.Width, sourceImage.Height, _strategy.GetType().Name);
 
             // Phase 1: 戦略による領域生成
             var regions = await _strategy.GenerateRegionsAsync(sourceImage, options, cancellationToken)

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Dependency;
+using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
@@ -449,8 +451,8 @@ public sealed class PaddleOcrModule : IServiceModule
                 logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
                 
                 // OCR設定からハイブリッドモードを確認
-                var ocrSettings = serviceProvider.GetService<OcrEngineSettings>();
-                bool enableHybridMode = ocrSettings?.EnableHybridMode ?? false;
+                var oldOcrSettings = serviceProvider.GetService<OcrEngineSettings>();
+                bool enableHybridMode = oldOcrSettings?.EnableHybridMode ?? false;
                 
                 Console.WriteLine($"🔍 ハイブリッドモード設定: {enableHybridMode}");
                 logger?.LogInformation($"ハイブリッドモード設定: {enableHybridMode}");
@@ -461,7 +463,8 @@ public sealed class PaddleOcrModule : IServiceModule
                 var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
                 
                 // PaddleOcrEngineは内部でハイブリッドモード処理を行います
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger);
+                var ocrSettings = serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
+                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, unifiedLoggingService, logger);
             }
             
             // 🎯 高機能版構成：常に最適化されたPaddleOcrEngineを使用
@@ -471,6 +474,7 @@ public sealed class PaddleOcrModule : IServiceModule
                 serviceProvider.GetRequiredService<IGpuMemoryManager>(),
                 serviceProvider.GetRequiredService<IUnifiedSettingsService>(), 
                 serviceProvider.GetRequiredService<IEventAggregator>(),
+                serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>(),
                 serviceProvider.GetService<IUnifiedLoggingService>(), logger);
         });
         

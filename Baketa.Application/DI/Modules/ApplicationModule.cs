@@ -6,6 +6,7 @@ using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.Platform.DI.Modules;
 using Baketa.Application.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -162,6 +163,7 @@ namespace Baketa.Application.DI.Modules;
                     Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                     Console.WriteLine($"✅ [DI_DEBUG] TranslationDictionaryService取得成功: {translationDictionaryService?.GetType().Name ?? "null"}");
                     
+                    var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                         captureService,
                         settingsService,
@@ -169,6 +171,7 @@ namespace Baketa.Application.DI.Modules;
                         translationEngineFactory,
                         coordinateBasedTranslation,
                         eventAggregator,
+                        ocrSettings,
                         translationDictionaryService,
                         logger);
                 }

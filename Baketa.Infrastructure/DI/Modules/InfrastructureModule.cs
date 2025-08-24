@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.Logging;
 using Baketa.Core.Abstractions.OCR;
@@ -19,6 +20,7 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using CoreTranslation = Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Logging;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Infrastructure.Performance;
 using Baketa.Infrastructure.Services;
@@ -57,6 +59,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
                 
+            // 設定ファイル統一: OCR設定をappsettings.jsonから読み込み
+            // 注意: これはServiceModuleの外で設定される想定（Startup.cs等）
+            
             // OCR関連サービス
             RegisterOcrServices(services);
             
@@ -112,7 +117,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var ocrEngine = provider.GetRequiredService<IOcrEngine>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy>>();
                 var advancedOptions = provider.GetService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AdvancedSettings>>();
-                var diagnosticsSaver = provider.GetRequiredService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
+                var diagnosticsSaver = provider.GetRequiredService<ImageDiagnosticsSaver>();
                 var adaptiveStrategy = new Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy(ocrEngine, logger, advancedOptions, diagnosticsSaver);
                 
                 var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();

@@ -7,6 +7,7 @@ using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
@@ -45,6 +46,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ITranslationEngineFactory _translationEngineFactory;
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
     private readonly IEventAggregator _eventAggregator;
+    private readonly IOptionsMonitor<Baketa.Core.Settings.OcrSettings> _ocrSettings;
     private readonly ITranslationDictionaryService? _translationDictionaryService;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
@@ -103,6 +105,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
         IEventAggregator eventAggregator,
+        IOptionsMonitor<Baketa.Core.Settings.OcrSettings> ocrSettings,
         ITranslationDictionaryService? translationDictionaryService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
@@ -111,6 +114,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ArgumentNullException.ThrowIfNull(ocrEngine);
         ArgumentNullException.ThrowIfNull(translationEngineFactory);
         ArgumentNullException.ThrowIfNull(eventAggregator);
+        ArgumentNullException.ThrowIfNull(ocrSettings);
         
         _captureService = captureService;
         _settingsService = settingsService;
@@ -118,6 +122,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
         _eventAggregator = eventAggregator;
+        _ocrSettings = ocrSettings;
         _translationDictionaryService = translationDictionaryService;
         _logger = logger;
 
@@ -1485,11 +1490,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 DebugLogUtility.WriteLog($"🛠️ OCRエンジン初期化開始");
                 
+                var unifiedSettings = _ocrSettings.CurrentValue;
                 var ocrSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
-                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
+                    DetectionThreshold = (float)unifiedSettings.DetectionThreshold, // 統一設定: appsettings.json から読み込み
+                    RecognitionThreshold = 0.1f // 認識閾値（今後統一化対象）
                 };
                 
                 try
@@ -1508,11 +1514,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 既に初期化されているが、閾値設定を更新する
                 DebugLogUtility.WriteLog($"🔄 既に初期化されたOCRエンジンの設定を更新");
                 
+                var unifiedSettings = _ocrSettings.CurrentValue;
                 var updatedSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
-                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
+                    DetectionThreshold = (float)unifiedSettings.DetectionThreshold, // 統一設定: appsettings.json から読み込み
+                    RecognitionThreshold = 0.1f // 認識閾値（今後統一化対象）
                 };
                 
                 try

@@ -328,7 +328,7 @@ public class OcrEngineSettings
     /// テキスト検出の信頼度閾値（0.0～1.0）
     /// より低い値で広範囲のテキスト領域を検出
     /// </summary>
-    public double DetectionThreshold { get; set; } = 0.09;
+    public double DetectionThreshold { get; set; } = 0.03;
     
     /// <summary>
     /// テキスト認識の信頼度閾値（0.0～1.0）

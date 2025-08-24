@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.ObjectPool;
+using Microsoft.Extensions.Options;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.Abstractions.OCR;
@@ -48,7 +49,8 @@ public sealed class StagedOcrStrategyModule : ServiceModuleBase
             var enginePool = provider.GetRequiredService<ObjectPool<IOcrEngine>>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PooledOcrService>>();
             
-            return new PooledOcrService(enginePool, logger);
+            var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
+            return new PooledOcrService(enginePool, logger, ocrSettings);
         });
         
         // 💾 CachedOcrEngine（最上位キャッシュ層）をシングルトン登録

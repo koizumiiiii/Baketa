@@ -131,44 +131,47 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                     return;
                 }
                 
-                // インプレース表示スタイルを適用（設定画面のフォントサイズを使用）
-                var configuredFontSize = GetConfiguredFontSize();
-                var finalFontSize = configuredFontSize > 0 ? configuredFontSize : optimalFontSize;
+                // インプレース表示スタイルを適用（ユーザー設定フォントサイズを使用）
+                var userFontSize = GetConfiguredFontSize();
+                var finalFontSize = userFontSize > 0 ? userFontSize : optimalFontSize;
                 ApplyInPlaceStyle(finalFontSize, textChunk.TranslatedText);
                 
                 // ウィンドウを表示
                 Show();
                 
-                // Show後にクリックスルー設定を適用
+                // 🎯 改善されたクリックスルー設定（透明度問題対策）
                 try
                 {
                     var hwnd = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
                     if (hwnd != IntPtr.Zero)
                     {
-                        // WS_EX_TRANSPARENT スタイルを追加してクリックスルーを有効化
                         const int GWL_EXSTYLE = -20;
                         const int WS_EX_TRANSPARENT = 0x00000020;
                         const int WS_EX_LAYERED = 0x00080000;
+                        const int WS_EX_TOPMOST = 0x00000008;
                         
                         var currentStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-                        var result = SetWindowLong(hwnd, GWL_EXSTYLE, currentStyle | WS_EX_TRANSPARENT | WS_EX_LAYERED);
+                        
+                        // 🎯 LayeredとTopMost設定（クリックスルーは無効化で操作性向上）
+                        var newStyle = currentStyle | WS_EX_LAYERED | WS_EX_TOPMOST;
+                        var result = SetWindowLong(hwnd, GWL_EXSTYLE, newStyle);
                         
                         if (result != 0)
                         {
-                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] クリックスルー設定完了");
+                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 改善されたウィンドウスタイル設定完了（透明度問題対策）");
                         }
                         else
                         {
-                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ [InPlaceTranslationOverlay] クリックスルー設定は失敗したが継続");
+                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定は失敗したが継続");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ [InPlaceTranslationOverlay] クリックスルー設定失敗: {ex.Message}");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定失敗: {ex.Message}");
                 }
                 
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース表示完了 - Position: ({overlayPosition.X},{overlayPosition.Y}) | Size: ({overlaySize.Width},{overlaySize.Height}) | FontSize: {optimalFontSize}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース表示完了 - Position: ({overlayPosition.X},{overlayPosition.Y}) | Size: ({overlaySize.Width},{overlaySize.Height}) | FontSize: {finalFontSize}");
                 
             }, DispatcherPriority.Normal, cancellationToken);
 
@@ -209,6 +212,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     {
         try
         {
+            // ユーザー設定フォントサイズをそのまま使用（強制的な最小値設定を削除）
+            var effectiveFontSize = fontSize;
+            
             // TextBlockを取得してスタイルを適用
             var textBlock = this.FindControl<TextBlock>("InPlaceTranslatedTextBlock");
             if (textBlock != null)
@@ -216,8 +222,8 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // 翻訳テキストを設定
                 textBlock.Text = translatedText ?? string.Empty;
                 
-                // 自動計算されたフォントサイズを適用
-                textBlock.FontSize = fontSize;
+                // ユーザー設定フォントサイズを適用
+                textBlock.FontSize = effectiveFontSize;
                 
                 // インプレース表示用のスタイル設定
                 textBlock.TextWrapping = TextWrapping.NoWrap;
@@ -225,34 +231,34 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 textBlock.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
                 textBlock.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
                 
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] すりガラス風インプレーススタイル適用完了 - FontSize: {fontSize} | Text: '{translatedText}'");
+                // テキスト色設定（コントラスト重視）
+                textBlock.Foreground = new SolidColorBrush(Colors.Black);
+                textBlock.FontWeight = FontWeight.Bold;
+                
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] ユーザー設定フォント適用完了 - FontSize: {effectiveFontSize} | Text: '{translatedText}'");
             }
             else
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ [InPlaceTranslationOverlay] InPlaceTranslatedTextBlockが見つかりません");
             }
             
-            // Borderのスタイル設定（XAMLのLinearGradientBrushを保持）
+            // Border の洗練されたデザイン適用
             var border = this.FindControl<Border>("InPlaceOverlayBorder");
             if (border != null)
             {
-                // 角丸無効化の試み（FluentThemeに上書きされる）
-                border.CornerRadius = new CornerRadius(0);
+                // 枠無し設定
+                border.CornerRadius = new CornerRadius(8); // 軽い角丸
+                border.BorderThickness = new Thickness(0); // 枠無し
                 
-                // XAMLで設定したLinearGradientBrushはそのまま使用（上書きしない）
-                // TextBlockの色のみ調整
-                if (textBlock != null)
-                {
-                    // 読みやすいダークグレー色を設定
-                    textBlock.Foreground = new SolidColorBrush(Color.FromArgb(255, 45, 45, 45));
-                }
+                // ブラー効果風の薄い白背景
+                border.Background = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)); // ごく薄い白（90%透明度）
                 
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 角丸なし・すりガラス風インプレーススタイル適用完了（強制モード）");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 視認性向上インプレーススタイル適用完了（改善モード）");
             }
         }
         catch (Exception ex)
         {
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [InPlaceTranslationOverlay] すりガラス風インプレーススタイル適用エラー: {ex.Message}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [InPlaceTranslationOverlay] インプレーススタイル適用エラー: {ex.Message}");
             _logger?.LogError(ex, "❌ インプレーススタイル適用エラー - ChunkId: {ChunkId}", ChunkId);
         }
     }
@@ -284,8 +290,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // 新しい翻訳テキストで更新
                 TranslatedText = updatedTextChunk.TranslatedText;
                 
-                // スタイルを再適用
-                var newFontSize = updatedTextChunk.CalculateOptimalFontSize();
+                // スタイルを再適用（ユーザー設定フォントサイズを優先）
+                var userFontSize = GetConfiguredFontSize();
+                var newFontSize = userFontSize > 0 ? userFontSize : updatedTextChunk.CalculateOptimalFontSize();
                 ApplyInPlaceStyle(newFontSize, TranslatedText);
                 
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース内容更新完了 - ChunkId: {ChunkId}");

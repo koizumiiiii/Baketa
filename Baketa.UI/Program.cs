@@ -284,6 +284,10 @@ namespace Baketa.UI;
             services.Configure<Baketa.Core.Settings.RoiDiagnosticsSettings>(
                 configuration.GetSection("DiagnosticsSettings"));
             
+            // OCR設定をappsettings.jsonから読み込み（DetectionThreshold統一化対応）
+            services.Configure<Baketa.Core.Settings.OcrSettings>(
+                configuration.GetSection("OCR"));
+            
             // ロギングの設定
             services.AddLogging(builder => 
             {

@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Services;
 using Baketa.Core.Performance;
 using Baketa.Core.Logging;
 using Baketa.Core.Settings;
@@ -873,16 +874,62 @@ public sealed class BatchOcrProcessor(
         {
             System.Console.WriteLine("🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync開始");
             
-            // 🔍 画像サイズを詳細ログ
-            try
-            {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            }
-            catch { }
-            
             var result = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
             System.Console.WriteLine($"🎯 Phase 6デバッグ: OCRエンジンRecognizeAsync完了 - 検出領域数={result.TextRegions.Count}");
             return result;
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("PaddlePredictor") && ex.Message.Contains("run failed"))
+        {
+            _logger?.LogWarning(ex, "🔧 PaddleOCRエラー検出 - フォールバック戦略を実行: {ErrorMessage}", ex.Message);
+            
+            // 🚀 フォールバック戦略1: より寛容な設定でリトライ
+            try
+            {
+                System.Console.WriteLine("🔧 フォールバック戦略1: 寛容な設定でリトライ開始");
+                
+                var fallbackSettings = currentSettings.Clone();
+                fallbackSettings.DetectionThreshold = 0.05; // より低い閾値
+                fallbackSettings.RecognitionThreshold = 0.1; // より低い閾値
+                
+                await _ocrEngine.ApplySettingsAsync(fallbackSettings, cancellationToken).ConfigureAwait(false);
+                
+                var fallbackResult = await _ocrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
+                
+                _logger?.LogInformation("✅ フォールバック戦略1成功 - 検出領域数: {Count}", fallbackResult.TextRegions.Count);
+                System.Console.WriteLine($"✅ フォールバック戦略1成功 - 検出領域数={fallbackResult.TextRegions.Count}");
+                
+                return fallbackResult;
+            }
+            catch (Exception fallbackEx)
+            {
+                _logger?.LogWarning(fallbackEx, "⚠️ フォールバック戦略1失敗 - 最終フォールバックを実行");
+                System.Console.WriteLine($"⚠️ フォールバック戦略1失敗: {fallbackEx.Message}");
+            }
+            
+            // 🔄 最終フォールバック: 空のOCR結果を返すが処理は継続（ROI画像生成のため）
+            _logger?.LogInformation("🔄 最終フォールバック実行 - 空のOCR結果で処理継続（ROI画像生成維持）");
+            System.Console.WriteLine("🔄 最終フォールバック実行 - 空のOCR結果で処理継続");
+            
+            // ROI画像生成は継続できるよう、空だが正常なOcrResultsを返却
+            return new OcrResults(
+                [], // 空のテキスト領域
+                image,
+                TimeSpan.FromMilliseconds(0),
+                "jpn"
+            );
+        }
+        catch (Exception generalEx)
+        {
+            _logger?.LogError(generalEx, "❌ OCR処理で予期しないエラー - 処理継続のため空結果を返却");
+            System.Console.WriteLine($"❌ OCR処理で予期しないエラー: {generalEx.Message}");
+            
+            // 一般的なエラーでも処理継続
+            return new OcrResults(
+                [],
+                image, 
+                TimeSpan.FromMilliseconds(0),
+                "jpn"
+            );
         }
         finally
         {
@@ -2190,7 +2237,18 @@ public sealed class BatchOcrProcessor(
     /// </summary>
     public IReadOnlyList<RoiImageInfo> GetCurrentSessionRoiImages()
     {
-        return _currentSessionRoiImages.ToList().AsReadOnly();
+        // 🎯 既存のROI画像情報と新しいグローバルコレクションを統合
+        var existingImages = _currentSessionRoiImages.ToList();
+        var tileStrategyImages = GlobalRoiImageCollection.ConvertToDiagnosticFormat();
+        
+        // 🎯 統合されたROI画像情報を返す
+        var combinedImages = new List<RoiImageInfo>(existingImages);
+        combinedImages.AddRange(tileStrategyImages);
+        
+        _logger?.LogDebug("🎯 ROI画像情報統合完了: 既存={ExistingCount}個, TileStrategy={TileCount}個, 合計={TotalCount}個", 
+            existingImages.Count, tileStrategyImages.Count, combinedImages.Count);
+            
+        return combinedImages.AsReadOnly();
     }
     
     /// <summary>
@@ -2199,7 +2257,11 @@ public sealed class BatchOcrProcessor(
     public void ClearRoiImageInfo()
     {
         _currentSessionRoiImages.Clear();
-        _logger?.LogDebug("ROI画像情報をクリアしました");
+        
+        // 🎯 グローバルROI画像コレクションもクリア
+        GlobalRoiImageCollection.ClearAll();
+        
+        _logger?.LogDebug("🎯 ROI画像情報を完全クリアしました（既存+グローバル）");
     }
 
 

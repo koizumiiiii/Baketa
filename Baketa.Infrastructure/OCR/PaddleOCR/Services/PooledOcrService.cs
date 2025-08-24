@@ -1,7 +1,9 @@
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
@@ -15,13 +17,16 @@ public sealed class PooledOcrService : IOcrEngine
 {
     private readonly ObjectPool<IOcrEngine> _enginePool;
     private readonly ILogger<PooledOcrService> _logger;
+    private readonly IOptionsMonitor<OcrSettings> _ocrSettings;
 
     public PooledOcrService(
         ObjectPool<IOcrEngine> enginePool,
-        ILogger<PooledOcrService> logger)
+        ILogger<PooledOcrService> logger,
+        IOptionsMonitor<OcrSettings> ocrSettings)
     {
         _enginePool = enginePool ?? throw new ArgumentNullException(nameof(enginePool));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
         
         _logger.LogInformation("🏊 PooledOcrService初期化完了 - プール化OCRサービス開始");
     }
@@ -138,13 +143,14 @@ public sealed class PooledOcrService : IOcrEngine
     {
         ThrowIfDisposed();
         
-        // プール化環境では、統一設定を返す
-        // 各エンジンインスタンスは同じ設定で初期化されるため
+        var settings = _ocrSettings.CurrentValue;
+        
+        // appsettings.jsonから統一設定を取得
         return new OcrEngineSettings
         {
             Language = "jpn",
-            DetectionThreshold = 0.3, // 現在の設定値
-            RecognitionThreshold = 0.6, // 現在の設定値
+            DetectionThreshold = settings.DetectionThreshold, // 統一設定: appsettings.json から読み込み
+            RecognitionThreshold = 0.6, // 現在の設定値（今後統一化対象）
             UseGpu = true,
             MaxDetections = 1000,
             EnablePreprocessing = true

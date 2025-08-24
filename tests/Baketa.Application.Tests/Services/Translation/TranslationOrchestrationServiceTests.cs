@@ -72,6 +72,13 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _coordinateBasedTranslationService = null;
 
         // テスト対象サービスのインスタンス作成
+        // OcrSettings用のモック作成
+        var ocrSettingsMock = new Mock<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
+        ocrSettingsMock.Setup(x => x.CurrentValue).Returns(new Baketa.Core.Settings.OcrSettings 
+        { 
+            DetectionThreshold = 0.03 
+        });
+        
         _service = new TranslationOrchestrationService(
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
@@ -79,6 +86,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _translationEngineFactoryMock.Object,
             _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
             _eventAggregatorMock.Object,
+            ocrSettingsMock.Object,
             null, // translationDictionaryService（テスト用にnull）
             _loggerMock.Object);
     }

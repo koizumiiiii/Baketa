@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
@@ -12,6 +14,7 @@ namespace Baketa.Infrastructure.OCR.Strategies;
 /// <summary>
 /// テキスト検出ベース適応的分割戦略
 /// PaddleOCR検出APIを活用したテキスト境界保護分割
+/// 🆕 小領域自動拡張機能: PaddleOCR対応サイズまで文脈保持拡張
 /// </summary>
 public sealed class AdaptiveTileStrategy(
     IOcrEngine textDetector,
@@ -132,6 +135,14 @@ public sealed class AdaptiveTileStrategy(
         var lineGroups = GroupBoundingBoxesByLines(filteredRegions, parameters);
 
         _logger?.LogDebug("📝 行グループ化完了 - {Groups}グループ", lineGroups.Count);
+        
+        // 🔍 [DEBUG] 行グループの詳細ログ
+        for (int i = 0; i < lineGroups.Count && i < 3; i++) // 最初の3グループのみ
+        {
+            var group = lineGroups[i];
+            var bounds = string.Join(" | ", group.Select(r => $"{r.Bounds.X},{r.Bounds.Y}({r.Bounds.Width}x{r.Bounds.Height})"));
+            _logger?.LogDebug("🔍 [LINE_GROUP_{Index}] 領域数={Count}, バウンディング=[{Bounds}]", i, group.Count, bounds);
+        }
 
         // Step 3: 水平方向統合
         var mergedRegions = new List<TileRegion>();
@@ -292,9 +303,20 @@ public sealed class AdaptiveTileStrategy(
 
         foreach (var region in regions)
         {
+            // 🔍 [DEBUG] 検証前の領域情報
+            _logger?.LogDebug("🔍 [VALIDATE_INPUT] 領域={RegionId}, バウンディング={X},{Y}({Width}x{Height}), 信頼度={Confidence:F3}", 
+                region.RegionId, region.Bounds.X, region.Bounds.Y, region.Bounds.Width, region.Bounds.Height, region.ConfidenceScore);
+            
             var adjustedRegions = ValidateRegionSize(region, image, Parameters);
             if (adjustedRegions != null)
             {
+                // 🔍 [DEBUG] 検証後の領域情報
+                foreach (var adjusted in adjustedRegions)
+                {
+                    _logger?.LogDebug("🔍 [VALIDATE_OUTPUT] 調整領域={RegionId}, バウンディング={X},{Y}({Width}x{Height})", 
+                        adjusted.RegionId, adjusted.Bounds.X, adjusted.Bounds.Y, adjusted.Bounds.Width, adjusted.Bounds.Height);
+                }
+                
                 validatedRegions.AddRange(adjustedRegions);
                 
                 // ROI画像保存（設定が有効な場合）
@@ -345,10 +367,29 @@ public sealed class AdaptiveTileStrategy(
         // 画像境界内にクリップ
         bounds = Rectangle.Intersect(bounds, new Rectangle(0, 0, image.Width, image.Height));
         
-        if (bounds.Width < parameters.MinRegionSize.Width || 
-            bounds.Height < parameters.MinRegionSize.Height)
+        // 🎯 [ROI_EXPANSION_STRATEGY] 小さすぎる領域をPaddleOCR対応サイズまで自動拡張
+        const int PADDLE_MIN_WIDTH = 64;   // PaddleOCR最小幅
+        const int PADDLE_MIN_HEIGHT = 32;  // PaddleOCR最小高さ        
+        
+        if (bounds.Width < PADDLE_MIN_WIDTH || bounds.Height < PADDLE_MIN_HEIGHT)
         {
-            return null; // 小さすぎる領域は除外
+            _logger?.LogDebug("🔧 [ROI_EXPANSION] 小領域検出、PaddleOCR対応サイズに拡張: {Width}x{Height} → 最小{MinW}x{MinH}", 
+                bounds.Width, bounds.Height, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT);
+            
+            // 文脈保持型ROI拡張を実行
+            var expandedRegion = ExpandSmallRegionWithContext(region, image, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT);
+            if (expandedRegion != null)
+            {
+                bounds = expandedRegion.Bounds;
+                region = expandedRegion; // 拡張された領域を使用
+                _logger?.LogDebug("✅ [ROI_EXPANSION] 拡張完了: {Width}x{Height}", bounds.Width, bounds.Height);
+            }
+            else
+            {
+                // 拡張に失敗した場合のみ除外
+                _logger?.LogWarning("❌ [ROI_EXPANSION] 拡張失敗、領域除外: {RegionId}", region.RegionId);
+                return null;
+            }
         }
 
         // 巨大すぎる領域は分割（オーバーフロー防止でlong計算→int変換、浮動小数点精度保持）
@@ -569,48 +610,147 @@ public sealed class AdaptiveTileStrategy(
     {
         try
         {
-            // ROI画像保存機能（診断設定で有効な場合のみ）
-            // 注意：現在の実装では画像保存を簡略化
+            // 🎯 改善されたROI画像保存処理
+            if (_diagnosticsSaver == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"AdaptiveTile: _diagnosticsSaver is null, ROI保存スキップ: {regionId}");
+                return;
+            }
             
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
-            var fileName = $"{timestamp}_adaptive_roi_{regionId}.txt";
+            var fileName = $"{timestamp}_adaptive_roi_{regionId}.png";
             
-            // 基本的なメタデータのみテキストファイルとして保存
-            var metadata = new Dictionary<string, object>
+            // 🎯 実際の画像保存をImageDiagnosticsSaverに委任
+            var imageBytes = await ExtractRoiImageAsync(sourceImage, region).ConfigureAwait(false);
+            if (imageBytes != null && imageBytes.Length > 0)
             {
-                ["RegionId"] = regionId,
-                ["Strategy"] = "AdaptiveTile",
-                ["Bounds"] = $"{region.Bounds.X},{region.Bounds.Y},{region.Bounds.Width},{region.Bounds.Height}",
-                ["Timestamp"] = DateTime.UtcNow.ToString("O")
-            };
-
-            var metadataContent = string.Join("\n", metadata.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
-            var outputPath = Path.Combine(GetDiagnosticOutputPath(), fileName);
-            
-            // ディレクトリ作成と保存を並列実行
-            await Task.Run(async () =>
-            {
+                var outputPath = Path.Combine(GetDiagnosticOutputPath(), fileName);
+                
+                // 🎯 ROI画像を直接保存（byte[]からファイルへ）
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-                await File.WriteAllTextAsync(outputPath, metadataContent).ConfigureAwait(false);
-            }).ConfigureAwait(false);
-            
-            // ログは基本的なもののみ出力
-            System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI情報保存完了: {regionId}");
+                await File.WriteAllBytesAsync(outputPath, imageBytes).ConfigureAwait(false);
+                
+                // 🎯 ROI画像情報をBatchOcrProcessorに通知（イベント使用）
+                await NotifyRoiImageSavedAsync(regionId, outputPath, region, imageBytes.Length)
+                    .ConfigureAwait(false);
+                
+                System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI画像保存完了: {fileName} ({imageBytes.Length} bytes)");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI画像抽出失敗: {regionId}");
+            }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI保存エラー: {regionId} - {ex.Message}");
         }
     }
-    
+
     /// <summary>
-    /// 診断出力パスを取得
+    /// 小さなROI領域を文脈保持しながらPaddleOCR対応サイズまで拡張
     /// </summary>
-    private string GetDiagnosticOutputPath()
+    private TileRegion? ExpandSmallRegionWithContext(
+        TileRegion smallRegion, 
+        IAdvancedImage image, 
+        int minWidth, 
+        int minHeight)
     {
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "ROI", "AdaptiveTile");
+        try
+        {
+            var originalBounds = smallRegion.Bounds;
+            var expandedBounds = originalBounds;
+            
+            // 🎯 [CONTEXT_PRESERVING_EXPANSION] テキスト文脈を保持する拡張戦略
+            
+            // Step 1: 最小サイズまで均等拡張
+            if (expandedBounds.Width < minWidth)
+            {
+                var widthExpansion = minWidth - expandedBounds.Width;
+                var leftExpansion = widthExpansion / 2;
+                var rightExpansion = widthExpansion - leftExpansion;
+                
+                expandedBounds.X = Math.Max(0, expandedBounds.X - leftExpansion);
+                expandedBounds.Width = Math.Min(image.Width - expandedBounds.X, 
+                    expandedBounds.Width + leftExpansion + rightExpansion);
+            }
+            
+            if (expandedBounds.Height < minHeight)
+            {
+                var heightExpansion = minHeight - expandedBounds.Height;
+                var topExpansion = heightExpansion / 2;
+                var bottomExpansion = heightExpansion - topExpansion;
+                
+                expandedBounds.Y = Math.Max(0, expandedBounds.Y - topExpansion);
+                expandedBounds.Height = Math.Min(image.Height - expandedBounds.Y,
+                    expandedBounds.Height + topExpansion + bottomExpansion);
+            }
+            
+            // Step 2: アスペクト比調整（極端な縦横比を修正）
+            var aspectRatio = (double)expandedBounds.Width / expandedBounds.Height;
+            const double MAX_ASPECT_RATIO = 8.0; // 最大アスペクト比
+            const double MIN_ASPECT_RATIO = 1.0 / 8.0; // 最小アスペクト比
+            
+            if (aspectRatio > MAX_ASPECT_RATIO)
+            {
+                // 横長すぎる場合：高さを増加
+                var targetHeight = (int)(expandedBounds.Width / MAX_ASPECT_RATIO);
+                var heightIncrease = targetHeight - expandedBounds.Height;
+                
+                expandedBounds.Y = Math.Max(0, expandedBounds.Y - heightIncrease / 2);
+                expandedBounds.Height = Math.Min(image.Height - expandedBounds.Y, targetHeight);
+                
+                _logger?.LogDebug("🔧 [ASPECT_FIX] 横長修正: aspect={Aspect:F2} → height={Height}", 
+                    aspectRatio, expandedBounds.Height);
+            }
+            else if (aspectRatio < MIN_ASPECT_RATIO)
+            {
+                // 縦長すぎる場合：幅を増加
+                var targetWidth = (int)(expandedBounds.Height * MIN_ASPECT_RATIO);
+                var widthIncrease = targetWidth - expandedBounds.Width;
+                
+                expandedBounds.X = Math.Max(0, expandedBounds.X - widthIncrease / 2);
+                expandedBounds.Width = Math.Min(image.Width - expandedBounds.X, targetWidth);
+                
+                _logger?.LogDebug("🔧 [ASPECT_FIX] 縦長修正: aspect={Aspect:F2} → width={Width}", 
+                    aspectRatio, expandedBounds.Width);
+            }
+            
+            // Step 3: 画像境界内に最終調整
+            expandedBounds = Rectangle.Intersect(expandedBounds, 
+                new Rectangle(0, 0, image.Width, image.Height));
+                
+            // Step 4: 最終サイズ確認
+            if (expandedBounds.Width >= minWidth && expandedBounds.Height >= minHeight)
+            {
+                var expandedRegion = smallRegion with 
+                { 
+                    Bounds = expandedBounds,
+                    RegionId = $"{smallRegion.RegionId}-expanded",
+                    Metadata = new Dictionary<string, object>(smallRegion.Metadata)
+                    {
+                        ["OriginalBounds"] = originalBounds.ToString(),
+                        ["ExpansionReason"] = "PaddleOCR minimum size requirement",
+                        ["ExpansionFactor"] = $"{(double)expandedBounds.Width * expandedBounds.Height / (originalBounds.Width * originalBounds.Height):F2}x"
+                    }
+                };
+                
+                _logger?.LogDebug("✅ [CONTEXT_EXPANSION] 成功: {Original} → {Expanded} (拡張率: {Factor}x)",
+                    originalBounds, expandedBounds, 
+                    (double)expandedBounds.Width * expandedBounds.Height / (originalBounds.Width * originalBounds.Height));
+                
+                return expandedRegion;
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ [ROI_EXPANSION] 拡張処理エラー: {RegionId}", smallRegion.RegionId);
+            return null;
+        }
     }
-    
+
     /// <summary>
     /// ROI画像抽出（指定領域のみを切り出し）
     /// </summary>
@@ -639,21 +779,54 @@ public sealed class AdaptiveTileStrategy(
             
             // ROI画像をバイト配列に変換
             using var outputStream = new MemoryStream();
-            var imageFormat = _advancedSettings.RoiImageFormat switch
-            {
-                RoiImageFormat.Jpeg => System.Drawing.Imaging.ImageFormat.Jpeg,
-                RoiImageFormat.Bmp => System.Drawing.Imaging.ImageFormat.Bmp,
-                _ => System.Drawing.Imaging.ImageFormat.Png
-            };
-            
-            roiBitmap.Save(outputStream, imageFormat);
+            roiBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
             return outputStream.ToArray();
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "AdaptiveTile ROI画像抽出エラー");
+            logger?.LogWarning(ex, "AdaptiveTile ROI画像抽出エラー");
             return null;
         }
+    }
+    
+    /// <summary>
+    /// ROI画像保存完了通知
+    /// </summary>
+    private async Task NotifyRoiImageSavedAsync(string regionId, string filePath, TileRegion region, long imageSizeBytes)
+    {
+        try
+        {
+            // 🎯 静的アクセスによるROI情報蓄積（BatchOcrProcessor統合用）
+            // Note: BatchOcrProcessorと直接統合するため、静的コレクションを使用
+            var roiInfo = new TileRoiImageInfo
+            {
+                RegionId = regionId,
+                Strategy = StrategyName,
+                FilePath = filePath,
+                Bounds = region.Bounds,
+                ImageSizeBytes = imageSizeBytes,
+                SavedAt = DateTime.UtcNow,
+                ConfidenceScore = region.ConfidenceScore,
+                Metadata = new Dictionary<string, object>(region.Metadata)
+            };
+            
+            // 🎯 グローバルROI情報コレクションに追加
+            GlobalRoiImageCollection.AddRoiImage(roiInfo);
+            
+            logger?.LogDebug("🎯 AdaptiveTile ROI保存通知完了: {RegionId}", regionId);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "AdaptiveTile ROI保存通知エラー");
+        }
+    }
+    
+    /// <summary>
+    /// 診断出力パスを取得
+    /// </summary>
+    private string GetDiagnosticOutputPath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "ROI", "AdaptiveTile");
     }
 
     /// <summary>

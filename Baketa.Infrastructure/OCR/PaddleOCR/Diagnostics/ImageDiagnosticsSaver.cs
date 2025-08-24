@@ -351,7 +351,7 @@ public sealed class ImageDiagnosticsSaver : IDisposable
         }
     }
 
-    private async Task SaveImageAsync(IImage image, string imagePath)
+    internal async Task SaveImageAsync(IImage image, string imagePath)
     {
         try
         {

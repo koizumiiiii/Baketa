@@ -57,11 +57,23 @@ public sealed class OcrSettings
     /// <summary>
     /// 認識信頼度の閾値（0.0-1.0）
     /// </summary>
+    /// <summary>
+    /// 認識信頼度の閾値（0.0-1.0）
+    /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "認識信頼度閾値", 
         Description = "この値以下の信頼度の結果は破棄されます", 
         MinValue = 0.0, 
         MaxValue = 1.0)]
     public double ConfidenceThreshold { get; set; } = 0.7;
+    
+    /// <summary>
+    /// テキスト検出の閾値（0.0-1.0）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "検出感度閾値", 
+        Description = "テキスト検出の感度調整（低い値ほど高感度）", 
+        MinValue = 0.0, 
+        MaxValue = 1.0)]
+    public double DetectionThreshold { get; set; } = 0.03;
     
     /// <summary>
     /// 画像前処理の有効化
@@ -297,6 +309,7 @@ public sealed class OcrSettings
             Engine = Engine,
             RecognitionLanguage = RecognitionLanguage,
             ConfidenceThreshold = ConfidenceThreshold,
+            DetectionThreshold = DetectionThreshold,
             EnableImagePreprocessing = EnableImagePreprocessing,
             ConvertToGrayscale = ConvertToGrayscale,
             EnableBinarization = EnableBinarization,

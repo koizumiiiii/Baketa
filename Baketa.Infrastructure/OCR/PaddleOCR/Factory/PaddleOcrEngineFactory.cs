@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Logging;
@@ -57,6 +59,7 @@ public sealed class PaddleOcrEngineFactory(
                 var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
+                var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
                     ocrPreprocessingService, 
@@ -65,6 +68,7 @@ public sealed class PaddleOcrEngineFactory(
                     gpuMemoryManager,
                     unifiedSettingsService,
                     eventAggregator,
+                    ocrSettings,
                     unifiedLoggingService,
                     engineLogger);
             }
@@ -74,6 +78,7 @@ public sealed class PaddleOcrEngineFactory(
                 var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
+                var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
                     ocrPreprocessingService, 
@@ -82,6 +87,7 @@ public sealed class PaddleOcrEngineFactory(
                     gpuMemoryManager,
                     unifiedSettingsService,
                     eventAggregator,
+                    ocrSettings,
                     unifiedLoggingService,
                     engineLogger);
             }
@@ -170,8 +176,9 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IGpuMemoryManager gpuMemoryManager,
     IUnifiedSettingsService unifiedSettingsService,
     IEventAggregator eventAggregator,
+    IOptionsMonitor<OcrSettings> ocrSettings,
     IUnifiedLoggingService? unifiedLoggingService = null,
-    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, unifiedLoggingService, logger)
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, unifiedLoggingService, logger)
 {
 
     /// <summary>
