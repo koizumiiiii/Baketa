@@ -27,6 +27,7 @@ public class TranslationFlowEventProcessor :
     IEventProcessor<StopTranslationRequestEvent>,
     IEventProcessor<ToggleTranslationDisplayRequestEvent>,
     IEventProcessor<SettingsChangedEvent>,
+    IEventProcessor<Baketa.UI.Framework.Events.StartCaptureRequestedEvent>,
     IEventProcessor<Baketa.UI.Framework.Events.StopCaptureRequestedEvent>,
     IDisposable
 {
@@ -37,6 +38,7 @@ public class TranslationFlowEventProcessor :
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
     private readonly IOcrEngine _ocrEngine;
+    private readonly IWindowManagerAdapter _windowManager;
     
     // 重複処理防止用
     private readonly HashSet<string> _processedEventIds = [];
@@ -57,7 +59,8 @@ public class TranslationFlowEventProcessor :
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
-        IOcrEngine ocrEngine)
+        IOcrEngine ocrEngine,
+        IWindowManagerAdapter windowManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -66,6 +69,7 @@ public class TranslationFlowEventProcessor :
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+        _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         
         _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
@@ -225,6 +229,48 @@ public class TranslationFlowEventProcessor :
             }
         }
         // 注意: finallyブロックを削除 - 継続的翻訳では処理中状態をStop時まで維持
+    }
+
+    /// <summary>
+    /// UI開始要求イベントの処理（StartCaptureRequestedEvent → StartTranslationRequestEventに変換）
+    /// </summary>
+    public async Task HandleAsync(Baketa.UI.Framework.Events.StartCaptureRequestedEvent eventData)
+    {
+        try
+        {
+            _logger.LogInformation("🚀 UI開始要求を受信 - 翻訳開始要求に変換中");
+            Console.WriteLine("🚀 [TranslationFlowEventProcessor] UI開始要求を受信 - 翻訳開始要求に変換中");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 UI開始要求を受信 - 翻訳開始要求に変換中");
+            
+            // アクティブウィンドウを取得
+            var activeWindow = await GetActiveWindowAsync().ConfigureAwait(false);
+            if (activeWindow == null)
+            {
+                var errorMessage = "アクティブウィンドウの取得に失敗しました";
+                Console.WriteLine($"❌ {errorMessage}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ {errorMessage}");
+                _logger.LogError("{ErrorMessage}", errorMessage);
+                return;
+            }
+            
+            Console.WriteLine($"🎯 アクティブウィンドウ: {activeWindow.Title} (Handle={activeWindow.Handle})");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 アクティブウィンドウ: {activeWindow.Title} (Handle={activeWindow.Handle})");
+            
+            // UI開始要求をApplication開始要求に変換
+            var startTranslationEvent = new StartTranslationRequestEvent(activeWindow);
+            
+            await _eventAggregator.PublishAsync(startTranslationEvent).ConfigureAwait(false);
+            
+            _logger.LogInformation("✅ UI開始要求 → 翻訳開始要求 変換完了");
+            Console.WriteLine("✅ [TranslationFlowEventProcessor] UI開始要求 → 翻訳開始要求 変換完了");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ UI開始要求 → 翻訳開始要求 変換完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "UI開始要求処理中にエラーが発生しました");
+            Console.WriteLine($"❌ [TranslationFlowEventProcessor] UI開始要求処理エラー: {ex.Message}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ UI開始要求処理エラー: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -556,6 +602,45 @@ public class TranslationFlowEventProcessor :
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// アクティブウィンドウを取得
+    /// </summary>
+    private async Task<WindowInfo?> GetActiveWindowAsync()
+    {
+        try
+        {
+            // WindowManagerAdapterを使用してアクティブウィンドウのハンドルを取得
+            var activeHandle = _windowManager.GetActiveWindowHandle();
+            
+            if (activeHandle == IntPtr.Zero)
+            {
+                _logger.LogWarning("アクティブウィンドウハンドルが取得できませんでした");
+                return null;
+            }
+            
+            // ウィンドウ情報を取得
+            var windows = _windowManager.GetRunningApplicationWindows();
+            var activeWindow = windows.FirstOrDefault(w => w.Handle == activeHandle);
+            
+            if (activeWindow != null)
+            {
+                _logger.LogDebug("アクティブウィンドウを取得: {Title} (Handle={Handle})", activeWindow.Title, activeWindow.Handle);
+            }
+            else
+            {
+                _logger.LogWarning("アクティブウィンドウが見つかりませんでした: Handle={Handle}", activeHandle);
+            }
+            
+            await Task.CompletedTask.ConfigureAwait(false);
+            return activeWindow;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "アクティブウィンドウ取得中にエラーが発生しました");
+            return null;
+        }
     }
 
     /// <summary>

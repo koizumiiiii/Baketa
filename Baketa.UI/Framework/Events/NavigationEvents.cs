@@ -65,7 +65,7 @@ namespace Baketa.UI.Framework.Events;
     /// <summary>
     /// キャプチャ開始リクエストイベント
     /// </summary>
-    internal sealed class StartCaptureRequestedEvent : UIEventBase
+    public sealed class StartCaptureRequestedEvent : UIEventBase
     {
         /// <inheritdoc/>
         public override string Name => "StartCaptureRequested";

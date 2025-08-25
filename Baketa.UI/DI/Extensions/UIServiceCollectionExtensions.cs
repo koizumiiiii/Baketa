@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.UI.ViewModels;
-using Baketa.UI.ViewModels.Controls;
 using Baketa.UI.Services;
 using Baketa.UI.DI.Modules;
 using Baketa.Core.Abstractions.Events;
@@ -11,6 +10,9 @@ using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.UI;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,7 +63,27 @@ internal static class UIServiceCollectionExtensions
         services.AddSingleton<LoadingOverlayManager>();
         
         // 翻訳フロー統合イベントプロセッサー
-        services.AddSingleton<TranslationFlowEventProcessor>();
+        services.AddSingleton<TranslationFlowEventProcessor>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<TranslationFlowEventProcessor>>();
+            var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+            var inPlaceOverlayManager = provider.GetRequiredService<IInPlaceTranslationOverlayManager>();
+            var captureService = provider.GetRequiredService<ICaptureService>();
+            var translationService = provider.GetRequiredService<ITranslationOrchestrationService>();
+            var settingsService = provider.GetRequiredService<ISettingsService>();
+            var ocrEngine = provider.GetRequiredService<IOcrEngine>();
+            var windowManager = provider.GetRequiredService<IWindowManagerAdapter>();
+            
+            return new TranslationFlowEventProcessor(
+                logger,
+                eventAggregator,
+                inPlaceOverlayManager,
+                captureService,
+                translationService,
+                settingsService,
+                ocrEngine,
+                windowManager);
+        });
         
         // メインオーバーレイViewModel
         services.AddSingleton<Baketa.UI.ViewModels.MainOverlayViewModel>();

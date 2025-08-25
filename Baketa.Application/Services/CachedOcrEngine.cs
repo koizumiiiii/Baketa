@@ -91,34 +91,43 @@ public sealed class CachedOcrEngine : IOcrEngine
             var hashStopwatch = Stopwatch.StartNew();
             byte[] imageData;
             
-            using (var memoryStream = new MemoryStream())
+            // 🧠 [ULTRATHINK_TYPE_FIX] IAdvancedImage対応 - WindowsImageAdapter型不一致解決
+            if (regionOfInterest.HasValue && image is IAdvancedImage advancedImage)
             {
-                // IImageから画像データを抽出
-                if (image is IWindowsImage windowsImage)
+                // ROIが指定されている場合は切り取り処理
+                using var croppedImage = await advancedImage.ExtractRegionAsync(regionOfInterest.Value).ConfigureAwait(false);
+                imageData = await croppedImage.ToByteArrayAsync().ConfigureAwait(false);
+            }
+            else if (image is IAdvancedImage advancedImageFull)
+            {
+                // 🎯 [TYPE_COMPATIBILITY] IAdvancedImage.ToByteArrayAsync()使用でWindowsImageAdapter対応
+                imageData = await advancedImageFull.ToByteArrayAsync().ConfigureAwait(false);
+            }
+            else if (image is IWindowsImage windowsImage)
+            {
+                // 🔄 [FALLBACK_COMPATIBILITY] 従来のIWindowsImage対応維持
+                using var memoryStream = new MemoryStream();
+                using var bitmap = windowsImage.GetBitmap();
+                
+                if (regionOfInterest.HasValue)
                 {
-                    using var bitmap = windowsImage.GetBitmap();
-                    
-                    // ROIが指定されている場合は切り取り
-                    if (regionOfInterest.HasValue)
-                    {
-                        var roi = regionOfInterest.Value;
-                        using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
-                        using var graphics = Graphics.FromImage(croppedBitmap);
-                        graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
-                        croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
-                    }
-                    else
-                    {
-                        bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
-                    }
+                    var roi = regionOfInterest.Value;
+                    using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
+                    using var graphics = Graphics.FromImage(croppedBitmap);
+                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+                    croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
                 else
                 {
-                    // フォールバック: 汎用IImage処理
-                    throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching");
+                    bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
                 
                 imageData = memoryStream.ToArray();
+            }
+            else
+            {
+                // エラーメッセージ改善 - 対応型を明記
+                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: IAdvancedImage, IWindowsImage");
             }
             
             var imageHash = _cacheService.GenerateImageHash(imageData);

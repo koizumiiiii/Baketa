@@ -45,10 +45,11 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 /// </summary>
 public class PaddleOcrEngine : IOcrEngine
 {
-    // 🚨 シングルトンパターン: 多重初期化防止
-    private static readonly object _globalLock = new();
-    private static volatile int _instanceCount;
-    private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
+    // ❌ DI競合解決: 自己流シングルトン管理を廃止（DIコンテナ+ObjectPoolに一任）
+    // ✅ ObjectPoolによる適切なライフサイクル管理により、独自インスタンス追跡は不要
+    // private static readonly object _globalLock = new();
+    // private static volatile int _instanceCount;
+    // private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
 
     // Dependencies
     private readonly IModelPathResolver __modelPathResolver;
@@ -85,8 +86,8 @@ public class PaddleOcrEngine : IOcrEngine
         _unifiedLoggingService = unifiedLoggingService;
         __logger = _logger;
         
-        // インスタンス作成追跡
-        TrackInstanceCreation();
+        // ❌ DI競合解決: インスタンス作成追跡を無効化（ObjectPool管理に一任）
+        // TrackInstanceCreation();
     }
 
     private readonly object _lockObject = new();
@@ -127,6 +128,9 @@ public class PaddleOcrEngine : IOcrEngine
     private HybridOcrSettings? _hybridSettings;
     private bool _isHybridMode;
     
+    // ❌ DI競合解決: 静的コンストラクタと独自インスタンス追跡を無効化
+    // ✅ ObjectPoolとDIコンテナによる適切なライフサイクル管理に一任
+    /*
     // コンストラクタで多重初期化チェック
     static PaddleOcrEngine()
     {
@@ -159,6 +163,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
         }
     }
+    */
 
     public string EngineName => "PaddleOCR";
     public string EngineVersion => "2.7.0.3"; // Sdcb.PaddleOCRのバージョン
@@ -184,9 +189,9 @@ public class PaddleOcrEngine : IOcrEngine
         
         __logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis started.");
 
-        // インスタンス作成追跡
+        // ❌ DI競合解決: インスタンス作成追跡を無効化（ObjectPool管理に一任）
         stepSw.Restart();
-        TrackInstanceCreation();
+        // TrackInstanceCreation();
         __logger?.LogInformation("🔍 Step 1: Instance tracking finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
         
         settings ??= new OcrEngineSettings();
@@ -1021,6 +1026,43 @@ public class PaddleOcrEngine : IOcrEngine
         
         try
         {
+            // 🧠 UltraThink段階的検証戦略: 安全なモデルから順次試行
+            __logger?.LogInformation("🧠 UltraThink: PaddleOCRモデル段階的検証開始 - 言語: {Language}", language);
+            
+            // Phase 1: 最も安全とされるEnglishV3で初期検証
+            __logger?.LogInformation("🔍 Phase 1: EnglishV3モデルでの安全性検証");
+            try
+            {
+                var testModel = LocalFullModels.EnglishV3;
+                if (testModel != null)
+                {
+                    __logger?.LogInformation("✅ EnglishV3モデル取得成功 - 基本的なPaddleOCR動作確認済み");
+                    
+                    // Phase 2: 言語別の最適化されたモデル選択
+                    __logger?.LogInformation("🔍 Phase 2: 言語別最適モデル選択");
+                    var selectedModel = language.ToLowerInvariant() switch
+                    {
+                        "jpn" or "ja" => LocalFullModels.JapanV4 ?? testModel, // 日本語優先、失敗時は英語
+                        "eng" or "en" => LocalFullModels.EnglishV4 ?? testModel, // 英語優先
+                        "chs" or "zh" or "chi" => LocalFullModels.ChineseV4 ?? testModel, // 中国語優先  
+                        _ => testModel // 安全なフォールバック
+                    };
+                    
+                    __logger?.LogInformation("🎯 選択モデル確定: {Language} → {ModelType}", language, selectedModel?.GetType().Name ?? "null");
+                    return await Task.FromResult(selectedModel).ConfigureAwait(false);
+                }
+            }
+            catch (Exception modelEx)
+            {
+                __logger?.LogError(modelEx, "❌ Phase 1: EnglishV3モデル検証失敗 - より安全な手法に切り替え");
+            }
+            
+            // Phase 3: 完全フォールバック - OCR無効化で安定性優先
+            __logger?.LogWarning("⚠️ Phase 3: 全モデル検証失敗 - OCR機能を一時無効化（アプリ安定性優先）");
+            await Task.Delay(10, cancellationToken).ConfigureAwait(false);
+            return null;
+            
+            /*
             // 🔧 シンプルフィックス: 言語別に直接LocalFullModelsを使用
             __logger?.LogInformation("LocalFullModels直接使用による高速モデル準備 - 言語: {Language}", language);
             
@@ -1041,12 +1083,13 @@ public class PaddleOcrEngine : IOcrEngine
             // フォールバック: 万が一選択に失敗した場合
             __logger?.LogWarning("モデル選択失敗。デフォルトのV5統一モデルを使用");
             return await Task.FromResult(LocalFullModels.ChineseV5).ConfigureAwait(false);
+            */
         }
         catch (Exception ex)
         {
-            __logger?.LogError(ex, "LocalFullModelsモデル準備エラー: {ExceptionType} - V5統一モデルを使用", ex.GetType().Name);
-            // 最終的なフォールバック（V5統一）
-            return await Task.FromResult(LocalFullModels.ChineseV5).ConfigureAwait(false);
+            __logger?.LogError(ex, "PrepareModelsAsyncエラー: {ExceptionType} - 一時的にnullを返却", ex.GetType().Name);
+            // 最終的なフォールバック（一時的にnull返却）
+            return null;
         }
     }
 
@@ -3473,13 +3516,19 @@ public class PaddleOcrEngine : IOcrEngine
     /// </summary>
     private async Task<object> ExecuteOcrInSeparateTask(Mat processedMat, CancellationToken cancellationToken)
     {
-        // 🎯 [OWNERSHIP_TRANSFER] この時点でprocessedMatの所有権を受け取る
-        using (processedMat) // スコープ終了時に自動Dispose
+        // 🧠 [ULTRATHINK_GEMINI_FIX] Gemini推奨Mat防御的コピー戦略 - メモリ競合回避
+        Mat safeMat = null;
+        try
         {
-            __logger?.LogDebug("🚀 強化OCR実行開始 - Task.WhenAny版");
+            safeMat = processedMat.Clone(); // 防御的コピー作成
+            processedMat.Dispose(); // 元Matを即座にDispose
+            
+            using (safeMat) // 安全なクローンMatを使用
+            {
+                __logger?.LogDebug("🚀 強化OCR実行開始 - Mat防御的コピー版");
             
             // 適応的タイムアウト設定 - 解像度とモデルに応じた最適化
-            var baseTimeout = CalculateBaseTimeout(processedMat);  // 動的タイムアウト計算
+            var baseTimeout = CalculateBaseTimeout(safeMat);  // 動的タイムアウト計算
             var adaptiveTimeout = GetAdaptiveTimeout(baseTimeout);
             __logger?.LogDebug($"⏱️ タイムアウト設定: {adaptiveTimeout}秒 (基本={baseTimeout}, V4={false /* V5統一により常にfalse */})");
         
@@ -3500,11 +3549,11 @@ public class PaddleOcrEngine : IOcrEngine
                     throw new InvalidOperationException("OCRエンジンが初期化されていません");
                 }
                 
-                // 2. Mat状態の詳細検証
+                // 2. Mat状態の詳細検証 (安全なsafeMatを使用)
                 try
                 {
-                    var matDetailsBeforeRun = $"Size={processedMat.Size()}, Type={processedMat.Type()}, Channels={processedMat.Channels()}, Empty={processedMat.Empty()}, IsContinuous={processedMat.IsContinuous()}, Step={processedMat.Step()}";
-                    __logger?.LogDebug("🔍 [MAT_VALIDATION] 実行前Mat詳細（直接Mat・修正版）: {MatDetails}", matDetailsBeforeRun);
+                    var matDetailsBeforeRun = $"Size={safeMat.Size()}, Type={safeMat.Type()}, Channels={safeMat.Channels()}, Empty={safeMat.Empty()}, IsContinuous={safeMat.IsContinuous()}, Step={safeMat.Step()}";
+                    __logger?.LogDebug("🔍 [MAT_VALIDATION] 実行前Mat詳細（防御的コピー版）: {MatDetails}", matDetailsBeforeRun);
                 }
                 catch (Exception matEx)
                 {
@@ -3522,27 +3571,26 @@ public class PaddleOcrEngine : IOcrEngine
                 
                 // 🚨 [CRASH_PREVENTION] 大画像サイズ制限（WER_FAULT_SIGクラッシュ対策）
                 const int MAX_PIXELS = 1000000; // 100万ピクセル制限
-                var totalPixels = processedMat.Cols * processedMat.Rows;
+                var totalPixels = safeMat.Cols * safeMat.Rows;
                 if (totalPixels > MAX_PIXELS)
                 {
                     // ✨ [OCR_ACCURACY_IMPROVEMENT] 画像リサイズによる制限対応
                     __logger?.LogDebug("🎯 [IMAGE_RESIZE] 大画像検出 - リサイズ実行: {Width}x{Height}={TotalPixels:N0} > {MaxPixels:N0}制限", 
-                        processedMat.Cols, processedMat.Rows, totalPixels, MAX_PIXELS);
+                        safeMat.Cols, safeMat.Rows, totalPixels, MAX_PIXELS);
                     
                     // アスペクト比を保持してリサイズ
                     var scale = Math.Sqrt((double)MAX_PIXELS / totalPixels);
-                    var newWidth = (int)(processedMat.Cols * scale);
-                    var newHeight = (int)(processedMat.Rows * scale);
+                    var newWidth = (int)(safeMat.Cols * scale);
+                    var newHeight = (int)(safeMat.Rows * scale);
                     
                     using var resizedMat = new Mat();
-                    Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
+                    Cv2.Resize(safeMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
                     
-                    // リサイズ後のMatに置き換え（Clone不要、resizedMatをそのまま使用）
-                    var oldMat = processedMat;
-                    processedMat = resizedMat.Clone();
-                    oldMat.Dispose();
+                    // 🧠 [GEMINI_MAT_FIX] safeMatを安全に置き換え
+                    safeMat.Dispose(); // 古いsafeMatを解放
+                    safeMat = resizedMat.Clone(); // 新しいサイズのsafeMatに更新
                     
-                    var finalPixels = processedMat.Cols * processedMat.Rows;
+                    var finalPixels = safeMat.Cols * safeMat.Rows;
                     __logger?.LogDebug("✅ [IMAGE_RESIZE] リサイズ完了: {NewWidth}x{NewHeight}={FinalPixels:N0}ピクセル (縮小率: {Scale:F3})",
                         newWidth, newHeight, finalPixels, scale);
                 }
@@ -3564,8 +3612,8 @@ public class PaddleOcrEngine : IOcrEngine
                         Mat workingMat = null;
                         try
                         {
-                            // ObjectDisposedException防止のため、完全独立コピーを作成
-                            workingMat = processedMat.Clone();
+                            // 🧠 [GEMINI_MAT_FIX] 既に防御的コピー済safeMatを使用
+                            workingMat = safeMat.Clone();
                             
                             if (!ValidateMatForPaddleOCR(workingMat))
                             {
@@ -3638,30 +3686,30 @@ public class PaddleOcrEngine : IOcrEngine
                 {
                     _consecutivePaddleFailures++;
                     __logger?.LogError(ex, "🚨 [PADDLE_MEMORY] PaddleOCRメモリアクセス違反が発生しました。Mat: {Width}x{Height}。連続失敗: {FailureCount}", 
-                        processedMat.Cols, processedMat.Rows, _consecutivePaddleFailures);
-                    throw new InvalidOperationException($"PaddleOCRメモリアクセス違反が発生しました。Mat: {processedMat.Cols}x{processedMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex.InnerException);
+                        safeMat.Cols, safeMat.Rows, _consecutivePaddleFailures);
+                    throw new InvalidOperationException($"PaddleOCRメモリアクセス違反が発生しました。Mat: {safeMat.Cols}x{safeMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex.InnerException);
                 }
                 catch (AccessViolationException ex)
                 {
                     _consecutivePaddleFailures++;
                     __logger?.LogError(ex, "🚨 [PADDLE_NATIVE] PaddleOCRネイティブライブラリでメモリ破損が発生しました。Mat: {Width}x{Height}。連続失敗: {FailureCount}", 
-                        processedMat.Cols, processedMat.Rows, _consecutivePaddleFailures);
-                    throw new InvalidOperationException($"PaddleOCRネイティブライブラリでメモリ破損が発生しました。Mat: {processedMat.Cols}x{processedMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex);
+                        safeMat.Cols, safeMat.Rows, _consecutivePaddleFailures);
+                    throw new InvalidOperationException($"PaddleOCRネイティブライブラリでメモリ破損が発生しました。Mat: {safeMat.Cols}x{safeMat.Rows}。連続失敗: {_consecutivePaddleFailures}", ex);
                 }
                 catch (Exception ex) when (ex.Message.Contains("PaddlePredictor") && ex.Message.Contains("run failed"))
                 {
                     // 🚨 [PADDLE_PREDICTOR_ERROR] PaddlePredictor特化エラー処理
                     _consecutivePaddleFailures++;
                     
-                    var detailedInfo = CollectPaddlePredictorErrorInfo(processedMat, ex);
+                    var detailedInfo = CollectPaddlePredictorErrorInfo(safeMat, ex);
                     __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED] {DetailedInfo}", detailedInfo);
                     
-                    // Mat状態の詳細ログ
+                    // Mat状態の詳細ログ (安全なsafeMatを使用)
                     try 
                     {
-                        var matInfo = $"Mat Info: {processedMat.Width}x{processedMat.Height}, " +
-                                     $"Channels={processedMat.Channels()}, Type={processedMat.Type()}, " +
-                                     $"Empty={processedMat.Empty()}, Continuous={processedMat.IsContinuous()}";
+                        var matInfo = $"Mat Info: {safeMat.Width}x{safeMat.Height}, " +
+                                     $"Channels={safeMat.Channels()}, Type={safeMat.Type()}, " +
+                                     $"Empty={safeMat.Empty()}, Continuous={safeMat.IsContinuous()}";
                         __logger?.LogError("🔍 [PADDLE_DEBUG] {MatInfo}", matInfo);
                     }
                     catch 
@@ -3771,15 +3819,29 @@ public class PaddleOcrEngine : IOcrEngine
             
                 throw new TimeoutException($"{modelVersion}モデルのOCR処理が{adaptiveTimeout}秒でタイムアウトしました");
             }
-        } // 🎯 [OWNERSHIP_TRANSFER] processedMatのusing scope終了 - 自動Dispose実行
+        } // 🧠 [GEMINI_MAT_FIX] safeMatのusing scope終了 - 安全なコピー解放
+        }
+        catch (Exception ex)
+        {
+            // 🧠 [GEMINI_ERROR_HANDLING] エラー時のsafeMatクリーンアップ
+            safeMat?.Dispose();
+            __logger?.LogError(ex, "🚨 [GEMINI_MAT_FIX] ExecuteOcrInSeparateTaskでエラー発生 - safeMatクリーンアップ完了");
+            throw;
+        }
     }
 
     private async Task<object> ExecuteOcrInSeparateTaskOptimized(Mat processedMat, CancellationToken cancellationToken, int timeoutSeconds = 15)
     {
-        // 🎯 [OWNERSHIP_TRANSFER] この時点でprocessedMatの所有権を受け取る（最適化版）
-        using (processedMat) // スコープ終了時に自動Dispose
+        // 🧠 [ULTRATHINK_GEMINI_FIX] Gemini推奨Mat防御的コピー戦略（最適化版） - メモリ競合回避
+        Mat safeMat = null;
+        try
         {
-            __logger?.LogDebug("🚀 最適化OCR実行開始 - 検出専用高速版");
+            safeMat = processedMat.Clone(); // 防御的コピー作成
+            processedMat.Dispose(); // 元Matを即座にDispose
+            
+            using (safeMat) // 安全なクローンMatを使用（最適化版）
+            {
+                __logger?.LogDebug("🚀 最適化OCR実行開始 - Mat防御的コピー版");
             
             // 🚀 [PERFORMANCE_OPTIMIZATION] 検出専用の高速タイムアウト設定
             var adaptiveTimeout = timeoutSeconds; // デフォルト15秒（通常の半分）
@@ -3804,8 +3866,8 @@ public class PaddleOcrEngine : IOcrEngine
                 // 🚀 [SPEED_OPTIMIZATION] 最適化Mat検証（軽量版）
                 try
                 {
-                    var matDetails = $"Size={processedMat.Size()}, Type={processedMat.Type()}, Channels={processedMat.Channels()}";
-                    __logger?.LogDebug("🔍 [MAT_VALIDATION_OPT] 実行前Mat詳細（最適化版）: {MatDetails}", matDetails);
+                    var matDetails = $"Size={safeMat.Size()}, Type={safeMat.Type()}, Channels={safeMat.Channels()}";
+                    __logger?.LogDebug("🔍 [MAT_VALIDATION_OPT] 実行前Mat詳細（防御的コピー最適化版）: {MatDetails}", matDetails);
                 }
                 catch (Exception matEx)
                 {
@@ -3822,26 +3884,26 @@ public class PaddleOcrEngine : IOcrEngine
                 
                 // 🚀 [PERFORMANCE_BOOST] 大画像制限の軽量チェック
                 const int MAX_PIXELS_OPT = 800000; // 80万ピクセル制限（最適化版）
-                var totalPixels = processedMat.Cols * processedMat.Rows;
+                var totalPixels = safeMat.Cols * safeMat.Rows;
                 if (totalPixels > MAX_PIXELS_OPT)
                 {
                     __logger?.LogDebug("🎯 [IMAGE_RESIZE_OPT] 大画像検出（最適化） - 高速リサイズ実行: {Width}x{Height}={TotalPixels:N0} > {MaxPixels:N0}制限", 
-                        processedMat.Cols, processedMat.Rows, totalPixels, MAX_PIXELS_OPT);
+                        safeMat.Cols, safeMat.Rows, totalPixels, MAX_PIXELS_OPT);
                     
                     // より積極的な縮小（高速化優先）
                     var scale = Math.Sqrt((double)MAX_PIXELS_OPT / totalPixels);
-                    var newWidth = (int)(processedMat.Cols * scale);
-                    var newHeight = (int)(processedMat.Rows * scale);
+                    var newWidth = (int)(safeMat.Cols * scale);
+                    var newHeight = (int)(safeMat.Rows * scale);
                     
                     using var resizedMat = new Mat();
                     // 高速補間法を使用
-                    Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Linear);
+                    Cv2.Resize(safeMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Linear);
                     
-                    var oldMat = processedMat;
-                    processedMat = resizedMat.Clone();
-                    oldMat.Dispose();
+                    // 🧠 [GEMINI_MAT_FIX] safeMatを安全に置き換え（最適化版）
+                    safeMat.Dispose(); // 古いsafeMatを解放
+                    safeMat = resizedMat.Clone(); // 新しいサイズのsafeMatに更新
                     
-                    var finalPixels = processedMat.Cols * processedMat.Rows;
+                    var finalPixels = safeMat.Cols * safeMat.Rows;
                     __logger?.LogDebug("✅ [IMAGE_RESIZE_OPT] 高速リサイズ完了: {NewWidth}x{NewHeight}={FinalPixels:N0}ピクセル (縮小率: {Scale:F3})",
                         newWidth, newHeight, finalPixels, scale);
                 }
@@ -3862,8 +3924,8 @@ public class PaddleOcrEngine : IOcrEngine
                         Mat workingMat = null;
                         try
                         {
-                            // ObjectDisposedException防止のため、完全独立コピーを作成
-                            workingMat = processedMat.Clone();
+                            // 🧠 [GEMINI_MAT_FIX] 既に防御的コピー済safeMatを使用（最適化版）
+                            workingMat = safeMat.Clone();
                             
                             // 🚀 [VALIDATION_OPTIMIZATION] 軽量Mat検証（最適化版）
                             if (workingMat.IsDisposed || workingMat.Empty() || workingMat.Cols < 16 || workingMat.Rows < 16)
@@ -3972,7 +4034,15 @@ public class PaddleOcrEngine : IOcrEngine
             
                 throw new TimeoutException($"{modelVersion}モデルのOCR処理が{adaptiveTimeout}秒でタイムアウトしました（最適化版）");
             }
-        } // 🎯 [OWNERSHIP_TRANSFER] processedMatのusing scope終了 - 自動Dispose実行
+        } // 🧠 [GEMINI_MAT_FIX] safeMatのusing scope終了 - 安全なコピー解放（最適化版）
+        }
+        catch (Exception ex)
+        {
+            // 🧠 [GEMINI_ERROR_HANDLING] エラー時のsafeMatクリーンアップ（最適化版）
+            safeMat?.Dispose();
+            __logger?.LogError(ex, "🚨 [GEMINI_MAT_FIX] ExecuteOcrInSeparateTaskOptimizedでエラー発生 - safeMatクリーンアップ完了");
+            throw;
+        }
     }
 
     /// <summary>

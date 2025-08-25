@@ -48,8 +48,7 @@ namespace Baketa.UI.DI.Modules;
             // 翻訳フローモジュールをDIコンテナに登録
             services.AddSingleton<TranslationFlowModule>();
             
-            // 翻訳フローイベントプロセッサーを登録
-            services.AddSingleton<TranslationFlowEventProcessor>();
+            // 翻訳フローイベントプロセッサーは UIServiceCollectionExtensions で登録済み
         }
 
         /// <summary>
@@ -65,8 +64,8 @@ namespace Baketa.UI.DI.Modules;
             services.AddSingleton<OverlayViewModel>();
             services.AddSingleton<HistoryViewModel>();
             
-            // 操作UI ViewModel（依存関係あり）
-            services.AddSingleton<Baketa.UI.ViewModels.Controls.OperationalControlViewModel>();
+            // 🗑️ [CLEANUP] OperationalControlViewModel削除 - 未使用コンポーネントのため除去
+            // services.AddSingleton<Baketa.UI.ViewModels.Controls.OperationalControlViewModel>();
             
             // 設定ビューモデル
             services.AddSingleton<AccessibilitySettingsViewModel>();

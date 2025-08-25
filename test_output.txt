@@ -1,0 +1,447 @@
+?? [ENCODING_INIT] Failed to configure UTF-8 console: ハンドルが無効です。
+[19:10:22.064] ?? Performance Logging System Initialized
+[19:10:22.070] ???  System: Microsoft Windows NT 10.0.26100.0
+[19:10:22.072] ?? Memory: 0MB
+[19:10:22.074] ???  Runtime: 8.0.19
+[19:10:22.076] ?? WorkDir: E:\dev\Baketa
+[19:10:22.078] ?? BaseDir: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+[19:10:22.085] ?? START [OverallProcessing_0001_191022_085] OverallProcessing: アプリケーション起動全体
+[19:10:22.086] ?? Baketa.UI.exe 起動開始
+[19:10:22.088] ?? CHECKPOINT [OverallProcessing_0001_191022_085] 統一ログシステム初期化完了 - Elapsed: 2.8ms
+?? DIコンテナの初期化開始
+?? ConfigureServices開始
+?? Debugger.IsAttached: False
+?? 環境: Development (OCR設定確保のため強制Development)
+?? [CONFIG_PATH_DEBUG] Base Directory: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+?? [CONFIG_PATH_DEBUG] Current Directory: E:\dev\Baketa
+?? [CONFIG_PATH_DEBUG] appsettings.json exists in BaseDirectory: True
+?? [CONFIG_PATH_DEBUG] appsettings.json exists in CurrentDirectory: True
+?? [CONFIG_PATH_DEBUG] Selected config base path: E:\dev\Baketa
+?? [CONFIG_PATH_DEBUG] Environment config file: appsettings.Development.json
+?? [CONFIG_PATH_DEBUG] Environment config file exists: True
+?? [CONFIG_DETAILED] All configuration keys:
+?? [CONFIG_DETAILED] OCR = 
+?? [CONFIG_DETAILED] OCR:RecognitionThreshold = 0.6
+?? [CONFIG_DETAILED] OCR:LogPerformanceMetrics = True
+?? [CONFIG_DETAILED] OCR:LogModelInfo = True
+?? [CONFIG_DETAILED] OCR:EnableDebugLogging = True
+?? [CONFIG_DETAILED] OCR:DetectionThreshold = 0.03
+?? [CONFIG_DETAILED] Logging:LogLevel:Baketa.Infrastructure.OCR = Debug
+?? [FIRST] DiagnosticModule最優先登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+? [FIRST] DiagnosticModule最優先登録完了
+?? Phase 2-1: 基盤モジュール群登録開始
+??? Core基盤モジュール登録開始
+? Core基盤モジュール登録完了
+?? 設定システム登録開始
+? 設定システム登録完了
+?? Infrastructure基盤モジュール登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+?? スティッキーROIシステム登録開始 - Issue #143 Week 3
+? IStickyRoiManager登録完了 - InMemory実装
+? StickyRoiEnhancedOcrEngine登録完了 - デコレーター実装
+? スティッキーROIシステム登録完了
+?? OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効
+? FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）
+?? OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み
+?? Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: 0）
+?? [PHASE2] サーキットブレーカー登録開始
+? [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s
+?? [DI_DEBUG] PythonServerHealthMonitor登録開始
+? [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能
+?? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始
+? TranslationMetricsCollector登録完了
+? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了
+?? Issue #147 Phase 5: ポート競合防止機構サービス登録開始
+? PortManagementService登録完了 - Mutexプロセス間競合防止
+? PythonServerManager登録完了 - 動的ポート管理・自動復旧
+?? Phase 5: ポート競合防止機構サービス登録完了
+?? ウォームアップサービス登録開始 - Issue #143
+? IWarmupService登録完了
+? WarmupHostedService登録完了
+?? GPU統合サービス登録開始 - Issue #143 Week 2
+? IOnnxSessionFactory登録完了 - DI統合
+? IOnnxModelConfiguration登録完了 - モデル外部化
+? IPersistentSessionCache登録完了 - 永続キャッシュ
+? IGpuOcrEngine登録完了 - Mock実装
+? GPU統合サービス登録完了
+?? 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator登録完了 - 統合最適化システム
+?? PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム
+? 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）
+?? [PHASE3] 動的リソース監視システム登録開始
+? [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分
+?? [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます
+?? [PHASE3] 動的リソース監視システム登録完了
+? Infrastructure基盤モジュール登録完了
+??? Platform基盤モジュール登録開始
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+? Platform基盤モジュール登録完了
+?? AdaptiveCapture基盤モジュール登録開始
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+? AdaptiveCapture基盤モジュール登録完了
+?? Auth基盤モジュール登録開始
+? Auth基盤モジュール登録完了
+?? 基盤モジュール登録済み数: 6
+? Phase 2-1: 基盤モジュール群登録完了
+?? Phase 2-2: アプリケーション・特殊機能モジュール群登録開始
+?? ApplicationModule登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+?? スティッキーROIシステム登録開始 - Issue #143 Week 3
+? IStickyRoiManager登録完了 - InMemory実装
+? StickyRoiEnhancedOcrEngine登録完了 - デコレーター実装
+? スティッキーROIシステム登録完了
+?? OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効
+? FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）
+?? OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み
+?? Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: 1）
+?? [PHASE2] サーキットブレーカー登録開始
+? [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s
+?? [DI_DEBUG] PythonServerHealthMonitor登録開始
+? [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能
+?? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始
+? TranslationMetricsCollector登録完了
+? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了
+?? Issue #147 Phase 5: ポート競合防止機構サービス登録開始
+? PortManagementService登録完了 - Mutexプロセス間競合防止
+? PythonServerManager登録完了 - 動的ポート管理・自動復旧
+?? Phase 5: ポート競合防止機構サービス登録完了
+?? ウォームアップサービス登録開始 - Issue #143
+? IWarmupService登録完了
+? WarmupHostedService登録完了
+?? GPU統合サービス登録開始 - Issue #143 Week 2
+? IOnnxSessionFactory登録完了 - DI統合
+? IOnnxModelConfiguration登録完了 - モデル外部化
+? IPersistentSessionCache登録完了 - 永続キャッシュ
+? IGpuOcrEngine登録完了 - Mock実装
+? GPU統合サービス登録完了
+?? 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator登録完了 - 統合最適化システム
+?? PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム
+? 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）
+?? [PHASE3] 動的リソース監視システム登録開始
+? [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分
+?? [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます
+?? [PHASE3] 動的リソース監視システム登録完了
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録開始
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録完了 - AdaptiveCaptureServiceをメインとして使用
+?? [DI_DEBUG] StreamingTranslationService登録開始
+? [DI_DEBUG] StreamingTranslationService登録完了
+?? [DI_DEBUG] TranslationDictionaryService登録開始
+? [DI_DEBUG] TranslationDictionaryService登録完了
+? ApplicationModule登録完了
+?? [GEMINI] StagedOcrStrategyModule登録開始...
+?? HighPerformanceOcrModule.RegisterServices 実行中！
+? [GEMINI] StagedOcrStrategyModule登録完了！
+?? [GEMINI] AdvancedCachingModule登録開始...
+?? AdvancedCachingModule.RegisterServices 実行中！
+? IAdvancedOcrCacheService登録完了
+? Step3: 高度キャッシング戦略登録完了
+?? 期待効果: キャッシュヒット時 数ミリ秒応答
+? [GEMINI] AdvancedCachingModule登録完了！
+?? UIModule登録開始
+? UIModule登録完了
+??? OverlayUIModule登録開始
+? OverlayUIModule登録完了
+?? BatchOcrModule登録開始
+? BatchOcrModule登録完了
+?? OcrProcessingModule登録開始
+? OcrProcessingModule登録完了
+?? OpenCvProcessingModule登録開始
+? OpenCvProcessingModule登録完了
+?? PaddleOcrModule登録開始
+?? パフォーマンス改善: OCRエンジンオブジェクトプーリング登録開始
+? IPaddleOcrEngineFactory登録完了（プール用ファクトリ）
+?? 既存のIOcrEngine Transient登録を削除
+? IPooledObjectPolicy<IOcrEngine>の登録完了
+? DefaultObjectPoolProviderの登録完了
+? ObjectPool<IOcrEngine>の登録完了
+?? OCRエンジンオブジェクトプーリングの登録が完了しました
+?? 期待効果: AccessViolationException根絶 + パフォーマンス大幅向上
+? PaddleOcrModule登録完了
+?? Phase4: UnifiedGpuModule登録開始
+? Phase4: UnifiedGpuModule登録完了
+?? アダプターサービス登録開始
+? アダプターサービス登録完了
+?? アプリケーション・特殊機能モジュール登録済み数: 11
+? Phase 2-2: アプリケーション・特殊機能モジュール群登録完了
+=== DI Service Registration Debug ===
+ISettingsService registrations count: 1
+  - ServiceType: ISettingsService
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationEngine registrations count: 1
+  - ServiceType: ITranslationEngine
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationService registrations count: 2
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+AccessibilitySettingsViewModel registrations count: 1
+IOcrPreprocessingService registrations count: 2
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: SimpleOcrPreprocessingService
+  - Lifetime: Transient
+  - ImplementationFactory: No
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: Factory
+  - Lifetime: Transient
+  - ImplementationFactory: Yes
+  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)
+=== ?? Diagnostic Services Registration Debug ===
+IDiagnosticCollectionService registrations count: 3
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+IDiagnosticReportGenerator registrations count: 3
+IBackgroundTaskQueue registrations count: 3
+DiagnosticEventProcessor registrations count: 3
+=== ?? End Diagnostic Services Debug ===
+=== ViewModel Registration Debug ===
+AccessibilitySettingsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: AccessibilitySettingsViewModel
+LanguagePairsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: LanguagePairsViewModel
+??? ServiceProvider構築開始
+? ServiceProvider構築完了
+?? ReactiveUI設定開始
+? ReactiveUI設定完了
+?????? [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ ??????
+?????? [DIRECT_DEBUG] IDiagnosticCollectionService解決試行中... ??????
+dbug: Baketa.Infrastructure.OCR.PaddleOCR.Models.DefaultModelPathResolver[0]
+      DefaultModelPathResolver initialized with base directory: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\models
+info: Baketa.Infrastructure.Memory.Pools.AdvancedImagePool[0]
+      ???♂? AdvancedImagePool initialized with capacity: 50
+info: Baketa.Infrastructure.OCR.PostProcessing.HybridOcrPostProcessorFactory[0]
+      ハイブリッドOCR後処理プロセッサを作成中
+info: Baketa.Infrastructure.OCR.PostProcessing.HybridOcrPostProcessorFactory[0]
+      ハイブリッドOCR後処理プロセッサ作成完了
+?? PaddleOCR環境判定開始
+?? 高機能版OCR構成：環境変数が設定されていないため、高機能版PaddleOcrEngineを使用
+?? BAKETA_FORCE_PRODUCTION_OCR環境変数: '' (強制本番モード: True)
+?? BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      環境変数により本番OCRエンジンを強制使用
+?? [CONFIG_DEBUG] Configuration available: True
+?? [CONFIG_DEBUG] Top-level section: DebugOptions
+?? [CONFIG_DEBUG] Top-level section: DiagnosticsSettings
+?? [CONFIG_DEBUG] Top-level section: DirectML
+?? [CONFIG_DEBUG] Top-level section: GeminiApi
+?? [CONFIG_DEBUG] Top-level section: GpuBenchmark
+?? [CONFIG_DEBUG] Top-level section: HybridTranslation
+?? [CONFIG_DEBUG] Top-level section: Logging
+?? [CONFIG_DEBUG] Top-level section: OCR
+?? [CONFIG_DEBUG] OCR child: DetectionThreshold
+?? [CONFIG_DEBUG] OCR child: EnableDebugLogging
+?? [CONFIG_DEBUG] OCR child: LogModelInfo
+?? [CONFIG_DEBUG] OCR child: LogPerformanceMetrics
+?? [CONFIG_DEBUG] OCR child: RecognitionThreshold
+?? [CONFIG_DEBUG] Top-level section: OpenVINO
+?? [CONFIG_DEBUG] Top-level section: ResourceMonitoring
+?? [CONFIG_DEBUG] Top-level section: SentencePiece
+?? [CONFIG_DEBUG] Top-level section: Translation
+?? [CONFIG_DEBUG] Top-level section: TranslationEngineStatus
+?? [CONFIG_DEBUG] Top-level section: UnifiedGpu
+?? [CONFIG_DEBUG] OCR:PaddleOCR section exists: False
+?? [CONFIG_DEBUG] EnableHybridMode raw value: ''
+?? [CONFIG_DEBUG] Alternative access OCR.PaddleOCR exists: False
+?? [CONFIG_DEBUG] Alternative EnableHybridMode: ''
+?? appsettings.json OCR:PaddleOCR セクションが見つかりません - デフォルト値を使用
+?? ハイブリッドモード設定: False
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ハイブリッドモード設定: False
+info: Baketa.Infrastructure.Performance.GpuMemoryManager[0]
+      ?? GpuMemoryManager initialized
+info: Baketa.Infrastructure.Services.Settings.UnifiedSettingsService[0]
+      UnifiedSettingsService初期化完了 - 監視ディレクトリ: C:\Users\suke0\.baketa\settings
+[19:10:22.266] ?? PaddleOcrEngine静的コンストラクタ実行
+warn: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOcrEngine インスタンス #1 が作成されました
+info: Baketa.Infrastructure.OCR.GPU.MockGpuOcrEngine[0]
+      ?? MockGpuOcrEngine初期化完了 - 仮想GPU加速OCR開始
+info: Baketa.Infrastructure.OCR.StickyRoi.InMemoryStickyRoiManager[0]
+      ?? InMemoryStickyRoiManager初期化完了 - スティッキーROIシステム開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuDeviceManager[0]
+      ?? WindowsGpuDeviceManager初期化完了 - Multi-GPU管理開始
+info: Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionFactory[0]
+      ?? DefaultOnnxSessionFactory初期化完了 - DI Container統合
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ??? WindowsTdrRecoveryManager初期化完了 - TDR監視開始
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? メタデータキャッシュ初期化完了 - 読み込み: 0件
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? FileBasedSessionCache初期化完了 - パス: C:\Users\suke0\AppData\Local\Baketa\SessionCache
+info: Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator[0]
+      ?? IntegratedPerformanceOrchestrator初期化完了 - 統合最適化システム開始
+info: Baketa.Infrastructure.Performance.AsyncPerformanceAnalyzer[0]
+      ? AsyncPerformanceAnalyzer initialized for performance monitoring
+dbug: Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator[0]
+      ?? 統合システム初期化開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ?? TDR監視開始
+?? [DIAGNOSTIC] IOptions<RoiDiagnosticsSettings>取得結果: 成功
+?? [DIAGNOSTIC] RoiDiagnosticsSettings値: 存在
+?? [DIAGNOSTIC] ROI画像出力パス: C:\Users\suke0\AppData\Roaming\Baketa\ROI\Images
+?? [DIAGNOSTIC] ROI画像出力有効: True
+info: Baketa.Infrastructure.DI.Modules.InfrastructureModule[0]
+      ?? AdaptiveTileStrategy登録完了 - 高速テキスト検出→ROIベース認識（ROI画像保存機能付き）
+?? [BATCH-DI] ImageDiagnosticsSaver注入確認: True
+?? [BATCH-DI] 他の依存関係確認: OCR=True, Options=True
+? [BATCH-DI] BatchOcrProcessor作成完了（diagnosticsSaver注入済み）
+?? [DIAGNOSTIC] レポートディレクトリチェック開始: 'C:\Users\suke0\AppData\Roaming\Baketa\Reports'
+? [DIAGNOSTIC] ディレクトリは既に存在
+??? [DIRECT_SUCCESS] IDiagnosticCollectionService解決成功: DiagnosticCollectionService ???
+?? 診断システム直接初期化非同期開始完了
+?????? [MAIN_DIAGNOSTIC] 診断システム直接初期化完了！ ??????
+?? OCRエンジン事前初期化開始（バックグラウンド）
+?? Phase4: 統合GPU最適化システム初期化開始
+?? [DIRECT_DEBUG] 診断データ収集開始中...
+?? [DIAGNOSTIC_COLLECTION] 診断データ収集開始 - IsCollecting=true
+? 診断データ収集開始完了
+info: Baketa.Infrastructure.Services.DiagnosticCollectionService[0]
+      診断データ収集開始
+?? 統合GPU最適化システム初期化開始
+?? OCRエンジン事前初期化開始
+?? OCRエンジンサービス取得成功 - 初期化開始
+[19:10:22.297] ?? CHECKPOINT [OverallProcessing_0001_191022_085] Avalonia アプリケーション開始準備完了 - Elapsed: 212.7ms
+[19:10:22.298] ?? Avalonia アプリケーション開始
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOCR initialization bottleneck analysis started.
+warn: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? PaddleOcrEngine インスタンス #2 が作成されました
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? 多重インスタンス検出! 合計: 2個
+info: Baketa.Infrastructure.OCR.GPU.UnifiedGpuOptimizer[0]
+      UnifiedGpuOptimizer initialized with 3 providers
+?? UnifiedGpuInitializer取得成功 - 初期化開始
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ?? Initializing Unified GPU Optimization System
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector[0]
+      GPU環境検出開始
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at PaddleOcrEngine.TrackInstanceCreation in PaddleOcrEngine.cs:line 148
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at <InitializeAsync>d__51.MoveNext in PaddleOcrEngine.cs:line 189
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at AsyncMethodBuilderCore.Start in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at AsyncTaskMethodBuilder`1.Start in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at PaddleOcrEngine.InitializeAsync in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at <PreInitializeOcrEngineAsync>d__12.MoveNext in Program.cs:line 582
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at AsyncMethodBuilderCore.Start in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at Program.PreInitializeOcrEngineAsync in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at Task`1.InnerInvoke in (null):line 0
+fail: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+        at ExecutionContext.RunFromThreadPoolDispatchLoop in (null):line 0
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 1: Instance tracking finished in 9ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 2: Settings validation finished in 0ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      PaddleOCRエンジンの初期化開始 - 言語: jpn, GPU: False, マルチスレッド: False
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 3: Settings preparation finished in 0ms.
+dbug: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ネイティブライブラリのチェック成功 - OpenCvSharp4 v4.10+ (Size: 1x1)
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 4: Native library check finished in 15ms.
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      LocalFullModels直接使用による高速モデル準備 - 言語: jpn
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      LocalFullModelsモデル選択成功: jpn → V5統一モデル
+info: Baketa.Infrastructure.OCR.PaddleOCR.Engine.PaddleOcrEngine[0]
+      ?? Step 5: Model preparation finished in 1063ms.
+?? イベント発行: PipelineDiagnosticEvent (ID: 0e49a1cd-7edb-48bb-8b57-3dc97a525012)
+?? イベント PipelineDiagnosticEvent のプロセッサが登録されていません
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント発行: PipelineDiagnosticEvent (ID: 0e49a1cd-7edb-48bb-8b57-3dc97a525012)
+?? 診断テストイベント発行完了（直接初期化版）
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント PipelineDiagnosticEvent のプロセッサが登録されていません
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector[0]
+      GPU環境検出完了: NVIDIA GeForce RTX 4070, CUDA:True, DirectML:True, VRAM:4095MB
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.CpuExecutionProviderFactory[0]
+      CPU provider always supported as fallback
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.OpenVINOExecutionProviderFactory[0]
+      OpenVINO not supported by current environment
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.DirectMLExecutionProviderFactory[0]
+      DirectML requires DirectX 11.1 or higher
+info: Baketa.Infrastructure.OCR.GPU.UnifiedGpuOptimizer[0]
+      Selected optimal provider: CPU (Priority: 10) for environment: CPU Provider (16 threads)
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ?? Selected optimal provider: CPU
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ? Unified GPU System initialization completed
+? 統合GPU最適化システム初期化完了 - 初期化時間: 3262ms
+?? [DIAGNOSTIC_COLLECTION] GenerateReportAsync開始 - reportType: direct_init_test, IsCollecting: True
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents呼び出し前 - キューサイズ: 0
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents完了 - 取得イベント数: 0
+?? [DIAGNOSTIC_COLLECTION] 警告: 生成する診断イベントがありません
+?? 手動レポート生成完了（直接初期化版）: 
+warn: Baketa.Infrastructure.Services.DiagnosticCollectionService[0]
+      生成する診断イベントがありません

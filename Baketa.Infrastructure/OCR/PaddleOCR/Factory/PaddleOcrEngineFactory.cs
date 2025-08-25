@@ -182,12 +182,12 @@ internal sealed class NonSingletonPaddleOcrEngine(
 {
 
     /// <summary>
-    /// プール化環境ではシングルトンチェックをスキップ
+    /// ❌ DI競合解決: インスタンス追跡を完全廃止（親クラスのメソッドがコメントアウト済み）
     /// </summary>
-    protected override void TrackInstanceCreation()
-    {
-        // シングルトンチェックを無効化 - プール環境では複数インスタンスが正常
-        // ログのみ出力してエラーチェックはスキップ
-        Console.WriteLine($"🏊 NonSingletonPaddleOcrEngine: プール用インスタンス作成 - Hash: {this.GetHashCode()}");
-    }
+    // protected override void TrackInstanceCreation()
+    // {
+    //     // シングルトンチェックを無効化 - プール環境では複数インスタンスが正常
+    //     // ログのみ出力してエラーチェックはスキップ
+    //     Console.WriteLine($"🏊 NonSingletonPaddleOcrEngine: プール用インスタンス作成 - Hash: {this.GetHashCode()}");
+    // }
 }

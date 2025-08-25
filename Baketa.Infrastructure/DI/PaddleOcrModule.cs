@@ -422,79 +422,10 @@ public sealed class PaddleOcrModule : IServiceModule
             return settings;
         });
 
-        // OCRエンジン（IOcrEngineインターフェース準拠）
-        services.AddSingleton<IOcrEngine>(serviceProvider =>
-        {
-            var modelPathResolver = serviceProvider.GetRequiredService<IModelPathResolver>();
-            var ocrPreprocessingService = serviceProvider.GetRequiredService<IOcrPreprocessingService>();
-            var textMerger = serviceProvider.GetRequiredService<ITextMerger>();
-            var ocrPostProcessor = serviceProvider.GetRequiredService<IOcrPostProcessor>();
-            var logger = serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-            
-            // 環境判定を実行
-            Console.WriteLine("🔍 PaddleOCR環境判定開始");
-            
-            // 環境変数で本番モードを強制できるようにする
-            string? envValue = Environment.GetEnvironmentVariable("BAKETA_FORCE_PRODUCTION_OCR");
-            bool forceProduction = envValue == "true";
-            
-            // 🎯 高機能版OCR構成：環境変数が設定されていない場合も高機能版エンジンを使用
-            if (string.IsNullOrEmpty(envValue))
-            {
-                Console.WriteLine("🎯 高機能版OCR構成：環境変数が設定されていないため、高機能版PaddleOcrEngineを使用");
-                forceProduction = true; // 🎯 高機能版：V3+V5ハイブリッド戦略エンジンを使用
-            }
-            Console.WriteLine($"📊 BAKETA_FORCE_PRODUCTION_OCR環境変数: '{envValue}' (強制本番モード: {forceProduction})");
-            if (forceProduction)
-            {
-                Console.WriteLine("⚠️ BAKETA_FORCE_PRODUCTION_OCR=true - 本番OCRエンジンを強制使用");
-                logger?.LogInformation("環境変数により本番OCRエンジンを強制使用");
-                
-                // OCR設定からハイブリッドモードを確認
-                var oldOcrSettings = serviceProvider.GetService<OcrEngineSettings>();
-                bool enableHybridMode = oldOcrSettings?.EnableHybridMode ?? false;
-                
-                Console.WriteLine($"🔍 ハイブリッドモード設定: {enableHybridMode}");
-                logger?.LogInformation($"ハイブリッドモード設定: {enableHybridMode}");
-                
-                var gpuMemoryManager = serviceProvider.GetRequiredService<IGpuMemoryManager>();
-                var unifiedSettingsService = serviceProvider.GetRequiredService<IUnifiedSettingsService>();
-                var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                var unifiedLoggingService = serviceProvider.GetService<IUnifiedLoggingService>();
-                
-                // PaddleOcrEngineは内部でハイブリッドモード処理を行います
-                var ocrSettings = serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
-                return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, unifiedLoggingService, logger);
-            }
-            
-            // 🎯 高機能版構成：常に最適化されたPaddleOcrEngineを使用
-            Console.WriteLine("✅ 高機能版OCR構成 - 最適化PaddleOcrEngineを使用");
-            logger?.LogInformation("高機能版OCR構成 - 最適化PaddleOcrEngineを使用");
-            return new PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, 
-                serviceProvider.GetRequiredService<IGpuMemoryManager>(),
-                serviceProvider.GetRequiredService<IUnifiedSettingsService>(), 
-                serviceProvider.GetRequiredService<IEventAggregator>(),
-                serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>(),
-                serviceProvider.GetService<IUnifiedLoggingService>(), logger);
-        });
-        
-        // 🚀 シングルトン統一: PaddleOcrEngineは常にIOcrEngineと同じインスタンスを返す
-        services.AddSingleton<PaddleOcrEngine>(serviceProvider =>
-        {
-            // IOcrEngineとして登録されているインスタンスを取得
-            var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
-            
-            // PaddleOcrEngineの場合はそのまま返却（シングルトン保証）
-            if (ocrEngine is PaddleOcrEngine paddleEngine)
-            {
-                Console.WriteLine("🔗 PaddleOcrEngine: IOcrEngineと同じインスタンスを再利用（多重初期化防止）");
-                return paddleEngine;
-            }
-            
-            // 高機能版構成では常にPaddleOcrEngineが使用される
-            Console.WriteLine("⚠️ PaddleOcrEngine要求: 期待されるPaddleOcrEngineインスタンスが見つかりません");
-            throw new InvalidOperationException("高機能版OCR構成でPaddleOcrEngineインスタンスが取得できませんでした。");
-        });
+        // ❌ DI競合解決: IOcrEngineとPaddleOcrEngineのシングルトン登録を削除
+        // ✅ ObjectPool<IOcrEngine>システムのみを使用することで多重インスタンス問題を根本解決
+        Console.WriteLine("🔧 [DI_FIX] IOcrEngine/PaddleOcrEngineシングルトン登録をObjectPoolに統一");
+        Console.WriteLine("🔧 [DI_FIX] 多重インスタンス問題の根本解決 - プールベース管理のみ使用");
         
         // 🏭 安定性改善戦略: ファクトリパターン実装（Immutable OCR Engine Pattern）
         RegisterOcrEngineFactory(services);
@@ -633,23 +564,18 @@ public sealed class PaddleOcrModule : IServiceModule
         services.AddSingleton<IPaddleOcrEngineFactory, PaddleOcrEngineFactory>();
         Console.WriteLine("✅ IPaddleOcrEngineFactory登録完了（プール用ファクトリ）");
         
-        // 2. 既存のIOcrEngine登録をクリア
-        var existingOcrEngineDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IOcrEngine));
-        if (existingOcrEngineDescriptor != null)
-        {
-            services.Remove(existingOcrEngineDescriptor);
-            Console.WriteLine("🔄 既存のIOcrEngine Transient登録を削除");
-        }
+        // ❌ DI競合解決: 既存登録削除ロジックを除去（上流でシングルトン登録を削除済み）
+        Console.WriteLine("🔧 [DI_FIX] 既存登録削除ロジックを除去 - シングルトン登録削除により不要");
 
-        // 3. プーリングポリシーを登録
+        // 2. プーリングポリシーを登録
         services.AddSingleton<IPooledObjectPolicy<IOcrEngine>, PaddleOcrEnginePoolPolicy>();
         Console.WriteLine("✅ IPooledObjectPolicy<IOcrEngine>の登録完了");
 
-        // 4. Microsoft.Extensions.ObjectPoolのプロバイダーを登録
+        // 3. Microsoft.Extensions.ObjectPoolのプロバイダーを登録
         services.AddSingleton<ObjectPoolProvider, DefaultObjectPoolProvider>();
         Console.WriteLine("✅ DefaultObjectPoolProviderの登録完了");
 
-        // 5. ObjectPool<IOcrEngine>を登録
+        // 4. ObjectPool<IOcrEngine>を登録
         services.AddSingleton(serviceProvider =>
         {
             var provider = serviceProvider.GetRequiredService<ObjectPoolProvider>();

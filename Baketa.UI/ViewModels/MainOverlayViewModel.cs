@@ -204,12 +204,16 @@ public class MainOverlayViewModel : ViewModelBase
                 if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
                 {
                     this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                    // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] Start/Stopボタン状態更新通知追加
+                    this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                 }
                 else
                 {
                     Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                        // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] Start/Stopボタン状態更新通知追加
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                     });
                 }
             }
@@ -231,14 +235,15 @@ public class MainOverlayViewModel : ViewModelBase
     { 
         get 
         {
-            var enabled = !IsLoading && IsWindowSelected; // ローディング中以外かつウィンドウ選択済み
-            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, 結果={enabled}");
+            // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] OCR初期化完了条件追加 - Start/Stopボタン有効化条件に IsOcrInitialized を追加
+            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized; 
+            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, 結果={enabled}");
             
             // デバッグ用に実際の状態をファイルログにも出力
             try
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", 
-                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}");
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}");
             }
             catch { }
             

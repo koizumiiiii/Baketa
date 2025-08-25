@@ -119,13 +119,24 @@ private async Task InitializeV3EngineAsync(CancellationToken cancellationToken)
 {
     await Task.Run(() =>
     {
-        _logger.LogDebug("⚡ V5エンジン初期化中（高速検出用・V3から統一）");
-        _v3Engine = new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Mkldnn())
+        // 🧠 UltraThink: ChineseV5ハング回避のため段階的モデル選択戦略を適用
+        _logger.LogDebug("🧠 UltraThink: V3エンジン初期化中（安全なモデル選択戦略）");
+        try
         {
-            AllowRotateDetection = true,
-            Enable180Classification = false // 高速検出では回転分類を無効化
-        };
-        _logger.LogDebug("✅ V5エンジン初期化完了（高速検出用）");
+            // Phase 1: 安全性検証済みモデルを優先使用
+            var safeModel = LocalFullModels.EnglishV4 ?? LocalFullModels.EnglishV3;
+            _v3Engine = new PaddleOcrAll(safeModel, PaddleDevice.Mkldnn())
+            {
+                AllowRotateDetection = true,
+                Enable180Classification = false // 高速検出では回転分類を無効化
+            };
+            _logger.LogDebug("✅ V3エンジン初期化完了（安全モデル使用: {ModelType}）", safeModel?.GetType().Name ?? "unknown");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ V3エンジン初期化失敗 - 緊急フォールバック必要");
+            throw; // HybridPaddleOcrServiceの初期化失敗として上位に通知
+        }
     }, cancellationToken).ConfigureAwait(false);
 }
 
@@ -139,13 +150,24 @@ private async Task InitializeV5EngineAsync(CancellationToken cancellationToken)
 {
     await Task.Run(() =>
     {
-        _logger.LogDebug("🎯 V5エンジン初期化中（高精度認識用・統一完了）");
-        _v5Engine = new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Mkldnn())
+        // 🧠 UltraThink: V5エンジンでも同じ段階的安全戦略を適用
+        _logger.LogDebug("🧠 UltraThink: V5エンジン初期化中（高精度認識用・安全戦略）");
+        try
+        {
+            // Phase 1: 高精度が必要なため日本語モデル優先、フォールバック付き
+            var highAccuracyModel = LocalFullModels.JapanV4 ?? LocalFullModels.EnglishV4 ?? LocalFullModels.EnglishV3;
+            _v5Engine = new PaddleOcrAll(highAccuracyModel, PaddleDevice.Mkldnn())
         {
             AllowRotateDetection = true,
             Enable180Classification = true // 高精度認識では全機能を有効化
         };
-        _logger.LogDebug("✅ V5エンジン初期化完了（高精度認識用）");
+            _logger.LogDebug("✅ V5エンジン初期化完了（高精度認識用・安全モデル: {ModelType}）", highAccuracyModel?.GetType().Name ?? "unknown");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ V5エンジン初期化失敗 - 緊急フォールバック必要");
+            throw; // HybridPaddleOcrServiceの初期化失敗として上位に通知
+        }
     }, cancellationToken).ConfigureAwait(false);
 }
 

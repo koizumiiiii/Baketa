@@ -899,13 +899,72 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
 
     private OcrResults PostprocessResults(OcrResults results, Rectangle? roi)
     {
-        // ROI座標を元画像座標に変換などの後処理
-        if (roi.HasValue)
+        // 🧠 [ULTRATHINK_COORDINATE_FIX] ROI座標を元画像座標に変換 - GPU加速器の座標ずれ修正
+        if (roi.HasValue && results.TextRegions.Count > 0)
         {
-            // TODO: 座標変換実装
+            _logger.LogDebug("🎯 [GPU_COORDINATE_FIX] ROI座標補正実行: {RoiX},{RoiY} - {TextRegionCount}個の領域", 
+                roi.Value.X, roi.Value.Y, results.TextRegions.Count);
+            
+            // PaddleOcrEngine.AdjustCoordinatesForRoiと同等のロジック実装
+            var adjustedRegions = AdjustTextRegionsForRoi(results.TextRegions, roi.Value);
+            
+            // 🧠 [ULTRATHINK_CONSTRUCTOR_FIX] OcrResults正しいコンストラクタ使用 - GPU座標補正版
+            return new OcrResults(
+                adjustedRegions,
+                results.SourceImage,
+                results.ProcessingTime,
+                results.LanguageCode,
+                roi, // ROI座標補正済みなので元のROI情報を保持
+                results.Text // mergedTextパラメータにはTextプロパティを使用
+            );
         }
         
         return results;
+    }
+    
+    /// <summary>
+    /// ROI使用時のテキスト領域座標補正（GPU加速器版）
+    /// PaddleOcrEngine.AdjustCoordinatesForRoiと同等の処理
+    /// </summary>
+    private List<OcrTextRegion> AdjustTextRegionsForRoi(IReadOnlyList<OcrTextRegion> textRegions, Rectangle roi)
+    {
+        // 画面サイズを取得（PaddleOcrEngine実装と同一）
+        var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080);
+        var screenWidth = screenBounds.Width;
+        var screenHeight = screenBounds.Height;
+
+        return [.. textRegions.Select(region => {
+            // ROI補正後の座標を計算
+            var adjustedX = region.Bounds.X + roi.X;
+            var adjustedY = region.Bounds.Y + roi.Y;
+            
+            // 画面境界内に制限
+            var clampedX = Math.Max(0, Math.Min(adjustedX, screenWidth - region.Bounds.Width));
+            var clampedY = Math.Max(0, Math.Min(adjustedY, screenHeight - region.Bounds.Height));
+            
+            // 境界外の場合は警告ログ出力
+            if (adjustedX != clampedX || adjustedY != clampedY)
+            {
+                _logger.LogWarning("🚨 [GPU_COORDINATE_FIX] 座標補正により画面外座標を修正: 元座標({AdjustedX},{AdjustedY}) → 補正後({ClampedX},{ClampedY}) [画面サイズ:{ScreenWidth}x{ScreenHeight}]",
+                    adjustedX, adjustedY, clampedX, clampedY, screenWidth, screenHeight);
+            }
+
+            return new OcrTextRegion(
+                region.Text,
+                new Rectangle(
+                    clampedX,
+                    clampedY,
+                    region.Bounds.Width,
+                    region.Bounds.Height
+                ),
+                region.Confidence,
+                region.Contour?.Select(p => new System.Drawing.Point(
+                    Math.Max(0, Math.Min(p.X + roi.X, screenWidth)), 
+                    Math.Max(0, Math.Min(p.Y + roi.Y, screenHeight))
+                )).ToArray(),
+                region.Direction
+            );
+        })];
     }
 
     public OcrEngineSettings GetSettings()
