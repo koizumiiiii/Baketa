@@ -65,9 +65,9 @@ public sealed class RoiAdvancedSettings
     public bool SaveOriginalImages { get; set; } = true;
     
     /// <summary>
-    /// 処理済み画像を保存するか
+    /// 処理済み画像（個別切り抜き領域）を保存するか
     /// </summary>
-    public bool SaveProcessedImages { get; set; } = true;
+    public bool SaveProcessedImages { get; set; } = false;
     
     /// <summary>
     /// エラー画像を保存するか

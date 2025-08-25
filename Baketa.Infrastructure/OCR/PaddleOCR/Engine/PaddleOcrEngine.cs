@@ -4974,4 +4974,23 @@ public class PaddleOcrEngine : IOcrEngine
         // デフォルトは適応的モード（画像品質に基づく自動選択）
         return OcrProcessingMode.Adaptive;
     }
+
+    /// <summary>
+    /// PaddleOCR連続失敗カウンターを強制リセット
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        var previousCount = _consecutivePaddleFailures;
+        _consecutivePaddleFailures = 0;
+        __logger?.LogWarning("🔄 [MANUAL_RESET] PaddleOCR失敗カウンターを手動リセット: {PreviousCount} → 0", previousCount);
+        Console.WriteLine($"🔄 [MANUAL_RESET] PaddleOCR失敗カウンターを手動リセット: {previousCount} → 0");
+    }
+
+    /// <summary>
+    /// 現在の連続失敗回数を取得
+    /// </summary>
+    public int GetConsecutiveFailureCount()
+    {
+        return _consecutivePaddleFailures;
+    }
 }

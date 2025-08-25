@@ -73,7 +73,7 @@ public sealed class OcrSettings
         Description = "テキスト検出の感度調整（低い値ほど高感度）", 
         MinValue = 0.0, 
         MaxValue = 1.0)]
-    public double DetectionThreshold { get; set; } = 0.03;
+    public double DetectionThreshold { get; set; } = 0.6;
     
     /// <summary>
     /// 画像前処理の有効化

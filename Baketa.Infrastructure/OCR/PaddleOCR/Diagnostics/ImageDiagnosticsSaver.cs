@@ -293,23 +293,60 @@ public sealed class ImageDiagnosticsSaver : IDisposable
         
         ObjectDisposedException.ThrowIf(_disposed, this);
         
+        // 🔍 [ROI_DEBUG] 詳細デバッグログ開始
+        Console.WriteLine($"🔍 [ROI_DEBUG] SaveAnnotatedFullImageAsync開始");
+        Console.WriteLine($"🔍 [ROI_DEBUG] FilePath: {filePath}");
+        Console.WriteLine($"🔍 [ROI_DEBUG] OperationId: {operationId}");
+        Console.WriteLine($"🔍 [ROI_DEBUG] OriginalImageBytes.Length: {originalImageBytes.Length}");
+        Console.WriteLine($"🔍 [ROI_DEBUG] TextRegions.Count: {textRegions.Count()}");
+        
+        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [ROI_DEBUG] SaveAnnotatedFullImageAsync開始 - FilePath: {filePath}{Environment.NewLine}");
+        
         try
         {
             // ディレクトリが存在しない場合は作成
             var directory = Path.GetDirectoryName(filePath);
+            Console.WriteLine($"🔍 [ROI_DEBUG] Directory: {directory}");
+            
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
+                Console.WriteLine($"🔍 [ROI_DEBUG] ディレクトリ作成中: {directory}");
                 Directory.CreateDirectory(directory);
+                Console.WriteLine($"🔍 [ROI_DEBUG] ディレクトリ作成完了");
+            }
+            else
+            {
+                Console.WriteLine($"🔍 [ROI_DEBUG] ディレクトリは既に存在: {Directory.Exists(directory)}");
             }
             
             // 元画像に赤枠を描画
+            Console.WriteLine($"🔍 [ROI_DEBUG] CreateAnnotatedImageAsync開始");
             var annotatedImageBytes = await CreateAnnotatedImageAsync(originalImageBytes, textRegions).ConfigureAwait(false);
+            Console.WriteLine($"🔍 [ROI_DEBUG] CreateAnnotatedImageAsync完了 - AnnotatedImageBytes.Length: {annotatedImageBytes.Length}");
             
+            Console.WriteLine($"🔍 [ROI_DEBUG] File.WriteAllBytesAsync開始");
             await File.WriteAllBytesAsync(filePath, annotatedImageBytes).ConfigureAwait(false);
+            Console.WriteLine($"🔍 [ROI_DEBUG] File.WriteAllBytesAsync完了");
+            
+            // ファイル存在確認
+            var fileExists = File.Exists(filePath);
+            var fileSize = fileExists ? new FileInfo(filePath).Length : 0;
+            Console.WriteLine($"🔍 [ROI_DEBUG] ファイル存在確認: {fileExists}, サイズ: {fileSize}");
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [ROI_SUCCESS] ROI画像保存成功 - FilePath: {filePath}, Size: {fileSize}{Environment.NewLine}");
+            
             _logger?.LogTrace("赤枠付きROI画像保存完了: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ [ROI_ERROR] SaveAnnotatedFullImageAsync例外発生: {ex.Message}");
+            Console.WriteLine($"❌ [ROI_ERROR] StackTrace: {ex.StackTrace}");
+            
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [ROI_ERROR] ROI画像保存失敗: {ex.Message}{Environment.NewLine}");
+            
             _logger?.LogError(ex, "赤枠付きROI画像保存失敗: {FilePath}, 操作ID: {OperationId}", filePath, operationId);
             throw;
         }
@@ -322,8 +359,12 @@ public sealed class ImageDiagnosticsSaver : IDisposable
     {
         return await Task.Run(() =>
         {
+            // 🔧 [GDI_FIX] スレッドセーフなBitmapコピー作成
             using var memoryStream = new MemoryStream(originalImageBytes);
             using var originalBitmap = new System.Drawing.Bitmap(memoryStream);
+            
+            // 🔧 [THREAD_SAFE] 元画像の完全なコピーを作成（並行アクセス競合を回避）
+            using var safeOriginalCopy = new System.Drawing.Bitmap(originalBitmap);
             using var annotatedBitmap = new System.Drawing.Bitmap(originalBitmap.Width, originalBitmap.Height);
             using var graphics = System.Drawing.Graphics.FromImage(annotatedBitmap);
             
@@ -332,8 +373,8 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
             
-            // 元画像を描画
-            graphics.DrawImage(originalBitmap, 0, 0);
+            // 🔧 [SAFE_DRAW] スレッドセーフなコピーから描画
+            graphics.DrawImage(safeOriginalCopy, 0, 0);
             
             // 描画リソース準備
             using var redPen = new System.Drawing.Pen(System.Drawing.Color.Red, 3.0f);
@@ -341,15 +382,16 @@ public sealed class ImageDiagnosticsSaver : IDisposable
             using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 255, 255, 255));
             using var font = new System.Drawing.Font("Arial", 12, System.Drawing.FontStyle.Bold);
             
-            // テキスト領域の並列描画準備（座標計算を並列化）
-            var regionTasks = textRegions.AsParallel().Select(region =>
+            // 🛡️ [THREAD_SAFETY_FINAL_FIX] 完全に順次処理に変更してGDI+スレッドセーフティ問題を解決
+            var regionTasks = new List<dynamic>();
+            foreach (var region in textRegions)
             {
                 var confidence = $"{region.Confidence:F2}";
                 var displayText = string.IsNullOrWhiteSpace(region.Text) ? "?" : 
                                  region.Text.Length > 10 ? region.Text[..10] + "..." : region.Text;
                 var label = $"{confidence} | {displayText}";
                 
-                // テキストサイズ計算（スレッドセーフでない可能性があるため事前計算）
+                // テキストサイズ計算（順次実行でスレッドセーフティ確保）
                 var textSize = graphics.MeasureString(label, font);
                 var textRect = new System.Drawing.RectangleF(
                     region.Bounds.X, 
@@ -357,8 +399,8 @@ public sealed class ImageDiagnosticsSaver : IDisposable
                     textSize.Width + 4, 
                     textSize.Height + 2);
                 
-                return new { Region = region, Label = label, TextRect = textRect };
-            }).ToList();
+                regionTasks.Add(new { Region = region, Label = label, TextRect = textRect });
+            }
 
             // 描画は順次実行（GDI+のスレッドセーフティ問題対応）
             foreach (var item in regionTasks)
