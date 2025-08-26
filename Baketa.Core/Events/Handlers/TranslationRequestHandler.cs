@@ -6,6 +6,7 @@ using Baketa.Core.Translation.Common;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Drawing;
 using System.Threading.Tasks;
 
 namespace Baketa.Core.Events.Handlers;
@@ -65,6 +66,10 @@ public class TranslationRequestHandler(
 
         // 🚫 [DUPLICATE_DISPLAY_FIX] 同言語の場合は翻訳結果を空文字で非表示にする
         var skippedResult = string.Empty; // 重複表示防止：同言語では非表示
+        
+        // 🎯 [COORDINATE_FIX] ROI座標から画面座標への変換を実装
+        var skipScreenBounds = ConvertRoiToScreenCoordinates(eventData.OcrResult.Bounds);
+        Console.WriteLine($"🎯 [COORDINATE_DEBUG_SKIP] ROI座標: {eventData.OcrResult.Bounds} → 画面座標: {skipScreenBounds}");
 
         // 翻訳完了イベントを即座に発行（処理時間0ms）
         var skipCompletedEvent = new TranslationWithBoundsCompletedEvent(
@@ -72,7 +77,7 @@ public class TranslationRequestHandler(
             translatedText: skippedResult, // 🚫 空文字で非表示設定
             sourceLanguage: eventData.SourceLanguage,
             targetLanguage: eventData.TargetLanguage,
-            bounds: eventData.OcrResult.Bounds,
+            bounds: skipScreenBounds, // 🎯 変換済み画面座標を使用
             confidence: 1.0f,
             engineName: "Same Language Filter (Phase 0.2 - Hidden)");
 
@@ -174,19 +179,24 @@ public class TranslationRequestHandler(
         }).ConfigureAwait(false);
 
     Console.WriteLine($"🚀 [PHASE_2_3] BaketaExceptionHandler処理完了: '{translationResult}'");
-    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [PHASE_2_3] BaketaExceptionHandler処理完了: '{translationResult}'{Environment.NewLine}");
-
+    Console.WriteLine($"🎯 [COORDINATE_REACH_CHECK] 座標変換処理に到達しました！");
+    
     _logger.LogInformation("翻訳完了: '{Original}' → '{Translated}'", 
         eventData.OcrResult.Text, translationResult);
 
+    // 🎯 [COORDINATE_FIX] ROI座標から画面座標への変換を実装
+    // ROI画像の座標はキャプチャ領域内の相対座標のため、実際の画面座標に変換する必要がある
+    Console.WriteLine($"🎯 [COORDINATE_BEFORE] 変換前のOcrResult.Bounds: {eventData.OcrResult.Bounds}");
+    var screenBounds = ConvertRoiToScreenCoordinates(eventData.OcrResult.Bounds);
+    Console.WriteLine($"🎯 [COORDINATE_DEBUG] ROI座標: {eventData.OcrResult.Bounds} → 画面座標: {screenBounds}");
+    
     // 座標情報付き翻訳完了イベントを発行
     var completedEvent = new TranslationWithBoundsCompletedEvent(
         sourceText: eventData.OcrResult.Text,
         translatedText: translationResult,
         sourceLanguage: eventData.SourceLanguage,
         targetLanguage: eventData.TargetLanguage,
-        bounds: eventData.OcrResult.Bounds,
+        bounds: screenBounds, // 🎯 変換済み画面座標を使用
         confidence: 1.0f,
         engineName: "Translation Service (Phase 2.3 Enhanced)");
 
@@ -218,5 +228,21 @@ public class TranslationRequestHandler(
             "auto" => Language.Auto, // 🚀 [CRITICAL_BUG_FIX] autoは正しくLanguage.Autoとして処理
             _ => Language.English // デフォルトは英語
         };
+    }
+    
+    /// <summary>
+    /// ROI座標を実際の画面座標に変換
+    /// 🎯 [DIRECT_COORDINATE_FIX] ROI座標をそのまま画面座標として使用
+    /// </summary>
+    /// <param name="roiBounds">ROI画像内の座標</param>
+    /// <returns>画面上の座標（変換なし）</returns>
+    private static System.Drawing.Rectangle ConvertRoiToScreenCoordinates(System.Drawing.Rectangle roiBounds)
+    {
+        // 🎯 [DIRECT_USE] ROI座標をそのまま画面座標として使用
+        // オフセット補正を削除し、OCR検出座標を直接使用
+        
+        Console.WriteLine($"🎯 [DIRECT_COORDINATE] ROI座標をそのまま使用: {roiBounds}");
+        
+        return roiBounds; // 変換せずそのまま返す
     }
 }

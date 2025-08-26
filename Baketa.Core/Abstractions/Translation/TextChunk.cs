@@ -217,9 +217,38 @@ public sealed class TextChunk
     
     /// <summary>
     /// オーバーレイ表示用の位置を取得
-    /// 元テキストと同じ位置に翻訳テキストを重ね表示するために使用
+    /// 元テキストと同じ位置に翻訳テキストを直接重ね表示
+    /// 座標ずれ修正: 元テキスト位置での直接オーバーレイ表示
     /// </summary>
-    public Point GetOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y);
+    public Point GetOverlayPosition()
+    {
+        // 元テキストと同じ位置に直接オーバーレイ表示
+        return new Point(CombinedBounds.X, CombinedBounds.Y);
+    }
+    
+    /// <summary>
+    /// 指定された画面境界内での最適なオーバーレイ位置を計算
+    /// 特定の画面境界を考慮した最適な位置に翻訳テキストを表示するために使用
+    /// 元テキストを避けた配置が必要な場合に使用
+    /// </summary>
+    /// <param name="screenBounds">対象画面の境界情報</param>
+    /// <returns>最適化された表示位置</returns>
+    public Point GetOverlayPosition(Rectangle screenBounds)
+    {
+        var overlaySize = GetOverlaySize();
+        return CalculateOptimalOverlayPosition(overlaySize, screenBounds);
+    }
+    
+    /// <summary>
+    /// デフォルト画面境界を取得
+    /// 画面サイズが不明な場合の安全なデフォルト値を提供
+    /// </summary>
+    /// <returns>デフォルト画面境界 (Full HD 1920x1080)</returns>
+    private static Rectangle GetDefaultScreenBounds()
+    {
+        // TODO: 将来的には設定ファイルからデフォルト画面サイズを取得する実装を検討
+        return new Rectangle(0, 0, 1920, 1080);
+    }
     
     /// <summary>
     /// オーバーレイ表示用のサイズを取得

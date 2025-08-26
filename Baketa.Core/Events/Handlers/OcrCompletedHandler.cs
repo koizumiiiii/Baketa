@@ -1,4 +1,6 @@
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Settings;
 using Baketa.Core.Models;
@@ -17,11 +19,11 @@ namespace Baketa.Core.Events.Handlers;
 /// コンストラクタ
 /// </remarks>
 /// <param name="eventAggregator">イベント集約インスタンス</param>
-/// <param name="appSettingsOptions">アプリケーション設定</param>
-public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppSettings> appSettingsOptions) : IEventProcessor<OcrCompletedEvent>
+/// <param name="settingsService">統合設定サービス</param>
+public class OcrCompletedHandler(IEventAggregator eventAggregator, IUnifiedSettingsService settingsService) : IEventProcessor<OcrCompletedEvent>
     {
         private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        private readonly AppSettings _appSettings = appSettingsOptions?.Value ?? throw new ArgumentNullException(nameof(appSettingsOptions));
+        private readonly IUnifiedSettingsService _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
         /// <inheritdoc />
         public int Priority => 0;
@@ -74,20 +76,21 @@ public class OcrCompletedHandler(IEventAggregator eventAggregator, IOptions<AppS
             {
                 Console.WriteLine($"🚀 [PHASE_2_2] 翻訳要求イベント準備: '{result.Text}'");
                 
-                // 翻訳設定から言語情報を取得
-                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] DefaultSourceLanguage: '{_appSettings.Translation.DefaultSourceLanguage}'");
-                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] DefaultTargetLanguage: '{_appSettings.Translation.DefaultTargetLanguage}'");
-                Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] AutoDetectSourceLanguage: {_appSettings.Translation.AutoDetectSourceLanguage}");
+                // 🔧 [CRITICAL_FIX] ユーザー設定から言語情報を取得（appsettings.json固定値ではなく）
+                var translationSettings = _settingsService.GetTranslationSettings();
+                Console.WriteLine($"🔍 [DEBUG_USER_CONFIG] DefaultSourceLanguage: '{translationSettings.DefaultSourceLanguage}'");
+                Console.WriteLine($"🔍 [DEBUG_USER_CONFIG] DefaultTargetLanguage: '{translationSettings.DefaultTargetLanguage}'");
+                Console.WriteLine($"🔍 [DEBUG_USER_CONFIG] AutoDetectSourceLanguage: {translationSettings.AutoDetectSourceLanguage}");
                 
-                var sourceLanguageCode = _appSettings.Translation.AutoDetectSourceLanguage 
+                var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
                     ? "auto" 
-                    : _appSettings.Translation.DefaultSourceLanguage;
+                    : translationSettings.DefaultSourceLanguage;
                 
-                var targetLanguageCode = _appSettings.Translation.DefaultTargetLanguage;
+                var targetLanguageCode = translationSettings.DefaultTargetLanguage;
 
                 Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] sourceLanguageCode: '{sourceLanguageCode}'");
                 Console.WriteLine($"🔍 [DEBUG_LANGUAGE_CONFIG] targetLanguageCode: '{targetLanguageCode}'");
-                Console.WriteLine($"🌍 [LANGUAGE_SETTING_FIXED] 設定取得: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {_appSettings.Translation.AutoDetectSourceLanguage})");
+                Console.WriteLine($"🌍 [USER_SETTING_APPLIED] ユーザー設定適用: {sourceLanguageCode} → {targetLanguageCode} (自動検出: {translationSettings.AutoDetectSourceLanguage})");
 
                 // 翻訳要求イベントを発行
                 var translationRequestEvent = new TranslationRequestEvent(
