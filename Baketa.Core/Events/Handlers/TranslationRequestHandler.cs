@@ -238,11 +238,93 @@ public class TranslationRequestHandler(
     /// <returns>画面上の座標（変換なし）</returns>
     private static System.Drawing.Rectangle ConvertRoiToScreenCoordinates(System.Drawing.Rectangle roiBounds)
     {
-        // 🎯 [DIRECT_USE] ROI座標をそのまま画面座標として使用
-        // オフセット補正を削除し、OCR検出座標を直接使用
+        // 🎯 [COORDINATE_TRANSFORM] ROI座標を画面座標に適切に変換
         
-        Console.WriteLine($"🎯 [DIRECT_COORDINATE] ROI座標をそのまま使用: {roiBounds}");
-        
-        return roiBounds; // 変換せずそのまま返す
+        try
+        {
+            // ROIスケールファクタ（通常0.5）を取得
+            // TODO: 設定から動的に取得するように改善
+            const float roiScaleFactor = 0.5f;
+            var inverseScale = 1.0f / roiScaleFactor;
+            
+            // 1. ROI座標を実際の画面座標にスケーリング
+            var scaledBounds = new System.Drawing.Rectangle(
+                (int)(roiBounds.X * inverseScale),
+                (int)(roiBounds.Y * inverseScale),
+                (int)(roiBounds.Width * inverseScale),
+                (int)(roiBounds.Height * inverseScale)
+            );
+            
+            // 2. ターゲットウィンドウのオフセットを取得
+            var windowOffset = GetTargetWindowOffset();
+            
+            // 3. 最終的な画面座標を計算
+            var finalBounds = new System.Drawing.Rectangle(
+                scaledBounds.X + windowOffset.X,
+                scaledBounds.Y + windowOffset.Y,
+                scaledBounds.Width,
+                scaledBounds.Height
+            );
+            
+            // デバッグログ: 座標変換の詳細を出力
+            Console.WriteLine($"🎯 [COORDINATE_DEBUG] ROI→画面座標変換:");
+            Console.WriteLine($"   入力ROI座標: {roiBounds}");
+            Console.WriteLine($"   スケールファクタ: {roiScaleFactor} (逆数: {inverseScale})");
+            Console.WriteLine($"   スケーリング後: {scaledBounds}");
+            Console.WriteLine($"   ウィンドウオフセット: {windowOffset}");
+            Console.WriteLine($"   最終画面座標: {finalBounds}");
+            
+            return finalBounds;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [COORDINATE_ERROR] 座標変換エラー: {ex.Message}");
+            // フォールバック: 元の座標をそのまま返す
+            return roiBounds;
+        }
+    }
+
+    private static System.Drawing.Point GetTargetWindowOffset()
+    {
+        try
+        {
+            // アクティブウィンドウのハンドルを取得
+            var activeWindowHandle = GetForegroundWindow();
+            
+            if (activeWindowHandle != IntPtr.Zero)
+            {
+                // ウィンドウの矩形情報を取得
+                if (GetWindowRect(activeWindowHandle, out var rect))
+                {
+                    var offset = new System.Drawing.Point(rect.Left, rect.Top);
+                    Console.WriteLine($"🎯 [WINDOW_OFFSET] アクティブウィンドウオフセット: {offset}");
+                    return offset;
+                }
+            }
+            
+            Console.WriteLine($"⚠️ [WINDOW_OFFSET] ウィンドウオフセット取得失敗、(0,0)を使用");
+            return System.Drawing.Point.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [WINDOW_OFFSET_ERROR] ウィンドウオフセット取得エラー: {ex.Message}");
+            return System.Drawing.Point.Empty;
+        }
+    }
+    
+    // Win32 API declarations
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+    
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out WindowRect lpRect);
+    
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct WindowRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
     }
 }

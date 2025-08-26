@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Settings;
 using System.Runtime.InteropServices;
 
 namespace Baketa.Infrastructure.Platform.Windows.GPU;
@@ -13,15 +15,19 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
 {
     private readonly ILogger<GPUEnvironmentDetector> _logger;
+    private readonly GpuSettings _gpuSettings;
     private GpuEnvironmentInfo? _cachedEnvironment;
     private readonly object _cacheLock = new();
     
     // Windows API とDirectX関連の定数
     private const int DXGI_ERROR_NOT_FOUND = unchecked((int)0x887A0002);
     
-    public GPUEnvironmentDetector(ILogger<GPUEnvironmentDetector> logger)
+    public GPUEnvironmentDetector(
+        ILogger<GPUEnvironmentDetector> logger,
+        IOptions<GpuSettings> gpuSettings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _gpuSettings = gpuSettings?.Value ?? throw new ArgumentNullException(nameof(gpuSettings));
     }
 
     public async Task<GpuEnvironmentInfo> DetectEnvironmentAsync()
@@ -35,9 +41,9 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
             var featureLevel = await Task.Run(() => GetDirectXFeatureLevel()).ConfigureAwait(false);
             
             // 2. 利用可能なGPUアダプター情報取得
-            var (Name, MemoryMB, IsIntegrated) = await Task.Run(() => GetPrimaryGpuInfo()).ConfigureAwait(false);
+            var (Name, MemoryMB, _) = await Task.Run(() => GetPrimaryGpuInfo()).ConfigureAwait(false);
             
-            // 3. GPU種別判定（統合/専用）
+            // 3. GPU種別判定（統合/専用） - 設定ファイルベースの判定を使用
             var isIntegrated = DetermineIfIntegratedGpu(Name);
             var isDedicated = !isIntegrated;
             
@@ -231,9 +237,34 @@ public class GPUEnvironmentDetector : ICaptureEnvironmentDetector
     
     private bool DetermineIfIntegratedGpu(string gpuName)
     {
-        // GPU名から統合GPU判定（簡易実装）
-        var integratedKeywords = new[] { "Intel", "AMD Radeon", "UHD", "Iris", "Vega" };
-        return integratedKeywords.Any(keyword => gpuName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        _logger.LogDebug("GPU種別判定開始: {GpuName}", gpuName);
+        
+        // まず専用GPUキーワードをチェック
+        foreach (var keyword in _gpuSettings.DedicatedGpuKeywords)
+        {
+            if (gpuName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("専用GPU検出: {GpuName} (キーワード: '{Keyword}')", gpuName, keyword);
+                return false; // 専用GPU
+            }
+        }
+        
+        // 次に統合GPUキーワードをチェック
+        foreach (var keyword in _gpuSettings.IntegratedGpuKeywords)
+        {
+            if (gpuName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("統合GPU検出: {GpuName} (キーワード: '{Keyword}')", gpuName, keyword);
+                return true; // 統合GPU
+            }
+        }
+        
+        // 一致するキーワードがない場合はフォールバック設定に従う
+        var fallbackResult = !_gpuSettings.FallbackToDedicated; // FallbackToDedicated=trueなら専用GPU扱い（false返却）
+        _logger.LogWarning("未知のGPU: {GpuName} - フォールバック設定により{GpuType}として処理", 
+            gpuName, fallbackResult ? "統合GPU" : "専用GPU");
+        
+        return fallbackResult;
     }
 
     private int GetMaxTextureSize()

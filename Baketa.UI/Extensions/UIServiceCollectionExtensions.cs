@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.UI.Configuration;
 using Baketa.UI.Services;
+using Baketa.Core.Settings;
 
 namespace Baketa.UI.Extensions;
 
@@ -32,6 +33,8 @@ public static class UIServiceCollectionExtensions
             configuration.GetSection(TranslationUIOptions.SectionName));
         services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
             configuration.GetSection("TranslationEngineStatus"));
+        services.Configure<GpuSettings>(
+            configuration.GetSection("GpuSettings"));
 
         // 基本サービスの登録
         services.AddSingleton<IUserPlanService, UserPlanService>();
