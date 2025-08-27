@@ -33,7 +33,29 @@ public sealed class EventHandlerInitializationService(
     /// <returns>初期化タスク</returns>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        // 🚨 最重要: メソッド開始の即座ログ出力（確実な記録）
+        var startTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        Console.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
+        System.Diagnostics.Debug.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
+        
+        // 確実なファイル記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{startTimestamp}→🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！{Environment.NewLine}");
+        }
+        catch { /* ファイル出力失敗は無視 */ }
+        
         _logger.LogInformation("イベントハンドラー初期化を開始します");
+        Console.WriteLine("🔥 [INIT_LOG] _logger.LogInformation実行完了");
+        
+        // ファイル記録
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🔥 [INIT_LOG] _logger.LogInformation実行完了{Environment.NewLine}");
+        }
+        catch { /* ファイル出力失敗は無視 */ }
 
         try
         {
@@ -49,23 +71,6 @@ public sealed class EventHandlerInitializationService(
             // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
             //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] EventHandlerInitializationService - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
     
-            // OcrCompletedHandlerの登録
-            try
-            {
-                var ocrCompletedHandler = _serviceProvider.GetRequiredService<OcrCompletedHandler>();
-                eventAggregator.Subscribe<OcrCompletedEvent>(ocrCompletedHandler);
-                _logger.LogInformation("OcrCompletedHandlerを登録しました");
-                Console.WriteLine("🔥 [DEBUG] OcrCompletedHandlerを登録しました");
-                // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DEBUG] OcrCompletedHandlerを登録しました{Environment.NewLine}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "OcrCompletedHandlerの登録に失敗しました");
-                Console.WriteLine($"🔥 [ERROR] OcrCompletedHandlerの登録失敗: {ex.Message}");
-                // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] OcrCompletedHandlerの登録失敗: {ex.Message}{Environment.NewLine}");
-            }
 
             // TranslationRequestHandlerの登録
             try
@@ -85,6 +90,20 @@ public sealed class EventHandlerInitializationService(
                 //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] TranslationRequestHandlerの登録失敗: {ex.Message}{Environment.NewLine}");
             }
 
+            // BatchTranslationRequestHandlerの登録
+            try
+            {
+                var batchTranslationRequestHandler = _serviceProvider.GetRequiredService<BatchTranslationRequestHandler>();
+                eventAggregator.Subscribe<BatchTranslationRequestEvent>(batchTranslationRequestHandler);
+                _logger.LogInformation("BatchTranslationRequestHandlerを登録しました");
+                Console.WriteLine("🔥 [DEBUG] BatchTranslationRequestHandlerを登録しました");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "BatchTranslationRequestHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] BatchTranslationRequestHandlerの登録失敗: {ex.Message}");
+            }
+
             // TranslationWithBoundsCompletedHandlerの登録
             try
             {
@@ -101,6 +120,36 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}");
                 // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
                 //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}{Environment.NewLine}");
+            }
+
+            // OcrCompletedHandler_Improved (TPL Dataflow版) 登録
+            try
+            {
+                var ocrCompletedHandler_Improved = _serviceProvider.GetRequiredService<OcrCompletedHandler_Improved>();
+                eventAggregator.Subscribe<OcrCompletedEvent>(ocrCompletedHandler_Improved);
+                _logger.LogInformation("OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました");
+                Console.WriteLine("🔥 [DEBUG] OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "OcrCompletedHandler_Improvedの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] OcrCompletedHandler_Improvedの登録失敗: {ex.Message}");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] OcrCompletedHandler_Improved登録失敗: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
             }
 
             // DiagnosticEventProcessorの登録
@@ -126,10 +175,27 @@ public sealed class EventHandlerInitializationService(
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"🚨🚨🚨 [INIT_EXCEPTION] EventHandlerInitializationService例外発生！");
+            Console.WriteLine($"🚨 [INIT_EXCEPTION] Type: {ex.GetType().FullName}");
+            Console.WriteLine($"🚨 [INIT_EXCEPTION] Message: {ex.Message}");
+            Console.WriteLine($"🚨 [INIT_EXCEPTION] StackTrace: {ex.StackTrace}");
+            System.Diagnostics.Debug.WriteLine($"🚨🚨🚨 [INIT_EXCEPTION] EventHandlerInitializationService例外発生！");
+            System.Diagnostics.Debug.WriteLine($"🚨 [INIT_EXCEPTION] Type: {ex.GetType().FullName}");
+            System.Diagnostics.Debug.WriteLine($"🚨 [INIT_EXCEPTION] Message: {ex.Message}");
+            
             _logger.LogError(ex, "イベントハンドラー初期化中にエラーが発生しました");
             Console.WriteLine($"🔥 [ERROR] イベントハンドラー初期化エラー: {ex.Message}");
-            // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] イベントハンドラー初期化エラー: {ex.Message}{Environment.NewLine}");
+            
+            // ファイルにも記録
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION] {ex.GetType().FullName}: {ex.Message}{Environment.NewLine}");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION_STACK] {ex.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* ファイル出力失敗は無視 */ }
+            
             throw;
         }
     }

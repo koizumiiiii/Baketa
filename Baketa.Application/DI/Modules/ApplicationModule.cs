@@ -106,7 +106,8 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
             Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
             
-            // 🚀 [Phase 2.1] 座標ベース翻訳サービス（Service Locator Anti-pattern除去済み）
+            // 🚀 [NLLB_TEST] CoordinateBasedTranslationService一時無効化 - NLLB-200 TPL Dataflowテスト用
+            /*
             services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
             {
                 Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (Phase 2.1更新版)");
@@ -141,6 +142,7 @@ namespace Baketa.Application.DI.Modules;
                     throw;
                 }
             });
+            */
             
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>(provider =>
@@ -157,9 +159,9 @@ namespace Baketa.Application.DI.Modules;
                     var translationDictionaryService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationDictionaryService>();
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
-                    Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入");
-                    var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
-                    Console.WriteLine($"✅ [DI_DEBUG] CoordinateBasedTranslationService取得成功: {coordinateBasedTranslation.GetType().Name}");
+                    Console.WriteLine("🔍 [NLLB_TEST] TranslationOrchestrationService - CoordinateBasedTranslationServiceはnullで注入（テスト用）");
+                    var coordinateBasedTranslation = (Baketa.Application.Services.Translation.CoordinateBasedTranslationService?)null;
+                    Console.WriteLine($"✅ [NLLB_TEST] CoordinateBasedTranslationService=null設定完了（NLLB-200テスト用）");
                     Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                     Console.WriteLine($"✅ [DI_DEBUG] TranslationDictionaryService取得成功: {translationDictionaryService?.GetType().Name ?? "null"}");
                     
@@ -277,15 +279,20 @@ namespace Baketa.Application.DI.Modules;
             // 翻訳モード変更イベントプロセッサー
             services.AddSingleton<Baketa.Application.Events.Processors.TranslationModeChangedEventProcessor>();
             
-            // OCR完了イベントハンドラー
-            services.AddSingleton<Baketa.Core.Events.Handlers.OcrCompletedHandler>();
-            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.OcrCompletedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.OcrCompletedHandler>());
+            
+            // OCR完了イベントハンドラー（改善版 - TPL Dataflow）
+            services.AddSingleton<Baketa.Core.Events.Handlers.OcrCompletedHandler_Improved>();
+            // 注意: 改善版は手動でEventAggregatorに登録する必要があります（EventHandlerInitializationService参照）
             
             // 翻訳要求イベントハンドラー
             services.AddSingleton<Baketa.Core.Events.Handlers.TranslationRequestHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationRequestEvent>>(
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.TranslationRequestHandler>());
+            
+            // バッチ翻訳要求イベントハンドラー
+            services.AddSingleton<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.BatchTranslationRequestEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>());
             
             // 座標情報付き翻訳完了イベントハンドラー
             services.AddSingleton<Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler>();

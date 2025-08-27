@@ -1136,20 +1136,51 @@ public sealed class BatchOcrProcessor(
                 };
 
                 chunks.Add(chunk);
+            
+            // 📝 [COORDINATION_VALIDATION] 座標妥当性検証
+            if (combinedBounds.X < 0 || combinedBounds.Y < 0)
+            {
+                Console.WriteLine($"⚠️ [COORD_WARNING] 負の座標検出! チャンク#{chunk.ChunkId}: ({combinedBounds.X},{combinedBounds.Y})");
+            }
+            
+            if (combinedBounds.Width <= 0 || combinedBounds.Height <= 0)
+            {
+                Console.WriteLine($"⚠️ [COORD_WARNING] 無効なサイズ検出! チャンク#{chunk.ChunkId}: {combinedBounds.Width}x{combinedBounds.Height}");
+            }
 
                 _logger?.LogDebug("📦 チャンク作成 - ID: {ChunkId}, テキスト: '{Text}', 領域数: {RegionCount}", 
                     chunk.ChunkId, chunk.CombinedText, groupedRegions.Count);
                     
-                // デバッグ用に詳細情報を出力
-                System.Console.WriteLine($"🎯 チャンク#{chunk.ChunkId} - 位置: ({combinedBounds.X},{combinedBounds.Y}) サイズ: ({combinedBounds.Width}x{combinedBounds.Height}) テキスト: '{chunk.CombinedText}'");
+                // 🎯 [CHUNK_DEBUG] チャンク座標の詳細デバッグ出力
+                System.Console.WriteLine($"🎯 [CHUNK_CREATED] チャンク#{chunk.ChunkId} 作成完了:");
+                System.Console.WriteLine($"🎯 [CHUNK_CREATED]   CombinedBounds: ({combinedBounds.X},{combinedBounds.Y}) サイズ:({combinedBounds.Width}x{combinedBounds.Height})");
+                System.Console.WriteLine($"🎯 [CHUNK_CREATED]   CombinedText: '{chunk.CombinedText}'");
+                System.Console.WriteLine($"🎯 [CHUNK_CREATED]   テキスト領域数: {groupedRegions.Count}");
+                System.Console.WriteLine($"🎯 [CHUNK_CREATED]   SourceWindowHandle: {windowHandle}");
+                
+                // 📝 [COORDINATION_FLOW] 座標変換フローの記録
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 [CHUNK_COORD] チャンク#{chunk.ChunkId}: CombinedBounds=({combinedBounds.X},{combinedBounds.Y},{combinedBounds.Width},{combinedBounds.Height}) Text='{chunk.CombinedText}'{Environment.NewLine}");
             }
 
-            // 空のテキストチャンクや無効なテキストをフィルタリング
+            // 📝 [FINAL_VALIDATION] 空のテキストチャンクや無効なテキストをフィルタリング
+            Console.WriteLine($"📝 [VALIDATION] フィルタリング前チャンク数: {chunks.Count}");
             var validChunks = FilterValidTextChunks(chunks);
+            Console.WriteLine($"📝 [VALIDATION] フィルタリング後チャンク数: {validChunks.Count}");
+            
+            // 📝 [FINAL_CHUNKS] 最終チャンク情報を出力
+            foreach (var chunk in validChunks)
+            {
+                Console.WriteLine($"📝 [FINAL_CHUNK] ID:{chunk.ChunkId} CombinedBounds:({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height}) Text:'{chunk.CombinedText}'");
+            }
             
             _logger?.LogInformation("📊 チャンクグルーピング完了 - 総チャンク数: {ChunkCount}, 有効チャンク数: {ValidCount}, 総テキスト領域数: {RegionCount}", 
                 chunks.Count, validChunks.Count, ocrResults.TextRegions.Count);
 
+            // 📝 [COORDINATION_LOG] 座標デバッグログに最終結果を記録
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 [BATCH_COMPLETE] 最終チャンク数: {validChunks.Count}, 総テキスト領域数: {ocrResults.TextRegions.Count}{Environment.NewLine}");
+                
             return (IReadOnlyList<TextChunk>)validChunks.AsReadOnly();
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -1676,17 +1707,38 @@ public sealed class BatchOcrProcessor(
     /// <summary>
     /// 複数の領域の結合バウンディングボックスを計算
     /// </summary>
+    /// <summary>
+    /// 🎯 [COORDINATE_FIX] 複数テキスト領域から統合境界を計算
+    /// </summary>
     private static Rectangle CalculateCombinedBounds(List<OcrTextRegion> regions)
     {
         if (regions.Count == 0)
+        {
+            Console.WriteLine($"🎯 [COMBINED_BOUNDS] 領域数0 - 空の矩形を返す");
             return Rectangle.Empty;
+        }
 
         var minX = regions.Min(r => r.Bounds.X);
         var minY = regions.Min(r => r.Bounds.Y);
         var maxX = regions.Max(r => r.Bounds.Right);
         var maxY = regions.Max(r => r.Bounds.Bottom);
 
-        return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+        var combinedBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+        
+        // 🎯 [DEBUG_OUTPUT] 統合座標の詳細デバッグ出力
+        Console.WriteLine($"🎯 [COMBINED_BOUNDS] 統合計算結果:");
+        Console.WriteLine($"🎯 [COMBINED_BOUNDS]   入力領域数: {regions.Count}");
+        Console.WriteLine($"🎯 [COMBINED_BOUNDS]   X範囲: {minX} → {maxX} (幅: {maxX - minX})");
+        Console.WriteLine($"🎯 [COMBINED_BOUNDS]   Y範囲: {minY} → {maxY} (高さ: {maxY - minY})");
+        Console.WriteLine($"🎯 [COMBINED_BOUNDS]   統合境界: ({combinedBounds.X},{combinedBounds.Y}) サイズ:({combinedBounds.Width}x{combinedBounds.Height})");
+        
+        // 個別領域の詳細も出力
+        foreach (var region in regions)
+        {
+            Console.WriteLine($"🎯 [REGION_DETAIL]     領域: ({region.Bounds.X},{region.Bounds.Y}) サイズ:({region.Bounds.Width}x{region.Bounds.Height}) テキスト:'{region.Text}'");
+        }
+
+        return combinedBounds;
     }
 
     /// <summary>
@@ -2105,15 +2157,26 @@ public sealed class BatchOcrProcessor(
             {
                 foreach (var region in tileResult.Result.TextRegions)
                 {
-                    // タイルオフセットを考慮してテキスト領域の座標を調整
+                    // 🎯 [COORDINATE_DEBUG] タイルオフセットを考慮してテキスト領域の座標を調整
+                    // 座標系詳細: Region座標(相対) + TileOffset(絶対) = 統合座標(絶対)
+                    var originalBounds = region.Bounds;
+                    var tileOffset = tileResult.TileOffset;
+                    var adjustedBounds = new Rectangle(
+                        originalBounds.X + tileOffset.X,
+                        originalBounds.Y + tileOffset.Y,
+                        originalBounds.Width,
+                        originalBounds.Height
+                    );
+                    
+                    Console.WriteLine($"🎯 [TILE_COORD] Tile#{tileResult.TileIndex} 座標調整:");
+                    Console.WriteLine($"🎯 [TILE_COORD]   元座標: ({originalBounds.X},{originalBounds.Y}) サイズ:({originalBounds.Width}x{originalBounds.Height})");
+                    Console.WriteLine($"🎯 [TILE_COORD]   オフセット: ({tileOffset.X},{tileOffset.Y})");
+                    Console.WriteLine($"🎯 [TILE_COORD]   調整後座標: ({adjustedBounds.X},{adjustedBounds.Y}) サイズ:({adjustedBounds.Width}x{adjustedBounds.Height})");
+                    Console.WriteLine($"🎯 [TILE_COORD]   テキスト: '{region.Text}'");
+                    
                     var adjustedRegion = new OcrTextRegion(
                         region.Text,
-                        new Rectangle(
-                            region.Bounds.X + tileResult.TileOffset.X,
-                            region.Bounds.Y + tileResult.TileOffset.Y,
-                            region.Bounds.Width,
-                            region.Bounds.Height
-                        ),
+                        adjustedBounds,
                         region.Confidence,
                         region.Contour,
                         region.Direction

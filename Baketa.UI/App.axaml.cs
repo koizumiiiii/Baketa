@@ -154,15 +154,31 @@ internal sealed partial class App : Avalonia.Application
             }
         }
 
-        public override void OnFrameworkInitializationCompleted()
+        public override async void OnFrameworkInitializationCompleted()
         {
             Console.WriteLine("🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨");
             Console.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
             System.Diagnostics.Debug.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
             
+            // ログファイルにも確実に記録（デバッグ用）
+            try
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨{Environment.NewLine}");
+            }
+            catch { /* ログファイル書き込み失敗は無視 */ }
+            
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 Console.WriteLine("🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨");
+                
+                // デバッグログ追加
+                try
+                {
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨{Environment.NewLine}");
+                }
+                catch { /* ログファイル書き込み失敗は無視 */ }
                 // 未監視タスク例外のハンドラーを登録（早期登録）
                 // TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
                 
@@ -200,6 +216,14 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine("🔍 Program.ServiceProviderアクセス試行");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 Program.ServiceProviderアクセス試行");
                         
+                        // デバッグログ追加
+                        try
+                        {
+                            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🔍 Program.ServiceProviderアクセス試行{Environment.NewLine}");
+                        }
+                        catch { /* ログファイル書き込み失敗は無視 */ }
+                        
                         serviceProvider = Program.ServiceProvider;
                         
                         Console.WriteLine($"🔍 Program.ServiceProvider取得結果: {(serviceProvider == null ? "null" : "not null")}");
@@ -223,6 +247,28 @@ internal sealed partial class App : Avalonia.Application
                     Console.WriteLine("✅ Program.ServiceProvider確認成功");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ Program.ServiceProvider確認成功");
                     
+                    // EventHandlerInitializationServiceを最優先で実行（Gemini分析に基づく修正）
+                    Console.WriteLine("🔥 EventHandlerInitializationService実行開始（最優先実行）");
+                    
+                    // デバッグログ追加
+                    try
+                    {
+                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🔥 EventHandlerInitializationService実行開始（最優先実行）{Environment.NewLine}");
+                    }
+                    catch { /* ログファイル書き込み失敗は無視 */ }
+                    
+                    // EventHandlerInitializationService は Program.cs で既に完了済み
+                    Console.WriteLine("✅ EventHandlerInitializationService は Program.cs で初期化済み - App.axaml.cs での重複実行をスキップ");
+                    
+                    // デバッグログ追加
+                    try
+                    {
+                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→✅ EventHandlerInitializationService は Program.cs で初期化済み{Environment.NewLine}");
+                    }
+                    catch { /* ログファイル書き込み失敗は無視 */ }
+                    
                     Console.WriteLine("🔍 IEventAggregator取得開始");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 IEventAggregator取得開始");
                     try
@@ -232,23 +278,7 @@ internal sealed partial class App : Avalonia.Application
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
                         _logger?.LogInformation("✅ IEventAggregator取得成功: {AggregatorType}", _eventAggregator.GetType().Name);
                         
-                        // EventHandlerInitializationServiceを取得して実行
-                        Console.WriteLine("🔥 EventHandlerInitializationService実行開始");
-                        var eventHandlerInitService = serviceProvider.GetRequiredService<Baketa.Application.Services.Events.EventHandlerInitializationService>();
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await eventHandlerInitService.InitializeAsync().ConfigureAwait(false);
-                                Console.WriteLine("🔥 EventHandlerInitializationService実行完了");
-                            }
-                            catch (Exception initEx)
-                            {
-                                Console.WriteLine($"🔥 [ERROR] EventHandlerInitializationService実行エラー: {initEx.Message}");
-                                _logger?.LogError(initEx, "EventHandlerInitializationService実行エラー");
-                            }
-                        });
-                        Console.WriteLine("🔥 EventHandlerInitializationService非同期実行開始");
+                        // EventHandlerInitializationServiceは最優先実行済み（上部で処理完了）
                         
                         // 🩺 診断システム開始 - 診断レポート機能を有効化
                         Console.WriteLine("🚨🚨🚨 [CRITICAL] 診断システム開始処理 - 重要ポイント！ 🚨🚨🚨");
@@ -375,6 +405,18 @@ internal sealed partial class App : Avalonia.Application
                         Console.WriteLine($"✅ MainOverlayViewModel取得成功: {mainOverlayViewModel.GetType().Name}");
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ MainOverlayViewModel取得成功: {mainOverlayViewModel.GetType().Name}");
                         _logger?.LogInformation("✅ MainOverlayViewModel取得成功: {ViewModelType}", mainOverlayViewModel.GetType().Name);
+                        
+                        // 🚀 EventHandler初期化完了をUI側に安全に通知（Gemini分析に基づく修正）
+                        if (Program.IsEventHandlerInitialized)
+                        {
+                            Console.WriteLine("🚀 [UI_SAFE] EventHandler初期化済み - MainOverlayViewModel通知実行");
+                            mainOverlayViewModel.IsEventHandlerInitialized = true;
+                            Console.WriteLine("✅ [UI_SAFE] MainOverlayViewModel.IsEventHandlerInitialized = true 設定完了");
+                        }
+                        else
+                        {
+                            Console.WriteLine("⚠️ [UI_SAFE] EventHandler初期化未完了 - UI表示時に手動設定が必要");
+                        }
                     }
                     catch (Exception mainViewModelEx)
                     {

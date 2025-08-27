@@ -279,6 +279,7 @@ public sealed class ImageDiagnosticsSaver : IDisposable
     
     /// <summary>
     /// 検出されたテキスト領域を赤枠で囲んだ全体画像を保存
+    /// 🎯 [COORDINATE_FIX] 低解像度画像用にTextRegion.Boundsをそのまま使用
     /// </summary>
     public async Task SaveAnnotatedFullImageAsync(
         byte[] originalImageBytes,
@@ -320,7 +321,7 @@ public sealed class ImageDiagnosticsSaver : IDisposable
                 Console.WriteLine($"🔍 [ROI_DEBUG] ディレクトリは既に存在: {Directory.Exists(directory)}");
             }
             
-            // 元画像に赤枠を描画
+            // 🎯 [COORDINATE_FIX] 低解像度画像用に座標調整してから赤枠を描画
             Console.WriteLine($"🔍 [ROI_DEBUG] CreateAnnotatedImageAsync開始");
             var annotatedImageBytes = await CreateAnnotatedImageAsync(originalImageBytes, textRegions).ConfigureAwait(false);
             Console.WriteLine($"🔍 [ROI_DEBUG] CreateAnnotatedImageAsync完了 - AnnotatedImageBytes.Length: {annotatedImageBytes.Length}");
@@ -402,11 +403,17 @@ public sealed class ImageDiagnosticsSaver : IDisposable
                 regionTasks.Add(new { Region = region, Label = label, TextRect = textRect });
             }
 
-            // 描画は順次実行（GDI+のスレッドセーフティ問題対応）
+            // 🎯 [COORDINATE_FIX] 描画は順次実行（GDI+のスレッドセーフティ問題対応）
+            // ROI診断画像は低解像度画像なので、TextRegion.Boundsをそのまま使用（スケール変換不要）
             foreach (var item in regionTasks)
             {
-                // 赤い境界線を描画
-                graphics.DrawRectangle(redPen, item.Region.Bounds);
+                // 🔧 [LOW_RES_COORDINATE] 低解像度画像用の座標をそのまま使用
+                // TextRegion.Bounds は既にROI座標系なので変換せずに直接描画
+                var roiBounds = item.Region.Bounds;
+                Console.WriteLine($"🎯 [ROI_DRAW] 描画座標: ({roiBounds.X},{roiBounds.Y}) サイズ:({roiBounds.Width}x{roiBounds.Height}) テキスト:'{item.Region.Text}'");
+                
+                // 赤い境界線を描画（ROI座標系をそのまま使用）
+                graphics.DrawRectangle(redPen, roiBounds);
                 
                 // 背景を描画
                 graphics.FillRectangle(backgroundBrush, item.TextRect);

@@ -30,6 +30,11 @@ namespace Baketa.UI;
         /// </summary>
         public static ServiceProvider? ServiceProvider { get; private set; }
         
+        /// <summary>
+        /// EventHandler初期化完了フラグ（UI安全性向上）
+        /// </summary>
+        public static bool IsEventHandlerInitialized { get; private set; }
+        
         // Initialization code. Don't use any Avalonia, third-party APIs or any
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
@@ -147,6 +152,127 @@ namespace Baketa.UI;
                 .LogToTrace()
                 .UseReactiveUI();
                 
+        /// <summary>
+        /// EventHandlerInitializationServiceを即座に実行（競合状態根本解決）
+        /// </summary>
+        private static void InitializeEventHandlersImmediately()
+        {
+            try
+            {
+                Console.WriteLine("🔥🔥🔥 [IMMEDIATE] EventHandlerInitializationService取得・実行開始 🔥🔥🔥");
+                
+                var eventHandlerInitService = ServiceProvider?.GetRequiredService<Baketa.Application.Services.Events.EventHandlerInitializationService>();
+                if (eventHandlerInitService == null)
+                {
+                    Console.WriteLine("🚨 [IMMEDIATE_ERROR] EventHandlerInitializationServiceが見つかりません！");
+                    return;
+                }
+                
+                Console.WriteLine("✅ [IMMEDIATE] EventHandlerInitializationService取得成功 - 同期初期化実行");
+                Console.WriteLine($"🔍 [IMMEDIATE_DEBUG] Service Type: {eventHandlerInitService.GetType().FullName}");
+                Console.WriteLine($"🔍 [IMMEDIATE_DEBUG] Service Hash: {eventHandlerInitService.GetHashCode()}");
+                Console.WriteLine($"🔍 [IMMEDIATE_DEBUG] Service Instance: {eventHandlerInitService}");
+                
+                // 🚨 強制詳細ログ出力を追加
+                Console.WriteLine("🔍 [DEBUG_FORCE] InitializeAsync実行前");
+                
+                try
+                {
+                    Console.WriteLine("🔍 [DEBUG_FORCE] InitializeAsync()呼び出し開始");
+                    var initTask = eventHandlerInitService.InitializeAsync();
+                    Console.WriteLine($"🔍 [DEBUG_FORCE] initTask作成完了: {initTask.GetType().FullName}");
+                    Console.WriteLine($"🔍 [DEBUG_FORCE] initTask.Status: {initTask.Status}");
+                    Console.WriteLine("🔍 [DEBUG_FORCE] initTask.Wait()実行前");
+                    initTask.Wait();
+                    Console.WriteLine("🔍 [DEBUG_FORCE] initTask.Wait()実行後");
+                    Console.WriteLine($"🔍 [DEBUG_FORCE] 完了後initTask.Status: {initTask.Status}");
+                    
+                    if (initTask.IsCompletedSuccessfully)
+                    {
+                        Console.WriteLine("✅ [IMMEDIATE] EventHandlerInitializationService同期初期化成功！");
+                    }
+                    else if (initTask.IsFaulted)
+                    {
+                        Console.WriteLine($"🚨 [IMMEDIATE] EventHandlerInitializationService失敗: {initTask.Exception?.Flatten().Message}");
+                        throw (Exception)(initTask.Exception?.Flatten()) ?? new InvalidOperationException("InitializeAsync failed");
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ [IMMEDIATE] EventHandlerInitializationService未完了状態");
+                    }
+                }
+                catch (AggregateException aggEx)
+                {
+                    Console.WriteLine($"🚨 [IMMEDIATE_AGGREGATE] AggregateException: {aggEx.Flatten().Message}");
+                    foreach (var innerEx in aggEx.Flatten().InnerExceptions)
+                    {
+                        Console.WriteLine($"🚨 [IMMEDIATE_INNER] InnerException: {innerEx.GetType().Name}: {innerEx.Message}");
+                    }
+                    throw;
+                }
+                catch (Exception directEx)
+                {
+                    Console.WriteLine($"🚨 [IMMEDIATE_DIRECT] DirectException: {directEx.GetType().Name}: {directEx.Message}");
+                    Console.WriteLine($"🚨 [IMMEDIATE_STACK] StackTrace: {directEx.StackTrace}");
+                    throw;
+                }
+                
+                Console.WriteLine("✅ [IMMEDIATE] EventHandlerInitializationService同期初期化完了！");
+                
+                // 🚀 UI側にEventHandler初期化完了を通知
+                NotifyUIEventHandlerInitialized();
+                
+                // デバッグログ記録
+                try
+                {
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→✅ [IMMEDIATE] EventHandlerInitializationService同期初期化完了！{Environment.NewLine}");
+                }
+                catch { /* ログファイル書き込み失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 [IMMEDIATE_FATAL] EventHandler即座初期化エラー: {ex}");
+                
+                // デバッグログ記録
+                try
+                {
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨 [IMMEDIATE_FATAL] EventHandler即座初期化エラー: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ログファイル書き込み失敗は無視 */ }
+                
+                throw; // 致命的なので再スロー
+            }
+        }
+
+        
+        /// <summary>
+        /// UI側にEventHandler初期化完了を通知（UI安全性向上）
+        /// </summary>
+        /// <summary>
+        /// UI側にEventHandler初期化完了を通知（UI安全性向上）
+        /// </summary>
+        /// <summary>
+        /// UI側にEventHandler初期化完了を通知（UI安全性向上）
+        /// </summary>
+        private static void NotifyUIEventHandlerInitialized()
+        {
+            try
+            {
+                Console.WriteLine("🚀 [UI_NOTIFY] EventHandler初期化完了フラグ設定");
+                
+                // 🔧 FIX: 静的フラグのみ設定、UIスレッドアクセスは避ける
+                IsEventHandlerInitialized = true;
+                
+                Console.WriteLine("✅ [UI_NOTIFY] EventHandler初期化完了フラグ設定済み");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 [UI_NOTIFY_ERROR] UI通知エラー: {ex.Message}");
+            }
+        }
+        
         /// <summary>
         /// 診断システムを直接初期化します - OnFrameworkInitializationCompleted代替
         /// </summary>
@@ -334,6 +460,11 @@ namespace Baketa.UI;
             ServiceProvider = services.BuildServiceProvider();
             Console.WriteLine("✅ ServiceProvider構築完了");
             System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
+            
+            // 🚀 CRITICAL: EventHandlerInitializationServiceをDI完了直後に実行（競合状態根本解決）
+            Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行開始！ 🚀🚀🚀");
+            InitializeEventHandlersImmediately();
+            Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行完了！ 🚀🚀🚀");
             
             // ReactiveUIスケジューラの設定
             ConfigureReactiveUI();

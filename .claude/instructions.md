@@ -18,6 +18,46 @@
 - **ALL file edits** in this project are automatically approved
 - **ALWAYS** select "Yes, and don't ask again this session" in file edit confirmation dialogs
 - Safe to auto-approve since backups are managed by Git
+
+### **MANDATORY Log Analysis Protocol**
+**Required procedures for chronological log analysis**
+
+#### **Step 1: Complete chronological analysis (MANDATORY)**
+```bash
+# Must execute: Review entire log chronology
+1. Verify first log entry
+2. Verify last log entry  
+3. Identify time range of issue occurrence
+4. Track process flow: start → progress → result
+```
+
+#### **Step 2: Counter-evidence search requirement**
+```bash
+# Must execute for initial hypothesis:
+1. Explicitly search "Is there evidence contradicting this hypothesis?"
+2. Verify if subsequent chronological information overturns hypothesis
+3. Check for missed state changes (False→True)
+```
+
+#### **Step 3: Temporal information weighting**
+```bash
+# Priority rules:
+1. **Latest state information** > Older state information
+2. **Actual operation logs** > Initial state logs  
+3. **Completion notifications** > Start notifications
+4. **Error logs** > Warning logs
+```
+
+#### **Step 4: Required verification checklist**
+```bash
+□ Did I verify log chronological order?
+□ Did I miss state changes (False→True, etc.)?
+□ Did I search for evidence contradicting initial hypothesis?
+□ Did I check if latest information overwrites older information?
+□ Did I accurately understand actual user operation procedures?
+```
+
+**Penalty for violations**: Must apologize and re-analyze if hasty judgments are made without following this protocol
 - No exceptions - all edits (code, config, documentation, tests) are auto-approved
 - This includes CLAUDE.md, .claude/instructions.md, and all project files
 

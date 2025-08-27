@@ -159,7 +159,8 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
             // Phase 3: 高解像度部分キャプチャ
             var phase3Stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions).ConfigureAwait(false);
+            // 🎯 [COORDINATE_FIX] ROIスケールファクターを渡して座標変換を実施
+            var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions, options.ROIScaleFactor).ConfigureAwait(false);
             phase3Stopwatch.Stop();
 
             // キャプチャ結果の品質評価
@@ -299,7 +300,14 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
         }
     }
 
-    private async Task<IList<IWindowsImage>> CaptureHighResRegionsAsync(IntPtr hwnd, IList<Rectangle> textRegions)
+    /// <summary>
+    /// 🎯 [COORDINATE_FIX] 高解像度部分キャプチャ実行（座標変換対応）
+    /// </summary>
+    /// <param name="hwnd">ターゲットウィンドウハンドル</param>
+    /// <param name="textRegions">低解像度座標系でのテキスト領域</param>
+    /// <param name="roiScaleFactor">ROIスケールファクター（通常0.5）</param>
+    /// <returns>高解像度部分画像リスト</returns>
+    private async Task<IList<IWindowsImage>> CaptureHighResRegionsAsync(IntPtr hwnd, IList<Rectangle> textRegions, float roiScaleFactor)
     {
         var results = new List<IWindowsImage>();
 
@@ -338,24 +346,42 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
                     {
                         try
                         {
-                            // 境界チェック
-                            if (region.X < 0 || region.Y < 0 ||
-                                region.Right > fullImage.Width || region.Bottom > fullImage.Height ||
-                                region.Width <= 0 || region.Height <= 0)
+                            // 🎯 [COORDINATE_TRANSFORM] 低解像度座標を高解像度座標に変換
+                            var inverseScale = 1.0f / roiScaleFactor;
+                            var highResRegion = new Rectangle(
+                                (int)(region.X * inverseScale),
+                                (int)(region.Y * inverseScale),
+                                (int)(region.Width * inverseScale),
+                                (int)(region.Height * inverseScale)
+                            );
+                            
+                            _logger.LogDebug("🎯 [COORD_TRANSFORM] 座標変換: 低解像度{LowRes} → 高解像度{HighRes} (スケール:{Scale})",
+                                region, highResRegion, inverseScale);
+                            
+                            // 境界チェック（高解像度座標でチェック）
+                            if (highResRegion.X < 0 || highResRegion.Y < 0 ||
+                                highResRegion.Right > fullImage.Width || highResRegion.Bottom > fullImage.Height ||
+                                highResRegion.Width <= 0 || highResRegion.Height <= 0)
                             {
-                                _logger.LogWarning("無効な領域をスキップ: {Region}, 画像サイズ: {ImageSize}",
-                                    region, $"{fullImage.Width}x{fullImage.Height}");
+                                _logger.LogWarning("無効な領域をスキップ: 変換後{HighResRegion}, 画像サイズ: {ImageSize}",
+                                    highResRegion, $"{fullImage.Width}x{fullImage.Height}");
                                 return null;
                             }
 
                             // 並列実行での画像切り出し（CPU集約的処理）
                             return await Task.Run(() =>
                             {
-                                var croppedImage = _imageFactory.CropImage(fullImage, region);
+                                // 🎯 [HIGH_RES_CROP] 高解像度座標でクロップ実行
+                                var croppedImage = _imageFactory.CropImage(fullImage, highResRegion);
                                 if (croppedImage != null)
                                 {
-                                    _logger.LogDebug("領域キャプチャ完了: {Region} → {Size}",
-                                        region, $"{croppedImage.Width}x{croppedImage.Height}");
+                                    _logger.LogDebug("🎯 [CROP_SUCCESS] 領域キャプチャ完了: 低解像度{LowRes} → 高解像度{HighRes} → クロップ{Size}",
+                                        region, highResRegion, $"{croppedImage.Width}x{croppedImage.Height}");
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("🚫 [CROP_FAILED] クロップ失敗: 低解像度{LowRes} → 高解像度{HighRes}",
+                                        region, highResRegion);
                                 }
                                 return croppedImage;
                             }).ConfigureAwait(false);

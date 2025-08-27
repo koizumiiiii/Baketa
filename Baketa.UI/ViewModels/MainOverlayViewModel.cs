@@ -34,6 +34,9 @@ public class MainOverlayViewModel : ViewModelBase
     private bool _isTranslationResultVisible; // 初期状態は非表示
     private bool _isWindowSelected;
     private bool _isOcrInitialized;
+    
+    // 🚀 EventHandler初期化完了状態（UI安全性向上）
+    private bool _isEventHandlerInitialized;
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -220,6 +223,34 @@ public class MainOverlayViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// EventHandler初期化完了状態 - Start button UI safety
+    /// </summary>
+    public bool IsEventHandlerInitialized
+    {
+        get => _isEventHandlerInitialized;
+        set
+        {
+            var changed = SetPropertySafe(ref _isEventHandlerInitialized, value);
+            if (changed)
+            {
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                    });
+                }
+                
+                DebugLogUtility.WriteLog($"🚀 EventHandler初期化状態変更: IsEventHandlerInitialized={value}");
+            }
+        }
+    }
+
     public WindowInfo? SelectedWindow
     {
         get => _selectedWindow;
@@ -235,15 +266,15 @@ public class MainOverlayViewModel : ViewModelBase
     { 
         get 
         {
-            // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] OCR初期化完了条件追加 - Start/Stopボタン有効化条件に IsOcrInitialized を追加
-            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized; 
-            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, 結果={enabled}");
+            // 🚀 EventHandler初期化完了チェックを追加（UI安全性向上）
+            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized; 
+            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, 結果={enabled}");
             
             // デバッグ用に実際の状態をファイルログにも出力
             try
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", 
-                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}");
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}");
             }
             catch { }
             
