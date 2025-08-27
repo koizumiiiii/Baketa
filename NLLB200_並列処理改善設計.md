@@ -207,6 +207,7 @@
 
 ### **問題分析文書**
 - 🚨 [OCR_NLLB200_RESOURCE_CONFLICT_ANALYSIS.md](./OCR_NLLB200_RESOURCE_CONFLICT_ANALYSIS.md) - **OCR⇔NLLB-200リソース競合問題分析** ⚠️ **Critical Issue**
+- 🔧 [HYBRID_RESOURCE_MANAGEMENT_DESIGN.md](./HYBRID_RESOURCE_MANAGEMENT_DESIGN.md) - **ハイブリッドリソース管理システム** 🆕 **根本解決策**
 
 ---
 

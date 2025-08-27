@@ -3,6 +3,7 @@
 ## 関連文書
 - **基盤設計**: [NLLB200_並列処理改善設計.md](./NLLB200_並列処理改善設計.md) - TPL Dataflow並列処理基盤
 - **統合設計**: [ROI_TRANSLATION_PIPELINE_INTEGRATION.md](./ROI_TRANSLATION_PIPELINE_INTEGRATION.md) - ROI翻訳パイプライン統合
+- **🆕 解決策設計**: [HYBRID_RESOURCE_MANAGEMENT_DESIGN.md](./HYBRID_RESOURCE_MANAGEMENT_DESIGN.md) - ハイブリッドリソース管理システム
 
 ## 🚨 Critical Issue: 設計考慮不足による重大なリソース競合
 
