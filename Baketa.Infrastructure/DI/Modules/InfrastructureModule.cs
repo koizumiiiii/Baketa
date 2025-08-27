@@ -35,7 +35,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -363,14 +362,14 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
             Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
             
-            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応）
+            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 2動的リソース管理）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
                 var connectionPool = provider.GetRequiredService<IConnectionPool>();
                 var configuration = provider.GetRequiredService<IConfiguration>();
                 logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）");
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration);
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration, null, null);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
@@ -510,7 +509,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
         }
-
+        
         /// <summary>
         /// このモジュールが依存する他のモジュールの型を取得します。
         /// </summary>

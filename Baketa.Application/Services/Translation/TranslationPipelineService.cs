@@ -46,7 +46,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     // Pipeline Configuration (from design document)
     private const int BatchSize = 3;
     private const int BatchTimeoutMs = 100;
-    private const int MaxDegreeOfParallelism = 2;
+    private const int MaxDegreeOfParallelism = 2; // 並列度復元: Phase 1.5リファクタリングにより元の設定に復元
     private const int BufferBlockCapacity = 100;
     private const int BatchBlockCapacity = 100;
     private const int TranslationBlockCapacity = 10;
@@ -283,6 +283,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         }
 
         _logger.LogDebug("バッチ翻訳処理開始: {BatchSize}個のジョブを処理", jobBatch.Length);
+
+        // Phase 1.5: 固定クールダウン削除 - appsettings.jsonのMaxConnections制御で十分
 
         try
         {

@@ -31,6 +31,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 {
     private readonly ILogger<OptimizedPythonTranslationEngine> _logger;
     private readonly SemaphoreSlim _serverLock = new(1, 1);
+    // Phase 1.5: バッチ並列度制限を削除 - appsettings.jsonのMaxConnections制御で十分
     private readonly IConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
     private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
@@ -597,6 +598,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CancellationToken cancellationToken)
     {
         var batchStopwatch = Stopwatch.StartNew();
+        
         PersistentConnection? connection = null;
         TcpClient? directClient = null;
         NetworkStream? directStream = null;
@@ -718,9 +720,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             .Select(g => g.Select(x => x.request).ToList())
             .ToList();
 
-        // 並列バッチ処理（接続プール活用）- 無限再帰回避のためProcessSingleBatchAsyncを直接呼び出し
-        var tasks = batches.Select(batch => ProcessSingleBatchAsync(batch, cancellationToken));
-        var batchResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+        // Phase 1.5: 並列バッチ処理復元 - Task.WhenAllで最適パフォーマンス
+        var batchTasks = batches.Select(batch => ProcessSingleBatchAsync(batch, cancellationToken));
+        var batchResults = await Task.WhenAll(batchTasks).ConfigureAwait(false);
 
         // 結果をフラット化
         foreach (var batchResult in batchResults)
