@@ -1,6 +1,7 @@
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
+using Baketa.Core.Events.EventTypes;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Infrastructure.Platform.DI.Modules;
@@ -90,6 +91,11 @@ namespace Baketa.Application.DI.Modules;
             {
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
+            
+            // 🔧 PHASE 3: TranslationPipelineService DI Registration (Critical Issue対応)
+            services.AddSingleton<Baketa.Application.Services.Translation.TranslationPipelineService>();
+            services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());
             
             // 🚨 [REGRESSION_FIX] エラーハンドリング統一による回帰問題を修正するため一時的に無効化
             // services.AddSingleton<Baketa.Application.Services.Translation.ITranslationErrorHandlerService, 
@@ -280,9 +286,8 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<Baketa.Application.Events.Processors.TranslationModeChangedEventProcessor>();
             
             
-            // OCR完了イベントハンドラー（改善版 - TPL Dataflow）
-            services.AddSingleton<Baketa.Core.Events.Handlers.OcrCompletedHandler_Improved>();
-            // 注意: 改善版は手動でEventAggregatorに登録する必要があります（EventHandlerInitializationService参照）
+            // 🚀 [ROI_PIPELINE] OCR完了イベント処理は TranslationPipelineService で統合処理
+            // OcrCompletedHandler_Improved は削除済み (TranslationPipelineService に統合)
             
             // 翻訳要求イベントハンドラー
             services.AddSingleton<Baketa.Core.Events.Handlers.TranslationRequestHandler>();

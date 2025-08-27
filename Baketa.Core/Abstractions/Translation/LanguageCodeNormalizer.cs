@@ -69,16 +69,9 @@ public static class LanguageCodeNormalizer
         
         // ISO 639-3 to ISO 639-1 mappings
         { "zho", "zh" },
-        { "cmn", "zh" },
         { "yue", "yue" }, // 広東語は独立コード
-        { "jpn", "ja" },
-        { "kor", "ko" },
-        { "eng", "en" },
-        { "deu", "de" },
-        { "fra", "fr" },
-        { "spa", "es" },
-        { "rus", "ru" },
-        { "ara", "ar" }
+        { "deu", "de" }
+        // 注意: cmn, jpn, kor, eng, fra, spa, rus, ara は上記で既に定義済み
     };
 
     /// <summary>

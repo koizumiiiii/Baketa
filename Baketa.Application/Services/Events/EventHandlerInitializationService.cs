@@ -122,32 +122,32 @@ public sealed class EventHandlerInitializationService(
                 //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}{Environment.NewLine}");
             }
 
-            // OcrCompletedHandler_Improved (TPL Dataflow版) 登録
+            // 🚀 [ROI_PIPELINE] TranslationPipelineService (統合翻訳パイプライン) 登録
             try
             {
-                var ocrCompletedHandler_Improved = _serviceProvider.GetRequiredService<OcrCompletedHandler_Improved>();
-                eventAggregator.Subscribe<OcrCompletedEvent>(ocrCompletedHandler_Improved);
-                _logger.LogInformation("OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました");
-                Console.WriteLine("🔥 [DEBUG] OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました");
+                var translationPipelineService = _serviceProvider.GetRequiredService<IEventProcessor<OcrCompletedEvent>>();
+                eventAggregator.Subscribe<OcrCompletedEvent>(translationPipelineService);
+                _logger.LogInformation("TranslationPipelineService (ROI統合パイプライン) を登録しました");
+                Console.WriteLine("🔥 [DEBUG] TranslationPipelineService (ROI統合パイプライン) を登録しました");
                 
                 // 確実なファイル記録
                 try
                 {
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] OcrCompletedHandler_Improved (TPL Dataflow版) を登録しました{Environment.NewLine}");
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] TranslationPipelineService (ROI統合パイプライン) を登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "OcrCompletedHandler_Improvedの登録に失敗しました");
-                Console.WriteLine($"🔥 [ERROR] OcrCompletedHandler_Improvedの登録失敗: {ex.Message}");
+                _logger.LogError(ex, "TranslationPipelineServiceの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] TranslationPipelineServiceの登録失敗: {ex.Message}");
                 
                 // 確実なファイル記録
                 try
                 {
                     System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] OcrCompletedHandler_Improved登録失敗: {ex.Message}{Environment.NewLine}");
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationPipelineService登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }

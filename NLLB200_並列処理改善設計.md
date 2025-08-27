@@ -184,10 +184,31 @@
 ### **今後の作業 (優先順位順)**
 1. ✅ **Phase 2完了**: A/Bテスト結果の定量評価 **完了**
 2. ✅ **Phase 4完了**: 改善版の正式採用と従来版削除 **完了**
-3. **ROI処理再有効化**: CoordinateBasedTranslationServiceとの再統合 ← **最重要残作業**
+3. **ROI処理統合**: Pipeline統合アプローチによる完全統合 ← **最重要残作業**
+   - 📋 **詳細計画**: [ROI_TRANSLATION_PIPELINE_INTEGRATION.md](./ROI_TRANSLATION_PIPELINE_INTEGRATION.md)
+   - 🎯 **目標**: TPL Dataflow + ROI処理の完全両立
+   - ⚡ **技術基盤**: Gemini推奨5段階統一パイプライン
 4. **Phase 3**: 設定値最適化（バッチサイズ・並列度）
 
 ---
 
+## 関連文書
+
+### **統合設計文書**
+- 📋 **[ROI_TRANSLATION_PIPELINE_INTEGRATION.md](./ROI_TRANSLATION_PIPELINE_INTEGRATION.md)** - ROI処理統合の詳細実装計画
+  - UltraThink分析結果とGemini推奨解決策
+  - 5段階統一翻訳パイプライン設計
+  - Phase別実装計画とリスク分析
+
+### **技術分析文書**
+- 📊 [ROI_COORDINATE_SYSTEM_ANALYSIS.md](./docs/ROI_COORDINATE_SYSTEM_ANALYSIS.md) - ROI座標系分析
+- 🔧 [NLLB200_CONCURRENCY_SOLUTION.md](./docs/NLLB200_CONCURRENCY_SOLUTION.md) - 並列処理解決策
+- 📝 [IMPLEMENTATION_CHECKLIST.md](./docs/IMPLEMENTATION_CHECKLIST.md) - 実装チェックリスト
+
+### **問題分析文書**
+- 🚨 [OCR_NLLB200_RESOURCE_CONFLICT_ANALYSIS.md](./OCR_NLLB200_RESOURCE_CONFLICT_ANALYSIS.md) - **OCR⇔NLLB-200リソース競合問題分析** ⚠️ **Critical Issue**
+
+---
+
 *✅ この設計は、UltraThink分析とGemini AIレビューを経て完全実装されました。*  
-*🚀 Phase 1完了：2024年12月 | Phase 2実行中：2025年1月*
+*🚀 Phase 1-2完了：2024年12月 | Phase 4完了：2025年1月 | ROI統合：2025年8月予定*
