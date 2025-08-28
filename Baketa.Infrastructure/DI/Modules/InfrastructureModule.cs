@@ -521,9 +521,9 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// </summary>
         private static void RegisterHybridResourceManagementServices(IServiceCollection services)
         {
-            Console.WriteLine("🔧 [PHASE2] ハイブリッドリソース管理システム登録開始");
+            Console.WriteLine("🔧 [PHASE3] ハイブリッドリソース管理システム登録開始（ホットリロード対応）");
 
-            // HybridResourceSettings の設定バインディング
+            // HybridResourceSettings の設定バインディング（Phase 3: ホットリロード対応）
             services.Configure<Baketa.Infrastructure.ResourceManagement.HybridResourceSettings>(
                 config =>
                 {
@@ -536,7 +536,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                     }
                     else
                     {
-                        // フォールバック設定
+                        // フォールバック設定（Phase 3拡張）
                         config.OcrChannelCapacity = 100;
                         config.TranslationChannelCapacity = 50;
                         config.InitialOcrParallelism = 2;
@@ -545,27 +545,30 @@ namespace Baketa.Infrastructure.DI.Modules;
                         config.MaxTranslationParallelism = 2;
                         config.EnableDynamicParallelism = true;
                         config.EnableDetailedLogging = false;
-                        Console.WriteLine("⚠️ [PHASE2] フォールバック設定を使用");
+                        config.EnableVerboseLogging = false; // Phase 3
+                        config.EnableHotReload = true; // Phase 3
+                        config.ConfigurationPollingIntervalMs = 5000; // Phase 3
+                        Console.WriteLine("⚠️ [PHASE3] フォールバック設定を使用（ホットリロード機能付き）");
                     }
                 });
 
-            // HybridResourceManager をシングルトンとして登録（動的VRAM容量対応）
+            // HybridResourceManager をシングルトンとして登録（Phase 3: IOptionsMonitor対応）
             services.AddSingleton<Baketa.Infrastructure.ResourceManagement.IResourceManager>(provider =>
             {
                 var resourceMonitor = provider.GetRequiredService<IResourceMonitor>();
-                var settings = provider.GetRequiredService<IOptions<HybridResourceSettings>>();
+                var optionsMonitor = provider.GetRequiredService<IOptionsMonitor<HybridResourceSettings>>();
                 var logger = provider.GetRequiredService<ILogger<HybridResourceManager>>();
                 var gpuEnvironmentDetector = provider.GetService<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector>();
                 
-                logger.LogInformation("🎯 [VRAM-FIX] HybridResourceManager初期化 - 動的VRAM容量対応: {GpuDetectorAvailable}",
+                logger.LogInformation("🎯 [PHASE3] HybridResourceManager初期化 - ホットリロード対応VRAM検出: {GpuDetectorAvailable}",
                     gpuEnvironmentDetector != null);
                 
-                return new HybridResourceManager(resourceMonitor, settings, logger, gpuEnvironmentDetector);
+                return new HybridResourceManager(resourceMonitor, optionsMonitor, logger, gpuEnvironmentDetector);
             });
 
-            Console.WriteLine("✅ [PHASE2] HybridResourceManager 登録完了 - 動的リソース制御システム");
-            Console.WriteLine("ℹ️ [PHASE2] IResourceMonitor依存は PlatformModule で解決されます");
-            Console.WriteLine("🎉 [PHASE2] ハイブリッドリソース管理システム登録完了");
+            Console.WriteLine("✅ [PHASE3] HybridResourceManager 登録完了 - ホットリロード対応動的リソース制御システム");
+            Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor依存は PlatformModule で解決されます");
+            Console.WriteLine("🎉 [PHASE3] ハイブリッドリソース管理システム登録完了（設定ホットリロード機能付き）");
         }
         
         /// <summary>

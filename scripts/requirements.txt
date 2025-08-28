@@ -1,5 +1,5 @@
 # Baketa NLLB-200 Translation Server Dependencies
-# Meta NLLB-200高品質多言語翻訳モデル用Pythonサーバー依存関係
+# Meta NLLB-200 multilingual translation model dependencies
 
 # Web Framework
 flask>=2.3.0

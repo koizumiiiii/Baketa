@@ -29,6 +29,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     // GPU関連
     private ManagementObjectSearcher? _gpuSearcher;
     private string? _gpuInstanceName;
+    private Advanced.NvmlGpuMonitor? _nvmlGpuMonitor;
     
     // 監視状態管理
     private readonly CancellationTokenSource _cancellationTokenSource = new();
@@ -60,6 +61,15 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         }
         
         _totalMemoryMB = new Lazy<long>(GetTotalSystemMemoryMB);
+        
+        // NVML GPU監視の初期化（Phase 3強化）
+        // ロガー型不一致を解決するため、ILoggerFactory経由で適切な型のロガーを作成
+        var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => 
+        {
+            builder.AddConsole().SetMinimumLevel(LogLevel.Debug);
+        });
+        var nvmlLogger = loggerFactory.CreateLogger<Advanced.NvmlGpuMonitor>();
+        _nvmlGpuMonitor = new Advanced.NvmlGpuMonitor(nvmlLogger);
         
         _logger.LogInformation("WindowsSystemResourceMonitor初期化開始 - 監視間隔:{MonitoringInterval}ms", 
             _settings.MonitoringIntervalMs);
@@ -384,10 +394,39 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return;
         }
         
+        // Phase 3: 高度なNVML GPU監視初期化
+        var nvmlInitialized = false;
+        if (_nvmlGpuMonitor != null)
+        {
+            try
+            {
+                _logger.LogInformation("🎯 [PHASE3] NVML GPU監視初期化開始");
+                nvmlInitialized = await _nvmlGpuMonitor.InitializeAsync(cancellationToken).ConfigureAwait(false);
+                
+                if (nvmlInitialized)
+                {
+                    _logger.LogInformation("✅ [PHASE3] NVML GPU監視初期化成功 - デバイス数: {DeviceCount}", 
+                        _nvmlGpuMonitor.DetectedDeviceCount);
+                    return; // NVML成功時はWMIフォールバック不要
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ [PHASE3] NVML初期化失敗 - WMIフォールバックに切り替え");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "⚠️ [PHASE3] NVML初期化例外 - WMIフォールバックに切り替え");
+            }
+        }
+        
+        // フォールバック: 従来のWMI GPU監視
         await Task.Run(() =>
         {
             try
             {
+                _logger.LogInformation("🔄 [FALLBACK] WMI GPU監視初期化開始");
+                
                 // WMI経由でGPU情報を取得
                 _gpuSearcher = new ManagementObjectSearcher("root\\CIMV2", 
                     "SELECT Name, AdapterRAM FROM Win32_VideoController WHERE AdapterRAM > 0");
@@ -399,19 +438,23 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                     if (!string.IsNullOrEmpty(gpuName))
                     {
                         _gpuInstanceName = gpuName;
-                        _logger.LogDebug("GPU検出: {GpuName}", gpuName);
+                        _logger.LogInformation("✅ [FALLBACK] GPU検出: {GpuName}", gpuName);
                         break;
                     }
                 }
                 
                 if (string.IsNullOrEmpty(_gpuInstanceName))
                 {
-                    _logger.LogWarning("GPU監視: 対応GPUが見つかりませんでした");
+                    _logger.LogWarning("⚠️ [FALLBACK] GPU監視: 対応GPUが見つかりませんでした");
+                }
+                else
+                {
+                    _logger.LogInformation("✅ [FALLBACK] WMI GPU監視初期化完了");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GPU監視初期化エラー - GPU監視を無効化します");
+                _logger.LogError(ex, "💥 [FALLBACK] GPU監視初期化エラー - GPU監視を無効化します");
                 _gpuSearcher?.Dispose();
                 _gpuSearcher = null;
             }
@@ -470,6 +513,26 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     /// </summary>
     private async Task<double?> GetGpuUsageAsync(CancellationToken cancellationToken)
     {
+        // Phase 3: 高度なNVML GPU監視を優先使用
+        if (_nvmlGpuMonitor?.IsNvmlAvailable == true)
+        {
+            try
+            {
+                var detailedMetrics = await _nvmlGpuMonitor.GetDetailedGpuMetricsAsync(cancellationToken).ConfigureAwait(false);
+                if (detailedMetrics != null)
+                {
+                    _logger.LogTrace("[NVML] GPU使用率取得成功: {Usage:F1}%, VRAM: {VramUsage:F1}%, 温度: {Temp}℃", 
+                        detailedMetrics.GpuUtilizationPercent, detailedMetrics.VramUsagePercent, detailedMetrics.TemperatureCelsius);
+                    return detailedMetrics.GpuUtilizationPercent;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "⚠️ [NVML] GPU使用率取得エラー - フォールバックに切り替え");
+            }
+        }
+        
+        // フォールバック: 従来のWMI GPU監視（基本的な可用性確認）
         if (_gpuSearcher == null || string.IsNullOrEmpty(_gpuInstanceName))
         {
             return null;
@@ -479,14 +542,14 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             try
             {
+                _logger.LogTrace("[FALLBACK] WMI GPU監視 - 基本的な可用性確認のみ実行");
                 // Note: Windows標準のWMIではGPU使用率の直接取得は制限があります
-                // 実際の実装では、NVIDIA-ML API、AMD ADL、または専用のGPU監視ライブラリを使用することを推奨します
-                // ここでは基本的な可用性確認のみ実装
-                return 0.0; // プレースホルダー実装
+                // フォールバック時は基本的な状態のみ返却
+                return 0.0; // プレースホルダー実装（GPU検出済みを示す）
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "GPU使用率取得エラー");
+                _logger.LogWarning(ex, "[FALLBACK] GPU使用率取得エラー");
                 return null;
             }
         }, cancellationToken).ConfigureAwait(false);
@@ -671,6 +734,9 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _threadCountCounter?.Dispose();
             
             _gpuSearcher?.Dispose();
+            
+            // Phase 3: NVML GPU監視のリソース解放
+            _nvmlGpuMonitor?.Dispose();
             
             _logger.LogInformation("WindowsSystemResourceMonitor正常終了");
         }
