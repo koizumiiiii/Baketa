@@ -704,8 +704,13 @@ class NllbTranslationServer:
                     break
                     
                 try:
+                    # デバッグ: 受信データをログ出力
+                    raw_data = data.decode('utf-8')
+                    logger.info(f"[DEBUG] Received raw data: {repr(raw_data)}")
+                    logger.info(f"[DEBUG] Data length: {len(raw_data)}")
+                    
                     # JSONパース
-                    request_data = json.loads(data.decode('utf-8'))
+                    request_data = json.loads(raw_data)
                     
                     # Pingリクエスト判定（ヘルスチェック用）
                     if 'ping' in request_data:

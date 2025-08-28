@@ -2,6 +2,7 @@ using Baketa.Application.DI.Modules;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.DI;
+using EventTypes = Baketa.Core.Events.EventTypes;
 using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Auth;
@@ -131,6 +132,10 @@ namespace Baketa.UI.DI.Modules;
             
             // メインウィンドウビューモデル
             services.AddSingleton<MainWindowViewModel>();
+            
+            // Phase 0: MainWindowViewModelをイベントプロセッサーとしても登録
+            services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(
+                provider => provider.GetRequiredService<MainWindowViewModel>());
             
             // 翻訳仕様を同期するサービス
             // 例: services.AddSingleton<IViewModelSynchronizationService, ViewModelSynchronizationService>();

@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Baketa.Core.Abstractions.DI;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Logging;
 using Baketa.Core.Abstractions.OCR;
+using EventTypes = Baketa.Core.Events.EventTypes;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
@@ -33,7 +36,6 @@ using Baketa.Infrastructure.Translation.Services;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -79,6 +81,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // Step 1: Python環境解決と診断サービス（即座の応急処置）
             RegisterPythonEnvironmentServices(services);
+            
+            // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
+            RegisterNllbFixServices(services);
             
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
@@ -176,6 +181,26 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<PythonEnvironmentResolver>();
             services.AddTransient<EnhancedDiagnosticReport>();
             services.AddSingleton<PortManager>();
+        }
+        
+        /// <summary>
+        /// Phase 0+1: NLLB修正対応サービスを登録します（30秒再起動問題解決）
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterNllbFixServices(IServiceCollection services)
+        {
+            // Phase 1: 30秒再起動ループの根本解決
+            services.AddSingleton<ModelCacheManager>();
+            services.AddSingleton<ModelPrewarmingService>();
+            services.AddSingleton<DynamicHealthCheckManager>();
+            
+            // Phase 1: ModelPrewarmingServiceをIHostedServiceとして登録
+            services.AddSingleton<IHostedService>(provider => 
+                provider.GetRequiredService<ModelPrewarmingService>());
+            
+            // Phase 1: DynamicHealthCheckManagerをイベントプロセッサーとして登録
+            services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(provider =>
+                provider.GetRequiredService<DynamicHealthCheckManager>());
         }
         
         /// <summary>

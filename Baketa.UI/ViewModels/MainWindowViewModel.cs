@@ -1,5 +1,6 @@
 using System;
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,8 @@ namespace Baketa.UI.ViewModels;
     /// <summary>
     /// メインウィンドウのビューモデル
     /// </summary>
-    public sealed class MainWindowViewModel : Framework.ViewModelBase
+    public sealed class MainWindowViewModel : Framework.ViewModelBase, 
+        IEventProcessor<EventTypes.PythonServerStatusChangedEvent>
     {
         private readonly INavigationService _navigationService;
         private readonly Baketa.Application.Services.Translation.TranslationOrchestrationService? _translationOrchestrationService;
@@ -712,4 +714,71 @@ namespace Baketa.UI.ViewModels;
             
             await Task.CompletedTask.ConfigureAwait(false);
         }
+
+        #region IEventProcessor<PythonServerStatusChangedEvent> Implementation
+
+        /// <summary>
+        /// Pythonサーバー状態変更イベントのハンドラー
+        /// StartButton制御機能の核心部分（Phase 0: 応急対策）
+        /// Thread-safe UI updates using RxApp.MainThreadScheduler
+        /// </summary>
+        public async Task HandleAsync(EventTypes.PythonServerStatusChangedEvent eventData)
+        {
+            try
+            {
+                Logger?.LogInformation("🔄 Pythonサーバー状態変更: Ready={IsReady}, Port={Port}, Message={Message}", 
+                    eventData.IsServerReady, eventData.ServerPort, eventData.StatusMessage);
+
+                // UI更新をメインスレッドで実行（Thread Safety修正）
+                RxApp.MainThreadScheduler.Schedule(Unit.Default, (scheduler, state) =>
+                {
+                    // StartCaptureCommandの有効/無効を制御
+                    IsTranslationEngineInitializing = !eventData.IsServerReady;
+                    
+                    // ステータスメッセージの更新
+                    StatusMessage = eventData.StatusMessage;
+                    
+                    // サーバー準備完了時の追加処理
+                    if (eventData.IsServerReady)
+                    {
+                        // 通知表示（準備完了）
+                        ShowNotification("翻訳機能が利用可能になりました", TimeSpan.FromSeconds(3));
+                        Logger?.LogInformation("✅ 翻訳サーバー準備完了 - StartCaptureCommand有効化");
+                    }
+                    else
+                    {
+                        // 初期化中または失敗時
+                        if (eventData.StatusMessage.Contains("エラー"))
+                        {
+                            ShowNotification(eventData.StatusMessage, TimeSpan.FromSeconds(5));
+                            Logger?.LogWarning("❌ 翻訳サーバーエラー - StartCaptureCommand無効化");
+                        }
+                        else
+                        {
+                            Logger?.LogInformation("🔄 翻訳サーバー初期化中 - StartCaptureCommand無効化");
+                        }
+                    }
+                    
+                    return Disposable.Empty;
+                });
+
+                await Task.CompletedTask.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "❌ Pythonサーバー状態変更イベント処理エラー");
+            }
+        }
+
+        /// <summary>
+        /// イベント処理優先度（通常優先度）
+        /// </summary>
+        public int Priority => 100;
+
+        /// <summary>
+        /// 同期実行フラグ（UIスレッドでの実行が必要なためfalse）
+        /// </summary>
+        public bool SynchronousExecution => false;
+
+        #endregion
     }

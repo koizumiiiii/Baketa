@@ -4,6 +4,8 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
 using Baketa.Infrastructure.Translation.Models;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +20,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 public class PythonServerManager(
     IPortManagementService portManager,
     PythonEnvironmentResolver pythonResolver,
+    IEventAggregator eventAggregator,
     ILogger<PythonServerManager> logger) : IPythonServerManager
 {
     private readonly ConcurrentDictionary<string, PythonServerInstance> _activeServers = [];
@@ -49,10 +52,19 @@ public class PythonServerManager(
     {
         logger.LogInformation("🚀 Python翻訳サーバー起動開始: {LanguagePair}", languagePair);
         
+        // Phase 0: サーバー初期化開始イベント発行
+        await PublishServerStatusAsync(false, 0, "翻訳サーバー初期化中...", 
+            $"言語ペア: {languagePair}").ConfigureAwait(false);
+        
         // 既存サーバーチェック
         if (_activeServers.TryGetValue(languagePair, out var existing) && existing.IsHealthy)
         {
             logger.LogInformation("♻️ 既存サーバーを再利用: {LanguagePair} → Port {Port}", languagePair, existing.Port);
+            
+            // Phase 0: 既存サーバー準備完了イベント発行
+            await PublishServerStatusAsync(true, existing.Port, "翻訳サーバー準備完了", 
+                $"既存サーバー再利用: {languagePair}").ConfigureAwait(false);
+            
             return existing;
         }
         
@@ -82,6 +94,10 @@ public class PythonServerManager(
             logger.LogInformation("✅ Python翻訳サーバー起動完了: {LanguagePair} → Port {Port}, PID {PID}", 
                 languagePair, port, process.Id);
             
+            // Phase 0: サーバー起動完了イベント発行
+            await PublishServerStatusAsync(true, port, "翻訳サーバー準備完了", 
+                $"起動完了: {languagePair}, PID {process.Id}").ConfigureAwait(false);
+            
             return instance;
         }
         catch (Exception ex)
@@ -89,6 +105,11 @@ public class PythonServerManager(
             // ポート解放
             await portManager.ReleasePortAsync(port).ConfigureAwait(false);
             logger.LogError(ex, "❌ Python翻訳サーバー起動失敗: {LanguagePair}, Port {Port}", languagePair, port);
+            
+            // Phase 0: サーバー起動失敗イベント発行
+            await PublishServerStatusAsync(false, port, "翻訳サーバーエラー", 
+                $"起動失敗: {languagePair}, エラー: {ex.Message}").ConfigureAwait(false);
+            
             throw;
         }
     }
@@ -389,6 +410,32 @@ public class PythonServerManager(
         {
             logger.LogDebug("❌ ヘルスチェック失敗: {Server}, Error: {Error}", server, ex.Message);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Pythonサーバー状態変更イベントを発行するヘルパーメソッド (Phase 0: StartButton制御機能)
+    /// </summary>
+    private async Task PublishServerStatusAsync(bool isReady, int port, string message, string details)
+    {
+        try
+        {
+            var statusEvent = new PythonServerStatusChangedEvent
+            {
+                IsServerReady = isReady,
+                ServerPort = port,
+                StatusMessage = message,
+                Details = details
+            };
+
+            await eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
+            
+            logger.LogDebug("📡 サーバー状態イベント発行: Ready={IsReady}, Port={Port}, Message={Message}", 
+                isReady, port, message);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "⚠️ サーバー状態イベント発行エラー: Ready={IsReady}, Port={Port}", isReady, port);
         }
     }
 
