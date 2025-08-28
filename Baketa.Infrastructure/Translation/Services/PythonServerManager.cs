@@ -13,15 +13,15 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// Python翻訳サーバー管理実装
 /// Issue #147 Phase 5: ヘルスチェック機能付きプロセス管理
 /// Gemini改善提案反映: 自動監視・復旧機能
+/// Step 1統合: PythonEnvironmentResolver活用
 /// </summary>
 public class PythonServerManager(
     IPortManagementService portManager,
+    PythonEnvironmentResolver pythonResolver,
     ILogger<PythonServerManager> logger) : IPythonServerManager
 {
     private readonly ConcurrentDictionary<string, PythonServerInstance> _activeServers = [];
-    private readonly System.Threading.Timer? _healthCheckTimer = 
-        new(callback: static state => { }, state: null, 
-            dueTime: System.Threading.Timeout.Infinite, period: System.Threading.Timeout.Infinite);
+    private System.Threading.Timer? _healthCheckTimer;
     private readonly object _healthCheckLock = new();
     private bool _disposed;
 
@@ -30,8 +30,18 @@ public class PythonServerManager(
     /// </summary>
     public void InitializeHealthCheckTimer()
     {
-        _healthCheckTimer?.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        _healthCheckTimer ??= new System.Threading.Timer(HealthCheckTimerCallback, null, 
+            System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        _healthCheckTimer.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         logger.LogInformation("🩺 PythonServerManager初期化完了（ヘルスチェック30秒間隔）");
+    }
+    
+    /// <summary>
+    /// ヘルスチェックタイマーコールバック
+    /// </summary>
+    private void HealthCheckTimerCallback(object? state)
+    {
+        _ = Task.Run(async () => await PerformHealthCheckInternalAsync().ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -144,9 +154,22 @@ public class PythonServerManager(
             logger.LogWarning("⚠️ dynamic_port_translation_server.pyが見つかりません。既存スクリプトを使用: {Script}", scriptPath);
         }
         
+        // Step 1統合: PythonEnvironmentResolver使用（py.exe優先戦略）
+        string pythonExecutable;
+        try
+        {
+            pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
+            logger.LogInformation("✅ Python実行環境解決: {PythonPath}", pythonExecutable);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
+            throw new InvalidOperationException($"Python実行環境が見つかりません。Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
+        }
+        
         var startInfo = new ProcessStartInfo
         {
-            FileName = "python",
+            FileName = pythonExecutable, // Step 1: py.exe優先戦略適用
             Arguments = $"\"{scriptPath}\" --port {port} --language-pair {languagePair}",
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -158,7 +181,8 @@ public class PythonServerManager(
         var process = Process.Start(startInfo) ?? 
             throw new InvalidOperationException($"Python翻訳サーバープロセス起動失敗: {languagePair}");
         
-        logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Args: {Args}", process.Id, startInfo.Arguments);
+        logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Python: {Python}, Args: {Args}", 
+            process.Id, pythonExecutable, startInfo.Arguments);
         
         // 非同期でログ出力監視（デバッグ用）
         _ = Task.Run(async () =>

@@ -77,6 +77,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Phase 5: ポート競合防止機構サービス
             RegisterPortManagementServices(services);
             
+            // Step 1: Python環境解決と診断サービス（即座の応急処置）
+            RegisterPythonEnvironmentServices(services);
+            
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
             
@@ -161,6 +164,18 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("✅ PythonServerManager登録完了 - 動的ポート管理・自動復旧");
             
             Console.WriteLine("🎉 Phase 5: ポート競合防止機構サービス登録完了");
+        }
+        
+        /// <summary>
+        /// Step 1: Python環境解決と診断サービスを登録します（即座の応急処置）
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterPythonEnvironmentServices(IServiceCollection services)
+        {
+            // Step 1: Python環境解決と診断サービス登録（即座の応急処置）
+            services.AddSingleton<PythonEnvironmentResolver>();
+            services.AddTransient<EnhancedDiagnosticReport>();
+            services.AddSingleton<PortManager>();
         }
         
         /// <summary>

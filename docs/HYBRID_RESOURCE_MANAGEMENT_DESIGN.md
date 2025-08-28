@@ -377,10 +377,10 @@ public class ResourceThresholds
 **削除理由**: 元設計のHybridResourceManager（OCR→クールダウン→翻訳パイプライン制御）と実装アプローチが根本的に異なっていたため、UltraThink方法論による体系的削除を実施。
 
 ### Phase 3: 高度な制御（2週間）
-- [ ] GPU/VRAM監視統合（NVML or Windows API）
-- [ ] ヒステリシス付き動的並列度調整
-- [ ] 動的クールダウン計算
-- [ ] 設定の外部化とホットリロード
+- ✅ GPU/VRAM監視統合（NVML or Windows API）
+- ✅ ヒステリシス付き動的並列度調整
+- ✅ 動的クールダウン計算
+- ✅ 設定の外部化とホットリロード
 
 ### Phase 4: 最適化とモニタリング（3週間）
 - [ ] パフォーマンスメトリクス収集
