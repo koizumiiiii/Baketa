@@ -53,8 +53,21 @@ public sealed class BatchOcrModule : ServiceModuleBase
             return processor;
         });
         
-        // バッチOCR統合サービス
-        services.AddSingleton<BatchOcrIntegrationService>();
+        // バッチOCR統合サービス（Phase 2統合: HybridResourceManager依存追加）
+        services.AddSingleton<BatchOcrIntegrationService>(serviceProvider =>
+        {
+            var batchOcrProcessor = serviceProvider.GetRequiredService<IBatchOcrProcessor>();
+            var fallbackOcrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
+            var resourceManager = serviceProvider.GetRequiredService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
+            var logger = serviceProvider.GetService<ILogger<BatchOcrIntegrationService>>();
+            
+            Console.WriteLine($"🔧 [BATCH-INTEGRATION-DI] BatchOcrIntegrationService依存関係確認:");
+            Console.WriteLine($"   - BatchOcrProcessor: {batchOcrProcessor != null}");
+            Console.WriteLine($"   - FallbackOcrEngine: {fallbackOcrEngine != null}");
+            Console.WriteLine($"   - HybridResourceManager: {resourceManager != null}");
+            
+            return new BatchOcrIntegrationService(batchOcrProcessor, fallbackOcrEngine, resourceManager, logger);
+        });
     }
 
     public override IEnumerable<Type> GetDependentModules()

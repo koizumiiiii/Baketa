@@ -20,6 +20,9 @@ using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Baketa.Infrastructure.ResourceManagement;
+using ResourceTranslationRequest = Baketa.Infrastructure.ResourceManagement.TranslationRequest;
+using CoreTranslationRequest = Baketa.Core.Translation.Models.TranslationRequest;
 
 namespace Baketa.Infrastructure.Translation.Local;
 
@@ -36,6 +39,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
+    private readonly IResourceManager? _resourceManager; // Phase 2: ハイブリッドリソース管理統合
     
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
@@ -73,13 +77,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         IConnectionPool? connectionPool,
         IConfiguration configuration,
         IPythonServerManager? serverManager = null,
-        ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
+        ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
+        IResourceManager? resourceManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
+        _resourceManager = resourceManager; // null許容（レガシー互換性維持）
         
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
@@ -350,7 +356,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     // 接続管理は FixedSizeConnectionPool が担当
 
     public async Task<TranslationResponse> TranslateAsync(
-        TranslationRequest request,
+        CoreTranslationRequest request,
         CancellationToken cancellationToken = default)
     {
         // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
@@ -435,22 +441,62 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // キャッシュチェック処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 常に新鮮な翻訳を実行");
             
-            // Phase2: サーキットブレーカーによる翻訳実行
+            // Phase2統合: HybridResourceManager経由でリソース制御付き翻訳実行
             TranslationResponse result;
-            if (_circuitBreaker != null)
+            if (_resourceManager != null)
             {
-                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行開始");
-                result = await _circuitBreaker.ExecuteAsync(
-                    async ct => await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false), 
+                _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] HybridResourceManager経由で翻訳実行開始");
+                
+                var translationRequest = new ResourceTranslationRequest(
+                    Text: request.SourceText,
+                    SourceLanguage: request.SourceLanguage.Code,
+                    TargetLanguage: request.TargetLanguage.Code,
+                    OperationId: request.RequestId.ToString(),
+                    Timestamp: DateTime.UtcNow
+                );
+
+                result = await _resourceManager.ProcessTranslationAsync(
+                    async (req, ct) =>
+                    {
+                        _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] 翻訳処理実行中 - OperationId: {OperationId}", req.OperationId);
+                        
+                        // サーキットブレーカーによる翻訳実行（既存ロジック保持）
+                        if (_circuitBreaker != null)
+                        {
+                            return await _circuitBreaker.ExecuteAsync(
+                                async cbt => await TranslateWithOptimizedServerAsync(request, cbt).ConfigureAwait(false), 
+                                ct).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            return await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false);
+                        }
+                    },
+                    translationRequest,
                     cancellationToken).ConfigureAwait(false);
-                _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行完了");
+                    
+                _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] HybridResourceManager経由で翻訳実行完了");
             }
             else
             {
-                // サーキットブレーカー無効時は従来通り直接実行
-                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し開始");
-                result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
-                _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し完了");
+                // レガシーモード: HybridResourceManager無しでの従来処理
+                _logger.LogDebug("🔧 [LEGACY_MODE] HybridResourceManager無効 - 従来の直接実行モード");
+                
+                if (_circuitBreaker != null)
+                {
+                    _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行開始");
+                    result = await _circuitBreaker.ExecuteAsync(
+                        async ct => await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false), 
+                        cancellationToken).ConfigureAwait(false);
+                    _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行完了");
+                }
+                else
+                {
+                    // サーキットブレーカー無効時は従来通り直接実行
+                    _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し開始");
+                    result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
+                    _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し完了");
+                }
             }
             
             stopwatch.Stop();
@@ -552,7 +598,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     public virtual async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
-        IReadOnlyList<TranslationRequest> requests, 
+        IReadOnlyList<CoreTranslationRequest> requests, 
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(requests);
@@ -594,7 +640,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> ProcessSingleBatchAsync(
-        IReadOnlyList<TranslationRequest> requests, 
+        IReadOnlyList<CoreTranslationRequest> requests, 
         CancellationToken cancellationToken)
     {
         var batchStopwatch = Stopwatch.StartNew();
@@ -707,7 +753,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> ProcessLargeBatchAsync(
-        IReadOnlyList<TranslationRequest> requests,
+        IReadOnlyList<CoreTranslationRequest> requests,
         int maxBatchSize,
         CancellationToken cancellationToken)
     {
@@ -735,7 +781,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
     private IReadOnlyList<TranslationResponse> MapBatchResponse(
         PythonBatchResponse batchResponse, 
-        IReadOnlyList<TranslationRequest> originalRequests, 
+        IReadOnlyList<CoreTranslationRequest> originalRequests, 
         long elapsedMilliseconds)
     {
         const string engineName = "OptimizedPythonTranslation";
@@ -802,7 +848,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> FallbackToIndividualProcessingAsync(
-        IReadOnlyList<TranslationRequest> requests,
+        IReadOnlyList<CoreTranslationRequest> requests,
         CancellationToken cancellationToken)
     {
         const string engineName = "OptimizedPythonTranslation";
@@ -862,7 +908,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     private async Task<TranslationResponse> TranslateWithOptimizedServerAsync(
-        TranslationRequest request,
+        CoreTranslationRequest request,
         CancellationToken cancellationToken)
     {
         // 🚨 [HANGUP_DEBUG] メソッド開始時点のデバッグ

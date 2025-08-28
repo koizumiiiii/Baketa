@@ -30,6 +30,7 @@ using Baketa.Infrastructure.Translation.Local;
 // OPUS-MT ONNX実装削除済み
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
+using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -87,6 +88,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // Phase3: リソース監視システム
             RegisterResourceMonitoringServices(services);
+            
+            // Phase2: ハイブリッドリソース管理システム
+            RegisterHybridResourceManagementServices(services);
             
             // データ永続化
             RegisterPersistenceServices(services, environment);
@@ -368,8 +372,10 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
                 var connectionPool = provider.GetRequiredService<IConnectionPool>();
                 var configuration = provider.GetRequiredService<IConfiguration>();
-                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）");
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration, null, null);
+                var resourceManager = provider.GetService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
+                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 2リソース管理）");
+                logger?.LogInformation("🎯 [PHASE2-DI] HybridResourceManager注入確認: {ResourceManagerExists}", resourceManager != null);
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration, null, null, resourceManager);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
@@ -508,6 +514,58 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます");
             
             Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
+        }
+
+        /// <summary>
+        /// Phase2: ハイブリッドリソース管理システムサービス登録
+        /// </summary>
+        private static void RegisterHybridResourceManagementServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔧 [PHASE2] ハイブリッドリソース管理システム登録開始");
+
+            // HybridResourceSettings の設定バインディング
+            services.Configure<Baketa.Infrastructure.ResourceManagement.HybridResourceSettings>(
+                config =>
+                {
+                    var serviceProvider = services.BuildServiceProvider();
+                    var configuration = serviceProvider.GetService<IConfiguration>();
+                    
+                    if (configuration != null)
+                    {
+                        configuration.GetSection("HybridResourceManagement").Bind(config);
+                    }
+                    else
+                    {
+                        // フォールバック設定
+                        config.OcrChannelCapacity = 100;
+                        config.TranslationChannelCapacity = 50;
+                        config.InitialOcrParallelism = 2;
+                        config.MaxOcrParallelism = 4;
+                        config.InitialTranslationParallelism = 1;
+                        config.MaxTranslationParallelism = 2;
+                        config.EnableDynamicParallelism = true;
+                        config.EnableDetailedLogging = false;
+                        Console.WriteLine("⚠️ [PHASE2] フォールバック設定を使用");
+                    }
+                });
+
+            // HybridResourceManager をシングルトンとして登録（動的VRAM容量対応）
+            services.AddSingleton<Baketa.Infrastructure.ResourceManagement.IResourceManager>(provider =>
+            {
+                var resourceMonitor = provider.GetRequiredService<IResourceMonitor>();
+                var settings = provider.GetRequiredService<IOptions<HybridResourceSettings>>();
+                var logger = provider.GetRequiredService<ILogger<HybridResourceManager>>();
+                var gpuEnvironmentDetector = provider.GetService<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector>();
+                
+                logger.LogInformation("🎯 [VRAM-FIX] HybridResourceManager初期化 - 動的VRAM容量対応: {GpuDetectorAvailable}",
+                    gpuEnvironmentDetector != null);
+                
+                return new HybridResourceManager(resourceMonitor, settings, logger, gpuEnvironmentDetector);
+            });
+
+            Console.WriteLine("✅ [PHASE2] HybridResourceManager 登録完了 - 動的リソース制御システム");
+            Console.WriteLine("ℹ️ [PHASE2] IResourceMonitor依存は PlatformModule で解決されます");
+            Console.WriteLine("🎉 [PHASE2] ハイブリッドリソース管理システム登録完了");
         }
         
         /// <summary>

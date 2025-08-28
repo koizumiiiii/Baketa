@@ -44,14 +44,23 @@ namespace Baketa.UI;
             // 🔧 [CRITICAL_ENCODING_FIX] Windows環境でUTF-8コンソール出力を強制設定
             try
             {
-                Console.OutputEncoding = System.Text.Encoding.UTF8;
-                Console.InputEncoding = System.Text.Encoding.UTF8;
+                // BOMなしUTF-8エンコーディングを使用してエンコーディング警告を回避
+                var utf8NoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+                Console.OutputEncoding = utf8NoBom;
+                Console.InputEncoding = utf8NoBom;
                 
-                // Windows環境でのUTF-8モード有効化
+                // Windows環境でのUTF-8モード有効化（グローバル設定）
                 Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
                 Environment.SetEnvironmentVariable("DOTNET_SYSTEM_TEXT_ENCODING_USEUTF8", "true");
                 
-                Console.WriteLine("🔧 [ENCODING_INIT] UTF-8 console encoding configured successfully");
+                // コンソールコードページを65001 (UTF-8) に設定
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    try { Console.OutputEncoding = System.Text.Encoding.GetEncoding(65001); }
+                    catch { /* コードページ設定失敗は無視 */ }
+                }
+                
+                Console.WriteLine("🔧 [ENCODING_INIT] UTF-8 console encoding configured successfully (BOM-less)");
             }
             catch (Exception ex)
             {
