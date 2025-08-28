@@ -4,9 +4,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using System.Drawing;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.OCR.Results;
 using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Models;
@@ -32,6 +36,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ITranslationServiceCore _translationService;
+    private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ILogger<TranslationPipelineService> _logger;
     private readonly CancellationTokenSource _cancellationTokenSource;
     
@@ -62,11 +67,13 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
         ITranslationServiceCore translationService,
+        IInPlaceTranslationOverlayManager overlayManager,
         ILogger<TranslationPipelineService> logger)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _cancellationTokenSource = new CancellationTokenSource();
 
@@ -498,17 +505,95 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
 
     /// <summary>
     /// InPlace表示処理
+    /// CoordinateBasedTranslationServiceの座標ベース表示ロジックを統合実装
     /// </summary>
     /// <param name="result">翻訳結果</param>
     private async Task ProcessInPlaceDisplayAsync(PipelineTranslationResult result)
     {
-        // CoordinateBasedTranslationServiceの座標ベース表示ロジックを移植
-        // 実装は後続のフェーズで詳細化
-        _logger.LogDebug("InPlace表示処理: '{Text}' → '{Translation}'",
-            result.OriginalText[..Math.Min(10, result.OriginalText.Length)],
-            result.TranslatedText[..Math.Min(10, result.TranslatedText.Length)]);
+        try
+        {
+            // CoordinateInfoが存在しない場合はInPlace表示不可
+            if (result.CoordinateInfo == null)
+            {
+                _logger.LogDebug("CoordinateInfo不在のためInPlace表示をスキップ: '{Text}'",
+                    result.OriginalText[..Math.Min(20, result.OriginalText.Length)]);
+                return;
+            }
 
-        await Task.CompletedTask; // 一時的な実装
+            // PipelineTranslationResultからTextChunkを作成
+            var textChunk = CreateTextChunkFromResult(result);
+            
+            // TextChunkの有効性とInPlace表示可能性をチェック
+            if (!textChunk.CanShowInPlace())
+            {
+                _logger.LogWarning("InPlace表示条件を満たしていません: {LogString}", textChunk.ToInPlaceLogString());
+                return;
+            }
+
+            _logger.LogDebug("InPlace表示開始: ChunkId={ChunkId}, '{Text}' → '{Translation}'",
+                textChunk.ChunkId,
+                result.OriginalText[..Math.Min(15, result.OriginalText.Length)],
+                result.TranslatedText[..Math.Min(15, result.TranslatedText.Length)]);
+
+            // IInPlaceTranslationOverlayManager経由でオーバーレイ表示
+            await _overlayManager.ShowInPlaceOverlayAsync(textChunk, _cancellationTokenSource.Token)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation("InPlace表示完了: ChunkId={ChunkId}, Position=({X},{Y}), Size=({W},{H})",
+                textChunk.ChunkId,
+                textChunk.CombinedBounds.X,
+                textChunk.CombinedBounds.Y,
+                textChunk.CombinedBounds.Width,
+                textChunk.CombinedBounds.Height);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "InPlace表示処理エラー: '{Text}'",
+                result.OriginalText[..Math.Min(30, result.OriginalText.Length)]);
+            
+            // InPlace表示失敗時は例外を再スローせず、Defaultモードにフォールバック
+            await ProcessDefaultDisplayAsync(result).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// PipelineTranslationResultからTextChunkを作成
+    /// CoordinateInfoの情報を使用してTextChunkの必須プロパティを設定
+    /// </summary>
+    /// <param name="result">パイプライン翻訳結果</param>
+    /// <returns>作成されたTextChunk</returns>
+    private static TextChunk CreateTextChunkFromResult(PipelineTranslationResult result)
+    {
+        if (result.CoordinateInfo == null)
+        {
+            throw new ArgumentException("CoordinateInfo is required for TextChunk creation", nameof(result));
+        }
+
+        var coord = result.CoordinateInfo;
+        
+        // PositionedTextResultを作成
+        var positionedTextResult = new PositionedTextResult
+        {
+            Text = result.OriginalText,
+            BoundingBox = new System.Drawing.Rectangle(coord.X, coord.Y, coord.Width, coord.Height),
+            Confidence = result.Confidence, // 翻訳結果の信頼度
+            ChunkId = result.JobId.GetHashCode(), // JobIdからChunkIdを生成
+            ProcessingTime = result.ProcessingTime,
+            DetectedLanguage = "auto", // 自動検出として設定
+            Orientation = TextOrientation.Horizontal
+        };
+
+        // TextChunkを作成
+        return new TextChunk
+        {
+            ChunkId = result.JobId.GetHashCode(), // JobIdからChunkIdを生成
+            TextResults = new List<PositionedTextResult> { positionedTextResult }.AsReadOnly(),
+            CombinedBounds = new System.Drawing.Rectangle(coord.X, coord.Y, coord.Width, coord.Height),
+            CombinedText = result.OriginalText,
+            TranslatedText = result.TranslatedText,
+            SourceWindowHandle = coord.WindowHandle,
+            DetectedLanguage = "auto"
+        };
     }
 
     /// <summary>

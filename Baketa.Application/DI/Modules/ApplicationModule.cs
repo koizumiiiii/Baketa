@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
 using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Services;
@@ -93,7 +94,21 @@ namespace Baketa.Application.DI.Modules;
             }
             
             // 🔧 PHASE 3: TranslationPipelineService DI Registration (Critical Issue対応)
-            services.AddSingleton<Baketa.Application.Services.Translation.TranslationPipelineService>();
+            services.AddSingleton<Baketa.Application.Services.Translation.TranslationPipelineService>(provider =>
+            {
+                var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+                var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
+                var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
+                var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.TranslationPipelineService>>();
+                
+                return new Baketa.Application.Services.Translation.TranslationPipelineService(
+                    eventAggregator,
+                    settingsService,
+                    translationService,
+                    overlayManager,
+                    logger);
+            });
             services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());
             

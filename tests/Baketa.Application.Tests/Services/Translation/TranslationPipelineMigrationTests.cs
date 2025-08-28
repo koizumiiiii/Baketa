@@ -31,6 +31,7 @@ public class TranslationPipelineMigrationTests
         services.AddSingleton(Mock.Of<IEventAggregator>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>());
+        services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>());
         
         // Phase 4 Migration DI configuration
         services.AddSingleton<TranslationPipelineService>();
@@ -62,6 +63,7 @@ public class TranslationPipelineMigrationTests
         var mockEventAggregator = Mock.Of<IEventAggregator>();
         var mockSettingsService = Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
         var mockTranslationService = Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>();
+        var mockOverlayManager = Mock.Of<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
         var mockLogger = Mock.Of<ILogger<TranslationPipelineService>>();
 
         // Act
@@ -69,6 +71,7 @@ public class TranslationPipelineMigrationTests
             mockEventAggregator,
             mockSettingsService,
             mockTranslationService,
+            mockOverlayManager,
             mockLogger);
 
         // Assert
