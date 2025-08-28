@@ -28,6 +28,7 @@ using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.DI;
 using Baketa.Application.Services.Events;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Events.Handlers;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -322,7 +323,13 @@ namespace Baketa.Application.DI.Modules;
             // 手動イベントプロセッサー登録サービスは削除（EventHandlerInitializationServiceに置き換え）
             
             // 他のイベントハンドラーの登録
-            // 例: services.AddSingleton<CaptureCompletedEventHandler>();
+            
+            // ⚡ [CRITICAL_FIX] CaptureCompletedHandler登録 - オーバーレイ表示に必要
+            Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始");
+            services.AddSingleton<Baketa.Core.Events.Handlers.CaptureCompletedHandler>();
+            services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.CaptureCompletedHandler>());
+            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - オーバーレイ表示修復");
             
             // 自動登録が必要な場合は必要に応じて実装
             // RegisterEventHandlersAutomatically(services);

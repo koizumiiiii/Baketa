@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Translation.Services;
 
 namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 
@@ -26,6 +27,7 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
     private readonly int _minConnections;
     private readonly System.Threading.Timer? _healthCheckTimer;
     private readonly CancellationTokenSource _disposalCts = new();
+    private readonly SmartConnectionEstablisher _smartConnectionEstablisher; // Phase 2: 接続信頼性向上
     
     private int _activeConnections;
     private int _totalConnectionsCreated;
@@ -50,6 +52,10 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _settings = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        
+        // Phase 2: SmartConnectionEstablisher初期化
+        _smartConnectionEstablisher = new SmartConnectionEstablisher(_logger as ILogger<SmartConnectionEstablisher> ?? 
+            new Microsoft.Extensions.Logging.Abstractions.NullLogger<SmartConnectionEstablisher>());
         
         // 接続数の計算
         _maxConnections = _settings.MaxConnections ?? Math.Max(8, Environment.ProcessorCount / 2);  // 🔧 CONCURRENT_OPTIMIZATION: 最小8接続を保証
@@ -272,6 +278,7 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
 
     /// <summary>
     /// 新しい永続接続を作成
+    /// Phase 2: SmartConnectionEstablisher統合により接続信頼性向上
     /// </summary>
     private async Task<PersistentConnection> CreateNewConnectionAsync(CancellationToken cancellationToken)
     {
@@ -283,8 +290,20 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
         
         try
         {
-            tcpClient = new TcpClient();
             var serverPort = GetServerPort();
+            
+            // Phase 2: サーバー準備完了を確認してから接続実行
+            var connectionTimeout = TimeSpan.FromMilliseconds(_settings.ConnectionTimeoutMs);
+            var isServerReady = await _smartConnectionEstablisher.WaitForServerReady(
+                serverPort, connectionTimeout, cancellationToken);
+            
+            if (!isServerReady)
+            {
+                throw new InvalidOperationException(
+                    $"サーバーが準備完了していません。Port: {serverPort}, Timeout: {connectionTimeout.TotalSeconds}秒");
+            }
+            
+            tcpClient = new TcpClient();
             await tcpClient.ConnectAsync("127.0.0.1", serverPort, cancellationToken);
             
             stream = tcpClient.GetStream();

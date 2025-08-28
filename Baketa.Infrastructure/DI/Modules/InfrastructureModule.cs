@@ -85,6 +85,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
             RegisterNllbFixServices(services);
             
+            // Phase 2: 完全安定化サービス（接続信頼性向上・キャッシュ管理強化）
+            RegisterPhase2Services(services);
+            
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
             
@@ -620,6 +623,32 @@ namespace Baketa.Infrastructure.DI.Modules;
             yield return typeof(CoreModule);
             yield return typeof(ObjectPoolModule);
             yield return typeof(DiagnosticModule);
+        }
+        
+        /// <summary>
+        /// Phase 2: 完全安定化サービス登録（接続信頼性向上・キャッシュ管理強化）
+        /// </summary>
+        private static void RegisterPhase2Services(IServiceCollection services)
+        {
+            Console.WriteLine("🚀 [PHASE2] 完全安定化サービス登録開始（接続信頼性向上・キャッシュ管理強化）");
+            
+            // CacheManagementService: ModelCacheManagerを基盤とした高度キャッシュ管理
+            services.AddSingleton<CacheManagementService>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<CacheManagementService>>();
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                var modelCacheManager = provider.GetRequiredService<ModelCacheManager>();
+                
+                logger.LogInformation("🗂️ CacheManagementService初期化 - 高度キャッシュ管理機能");
+                return new CacheManagementService(logger, configuration, modelCacheManager);
+            });
+            
+            Console.WriteLine("✅ [PHASE2] CacheManagementService登録完了");
+            
+            // SmartConnectionEstablisher: FixedSizeConnectionPool統合済み（追加DI不要）
+            Console.WriteLine("✅ [PHASE2] SmartConnectionEstablisher統合完了（FixedSizeConnectionPool内統合）");
+            
+            Console.WriteLine("🎉 [PHASE2] Phase 2完全安定化サービス登録完了 - システム信頼性向上");
         }
         
         /// <summary>
