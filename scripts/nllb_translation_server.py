@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 NLLB-200ベースの高品質翻訳サーバー
 Metaの最新多言語翻訳モデルを使用した改良版
@@ -911,6 +912,17 @@ class NllbTranslationServer:
 
 def main():
     """メインエントリポイント"""
+    # UTF-8エンコーディング設定
+    import os
+    import locale
+    try:
+        # Windows環境でのUTF-8設定
+        if sys.platform == 'win32':
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            locale.setlocale(locale.LC_ALL, '')
+    except Exception as e:
+        logger.warning(f"⚠️ UTF-8設定警告: {e}")
+    
     parser = argparse.ArgumentParser(description='NLLB-200 Translation Server')
     parser.add_argument('--port', type=int, default=5556, help='Server port')
     args = parser.parse_args()

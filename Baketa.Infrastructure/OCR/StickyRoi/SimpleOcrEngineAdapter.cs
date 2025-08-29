@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Factories;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -11,88 +12,150 @@ namespace Baketa.Infrastructure.OCR.StickyRoi;
 /// <summary>
 /// IOcrEngineからISimpleOcrEngineへのアダプター
 /// StickyROI統合のために必要な軽量インターフェース変換
+/// Sprint 1: 完全版実装 - 実際のPaddleOCR統合
 /// </summary>
 public sealed class SimpleOcrEngineAdapter : ISimpleOcrEngine
 {
-    private readonly IOcrEngine _baseOcrEngine;
+    private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _baseOcrEngine;
+    private readonly Baketa.Core.Abstractions.Factories.IImageFactory _imageFactory;
     private readonly ILogger<SimpleOcrEngineAdapter> _logger;
     private bool _disposed;
 
-    public SimpleOcrEngineAdapter(IOcrEngine baseOcrEngine, ILogger<SimpleOcrEngineAdapter> logger)
+    public SimpleOcrEngineAdapter(
+        Baketa.Core.Abstractions.OCR.IOcrEngine baseOcrEngine, 
+        Baketa.Core.Abstractions.Factories.IImageFactory imageFactory,
+        ILogger<SimpleOcrEngineAdapter> logger)
     {
         _baseOcrEngine = baseOcrEngine ?? throw new ArgumentNullException(nameof(baseOcrEngine));
+        _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
-        _logger.LogInformation("🔗 SimpleOcrEngineAdapter初期化完了: {BaseEngineType}", _baseOcrEngine.GetType().Name);
+        _logger.LogInformation("🔗 SimpleOcrEngineAdapter完全版初期化完了: BaseEngine={BaseEngineType}, ImageFactory={ImageFactoryType}", 
+            _baseOcrEngine.GetType().Name, _imageFactory.GetType().Name);
     }
 
     /// <summary>
-    /// テキスト認識実行（IOcrEngineに委譲）
+    /// テキスト認識実行（実際のPaddleOCR処理に委譲）
+    /// Sprint 1: 完全版実装
     /// </summary>
     public async Task<OcrResult> RecognizeTextAsync(byte[] imageData, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
         try
         {
-            _logger.LogDebug("🔄 SimpleOcrEngineAdapter: IOcrEngineに処理を委譲");
+            _logger.LogDebug("🔄 SimpleOcrEngineAdapter: 実際のOCR処理開始 - ImageSize: {Size}bytes", imageData.Length);
             
-            // 🚀 シンプルなアプローチ: byte[]を一時ファイルとして保存してIOcrEngineに処理させる
-            // これにより複雑なIImage変換を回避する
-            var tempImagePath = Path.GetTempFileName();
+            // Step 1: byte[] → IImage変換
+            using var image = await _imageFactory.CreateFromBytesAsync(imageData);
+            _logger.LogDebug("✅ IImage作成完了: {Width}x{Height}", image.Width, image.Height);
             
-            try
-            {
-                await File.WriteAllBytesAsync(tempImagePath, imageData, cancellationToken);
-                
-                // ファイルパスからBitmapを作成
-                using var bitmap = new Bitmap(tempImagePath);
-                
-                // Bitmapを再度byte[]に変換（標準的な形式で）
-                using var memoryStream = new MemoryStream();
-                bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
-                var processedImageData = memoryStream.ToArray();
-                
-                // 🔄 実際のOCR処理はbaseOcrEngineに委譲するが、IImageインターフェース問題を回避するため
-                // 代替手段としてDIコンテナから別のOCRサービスを取得する
-                _logger.LogDebug("✅ SimpleOcrEngineAdapter: 画像処理完了 - 簡易結果を返却");
-                
-                // 暫定的な結果を返す（実際のOCR処理は後で実装）
-                return new OcrResult
-                {
-                    DetectedTexts = [],
-                    IsSuccessful = true,
-                    ProcessingTime = TimeSpan.FromMilliseconds(10),
-                    ErrorMessage = null
-                };
-            }
-            finally
-            {
-                // 一時ファイルを削除
-                if (File.Exists(tempImagePath))
-                {
-                    try { File.Delete(tempImagePath); } catch { /* 無視 */ }
-                }
-            }
+            // Step 2: IOcrEngineでOCR実行
+            var ocrResults = await _baseOcrEngine.RecognizeAsync(image, cancellationToken: cancellationToken);
+            
+            // Step 3: OcrResults → OcrResult変換
+            var convertedResult = ConvertOcrResults(ocrResults, stopwatch.Elapsed);
+            
+            _logger.LogInformation("🎯 SimpleOcrEngineAdapter: OCR完了 - 検出テキスト数: {Count}, 処理時間: {Time}ms, 全体信頼度: {Confidence:F3}", 
+                convertedResult.TextCount, stopwatch.ElapsedMilliseconds, convertedResult.OverallConfidence);
+            
+            return convertedResult;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ SimpleOcrEngineAdapter: テキスト認識エラー");
-            throw;
+            _logger.LogError(ex, "❌ SimpleOcrEngineAdapter: テキスト認識エラー - 処理時間: {Time}ms", stopwatch.ElapsedMilliseconds);
+            
+            return new OcrResult
+            {
+                DetectedTexts = [],
+                IsSuccessful = false,
+                ProcessingTime = stopwatch.Elapsed,
+                ErrorMessage = ex.Message,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["Exception"] = ex.GetType().Name,
+                    ["ImageSizeBytes"] = imageData.Length
+                }
+            };
         }
+        finally
+        {
+            stopwatch.Stop();
+        }
+    }
+    
+    /// <summary>
+    /// OcrResults を OcrResult に変換
+    /// </summary>
+    private OcrResult ConvertOcrResults(OcrResults ocrResults, TimeSpan processingTime)
+    {
+        var detectedTexts = ocrResults.TextRegions.Select(region => new DetectedText
+        {
+            Text = region.Text,
+            Confidence = region.Confidence,
+            BoundingBox = region.Bounds,
+            Language = ocrResults.LanguageCode,
+            ProcessingTechnique = OptimizationTechnique.None, // CPU First
+            ProcessingTime = processingTime,
+            DetailedRegion = region.Contour?.Select(p => new PointF(p.X, p.Y)).ToArray(),
+            Angle = 0f, // 将来拡張用
+            EstimatedFont = null, // 将来拡張用
+            Metadata = new Dictionary<string, object>
+            {
+                ["Direction"] = region.Direction.ToString(),
+                ["SourceEngine"] = _baseOcrEngine.EngineName
+            }
+        }).ToList();
+        
+        return new OcrResult
+        {
+            DetectedTexts = detectedTexts,
+            IsSuccessful = ocrResults.HasText,
+            ProcessingTime = processingTime,
+            ErrorMessage = null,
+            Metadata = new Dictionary<string, object>
+            {
+                ["SourceImageWidth"] = ocrResults.SourceImage.Width,
+                ["SourceImageHeight"] = ocrResults.SourceImage.Height,
+                ["LanguageCode"] = ocrResults.LanguageCode,
+                ["TotalRegions"] = ocrResults.TextRegions.Count,
+                ["MergedText"] = ocrResults.Text,
+                ["EngineVersion"] = _baseOcrEngine.EngineVersion,
+                ["RegionOfInterest"] = ocrResults.RegionOfInterest?.ToString() ?? "None"
+            }
+        };
     }
 
     /// <summary>
-    /// エンジンの利用可能性確認
+    /// エンジンの利用可能性確認（完全版実装）
     /// </summary>
     public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
+        if (_disposed)
+            return false;
+            
         try
         {
-            // IOcrEngineが初期化済みかどうかで判定
-            return await Task.FromResult(_baseOcrEngine != null);
+            // IOcrEngineとIImageFactoryの両方が利用可能かチェック
+            var engineAvailable = _baseOcrEngine?.IsInitialized == true;
+            var factoryAvailable = _imageFactory != null;
+            
+            if (engineAvailable && factoryAvailable)
+            {
+                _logger.LogDebug("✅ SimpleOcrEngineAdapter: 利用可能 - Engine={EngineName}, Version={Version}", 
+                    _baseOcrEngine.EngineName, _baseOcrEngine.EngineVersion);
+                return true;
+            }
+            
+            _logger.LogWarning("⚠️ SimpleOcrEngineAdapter: 利用不可 - Engine初期化済み={EngineReady}, Factory利用可能={FactoryReady}", 
+                engineAvailable, factoryAvailable);
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "⚠️ SimpleOcrEngineAdapter: 利用可能性確認エラー");
+            _logger.LogError(ex, "❌ SimpleOcrEngineAdapter: 利用可能性確認エラー");
             return false;
         }
     }
@@ -101,16 +164,33 @@ public sealed class SimpleOcrEngineAdapter : ISimpleOcrEngine
     {
         if (!_disposed)
         {
-            _logger.LogDebug("🔄 SimpleOcrEngineAdapter: リソース解放");
+            _logger.LogDebug("🔄 SimpleOcrEngineAdapter: リソース解放開始");
             
-            // IOcrEngineがIDisposableの場合は解放
-            if (_baseOcrEngine is IDisposable disposableEngine)
+            try
             {
-                disposableEngine.Dispose();
+                // IOcrEngineがIDisposableの場合は解放
+                if (_baseOcrEngine is IDisposable disposableEngine)
+                {
+                    disposableEngine.Dispose();
+                    _logger.LogDebug("✅ BaseOcrEngine解放完了");
+                }
+                
+                // IImageFactoryもIDisposableの場合は解放
+                if (_imageFactory is IDisposable disposableFactory)
+                {
+                    disposableFactory.Dispose();
+                    _logger.LogDebug("✅ ImageFactory解放完了");
+                }
             }
-            
-            _disposed = true;
-            _logger.LogInformation("✅ SimpleOcrEngineAdapter: リソース解放完了");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ SimpleOcrEngineAdapter: リソース解放中にエラー");
+            }
+            finally
+            {
+                _disposed = true;
+                _logger.LogInformation("✅ SimpleOcrEngineAdapter: リソース解放完了");
+            }
         }
     }
 }

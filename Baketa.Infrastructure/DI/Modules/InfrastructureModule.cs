@@ -113,6 +113,10 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterOcrServices(IServiceCollection services)
         {
+            // Sprint 1: PaddleOCR診断システム（Gemini推奨）
+            services.AddSingleton<Baketa.Core.Abstractions.Diagnostics.IPaddleOcrDiagnostics, Baketa.Infrastructure.Diagnostics.PaddleOcrDiagnosticsService>();
+            Console.WriteLine("✅ Sprint 1: PaddleOCR診断システム登録完了 - CPU First戦略対応");
+            
             // OCRエンジンやプロセッサーの登録
             // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
             // 例: services.AddSingleton<IOcrModelProvider, LocalOcrModelProvider>();
@@ -302,13 +306,15 @@ namespace Baketa.Infrastructure.DI.Modules;
             {
                 var strategies = provider.GetServices<Baketa.Core.Abstractions.Translation.ITranslationStrategy>();
                 var metricsCollector = provider.GetRequiredService<Baketa.Infrastructure.Translation.Metrics.TranslationMetricsCollector>();
+                var integratedMetricsCollector = provider.GetService<Baketa.Core.Abstractions.Monitoring.IPerformanceMetricsCollector>(); // Phase 4.1
                 var settings = provider.GetRequiredService<Baketa.Infrastructure.Translation.Strategies.HybridStrategySettings>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Strategies.HybridTranslationStrategy>>();
                 
                 var hybridStrategy = new Baketa.Infrastructure.Translation.Strategies.HybridTranslationStrategy(
-                    strategies, metricsCollector, settings, logger);
+                    strategies, metricsCollector, settings, logger, integratedMetricsCollector);
                     
-                Console.WriteLine("🎯 HybridTranslationStrategy登録完了 - 戦略統合オーケストレーター");
+                var metricsStatus = integratedMetricsCollector != null ? "Phase 4.1統合メトリクス統合完了" : "従来メトリクスのみ";
+                Console.WriteLine($"🎯 HybridTranslationStrategy登録完了 - 戦略統合オーケストレーター ({metricsStatus})");
                 return hybridStrategy;
             });
             
@@ -437,11 +443,54 @@ namespace Baketa.Infrastructure.DI.Modules;
         
         /// <summary>
         /// パフォーマンス管理サービスを登録します。
+        /// Phase 4.1: パフォーマンスメトリクス収集統合
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         private static void RegisterPerformanceServices(IServiceCollection services)
         {
-            Console.WriteLine("🚀 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2");
+            Console.WriteLine("🚀 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2 + Phase 4.1");
+            
+            // Phase 4.1: パフォーマンスメトリクス設定を登録
+            services.Configure<Baketa.Infrastructure.Monitoring.PerformanceMetricsSettings>(config =>
+            {
+                var serviceProvider = services.BuildServiceProvider();
+                var configuration = serviceProvider.GetService<IConfiguration>();
+                
+                if (configuration != null)
+                {
+                    configuration.GetSection("PerformanceMetrics").Bind(config);
+                }
+                else
+                {
+                    // フォールバック設定
+                    config.Enabled = true;
+                    config.BatchSize = 50;
+                    config.FlushIntervalSeconds = 5;
+                    config.MaxQueueSize = 1000;
+                    config.LogRetentionDays = 30;
+                    config.EnableStructuredReports = true;
+                    config.LogLevel = "Information";
+                    Console.WriteLine("⚠️ [PHASE4.1] フォールバックメトリクス設定を使用");
+                }
+            });
+            Console.WriteLine("✅ [PHASE4.1] PerformanceMetricsSettings設定完了");
+            
+            // Phase 4.1: 統合パフォーマンスメトリクスコレクター登録
+            services.AddSingleton<Baketa.Core.Abstractions.Monitoring.IPerformanceMetricsCollector>(
+                provider =>
+                {
+                    var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Monitoring.IntegratedPerformanceMetricsCollector>>();
+                    var baketaLogger = provider.GetRequiredService<IBaketaLogger>();
+                    var translationMetricsCollector = provider.GetRequiredService<Baketa.Infrastructure.Translation.Metrics.TranslationMetricsCollector>();
+                    var settings = provider.GetRequiredService<IOptions<Baketa.Infrastructure.Monitoring.PerformanceMetricsSettings>>();
+                    
+                    var collector = new Baketa.Infrastructure.Monitoring.IntegratedPerformanceMetricsCollector(
+                        logger, baketaLogger, translationMetricsCollector, settings);
+                    
+                    logger.LogInformation("📊 [PHASE4.1] 統合パフォーマンスメトリクスコレクター初期化完了");
+                    return collector;
+                });
+            Console.WriteLine("✅ [PHASE4.1] IntegratedPerformanceMetricsCollector登録完了 - 既存TranslationMetricsCollector統合");
             
             // GPUメモリ管理
             services.AddSingleton<IGpuMemoryManager, GpuMemoryManager>();
@@ -465,7 +514,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             // services.AddSingleton<ITranslationAccuracyValidator, TranslationAccuracyValidator>();
             // #endif
             
-            Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）");
+            Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了（プール化×GPU最適化 + Phase 4.1 メトリクス収集含む）");
         }
         
         /// <summary>
