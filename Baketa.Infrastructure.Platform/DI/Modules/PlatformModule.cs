@@ -100,8 +100,8 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             // 拡張メソッドを使用して登録
             services.AddOpenCvServices();
             
-            // ファクトリー
-            // 例: services.AddSingleton<IImageFactory>(sp => sp.GetRequiredService<DefaultImageFactory>());
+            // ファクトリー - Sprint 2 Fix: IImageFactory登録（PaddleOCR連続失敗解決）
+            services.AddSingleton<Baketa.Core.Abstractions.Factories.IImageFactory, Baketa.Infrastructure.Platform.Adapters.WindowsImageAdapterFactory>();
         }
         
         /// <summary>

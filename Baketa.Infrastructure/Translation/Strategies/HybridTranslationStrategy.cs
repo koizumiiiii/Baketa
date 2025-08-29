@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Infrastructure.Translation.Metrics;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
@@ -15,6 +16,7 @@ public sealed class HybridTranslationStrategy : IDisposable
     private readonly IReadOnlyList<ITranslationStrategy> _strategies;
     private readonly ILogger<HybridTranslationStrategy> _logger;
     private readonly TranslationMetricsCollector _metricsCollector;
+    private readonly IPerformanceMetricsCollector? _integratedMetricsCollector; // Phase 4.1 統合メトリクス
     private readonly HybridStrategySettings _settings;
     private bool _disposed;
 
@@ -22,14 +24,18 @@ public sealed class HybridTranslationStrategy : IDisposable
         IEnumerable<ITranslationStrategy> strategies,
         TranslationMetricsCollector metricsCollector,
         HybridStrategySettings settings,
-        ILogger<HybridTranslationStrategy> logger)
+        ILogger<HybridTranslationStrategy> logger,
+        IPerformanceMetricsCollector? integratedMetricsCollector = null)
     {
         _strategies = [..strategies.OrderByDescending(s => s.Priority)];
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
+        _integratedMetricsCollector = integratedMetricsCollector;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
-        _logger.LogInformation("🚀 HybridTranslationStrategy初期化 - 戦略数: {StrategyCount}", _strategies.Count);
+        var metricsStatus = _integratedMetricsCollector != null ? "Phase 4.1統合メトリクス有効" : "従来メトリクスのみ";
+        _logger.LogInformation("🚀 HybridTranslationStrategy初期化 - 戦略数: {StrategyCount}, メトリクス: {MetricsStatus}", 
+            _strategies.Count, metricsStatus);
     }
 
     /// <summary>
@@ -60,13 +66,27 @@ public sealed class HybridTranslationStrategy : IDisposable
 
             stopwatch.Stop();
             
-            // メトリクス記録
+            // 従来メトリクス記録
             _metricsCollector.RecordTranslation(new TranslationMetrics
             {
                 Strategy = strategy.GetType().Name,
                 TextLength = text.Length,
                 ProcessingTime = stopwatch.Elapsed,
                 Success = result.Success,
+                Timestamp = DateTime.UtcNow
+            });
+
+            // Phase 4.1 統合メトリクス記録
+            _integratedMetricsCollector?.RecordTranslationMetrics(new TranslationPerformanceMetrics
+            {
+                Engine = strategy.GetType().Name,
+                InputTextLength = text.Length,
+                OutputTextLength = result.Success ? result.TranslatedText.Length : 0,
+                TranslationDuration = stopwatch.Elapsed,
+                TotalDuration = stopwatch.Elapsed,
+                MemoryUsageMB = GC.GetTotalMemory(false) / 1024 / 1024,
+                GpuUtilization = 0.0, // TODO: 実際のGPU使用率取得
+                IsSuccess = result.Success,
                 Timestamp = DateTime.UtcNow
             });
 
@@ -116,7 +136,7 @@ public sealed class HybridTranslationStrategy : IDisposable
 
             stopwatch.Stop();
             
-            // バッチメトリクス記録
+            // 従来バッチメトリクス記録
             _metricsCollector.RecordBatchTranslation(new BatchTranslationMetrics
             {
                 Strategy = strategy.GetType().Name,
@@ -127,6 +147,24 @@ public sealed class HybridTranslationStrategy : IDisposable
                 FailureCount = results.Count(r => !r.Success),
                 Timestamp = DateTime.UtcNow
             });
+
+            // Phase 4.1 統合メトリクス記録（バッチを個別メトリクスとして記録）
+            if (_integratedMetricsCollector != null)
+            {
+                var totalOutputLength = results.Where(r => r.Success).Sum(r => r.TranslatedText.Length);
+                _integratedMetricsCollector.RecordTranslationMetrics(new TranslationPerformanceMetrics
+                {
+                    Engine = $"{strategy.GetType().Name}_Batch",
+                    InputTextLength = context.TotalCharacterCount,
+                    OutputTextLength = totalOutputLength,
+                    TranslationDuration = stopwatch.Elapsed,
+                    TotalDuration = stopwatch.Elapsed,
+                    MemoryUsageMB = GC.GetTotalMemory(false) / 1024 / 1024,
+                    GpuUtilization = 0.0, // TODO: 実際のGPU使用率取得
+                    IsSuccess = results.All(r => r.Success),
+                    Timestamp = DateTime.UtcNow
+                });
+            }
 
             return results;
         }

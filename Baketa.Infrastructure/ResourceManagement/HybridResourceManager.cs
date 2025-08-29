@@ -2,6 +2,8 @@ using System.Threading.Channels;
 using Baketa.Core.Abstractions.Common;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Monitoring;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -59,6 +61,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     // === GPU環境検出（動的VRAM容量対応） ===
     private readonly IGpuEnvironmentDetector? _gpuEnvironmentDetector;
     private long _actualTotalVramMB = 8192; // デフォルトフォールバック値
+    
+    // === Phase 4.1: パフォーマンスメトリクス収集統合 ===
+    private readonly IPerformanceMetricsCollector? _metricsCollector;
 
     // === Phase 3: 高度なヒステリシス制御 ===
     private DateTime _lastThresholdCrossTime = DateTime.UtcNow;
@@ -80,7 +85,8 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         IResourceMonitor resourceMonitor,
         IOptionsMonitor<HybridResourceSettings> optionsMonitor,
         ILogger<HybridResourceManager> logger,
-        IGpuEnvironmentDetector? gpuEnvironmentDetector = null)
+        IGpuEnvironmentDetector? gpuEnvironmentDetector = null,
+        IPerformanceMetricsCollector? metricsCollector = null)
     {
         ArgumentNullException.ThrowIfNull(resourceMonitor);
         ArgumentNullException.ThrowIfNull(optionsMonitor);
@@ -91,6 +97,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         _settings = optionsMonitor.CurrentValue;
         _logger = logger;
         _gpuEnvironmentDetector = gpuEnvironmentDetector;
+        _metricsCollector = metricsCollector;
+        
+        if (_metricsCollector != null)
+        {
+            _logger.LogInformation("📊 [PHASE4.1] パフォーマンスメトリクス統合が有効化されました");
+        }
         
         // Phase 3: 設定変更の監視を開始
         if (_settings.EnableHotReload)
@@ -565,9 +577,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
     /// <summary>
     /// 並列度減少（SemaphoreSlim再作成方式）
+    /// Phase 4.1: メトリクス記録統合
     /// </summary>
     private async Task DecreaseParallelismAsync()
     {
+        var status = await GetCurrentResourceStatusAsync(_disposalCts.Token).ConfigureAwait(false);
+        
         lock (_semaphoreLock)
         {
             // 翻訳の並列度を優先的に削減
@@ -577,6 +592,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Max(1, currentTranslation - 1);
                 RecreateSemaphore(ref _translationSemaphore, newCount, _settings.MaxTranslationParallelism);
                 _logger.LogInformation("翻訳並列度減少: {Old} → {New}", currentTranslation, newCount);
+                
+                // Phase 4.1: リソース調整メトリクス記録
+                RecordResourceAdjustmentMetrics("Translation", "DecreaseParallelism", currentTranslation, newCount, "High load detected", status);
                 return;
             }
 
@@ -587,6 +605,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Max(1, currentOcr - 1);
                 RecreateSemaphore(ref _ocrSemaphore, newCount, _settings.MaxOcrParallelism);
                 _logger.LogInformation("OCR並列度減少: {Old} → {New}", currentOcr, newCount);
+                
+                // Phase 4.1: リソース調整メトリクス記録
+                RecordResourceAdjustmentMetrics("OCR", "DecreaseParallelism", currentOcr, newCount, "High load + Translation at minimum", status);
             }
         }
 
@@ -596,9 +617,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
     /// <summary>
     /// 並列度増加（段階的）
+    /// Phase 4.1: メトリクス記録統合
     /// </summary>
     private async Task IncreaseParallelismAsync()
     {
+        var status = await GetCurrentResourceStatusAsync(_disposalCts.Token).ConfigureAwait(false);
+        
         lock (_semaphoreLock)
         {
             // OCRの並列度を優先的に回復
@@ -608,6 +632,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Min(_settings.MaxOcrParallelism, currentOcr + 1);
                 RecreateSemaphore(ref _ocrSemaphore, newCount, _settings.MaxOcrParallelism);
                 _logger.LogInformation("OCR並列度増加: {Old} → {New}", currentOcr, newCount);
+                
+                // Phase 4.1: リソース調整メトリクス記録
+                RecordResourceAdjustmentMetrics("OCR", "IncreaseParallelism", currentOcr, newCount, "Low load detected - OCR priority recovery", status);
                 return;
             }
 
@@ -619,6 +646,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Min(_settings.MaxTranslationParallelism, currentTranslation + 1);
                 RecreateSemaphore(ref _translationSemaphore, newCount, _settings.MaxTranslationParallelism);
                 _logger.LogInformation("翻訳並列度増加: {Old} → {New}", currentTranslation, newCount);
+                
+                // Phase 4.1: リソース調整メトリクス記録
+                RecordResourceAdjustmentMetrics("Translation", "IncreaseParallelism", currentTranslation, newCount, "Low load + OCR stable", status);
             }
         }
 
@@ -890,6 +920,49 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             throw;
         }
     }
+    
+    /// <summary>
+    /// Phase 4.1: リソース調整メトリクス記録ヘルパー
+    /// </summary>
+    private void RecordResourceAdjustmentMetrics(
+        string componentName, 
+        string adjustmentType, 
+        int oldValue, 
+        int newValue, 
+        string reason, 
+        ResourceStatus status)
+    {
+        if (_metricsCollector == null) return;
+        
+        try
+        {
+            var metrics = new ResourceAdjustmentMetrics
+            {
+                ComponentName = componentName,
+                AdjustmentType = adjustmentType,
+                OldValue = oldValue,
+                NewValue = newValue,
+                Reason = reason,
+                CpuUsage = status.CpuUsage,
+                MemoryUsage = status.MemoryUsage,
+                GpuUtilization = status.GpuUtilization,
+                VramUsage = status.VramUsage,
+                Timestamp = DateTime.UtcNow
+            };
+            
+            _metricsCollector.RecordResourceAdjustment(metrics);
+            
+            if (_settings.EnableVerboseLogging)
+            {
+                _logger.LogTrace("📊 [PHASE4.1] リソース調整メトリクス記録: {Component} {Type} {OldValue}→{NewValue}",
+                    componentName, adjustmentType, oldValue, newValue);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ [PHASE4.1] リソース調整メトリクス記録失敗 - 処理続行");
+        }
+    }
 
     public void Dispose()
     {
@@ -910,6 +983,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             _resourceMonitor?.Dispose();
 
             _logger.LogInformation("🔄 [PHASE3] HybridResourceManager正常終了（ホットリロード機能含む）");
+            
+            // Phase 4.1: メトリクスコレクターの終了処理
+            _metricsCollector?.Dispose();
         }
         catch (Exception ex)
         {
