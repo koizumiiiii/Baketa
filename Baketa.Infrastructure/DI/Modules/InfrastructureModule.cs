@@ -205,8 +205,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<DynamicHealthCheckManager>();
             
             // Phase 1: ModelPrewarmingServiceをIHostedServiceとして登録
-            services.AddSingleton<IHostedService>(provider => 
-                provider.GetRequiredService<ModelPrewarmingService>());
+            services.AddHostedService<ModelPrewarmingService>();
             
             // Phase 1: DynamicHealthCheckManagerをイベントプロセッサーとして登録
             services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(provider =>
@@ -247,8 +246,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
             
             // HostedServiceとしても登録
-            services.AddHostedService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>(provider => 
-                provider.GetRequiredService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>());
+            services.AddHostedService<PythonServerHealthMonitor>();
             
             Console.WriteLine("✅ [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能");
             
@@ -589,8 +587,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 🚀 プール化×GPU最適化統合オーケストレーター（最終フェーズ）
             services.AddSingleton<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>();
-            services.AddHostedService<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>(provider =>
-                provider.GetRequiredService<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>());
+            services.AddHostedService<PooledGpuOptimizationOrchestrator>();
             Console.WriteLine("🚀 PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム");
             
             // 翻訳精度検証システム（デバッグビルドのみ）

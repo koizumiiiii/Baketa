@@ -28,7 +28,7 @@ public sealed class PortManager : IPortManagementService
     }
     
     /// <inheritdoc />
-    public async Task<int> AcquireAvailablePortAsync(int startPort = 5555, int endPort = 5560)
+    public async Task<int> AcquireAvailablePortAsync(int startPort = PortRangeStart, int endPort = PortRangeEnd)
     {
         _logger.LogInformation("🔍 利用可能ポート検索開始 - 範囲: {StartPort}-{EndPort}", startPort, endPort);
         

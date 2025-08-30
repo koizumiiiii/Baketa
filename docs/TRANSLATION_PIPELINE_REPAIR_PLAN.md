@@ -553,4 +553,68 @@ internal sealed class NativeDllInitializationService : IHostedService
 
 ---
 
-**最終更新**: 2025-08-30 (UltraThink分析完了、**Phase 1-5全体完了**・ネイティブDLL問題根本原因解明完了)
+## Phase 6: 統合品質向上・システム安定化 (2025-08-30)
+
+### **Phase 6.1: アーキテクチャ品質向上 ✅完了**
+
+#### **問題1: IHostedService登録方法の不統一**
+- **問題**: 4種類の異なる登録パターン混在によるDIコンテナ動作の不一貫性
+- **影響**: 
+  - `AddSingleton<IHostedService>(provider => ...)`
+  - `AddHostedService<T>(provider => ...)`
+  - `AddHostedService<T>()`
+  - 手動起動パターン
+- **解決**: 標準`AddHostedService<T>()`パターンに統一
+- **修正ファイル**:
+  - `Baketa.Infrastructure/DI/Modules/InfrastructureModule.cs` (3箇所)
+  - `Baketa.Infrastructure.Platform/DI/Modules/AdaptiveCaptureModule.cs` (1箇所)
+
+#### **問題2: ポート競合回避機能の設計不備**
+- **問題**: `PortManager.AcquireAvailablePortAsync`が6ポート（5555-5560）のみハードコード
+- **影響**: 実環境での並列処理時にポート不足による障害発生リスク
+- **解決**: 44ポート全範囲（5557-5600）対応に拡張
+- **修正**: デフォルト引数を`PortRangeStart`と`PortRangeEnd`定数に変更
+
+#### **問題3: UI制御フローの重複問題**
+- **発見された問題**:
+  - 診断レポート生成が`ExecuteStartStopAsync`と`StartTranslationAsync`で重複実行
+  - UI ViewModelにビジネスロジック混入（190行超のメソッド）
+- **即座対応**: 診断レポート重複除去（予定）
+- **中長期課題**: 責務分離によるViewModel軽量化（Phase 7計画）
+
+#### **問題4: ModelPrewarmingServiceのログ出力**
+- **調査結果**: 豊富なログ実装済み（問題なし）
+- **確認内容**: StartAsync, ExecuteWarmupAsync, エラーハンドリング等
+
+### **Phase 6.2: UI制御フローの重複問題 - 責務分離戦略 🔄進行中**
+
+#### **現状分析**:
+- **MainOverlayViewModel**: 1,219行、UI制御+ビジネスロジック混在
+- **重複パターン**: 診断レポート生成が複数箇所で重複
+- **構造的課題**: ReactiveUIパターンとビジネスロジックの境界不明確
+
+#### **解決戦略**:
+
+**Phase 6.2.1: 診断レポート重複除去（即座対応）**
+- `ExecuteStartStopAsync`から診断レポート生成を削除
+- `StartTranslationAsync`の診断レポートのみ保持
+- 重複実行による不要な処理負荷を解消
+
+**Phase 6.2.2: UI制御サービス分離（中期対応）**
+- `ITranslationControlService`抽象化作成
+- MainOverlayViewModelからビジネスロジック抽出
+- ReactiveUIパターンに準拠したViewModel軽量化
+
+**Phase 6.2.3: 責務分離完了（長期対応）**
+- ViewModel: UI状態管理のみに専念
+- Service層: ビジネスロジックとワークフロー制御
+- Clean Architecture原則の完全遵守
+
+#### **実装優先度**:
+1. **高**: 診断レポート重複除去（パフォーマンス影響）
+2. **中**: UI制御サービス分離（保守性向上）
+3. **低**: 完全責務分離（アーキテクチャ理想化）
+
+---
+
+**最終更新**: 2025-08-30 (UltraThink分析完了、**Phase 1-6.1完了**・Phase 6.2進行中)

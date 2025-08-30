@@ -77,7 +77,7 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         });
         
         // ★ アプリ起動時強制初期化サービス追加
-        services.AddSingleton<IHostedService, NativeDllInitializationService>();
+        services.AddHostedService<NativeDllInitializationService>();
         
         // フォールバック用のGDI Capturer（別途登録が必要）
         // services.AddTransient<GdiWindowsCapturer>();
