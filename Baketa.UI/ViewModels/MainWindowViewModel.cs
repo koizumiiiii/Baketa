@@ -207,6 +207,9 @@ namespace Baketa.UI.ViewModels;
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
             _translationOrchestrationService = translationOrchestrationService;
             
+            // 🔧 Phase 1.4修正: UI起動時は翻訳エンジン初期化中として開始（Startボタン無効化）
+            _isTranslationEngineInitializing = true; // ← 初期値をtrueに変更
+            
             // 各タブのビューモデルを初期化
             HomeViewModel = homeViewModel;
             CaptureViewModel = captureViewModel;

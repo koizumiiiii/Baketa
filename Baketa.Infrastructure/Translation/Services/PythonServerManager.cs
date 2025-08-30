@@ -233,7 +233,7 @@ public class PythonServerManager(
     /// </summary>
     private async Task WaitForServerReadyAsync(int port)
     {
-        var maxRetries = 30; // 30秒
+        var maxRetries = 120; // 120秒（30秒→120秒に延長：初回NLLB-200ダウンロード対応）
         var retryDelay = TimeSpan.FromSeconds(1);
         
         logger.LogDebug("⏳ サーバー準備完了を待機中: Port {Port}", port);
