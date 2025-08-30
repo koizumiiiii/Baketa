@@ -101,8 +101,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Phase3: リソース監視システム
             RegisterResourceMonitoringServices(services);
             
-            // Phase2: ハイブリッドリソース管理システム
-            RegisterHybridResourceManagementServices(services);
+            // Phase2: ハイブリッドリソース管理システム - PlatformModuleに移動（循環依存解決）
             
             // データ永続化
             RegisterPersistenceServices(services, environment);
@@ -487,15 +486,29 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
             Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
             
-            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 2動的リソース管理）
+            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 3.2 VRAMモニタリング統合）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
                 var connectionPool = provider.GetRequiredService<IConnectionPool>();
                 var configuration = provider.GetRequiredService<IConfiguration>();
-                var resourceManager = provider.GetService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
-                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 2リソース管理）");
-                logger?.LogInformation("🎯 [PHASE2-DI] HybridResourceManager注入確認: {ResourceManagerExists}", resourceManager != null);
+                
+                // 🚀 Phase 3.2修正: GetRequiredServiceでHybridResourceManagerを強制取得
+                Baketa.Infrastructure.ResourceManagement.IResourceManager? resourceManager = null;
+                try
+                {
+                    resourceManager = provider.GetRequiredService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
+                    logger?.LogInformation("✅ [PHASE3.2] HybridResourceManager注入成功 - VRAMモニタリング機能アクティブ");
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "❌ [PHASE3.2] HybridResourceManager注入失敗 - 依存関係問題: {Message}", ex.Message);
+                    logger?.LogWarning("⚠️ [PHASE3.2] HybridResourceManagerなしで継続（レガシーモード）");
+                }
+                
+                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 3.2 VRAMモニタリング）");
+                logger?.LogInformation("🎯 [PHASE3.2-DI] HybridResourceManager最終状態: {ResourceManagerExists}", resourceManager != null);
+                
                 return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration, null, null, resourceManager);
             });
             
@@ -680,60 +693,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
         }
 
-        /// <summary>
-        /// Phase2: ハイブリッドリソース管理システムサービス登録
-        /// </summary>
-        private static void RegisterHybridResourceManagementServices(IServiceCollection services)
-        {
-            Console.WriteLine("🔧 [PHASE3] ハイブリッドリソース管理システム登録開始（ホットリロード対応）");
-
-            // HybridResourceSettings の設定バインディング（Phase 3: ホットリロード対応）
-            services.Configure<Baketa.Infrastructure.ResourceManagement.HybridResourceSettings>(
-                config =>
-                {
-                    var serviceProvider = services.BuildServiceProvider();
-                    var configuration = serviceProvider.GetService<IConfiguration>();
-                    
-                    if (configuration != null)
-                    {
-                        configuration.GetSection("HybridResourceManagement").Bind(config);
-                    }
-                    else
-                    {
-                        // フォールバック設定（Phase 3拡張）
-                        config.OcrChannelCapacity = 100;
-                        config.TranslationChannelCapacity = 50;
-                        config.InitialOcrParallelism = 2;
-                        config.MaxOcrParallelism = 4;
-                        config.InitialTranslationParallelism = 1;
-                        config.MaxTranslationParallelism = 2;
-                        config.EnableDynamicParallelism = true;
-                        config.EnableDetailedLogging = false;
-                        config.EnableVerboseLogging = false; // Phase 3
-                        config.EnableHotReload = true; // Phase 3
-                        config.ConfigurationPollingIntervalMs = 5000; // Phase 3
-                        Console.WriteLine("⚠️ [PHASE3] フォールバック設定を使用（ホットリロード機能付き）");
-                    }
-                });
-
-            // HybridResourceManager をシングルトンとして登録（Phase 3: IOptionsMonitor対応）
-            services.AddSingleton<Baketa.Infrastructure.ResourceManagement.IResourceManager>(provider =>
-            {
-                var resourceMonitor = provider.GetRequiredService<IResourceMonitor>();
-                var optionsMonitor = provider.GetRequiredService<IOptionsMonitor<HybridResourceSettings>>();
-                var logger = provider.GetRequiredService<ILogger<HybridResourceManager>>();
-                var gpuEnvironmentDetector = provider.GetService<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector>();
-                
-                logger.LogInformation("🎯 [PHASE3] HybridResourceManager初期化 - ホットリロード対応VRAM検出: {GpuDetectorAvailable}",
-                    gpuEnvironmentDetector != null);
-                
-                return new HybridResourceManager(resourceMonitor, optionsMonitor, logger, gpuEnvironmentDetector);
-            });
-
-            Console.WriteLine("✅ [PHASE3] HybridResourceManager 登録完了 - ホットリロード対応動的リソース制御システム");
-            Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor依存は PlatformModule で解決されます");
-            Console.WriteLine("🎉 [PHASE3] ハイブリッドリソース管理システム登録完了（設定ホットリロード機能付き）");
-        }
+        // Phase2: ハイブリッドリソース管理システム登録はPlatformModuleに移動済み（循環依存解決）
         
         /// <summary>
         /// このモジュールが依存する他のモジュールの型を取得します。

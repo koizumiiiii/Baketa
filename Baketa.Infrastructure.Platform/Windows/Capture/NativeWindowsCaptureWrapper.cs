@@ -113,15 +113,46 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     try
                     {
                         var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                        var dllPath = System.IO.Path.Combine(baseDir, "BaketaCaptureNative.dll");
+                        
+                        // P/Invoke前の詳細ログ
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 P/Invoke前チェック: BaseDir='{baseDir}'{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 P/Invoke前チェック: DLL予想パス='{dllPath}'{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 P/Invoke前チェック: DLL存在確認={System.IO.File.Exists(dllPath)}{Environment.NewLine}");
+                        
+                        if (System.IO.File.Exists(dllPath))
+                        {
+                            var dllInfo = new System.IO.FileInfo(dllPath);
+                            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 P/Invoke前チェック: DLLサイズ={dllInfo.Length} bytes{Environment.NewLine}");
+                        }
+                        
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🧪 NativeWrapper: BaketaCapture_IsSupported()テスト呼び出し開始{Environment.NewLine}");
                         
                         int supportResult = NativeWindowsCapture.BaketaCapture_IsSupported();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 NativeWrapper: BaketaCapture_IsSupported()結果 = {supportResult}{Environment.NewLine}");
                     }
+                    catch (DllNotFoundException dllEx)
+                    {
+                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLL読み込み失敗: {dllEx.Message}{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLL検索パス: {Environment.GetEnvironmentVariable("PATH")}{Environment.NewLine}");
+                    }
+                    catch (EntryPointNotFoundException entryEx)
+                    {
+                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ エントリポイント未発見: {entryEx.Message}{Environment.NewLine}");
+                    }
+                    catch (BadImageFormatException imageEx)
+                    {
+                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLLフォーマットエラー（x86/x64不整合？）: {imageEx.Message}{Environment.NewLine}");
+                    }
                     catch (Exception supportEx)
                     {
                         var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper: BaketaCapture_IsSupported()例外 {supportEx.GetType().Name}: {supportEx.Message}{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 詳細スタックトレース: {supportEx.StackTrace}{Environment.NewLine}");
                     }
 
                     // 🔍🔍🔍 デバッグ: ネイティブDLL初期化試行

@@ -441,10 +441,31 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // キャッシュチェック処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 常に新鮮な翻訳を実行");
             
-            // Phase2統合: HybridResourceManager経由でリソース制御付き翻訳実行
+            // Phase 3.2統合: HybridResourceManager経由でVRAMモニタリング付き翻訳実行
             TranslationResponse result;
             if (_resourceManager != null)
             {
+                _logger.LogInformation("🚀 [PHASE3.2] HybridResourceManager経由でVRAMモニタリング付き翻訳実行開始");
+                
+                // 🎯 Phase 3.2: HybridResourceManagerの初期化を確実に実行
+                try 
+                {
+                    if (!_resourceManager.IsInitialized)
+                    {
+                        _logger.LogInformation("🔧 [PHASE3.2] HybridResourceManager初期化実行中...");
+                        await _resourceManager.InitializeAsync(cancellationToken).ConfigureAwait(false);
+                        _logger.LogInformation("✅ [PHASE3.2] HybridResourceManager初期化完了 - VRAMモニタリング開始");
+                    }
+                    else
+                    {
+                        _logger.LogDebug("✅ [PHASE3.2] HybridResourceManager既に初期化済み");
+                    }
+                }
+                catch (Exception initEx)
+                {
+                    _logger.LogError(initEx, "❌ [PHASE3.2] HybridResourceManager初期化失敗: {Message}", initEx.Message);
+                }
+                
                 _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] HybridResourceManager経由で翻訳実行開始");
                 
                 var translationRequest = new ResourceTranslationRequest(

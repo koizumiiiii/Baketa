@@ -80,6 +80,11 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     // === 状態管理 ===
     private bool _isInitialized = false;
     private readonly CancellationTokenSource _disposalCts = new();
+    
+    /// <summary>
+    /// リソース管理システムの初期化状態
+    /// </summary>
+    public bool IsInitialized => _isInitialized;
 
     public HybridResourceManager(
         IResourceMonitor resourceMonitor,

@@ -32,22 +32,23 @@ public static class TranslationValidator
     /// <returns>有効な翻訳結果の場合true</returns>
     public static bool IsValid(string? translatedText, string? originalText = null)
     {
-        // null・空文字チェック
+        // null・空文字チェックのみ - その他は全て表示
         if (string.IsNullOrWhiteSpace(translatedText))
-            return false;
-            
-        // エラーメッセージパターンの包括的チェック
-        foreach (var pattern in s_errorPatterns)
         {
-            if (translatedText.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                return false;
+            return false;
+        }
+            
+        // 明らかなエラーメッセージの場合のみ除外
+        // システムエラーメッセージは表示しない
+        if (translatedText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) ||
+            translatedText.StartsWith("Exception:", StringComparison.OrdinalIgnoreCase) ||
+            translatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
         }
         
-        // 原文と同じ場合（翻訳が実行されていない）
-        if (!string.IsNullOrEmpty(originalText) && 
-            string.Equals(translatedText.Trim(), originalText.Trim(), StringComparison.Ordinal))
-            return false;
-            
+        // それ以外は全て有効な翻訳結果として扱う
+        // OCR結果が不完全でも、ユーザーが判断できるよう表示する
         return true;
     }
 }

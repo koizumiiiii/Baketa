@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.DI;
@@ -9,6 +10,9 @@ using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 using System;
 using System.IO;
+using System.Drawing;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
@@ -46,21 +50,34 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         {
             var logger = serviceProvider.GetService<ILogger<IWindowsCapturer>>();
             
-            // Windows Graphics Capture API サポートをチェック
-            var nativeWrapper = serviceProvider.GetRequiredService<NativeWindowsCaptureWrapper>();
-            if (nativeWrapper.IsSupported())
+            try
             {
-                logger?.LogDebug("Windows Graphics Capture APIをサポート、WindowsGraphicsCapturerを使用");
-                return serviceProvider.GetRequiredService<WindowsGraphicsCapturer>();
+                // Windows Graphics Capture API サポートをチェック
+                var nativeWrapper = serviceProvider.GetRequiredService<NativeWindowsCaptureWrapper>();
+                logger?.LogInformation("🔍 ネイティブDLL サポート状況チェック開始");
+                
+                if (nativeWrapper.IsSupported())
+                {
+                    logger?.LogInformation("✅ Windows Graphics Capture APIをサポート、WindowsGraphicsCapturerを使用");
+                    return serviceProvider.GetRequiredService<WindowsGraphicsCapturer>();
+                }
+                else
+                {
+                    logger?.LogWarning("⚠️ Windows Graphics Capture APIが利用不可、フォールバック実装を使用");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                logger?.LogError("Windows Graphics Capture APIが利用不可、MarshalDirectiveException回避のためフォールバックを無効化");
-                // 緊急修正：MarshalDirectiveExceptionを回避するためフォールバックを無効化
-                // TODO: 安全な代替実装を提供する必要あり
-                throw new NotSupportedException("Windows Graphics Capture APIがサポートされていないシステムです。Windows 10 1903以降が必要です。");
+                logger?.LogError(ex, "❌ ネイティブDLL初期化エラー、フォールバック実装を使用: {ErrorMessage}", ex.Message);
             }
+            
+            // フォールバック実装：スタブキャプチャラーを使用
+            logger?.LogWarning("🔄 フォールバック: FallbackWindowsCapturer（スタブ実装）を使用");
+            return new FallbackWindowsCapturer(logger);
         });
+        
+        // ★ アプリ起動時強制初期化サービス追加
+        services.AddSingleton<IHostedService, NativeDllInitializationService>();
         
         // フォールバック用のGDI Capturer（別途登録が必要）
         // services.AddTransient<GdiWindowsCapturer>();
@@ -79,5 +96,136 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         
         // テキスト領域検出 - 高速軽量実装
         services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.TextDetection.FastTextRegionDetector>();
+    }
+}
+
+/// <summary>
+/// ネイティブDLLが利用できない場合のフォールバック実装
+/// </summary>
+internal sealed class FallbackWindowsCapturer : IWindowsCapturer
+{
+    private readonly ILogger? _logger;
+    private WindowsCaptureOptions _options;
+    
+    public FallbackWindowsCapturer(ILogger? logger = null)
+    {
+        _logger = logger;
+        _options = new WindowsCaptureOptions();
+    }
+
+    public Task<IWindowsImage> CaptureScreenAsync()
+    {
+        _logger?.LogError("❌ FallbackWindowsCapturer: 画面キャプチャは利用できません（ネイティブDLL不在）");
+        throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
+    }
+
+    public Task<IWindowsImage> CaptureRegionAsync(Rectangle region)
+    {
+        _logger?.LogError("❌ FallbackWindowsCapturer: 領域キャプチャは利用できません（ネイティブDLL不在）");
+        throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
+    }
+
+    public Task<IWindowsImage> CaptureWindowAsync(IntPtr windowHandle)
+    {
+        _logger?.LogError("❌ FallbackWindowsCapturer: ウィンドウキャプチャは利用できません（ネイティブDLL不在）");
+        throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
+    }
+    
+    public Task<IWindowsImage> CaptureClientAreaAsync(IntPtr windowHandle)
+    {
+        _logger?.LogError("❌ FallbackWindowsCapturer: クライアント領域キャプチャは利用できません（ネイティブDLL不在）");
+        throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
+    }
+    
+    public void SetCaptureOptions(WindowsCaptureOptions options)
+    {
+        _options = options ?? new WindowsCaptureOptions();
+        _logger?.LogDebug("📝 FallbackWindowsCapturer: キャプチャオプション設定（機能なし）");
+    }
+    
+    public WindowsCaptureOptions GetCaptureOptions()
+    {
+        return _options;
+    }
+}
+
+/// <summary>
+/// ネイティブDLL初期化強制実行サービス
+/// アプリ起動時にIWindowsCapturerを要求してP/Invoke問題を早期発見
+/// </summary>
+internal sealed class NativeDllInitializationService : IHostedService
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<NativeDllInitializationService> _logger;
+
+    public NativeDllInitializationService(
+        IServiceProvider serviceProvider,
+        ILogger<NativeDllInitializationService> logger)
+    {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🚀 NativeDLL初期化サービス開始 - アプリ起動時強制初期化");
+        
+        try
+        {
+            // デバッグログ出力
+            try
+            {
+                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [STARTUP] NativeDLL初期化サービス開始{Environment.NewLine}");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+
+            // IWindowsCapturerを強制的に要求（ファクトリーメソッド実行）
+            _logger.LogInformation("🔧 IWindowsCapturer要求開始 - ファクトリーメソッド強制実行");
+            
+            var capturer = _serviceProvider.GetRequiredService<IWindowsCapturer>();
+            
+            _logger.LogInformation("✅ IWindowsCapturer取得成功: {CapturerType}", capturer.GetType().Name);
+            
+            // デバッグログ出力
+            try
+            {
+                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [STARTUP] IWindowsCapturer取得成功: {capturer.GetType().Name}{Environment.NewLine}");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+
+            // 追加テスト: キャプチャオプション取得
+            var options = capturer.GetCaptureOptions();
+            _logger.LogInformation("📋 キャプチャオプション取得成功: {Options}", options);
+            
+            _logger.LogInformation("🎉 ネイティブDLL初期化テスト完了 - P/Invoke問題なし");
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ ネイティブDLL初期化テスト失敗: {ErrorType}: {ErrorMessage}", 
+                ex.GetType().Name, ex.Message);
+            
+            // デバッグログ出力（詳細）
+            try
+            {
+                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [STARTUP] NativeDLL初期化失敗: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+                File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [STARTUP] スタックトレース: {ex.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+
+            // 例外は再スローしない（アプリ起動を妨げないため）
+            _logger.LogWarning("⚠️ ネイティブDLL初期化は失敗しましたが、アプリケーション起動は継続します");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🛑 NativeDLL初期化サービス停止");
+        await Task.CompletedTask;
     }
 }

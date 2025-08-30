@@ -9,6 +9,11 @@ namespace Baketa.Infrastructure.ResourceManagement;
 public interface IResourceManager : IDisposable
 {
     /// <summary>
+    /// リソース管理システムの初期化状態
+    /// </summary>
+    bool IsInitialized { get; }
+
+    /// <summary>
     /// リソース状況に基づく動的並列度調整（ヒステリシス付き）
     /// </summary>
     Task AdjustParallelismAsync(CancellationToken cancellationToken = default);
