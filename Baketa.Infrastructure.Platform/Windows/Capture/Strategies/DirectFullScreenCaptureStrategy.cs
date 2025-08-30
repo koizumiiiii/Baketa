@@ -229,11 +229,21 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "DirectFullScreenキャプチャ中にエラー");
+            // システムダイアログ等のキャプチャセッション作成失敗は想定内
+            if (ex is InvalidOperationException && ex.Message.Contains("キャプチャセッション作成に失敗"))
+            {
+                _logger.LogDebug("DirectFullScreenキャプチャ制限（システム保護ウィンドウの可能性）: {Message}", ex.Message);
+            }
+            else
+            {
+                _logger.LogError(ex, "DirectFullScreenキャプチャ中にエラー");
+            }
+            
             result.Success = false;
             result.ErrorMessage = ex.Message;
 
-            // 📊 [DIAGNOSTIC] 一般エラーイベント
+            // 📊 [DIAGNOSTIC] 一般エラーイベント（システム制限の場合は警告レベル）
+            var severity = ex is InvalidOperationException ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error;
             await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
             {
                 Stage = "ScreenCapture",
@@ -241,7 +251,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                 ErrorMessage = result.ErrorMessage,
                 SessionId = sessionId,
-                Severity = DiagnosticSeverity.Error,
+                Severity = severity,
                 Message = $"DirectFullScreen画面キャプチャ中にエラー: {ex.Message}",
                 Metrics = new Dictionary<string, object>
                 {

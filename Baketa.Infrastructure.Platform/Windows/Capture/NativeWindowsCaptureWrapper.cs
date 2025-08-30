@@ -302,6 +302,18 @@ public class NativeWindowsCaptureWrapper : IDisposable
             {
                 string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
                 
+                // システムダイアログやセキュリティウィンドウのキャプチャ失敗は想定内のためDebugレベル
+                // Windows Graphics Capture APIの仕様により、これらは意図的に保護されている
+                bool isExpectedFailure = false;
+                
+                // HRESULTエラーコードから判定（E_ACCESSDENIED, E_INVALIDARG など）
+                if (result == -2147024891 || // E_ACCESSDENIED (0x80070005)
+                    result == -2147024809 || // E_INVALIDARG (0x80070057)
+                    result == -2147467259)   // E_FAIL (0x80004005) - 一般的な失敗
+                {
+                    isExpectedFailure = true;
+                }
+                
                 // 2560x1080などの大画面解像度の場合のメモリ不足エラーを特定
                 if (result == NativeWindowsCapture.ErrorCodes.Memory)
                 {
@@ -310,6 +322,11 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 else if (result == NativeWindowsCapture.ErrorCodes.Device)
                 {
                     _logger?.LogError("Graphics Device初期化失敗: WindowHandle=0x{WindowHandle:X8}, {ErrorMessage}", windowHandle.ToInt64(), errorMsg);
+                }
+                else if (isExpectedFailure)
+                {
+                    // システムダイアログ等の想定内失敗はDebugレベルで静寂化
+                    _logger?.LogDebug("システム保護ウィンドウのキャプチャ制限: ErrorCode={ErrorCode}, WindowHandle=0x{WindowHandle:X8}", result, windowHandle.ToInt64());
                 }
                 else
                 {

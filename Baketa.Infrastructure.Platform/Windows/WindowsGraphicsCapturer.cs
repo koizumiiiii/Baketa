@@ -251,12 +251,22 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             try
             {
                 var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎥 CreateCaptureSession結果: {sessionCreated}, SessionId={_nativeCapture.SessionId}{Environment.NewLine}");
+                // セッション作成失敗はDebugレベルで記録（システムダイアログ等の失敗が多いため）
+                if (!sessionCreated)
+                {
+                    System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📝 CreateCaptureSession結果: False (システム制限の可能性), HWND=0x{windowHandle.ToInt64():X8}{Environment.NewLine}");
+                }
+                else
+                {
+                    System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎥 CreateCaptureSession結果: {sessionCreated}, SessionId={_nativeCapture.SessionId}{Environment.NewLine}");
+                }
             }
             catch { /* デバッグログ失敗は無視 */ }
             
             if (!sessionCreated)
             {
+                // システムダイアログ等の場合はDebugレベルで静寂に失敗
+                _logger?.LogDebug("キャプチャセッション作成失敗（システム制限の可能性）: 0x{WindowHandle:X8}", windowHandle.ToInt64());
                 throw new InvalidOperationException($"ウィンドウ 0x{windowHandle.ToInt64():X8} のキャプチャセッション作成に失敗");
             }
 
