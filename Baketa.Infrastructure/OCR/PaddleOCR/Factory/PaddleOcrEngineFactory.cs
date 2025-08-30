@@ -11,6 +11,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Infrastructure.OCR.StickyRoi;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 
@@ -74,7 +75,7 @@ public sealed class PaddleOcrEngineFactory(
             }
             else
             {
-                _logger.LogDebug("🔒 高機能版PaddleOcrEngine作成（全環境対応）");
+                _logger.LogDebug("🔒 フォールバック: 標準PaddleOcrEngine作成");
                 var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();

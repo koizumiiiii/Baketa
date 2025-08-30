@@ -112,7 +112,10 @@ public sealed class AuthModule : ServiceModuleBase
     {
         // Authentication initialization service
         services.AddSingleton<AuthInitializationService>();
-        services.AddHostedService<AuthInitializationService>();
+        // TEMPORARY: Disable AuthInitializationService for Phase 1 testing
+        // Phase 1 Goal: Focus on translation pipeline functionality
+        // Will re-enable after Phase 4 completion for premium membership features
+        // services.AddHostedService<AuthInitializationService>();
 
         // Session refresh service (future extension)
         // services.AddSingleton<SessionRefreshService>();

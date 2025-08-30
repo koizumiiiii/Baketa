@@ -475,10 +475,86 @@ namespace Baketa.UI;
             InitializeEventHandlersImmediately();
             Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行完了！ 🚀🚀🚀");
             
+            // 🚀 CRITICAL: IHostedService手動起動（ModelPrewarmingService等を確実に起動）
+            Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動開始！ 🚀🚀🚀");
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await StartHostedServicesAsync().ConfigureAwait(false);
+                    Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動完了！ 🚀🚀🚀");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー: {ex.Message}");
+                }
+            });
+            
             // ReactiveUIスケジューラの設定
             ConfigureReactiveUI();
             
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
+        }
+
+        
+        /// <summary>
+        /// 登録されたIHostedServiceを手動で起動します
+        /// </summary>
+        private static async Task StartHostedServicesAsync()
+        {
+            if (ServiceProvider == null)
+            {
+                Console.WriteLine("⚠️ ServiceProviderがnull - IHostedService起動をスキップ");
+                return;
+            }
+
+            try
+            {
+                Console.WriteLine("🚀 IHostedService手動起動開始");
+                
+                // すべてのIHostedServiceを取得
+                var hostedServices = ServiceProvider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+                var serviceList = hostedServices.ToList();
+                
+                Console.WriteLine($"🔍 検出されたIHostedService数: {serviceList.Count}");
+                
+                var cancellationToken = CancellationToken.None;
+                var startTasks = new List<Task>();
+                
+                foreach (var service in serviceList)
+                {
+                    var serviceName = service.GetType().Name;
+                    Console.WriteLine($"🚀 {serviceName} 起動開始...");
+                    
+                    try
+                    {
+                        var startTask = service.StartAsync(cancellationToken);
+                        startTasks.Add(startTask);
+                        Console.WriteLine($"✅ {serviceName} StartAsync呼び出し完了");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ {serviceName} 起動エラー: {ex.Message}");
+                    }
+                }
+                
+                // すべてのStartAsyncを並行実行で待機
+                if (startTasks.Count > 0)
+                {
+                    Console.WriteLine($"⏳ {startTasks.Count}個のIHostedService起動完了を待機中...");
+                    await Task.WhenAll(startTasks).ConfigureAwait(false);
+                    Console.WriteLine("✅ 全IHostedService起動完了");
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ 起動対象のIHostedServiceが見つかりませんでした");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"💥 IHostedService手動起動エラー: {ex.Message}");
+                Console.WriteLine($"💥 StackTrace: {ex.StackTrace}");
+            }
         }
         
         /// <summary>

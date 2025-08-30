@@ -28,15 +28,53 @@ public class CaptureCompletedHandler(IEventAggregator eventAggregator) : IEventP
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);
 
-            // キャプチャが完了したことを通知するイベントを発行
-            var notificationEvent = new NotificationEvent(
-                $"キャプチャが完了しました: {eventData.CapturedImage.Width}x{eventData.CapturedImage.Height}",
-                NotificationType.Success,
-                "キャプチャ完了",
-                displayTime: 3000);
+            try
+            {
+                // キャプチャが完了したことを通知するイベントを発行
+                var notificationEvent = new NotificationEvent(
+                    $"キャプチャが完了しました: {eventData.CapturedImage.Width}x{eventData.CapturedImage.Height}",
+                    NotificationType.Success,
+                    "キャプチャ完了",
+                    displayTime: 3000);
+                    
+                await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
                 
-            await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
-            
-            // ここで次のステップ（OCR処理など）を開始するコードを追加することも可能
+                // ⚡ [PHASE_2_FIX] OCR処理要求イベント発行 - 翻訳パイプライン連鎖修復
+                Console.WriteLine($"🔥 [PHASE2_FIX] CaptureCompletedHandler: OCR要求イベント発行 - Image: {eventData.CapturedImage.Width}x{eventData.CapturedImage.Height}");
+                
+                // OCR処理要求イベントを発行（Applicationレイヤーで処理）
+                var ocrRequestEvent = new OcrRequestEvent(
+                    eventData.CapturedImage,
+                    eventData.CaptureRegion,
+                    targetWindowHandle: null
+                );
+                
+                await _eventAggregator.PublishAsync(ocrRequestEvent).ConfigureAwait(false);
+                
+                Console.WriteLine("✅ [PHASE2_FIX] CaptureCompletedHandler: OcrRequestEvent発行完了");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [PHASE2_FIX] CaptureCompletedHandler処理エラー: {ex.GetType().Name} - {ex.Message}");
+                
+                // エラー通知イベントを発行
+                var errorNotificationEvent = new NotificationEvent(
+                    $"キャプチャ後の処理でエラーが発生しました: {ex.Message}",
+                    NotificationType.Error,
+                    "処理エラー",
+                    displayTime: 5000);
+                    
+                try
+                {
+                    await _eventAggregator.PublishAsync(errorNotificationEvent).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // 通知イベント発行失敗は無視（ログ出力済み）
+                }
+                
+                // 例外は再スローして上位で処理
+                throw;
+            }
         }
     }

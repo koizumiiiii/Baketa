@@ -68,9 +68,66 @@ public sealed class EventHandlerInitializationService(
             Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
             Console.WriteLine($"🔥 [DI_DEBUG] EventAggregatorハッシュ: {eventAggregator.GetHashCode()}");
             Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator参照: {eventAggregator}");
-            // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-            //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥 [DI_DEBUG] EventHandlerInitializationService - EventAggregator型: {eventAggregator.GetType().FullName}, ハッシュ: {eventAggregator.GetHashCode()}{Environment.NewLine}");
-    
+
+            // ⚡ [PHASE_2_FIX] CaptureCompletedHandlerの登録
+            try
+            {
+                var captureCompletedHandler = _serviceProvider.GetRequiredService<IEventProcessor<CaptureCompletedEvent>>();
+                eventAggregator.Subscribe<CaptureCompletedEvent>(captureCompletedHandler);
+                _logger.LogInformation("CaptureCompletedHandlerを登録しました");
+                Console.WriteLine("🔥 [DEBUG] CaptureCompletedHandlerを登録しました");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] CaptureCompletedHandlerを登録しました{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CaptureCompletedHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] CaptureCompletedHandlerの登録失敗: {ex.Message}");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] CaptureCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+
+            // ⚡ [PHASE_2_FIX] OcrRequestHandlerの登録 - 翻訳パイプライン連鎖修復
+            try
+            {
+                var ocrRequestHandler = _serviceProvider.GetRequiredService<IEventProcessor<OcrRequestEvent>>();
+                eventAggregator.Subscribe<OcrRequestEvent>(ocrRequestHandler);
+                _logger.LogInformation("OcrRequestHandlerを登録しました");
+                Console.WriteLine("🔥 [DEBUG] OcrRequestHandlerを登録しました");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] OcrRequestHandler (翻訳パイプライン連鎖) を登録しました{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "OcrRequestHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] OcrRequestHandlerの登録失敗: {ex.Message}");
+                
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] OcrRequestHandler登録失敗: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
 
             // TranslationRequestHandlerの登録
             try

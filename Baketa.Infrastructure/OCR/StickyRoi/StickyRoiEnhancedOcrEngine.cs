@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Settings;
 
 namespace Baketa.Infrastructure.OCR.StickyRoi;
 
@@ -16,6 +18,8 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
     private readonly ILogger<StickyRoiEnhancedOcrEngine> _logger;
     private readonly ISimpleOcrEngine _baseOcrEngine;
     private readonly IStickyRoiManager _roiManager;
+    private readonly IOptionsMonitor<OcrSettings> _ocrSettings;
+    private readonly SemaphoreSlim _ocrSemaphore;
     private bool _disposed;
     
     // パフォーマンス統計
@@ -27,13 +31,20 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
     public StickyRoiEnhancedOcrEngine(
         ILogger<StickyRoiEnhancedOcrEngine> logger,
         ISimpleOcrEngine baseOcrEngine,
-        IStickyRoiManager roiManager)
+        IStickyRoiManager roiManager,
+        IOptionsMonitor<OcrSettings> ocrSettings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _baseOcrEngine = baseOcrEngine ?? throw new ArgumentNullException(nameof(baseOcrEngine));
         _roiManager = roiManager ?? throw new ArgumentNullException(nameof(roiManager));
+        _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
         
-        _logger.LogInformation("🎯 StickyRoiEnhancedOcrEngine初期化完了 - ROI最適化OCR開始");
+        // Improvement: 設定から読み込み（Gemini指摘事項対応 - ハードコード設定外部化完了）
+        var maxConcurrentRequests = _ocrSettings.CurrentValue.MaxConcurrentOcrRequests;
+        _ocrSemaphore = new SemaphoreSlim(maxConcurrentRequests, maxConcurrentRequests);
+        
+        _logger.LogInformation("🎯 StickyRoiEnhancedOcrEngine初期化完了 - ROI最適化OCR開始 (最大同時OCR: {MaxConcurrent}, 最大並列ROI: {MaxParallelRois})", 
+            maxConcurrentRequests, _ocrSettings.CurrentValue.MaxParallelRois);
     }
 
     public async Task<Baketa.Core.Abstractions.OCR.OcrResult> RecognizeTextAsync(
@@ -122,6 +133,7 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
         if (_disposed) return;
         
         _baseOcrEngine?.Dispose();
+        _ocrSemaphore?.Dispose(); // Critical: SemaphoreSlim リソース解放
         // _roiManager?.Dispose(); // IStickyRoiManagerは IDisposable を実装していない
         _disposed = true;
         
@@ -160,53 +172,152 @@ public sealed class StickyRoiEnhancedOcrEngine : ISimpleOcrEngine
     {
         try
         {
-            var detectedTexts = new List<Baketa.Core.Abstractions.OCR.DetectedText>();
+            _logger.LogDebug("🚀 Sprint 3: ROI並列処理開始 - ROI数: {RoiCount}", rois.Count);
             
-            foreach (var roi in rois)
+            // Improvement: 設定から読み込み（Gemini指摘事項対応 - ハードコード設定外部化完了）
+            var maxParallelRois = _ocrSettings.CurrentValue.MaxParallelRois;
+            
+            var processingTasks = rois.Select(async roi =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                // ROI領域の画像切り出し
-                var roiImageData = await ExtractRoiImageAsync(imageData, roi.Region, cancellationToken);
-                if (roiImageData == null) continue;
+                var roiStopwatch = Stopwatch.StartNew();
                 
-                // ROI領域でOCR実行
-                var roiResult = await _baseOcrEngine.RecognizeTextAsync(roiImageData, cancellationToken);
-                
-                // 座標をフルスクリーン座標に変換
-                var adjustedTexts = AdjustCoordinates(roiResult.DetectedTexts, roi.Region);
-                detectedTexts.AddRange(adjustedTexts);
-                
-                // ROI信頼度更新
-                var detectionResult = roiResult.DetectedTexts.Any() ? 
-                    RoiDetectionResult.Success : RoiDetectionResult.Failed;
-                
-                var confidence = roiResult.DetectedTexts.Any() ? 
-                    roiResult.DetectedTexts.Average(t => t.Confidence) : 0.0;
-                
-                await _roiManager.UpdateRoiConfidenceAsync(roi.RoiId, detectionResult, confidence, cancellationToken);
+                try
+                {
+                    // ROI領域の画像切り出し
+                    var roiImageData = await ExtractRoiImageAsync(imageData, roi.Region, cancellationToken);
+                    if (roiImageData == null) 
+                    {
+                        _logger.LogDebug("⚠️ ROI画像切り出し失敗 - ROI: {RoiId}", roi.RoiId);
+                        return new RoiProcessingResult { RoiId = roi.RoiId, Success = false };
+                    }
+                    
+                    // Critical: OCRエンジンスレッドセーフティ制御（Gemini指摘事項対応）
+                    await _ocrSemaphore.WaitAsync(cancellationToken);
+                    
+                    Baketa.Core.Abstractions.OCR.OcrResult roiResult;
+                    try
+                    {
+                        // ROI領域でOCR実行（同期化制御あり）
+                        roiResult = await _baseOcrEngine.RecognizeTextAsync(roiImageData, cancellationToken);
+                    }
+                    finally
+                    {
+                        _ocrSemaphore.Release();
+                    }
+                    
+                    // 座標をフルスクリーン座標に変換
+                    var adjustedTexts = AdjustCoordinates(roiResult.DetectedTexts, roi.Region);
+                    
+                    // ROI信頼度更新（非同期並列）
+                    var detectionResult = roiResult.DetectedTexts.Any() ? 
+                        RoiDetectionResult.Success : RoiDetectionResult.Failed;
+                    
+                    var confidence = roiResult.DetectedTexts.Any() ? 
+                        roiResult.DetectedTexts.Average(t => t.Confidence) : 0.0;
+                    
+                    // 信頼度更新を非同期で実行（パフォーマンス向上）
+                    var confidenceUpdateTask = _roiManager.UpdateRoiConfidenceAsync(roi.RoiId, detectionResult, confidence, cancellationToken);
+                    
+                    roiStopwatch.Stop();
+                    
+                    _logger.LogDebug("✅ ROI並列処理完了 - ROI: {RoiId}, 検出数: {Count}, 時間: {Time}ms", 
+                        roi.RoiId, adjustedTexts.Count, roiStopwatch.ElapsedMilliseconds);
+                    
+                    return new RoiProcessingResult 
+                    { 
+                        RoiId = roi.RoiId, 
+                        Success = true, 
+                        DetectedTexts = adjustedTexts,
+                        ProcessingTime = roiStopwatch.Elapsed,
+                        ConfidenceUpdateTask = confidenceUpdateTask
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "⚠️ ROI個別処理失敗 - ROI: {RoiId}", roi.RoiId);
+                    return new RoiProcessingResult { RoiId = roi.RoiId, Success = false };
+                }
+            });
+            
+            // 並列タスク実行・完了待機
+            var results = await Task.WhenAll(processingTasks);
+            
+            // 信頼度更新タスクの完了待機（非ブロッキング統計更新）
+            var confidenceUpdateTasks = results
+                .Where(r => r.Success && r.ConfidenceUpdateTask != null)
+                .Select(r => r.ConfidenceUpdateTask!)
+                .ToArray();
+            
+            if (confidenceUpdateTasks.Any())
+            {
+                // 信頼度更新を非同期で完了させる（メイン処理をブロックしない）
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.WhenAll(confidenceUpdateTasks);
+                        _logger.LogDebug("📊 ROI信頼度更新完了 - 更新数: {Count}", confidenceUpdateTasks.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "⚠️ ROI信頼度更新一部失敗");
+                    }
+                }, cancellationToken);
             }
             
-            if (!detectedTexts.Any()) return null;
+            // 成功したROI結果のマージ
+            var allDetectedTexts = results
+                .Where(r => r.Success && r.DetectedTexts?.Any() == true)
+                .SelectMany(r => r.DetectedTexts!)
+                .ToList();
+            
+            if (!allDetectedTexts.Any()) 
+            {
+                _logger.LogDebug("ℹ️ ROI並列処理完了 - 検出テキストなし");
+                return null;
+            }
+            
+            var totalProcessingTime = results.Where(r => r.Success).Sum(r => r.ProcessingTime.TotalMilliseconds);
+            var successfulRois = results.Count(r => r.Success);
+            
+            _logger.LogInformation("🎯 Sprint 3並列ROI処理完了 - 成功: {Success}/{Total}, 検出数: {Count}, 平均時間: {AvgTime:F1}ms", 
+                successfulRois, rois.Count, allDetectedTexts.Count, totalProcessingTime / Math.Max(1, successfulRois));
             
             return new Baketa.Core.Abstractions.OCR.OcrResult
             {
-                DetectedTexts = detectedTexts.AsReadOnly(),
-                ProcessingTime = TimeSpan.Zero, // 個別計測済み
+                DetectedTexts = allDetectedTexts.AsReadOnly(),
+                ProcessingTime = TimeSpan.FromMilliseconds(totalProcessingTime), 
                 IsSuccessful = true,
                 Metadata = new Dictionary<string, object>
                 {
-                    ["ProcessingMode"] = "StickyROI",
+                    ["ProcessingMode"] = "StickyROI_Parallel",
                     ["RoiCount"] = rois.Count,
-                    ["DetectedRegions"] = detectedTexts.Count
+                    ["SuccessfulRois"] = successfulRois,
+                    ["DetectedRegions"] = allDetectedTexts.Count,
+                    ["ParallelProcessingEnabled"] = true,
+                    ["Sprint3Optimization"] = true
                 }
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ ROI優先処理失敗");
+            _logger.LogError(ex, "❌ ROI並列処理失敗");
             return null;
         }
+    }
+    
+    /// <summary>
+    /// Sprint 3: ROI並列処理結果
+    /// </summary>
+    private sealed class RoiProcessingResult
+    {
+        public string RoiId { get; init; } = string.Empty;
+        public bool Success { get; init; }
+        public List<Baketa.Core.Abstractions.OCR.DetectedText>? DetectedTexts { get; init; }
+        public TimeSpan ProcessingTime { get; init; }
+        public Task? ConfidenceUpdateTask { get; init; }
     }
 
     private async Task<byte[]?> ExtractRoiImageAsync(byte[] imageData, Rectangle roi, CancellationToken _)

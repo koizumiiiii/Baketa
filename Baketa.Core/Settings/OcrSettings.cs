@@ -152,6 +152,24 @@ public sealed class OcrSettings
     public int MaxParallelThreads { get; set; } = 4;
     
     /// <summary>
+    /// StickyROI最大並列処理数
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ROI並列処理数", 
+        Description = "StickyROI機能の最大並列処理数", 
+        MinValue = 1, 
+        MaxValue = 16)]
+    public int MaxParallelRois { get; set; } = 4;
+    
+    /// <summary>
+    /// OCRエンジン最大同時実行数
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "OCR同時実行数", 
+        Description = "OCRエンジンの最大同時実行数（スレッドセーフティ制御）", 
+        MinValue = 1, 
+        MaxValue = 8)]
+    public int MaxConcurrentOcrRequests { get; set; } = 1;
+    
+    /// <summary>
     /// テキスト領域検出の有効化
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "テキスト領域検出", 
@@ -320,6 +338,8 @@ public sealed class OcrSettings
             ImageScaleFactor = ImageScaleFactor,
             EnableParallelProcessing = EnableParallelProcessing,
             MaxParallelThreads = MaxParallelThreads,
+            MaxParallelRois = MaxParallelRois, // Improvement: 新規追加設定
+            MaxConcurrentOcrRequests = MaxConcurrentOcrRequests, // Improvement: 新規追加設定
             EnableTextAreaDetection = EnableTextAreaDetection,
             EnableTextFiltering = EnableTextFiltering,
             MinTextLineHeight = MinTextLineHeight,

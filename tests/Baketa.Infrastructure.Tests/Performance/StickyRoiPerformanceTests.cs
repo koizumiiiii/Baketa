@@ -22,6 +22,7 @@ public class StickyRoiPerformanceTests : IDisposable
     private readonly Mock<ILogger<StickyRoiEnhancedOcrEngine>> _ocrEngineLogger;
     private readonly Mock<ISimpleOcrEngine> _mockBaseOcrEngine;
     private readonly Mock<IOptions<OcrSettings>> _mockOcrSettings;
+    private readonly Mock<IOptionsMonitor<OcrSettings>> _mockOcrSettingsMonitor;
     private readonly InMemoryStickyRoiManager _roiManager;
     private readonly StickyRoiEnhancedOcrEngine _enhancedOcrEngine;
 
@@ -32,8 +33,10 @@ public class StickyRoiPerformanceTests : IDisposable
         _ocrEngineLogger = new Mock<ILogger<StickyRoiEnhancedOcrEngine>>();
         _mockBaseOcrEngine = new Mock<ISimpleOcrEngine>();
         _mockOcrSettings = new Mock<IOptions<OcrSettings>>();
+        _mockOcrSettingsMonitor = new Mock<IOptionsMonitor<OcrSettings>>();
         
         _mockOcrSettings.Setup(x => x.Value).Returns(new OcrSettings());
+        _mockOcrSettingsMonitor.Setup(x => x.CurrentValue).Returns(new OcrSettings());
         
         _roiManager = new InMemoryStickyRoiManager(
             _roiManagerLogger.Object,
@@ -42,7 +45,8 @@ public class StickyRoiPerformanceTests : IDisposable
         _enhancedOcrEngine = new StickyRoiEnhancedOcrEngine(
             _ocrEngineLogger.Object,
             _mockBaseOcrEngine.Object,
-            _roiManager);
+            _roiManager,
+            _mockOcrSettingsMonitor.Object);
     }
 
     [Fact]

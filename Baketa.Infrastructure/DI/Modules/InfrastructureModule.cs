@@ -440,8 +440,9 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var baseOcrEngine = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
                     basePaddleOcr, imageFactory, adapterLogger);
                 
+                var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                 var roiEnhancedEngine = new Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine(
-                    logger, baseOcrEngine, roiManager);
+                    logger, baseOcrEngine, roiManager, ocrSettings);
                 
                 logger.LogInformation("🎯 StickyRoiEnhancedOcrEngine統合完了 - " +
                     "BaseEngine: SimpleOcrEngineAdapter(PaddleOCR), ROI最適化有効, Mock除去済み");

@@ -260,6 +260,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             _recentStatusHistory.Dequeue();
         }
 
+        // Important: VRAM動的監視統合（Gemini指摘事項対応）
+        var vramMonitoring = await MonitorVramDynamicallyAsync(cancellationToken).ConfigureAwait(false);
+        
         // Phase 3: 負荷トレンドの分析
         var currentTrend = AnalyzeLoadTrend();
         if (currentTrend != _currentLoadTrend)
@@ -270,38 +273,84 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             _lastTrendChangeTime = now;
         }
 
-        // 基本負荷評価
+        // Important: VRAM監視結果と従来の閾値評価を統合
         var isHighLoad = status.CpuUsage > _settings.CpuHighThreshold ||
                         status.MemoryUsage > _settings.MemoryHighThreshold ||
                         status.GpuUtilization > _settings.GpuHighThreshold ||
-                        status.VramUsage > _settings.VramHighThreshold;
+                        vramMonitoring.ShouldFallbackToCpu; // VRAM監視統合
 
         var isLowLoad = status.CpuUsage < _settings.CpuLowThreshold &&
                        status.MemoryUsage < _settings.MemoryLowThreshold &&
                        status.GpuUtilization < _settings.GpuLowThreshold &&
-                       status.VramUsage < _settings.VramLowThreshold;
+                       vramMonitoring.OptimalForGpuProcessing; // VRAM監視統合
 
-        // Phase 3: 高度なヒステリシス制御
+        // Important: VRAM推奨アクション統合による高度な制御（既存enum値使用）
+        bool forceAdjustmentDueToVram = false;
+        switch (vramMonitoring.RecommendedAction)
+        {
+            case VramAction.ScaleDown:
+            case VramAction.FallbackToCpu:
+            case VramAction.EmergencyFallback:
+                forceAdjustmentDueToVram = true;
+                isHighLoad = true;
+                _logger.LogWarning("⚠️ [VRAM統合] VRAM圧迫による処理削減推奨 - 圧迫度: {Pressure}, アクション: {Action}", 
+                    vramMonitoring.PressureLevel, vramMonitoring.RecommendedAction);
+                break;
+            
+            case VramAction.ScaleUp:
+                if (!isHighLoad && vramMonitoring.OptimalForGpuProcessing)
+                {
+                    forceAdjustmentDueToVram = true;
+                    isLowLoad = true;
+                    _logger.LogInformation("📈 [VRAM統合] VRAM最適状態による処理増強推奨 - 圧迫度: {Pressure}", 
+                        vramMonitoring.PressureLevel);
+                }
+                break;
+                
+            case VramAction.Maintain:
+                // VRAM状況は安定、従来ロジックを維持
+                if (_settings.EnableVerboseLogging)
+                {
+                    _logger.LogTrace("✅ [VRAM統合] VRAM状況安定 - 従来制御継続 圧迫度: {Pressure}", 
+                        vramMonitoring.PressureLevel);
+                }
+                break;
+        }
+
+        // Phase 3: 高度なヒステリシス制御（VRAM統合考慮）
         var shouldAdjust = ShouldAdjustParallelism(isHighLoad, isLowLoad, currentTrend, now);
+
+        // Important: VRAM統合による強制調整の適用
+        if (forceAdjustmentDueToVram)
+        {
+            shouldAdjust = (isHighLoad && !isLowLoad, !isHighLoad && isLowLoad);
+        }
 
         if (shouldAdjust.Decrease)
         {
             await DecreaseParallelismAsync().ConfigureAwait(false);
             _lastThresholdCrossTime = now;
-            _logger.LogWarning("🔻 [PHASE3] 高度制御による並列度減少: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, VRAM={Vram:F1}%, トレンド={Trend}", 
-                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, status.VramUsage, currentTrend);
+            _logger.LogWarning("🔻 [VRAM統合] 並列度減少実行: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, " +
+                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}", 
+                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, 
+                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel, 
+                currentTrend, vramMonitoring.RecommendedAction);
         }
         else if (shouldAdjust.Increase)
         {
             await IncreaseParallelismAsync().ConfigureAwait(false);
             _lastThresholdCrossTime = now;
-            _logger.LogInformation("🔺 [PHASE3] 高度制御による並列度増加: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, VRAM={Vram:F1}%, トレンド={Trend}", 
-                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, status.VramUsage, currentTrend);
+            _logger.LogInformation("🔺 [VRAM統合] 並列度増加実行: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, " +
+                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}", 
+                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, 
+                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel, 
+                currentTrend, vramMonitoring.RecommendedAction);
         }
         else if (_settings.EnableVerboseLogging)
         {
-            _logger.LogTrace("⚖️ [PHASE3] 並列度調整不要 - 安定状態維持: トレンド={Trend}, 待機時間={Wait:F1}秒", 
-                currentTrend, (now - _lastThresholdCrossTime).TotalSeconds);
+            _logger.LogTrace("⚖️ [VRAM統合] 並列度調整不要 - 安定状態維持: トレンド={Trend}, VRAM圧迫度={Pressure}, " +
+                "待機時間={Wait:F1}秒", currentTrend, vramMonitoring.PressureLevel, 
+                (now - _lastThresholdCrossTime).TotalSeconds);
         }
     }
 
@@ -547,6 +596,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
     /// <summary>
     /// VRAMの使用率パーセンテージを計算（動的VRAM容量対応）
+    /// Sprint 3: 高度なVRAM監視機能拡張
     /// </summary>
     private double CalculateVramUsagePercent(ResourceMetrics metrics)
     {
@@ -557,6 +607,138 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         var usagePercent = (double)metrics.GpuMemoryUsageMB.Value / _actualTotalVramMB * 100;
         
         return Math.Min(100, Math.Max(0, usagePercent));
+    }
+
+    /// <summary>
+    /// Sprint 3: 拡張VRAM監視とGPU段階的制御
+    /// </summary>
+    private async Task<VramMonitoringResult> MonitorVramDynamicallyAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var status = await GetCurrentResourceStatusAsync(cancellationToken).ConfigureAwait(false);
+            var vramUsagePercent = status.VramUsage;
+            var vramUsageMB = (long)(vramUsagePercent / 100.0 * _actualTotalVramMB);
+            var availableVramMB = _actualTotalVramMB - vramUsageMB;
+            
+            // Sprint 3: VRAM圧迫度分析
+            var vramPressure = CalculateVramPressureLevel(vramUsagePercent);
+            var recommendedAction = DetermineVramAction(vramPressure, vramUsagePercent);
+            
+            var result = new VramMonitoringResult
+            {
+                CurrentUsagePercent = vramUsagePercent,
+                CurrentUsageMB = vramUsageMB,
+                TotalCapacityMB = _actualTotalVramMB,
+                AvailableMB = availableVramMB,
+                PressureLevel = vramPressure,
+                RecommendedAction = recommendedAction,
+                ShouldFallbackToCpu = vramUsagePercent > _settings.VramHighThreshold,
+                OptimalForGpuProcessing = vramUsagePercent < _settings.VramLowThreshold,
+                Timestamp = DateTime.UtcNow
+            };
+
+            if (_settings.EnableVerboseLogging)
+            {
+                _logger.LogDebug("📊 Sprint 3 VRAM動的監視: 使用率={Usage:F1}% ({UsageMB}MB/{TotalMB}MB), " +
+                    "圧迫度={Pressure}, 推奨アクション={Action}, CPU切替={Fallback}",
+                    vramUsagePercent, vramUsageMB, _actualTotalVramMB, 
+                    vramPressure, recommendedAction, result.ShouldFallbackToCpu);
+            }
+
+            // Phase 4.1: VRAM監視メトリクス記録（将来実装予定）
+            if (_metricsCollector != null && _settings.EnableVerboseLogging)
+            {
+                _logger.LogDebug("📊 Phase 4.1: VRAM監視メトリクス記録 - 使用率={Usage:F1}%, 圧迫度={Pressure}", 
+                    vramUsagePercent, vramPressure);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Sprint 3 VRAM動的監視エラー");
+            return new VramMonitoringResult
+            {
+                CurrentUsagePercent = 0,
+                PressureLevel = VramPressureLevel.Unknown,
+                RecommendedAction = VramAction.Maintain,
+                ShouldFallbackToCpu = true, // エラー時は安全側に倒す
+                Timestamp = DateTime.UtcNow
+            };
+        }
+    }
+
+    /// <summary>
+    /// Sprint 3: VRAM圧迫度レベル計算
+    /// </summary>
+    private VramPressureLevel CalculateVramPressureLevel(double vramUsagePercent)
+    {
+        return vramUsagePercent switch
+        {
+            < 40 => VramPressureLevel.Low,
+            < 60 => VramPressureLevel.Moderate, 
+            < 75 => VramPressureLevel.High,
+            < 90 => VramPressureLevel.Critical,
+            _ => VramPressureLevel.Emergency
+        };
+    }
+
+    /// <summary>
+    /// Sprint 3: VRAM状況に基づく推奨アクション決定
+    /// </summary>
+    private VramAction DetermineVramAction(VramPressureLevel pressureLevel, double vramUsagePercent)
+    {
+        return pressureLevel switch
+        {
+            VramPressureLevel.Low => VramAction.ScaleUp,
+            VramPressureLevel.Moderate => VramAction.Maintain,
+            VramPressureLevel.High => VramAction.ScaleDown,
+            VramPressureLevel.Critical => VramAction.FallbackToCpu,
+            VramPressureLevel.Emergency => VramAction.EmergencyFallback,
+            _ => VramAction.Maintain
+        };
+    }
+
+    /// <summary>
+    /// Sprint 3: VRAM監視結果
+    /// </summary>
+    private sealed record VramMonitoringResult
+    {
+        public double CurrentUsagePercent { get; init; }
+        public long CurrentUsageMB { get; init; }
+        public long TotalCapacityMB { get; init; }
+        public long AvailableMB { get; init; }
+        public VramPressureLevel PressureLevel { get; init; }
+        public VramAction RecommendedAction { get; init; }
+        public bool ShouldFallbackToCpu { get; init; }
+        public bool OptimalForGpuProcessing { get; init; }
+        public DateTime Timestamp { get; init; }
+    }
+
+    /// <summary>
+    /// Sprint 3: VRAM圧迫度レベル
+    /// </summary>
+    private enum VramPressureLevel
+    {
+        Unknown,
+        Low,        // < 40%
+        Moderate,   // 40-60%
+        High,       // 60-75%
+        Critical,   // 75-90%
+        Emergency   // > 90%
+    }
+
+    /// <summary>
+    /// Sprint 3: VRAM状況に基づく推奨アクション
+    /// </summary>
+    private enum VramAction
+    {
+        ScaleUp,           // GPU処理増強
+        Maintain,          // 現状維持
+        ScaleDown,         // GPU処理削減
+        FallbackToCpu,     // CPU切替推奨
+        EmergencyFallback  // 緊急CPU切替
     }
 
     /// <summary>

@@ -331,6 +331,13 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.CaptureCompletedHandler>());
             Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - オーバーレイ表示修復");
             
+            // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
+            Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");
+            services.AddSingleton<Baketa.Application.Events.Handlers.OcrRequestHandler>();
+            services.AddSingleton<IEventProcessor<OcrRequestEvent>>(
+                provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.OcrRequestHandler>());
+            Console.WriteLine("✅ [DI_DEBUG] OcrRequestHandler登録完了 - Phase 2翻訳チェーン修復");
+            
             // 自動登録が必要な場合は必要に応じて実装
             // RegisterEventHandlersAutomatically(services);
         }
