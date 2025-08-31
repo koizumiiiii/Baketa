@@ -8,6 +8,7 @@ WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
     , m_frameWidth(0)
     , m_frameHeight(0)
     , m_frameTimestamp(0)
+    , m_lastHResult(S_OK)
 {
 }
 
@@ -28,38 +29,45 @@ bool WindowsCaptureSession::Initialize()
 {
     try
     {
+        SetLastError("DEBUG: Initialize() started");
+        
         // Direct3D デバイスを作成
         if (!CreateD3DDevice())
         {
-            SetLastError("Failed to create D3D device");
+            SetLastError("DEBUG: CreateD3DDevice() failed - " + m_lastError);
             return false;
         }
+
+        SetLastError("DEBUG: CreateD3DDevice() succeeded");
 
         // GraphicsCaptureItem を作成
         if (!CreateCaptureItem())
         {
-            SetLastError("Failed to create capture item");
+            SetLastError("DEBUG: CreateCaptureItem() failed - " + m_lastError);
             return false;
         }
+
+        SetLastError("DEBUG: CreateCaptureItem() succeeded");
 
         // フレームプールを作成
         if (!CreateFramePool())
         {
-            SetLastError("Failed to create frame pool");
+            SetLastError("DEBUG: CreateFramePool() failed - " + m_lastError);
             return false;
         }
 
+        SetLastError("DEBUG: All initialization steps completed successfully");
         m_initialized = true;
         return true;
     }
     catch (const std::exception& e)
     {
-        SetLastError(std::string("Initialize failed: ") + e.what());
+        SetLastError(std::string("DEBUG: Initialize exception caught: ") + e.what());
         return false;
     }
     catch (...)
     {
-        SetLastError("Initialize failed: Unknown error");
+        SetLastError("DEBUG: Initialize unknown exception caught");
         return false;
     }
 }
@@ -78,7 +86,7 @@ bool WindowsCaptureSession::CreateD3DDevice()
 
         UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
-        creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+        // creationFlags |= D3D11_CREATE_DEVICE_DEBUG; // Graphics Tools未対応環境対策で一時的に無効化
 #endif
 
         HRESULT hr = D3D11CreateDevice(
@@ -96,7 +104,23 @@ bool WindowsCaptureSession::CreateD3DDevice()
 
         if (FAILED(hr))
         {
-            SetLastError("D3D11CreateDevice failed");
+            // HRESULTを保存
+            m_lastHResult = hr;
+            
+            // HRESULTの詳細な値を16進数でログ出力
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "D3D11CreateDevice failed with HRESULT: 0x%08X", hr);
+            
+            // 特定のエラーの詳細説明を追加
+            if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (DXGI_ERROR_SDK_COMPONENT_MISSING - Graphics Tools required for Debug builds)");
+            } else if (hr == E_ACCESSDENIED) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (E_ACCESSDENIED - Access denied)");
+            } else if (hr == DXGI_ERROR_UNSUPPORTED) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (DXGI_ERROR_UNSUPPORTED - Feature not supported)");
+            }
+            
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -105,7 +129,10 @@ bool WindowsCaptureSession::CreateD3DDevice()
         hr = m_d3dDevice.As(&dxgiDevice);
         if (FAILED(hr))
         {
-            SetLastError("Failed to get DXGI device");
+            m_lastHResult = hr;
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "Failed to get DXGI device with HRESULT: 0x%08X", hr);
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -115,7 +142,10 @@ bool WindowsCaptureSession::CreateD3DDevice()
         hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), reinterpret_cast<IInspectable**>(winrt::put_abi(m_winrtDevice)));
         if (FAILED(hr))
         {
-            SetLastError("Failed to create WinRT Direct3D device");
+            m_lastHResult = hr;
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "Failed to create WinRT Direct3D device with HRESULT: 0x%08X", hr);
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -169,6 +199,7 @@ bool WindowsCaptureSession::CreateCaptureItem()
     }
     catch (const winrt::hresult_error& ex)
     {
+        m_lastHResult = ex.code();
         SetLastError("CreateCaptureItem winrt error: 0x" + std::to_string(ex.code()));
         return false;
     }
@@ -227,6 +258,7 @@ bool WindowsCaptureSession::CreateFramePool()
     }
     catch (const winrt::hresult_error& ex)
     {
+        m_lastHResult = ex.code();
         SetLastError("CreateFramePool winrt error: 0x" + std::to_string(ex.code()));
         return false;
     }

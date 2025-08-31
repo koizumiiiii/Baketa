@@ -359,6 +359,8 @@ public class OcrCircuitBreakerOptions
 - [ ] 統合システム安定性テスト
 - [ ] 総合品質保証・リリース準備
 
+> **重要**: Sprint 4実装における詳細な問題分析およびUltraThink根本原因特定については、[ROI戦略詳細分析レポート](./ROI_STRATEGY_ANALYSIS_REPORT.md)を参照してください。DirectX/D3D11 Graphics Device初期化失敗（ErrorCode: -6）が根本原因として特定されました。システムレベルのWindows Graphics Capture API環境問題により、すべての高性能キャプチャ戦略が使用不可能な状況です。
+
 ---
 
 ## ✅ 検証計画

@@ -106,7 +106,15 @@ int BaketaCapture_CreateSession(void* hwnd, int* sessionId)
         
         if (!session->Initialize())
         {
-            SetLastError("Failed to initialize capture session");
+            // WindowsCaptureSessionの詳細エラーメッセージを取得して伝播
+            SetLastError(session->GetLastError());
+            
+            // Gemini推奨: HRESULTを直接取得して返却
+            HRESULT hr = session->GetLastHResult();
+            if (hr != S_OK) {
+                return hr; // 実際のHRESULTを直接返却
+            }
+            
             return BAKETA_CAPTURE_ERROR_DEVICE;
         }
 

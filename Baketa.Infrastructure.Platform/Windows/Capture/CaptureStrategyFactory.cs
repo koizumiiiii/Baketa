@@ -67,13 +67,16 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
 
         try
         {
-            // プライマリ戦略が指定されている場合は最優先
+            // 🎯 [PRIMARY_STRATEGY_FIX] primaryStrategy を最優先で確保
+            ICaptureStrategy? reservedPrimary = null;
             if (primaryStrategy != null)
             {
-                strategies.Add(primaryStrategy);
+                reservedPrimary = primaryStrategy;
+                _logger.LogDebug("primaryStrategy予約: {StrategyName} (Priority: {Priority})", 
+                    primaryStrategy.StrategyName, primaryStrategy.Priority);
             }
 
-            // 優先順位順に戦略を追加（統合GPU優先の設計）
+            // フォールバック戦略を優先順位順に追加（統合GPU優先の設計）
             var strategyTypes = new[]
             {
                 CaptureStrategyUsed.DirectFullScreen,   // 統合GPU向け（最高効率）
@@ -85,14 +88,33 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
             foreach (var strategyType in strategyTypes)
             {
                 var strategy = GetStrategy(strategyType);
-                if (strategy != null && !strategies.Any(s => s.StrategyName == strategy.StrategyName))
+                if (strategy != null)
                 {
                     strategies.Add(strategy);
                 }
             }
 
-            // 優先度でソート
+            // フォールバック戦略を優先度でソート
             strategies.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+
+            // 🎯 [PRIMARY_FIRST] primaryStrategyを最優先に配置
+            if (reservedPrimary != null)
+            {
+                // primaryStrategyと同じ戦略をフォールバックから除去（重複回避）
+                strategies.RemoveAll(s => s.StrategyName == reservedPrimary.StrategyName);
+                
+                // primaryStrategyを最優先に配置
+                strategies.Insert(0, reservedPrimary);
+                
+                _logger.LogDebug("🎯 primaryStrategy最優先配置完了: {PrimaryName} → フォールバック: [{FallbackStrategies}]", 
+                    reservedPrimary.StrategyName, 
+                    string.Join(", ", strategies.Skip(1).Select(s => s.StrategyName)));
+            }
+            else
+            {
+                _logger.LogDebug("primaryStrategy未指定 - 優先度順: [{StrategiesByPriority}]", 
+                    string.Join(", ", strategies.Select(s => $"{s.StrategyName}({s.Priority})")));
+            }
 
             _logger.LogDebug("戦略順序生成完了: {StrategyCount}個の戦略", strategies.Count);
             return strategies;
