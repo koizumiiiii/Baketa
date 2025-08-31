@@ -1,5 +1,7 @@
 #pragma warning disable CS0618 // Type or member is obsolete
+using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
+using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
@@ -45,13 +47,19 @@ public class MainOverlayViewModel : ViewModelBase
         IWindowManagerAdapter windowManager,
         IInPlaceTranslationOverlayManager inPlaceOverlayManager,
         LoadingOverlayManager loadingManager,
-        IServiceProvider serviceProvider)
+        IDiagnosticReportService diagnosticReportService,
+        IWindowManagementService windowManagementService,
+        ITranslationControlService translationControlService,
+        SimpleSettingsViewModel settingsViewModel)
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _diagnosticReportService = diagnosticReportService ?? throw new ArgumentNullException(nameof(diagnosticReportService));
+        _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
+        _translationControlService = translationControlService ?? throw new ArgumentNullException(nameof(translationControlService));
+        _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = true; // Phase 3デバッグのため一時的に初期化済みとする
@@ -81,7 +89,10 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IWindowManagerAdapter _windowManager;
     private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
     private readonly LoadingOverlayManager _loadingManager;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IDiagnosticReportService _diagnosticReportService;
+    private readonly IWindowManagementService _windowManagementService;
+    private readonly ITranslationControlService _translationControlService;
+    private readonly SimpleSettingsViewModel _settingsViewModel;
 
     #region Properties
 
@@ -583,7 +594,8 @@ public class MainOverlayViewModel : ViewModelBase
         
         try
         {
-            var selectedWindow = await ShowWindowSelectionDialogAsync().ConfigureAwait(false);
+            // WindowManagementServiceを通じてウィンドウ選択ダイアログを表示
+            var selectedWindow = await _windowManagementService.ShowWindowSelectionAsync().ConfigureAwait(false);
             if (selectedWindow == null)
             {
                 DebugLogUtility.WriteLog("❌ ウィンドウ選択がキャンセルされました");
@@ -626,45 +638,16 @@ public class MainOverlayViewModel : ViewModelBase
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
 
-        // 🔧 診断レポート生成（StartまたはStop操作時）
-        // Start時とStop時の両方で診断レポートを生成
+        // 🔧 診断レポート生成（StartまたはStop操作時）- 統一サービス使用
         {
-            try
-            {
-                var diagnosticService = _serviceProvider.GetService<IDiagnosticCollectionService>();
-                if (diagnosticService != null)
-                {
-                    var operation = IsTranslationActive ? "Stop" : "Start";
-                    DebugLogUtility.WriteLog($"📊 診断レポート生成開始（ExecuteStartStopAsync {operation}操作時）");
-                    Console.WriteLine($"📊 診断レポート生成開始（ExecuteStartStopAsync {operation}操作時）");
-                    var reportPath = await diagnosticService.GenerateReportAsync($"execute_{operation.ToLower()}_button_pressed").ConfigureAwait(false);
-                    
-                    if (!string.IsNullOrEmpty(reportPath))
-                    {
-                        DebugLogUtility.WriteLog($"✅ 診断レポート生成成功: {reportPath}");
-                        Console.WriteLine($"📊 診断レポート生成完了: {reportPath}");
-                        Logger?.LogInformation("診断レポート生成完了: {ReportPath}", reportPath);
-                    }
-                    else
-                    {
-                        DebugLogUtility.WriteLog("⚠️ 診断レポート生成：データなし");
-                        Console.WriteLine("⚠️ 診断レポート生成：蓄積されたデータがありません");
-                        Logger?.LogWarning("診断レポート生成：蓄積されたデータなし");
-                    }
-                }
-                else
-                {
-                    DebugLogUtility.WriteLog("❌ 診断サービス取得失敗：DIに登録されていません");
-                    Console.WriteLine("❌ 診断サービス取得失敗：DIに登録されていません");
-                    Logger?.LogError("診断サービスが取得できませんでした");
-                }
-            }
-            catch (Exception diagEx)
-            {
-                DebugLogUtility.WriteLog($"❌ 診断レポート生成エラー: {diagEx.Message}");
-                Console.WriteLine($"❌ 診断レポート生成エラー: {diagEx.Message}");
-                Logger?.LogError(diagEx, "診断レポート生成中にエラーが発生しました");
-            }
+            var operation = IsTranslationActive ? "Stop" : "Start";
+            var trigger = $"execute_{operation.ToLower()}_button_pressed";
+            var context = $"ExecuteStartStopAsync {operation} operation";
+            
+            DebugLogUtility.WriteLog($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
+            Console.WriteLine($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
+            
+            await _diagnosticReportService.GenerateReportAsync(trigger, context).ConfigureAwait(false);
         }
         
         try
@@ -704,41 +687,9 @@ public class MainOverlayViewModel : ViewModelBase
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
         Logger?.LogInformation("🚀 翻訳ワークフローを開始");
 
-        // 🔧 診断レポート生成（Startボタン押下時）
-        try
-        {
-            var diagnosticService = _serviceProvider.GetService<IDiagnosticCollectionService>();
-            if (diagnosticService != null)
-            {
-                DebugLogUtility.WriteLog("📊 診断レポート生成開始（Start押下時）");
-                var reportPath = await diagnosticService.GenerateReportAsync("start_button_pressed").ConfigureAwait(false);
-                
-                if (!string.IsNullOrEmpty(reportPath))
-                {
-                    DebugLogUtility.WriteLog($"✅ 診断レポート生成成功: {reportPath}");
-                    Console.WriteLine($"📊 診断レポート生成完了: {reportPath}");
-                    Logger?.LogInformation("診断レポート生成完了: {ReportPath}", reportPath);
-                }
-                else
-                {
-                    DebugLogUtility.WriteLog("⚠️ 診断レポート生成：データなし");
-                    Console.WriteLine("⚠️ 診断レポート生成：蓄積されたデータがありません");
-                    Logger?.LogWarning("診断レポート生成：蓄積されたデータなし");
-                }
-            }
-            else
-            {
-                DebugLogUtility.WriteLog("❌ 診断サービス取得失敗：DIに登録されていません");
-                Console.WriteLine("❌ 診断サービスが利用できません");
-                Logger?.LogError("診断サービスが取得できませんでした");
-            }
-        }
-        catch (Exception diagEx)
-        {
-            DebugLogUtility.WriteLog($"❌ 診断レポート生成エラー: {diagEx.Message}");
-            Console.WriteLine($"❌ 診断レポート生成エラー: {diagEx.Message}");
-            Logger?.LogError(diagEx, "診断レポート生成中にエラーが発生しました");
-        }
+        // 🔧 診断レポート生成（統一サービス使用）
+        DebugLogUtility.WriteLog("📊 診断レポート生成開始（統一サービス使用 - Start押下時）");
+        await _diagnosticReportService.GenerateReportAsync("start_button_pressed", "StartTranslationAsync operation").ConfigureAwait(false);
 
         try
         {
@@ -888,74 +839,6 @@ public class MainOverlayViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// ウィンドウ選択ダイアログを表示
-    /// </summary>
-    private async Task<WindowInfo?> ShowWindowSelectionDialogAsync()
-    {
-        try
-        {
-            DebugLogUtility.WriteLog("🏁 ShowWindowSelectionDialogAsync開始");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏁 ShowWindowSelectionDialogAsync開始");
-            
-            DebugLogUtility.WriteLog("🏁 WindowManagerAdapter確認開始");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 WindowManagerAdapter状態: {(_windowManager != null ? "利用可能" : "null")}");
-            
-            var dialogViewModel = new WindowSelectionDialogViewModel(EventAggregator, 
-                Microsoft.Extensions.Logging.LoggerFactoryExtensions.CreateLogger<WindowSelectionDialogViewModel>(
-                    Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance), _windowManager!);
-            var dialog = new WindowSelectionDialogView
-            {
-                DataContext = dialogViewModel
-            };
-
-            DebugLogUtility.WriteLog("🏁 ダイアログViewModel・View作成完了");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏁 ダイアログViewModel・View作成完了");
-
-            // UIスレッドで安全にApplication.Currentにアクセス
-            var owner = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                return Avalonia.Application.Current?.ApplicationLifetime
-                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
-                    ? desktop.MainWindow : null;
-            });
-            
-            DebugLogUtility.WriteLog($"🏁 オーナーウィンドウ取得: {(owner != null ? "成功" : "null")}");
-            
-            WindowInfo? result = null;
-            if (owner != null)
-            {
-                DebugLogUtility.WriteLog("🏁 ShowDialogでダイアログ表示開始");
-                result = await dialog.ShowDialog<WindowInfo?>(owner).ConfigureAwait(false);
-                DebugLogUtility.WriteLog($"🏁 ShowDialog完了: {(result != null ? $"結果='{result.Title}'" : "null")}");
-            }
-            else
-            {
-                DebugLogUtility.WriteLog("🏁 Showでダイアログ表示開始（フォールバック）");
-                dialog.Show();
-                // ShowDialogではなくShowで表示し、IsClosedで制御
-                while (!dialogViewModel.IsClosed)
-                {
-                    await Task.Delay(100).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog($"🏁 ダイアログ待機中: IsClosed={dialogViewModel.IsClosed}");
-                }
-                result = dialogViewModel.DialogResult;
-                DebugLogUtility.WriteLog($"🏁 ダイアログ結果取得: {(result != null ? $"結果='{result.Title}'" : "null")}");
-                dialog.Close();
-            }
-
-            DebugLogUtility.WriteLog($"🏁 ShowWindowSelectionDialogAsync完了: {(result != null ? $"成功='{result.Title}'" : "キャンセル")}");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "Failed to show window selection dialog");
-            DebugLogUtility.WriteLog($"🏁 ShowWindowSelectionDialogAsyncエラー: {ex.Message}");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 ShowWindowSelectionDialogAsyncエラー: {ex.Message}");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🏁 エラースタックトレース: {ex.StackTrace}");
-            return null;
-        }
-    }
 
     private async Task StopTranslationAsync()
     {
@@ -1047,12 +930,12 @@ public class MainOverlayViewModel : ViewModelBase
             DebugHelper.Log($"🔧 [MainOverlayViewModel] 新しい設定ダイアログを作成開始");
             Logger?.LogDebug("Opening simple settings dialog");
             
-            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成開始");
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel使用開始");
 
-            // DIコンテナ経由でSimpleSettingsViewModelを取得
-            var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
+            // DI注入されたSimpleSettingsViewModelを使用
+            var settingsViewModel = _settingsViewModel;
             var vmHash = settingsViewModel.GetHashCode();
-            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel作成: {vmHash}");
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel取得: {vmHash}");
 
             // ViewModelの設定を読み込み
             DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し前");

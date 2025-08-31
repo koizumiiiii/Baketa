@@ -245,6 +245,20 @@ namespace Baketa.Application.DI.Modules;
             // フルスクリーン管理サービス
             services.AddFullscreenManagement();
             
+            // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）
+            // IHostedServiceとして登録しアプリケーションライフサイクルと連動
+            services.AddSingleton<Services.Diagnostics.DiagnosticReportService>();
+            services.AddSingleton<Services.Diagnostics.IDiagnosticReportService>(
+                provider => provider.GetRequiredService<Services.Diagnostics.DiagnosticReportService>());
+            services.AddHostedService<Services.Diagnostics.DiagnosticReportService>(
+                provider => provider.GetRequiredService<Services.Diagnostics.DiagnosticReportService>());
+            
+            // 🔧 ウィンドウ管理サービス（UI制御フロー責務分離 - Phase 6.2.2）
+            services.AddSingleton<Services.UI.IWindowManagementService, Services.UI.WindowManagementService>();
+            
+            // 🔧 翻訳制御サービス（UI制御フロー責務分離 - Phase 6.2.3）
+            services.AddSingleton<Services.Translation.ITranslationControlService, Services.Translation.TranslationControlService>();
+            
             // 統合サービス
             // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
             

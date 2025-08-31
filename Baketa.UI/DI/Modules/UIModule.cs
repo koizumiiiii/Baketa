@@ -157,6 +157,9 @@ namespace Baketa.UI.DI.Modules;
             // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
             services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
             
+            // ウィンドウ選択ダイアログサービス（UIレイヤー）
+            services.AddSingleton<Baketa.Application.Services.UI.IWindowSelectionDialogService, WindowSelectionDialogService>();
+            
             // OPUS-MT削除済み: NLLB-200統一により事前起動サービス不要
             
             
