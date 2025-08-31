@@ -56,7 +56,7 @@ public class PythonServerManager(
         await PublishServerStatusAsync(false, 0, "翻訳サーバー初期化中...", 
             $"言語ペア: {languagePair}").ConfigureAwait(false);
         
-        // 既存サーバーチェック
+        // 既存サーバーチェック（内部管理）
         if (_activeServers.TryGetValue(languagePair, out var existing) && existing.IsHealthy)
         {
             logger.LogInformation("♻️ 既存サーバーを再利用: {LanguagePair} → Port {Port}", languagePair, existing.Port);
@@ -66,6 +66,23 @@ public class PythonServerManager(
                 $"既存サーバー再利用: {languagePair}").ConfigureAwait(false);
             
             return existing;
+        }
+        
+        // 外部サーバー検出（OptimizedPythonTranslationEngine等）
+        var externalServerPort = await DetectExternalServerAsync().ConfigureAwait(false);
+        if (externalServerPort.HasValue)
+        {
+            logger.LogInformation("🔍 外部翻訳サーバー検出・登録: Port {Port}", externalServerPort.Value);
+            
+            // 外部サーバーをPythonServerManagerに登録
+            var externalInstance = new PythonServerInstance(externalServerPort.Value, languagePair, null);
+            externalInstance.UpdateStatus(ServerStatus.Running);
+            _activeServers[languagePair] = externalInstance;
+            
+            await PublishServerStatusAsync(true, externalServerPort.Value, "翻訳サーバー準備完了", 
+                $"外部サーバー統合: {languagePair}").ConfigureAwait(false);
+            
+            return externalInstance;
         }
         
         // 既存が不健全な場合は停止
@@ -272,6 +289,36 @@ public class PythonServerManager(
         // 現在は基本的なポート管理のみ実装
         logger.LogDebug("📝 サーバー情報をレジストリに登録: {LanguagePair} → Port {Port}", 
             instance.LanguagePair, instance.Port);
+    }
+
+    /// <summary>
+    /// 外部翻訳サーバー検出（OptimizedPythonTranslationEngine等との統合）
+    /// </summary>
+    private async Task<int?> DetectExternalServerAsync()
+    {
+        // 設定ファイルで指定されたポート範囲をチェック
+        var commonPorts = new[] { 5557, 5556, 5555, 5000 }; // 一般的な翻訳サーバーポート
+        
+        foreach (var port in commonPorts)
+        {
+            try
+            {
+                using var client = new TcpClient();
+                await client.ConnectAsync(IPAddress.Loopback, port)
+                    .WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+                
+                logger.LogInformation("🔍 外部翻訳サーバー検出成功: Port {Port}", port);
+                return port;
+            }
+            catch
+            {
+                // 接続失敗 - 次のポートをチェック
+                logger.LogDebug("🔍 外部サーバーチェック: Port {Port} - 利用不可", port);
+            }
+        }
+        
+        logger.LogDebug("🔍 外部翻訳サーバー未検出");
+        return null;
     }
 
     /// <summary>

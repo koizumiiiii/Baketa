@@ -590,6 +590,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddHostedService<PooledGpuOptimizationOrchestrator>();
             Console.WriteLine("🚀 PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム");
             
+            // 📊 Phase 3.2: VRAM監視5-tier圧迫度レベル判定システム
+            services.AddHostedService<Baketa.Infrastructure.Services.ResourceMonitoringHostedService>();
+            Console.WriteLine("📊 Phase 3.2: ResourceMonitoringHostedService登録完了 - VRAM監視5-tier圧迫度レベル判定システム");
+            
             // 翻訳精度検証システム（デバッグビルドのみ）
             // TODO: 翻訳精度検証システムは将来実装予定
             // #if DEBUG

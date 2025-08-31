@@ -23,7 +23,7 @@ public class PortManagementService(ILogger<PortManagementService> logger) : IPor
     private bool _disposed;
 
     /// <inheritdoc />
-    public async Task<int> AcquireAvailablePortAsync(int startPort = 5555, int endPort = 5560)
+    public async Task<int> AcquireAvailablePortAsync(int startPort = 5557, int endPort = 5562)
     {
         logger.LogDebug("🔍 ポート取得開始: 範囲 {StartPort}-{EndPort}", startPort, endPort);
         

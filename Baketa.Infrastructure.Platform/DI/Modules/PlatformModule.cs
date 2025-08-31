@@ -221,7 +221,7 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
                         config.MaxTranslationParallelism = 2;
                         config.EnableDynamicParallelism = true;
                         config.EnableDetailedLogging = false;
-                        config.EnableVerboseLogging = false; // Phase 3
+                        config.EnableVerboseLogging = true; // Phase 3.2テスト: VRAM監視ログ有効化
                         config.EnableHotReload = true; // Phase 3
                         config.ConfigurationPollingIntervalMs = 5000; // Phase 3
                         Console.WriteLine("⚠️ [PHASE3 Platform] フォールバック設定を使用（ホットリロード機能付き）");
