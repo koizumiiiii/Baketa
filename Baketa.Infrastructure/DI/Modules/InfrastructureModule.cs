@@ -714,19 +714,13 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Core.Abstractions.Services.IImageChangeMetricsService, ImageChangeMetricsService>();
             Console.WriteLine("✅ IImageChangeMetricsService登録完了 - 変化検知メトリクス収集");
             
-            // 画像変化検知サービス
-            services.AddSingleton<Baketa.Core.Abstractions.Services.IImageChangeDetectionService, ImageChangeDetectionService>();
-            Console.WriteLine("✅ IImageChangeDetectionService登録完了 - Perceptual Hash実装");
+            // 画像変化検知サービス（拡張実装を優先）
+            services.AddSingleton<Baketa.Core.Abstractions.Services.IImageChangeDetectionService, Baketa.Infrastructure.Imaging.ChangeDetection.EnhancedImageChangeDetectionService>();
+            Console.WriteLine("✅ IImageChangeDetectionService登録完了 - 拡張3段階フィルタリング実装");
             
-            // 画像変化検知設定（デフォルト値）
-            services.Configure<Baketa.Core.Abstractions.Services.ImageChangeDetectionSettings>(options =>
-            {
-                options.Enabled = true;
-                options.ChangeThreshold = 0.05f; // 5%の変化で検知
-                options.DefaultAlgorithm = Baketa.Core.Abstractions.Services.HashAlgorithmType.DifferenceHash;
-                options.EnableMetrics = true;
-            });
-            Console.WriteLine("✅ ImageChangeDetectionSettings設定完了 - しきい値:5%, DifferenceHash使用");
+            // Perceptual Hash サービス
+            services.AddSingleton<Baketa.Core.Abstractions.Services.IPerceptualHashService, Baketa.Infrastructure.Imaging.ChangeDetection.OptimizedPerceptualHashService>();
+            Console.WriteLine("✅ IPerceptualHashService登録完了 - OpenCV SIMD最適化実装");
             
             Console.WriteLine("🎉 [PHASE1] 画像変化検知システム登録完了");
         }

@@ -1,6 +1,8 @@
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Models.ImageProcessing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -8,25 +10,27 @@ using System.Diagnostics;
 namespace Baketa.Infrastructure.Processing.Strategies;
 
 /// <summary>
-/// 画像変化検知段階の処理戦略
-/// P0で実装済みのIImageChangeDetectionServiceを活用
+/// 拡張画像変化検知段階の処理戦略
+/// P0: 3段階フィルタリング対応（Stage 1: 90% → Stage 2: 8% → Stage 3: 2%）
+/// EnhancedImageChangeDetectionServiceによる高速化実装
 /// </summary>
 public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 {
     private readonly IImageChangeDetectionService _changeDetectionService;
-    private readonly IOptionsMonitor<ImageChangeDetectionSettings> _settings;
     private readonly ILogger<ImageChangeDetectionStageStrategy> _logger;
     
+    // 🔥 Critical Fix: 前回画像管理のためのフィールド追加
+    private readonly object _imageLock = new object();
+    private IImage? _previousImage;
+    
     public ProcessingStageType StageType => ProcessingStageType.ImageChangeDetection;
-    public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(5);
+    public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(2); // 3段階フィルタリングによる高速化
 
     public ImageChangeDetectionStageStrategy(
         IImageChangeDetectionService changeDetectionService,
-        IOptionsMonitor<ImageChangeDetectionSettings> settings,
         ILogger<ImageChangeDetectionStageStrategy> logger)
     {
         _changeDetectionService = changeDetectionService ?? throw new ArgumentNullException(nameof(changeDetectionService));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -36,57 +40,67 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         
         try
         {
-            var settings = _settings.CurrentValue;
-            if (!settings.Enabled)
-            {
-                _logger.LogDebug("画像変化検知が無効化されています");
-                return ProcessingStageResult.CreateSkipped(StageType, "画像変化検知が無効化されています");
-            }
-
             var input = context.Input;
+            var currentImage = input.CapturedImage;
             
-            // 画像データを取得
-            var currentImageData = await ConvertImageToByteArrayAsync(input.CapturedImage).ConfigureAwait(false);
-            if (currentImageData == null)
+            if (currentImage == null)
             {
-                _logger.LogWarning("画像データ変換失敗 - 変化ありとして処理継続");
+                _logger.LogWarning("キャプチャ画像が null - 変化ありとして処理継続");
                 return ProcessingStageResult.CreateSuccess(StageType, 
-                    ImageChangeDetectionResult.CreateFirstTime(), stopwatch.Elapsed);
+                    CreateLegacyResult(ImageChangeResult.CreateFirstTime("NULL", HashAlgorithmType.AverageHash, stopwatch.Elapsed)), 
+                    stopwatch.Elapsed);
             }
 
-            // 前回画像との比較
-            if (!string.IsNullOrEmpty(input.PreviousImageHash))
+            // コンテキストIDを生成（デフォルト）
+            var contextId = "default";
+            
+            // 🔥 Critical Fix: 前回画像を適切に管理
+            IImage? previousImageToUse;
+            lock (_imageLock)
             {
-                var currentHash = _changeDetectionService.GeneratePerceptualHash(currentImageData, settings.DefaultAlgorithm);
-                var changePercentage = CalculateHashChangePercentage(input.PreviousImageHash, currentHash);
-                
-                var hasChanged = changePercentage >= settings.ChangeThreshold;
-                
-                _logger.LogDebug("画像変化検知完了 - 変化: {HasChanged}, 変化率: {ChangePercentage:F3}%, しきい値: {Threshold:F1}%",
-                    hasChanged, changePercentage * 100, settings.ChangeThreshold * 100);
-                
-                var result = new ImageChangeDetectionResult
-                {
-                    HasChanged = hasChanged,
-                    ChangePercentage = changePercentage,
-                    PreviousHash = input.PreviousImageHash,
-                    CurrentHash = currentHash,
-                    ProcessingTime = stopwatch.Elapsed,
-                    AlgorithmUsed = settings.DefaultAlgorithm.ToString()
-                };
-                
-                return ProcessingStageResult.CreateSuccess(StageType, result);
+                previousImageToUse = _previousImage;
             }
 
-            // 初回実行時は変化ありとして処理継続
-            _logger.LogDebug("初回画像キャプチャ - 変化ありとして処理継続");
-            return ProcessingStageResult.CreateSuccess(StageType, 
-                ImageChangeDetectionResult.CreateFirstTime(), stopwatch.Elapsed);
+            // 3段階フィルタリング画像変化検知を実行
+            var changeResult = await _changeDetectionService.DetectChangeAsync(
+                previousImageToUse, 
+                currentImage, 
+                contextId, 
+                cancellationToken).ConfigureAwait(false);
+
+            // 🔥 Critical Fix: 前回画像を更新（リソース管理付き）
+            lock (_imageLock)
+            {
+                // 古い画像を破棄
+                if (_previousImage is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+                _previousImage = currentImage;
+            }
+
+            var processingResult = CreateLegacyResult(changeResult);
+            
+            _logger.LogDebug("🎯 拡張画像変化検知完了 - 変化: {HasChanged}, Stage: {DetectionStage}, 変化率: {ChangePercentage:F3}%, 処理時間: {ProcessingTimeMs}ms",
+                changeResult.HasChanged, 
+                changeResult.DetectionStage, 
+                changeResult.ChangePercentage * 100, 
+                changeResult.ProcessingTime.TotalMilliseconds);
+
+            // 統計情報をログ出力（パフォーマンス監視用）
+            LogPerformanceStatistics();
+
+            return ProcessingStageResult.CreateSuccess(StageType, processingResult, stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "画像変化検知段階でエラーが発生");
-            return ProcessingStageResult.CreateError(StageType, ex.Message, stopwatch.Elapsed);
+            _logger.LogError(ex, "💥 拡張画像変化検知段階でエラーが発生 - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            
+            // エラー時は変化ありとして安全側で処理継続
+            var fallbackResult = CreateLegacyResult(
+                ImageChangeResult.CreateChanged("ERROR", "ERROR", 1.0f, HashAlgorithmType.AverageHash, stopwatch.Elapsed));
+            
+            return ProcessingStageResult.CreateSuccess(StageType, fallbackResult, stopwatch.Elapsed);
         }
         finally
         {
@@ -96,47 +110,54 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     public bool ShouldExecute(ProcessingContext context)
     {
-        var settings = _settings.CurrentValue;
-        return settings.Enabled;
+        // 新しい実装では常に実行（3段階フィルタリングで効率的に処理）
+        return context.Input?.CapturedImage != null;
     }
 
     /// <summary>
-    /// IImageをbyte配列に変換
+    /// 新しいImageChangeResultを既存のImageChangeDetectionResultに変換
+    /// 後方互換性のためのアダプター
     /// </summary>
-    private static async Task<byte[]?> ConvertImageToByteArrayAsync(Baketa.Core.Abstractions.Imaging.IImage image)
+    private static ImageChangeDetectionResult CreateLegacyResult(ImageChangeResult changeResult)
+    {
+        return new ImageChangeDetectionResult
+        {
+            HasChanged = changeResult.HasChanged,
+            ChangePercentage = changeResult.ChangePercentage,
+            PreviousHash = changeResult.PreviousHash,
+            CurrentHash = changeResult.CurrentHash,
+            ProcessingTime = changeResult.ProcessingTime,
+            AlgorithmUsed = changeResult.AlgorithmUsed.ToString(),
+            // 拡張情報は現在のImageChangeDetectionResultでは未対応
+            // 将来的に拡張予定
+        };
+    }
+
+    /// <summary>
+    /// パフォーマンス統計をログ出力
+    /// </summary>
+    private void LogPerformanceStatistics()
     {
         try
         {
-            var imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
-            if (imageData != null && imageData.Length > 0)
+            var statistics = _changeDetectionService.GetStatistics();
+            
+            if (statistics.TotalProcessed > 0 && statistics.TotalProcessed % 100 == 0) // 100回毎に統計出力
             {
-                return imageData;
+                _logger.LogInformation("📊 画像変化検知統計 - 総処理: {TotalProcessed}, Stage1除外率: {Stage1FilterRate:F1}%, " +
+                    "Stage1平均: {Stage1AvgMs:F1}ms, Stage2平均: {Stage2AvgMs:F1}ms, Stage3平均: {Stage3AvgMs:F1}ms, " +
+                    "キャッシュサイズ: {CacheSize}",
+                    statistics.TotalProcessed,
+                    statistics.FilteringEfficiency * 100,
+                    statistics.AverageStage1Time.TotalMilliseconds,
+                    statistics.AverageStage2Time.TotalMilliseconds,
+                    statistics.AverageStage3Time.TotalMilliseconds,
+                    statistics.CurrentCacheSize);
             }
-            return null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return null;
+            _logger.LogWarning(ex, "統計情報取得エラー");
         }
-    }
-
-    /// <summary>
-    /// ハッシュ間の変化率を計算
-    /// </summary>
-    private static float CalculateHashChangePercentage(string hash1, string hash2)
-    {
-        if (string.IsNullOrEmpty(hash1) || string.IsNullOrEmpty(hash2) || hash1.Length != hash2.Length)
-        {
-            return 1.0f; // 完全に異なる
-        }
-
-        var diffCount = 0;
-        for (int i = 0; i < hash1.Length; i++)
-        {
-            if (hash1[i] != hash2[i])
-                diffCount++;
-        }
-
-        return (float)diffCount / hash1.Length;
     }
 }
