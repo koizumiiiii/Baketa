@@ -13,6 +13,7 @@ using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Settings;
 using Baketa.Core.DI;
@@ -71,6 +72,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 🔄 Phase 1: 画像変化検知システム
             RegisterImageChangeDetectionServices(services);
+            
+            // 🔄 P1: 段階的フィルタリングシステム
+            RegisterStagedFilteringServices(services);
             
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
@@ -725,6 +729,43 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("✅ ImageChangeDetectionSettings設定完了 - しきい値:5%, DifferenceHash使用");
             
             Console.WriteLine("🎉 [PHASE1] 画像変化検知システム登録完了");
+        }
+
+        /// <summary>
+        /// P1: 段階的フィルタリングシステムを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterStagedFilteringServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔄 [P1] 段階的フィルタリングシステム登録開始");
+            
+            // テキスト変化検知サービス（新規）
+            services.AddSingleton<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService, Baketa.Infrastructure.Text.ChangeDetection.TextChangeDetectionService>();
+            Console.WriteLine("✅ ITextChangeDetectionService登録完了 - Edit Distance実装");
+            
+            // メイン処理パイプラインサービス
+            services.AddSingleton<Baketa.Core.Abstractions.Processing.ISmartProcessingPipelineService, Baketa.Infrastructure.Processing.SmartProcessingPipelineService>();
+            Console.WriteLine("✅ ISmartProcessingPipelineService登録完了 - 段階的処理パイプライン");
+            
+            // 段階別戦略実装（IProcessingStageStrategyインターフェースとして登録 - Geminiフィードバック反映）
+            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.ImageChangeDetectionStageStrategy>();
+            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.OcrExecutionStageStrategy>();
+            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TextChangeDetectionStageStrategy>();
+            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TranslationExecutionStageStrategy>();
+            Console.WriteLine("✅ 段階別戦略登録完了 - 4段階処理戦略");
+            
+            // 段階的処理設定（appsettings.jsonから読み込み可能）
+            services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(options =>
+            {
+                options.EnableStaging = true;
+                options.EnableEarlyTermination = true;
+                options.TextChangeThreshold = 0.1f; // 10%の変化で翻訳実行
+                options.EnablePerformanceMetrics = true;
+                options.StopOnFirstError = true;
+            });
+            Console.WriteLine("✅ ProcessingPipelineSettings設定完了 - テキスト変化しきい値:10%");
+            
+            Console.WriteLine("🎉 [P1] 段階的フィルタリングシステム登録完了");
         }
 
         // Phase2: ハイブリッドリソース管理システム登録はPlatformModuleに移動済み（循環依存解決）
