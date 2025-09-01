@@ -257,10 +257,24 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             _logger.LogInformation("低解像度スキャン実行: スケール={ScaleFactor}, 対象ウィンドウ=0x{Hwnd:X}", 
                 scaleFactor, hwnd.ToInt64());
 
+            // 🚨 CRITICAL FIX: ネイティブラッパーの初期化状態を確認・初期化
+            if (!_nativeWrapper.IsInitialized)
+            {
+                _logger.LogInformation("ネイティブラッパー未初期化 - 初期化実行中");
+                if (!_nativeWrapper.Initialize())
+                {
+                    _logger.LogError("ネイティブラッパー初期化失敗");
+                    return null;
+                }
+                _logger.LogInformation("ネイティブラッパー初期化完了");
+            }
+
             // ネイティブラッパーでキャプチャセッション作成
             if (!_nativeWrapper.CreateCaptureSession(hwnd))
             {
-                _logger.LogError("ネイティブキャプチャセッション作成失敗");
+                _logger.LogError("ネイティブキャプチャセッション作成失敗 - リソースクリーンアップ実行");
+                // ActiveInstancesリーク防止のため明示的にDispose実行
+                try { _nativeWrapper.Dispose(); } catch { /* Dispose失敗は無視 */ }
                 return null;
             }
 
@@ -322,10 +336,24 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
                 return results;
             }
 
+            // 🚨 CRITICAL FIX: ネイティブラッパーの初期化状態を確認・初期化
+            if (!_nativeWrapper.IsInitialized)
+            {
+                _logger.LogInformation("ネイティブラッパー未初期化 - 高解像度キャプチャ前に初期化実行");
+                if (!_nativeWrapper.Initialize())
+                {
+                    _logger.LogError("ネイティブラッパー初期化失敗 - 高解像度キャプチャ中止");
+                    return results;
+                }
+                _logger.LogInformation("ネイティブラッパー初期化完了 - 高解像度キャプチャ継続");
+            }
+
             // ネイティブラッパーでキャプチャセッション作成
             if (!_nativeWrapper.CreateCaptureSession(hwnd))
             {
-                _logger.LogError("高解像度キャプチャセッション作成失敗");
+                _logger.LogError("高解像度キャプチャセッション作成失敗 - リソースクリーンアップ実行");
+                // ActiveInstancesリーク防止のため明示的にDispose実行
+                try { _nativeWrapper.Dispose(); } catch { /* Dispose失敗は無視 */ }
                 return results;
             }
 

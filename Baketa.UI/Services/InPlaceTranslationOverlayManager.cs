@@ -237,6 +237,9 @@ public class InPlaceTranslationOverlayManager(
         
         try
         {
+            // 衝突回避のための既存オーバーレイ境界情報を取得
+            var existingBounds = GetExistingOverlayBounds();
+            
             // UIスレッドでオーバーレイウィンドウを作成
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -260,13 +263,38 @@ public class InPlaceTranslationOverlayManager(
                 // オーバーレイ表示直前のキャンセレーションチェック
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                // オーバーレイをコレクションに追加
+                // 🎯 衝突回避位置を計算
+                System.Drawing.Point collisionAwarePosition;
+                try
+                {
+                    var overlaySize = textChunk.GetOverlaySize();
+                    var screenBounds = new Rectangle(0, 0, 1920, 1080); // デフォルト画面サイズ
+                        
+                    collisionAwarePosition = textChunk.CalculateOptimalOverlayPositionWithCollisionAvoidance(
+                        overlaySize, screenBounds, existingBounds);
+                        
+                    Console.WriteLine($"🎯 [COLLISION_AVOIDANCE] 衝突回避位置計算完了 - ChunkId: {textChunk.ChunkId}, " +
+                                    $"Position: ({collisionAwarePosition.X},{collisionAwarePosition.Y}), " +
+                                    $"ExistingOverlays: {existingBounds.Count}");
+                }
+                catch (Exception ex)
+                {
+                    // 衝突回避計算失敗時は通常の位置計算にフォールバック
+                    collisionAwarePosition = textChunk.GetOverlayPosition();
+                    _logger.LogWarning(ex, "衝突回避位置計算失敗、通常位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
+                }
+                
+                // オーバーレイを コレクションに追加
                 _activeOverlays[textChunk.ChunkId] = newOverlay;
                 
-                // インプレース表示を開始
-                await newOverlay.ShowInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
+                // 一時的なTextChunkで衝突回避位置を適用
+                var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, collisionAwarePosition);
                 
-                _logger.LogDebug("新規インプレースオーバーレイ表示完了 - ChunkId: {ChunkId}", textChunk.ChunkId);
+                // 衝突回避位置でインプレース表示を開始
+                await newOverlay.ShowInPlaceOverlayAsync(adjustedTextChunk, cancellationToken).ConfigureAwait(false);
+                
+                _logger.LogDebug("新規インプレースオーバーレイ表示完了（衝突回避対応） - ChunkId: {ChunkId}, Position: ({X},{Y})", 
+                    textChunk.ChunkId, collisionAwarePosition.X, collisionAwarePosition.Y);
             }
             else
             {
@@ -428,6 +456,61 @@ public class InPlaceTranslationOverlayManager(
     /// 現在アクティブなインプレースオーバーレイの数を取得
     /// </summary>
     public int ActiveOverlayCount => _activeOverlays.Count;
+    
+    /// <summary>
+    /// 既存の全てのアクティブオーバーレイの境界情報を取得
+    /// 衝突回避計算用
+    /// </summary>
+    /// <returns>既存オーバーレイの境界リスト</returns>
+    private List<Rectangle> GetExistingOverlayBounds()
+    {
+        var bounds = new List<Rectangle>();
+        
+        foreach (var overlay in _activeOverlays.Values)
+        {
+            try
+            {
+                // オーバーレイの現在位置とサイズを取得
+                var position = overlay.Position;
+                var clientSize = overlay.ClientSize;
+                bounds.Add(new Rectangle((int)position.X, (int)position.Y, (int)clientSize.Width, (int)clientSize.Height));
+            }
+            catch (Exception ex)
+            {
+                // 個別オーバーレイの情報取得失敗は無視（他のオーバーレイに影響しない）
+                _logger.LogDebug(ex, "オーバーレイ境界情報取得失敗: ChunkId={ChunkId}", overlay.ChunkId);
+            }
+        }
+        
+        return bounds;
+    }
+
+    /// <summary>
+    /// 衝突回避位置で調整されたTextChunkを作成
+    /// 元のTextChunkのプロパティを維持しつつ、表示位置のみを衝突回避位置に調整
+    /// </summary>
+    /// <param name="originalChunk">元のTextChunk</param>
+    /// <param name="adjustedPosition">衝突回避計算で決定された新しい位置</param>
+    /// <returns>位置調整されたTextChunk</returns>
+    private static TextChunk CreateAdjustedTextChunk(TextChunk originalChunk, System.Drawing.Point adjustedPosition)
+    {
+        // 元の境界サイズを維持しつつ、位置のみを調整
+        var adjustedBounds = new Rectangle(adjustedPosition.X, adjustedPosition.Y, 
+            originalChunk.CombinedBounds.Width, originalChunk.CombinedBounds.Height);
+        
+        // 調整済みTextChunkを作成（元のプロパティを全て継承）
+        return new TextChunk
+        {
+            ChunkId = originalChunk.ChunkId,
+            TextResults = originalChunk.TextResults,
+            CombinedBounds = adjustedBounds, // 調整済み位置
+            CombinedText = originalChunk.CombinedText,
+            TranslatedText = originalChunk.TranslatedText,
+            SourceWindowHandle = originalChunk.SourceWindowHandle,
+            DetectedLanguage = originalChunk.DetectedLanguage,
+            CreatedAt = originalChunk.CreatedAt
+        };
+    }
 
     /// <summary>
     /// 指定されたChunkIdのオーバーレイを非表示にする（翻訳完了時の原文非表示用）

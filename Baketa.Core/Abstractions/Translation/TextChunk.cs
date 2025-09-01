@@ -117,6 +117,140 @@ public sealed class TextChunk
                        
         return new Point(clampedX, clampedY);
     }
+
+    /// <summary>
+    /// 既存オーバーレイとの衝突を回避した最適なオーバーレイ位置を計算
+    /// 複数オーバーレイ表示時の重なり防止機能
+    /// </summary>
+    /// <param name="overlaySize">オーバーレイのサイズ</param>
+    /// <param name="screenBounds">画面境界</param>
+    /// <param name="existingOverlayBounds">既存オーバーレイの位置情報リスト</param>
+    /// <returns>衝突を回避した最適な表示位置</returns>
+    public Point CalculateOptimalOverlayPositionWithCollisionAvoidance(Size overlaySize, Rectangle screenBounds, IReadOnlyList<Rectangle> existingOverlayBounds)
+    {
+        // 優先順位付きポジショニング戦略（衝突回避版）
+        var positions = new[]
+        {
+            // 1. テキスト領域の直上（5px余白）
+            new { CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 1 },
+            // 2. テキスト領域の直下（5px余白）  
+            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 2 },
+            // 3. テキスト領域の右側（5px余白）
+            new { X = CombinedBounds.Right + 5, CombinedBounds.Y, Priority = 3 },
+            // 4. テキスト領域の左側（5px余白）
+            new { X = CombinedBounds.X - overlaySize.Width - 5, CombinedBounds.Y, Priority = 4 },
+            // 5. テキスト領域の右上角
+            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 5 },
+            // 6. テキスト領域の左上角
+            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 6 },
+            // 7. テキスト領域の右下角
+            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Bottom + 5, Priority = 7 },
+            // 8. テキスト領域の左下角
+            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Bottom + 5, Priority = 8 }
+        };
+
+        // 各候補位置を優先順位順で試行（衝突チェック付き）
+        foreach (var pos in positions.OrderBy(p => p.Priority))
+        {
+            var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
+            
+            // 画面境界内チェック
+            if (!screenBounds.Contains(candidateRect))
+                continue;
+
+            // 既存オーバーレイとの衝突チェック
+            bool hasCollision = false;
+            foreach (var existingBounds in existingOverlayBounds)
+            {
+                if (candidateRect.IntersectsWith(existingBounds))
+                {
+                    hasCollision = true;
+                    break;
+                }
+            }
+
+            if (!hasCollision)
+            {
+                return new Point(pos.X, pos.Y);
+            }
+        }
+
+        // 衝突回避できない場合は動的オフセット調整
+        var basePosition = CalculateOptimalOverlayPosition(overlaySize, screenBounds);
+        return FindNonCollidingPosition(basePosition, overlaySize, screenBounds, existingOverlayBounds);
+    }
+
+    /// <summary>
+    /// 動的オフセット調整による衝突回避位置の検索
+    /// 全ての優先位置で衝突が発生した場合の最終的な回避戦略
+    /// </summary>
+    private Point FindNonCollidingPosition(Point basePosition, Size overlaySize, Rectangle screenBounds, IReadOnlyList<Rectangle> existingOverlayBounds)
+    {
+        const int stepSize = 10; // 調整ステップサイズ
+        const int maxSteps = 20;  // 最大調整回数
+        
+        // X軸方向の調整を試行
+        for (int step = 1; step <= maxSteps; step++)
+        {
+            var offsetX = step * stepSize;
+            
+            // 右方向へのオフセット
+            var rightPosition = new Point(basePosition.X + offsetX, basePosition.Y);
+            var rightRect = new Rectangle(rightPosition.X, rightPosition.Y, overlaySize.Width, overlaySize.Height);
+            if (screenBounds.Contains(rightRect) && !HasCollisionWithExistingOverlays(rightRect, existingOverlayBounds))
+            {
+                return rightPosition;
+            }
+            
+            // 左方向へのオフセット
+            var leftPosition = new Point(basePosition.X - offsetX, basePosition.Y);
+            var leftRect = new Rectangle(leftPosition.X, leftPosition.Y, overlaySize.Width, overlaySize.Height);
+            if (screenBounds.Contains(leftRect) && !HasCollisionWithExistingOverlays(leftRect, existingOverlayBounds))
+            {
+                return leftPosition;
+            }
+        }
+
+        // Y軸方向の調整を試行
+        for (int step = 1; step <= maxSteps; step++)
+        {
+            var offsetY = step * stepSize;
+            
+            // 下方向へのオフセット
+            var downPosition = new Point(basePosition.X, basePosition.Y + offsetY);
+            var downRect = new Rectangle(downPosition.X, downPosition.Y, overlaySize.Width, overlaySize.Height);
+            if (screenBounds.Contains(downRect) && !HasCollisionWithExistingOverlays(downRect, existingOverlayBounds))
+            {
+                return downPosition;
+            }
+            
+            // 上方向へのオフセット
+            var upPosition = new Point(basePosition.X, basePosition.Y - offsetY);
+            var upRect = new Rectangle(upPosition.X, upPosition.Y, overlaySize.Width, overlaySize.Height);
+            if (screenBounds.Contains(upRect) && !HasCollisionWithExistingOverlays(upRect, existingOverlayBounds))
+            {
+                return upPosition;
+            }
+        }
+
+        // 全ての調整が失敗した場合は元の位置を返す
+        return basePosition;
+    }
+
+    /// <summary>
+    /// 指定された領域が既存オーバーレイと衝突するかチェック
+    /// </summary>
+    private static bool HasCollisionWithExistingOverlays(Rectangle candidateRect, IReadOnlyList<Rectangle> existingOverlayBounds)
+    {
+        foreach (var existingBounds in existingOverlayBounds)
+        {
+            if (candidateRect.IntersectsWith(existingBounds))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     
     /// <summary>
     /// ログ出力用の文字列表現
@@ -217,13 +351,15 @@ public sealed class TextChunk
     
     /// <summary>
     /// オーバーレイ表示用の位置を取得
-    /// 元テキストと同じ位置に翻訳テキストを直接重ね表示
-    /// 座標ずれ修正: 元テキスト位置での直接オーバーレイ表示
+    /// 翻訳結果をテキスト上方に表示するため、最適化されたポジショニング戦略を使用
+    /// 座標ずれ修正: テキスト領域上方への最適配置
     /// </summary>
     public Point GetOverlayPosition()
     {
-        // 元テキストと同じ位置に直接オーバーレイ表示
-        return new Point(CombinedBounds.X, CombinedBounds.Y);
+        // 翻訳結果をテキスト上方に表示するため、最適化されたポジショニング戦略を使用
+        var defaultBounds = GetDefaultScreenBounds();
+        var overlaySize = GetOverlaySize();
+        return CalculateOptimalOverlayPosition(overlaySize, defaultBounds);
     }
     
     /// <summary>

@@ -62,6 +62,7 @@ public class CaptureStrategyResult
 
 /// <summary>
 /// 適応的キャプチャ結果
+/// Phase 1: OCR処理最適化システム対応
 /// </summary>
 public class AdaptiveCaptureResult
 {
@@ -75,6 +76,12 @@ public class AdaptiveCaptureResult
     public CaptureMetrics Metrics { get; set; } = new CaptureMetrics();
     public string ErrorDetails { get; set; } = string.Empty;
     public DateTime CaptureTime { get; set; } = DateTime.Now;
+    
+    /// <summary>
+    /// 画像変化検知によりOCR処理がスキップされたかどうか
+    /// Phase 1: OCR処理最適化システム
+    /// </summary>
+    public bool ImageChangeSkipped { get; set; } = false;
 }
 
 /// <summary>

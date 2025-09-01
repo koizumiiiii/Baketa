@@ -30,6 +30,24 @@ public class CaptureCompletedHandler(IEventAggregator eventAggregator) : IEventP
 
             try
             {
+                // 🔄 Phase 1: 画像変化検知によるOCR処理制御
+                if (eventData.ImageChangeSkipped)
+                {
+                    Console.WriteLine("⚡ [CHANGE_DETECTION] CaptureCompletedHandler: 画像変化なし - OCR処理スキップ");
+                    
+                    // スキップ通知イベント発行
+                    var skipNotification = new NotificationEvent(
+                        "画像変化なし - OCR処理をスキップしました",
+                        NotificationType.Information,
+                        "OCRスキップ",
+                        displayTime: 1000);
+                        
+                    await _eventAggregator.PublishAsync(skipNotification).ConfigureAwait(false);
+                    
+                    Console.WriteLine("✅ [CHANGE_DETECTION] CaptureCompletedHandler: スキップ通知完了");
+                    return; // OCRRequestEventを発行せずに終了
+                }
+                
                 // キャプチャが完了したことを通知するイベントを発行
                 var notificationEvent = new NotificationEvent(
                     $"キャプチャが完了しました: {eventData.CapturedImage.Width}x{eventData.CapturedImage.Height}",

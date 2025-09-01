@@ -36,6 +36,7 @@ using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Infrastructure.Patterns;
+using Baketa.Infrastructure.Imaging.ChangeDetection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -67,6 +68,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // OCR関連サービス
             RegisterOcrServices(services);
+            
+            // 🔄 Phase 1: 画像変化検知システム
+            RegisterImageChangeDetectionServices(services);
             
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
@@ -692,6 +696,35 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます");
             
             Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
+        }
+
+        /// <summary>
+        /// Phase 1: 画像変化検知システムを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterImageChangeDetectionServices(IServiceCollection services)
+        {
+            Console.WriteLine("🔄 [PHASE1] 画像変化検知システム登録開始");
+            
+            // 画像変化検知メトリクスサービス
+            services.AddSingleton<Baketa.Core.Abstractions.Services.IImageChangeMetricsService, ImageChangeMetricsService>();
+            Console.WriteLine("✅ IImageChangeMetricsService登録完了 - 変化検知メトリクス収集");
+            
+            // 画像変化検知サービス
+            services.AddSingleton<Baketa.Core.Abstractions.Services.IImageChangeDetectionService, ImageChangeDetectionService>();
+            Console.WriteLine("✅ IImageChangeDetectionService登録完了 - Perceptual Hash実装");
+            
+            // 画像変化検知設定（デフォルト値）
+            services.Configure<Baketa.Core.Abstractions.Services.ImageChangeDetectionSettings>(options =>
+            {
+                options.Enabled = true;
+                options.ChangeThreshold = 0.05f; // 5%の変化で検知
+                options.DefaultAlgorithm = Baketa.Core.Abstractions.Services.HashAlgorithmType.DifferenceHash;
+                options.EnableMetrics = true;
+            });
+            Console.WriteLine("✅ ImageChangeDetectionSettings設定完了 - しきい値:5%, DifferenceHash使用");
+            
+            Console.WriteLine("🎉 [PHASE1] 画像変化検知システム登録完了");
         }
 
         // Phase2: ハイブリッドリソース管理システム登録はPlatformModuleに移動済み（循環依存解決）

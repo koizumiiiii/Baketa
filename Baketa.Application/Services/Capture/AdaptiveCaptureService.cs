@@ -9,27 +9,43 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.Services;
+using Microsoft.Extensions.Options;
 using System.Drawing;
+using CaptureOptions = Baketa.Core.Models.Capture.CaptureOptions;
 
 namespace Baketa.Application.Services.Capture;
 
 /// <summary>
 /// 適応的キャプチャサービスの実装
+/// Phase 1: OCR処理最適化システム統合済み
 /// </summary>
 public class AdaptiveCaptureService(
     ICaptureEnvironmentDetector gpuDetector,
     ICaptureStrategyFactory strategyFactory,
     ILogger<AdaptiveCaptureService> logger,
-    IEventAggregator eventAggregator) : IAdaptiveCaptureService, IDisposable
+    IEventAggregator eventAggregator,
+    IImageChangeDetectionService? changeDetectionService = null,
+    IOptionsMonitor<ImageChangeDetectionSettings>? changeDetectionOptions = null,
+    IWindowsImageAdapter? imageAdapter = null) : IAdaptiveCaptureService, IDisposable
 {
     private readonly ICaptureEnvironmentDetector _gpuDetector = gpuDetector ?? throw new ArgumentNullException(nameof(gpuDetector));
     private readonly ICaptureStrategyFactory _strategyFactory = strategyFactory ?? throw new ArgumentNullException(nameof(strategyFactory));
     private readonly ILogger<AdaptiveCaptureService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly IImageChangeDetectionService? _changeDetectionService = changeDetectionService;
+    private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _changeDetectionOptions = changeDetectionOptions;
+    private readonly IWindowsImageAdapter? _imageAdapter = imageAdapter;
     
     // GpuEnvironmentInfoのキャッシュ（起動時に1回だけ検出）
     private GpuEnvironmentInfo? _cachedEnvironment;
     private readonly object _cacheLock = new();
+    
+    // 画像変化検知用キャッシュ（ハッシュ値のみ保存でメモリ効率化）
+    private string? _previousImageHash;
+    private Rectangle _previousCaptureRegion;
+    private readonly object _imageChangeLock = new();
     
     // キャンセレーションとリソース管理
     private readonly CancellationTokenSource _cancellationTokenSource = new();
@@ -61,6 +77,24 @@ public class AdaptiveCaptureService(
             var captureResult = await ExecuteWithFallbackAsync(
                 hwnd, options, strategy, result.FallbacksAttempted).ConfigureAwait(false);
             
+            // 🔄 Phase 1: 画像変化検知システム統合
+            var imageChangeSkipped = false;
+            if (captureResult.Success && captureResult.Images?.Count > 0 && 
+                _changeDetectionService != null && _changeDetectionOptions != null && _imageAdapter != null)
+            {
+                var settings = _changeDetectionOptions.CurrentValue;
+                if (settings.Enabled)
+                {
+                    // WindowsImageをIImageに変換
+                    var windowsImage = captureResult.Images[0];
+                    var coreImage = await _imageAdapter.AdaptToImageAsync(windowsImage).ConfigureAwait(false);
+                    var captureRegion = new Rectangle(0, 0, windowsImage.Width, windowsImage.Height);
+                    
+                    imageChangeSkipped = await ProcessImageChangeDetectionAsync(
+                        coreImage, captureRegion, settings).ConfigureAwait(false);
+                }
+            }
+            
             // 4. 結果構築
             result.Success = captureResult.Success;
             result.CapturedImages = captureResult.Images;
@@ -69,6 +103,7 @@ public class AdaptiveCaptureService(
             result.ProcessingTime = stopwatch.Elapsed;
             result.Metrics = captureResult.Metrics;
             result.ErrorDetails = captureResult.ErrorMessage;
+            result.ImageChangeSkipped = imageChangeSkipped; // 新機能: 変化検知結果
             
             // キャプチャ結果をログ出力
             try 
@@ -304,6 +339,135 @@ public class AdaptiveCaptureService(
         }
     }
 
+    /// <summary>
+    /// 画像変化検知処理（Phase 1: OCR処理最適化システム）
+    /// </summary>
+    private async Task<bool> ProcessImageChangeDetectionAsync(
+        IImage currentImage, 
+        Rectangle captureRegion, 
+        ImageChangeDetectionSettings settings)
+    {
+        try
+        {
+            // 画像データを取得
+            var currentImageData = ConvertImageToByteArray(currentImage);
+            if (currentImageData == null)
+            {
+                _logger.LogWarning("🔄 画像データ変換失敗 - 変化検知スキップ");
+                return false;
+            }
+
+            lock (_imageChangeLock)
+            {
+                // ROI変更時はキャッシュをリセット（Gemini提案）
+                if (_previousCaptureRegion != captureRegion)
+                {
+                    _logger.LogDebug("🔄 キャプチャ領域変更検出 - ハッシュキャッシュリセット");
+                    _previousImageHash = null;
+                    _previousCaptureRegion = captureRegion;
+                }
+
+                // 初回キャプチャの場合
+                if (string.IsNullOrEmpty(_previousImageHash))
+                {
+                    _previousImageHash = _changeDetectionService!.GeneratePerceptualHash(currentImageData, settings.DefaultAlgorithm);
+                    _logger.LogDebug("🔄 初回画像ハッシュ生成: {Hash}", _previousImageHash[..8]);
+                    return false; // 初回は変化なしとしてOCR実行
+                }
+
+                // 現在画像のハッシュ生成
+                var currentHash = _changeDetectionService!.GeneratePerceptualHash(currentImageData, settings.DefaultAlgorithm);
+                
+                // 変化率計算
+                var changePercentage = CalculateHashChangePercentage(_previousImageHash, currentHash);
+                var changeResult = new ImageChangeResult
+                {
+                    PreviousHash = _previousImageHash,
+                    CurrentHash = currentHash,
+                    ChangePercentage = changePercentage,
+                    HasChanged = changePercentage >= settings.ChangeThreshold,
+                    ProcessingTime = TimeSpan.Zero, // 同期処理のため
+                    AlgorithmUsed = settings.DefaultAlgorithm
+                };
+
+                // ログ出力
+                _logger.LogDebug("🔄 画像変化検知: {HasChanged}, 変化率: {ChangePercentage:F1}%, しきい値: {Threshold:F1}%",
+                    changeResult.HasChanged, changeResult.ChangePercentage * 100, settings.ChangeThreshold * 100);
+
+                // ハッシュ更新
+                _previousImageHash = currentHash;
+
+                // 変化なし = OCRスキップ
+                return !changeResult.HasChanged;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "🔥 画像変化検知エラー");
+            return false; // エラー時はOCRを実行
+        }
+    }
+
+    /// <summary>
+    /// 画像変化検知キャッシュのリセット（ROI変更等で使用）
+    /// </summary>
+    public void ClearImageChangeCache()
+    {
+        lock (_imageChangeLock)
+        {
+            _previousImageHash = null;
+            _previousCaptureRegion = Rectangle.Empty;
+            _logger.LogDebug("🔄 画像変化検知キャッシュをクリア");
+        }
+    }
+
+    /// <summary>
+    /// IImageをbyte配列に変換
+    /// </summary>
+    private static byte[]? ConvertImageToByteArray(IImage image)
+    {
+        try
+        {
+            // 🐛 修正: IImageから実際の画像データを取得
+            // IImageBase.ToByteArrayAsync()を使用して正しい画像データを取得
+            var imageDataTask = image.ToByteArrayAsync();
+            var imageData = imageDataTask.GetAwaiter().GetResult(); // 同期実行
+            
+            if (imageData != null && imageData.Length > 0)
+            {
+                return imageData;
+            }
+            
+            Console.WriteLine("⚠️ [IMAGE_CHANGE_DETECTION] IImage.ToByteArrayAsync()が空データを返しました");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [IMAGE_CHANGE_DETECTION] ConvertImageToByteArray例外: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// ハッシュ間の変化率を計算
+    /// </summary>
+    private static float CalculateHashChangePercentage(string hash1, string hash2)
+    {
+        if (string.IsNullOrEmpty(hash1) || string.IsNullOrEmpty(hash2) || hash1.Length != hash2.Length)
+        {
+            return 1.0f; // 完全に異なる
+        }
+
+        var diffCount = 0;
+        for (int i = 0; i < hash1.Length; i++)
+        {
+            if (hash1[i] != hash2[i])
+                diffCount++;
+        }
+
+        return (float)diffCount / hash1.Length;
+    }
+
     private async Task PublishCaptureCompletedEventAsync(AdaptiveCaptureResult result)
     {
         try
@@ -346,7 +510,10 @@ public class AdaptiveCaptureService(
                 var captureCompletedEvent = new CaptureCompletedEvent(
                     imageInterface, 
                     captureRegion, 
-                    result.ProcessingTime);
+                    result.ProcessingTime)
+                {
+                    ImageChangeSkipped = result.ImageChangeSkipped
+                };
                 
                 await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
                 

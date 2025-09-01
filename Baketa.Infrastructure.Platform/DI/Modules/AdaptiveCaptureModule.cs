@@ -3,11 +3,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.DI;
 using Baketa.Infrastructure.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Baketa.Infrastructure.Platform.Adapters;
 using System;
 using System.IO;
 using System.Drawing;
@@ -56,6 +58,16 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
                 var nativeWrapper = serviceProvider.GetRequiredService<NativeWindowsCaptureWrapper>();
                 logger?.LogInformation("🔍 ネイティブDLL サポート状況チェック開始");
                 
+                // 🚨 CRITICAL FIX: Initialize()を確実に呼び出してからIsSupported()をチェック
+                logger?.LogInformation("🔧 NativeWindowsCaptureWrapper初期化実行開始");
+                bool initialized = nativeWrapper.Initialize();
+                if (!initialized)
+                {
+                    logger?.LogError("❌ NativeWindowsCaptureWrapper.Initialize()が失敗");
+                    throw new InvalidOperationException("ネイティブDLLの初期化に失敗しました");
+                }
+                logger?.LogInformation("✅ NativeWindowsCaptureWrapper.Initialize()完了");
+                
                 if (nativeWrapper.IsSupported())
                 {
                     logger?.LogInformation("✅ Windows Graphics Capture APIをサポート、WindowsGraphicsCapturerを使用");
@@ -96,6 +108,9 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         
         // テキスト領域検出 - 高速軽量実装
         services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.TextDetection.FastTextRegionDetector>();
+        
+        // WindowsImageアダプター - 型変換用（Phase 1では一旦オプショナルDI対応で実装）
+        // TODO: 今後のPhaseで完全なWindowsImageAdapter実装を追加
     }
 }
 

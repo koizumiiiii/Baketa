@@ -31,6 +31,12 @@ public class CaptureCompletedEvent(IImage capturedImage, Rectangle captureRegion
     /// </summary>
     public TimeSpan CaptureTime { get; } = captureTime;
 
+    /// <summary>
+    /// 画像変化検知によりOCR処理がスキップされたかどうか
+    /// Phase 1: OCR処理最適化システム
+    /// </summary>
+    public bool ImageChangeSkipped { get; init; } = false;
+
     /// <inheritdoc />
     public override string Name => "CaptureCompleted";
         
