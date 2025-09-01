@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Infrastructure.Platform.Adapters;
+using Baketa.Infrastructure.Platform.Windows.Services;
 using Microsoft.Extensions.Logging;
 using ServicesCaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
@@ -213,12 +214,9 @@ public partial class AdaptiveCaptureServiceAdapter(
 
     private static IntPtr GetDesktopWindowHandle()
     {
-        // デスクトップのHWNDを取得（Win32 API）
-        return GetDesktopWindow();
+        // WindowsNativeServiceを通じてUser32Methods.GetDesktopWindow()を呼び出し
+        return WindowsNativeService.GetDesktopWindowHandle();
     }
-
-    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
-    private static partial IntPtr GetDesktopWindow();
     
     /// <summary>
     /// キャプチャサービスを停止
