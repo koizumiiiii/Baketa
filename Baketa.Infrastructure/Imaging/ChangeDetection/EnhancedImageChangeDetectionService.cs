@@ -59,6 +59,14 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         ArgumentNullException.ThrowIfNull(currentImage);
         Interlocked.Increment(ref _totalProcessed);
         
+        // 🚨 P0システム動作確認用 - 変化検知開始ログ
+        try
+        {
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_CHANGE_DETECT] EnhancedImageChangeDetectionService.DetectChangeAsync開始 - ContextId: {contextId}{Environment.NewLine}");
+        }
+        catch { /* ファイル出力失敗は無視 */ }
+        
         var overallStopwatch = Stopwatch.StartNew();
         
         try
@@ -79,8 +87,24 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 _logger.LogDebug("📊 Stage 1で除外 - Context: {ContextId}, 処理時間: {ProcessingTimeMs}ms", 
                     contextId, quickResult.ProcessingTime.TotalMilliseconds);
                 
+                // 🚨 P0システム動作確認用 - Stage 1フィルタリングログ（Gemini推奨: 類似度情報追加）
+                try
+                {
+                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE1_FILTERED] Stage 1で変化なし除外 - Similarity: {quickResult.MaxSimilarity:F4}, ContextId: {contextId}, 処理時間: {quickResult.ProcessingTime.TotalMilliseconds:F2}ms{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+                
                 return ImageChangeResult.CreateNoChange(quickResult.ProcessingTime, detectionStage: 1);
             }
+            
+            // 🚨 P0システム動作確認用 - Stage 1通過ログ（Gemini推奨: 類似度情報追加）
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE1_PASSED] Stage 1通過 - Similarity: {quickResult.MaxSimilarity:F4}, 変化の可能性あり - ContextId: {contextId}{Environment.NewLine}");
+            }
+            catch { /* ファイル出力失敗は無視 */ }
 
             // Stage 2: 中精度検証（8%処理）
             var stage2Result = await ExecuteStage2MediumPrecisionAsync(previousImage, currentImage, contextId, cancellationToken);
@@ -308,7 +332,24 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 : cachedHashes.DifferenceHash;
                 
             var similarity = _perceptualHashService.CompareHashes(previousHash, currentHash, quickAlgorithm);
-            var hasPotentialChange = similarity < 0.98f; // Stage 1での高感度閾値
+            var hasPotentialChange = similarity < 0.92f; // Gemini推奨: ハミング距離5を許容する閾値に調整
+            
+            // 🚨 P0システム動作確認用 - ハッシュ値デバッグログ
+            try
+            {
+                var prevHashShort = string.IsNullOrEmpty(previousHash) ? "NULL" : previousHash.Substring(0, Math.Min(8, previousHash.Length)) + "...";
+                var currHashShort = string.IsNullOrEmpty(currentHash) ? "NULL" : currentHash.Substring(0, Math.Min(8, currentHash.Length)) + "...";
+                
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🔍 [P0_HASH_DEBUG] " +
+                    $"Algorithm: {quickAlgorithm}, " +
+                    $"PrevHash: {prevHashShort}, " +
+                    $"CurrHash: {currHashShort}, " +
+                    $"Similarity: {similarity:F4}, " +
+                    $"HasChange: {hasPotentialChange}, " +
+                    $"ContextId: {contextId}{Environment.NewLine}");
+            }
+            catch { /* ファイル出力失敗は無視 */ }
             
             // キャッシュ更新
             var updatedCache = quickAlgorithm == HashAlgorithmType.AverageHash

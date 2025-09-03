@@ -343,12 +343,12 @@ namespace Baketa.Application.DI.Modules;
             
             // 他のイベントハンドラーの登録
             
-            // ⚡ [CRITICAL_FIX] CaptureCompletedHandler登録 - オーバーレイ表示に必要
-            Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始");
-            services.AddSingleton<Baketa.Core.Events.Handlers.CaptureCompletedHandler>();
+            // ⚡ [ARCHITECTURAL_FIX] CaptureCompletedHandler登録 - Application層に適切配置
+            Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");
+            services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>();
             services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.CaptureCompletedHandler>());
-            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - オーバーレイ表示修復");
+                provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());
+            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - Clean Architecture準拠");
             
             // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
             Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");

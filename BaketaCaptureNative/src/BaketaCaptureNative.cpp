@@ -199,13 +199,14 @@ int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int tim
 }
 
 /// <summary>
-/// フレームデータを解放
+/// フレームデータを解放 - 🚀 P2最適化: アライメント済みメモリ対応
 /// </summary>
 void BaketaCapture_ReleaseFrame(BaketaCaptureFrame* frame)
 {
     if (frame && frame->bgraData)
     {
-        delete[] frame->bgraData;
+        // 🚀 P2最適化: _aligned_mallocに対応する_aligned_freeを使用
+        _aligned_free(frame->bgraData);
         frame->bgraData = nullptr;
         frame->width = 0;
         frame->height = 0;
@@ -256,6 +257,62 @@ int BaketaCapture_GetLastError(char* buffer, int bufferSize)
     buffer[copyLength] = '\0';
 
     return static_cast<int>(g_lastError.length());
+}
+
+/// <summary>
+/// セッションのウィンドウデバッグ情報を取得
+/// </summary>
+int BaketaCapture_GetWindowDebugInfo(int sessionId, char* windowInfoBuffer, int windowInfoSize, char* screenRectBuffer, int screenRectSize)
+{
+    if (!windowInfoBuffer || !screenRectBuffer || windowInfoSize <= 0 || screenRectSize <= 0)
+    {
+        SetLastError("Invalid parameters for debug info retrieval");
+        return 0;
+    }
+
+    try
+    {
+        std::lock_guard<std::mutex> lock(g_sessionMutex);
+        auto it = g_sessions.find(sessionId);
+        if (it == g_sessions.end())
+        {
+            SetLastError("Session not found for debug info");
+            strncpy_s(windowInfoBuffer, windowInfoSize, "Session not found", windowInfoSize - 1);
+            strncpy_s(screenRectBuffer, screenRectSize, "N/A", screenRectSize - 1);
+            return 0;
+        }
+
+        std::string windowInfo, screenRect;
+        if (!it->second->GetWindowDebugInfo(windowInfo, screenRect))
+        {
+            SetLastError("Failed to get debug info from session");
+            strncpy_s(windowInfoBuffer, windowInfoSize, "Failed to get info", windowInfoSize - 1);
+            strncpy_s(screenRectBuffer, screenRectSize, "N/A", screenRectSize - 1);
+            return 0;
+        }
+
+        // 結果をバッファにコピー
+        strncpy_s(windowInfoBuffer, windowInfoSize, windowInfo.c_str(), windowInfoSize - 1);
+        strncpy_s(screenRectBuffer, screenRectSize, screenRect.c_str(), screenRectSize - 1);
+        windowInfoBuffer[windowInfoSize - 1] = '\0';
+        screenRectBuffer[screenRectSize - 1] = '\0';
+
+        return 1; // 成功
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("Exception in GetWindowDebugInfo: ") + ex.what());
+        strncpy_s(windowInfoBuffer, windowInfoSize, "Exception occurred", windowInfoSize - 1);
+        strncpy_s(screenRectBuffer, screenRectSize, "N/A", screenRectSize - 1);
+        return 0;
+    }
+    catch (...)
+    {
+        SetLastError("Unknown exception in GetWindowDebugInfo");
+        strncpy_s(windowInfoBuffer, windowInfoSize, "Unknown exception", windowInfoSize - 1);
+        strncpy_s(screenRectBuffer, screenRectSize, "N/A", screenRectSize - 1);
+        return 0;
+    }
 }
 
 /// <summary>

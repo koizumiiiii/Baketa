@@ -590,21 +590,46 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task ExecuteSelectWindowAsync()
     {
         DebugLogUtility.WriteLog("🖥️ ExecuteSelectWindowAsync開始");
+        Console.WriteLine("🖥️ MainOverlayViewModel.ExecuteSelectWindowAsync開始");
         Logger?.LogInformation("ウィンドウ選択処理開始");
         
         try
         {
+            Console.WriteLine($"🔧 _windowManagementService null check: {_windowManagementService == null}");
+            
+            // 🔒 安全化: ウィンドウ選択開始前にネイティブキャプチャを一時停止
+            Console.WriteLine("🔒 [SAFETY] ネイティブキャプチャを一時停止します");
+            DebugLogUtility.WriteLog("🔒 [SAFETY] ネイティブキャプチャを一時停止します");
+            Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.PauseForWindowSelection();
+            
+            Console.WriteLine("🔧 _windowManagementService.ShowWindowSelectionAsync()呼び出し開始");
+            
             // WindowManagementServiceを通じてウィンドウ選択ダイアログを表示
             var selectedWindow = await _windowManagementService.ShowWindowSelectionAsync().ConfigureAwait(false);
+            
+            Console.WriteLine($"🔧 _windowManagementService.ShowWindowSelectionAsync()呼び出し完了: result={selectedWindow != null}");
+            
             if (selectedWindow == null)
             {
+                // 🔒 安全化: キャンセル時もネイティブキャプチャを再開
+                Console.WriteLine("🚀 [SAFETY] ウィンドウ選択キャンセル - ネイティブキャプチャを再開します");
+                DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択キャンセル - ネイティブキャプチャを再開します");
+                Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
+                
                 DebugLogUtility.WriteLog("❌ ウィンドウ選択がキャンセルされました");
+                Console.WriteLine("❌ ウィンドウ選択がキャンセルされました");
                 Logger?.LogDebug("ウィンドウ選択がキャンセルされました");
                 return;
             }
             
             DebugLogUtility.WriteLog($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Console.WriteLine($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
             Logger?.LogInformation("ウィンドウが選択されました: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
+            
+            // 🔒 安全化: ウィンドウ選択完了後にネイティブキャプチャを再開
+            Console.WriteLine("🚀 [SAFETY] ウィンドウ選択完了 - ネイティブキャプチャを再開します");
+            DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択完了 - ネイティブキャプチャを再開します");
+            Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -614,11 +639,19 @@ public class MainOverlayViewModel : ViewModelBase
             });
             
             DebugLogUtility.WriteLog($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
+            Console.WriteLine($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
             Logger?.LogInformation("ウィンドウ選択処理完了");
         }
         catch (Exception ex)
         {
+            // 🔒 安全化: エラー時もネイティブキャプチャを再開
+            Console.WriteLine("🚀 [SAFETY] ウィンドウ選択エラー - ネイティブキャプチャを再開します");
+            DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択エラー - ネイティブキャプチャを再開します");
+            Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
+            
             Logger?.LogError(ex, "ウィンドウ選択処理中にエラーが発生");
+            Console.WriteLine($"💥 MainOverlayViewModel.ExecuteSelectWindowAsyncエラー: {ex.Message}");
+            Console.WriteLine($"💥 スタックトレース: {ex.StackTrace}");
             DebugLogUtility.WriteLog($"❌ ウィンドウ選択処理エラー: {ex.Message}");
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>

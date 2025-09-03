@@ -226,6 +226,112 @@ Windows Graphics Capture:
 
 ---
 
+## 📝 追加実装完了内容 (2025-08-31 更新)
+
+### ✅ オーバーレイ表示システム改善 (完了)
+
+**実装された機能**:
+
+1. **座標調整機能**
+   - `TextChunk.GetOverlayPosition()` → 最適化ポジショニング戦略に変更
+   - 翻訳結果がテキスト上方に表示される優先順位付き配置
+   - ファイル: `Baketa.Core/Abstractions/Translation/TextChunk.cs:223-229`
+
+2. **全文表示機能** 
+   - `TextWrapping="Wrap"`, `TextTrimming="None"`に変更
+   - テキスト省略を完全解除、折り返し表示を有効化
+   - ファイル: `Baketa.UI/Views/Overlay/InPlaceTranslationOverlayWindow.axaml:50,54`
+
+3. **衝突回避システム**
+   - `CalculateOptimalOverlayPositionWithCollisionAvoidance()` 新規実装
+   - 8つの優先位置候補 + 20ステップ動的オフセット調整
+   - 既存オーバーレイとの重なり防止機能
+   - ファイル: `Baketa.Core/Abstractions/Translation/TextChunk.cs:129-253`
+
+### ⚠️ 残存課題と確認タスク
+
+#### 🔧 Windows Graphics Capture API 互換性課題
+
+**現在の状況**:
+- **解決済み環境**: Windows 11 Home Build 26100 + NVIDIA RTX 4070
+- **解決方法**: D3D11_CREATE_DEVICE_DEBUG フラグ無効化
+- **ファイル**: `BaketaCaptureNative/src/WindowsCaptureSession.cpp:42`
+
+**未確認事項**:
+1. **他のWindows環境での動作保証なし**
+   - Windows 10 (各ビルド)
+   - Windows 11 Pro/Enterprise/Education
+   - 異なるGPU (AMD Radeon、Intel Arc、古いNVIDIA)
+   - 異なるDirectXバージョン
+   - Graphics Tools有無による影響
+
+2. **現在のフォールバック戦略の問題**
+   - Windows Graphics Capture API失敗後にPrintWindow APIへフォールバック
+   - **初回失敗コスト**: 2-5秒の遅延 + GPU初期化負荷
+   - **ユーザー体験**: エラーログ出力による不安感
+
+#### 🚀 推奨改善策
+
+**Phase 1: 事前環境判定システム**
+```csharp
+// 提案: CaptureStrategyFactory.cs に追加
+public static bool IsGraphicsCaptureApiSupported()
+{
+    // Windows バージョン確認
+    if (!IsWindows10Version1903OrLater()) return false;
+    
+    // Graphics Tools 存在確認
+    if (!IsGraphicsToolsAvailable()) return false;
+    
+    // GPU ドライバー互換性確認
+    if (!IsCompatibleGpuDriver()) return false;
+    
+    // D3D11デバイス作成テスト（軽量版）
+    return CanCreateD3D11Device();
+}
+```
+
+**Phase 2: 戦略優先順位の動的調整**
+```csharp
+// 現在: 固定優先順位
+// ROI → DirectFullScreen → PrintWindow → GDIFallback
+
+// 提案: 環境判定による最適化
+if (!IsGraphicsCaptureApiSupported())
+{
+    // 事前にGDIFallbackを優先使用
+    strategy = new GDIFallbackStrategy();
+}
+```
+
+**Phase 3: ユーザー通知システム**
+- Graphics Tools インストール案内
+- GPU ドライバー更新推奨
+- 互換性情報の表示
+
+#### 📋 今後の確認タスク
+
+**必須確認事項**:
+1. **Windows 10 Build 1903以降** での動作テスト
+2. **AMD Radeon GPU** での互換性確認  
+3. **Intel Arc GPU** での動作検証
+4. **Graphics Tools無効環境** でのフォールバック動作
+5. **古いNVIDIA GPU (GTX シリーズ)** での動作確認
+
+**テスト環境構築**:
+- Windows 10 LTSC 2021 (Build 19044)
+- Windows 11 Pro (Build 22621)  
+- AMD Radeon RX 6700 XT環境
+- Intel Arc A770環境
+- NVIDIA GTX 1660環境
+
+**期待結果**:
+- 事前判定により初回失敗を回避
+- ユーザー体験の大幅改善
+- 99%の環境での即座動作開始
+
+---
+
 ## 🔍 詳細ログ分析（従来調査）
 
 ### ネイティブDLL関連ログ

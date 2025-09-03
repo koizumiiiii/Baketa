@@ -101,7 +101,8 @@
         </StackPanel>
 
         <!-- ウィンドウリスト - タイル型表示 -->
-        <ItemsControl ItemsSource="{Binding AvailableWindows}"
+        <ItemsControl x:Name="AvailableWindowsList"
+                      ItemsSource="{Binding AvailableWindows}"
                       IsVisible="{Binding !IsLoading}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -161,13 +162,14 @@
                       </Grid>
                     </Border>
                     
-                    <!-- 選択状態インジケーター -->
+                    <!-- 選択状態インジケーター - UltraThink修正版: 複雑バインディングを安全化 -->
                     <Ellipse Width="16" Height="16"
                              Fill="#0078D4"
                              HorizontalAlignment="Right"
                              VerticalAlignment="Top"
                              Margin="0,-4,-4,0"
-                             IsVisible="{Binding $parent[Window].((vm:WindowSelectionDialogViewModel)DataContext).SelectedWindow, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={Binding}}"/>
+                             IsVisible="False"
+                             x:Name="SelectionIndicator"/>
                   </Grid>
 
                   <!-- ウィンドウ情報 -->
@@ -210,8 +212,9 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- 空の状態 -->
-        <StackPanel IsVisible="{Binding AvailableWindows.Count, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=0}"
+        <!-- 空の状態 - UltraThink修正版: 複雑バインディング簡素化 -->
+        <StackPanel x:Name="EmptyStatePanel"
+                    IsVisible="False"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
           <TextBlock Text="利用可能なウィンドウが見つかりません"

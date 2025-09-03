@@ -60,20 +60,25 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
         try
         {
             _logger.LogInformation("ウィンドウ選択ダイアログ表示要求");
+            Console.WriteLine("🔧 WindowManagementService.ShowWindowSelectionAsync開始");
 
             // UI層のダイアログサービスがある場合は使用、ない場合はnullを返す
             if (_dialogService != null)
             {
+                Console.WriteLine("🔧 _dialogService != null - ShowWindowSelectionDialogAsync呼び出し開始");
                 var result = await _dialogService.ShowWindowSelectionDialogAsync();
+                Console.WriteLine($"🔧 _dialogService.ShowWindowSelectionDialogAsync完了: result={result != null}");
                 
                 if (result != null)
                 {
                     _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})", 
                         result.Title, result.Handle);
+                    Console.WriteLine($"✅ ウィンドウ選択完了: '{result.Title}' (Handle={result.Handle})");
                 }
                 else
                 {
                     _logger.LogDebug("ウィンドウ選択がキャンセルされました");
+                    Console.WriteLine("❌ ウィンドウ選択がキャンセルされました");
                 }
                 
                 return result;
@@ -81,12 +86,15 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
             else
             {
                 _logger.LogWarning("ダイアログサービスが利用できません - UI層での実装が必要");
+                Console.WriteLine("❌ _dialogService == null - ダイアログサービスが利用できません");
                 return null;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ウィンドウ選択ダイアログ処理中にエラーが発生");
+            Console.WriteLine($"💥 WindowManagementService.ShowWindowSelectionAsyncエラー: {ex.Message}");
+            Console.WriteLine($"💥 スタックトレース: {ex.StackTrace}");
             return null;
         }
     }

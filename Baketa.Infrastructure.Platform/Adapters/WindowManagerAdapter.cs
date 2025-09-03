@@ -578,6 +578,12 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             return WindowType.Normal;
         }
         
+        /// <inheritdoc />
+        public string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
+        {
+            return _windowsManager.GetWindowThumbnail(handle, maxWidth, maxHeight);
+        }
+        
         /// <summary>
         /// ウィンドウクラス名を取得
         /// </summary>
@@ -657,7 +663,16 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             
             try
             {
-                var processes = Process.GetProcesses();
+                // 🚀 UltraThink緊急修正: Process.GetProcesses()によるメモリ競合を完全回避
+                // ネイティブキャプチャとの同時実行で System.AccessViolationException が発生
+                // 軽量実装により安全性を優先
+                
+                _logger?.LogDebug("🔧 WindowManagerAdapter: Process.GetProcesses()スキップ - メモリ競合回避のため");
+                
+                // プロセスマップは空のまま維持（機能は制限されるが安全性を優先）
+                // var processes = Process.GetProcesses(); // <- 無効化
+                var processes = Array.Empty<Process>(); // 空配列で安全な実装
+                
                 foreach (var process in processes)
                 {
                     try

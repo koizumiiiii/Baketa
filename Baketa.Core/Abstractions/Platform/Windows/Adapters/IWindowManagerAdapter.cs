@@ -55,6 +55,15 @@ namespace Baketa.Core.Abstractions.Platform.Windows.Adapters;
         /// </summary>
         /// <returns>ウィンドウ情報のリスト</returns>
         IReadOnlyCollection<WindowInfo> GetRunningApplicationWindows();
+        
+        /// <summary>
+        /// ウィンドウのサムネイル画像を取得
+        /// </summary>
+        /// <param name="handle">ウィンドウハンドル</param>
+        /// <param name="maxWidth">最大幅 (デフォルト: 160)</param>
+        /// <param name="maxHeight">最大高さ (デフォルト: 120)</param>
+        /// <returns>Base64エンコードされたサムネイル画像 (PNG形式)</returns>
+        string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120);
     }
     
     /// <summary>

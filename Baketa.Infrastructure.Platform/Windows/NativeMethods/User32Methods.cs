@@ -13,8 +13,9 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
 [SupportedOSPlatform("windows")]
 internal static class User32Methods
 {
-    // CA5392警告対策：LoadLibraryのパスを明示的に指定
-    private const string USER32_DLL = @"C:\Windows\System32\user32.dll";
+    // 🎯 Gemini Expert推奨: 標準DLL検索メカニズムを使用（移植性・堅牢性向上）
+    // クライアントアプリケーションでは標準検索順序で十分安全
+    private const string USER32_DLL = "user32.dll";
     
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -64,7 +65,7 @@ internal static class User32Methods
         return length;
     }
     
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, EntryPoint = "GetWindowTextLengthW", SetLastError = true, ExactSpelling = true)]
     internal static extern int GetWindowTextLength(IntPtr hWnd);
     
     // フルスクリーン検出のための追加API
@@ -166,6 +167,16 @@ internal static class User32Methods
     
     [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = false)]
     internal static extern int GetClassName(IntPtr hWnd, char[] lpClassName, int nMaxCount);
+    
+    // 🚀 UltraThink + Gemini推奨: EnumWindows軽量実装によるProcess.GetProcesses()代替
+    // ウィンドウ列挙用デリゲート
+    internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    
+    // GetWindowTextLength と IsIconic は既に定義済み（68行目、105行目）
 }
 
 [Flags]

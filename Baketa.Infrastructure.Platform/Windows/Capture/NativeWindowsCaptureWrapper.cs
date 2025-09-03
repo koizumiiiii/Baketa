@@ -27,6 +27,10 @@ public class NativeWindowsCaptureWrapper : IDisposable
     private static bool _hasBeenShutdown;
     private static bool _isApplicationExiting;
     private static bool _globalInitialized;
+    
+    // 🔒 ウィンドウ選択時の安全化: キャプチャ一時停止機能
+    private static bool _isPausedForWindowSelection;
+    private static readonly object _pauseLock = new();
 
     /// <summary>
     /// ライブラリが初期化済みかどうか
@@ -360,16 +364,38 @@ public class NativeWindowsCaptureWrapper : IDisposable
             return null;
         }
         
-        // 🔍🔍🔍 デバッグ: CaptureFrameAsync開始
+        // 🔍🔍🔍 デバッグ: CaptureFrameAsync開始とウィンドウ情報取得
         try
         {
             var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 NativeWrapper.CaptureFrameAsync: SessionId={_sessionId}, HWND=0x{_windowHandle.ToInt64():X8}, Timeout={timeoutMs}ms{Environment.NewLine}");
+            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 NativeWrapper.CaptureFrameAsync開始: SessionId={_sessionId}, Timeout={timeoutMs}ms{Environment.NewLine}");
+            
+            // ウィンドウデバッグ情報取得
+            var (windowInfo, screenRect) = NativeWindowsCapture.GetSessionDebugInfo(_sessionId);
+            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📋 ウィンドウ情報: {windowInfo}{Environment.NewLine}");
+            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📍 スクリーン座標: {screenRect}{Environment.NewLine}");
         }
         catch { /* デバッグログ失敗は無視 */ }
 
         return await Task.Run(() =>
         {
+            // 🔒 安全化: ウィンドウ選択中は一時停止
+            lock (_pauseLock)
+            {
+                if (_isPausedForWindowSelection)
+                {
+                    try
+                    {
+                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します{Environment.NewLine}");
+                        System.Diagnostics.Debug.WriteLine("⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します");
+                        Console.WriteLine("⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します");
+                    }
+                    catch { /* デバッグログ失敗は無視 */ }
+                    return null;
+                }
+            }
+            
             try
             {
                 var frame = new NativeWindowsCapture.BaketaCaptureFrame();
@@ -379,11 +405,15 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
                     _logger?.LogError("フレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
                     
-                    // 🔍🔍🔍 デバッグ: キャプチャ失敗
+                    // 🔍🔍🔍 デバッグ: キャプチャ失敗時の詳細情報
                     try
                     {
                         var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper.CaptureFrame失敗: ErrorCode={result}, ErrorMsg={errorMsg}, SessionId={_sessionId}{Environment.NewLine}");
+                        var (windowInfo, screenRect) = NativeWindowsCapture.GetSessionDebugInfo(_sessionId);
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ CaptureFrame失敗: ErrorCode={result}, SessionId={_sessionId}{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ エラー詳細: {errorMsg}{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ ウィンドウ状態: {windowInfo}{Environment.NewLine}");
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 座標状態: {screenRect}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
                     
@@ -513,6 +543,25 @@ public class NativeWindowsCaptureWrapper : IDisposable
             bitmap.UnlockBits(bitmapData);
         }
 
+        // 🚀 P2最適化: フレームメモリを適切に解放
+        try
+        {
+            var tempFrame = frame; // コピーで安全に渡す
+            NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref tempFrame);
+            
+            // 🔍🔍🔍 デバッグ: メモリ解放確認
+            try
+            {
+                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🗑️ P2: フレームメモリ解放完了 - サイズ={frame.width}x{frame.height}{Environment.NewLine}");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "P2: フレームメモリ解放中に警告 - サイズ={FrameSize}", $"{frame.width}x{frame.height}");
+        }
+        
         return bitmap;
     }
 
@@ -691,6 +740,53 @@ public class NativeWindowsCaptureWrapper : IDisposable
         }
         catch { /* デバッグログ失敗は無視 */ }
     }
+
+    /// <summary>
+    /// ウィンドウ選択時にキャプチャを安全に一時停止
+    /// </summary>
+    public static void PauseForWindowSelection()
+    {
+        lock (_pauseLock)
+        {
+            _isPausedForWindowSelection = true;
+            
+            // 🔍 デバッグ: 一時停止開始ログ
+            try
+            {
+                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました{Environment.NewLine}");
+                System.Diagnostics.Debug.WriteLine("🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました");
+                Console.WriteLine("🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+        }
+    }
+
+    /// <summary>
+    /// ウィンドウ選択完了後にキャプチャを再開
+    /// </summary>
+    public static void ResumeAfterWindowSelection()
+    {
+        lock (_pauseLock)
+        {
+            _isPausedForWindowSelection = false;
+            
+            // 🔍 デバッグ: 再開ログ
+            try
+            {
+                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました{Environment.NewLine}");
+                System.Diagnostics.Debug.WriteLine("🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました");
+                Console.WriteLine("🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+        }
+    }
+
+    /// <summary>
+    /// 現在一時停止中かどうかを確認
+    /// </summary>
+    public static bool IsPausedForWindowSelection => _isPausedForWindowSelection;
 
     /// <summary>
     /// アプリケーション終了時の強制クリーンアップ

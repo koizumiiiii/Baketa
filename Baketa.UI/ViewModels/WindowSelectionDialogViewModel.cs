@@ -34,7 +34,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         
         AvailableWindows = [];
         
-        // コマンドの初期化（UIスレッドで安全に初期化）
+        // コマンドの初期化（UI スレッドで安全に初期化）
         try
         {
             SelectWindowCommand = ReactiveCommand.CreateFromTask<WindowInfo>(ExecuteSelectWindowAsync,
@@ -50,8 +50,10 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             throw;
         }
         
-        // 初期ロード（非同期で安全に実行）
-        _ = LoadAvailableWindowsAsync();
+        // 🚀 GEMINI FIX: レースコンディション回避 - コンストラクタ内非同期初期化を削除
+        // Task.Runによる初期ロードは削除し、明示的なRefreshCommand呼び出しに変更
+        
+        Logger?.LogInformation("WindowSelectionDialogViewModel初期化完了 - 非同期ロードはRefreshCommand経由で実行");
     }
 
     /// <summary>
@@ -130,7 +132,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// <summary>
     /// ダイアログ結果
     /// </summary>
-    public WindowInfo? DialogResult { get; private set; }
+    public WindowInfo? DialogResult { get; internal set; }
 
     /// <summary>
     /// ダイアログが閉じられたかどうか
@@ -219,15 +221,30 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             {
                 IsLoading = true;
             });
-            Logger?.LogDebug("Loading available windows...");
+            
+            Logger?.LogDebug("🔍 LoadAvailableWindowsAsync開始");
+            Console.WriteLine("🔍 LoadAvailableWindowsAsync開始");
 
             // バックグラウンドでウィンドウリストを取得
             var windows = await Task.Run(() =>
             {
-                return _windowManager.GetRunningApplicationWindows()
+                Logger?.LogDebug("🔍 _windowManager.GetRunningApplicationWindows()呼び出し開始");
+                Console.WriteLine("🔍 _windowManager.GetRunningApplicationWindows()呼び出し開始");
+                
+                var rawWindows = _windowManager.GetRunningApplicationWindows();
+                
+                Logger?.LogDebug("🔍 _windowManager.GetRunningApplicationWindows()呼び出し完了: {Count}個のウィンドウを取得", rawWindows.Count);
+                Console.WriteLine($"🔍 _windowManager.GetRunningApplicationWindows()呼び出し完了: {rawWindows.Count}個のウィンドウを取得");
+                
+                var filteredWindows = rawWindows
                     .Where(IsValidWindow)
                     .Where(w => w.Title != "WindowSelectionDialog") // 自分自身を除外
                     .ToList();
+                    
+                Logger?.LogDebug("🔍 フィルタリング完了: {Count}個の有効ウィンドウ", filteredWindows.Count);
+                Console.WriteLine($"🔍 フィルタリング完了: {filteredWindows.Count}個の有効ウィンドウ");
+                
+                return filteredWindows;
             }).ConfigureAwait(false);
 
             // UIスレッドで更新
@@ -240,11 +257,13 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                 }
             });
 
-            Logger?.LogDebug("Loaded {Count} available windows", AvailableWindows.Count);
+            Logger?.LogDebug("✅ LoadAvailableWindowsAsync完了: {Count}個のウィンドウを表示", AvailableWindows.Count);
+            Console.WriteLine($"✅ LoadAvailableWindowsAsync完了: {AvailableWindows.Count}個のウィンドウを表示");
         }
         catch (Exception ex)
         {
-            Logger?.LogError(ex, "Failed to load available windows");
+            Logger?.LogError(ex, "❌ LoadAvailableWindowsAsyncでエラー発生");
+            Console.WriteLine($"❌ LoadAvailableWindowsAsyncでエラー発生: {ex.Message}");
             
             // フォールバック：空の一覧を表示
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -314,7 +333,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// <summary>
     /// 更新実行
     /// </summary>
-    private async Task ExecuteRefreshAsync()
+    internal async Task ExecuteRefreshAsync()
     {
         Logger?.LogDebug("Refreshing window list");
         await LoadAvailableWindowsAsync().ConfigureAwait(false);

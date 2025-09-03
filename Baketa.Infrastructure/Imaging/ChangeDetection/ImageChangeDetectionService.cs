@@ -1,4 +1,6 @@
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.ImageProcessing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Drawing;
@@ -8,23 +10,24 @@ using System.IO;
 namespace Baketa.Infrastructure.Imaging.ChangeDetection;
 
 /// <summary>
-/// 画像変化検知サービスの実装
+/// 画像変化検知サービスの基本実装（レガシー互換性）
 /// Difference Hash（dHash）によるPerceptual Hash実装
-/// Phase 1: OCR処理最適化システム
+/// 注意: 新規実装では EnhancedImageChangeDetectionService を使用推奨
 /// </summary>
 public sealed class ImageChangeDetectionService : IImageChangeDetectionService
 {
     private readonly ILogger<ImageChangeDetectionService> _logger;
-    private readonly IOptionsMonitor<ImageChangeDetectionSettings> _options;
     private readonly IImageChangeMetricsService _metricsService;
+    
+    // レガシー設定用デフォルト値
+    private readonly HashAlgorithmType _defaultAlgorithm = HashAlgorithmType.DifferenceHash;
+    private readonly float _changeThreshold = 0.1f;
 
     public ImageChangeDetectionService(
         ILogger<ImageChangeDetectionService> logger,
-        IOptionsMonitor<ImageChangeDetectionSettings> options,
         IImageChangeMetricsService metricsService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _metricsService = metricsService ?? throw new ArgumentNullException(nameof(metricsService));
     }
 
@@ -41,8 +44,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             ArgumentNullException.ThrowIfNull(previousImage, nameof(previousImage));
             ArgumentNullException.ThrowIfNull(currentImage, nameof(currentImage));
 
-            var settings = _options.CurrentValue;
-            var algorithm = settings.DefaultAlgorithm;
+            var algorithm = _defaultAlgorithm;
 
             // 非同期でPerceptual Hash生成
             var (previousHash, currentHash) = await Task.Run(() =>
@@ -56,29 +58,20 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
 
             // ハミング距離計算
             var changePercentage = CalculateHammingDistancePercentage(previousHash, currentHash);
-            var hasChanged = IsSignificantChange(changePercentage, settings.ChangeThreshold);
+            var hasChanged = IsSignificantChange(changePercentage, _changeThreshold);
 
-            var result = new ImageChangeResult
-            {
-                HasChanged = hasChanged,
-                ChangePercentage = changePercentage,
-                PreviousHash = previousHash,
-                CurrentHash = currentHash,
-                ProcessingTime = stopwatch.Elapsed,
-                AlgorithmUsed = algorithm
-            };
+            var result = hasChanged 
+                ? ImageChangeResult.CreateChanged(previousHash, currentHash, changePercentage, algorithm, stopwatch.Elapsed)
+                : ImageChangeResult.CreateNoChange(stopwatch.Elapsed);
 
-            // メトリクス記録（設定で有効な場合）
-            if (settings.EnableMetrics)
+            // メトリクス記録
+            if (hasChanged)
             {
-                if (hasChanged)
-                {
-                    _metricsService.RecordOcrExecuted(changePercentage, stopwatch.Elapsed);
-                }
-                else
-                {
-                    _metricsService.RecordOcrSkipped(changePercentage, stopwatch.Elapsed);
-                }
+                _metricsService.RecordOcrExecuted(changePercentage, stopwatch.Elapsed);
+            }
+            else
+            {
+                _metricsService.RecordOcrSkipped(changePercentage, stopwatch.Elapsed);
             }
 
             _logger.LogDebug("🔄 画像変化検知: {HasChanged}, 変化率: {ChangePercentage:F1}%, 処理時間: {ProcessingTimeMs}ms",
@@ -92,16 +85,104 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             _logger.LogError(ex, "💥 画像変化検知エラー: 処理時間 {ProcessingTimeMs}ms", stopwatch.ElapsedMilliseconds);
             
             // エラー時はデフォルトで変化ありとして処理を継続
-            return new ImageChangeResult
-            {
-                HasChanged = true,
-                ChangePercentage = 1.0f,
-                PreviousHash = "ERROR",
-                CurrentHash = "ERROR",
-                ProcessingTime = stopwatch.Elapsed,
-                AlgorithmUsed = _options.CurrentValue.DefaultAlgorithm
-            };
+            return ImageChangeResult.CreateChanged("ERROR", "ERROR", 1.0f, _defaultAlgorithm, stopwatch.Elapsed);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<ImageChangeResult> DetectChangeAsync(
+        IImage? previousImage, 
+        IImage currentImage, 
+        string contextId = "default",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(currentImage);
+        
+        if (previousImage == null)
+        {
+            // 初回検知の場合
+            var currentHash = GeneratePerceptualHash(await ConvertImageToByteArrayAsync(currentImage), _defaultAlgorithm);
+            return ImageChangeResult.CreateFirstTime(currentHash, _defaultAlgorithm, TimeSpan.Zero);
+        }
+        
+        // IImage -> byte[] 変換して既存メソッドを呼び出し
+        var prevBytes = await ConvertImageToByteArrayAsync(previousImage);
+        var currBytes = await ConvertImageToByteArrayAsync(currentImage);
+        
+        return await DetectChangeAsync(prevBytes, currBytes, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<QuickFilterResult> QuickFilterAsync(
+        IImage? previousImage, 
+        IImage currentImage, 
+        string contextId = "default")
+    {
+        if (previousImage == null)
+        {
+            return QuickFilterResult.PotentialChange;
+        }
+        
+        // 簡易実装：基本的な変化検知結果から判定
+        var changeResult = await DetectChangeAsync(previousImage, currentImage, contextId);
+        
+        return new QuickFilterResult
+        {
+            HasPotentialChange = changeResult.HasChanged,
+            ProcessingTime = changeResult.ProcessingTime,
+            MaxSimilarity = 1.0f - changeResult.ChangePercentage
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<ImageType> DetectImageTypeAsync(IImage image)
+    {
+        return await Task.FromResult(ImageType.Unknown); // 簡易実装
+    }
+
+    /// <inheritdoc />
+    public async Task<RegionChangeResult[]> DetectRegionChangesAsync(
+        IImage? previousImage,
+        IImage currentImage,
+        Rectangle[] regions,
+        CancellationToken cancellationToken = default)
+    {
+        if (previousImage == null || regions.Length == 0)
+        {
+            return regions.Select(r => new RegionChangeResult(r, true, 0.0f)).ToArray();
+        }
+        
+        // 簡易実装：全体の変化検知結果を各領域に適用
+        var changeResult = await DetectChangeAsync(previousImage, currentImage, "default", cancellationToken);
+        var similarity = 1.0f - changeResult.ChangePercentage;
+        
+        return regions.Select(r => new RegionChangeResult(r, changeResult.HasChanged, similarity)).ToArray();
+    }
+
+    /// <inheritdoc />
+    public void ClearCache(string? contextId = null)
+    {
+        // レガシー実装ではキャッシュなし
+        _logger.LogDebug("ClearCache called (no-op in legacy implementation)");
+    }
+
+    /// <inheritdoc />
+    public ImageChangeDetectionStatistics GetStatistics()
+    {
+        // レガシー実装では統計なし
+        return new ImageChangeDetectionStatistics
+        {
+            TotalProcessed = 0,
+            Stage1Filtered = 0,
+            Stage2Filtered = 0,
+            Stage3Processed = 0,
+            AverageStage1Time = TimeSpan.Zero,
+            AverageStage2Time = TimeSpan.Zero,
+            AverageStage3Time = TimeSpan.Zero,
+            CacheHitRate = 0f,
+            CurrentCacheSize = 0,
+            FilteringEfficiency = 0f
+        };
     }
 
     /// <inheritdoc />
@@ -135,6 +216,9 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
         return IsSignificantChange(result.ChangePercentage, threshold);
     }
 
+    /// <summary>
+    /// 変化率から有意な変化かを判定
+    /// </summary>
     private static bool IsSignificantChange(float changePercentage, float threshold)
     {
         return changePercentage >= threshold;
@@ -311,5 +395,21 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             value &= (byte)(value - 1); // 最下位の1ビットをクリア
         }
         return count;
+    }
+
+    /// <summary>
+    /// IImageをbyte配列に変換
+    /// </summary>
+    private static async Task<byte[]> ConvertImageToByteArrayAsync(IImage image)
+    {
+        try
+        {
+            var imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
+            return imageData ?? Array.Empty<byte>();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<byte>();
+        }
     }
 }

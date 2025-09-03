@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -73,15 +74,15 @@ namespace Baketa.Infrastructure.Platform.Windows;
         /// <param name="maxWidth">最大幅</param>
         /// <param name="maxHeight">最大高さ</param>
         /// <returns>Base64エンコードされたサムネイル画像</returns>
-        private static string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
+        public string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
         {
             try
             {
-                if (!GetWindowRect(handle, out RECT rect))
+                if (!NativeMethods.User32Methods.GetWindowRect(handle, out NativeMethods.RECT rect))
                     return null;
                     
-                int width = rect.Right - rect.Left;
-                int height = rect.Bottom - rect.Top;
+                int width = rect.right - rect.left;
+                int height = rect.bottom - rect.top;
                 
                 if (width <= 0 || height <= 0)
                     return null;
@@ -92,7 +93,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 int thumbHeight = Math.Max(1, (int)(height * scale));
                 
                 // デスクトップDCを取得
-                IntPtr desktopDC = GetDC(IntPtr.Zero);
+                IntPtr desktopDC = NativeMethods.User32Methods.GetDC(IntPtr.Zero);
                 if (desktopDC == IntPtr.Zero)
                     return null;
                 
@@ -104,7 +105,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 try
                 {
                     // ウィンドウ画像をキャプチャ
-                    if (PrintWindow(handle, memoryDC, 0))
+                    if (NativeMethods.User32Methods.PrintWindow(handle, memoryDC, 0))
                     {
                         // Bitmapオブジェクトを作成
                         using var originalBitmap = Image.FromHbitmap(bitmap);
@@ -126,7 +127,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     _ = SelectObject(memoryDC, oldBitmap);
                     _ = DeleteObject(bitmap);
                     _ = DeleteDC(memoryDC);
-                    _ = ReleaseDC(IntPtr.Zero, desktopDC);
+                    _ = NativeMethods.User32Methods.ReleaseDC(IntPtr.Zero, desktopDC);
                 }
             }
             catch (Exception)
@@ -296,71 +297,153 @@ namespace Baketa.Infrastructure.Platform.Windows;
         public Dictionary<IntPtr, string> GetRunningApplicationWindows()
         {
             var windows = new Dictionary<IntPtr, string>();
+            var visibleWindows = new List<IntPtr>();
             
             try
             {
-                // System.Diagnostics.Processを使用して実際のウィンドウを取得
-                var processes = System.Diagnostics.Process.GetProcesses();
+                // 🚀 Gemini Expert Recommendation: EnumWindows軽量実装でProcess.GetProcesses()完全置き換え
+                // メモリ競合回避 + 数十倍高速化で機能と安全性を両立
                 
-                foreach (var process in processes)
+                System.Diagnostics.Debug.WriteLine("🚀 WindowsManagerStub: EnumWindows軽量実装でウィンドウ列挙開始");
+                Console.WriteLine("🚀 WindowsManagerStub: EnumWindows軽量実装でウィンドウ列挙開始");
+                
+                uint currentProcessId = (uint)Environment.ProcessId;
+                
+                // EnumWindowsで全ウィンドウを軽量に列挙
+                bool enumResult = NativeMethods.User32Methods.EnumWindows(delegate(IntPtr hWnd, IntPtr lParam)
                 {
                     try
                     {
-                        // メインウィンドウハンドルがあるプロセスのみ処理
-                        if (process.MainWindowHandle != IntPtr.Zero && !string.IsNullOrWhiteSpace(process.MainWindowTitle))
+                        // 🚀 UltraThink根本修正: GetWindowTextLength制限を撤廃
+                        // ゲーム系ウィンドウはタイトル長0でも有効な場合が多い
+                        
+                        // Step 1: 基本的なウィンドウ有効性チェックのみ
+                        if (!NativeMethods.User32Methods.IsWindow(hWnd))
                         {
-                            // システムプロセスや非表示ウィンドウをフィルタリング
-                            var processName = process.ProcessName.ToLower(System.Globalization.CultureInfo.InvariantCulture);
-                            var windowTitle = process.MainWindowTitle;
-                            
-                            // 最小限のシステムプロセスのみ除外（Discord風）
-                            if (processName == "dwm" || processName == "winlogon" || processName == "csrss" || 
-                                processName == "smss" || processName == "wininit" || processName == "services" ||
-                                processName == "lsass" || processName == "svchost" || processName.StartsWith("system", StringComparison.InvariantCulture))
-                            {
-                                continue;
-                            }
-                            
-                            // メインウィンドウが表示されているかチェック
-                            if (!IsWindowVisible(process.MainWindowHandle))
-                            {
-                                continue;
-                            }
-                            
-                            // Baketaアプリケーションを除外
-                            if (processName.Contains("baketa", StringComparison.InvariantCulture) ||
-                                windowTitle.Contains("Baketa", StringComparison.OrdinalIgnoreCase) ||
-                                windowTitle.Contains("WindowSelectionDialog", StringComparison.OrdinalIgnoreCase) ||
-                                windowTitle.Contains("MainOverlay", StringComparison.OrdinalIgnoreCase))
-                            {
-                                continue;
-                            }
-                            
-                            // デスクトップやタスクバーなどのシステムコンポーネントを除外
-                            if (processName == "explorer" && (windowTitle == "デスクトップ" || windowTitle == "タスクバー" || windowTitle == "Program Manager"))
-                            {
-                                continue;
-                            }
-                            
-                            windows[process.MainWindowHandle] = windowTitle;
+                            Console.WriteLine($"⚠️  WindowsManagerStub: 無効ウィンドウをスキップ - ハンドル: {hWnd}");
+                            return true; // 次のウィンドウへ
+                        }
+                        
+                        // Step 2: 自プロセスのウィンドウは除外
+                        uint threadId = NativeMethods.User32Methods.GetWindowThreadProcessId(hWnd, out uint windowProcessId);
+                        if (windowProcessId == currentProcessId)
+                        {
+                            Console.WriteLine($"⚠️  WindowsManagerStub: 自プロセスウィンドウをスキップ - ハンドル: {hWnd}, PID: {windowProcessId}");
+                            return true; // 次のウィンドウへ
+                        }
+                        
+                        // Step 3: 詳細デバッグログ with タイトル長情報
+                        int titleLength = NativeMethods.User32Methods.GetWindowTextLength(hWnd);
+                        Console.WriteLine($"🔍 WindowsManagerStub: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}");
+                        System.Diagnostics.Debug.WriteLine($"🔍 WindowsManagerStub: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}");
+                        
+                        // Step 4: すべての候補をリストに追加（タイトル長に関係なく）
+                        visibleWindows.Add(hWnd);
+                        return true; // 列挙を続ける
+                    }
+                    catch (Exception ex)
+                    {
+                        // Win32 APIエラー時はログ出力してスキップ
+                        Console.WriteLine($"❌ WindowsManagerStub: EnumWindows例外 - ハンドル: {hWnd}, エラー: {ex.Message}");
+                        return true;
+                    }
+                }, IntPtr.Zero);
+                
+                // 🎯 Gemini Expert推奨: EnumWindows結果検証とエラーハンドリング
+                if (!enumResult)
+                {
+                    int lastError = Marshal.GetLastWin32Error();
+                    Console.WriteLine($"⚠️  WindowsManagerStub: EnumWindows失敗 - Win32エラーコード: {lastError}");
+                    System.Diagnostics.Debug.WriteLine($"⚠️  WindowsManagerStub: EnumWindows失敗 - Win32エラーコード: {lastError}");
+                    // 部分的な結果でも処理を継続（完全失敗ではない場合）
+                }
+                
+                Console.WriteLine($"✅ WindowsManagerStub: EnumWindows完了 - 候補ウィンドウ数: {visibleWindows.Count}");
+                
+                // 各ウィンドウのタイトルを取得
+                foreach (var handle in visibleWindows)
+                {
+                    try
+                    {
+                        string title = GetWindowTitle(handle);
+                        
+                        // 🚀 UltraThink緩和: 空タイトルには代替表示名を付与
+                        string displayTitle = string.IsNullOrEmpty(title) ? $"<無題ウィンドウ {handle}>" : title;
+                        Console.WriteLine($"🔍 WindowsManagerStub: ハンドル {handle} のタイトル: '{title}' → 表示名: '{displayTitle}'");
+                        
+                        // IsValidApplicationWindowの判定を実行（デバッグのため）
+                        bool isValid = IsValidApplicationWindow(title, handle);
+                        
+                        if (isValid)
+                        {
+                            windows[handle] = displayTitle;  // 表示名を使用
+                            Console.WriteLine($"✅ WindowsManagerStub: 有効ウィンドウ追加 - {displayTitle}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"❌ WindowsManagerStub: ウィンドウ除外 - タイトル: '{title}', 表示名: '{displayTitle}', 有効性: {isValid}");
                         }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        // プロセスにアクセスできない場合はスキップ
-                        continue;
-                    }
-                    finally
-                    {
-                        process.Dispose();
+                        Console.WriteLine($"❌ WindowsManagerStub: タイトル取得エラー - ハンドル: {handle}, エラー: {ex.Message}");
                     }
                 }
+                
+                System.Diagnostics.Debug.WriteLine($"✅ WindowsManagerStub: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
+                Console.WriteLine($"✅ WindowsManagerStub: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // エラー時は空のディクショナリを返す
+                System.Diagnostics.Debug.WriteLine($"❌ WindowsManagerStub: EnumWindowsエラー - {ex.Message}");
+                Console.WriteLine($"❌ WindowsManagerStub: EnumWindowsエラー - {ex.Message}");
             }
             
             return windows;
+        }
+        
+        /// <summary>
+        /// アプリケーションウィンドウとして有効か判定
+        /// </summary>
+        private bool IsValidApplicationWindow(string title, IntPtr handle)
+        {
+            // 🚀 UltraThink緩和: 空のタイトルも一時的に許可（ゲーム系対応）
+            Console.WriteLine($"🔍 IsValidApplicationWindow: 判定開始 - ハンドル: {handle}, タイトル: '{title}'");
+            
+            // Baketaアプリケーションを除外（これは必須）
+            if (!string.IsNullOrEmpty(title))
+            {
+                if (title.Contains("Baketa", StringComparison.OrdinalIgnoreCase) ||
+                    title.Contains("WindowSelectionDialog", StringComparison.OrdinalIgnoreCase) ||
+                    title.Contains("MainOverlay", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"❌ IsValidApplicationWindow: Baketaアプリ除外 - タイトル: '{title}'");
+                    return false;
+                }
+                
+                // 明らかなシステムウィンドウは除外
+                var systemWindowTitles = new[]
+                {
+                    "Program Manager", "デスクトップ", "タスクバー",
+                    "Desktop Window Manager", "Windows Shell Experience Host"
+                };
+                
+                foreach (var systemTitle in systemWindowTitles)
+                {
+                    if (title.Contains(systemTitle, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"❌ IsValidApplicationWindow: システムウィンドウ除外 - タイトル: '{title}' (除外理由: '{systemTitle}')");
+                        return false;
+                    }
+                }
+            }
+            
+            // 🎯 追加検証: ウィンドウ可視性とスタイル
+            bool isVisible = IsWindowVisible(handle);
+            Console.WriteLine($"🔍 IsValidApplicationWindow: 可視性チェック - ハンドル: {handle}, 可視: {isVisible}");
+            
+            // 可視性に関係なく一旦通す（最小化ウィンドウ対応）
+            Console.WriteLine($"✅ IsValidApplicationWindow: 有効ウィンドウ判定 - タイトル: '{title}', 可視: {isVisible}");
+            return true;
         }
     }

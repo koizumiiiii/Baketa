@@ -22,6 +22,12 @@ public:
     bool Initialize();
 
     /// <summary>
+    /// 最後の初期化エラーのHRESULTを取得
+    /// </summary>
+    /// <returns>HRESULT値（成功時は S_OK）</returns>
+    HRESULT GetLastHResult() const { return m_lastHResult; }
+
+    /// <summary>
     /// フレームをキャプチャ
     /// </summary>
     /// <param name="bgraData">BGRAピクセルデータ（出力）</param>
@@ -50,6 +56,20 @@ public:
     /// </summary>
     /// <returns>初期化済みの場合は true</returns>
     bool IsInitialized() const { return m_initialized; }
+
+    /// <summary>
+    /// 最後のエラーメッセージを取得
+    /// </summary>
+    /// <returns>エラーメッセージ</returns>
+    const std::string& GetLastError() const { return m_lastError; }
+
+    /// <summary>
+    /// ウィンドウ情報とスクリーン座標を取得（デバッグ用）
+    /// </summary>
+    /// <param name="windowInfo">ウィンドウ情報（出力）</param>
+    /// <param name="screenRect">スクリーン座標（出力）</param>
+    /// <returns>成功時は true</returns>
+    bool GetWindowDebugInfo(std::string& windowInfo, std::string& screenRect) const;
 
 private:
     /// <summary>
@@ -120,4 +140,5 @@ private:
 
     // エラー情報
     std::string m_lastError;
+    HRESULT m_lastHResult;
 };

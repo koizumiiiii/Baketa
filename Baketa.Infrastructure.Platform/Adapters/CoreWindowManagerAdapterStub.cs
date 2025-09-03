@@ -231,7 +231,7 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
     /// <summary>
     /// ウィンドウのサムネイル画像を取得（改良版キャプチャ実装）
     /// </summary>
-    private string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
+    public string? GetWindowThumbnail(IntPtr handle, int maxWidth = 160, int maxHeight = 120)
     {
         try
         {

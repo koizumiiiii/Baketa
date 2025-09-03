@@ -17,6 +17,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
     public class WindowsImageFactory : IWindowsImageFactoryInterface
     {
         private readonly ILogger<WindowsImageFactory>? _logger;
+        private static readonly object _gdiLock = new(); // GDI+操作の同期化
 
         public WindowsImageFactory(ILogger<WindowsImageFactory>? logger = null)
         {
@@ -118,31 +119,77 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 throw new ArgumentException($"無効なサイズが指定されました: {width}x{height}");
 
             var stopwatch = Stopwatch.StartNew();
+            Bitmap? resizedBitmap = null;
+            Bitmap? sourceBitmapClone = null;
+            
             try
             {
-                var sourceBitmap = ((WindowsImage)source).GetBitmap();
-                var resizedBitmap = new Bitmap(width, height);
+                // スレッドセーフティのため、GDI+操作を同期化
+                lock (_gdiLock)
+                {
+                    var sourceBitmap = ((WindowsImage)source).GetBitmap();
+                    // 🔒 CRITICAL FIX: Bitmap競合状態防止のためクローン作成
+                    sourceBitmapClone = new Bitmap(sourceBitmap);
+                }
 
-                using var graphics = Graphics.FromImage(resizedBitmap);
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                resizedBitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
 
-                graphics.DrawImage(sourceBitmap, 0, 0, width, height);
+                using (var graphics = Graphics.FromImage(resizedBitmap))
+                {
+                    graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                    graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+
+                    // 🔒 Thread-safe DrawImage呼び出し
+                    lock (_gdiLock)
+                    {
+                        graphics.DrawImage(sourceBitmapClone, 0, 0, width, height);
+                    }
+                }
 
                 stopwatch.Stop();
-                _logger?.LogInformation("画像リサイズ完了: {OriginalSize} → {NewSize}, 処理時間={ElapsedMs}ms",
-                    $"{sourceBitmap.Width}x{sourceBitmap.Height}", $"{width}x{height}", stopwatch.ElapsedMilliseconds);
+                _logger?.LogDebug("🎯 Thread-safe ResizeImage完了: {OriginalSize} → {NewSize}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
+                    $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", $"{width}x{height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
 
-                return new WindowsImage(resizedBitmap);
+                var result = new WindowsImage(resizedBitmap);
+                resizedBitmap = null; // WindowsImageが所有権を取得
+                return result;
+            }
+            catch (OutOfMemoryException memEx)
+            {
+                stopwatch.Stop();
+                _logger?.LogError(memEx, "💥 ResizeImage - メモリ不足: {TargetSize}, 処理時間={ElapsedMs}ms", 
+                    $"{width}x{height}", stopwatch.ElapsedMilliseconds);
+                throw new InvalidOperationException($"画像リサイズ中にメモリ不足が発生: {width}x{height}", memEx);
+            }
+            catch (ArgumentException argEx) when (argEx.Message.Contains("Parameter is not valid"))
+            {
+                stopwatch.Stop();
+                _logger?.LogError(argEx, "💥 ResizeImage - GDI+パラメータエラー: {TargetSize}, 処理時間={ElapsedMs}ms", 
+                    $"{width}x{height}", stopwatch.ElapsedMilliseconds);
+                throw new InvalidOperationException($"画像リサイズ中にGDI+エラーが発生: {width}x{height}", argEx);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                _logger?.LogError(ex, "画像リサイズ失敗: {TargetSize}, 処理時間={ElapsedMs}ms", 
-                    $"{width}x{height}", stopwatch.ElapsedMilliseconds);
+                _logger?.LogError(ex, "💥 ResizeImage - 予期しないエラー: {TargetSize}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}", 
+                    $"{width}x{height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
                 throw new InvalidOperationException($"画像のリサイズに失敗しました: {width}x{height}", ex);
+            }
+            finally
+            {
+                // リソースクリーンアップ（エラー時）
+                try
+                {
+                    sourceBitmapClone?.Dispose();
+                    // エラー時のみresizedBitmapを破棄（正常時はWindowsImageが管理）
+                    resizedBitmap?.Dispose();
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger?.LogWarning(cleanupEx, "⚠️ ResizeImage - リソースクリーンアップ時に警告: {TargetSize}", $"{width}x{height}");
+                }
             }
         }
 
@@ -159,34 +206,86 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 throw new ArgumentException($"無効な切り出し領域が指定されました: {cropArea}");
 
             var stopwatch = Stopwatch.StartNew();
+            Bitmap? croppedBitmap = null;
+            Bitmap? sourceBitmapClone = null;
+            
             try
             {
-                var sourceBitmap = ((WindowsImage)source).GetBitmap();
-                
-                // 境界チェック
-                if (cropArea.X < 0 || cropArea.Y < 0 ||
-                    cropArea.Right > sourceBitmap.Width || cropArea.Bottom > sourceBitmap.Height)
+                // スレッドセーフティのため、GDI+操作を同期化
+                lock (_gdiLock)
                 {
-                    throw new ArgumentException($"切り出し領域が画像の境界を超えています: {cropArea}, 画像サイズ: {sourceBitmap.Width}x{sourceBitmap.Height}");
+                    var sourceBitmap = ((WindowsImage)source).GetBitmap();
+                    
+                    // 境界チェック
+                    if (cropArea.X < 0 || cropArea.Y < 0 ||
+                        cropArea.Right > sourceBitmap.Width || cropArea.Bottom > sourceBitmap.Height)
+                    {
+                        throw new ArgumentException($"切り出し領域が画像の境界を超えています: {cropArea}, 画像サイズ: {sourceBitmap.Width}x{sourceBitmap.Height}");
+                    }
+
+                    // 🔒 CRITICAL FIX: Bitmap競合状態防止のためクローン作成
+                    sourceBitmapClone = new Bitmap(sourceBitmap);
                 }
 
-                var croppedBitmap = new Bitmap(cropArea.Width, cropArea.Height);
-
-                using var graphics = Graphics.FromImage(croppedBitmap);
-                graphics.DrawImage(sourceBitmap, 0, 0, cropArea, GraphicsUnit.Pixel);
+                // ロック外でBitmap操作実行（パフォーマンス向上）
+                croppedBitmap = new Bitmap(cropArea.Width, cropArea.Height, PixelFormat.Format32bppArgb);
+                
+                using (var graphics = Graphics.FromImage(croppedBitmap))
+                {
+                    // 高品質設定でレンダリング
+                    graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                    
+                    // 🔒 Thread-safe DrawImage呼び出し
+                    lock (_gdiLock)
+                    {
+                        graphics.DrawImage(sourceBitmapClone, 0, 0, cropArea, GraphicsUnit.Pixel);
+                    }
+                }
 
                 stopwatch.Stop();
-                _logger?.LogInformation("画像切り出し完了: 領域={CropArea} (元画像: {OriginalSize}), 処理時間={ElapsedMs}ms",
-                    cropArea, $"{sourceBitmap.Width}x{sourceBitmap.Height}", stopwatch.ElapsedMilliseconds);
+                _logger?.LogDebug("🎯 Thread-safe CropImage完了: 領域={CropArea} (元画像: {OriginalSize}), 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
+                    cropArea, $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
 
-                return new WindowsImage(croppedBitmap);
+                var result = new WindowsImage(croppedBitmap);
+                croppedBitmap = null; // WindowsImageが所有権を取得
+                return result;
+            }
+            catch (OutOfMemoryException memEx)
+            {
+                stopwatch.Stop();
+                _logger?.LogError(memEx, "💥 CropImage - メモリ不足: 領域={CropArea}, 処理時間={ElapsedMs}ms", 
+                    cropArea, stopwatch.ElapsedMilliseconds);
+                throw new InvalidOperationException($"画像切り出し中にメモリ不足が発生: {cropArea}", memEx);
+            }
+            catch (ArgumentException argEx) when (argEx.Message.Contains("Parameter is not valid"))
+            {
+                stopwatch.Stop();
+                _logger?.LogError(argEx, "💥 CropImage - GDI+パラメータエラー: 領域={CropArea}, 処理時間={ElapsedMs}ms", 
+                    cropArea, stopwatch.ElapsedMilliseconds);
+                throw new InvalidOperationException($"画像切り出し中にGDI+エラーが発生: {cropArea}", argEx);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                _logger?.LogError(ex, "画像切り出し失敗: 領域={CropArea}, 処理時間={ElapsedMs}ms", 
-                    cropArea, stopwatch.ElapsedMilliseconds);
+                _logger?.LogError(ex, "💥 CropImage - 予期しないエラー: 領域={CropArea}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}", 
+                    cropArea, stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
                 throw new InvalidOperationException($"画像の切り出しに失敗しました: {cropArea}", ex);
+            }
+            finally
+            {
+                // リソースクリーンアップ（エラー時）
+                try
+                {
+                    sourceBitmapClone?.Dispose();
+                    // エラー時のみcroppedBitmapを破棄（正常時はWindowsImageが管理）
+                    croppedBitmap?.Dispose();
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger?.LogWarning(cleanupEx, "⚠️ CropImage - リソースクリーンアップ時に警告: 領域={CropArea}", cropArea);
+                }
             }
         }
     }
