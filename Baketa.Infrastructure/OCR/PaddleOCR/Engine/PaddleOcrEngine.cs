@@ -3615,6 +3615,9 @@ public class PaddleOcrEngine : IOcrEngine
                             // 🧠 [GEMINI_MAT_FIX] 既に防御的コピー済safeMatを使用
                             workingMat = safeMat.Clone();
                             
+                            // 🎯 [ULTRATHINK_FIX] Gemini推奨: 奇数幅メモリアライメント問題解決
+                            workingMat = NormalizeImageDimensions(workingMat);
+                            
                             if (!ValidateMatForPaddleOCR(workingMat))
                             {
                                 __logger?.LogWarning("⚠️ [MAT_PROCESSING] Mat validation failed, attempting automatic fix...");
@@ -4436,6 +4439,63 @@ public class PaddleOcrEngine : IOcrEngine
     /// Mat画像をPaddleOCR実行に適合するよう自動修正
     /// PaddlePredictor(Detector) run failedエラー対策
     /// </summary>
+    /// <summary>
+    /// 🎯 [ULTRATHINK_FIX] Gemini推奨: 奇数幅メモリアライメント正規化
+    /// PaddlePredictor内部のSIMD命令・メモリ境界問題を回避
+    /// </summary>
+    private Mat NormalizeImageDimensions(Mat inputMat)
+    {
+        if (inputMat == null || inputMat.Empty())
+        {
+            __logger?.LogWarning("⚠️ [NORMALIZE] Cannot normalize null or empty Mat");
+            return inputMat;
+        }
+
+        try
+        {
+            bool needsResize = false;
+            var newWidth = inputMat.Width;
+            var newHeight = inputMat.Height;
+
+            // 🔧 奇数幅を偶数に正規化 (メモリアライメント最適化)
+            if (inputMat.Width % 2 == 1)
+            {
+                newWidth = inputMat.Width + 1;
+                needsResize = true;
+                __logger?.LogDebug("🔧 [NORMALIZE] 奇数幅検出: {Width} → {NewWidth} (メモリアライメント最適化)", 
+                    inputMat.Width, newWidth);
+            }
+
+            // 🔧 奇数高さも正規化 (SIMD命令最適化)
+            if (inputMat.Height % 2 == 1)
+            {
+                newHeight = inputMat.Height + 1;
+                needsResize = true;
+                __logger?.LogDebug("🔧 [NORMALIZE] 奇数高さ検出: {Height} → {NewHeight} (SIMD最適化)", 
+                    inputMat.Height, newHeight);
+            }
+
+            if (needsResize)
+            {
+                Mat normalizedMat = new();
+                Cv2.Resize(inputMat, normalizedMat, new OpenCvSharp.Size(newWidth, newHeight));
+                
+                __logger?.LogInformation("✅ [NORMALIZE] 画像サイズ正規化完了: {OriginalSize} → {NormalizedSize} " +
+                    "(PaddlePredictor最適化対応)", 
+                    $"{inputMat.Width}x{inputMat.Height}", $"{newWidth}x{newHeight}");
+                
+                return normalizedMat;
+            }
+
+            return inputMat;
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogError(ex, "🚨 [NORMALIZE] 画像正規化中にエラー - 元画像を返却");
+            return inputMat;
+        }
+    }
+
     private Mat? FixMatForPaddleOCR(Mat originalMat)
     {
         try 
