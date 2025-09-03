@@ -23,7 +23,7 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
     private readonly IEventAggregator _eventAggregator;
 
     public string StrategyName => "ROIBased";
-    public int Priority => 50; // 中優先度（専用GPU環境で効率的）
+    public int Priority => 25; // 🔧 Phase 0 WGC修復: WGC問題対応で低優先度（ネイティブラッパー依存）
 
     public ROIBasedCaptureStrategy(
         ILogger<ROIBasedCaptureStrategy> logger,

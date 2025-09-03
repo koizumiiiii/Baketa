@@ -16,7 +16,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
     private readonly IWindowsCapturer _windowsCapturer;
 
     public string StrategyName => "PrintWindowFallback";
-    public int Priority => 10; // 低優先度（確実だが低速）
+    public int Priority => 75; // 🔧 Phase 0 WGC修復: WGC問題対応で高優先度（確実な代替手段）
 
     public PrintWindowFallbackStrategy(
         ILogger<PrintWindowFallbackStrategy> logger,

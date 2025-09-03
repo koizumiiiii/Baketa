@@ -79,6 +79,12 @@ private:
     bool CreateD3DDevice();
 
     /// <summary>
+    /// ウィンドウ状態をキャプチャ用に検証 (Phase 0 WGC修復)
+    /// </summary>
+    /// <returns>キャプチャ可能時は true</returns>
+    bool ValidateWindowStateForCapture();
+
+    /// <summary>
     /// GraphicsCaptureItem を作成
     /// </summary>
     /// <returns>成功時は true</returns>

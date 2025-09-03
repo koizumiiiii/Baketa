@@ -22,7 +22,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
     private readonly IEventAggregator _eventAggregator;
 
     public string StrategyName => "DirectFullScreen";
-    public int Priority => 100; // 最高優先度（統合GPUでは最も効率的）
+    public int Priority => 15; // 🔧 Phase 0 WGC修復: WGC問題対応で低優先度（WGC依存戦略）
 
     public DirectFullScreenCaptureStrategy(
         ILogger<DirectFullScreenCaptureStrategy> logger,

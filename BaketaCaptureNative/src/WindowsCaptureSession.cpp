@@ -1,5 +1,19 @@
 ﻿#include "pch.h"
 
+// 🔍 Phase 0 WGC修復: Windows API関数の必要な宣言
+extern "C" {
+    // ウィンドウ状態確認用API
+    BOOL IsWindow(HWND hWnd);
+    BOOL IsWindowVisible(HWND hWnd);
+    BOOL IsIconic(HWND hWnd);
+    HWND GetForegroundWindow(VOID);
+    BOOL IsChild(HWND hWndParent, HWND hWnd);
+    BOOL GetWindowRect(HWND hWnd, LPRECT lpRect);
+    int GetClassNameA(HWND hWnd, LPSTR lpClassName, int nMaxCount);
+    int GetWindowTextA(HWND hWnd, LPSTR lpString, int nMaxCount);
+    VOID Sleep(DWORD dwMilliseconds); // リトライ遅延用
+}
+
 WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
     : m_sessionId(sessionId)
     , m_hwnd(hwnd)
@@ -162,6 +176,13 @@ bool WindowsCaptureSession::CreateCaptureItem()
 {
     try
     {
+        // 🔍 Phase 0 WGC修復: ウィンドウフォーカス状態事前チェック
+        if (!ValidateWindowStateForCapture())
+        {
+            SetLastError("Window validation failed - invalid state for Graphics Capture");
+            return false;
+        }
+
         // C++/WinRT でのGraphicsCaptureItem作成（MarshalDirectiveException回避）
         auto interopFactory = winrt::get_activation_factory<winrt::GraphicsCaptureItem>();
         auto interop = interopFactory.as<::IGraphicsCaptureItemInterop>();
@@ -172,17 +193,59 @@ bool WindowsCaptureSession::CreateCaptureItem()
             return false;
         }
 
-        // GraphicsCaptureItemを作成
+        // 🔍 Phase 0 WGC修復: GraphicsCaptureItem作成前の最終確認
+        SetLastError("DEBUG: About to create GraphicsCaptureItem for validated window");
+
+        // 🔍 Phase 0 WGC修復: リトライメカニズム付きGraphicsCaptureItem作成
         winrt::com_ptr<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem> captureItem;
-        HRESULT hr = interop->CreateForWindow(
-            m_hwnd,
-            winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
-            captureItem.put_void()
-        );
+        HRESULT hr = E_FAIL;
+        const int maxRetries = 3;
+        const int delayMs = 100;
+
+        for (int attempt = 0; attempt < maxRetries; ++attempt)
+        {
+            hr = interop->CreateForWindow(
+                m_hwnd,
+                winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
+                captureItem.put_void()
+            );
+
+            if (SUCCEEDED(hr))
+            {
+                char successMsg[256];
+                sprintf_s(successMsg, sizeof(successMsg), 
+                    "CreateForWindow succeeded on attempt %d", attempt + 1);
+                SetLastError(std::string(successMsg));
+                break;
+            }
+            else
+            {
+                char retryMsg[512];
+                sprintf_s(retryMsg, sizeof(retryMsg),
+                    "CreateForWindow attempt %d failed with HRESULT: 0x%08X - %s", 
+                    attempt + 1, hr, (attempt + 1 < maxRetries) ? "retrying" : "giving up");
+                SetLastError(std::string(retryMsg));
+
+                // 最終試行でなければ少し待つ
+                if (attempt + 1 < maxRetries)
+                {
+                    Sleep(delayMs);
+                    // 次の試行のためにウィンドウ状態を再確認
+                    if (!ValidateWindowStateForCapture())
+                    {
+                        SetLastError("Window state changed during retry - aborting");
+                        return false;
+                    }
+                }
+            }
+        }
 
         if (FAILED(hr))
         {
-            SetLastError("CreateForWindow failed with HRESULT: 0x" + std::to_string(hr));
+            char finalError[256];
+            sprintf_s(finalError, sizeof(finalError),
+                "CreateForWindow failed after %d attempts, final HRESULT: 0x%08X", maxRetries, hr);
+            SetLastError(std::string(finalError));
             return false;
         }
 
@@ -559,6 +622,111 @@ bool WindowsCaptureSession::ConvertTextureToBGRA(ID3D11Texture2D* texture, unsig
 void WindowsCaptureSession::SetLastError(const std::string& message)
 {
     m_lastError = message;
+}
+
+/// <summary>
+/// 🔍 Phase 0 WGC修復: ウィンドウ状態をキャプチャ用に検証
+/// </summary>
+bool WindowsCaptureSession::ValidateWindowStateForCapture()
+{
+    if (!m_hwnd)
+    {
+        SetLastError("Invalid window handle for validation");
+        return false;
+    }
+
+    try
+    {
+        // 1. ウィンドウの存在確認
+        if (!IsWindow(m_hwnd))
+        {
+            SetLastError("Window no longer exists");
+            return false;
+        }
+
+        // 2. ウィンドウの可視性確認
+        if (!IsWindowVisible(m_hwnd))
+        {
+            SetLastError("Window is not visible - may cause white image capture");
+            return false;
+        }
+
+        // 3. ウィンドウの最小化状態確認
+        if (IsIconic(m_hwnd))
+        {
+            SetLastError("Window is minimized - Graphics Capture will return white image");
+            return false;
+        }
+
+        // 4. ウィンドウのサイズ確認
+        RECT windowRect;
+        if (!GetWindowRect(m_hwnd, &windowRect))
+        {
+            SetLastError("Failed to get window rectangle");
+            return false;
+        }
+
+        int width = windowRect.right - windowRect.left;
+        int height = windowRect.bottom - windowRect.top;
+        if (width <= 0 || height <= 0)
+        {
+            SetLastError("Invalid window dimensions - zero or negative size");
+            return false;
+        }
+
+        if (width > 7680 || height > 4320) // 8K解像度以上はメモリ不足の可能性
+        {
+            char sizeWarning[256];
+            sprintf_s(sizeWarning, sizeof(sizeWarning), 
+                "Extremely large window detected (%dx%d) - may cause memory issues", width, height);
+            SetLastError(std::string(sizeWarning));
+            // 警告だが継続
+        }
+
+        // 5. ウィンドウのフォーカス状態確認 (重要)
+        HWND foregroundWindow = GetForegroundWindow();
+        bool isInForeground = (m_hwnd == foregroundWindow) || IsChild(foregroundWindow, m_hwnd);
+        
+        if (!isInForeground)
+        {
+            // フォーカスがないと白画像の原因になる場合がある
+            char focusWarning[512];
+            sprintf_s(focusWarning, sizeof(focusWarning), 
+                "Target window (0x%p) is not in foreground (current: 0x%p) - may cause white image", 
+                m_hwnd, foregroundWindow);
+            SetLastError(std::string(focusWarning));
+            // 警告だが継続 (フォーカスなしでもキャプチャできる場合がある)
+        }
+
+        // 6. ウィンドウのクラス名取得 (デバッグ用)
+        char className[256] = {};
+        GetClassNameA(m_hwnd, className, sizeof(className));
+        
+        char windowTitle[256] = {};
+        GetWindowTextA(m_hwnd, windowTitle, sizeof(windowTitle));
+
+        // 7. 統合デバッグ情報
+        char validationResult[1024];
+        sprintf_s(validationResult, sizeof(validationResult),
+            "Window validation PASSED: Class='%s', Title='%s', Size=%dx%d, Visible=%s, Focus=%s",
+            className, windowTitle, width, height,
+            IsWindowVisible(m_hwnd) ? "YES" : "NO",
+            isInForeground ? "YES" : "NO"
+        );
+        SetLastError(std::string(validationResult));
+
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("Window validation exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("Window validation unknown exception");
+        return false;
+    }
 }
 
 bool WindowsCaptureSession::GetWindowDebugInfo(std::string& windowInfo, std::string& screenRect) const
