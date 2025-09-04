@@ -206,6 +206,21 @@ class NllbTranslationServer:
             "english": "eng_Latn", 
             "japanese": "jpn_Jpan"
         }
+    
+    def _get_available_memory_gb(self) -> float:
+        """利用可能メモリ量（GB）を取得"""
+        import psutil
+        try:
+            # システム利用可能メモリを取得
+            available_bytes = psutil.virtual_memory().available
+            available_gb = available_bytes / (1024**3)
+            return available_gb
+        except ImportError:
+            logger.warning("psutil not available - assuming 8GB memory")
+            return 8.0  # psutilがない場合は8GBと仮定
+        except Exception as e:
+            logger.warning(f"Memory detection failed: {e} - assuming 4GB")
+            return 4.0
         
     def load_model(self):
         """NLLB-200モデルを事前ロード"""
@@ -214,13 +229,54 @@ class NllbTranslationServer:
         start_time = time.time()
         
         try:
-            # NLLB-200 distilled版（軽量で高品質）
-            model_name = "facebook/nllb-200-distilled-600M"
+            # 🛡️ メモリ不足対策: メモリ量に応じたモデル選択
+            lightweight_model = "facebook/nllb-200-distilled-600M"   # 600M版 (約2.4GB) - 軽量・高品質
+            heavy_model = "facebook/nllb-200-distilled-1.3B"        # 1.3B版 (約5GB) - 重い・最高品質
+            
+            # メモリ使用量ベースでモデル選択（正しいロジック）
+            available_memory_gb = self._get_available_memory_gb()
+            if available_memory_gb >= 6.0:  # 十分なメモリがある場合は重いモデル
+                model_name = heavy_model
+                logger.info(f"🚀 十分なメモリあり({available_memory_gb:.1f}GB) - 最高品質モデル{model_name}使用")
+            else:  # メモリ制約がある場合は軽量モデル
+                model_name = lightweight_model
+                logger.info(f"⚡ メモリ制約あり({available_memory_gb:.1f}GB) - 軽量モデル{model_name}使用")
             
             logger.info(f"モデル {model_name} 初期化中...")
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-            self.model = self.model.to(self.device)
+            
+            # 段階的ロード - まずトークナイザー
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                logger.info("✅ トークナイザーロード完了")
+            except Exception as e:
+                logger.error(f"❌ トークナイザーロード失敗: {e}")
+                raise ModelNotLoadedError(f"Tokenizer load failed: {e}")
+            
+            # 次にモデル本体（メモリ集約的）
+            try:
+                logger.info("🧠 モデル本体ロード中（メモリ使用量が増加します）...")
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    model_name,
+                    torch_dtype=torch.float16,  # メモリ使用量を半分に
+                    device_map="auto"           # 自動デバイス配置
+                )
+                logger.info("✅ モデル本体ロード完了")
+            except torch.cuda.OutOfMemoryError as e:
+                logger.warning(f"⚠️ GPU メモリ不足 - CPU使用にフォールバック: {e}")
+                # CPUフォールバック
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    model_name,
+                    torch_dtype=torch.float32,
+                    device_map="cpu"
+                )
+                self.device = "cpu"
+                logger.info("✅ CPUモードでモデルロード完了")
+            
+            # デバイス配置確認（device_mapで自動配置済みの場合はスキップ）
+            if not hasattr(self.model, "hf_device_map"):
+                self.model = self.model.to(self.device)
+                logger.info(f"📍 モデルを{self.device}に配置完了")
+            
             self.model.eval()  # 評価モードに設定
             
             load_time = time.time() - start_time

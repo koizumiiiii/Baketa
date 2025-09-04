@@ -179,14 +179,14 @@ namespace Baketa.Application.DI.Modules;
                     // [REMOVED] var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
                     var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
                     var translationService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationService>();
-                    var translationDictionaryService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationDictionaryService>();
+                    var translationDictionaryService = (Baketa.Core.Abstractions.Services.ITranslationDictionaryService?)null; // REMOVED: 辞書翻訳削除済み
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
                     Console.WriteLine("🔍 [NLLB_TEST] TranslationOrchestrationService - CoordinateBasedTranslationServiceはnullで注入（テスト用）");
                     var coordinateBasedTranslation = (Baketa.Application.Services.Translation.CoordinateBasedTranslationService?)null;
                     Console.WriteLine($"✅ [NLLB_TEST] CoordinateBasedTranslationService=null設定完了（NLLB-200テスト用）");
                     Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
-                    Console.WriteLine($"✅ [DI_DEBUG] TranslationDictionaryService取得成功: {translationDictionaryService?.GetType().Name ?? "null"}");
+                    Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
                     
                     var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
@@ -212,11 +212,11 @@ namespace Baketa.Application.DI.Modules;
             
             // OPUS-MT削除済み: NLLB-200統一によりOpusMtPrewarmService不要
             
-            // 📚 翻訳辞書サービス（設定ファイルベース翻訳）
-            Console.WriteLine("🔍 [DI_DEBUG] TranslationDictionaryService登録開始");
-            services.AddSingleton<Baketa.Core.Abstractions.Services.ITranslationDictionaryService, 
-                Baketa.Application.Services.Translation.TranslationDictionaryService>();
-            Console.WriteLine("✅ [DI_DEBUG] TranslationDictionaryService登録完了");
+            // 🚫 [REMOVED] 翻訳辞書サービス削除済み - NLLB-200専用システムに統一
+            // Console.WriteLine("🔍 [DI_DEBUG] TranslationDictionaryService登録開始");
+            // services.AddSingleton<Baketa.Core.Abstractions.Services.ITranslationDictionaryService, 
+            //     Baketa.Application.Services.Translation.TranslationDictionaryService>();
+            // Console.WriteLine("✅ [DI_DEBUG] TranslationDictionaryService登録完了");
             
             // 翻訳関連のアプリケーションサービス（将来拡張）
             // 例: services.AddSingleton<ITranslationService, TranslationService>();

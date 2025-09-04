@@ -4834,6 +4834,42 @@ public class PaddleOcrEngine : IOcrEngine
                 wasModified = true;
             }
             
+            // 🔧 [FIX-6] 4の倍数アライメント修正（PaddlePredictor SIMD互換性対応）
+            int currentWidth = fixedMat.Width;
+            int currentHeight = fixedMat.Height;
+            
+            if (currentWidth % 4 != 0 || currentHeight % 4 != 0)
+            {
+                // 4の倍数に調整（切り上げ）
+                int alignedWidth = (currentWidth + 3) & ~3;   // 4の倍数に切り上げ
+                int alignedHeight = (currentHeight + 3) & ~3; // 4の倍数に切り上げ
+                
+                __logger?.LogDebug("🔧 [MAT_FIX] 4-byte alignment fix: {OldWidth}x{OldHeight} → {NewWidth}x{NewHeight}",
+                    currentWidth, currentHeight, alignedWidth, alignedHeight);
+                
+                // ✅ [MEMORY_SAFE] アライメント調整のためのパディング処理
+                var alignedMat = new Mat();
+                try
+                {
+                    // 境界をゼロパディングでリサイズ（画像内容を保持）
+                    Cv2.CopyMakeBorder(fixedMat, alignedMat, 
+                        0, alignedHeight - currentHeight,  // top, bottom
+                        0, alignedWidth - currentWidth,    // left, right  
+                        BorderTypes.Constant, Scalar.Black);
+                    
+                    fixedMat.Dispose(); // 古いMatを解放
+                    fixedMat = alignedMat; // 新しいMatに置き換え
+                    wasModified = true;
+                }
+                catch (Exception ex)
+                {
+                    __logger?.LogError(ex, "🚨 [MAT_FIX] 4-byte alignment failed");
+                    alignedMat.Dispose();
+                    fixedMat?.Dispose();
+                    return null;
+                }
+            }
+            
             // 最終検証
             if (ValidateMatForPaddleOCR(fixedMat))
             {

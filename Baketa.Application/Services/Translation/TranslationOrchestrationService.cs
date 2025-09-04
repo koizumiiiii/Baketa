@@ -1873,7 +1873,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                             { "IsSameLanguage", isSameLanguage },
                             { "TextSimilarity", textSimilarity },
                             { "QualityScore", qualityScore },
-                            { "TranslationMethod", "dictionary" },
+                            { "TranslationMethod", "string_replacement" },
                             { "IsActualTranslation", !isSameLanguage }
                         }
                     }).ConfigureAwait(false);
@@ -1919,7 +1919,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         {
                             { "ErrorType", translationEx.GetType().Name },
                             { "OriginalText", originalText },
-                            { "AttemptedTranslationMethod", "dictionary" }
+                            { "AttemptedTranslationMethod", "nllb200_timeout_fallback" }
                         }
                     }).ConfigureAwait(false);
 

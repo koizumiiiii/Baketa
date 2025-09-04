@@ -360,11 +360,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CancellationToken cancellationToken = default)
     {
         // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
-        _logger.LogError("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
-        _logger.LogError("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
-        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
-        _logger.LogError("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
-        _logger.LogError("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
+        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
+        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
+        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
+        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
+        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
         Console.WriteLine($"🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始 - RequestId: {request.RequestId}");
         Console.WriteLine($"🔥 [TRANSLATE_DEBUG] SourceText: '{request.SourceText}', {request.SourceLanguage} → {request.TargetLanguage}");
         
@@ -600,10 +600,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             _logger.LogError(ex, "翻訳エラー - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             
             // 🔥 [ERROR_DEBUG] 例外の詳細情報を出力
-            _logger.LogError("🔥 [ERROR_DEBUG] 例外詳細:");
-            _logger.LogError("🔥 [ERROR_DEBUG] - 例外タイプ: {ExceptionType}", ex.GetType().Name);
-            _logger.LogError("🔥 [ERROR_DEBUG] - 例外メッセージ: {Message}", ex.Message);
-            _logger.LogError("🔥 [ERROR_DEBUG] - スタックトレース: {StackTrace}", ex.StackTrace);
+            _logger.LogDebug("🔥 [ERROR_DEBUG] 例外詳細:");
+            _logger.LogDebug("🔥 [ERROR_DEBUG] - 例外タイプ: {ExceptionType}", ex.GetType().Name);
+            _logger.LogDebug("🔥 [ERROR_DEBUG] - 例外メッセージ: {Message}", ex.Message);
+            _logger.LogDebug("🔥 [ERROR_DEBUG] - スタックトレース: {StackTrace}", ex.StackTrace);
             Console.WriteLine($"🔥 [ERROR_DEBUG] 翻訳エラー発生: {ex.GetType().Name} - {ex.Message}");
             
             var error = TranslationError.FromException(
@@ -713,16 +713,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // 接続プール使用モード
                 await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()を10秒に短縮（30秒→10秒）- P2統合システム協調
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             else
             {
                 // 単発接続モード（汚染対策）
                 await directWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()に5秒タイムアウト追加で無限待機防止
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                // 🔧 [TIMEOUT_FIX] バッチ翻訳ReadLineAsync()を10秒に短縮（30秒→10秒）- P2統合システム協調
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
             }
             
@@ -1056,10 +1056,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // 🔥 [ENCODING_DEBUG] 受信したレスポンスの詳細バイト情報をログ出力（セキュリティ対策済み）
             var responseBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse);
             var sanitizedResponse = SanitizeForLogging(jsonResponse);
-            _logger.LogError("🔍 [ENCODING_DEBUG] 受信したレスポンス詳細:");
-            _logger.LogError("🔍 [ENCODING_DEBUG] - レスポンス文字列長: {Length}", jsonResponse.Length);
-            _logger.LogError("🔍 [ENCODING_DEBUG] - UTF-8バイト長: {ByteLength}", responseBytes.Length);
-            _logger.LogError("🔍 [ENCODING_DEBUG] - サニタイズ後レスポンス: {Response}", sanitizedResponse);
+            _logger.LogDebug("🔍 [ENCODING_DEBUG] 受信したレスポンス詳細:");
+            _logger.LogDebug("🔍 [ENCODING_DEBUG] - レスポンス文字列長: {Length}", jsonResponse.Length);
+            _logger.LogDebug("🔍 [ENCODING_DEBUG] - UTF-8バイト長: {ByteLength}", responseBytes.Length);
+            _logger.LogDebug("🔍 [ENCODING_DEBUG] - サニタイズ後レスポンス: {Response}", sanitizedResponse);
             Console.WriteLine($"🔍 [ENCODING_DEBUG] 受信したレスポンス長: {jsonResponse.Length}");
             Console.WriteLine($"🔍 [ENCODING_DEBUG] UTF-8バイト長: {responseBytes.Length}");
             
@@ -1102,17 +1102,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             }
             
             // 🔥 [ENCODING_DEBUG] JSON解析後のレスポンス詳細情報をログ出力
-            _logger.LogError("🔍 [JSON_DEBUG] JSON解析後のレスポンス詳細:");
-            _logger.LogError("🔍 [JSON_DEBUG] - Success: {Success}", response.Success);
-            _logger.LogError("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.Translation ?? "null");
-            _logger.LogError("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.Translation?.Length ?? 0);
+            _logger.LogDebug("🔍 [JSON_DEBUG] JSON解析後のレスポンス詳細:");
+            _logger.LogDebug("🔍 [JSON_DEBUG] - Success: {Success}", response.Success);
+            _logger.LogDebug("🔍 [JSON_DEBUG] - Translation: '{Translation}'", response.Translation ?? "null");
+            _logger.LogDebug("🔍 [JSON_DEBUG] - Translation Length: {Length}", response.Translation?.Length ?? 0);
             if (response.Translation != null)
             {
                 var translationBytes = System.Text.Encoding.UTF8.GetBytes(response.Translation);
-                _logger.LogError("🔍 [JSON_DEBUG] - Translation UTF-8バイト: {Bytes}", Convert.ToHexString(translationBytes));
+                _logger.LogDebug("🔍 [JSON_DEBUG] - Translation UTF-8バイト: {Bytes}", Convert.ToHexString(translationBytes));
             }
-            _logger.LogError("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.Confidence);
-            _logger.LogError("🔍 [JSON_DEBUG] - Error: '{Error}'", response.Error ?? "null");
+            _logger.LogDebug("🔍 [JSON_DEBUG] - Confidence: {Confidence}", response.Confidence);
+            _logger.LogDebug("🔍 [JSON_DEBUG] - Error: '{Error}'", response.Error ?? "null");
             Console.WriteLine($"🔍 [JSON_DEBUG] Success: {response.Success}, Translation: '{response.Translation}', Length: {response.Translation?.Length ?? 0}");
             
             var resultCreationStopwatch = Stopwatch.StartNew();
