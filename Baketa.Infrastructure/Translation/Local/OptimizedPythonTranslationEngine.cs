@@ -1669,7 +1669,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // NLLB-200設定から動的にポートとスクリプトパスを取得
                 _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5556);
-                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+                _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200モード - ポート: {Port}, スクリプト: {Script}", 
                     _serverPort, Path.GetFileName(_serverScriptPath));
             }
@@ -1677,7 +1678,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
                 _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
-                _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+                var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+                _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 _logger.LogInformation("🔧 [NLLB-200] デフォルトモード - ポート: {Port}, スクリプト: {Script}", 
                     _serverPort, Path.GetFileName(_serverScriptPath));
             }
@@ -1686,7 +1688,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
             _serverPort = 5556;
-            _serverScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+            var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+            _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
         }
     }
     

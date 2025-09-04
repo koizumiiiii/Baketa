@@ -112,29 +112,47 @@ public class TcpHandshakeStrategy : IConnectionStrategy
         try
         {
             using var tcpClient = new System.Net.Sockets.TcpClient();
+            // 🔧 UltraThink Phase 4.8: タイムアウト設定追加（5秒）
+            tcpClient.ReceiveTimeout = 5000;
+            tcpClient.SendTimeout = 5000;
+            
             await tcpClient.ConnectAsync("127.0.0.1", port, cancellationToken);
             
             var stream = tcpClient.GetStream();
             var writer = new StreamWriter(stream, System.Text.Encoding.UTF8);
             var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
 
-            // 簡易ハンドシェイクテスト
-            await writer.WriteLineAsync("{\"ping\":true}");
+            // 🚀 UltraThink Phase 4.8: 翻訳テストリクエスト（Python翻訳サーバー対応）
+            var testRequest = "{\"text\":\"test\",\"source_lang\":\"en\",\"target_lang\":\"ja\"}";
+            await writer.WriteLineAsync(testRequest);
             await writer.FlushAsync();
+            
+            // タイムアウト付きレスポンス読み取り
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
             
             var response = await reader.ReadLineAsync();
             if (!string.IsNullOrEmpty(response))
             {
-                _logger.LogDebug("🤝 ハンドシェイク成功: Port {Port}, Response: {Response}", port, response);
-                return true;
+                // 🎯 成功レスポンス確認（JSONに"success":trueが含まれているかチェック）
+                if (response.Contains("\"success\":true") || response.Contains("\"success\": true"))
+                {
+                    _logger.LogDebug("🤝 翻訳テスト成功: Port {Port}, Response: {Response}", port, response?.Substring(0, Math.Min(100, response.Length)));
+                    return true;
+                }
+                else
+                {
+                    _logger.LogDebug("⚠️ 翻訳テスト応答異常: Port {Port}, Response: {Response}", port, response?.Substring(0, Math.Min(100, response.Length)));
+                    return false;
+                }
             }
             
-            _logger.LogDebug("🤷 ハンドシェイク無応答: Port {Port}", port);
+            _logger.LogDebug("🤷 翻訳テスト無応答: Port {Port}", port);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("❌ ハンドシェイク失敗: Port {Port}, Error: {Error}", port, ex.Message);
+            _logger.LogDebug("❌ 翻訳テスト失敗: Port {Port}, Error: {Error}", port, ex.Message);
             return false;
         }
     }
