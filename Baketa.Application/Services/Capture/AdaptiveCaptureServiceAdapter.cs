@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Adapters;
 using Baketa.Infrastructure.Platform.Windows.Services;
 using Microsoft.Extensions.Logging;
@@ -99,7 +100,8 @@ public partial class AdaptiveCaptureServiceAdapter(
         // ログファイルにも出力
         try 
         {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+            var logPath = loggingSettings.GetFullDebugLogPath();
             File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x{windowHandle.ToInt64():X}{Environment.NewLine}");
         }
         catch { /* ログファイル書き込み失敗は無視 */ }

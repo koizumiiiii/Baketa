@@ -49,9 +49,10 @@ public sealed class CaptureModule : ServiceModuleBase
                 var strategyFactory = provider.GetRequiredService<Baketa.Core.Abstractions.Capture.ICaptureStrategyFactory>();
                 var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AdaptiveCaptureService>>();
                 var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+                var loggingOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.LoggingSettings>>();
                 
                 logger.LogDebug("AdaptiveCaptureService インスタンス作成");
-                var service = new AdaptiveCaptureService(gpuDetector, strategyFactory, logger, eventAggregator);
+                var service = new AdaptiveCaptureService(gpuDetector, strategyFactory, logger, eventAggregator, loggingOptions);
                 logger.LogInformation("AdaptiveCaptureService 登録完了");
                 return service;
             }

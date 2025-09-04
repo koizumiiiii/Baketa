@@ -5,6 +5,8 @@ using System.Linq;
 using Xunit;
 using Moq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
@@ -96,6 +98,7 @@ public class AdaptiveCaptureServiceMockTests
     private readonly Mock<ICaptureStrategy> _mockROIStrategy;
     private readonly Mock<ICaptureStrategy> _mockFallbackStrategy;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
+    private readonly Mock<IOptions<Baketa.Core.Settings.LoggingSettings>> _mockLoggingOptions;
 
     public AdaptiveCaptureServiceMockTests()
     {
@@ -103,6 +106,17 @@ public class AdaptiveCaptureServiceMockTests
         _mockGpuDetector = new Mock<ICaptureEnvironmentDetector>();
         _mockStrategyFactory = new Mock<ICaptureStrategyFactory>();
         _mockEventAggregator = new Mock<IEventAggregator>();
+        _mockLoggingOptions = new Mock<IOptions<Baketa.Core.Settings.LoggingSettings>>();
+        
+        // LoggingSettings用の設定値をモック
+        var mockLoggingSettings = new Baketa.Core.Settings.LoggingSettings
+        {
+            DebugLogPath = "test_debug_logs.txt",
+            EnableDebugFileLogging = true,
+            MaxDebugLogFileSizeMB = 10,
+            DebugLogRetentionDays = 7
+        };
+        _mockLoggingOptions.Setup(x => x.Value).Returns(mockLoggingSettings);
         
         // 各戦略のモック設定
         _mockDirectFullScreenStrategy = new Mock<ICaptureStrategy>();
@@ -164,7 +178,8 @@ public class AdaptiveCaptureServiceMockTests
             _mockGpuDetector.Object,
             _mockStrategyFactory.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockLoggingOptions.Object);
 
         // Act
         var result = await service.CaptureAsync(windowHandle, options);
@@ -228,7 +243,8 @@ public class AdaptiveCaptureServiceMockTests
             _mockGpuDetector.Object,
             _mockStrategyFactory.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockLoggingOptions.Object);
 
         // Act
         var result = await service.CaptureAsync(windowHandle, options);
@@ -294,7 +310,8 @@ public class AdaptiveCaptureServiceMockTests
             _mockGpuDetector.Object,
             _mockStrategyFactory.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockLoggingOptions.Object);
 
         // Act
         var result = await service.CaptureAsync(windowHandle, options);
@@ -369,7 +386,8 @@ public class AdaptiveCaptureServiceMockTests
             _mockGpuDetector.Object,
             _mockStrategyFactory.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockLoggingOptions.Object);
 
         // Act
         var result = await service.CaptureAsync(windowHandle, options);
@@ -404,7 +422,8 @@ public class AdaptiveCaptureServiceMockTests
             _mockGpuDetector.Object,
             _mockStrategyFactory.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockLoggingOptions.Object);
 
         // Act - プライベートメソッドのテストの代わりに、戦略選択の動作をテスト
         var integratedGpu = GpuEnvironmentMockHelper.CreateMockIntegratedGpu();

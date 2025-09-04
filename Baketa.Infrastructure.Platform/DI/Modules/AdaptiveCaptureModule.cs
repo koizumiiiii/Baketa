@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.DI;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture;
@@ -30,7 +31,8 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         // ログファイルにも出力
         try 
         {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+            var logPath = loggingSettings.GetFullDebugLogPath();
             File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 AdaptiveCaptureModule.RegisterServices 呼び出されました！{Environment.NewLine}");
         }
         catch { /* ログファイル書き込み失敗は無視 */ }
@@ -190,7 +192,8 @@ internal sealed class NativeDllInitializationService : IHostedService
             // デバッグログ出力
             try
             {
-                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+                var debugPath = loggingSettings.GetFullDebugLogPath();
                 File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [STARTUP] NativeDLL初期化サービス開始{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
@@ -205,7 +208,8 @@ internal sealed class NativeDllInitializationService : IHostedService
             // デバッグログ出力
             try
             {
-                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+                var debugPath = loggingSettings.GetFullDebugLogPath();
                 File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [STARTUP] IWindowsCapturer取得成功: {capturer.GetType().Name}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
@@ -225,7 +229,8 @@ internal sealed class NativeDllInitializationService : IHostedService
             // デバッグログ出力（詳細）
             try
             {
-                var debugPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+                var debugPath = loggingSettings.GetFullDebugLogPath();
                 File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [STARTUP] NativeDLL初期化失敗: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                 File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [STARTUP] スタックトレース: {ex.StackTrace}{Environment.NewLine}");
             }

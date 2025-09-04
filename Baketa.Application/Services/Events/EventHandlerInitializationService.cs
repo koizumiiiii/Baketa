@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Handlers;
 using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Settings;
 
 namespace Baketa.Application.Services.Events;
 
@@ -25,6 +27,30 @@ public sealed class EventHandlerInitializationService(
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<EventHandlerInitializationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly LoggingSettings _loggingSettings = InitializeLoggingSettings(serviceProvider);
+    
+    private static LoggingSettings InitializeLoggingSettings(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var configuration = serviceProvider.GetService<IConfiguration>();
+            if (configuration != null)
+            {
+                return new LoggingSettings
+                {
+                    DebugLogPath = configuration.GetValue<string>("Logging:DebugLogPath") ?? "debug_app_logs.txt",
+                    EnableDebugFileLogging = configuration.GetValue<bool>("Logging:EnableDebugFileLogging", true),
+                    MaxDebugLogFileSizeMB = configuration.GetValue<int>("Logging:MaxDebugLogFileSizeMB", 10),
+                    DebugLogRetentionDays = configuration.GetValue<int>("Logging:DebugLogRetentionDays", 7)
+                };
+            }
+        }
+        catch
+        {
+            // 設定取得失敗時はデフォルトを使用
+        }
+        return LoggingSettings.CreateDevelopmentSettings();
+    }
 
     /// <summary>
     /// イベントハンドラーを初期化します
@@ -41,7 +67,7 @@ public sealed class EventHandlerInitializationService(
         // 確実なファイル記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                 $"{startTimestamp}→🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！{Environment.NewLine}");
         }
         catch { /* ファイル出力失敗は無視 */ }
@@ -52,7 +78,7 @@ public sealed class EventHandlerInitializationService(
         // ファイル記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                 $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🔥 [INIT_LOG] _logger.LogInformation実行完了{Environment.NewLine}");
         }
         catch { /* ファイル出力失敗は無視 */ }
@@ -80,7 +106,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] CaptureCompletedHandlerを登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -93,7 +119,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] CaptureCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -110,7 +136,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] OcrRequestHandler (翻訳パイプライン連鎖) を登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -123,7 +149,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] OcrRequestHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -190,7 +216,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] TranslationPipelineService (ROI統合パイプライン) を登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -203,7 +229,7 @@ public sealed class EventHandlerInitializationService(
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationPipelineService登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -246,9 +272,9 @@ public sealed class EventHandlerInitializationService(
             // ファイルにも記録
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION] {ex.GetType().FullName}: {ex.Message}{Environment.NewLine}");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION_STACK] {ex.StackTrace}{Environment.NewLine}");
             }
             catch { /* ファイル出力失敗は無視 */ }

@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using CoreEvents = Baketa.Core.Events;
 using Baketa.UI.ViewModels;
 using Baketa.UI.Views;
@@ -163,8 +164,9 @@ internal sealed partial class App : Avalonia.Application
             // ログファイルにも確実に記録（デバッグ用）
             try
             {
+                var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                 var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨{Environment.NewLine}");
+                System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨{Environment.NewLine}");
             }
             catch { /* ログファイル書き込み失敗は無視 */ }
             
@@ -175,8 +177,9 @@ internal sealed partial class App : Avalonia.Application
                 // デバッグログ追加
                 try
                 {
+                    var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨{Environment.NewLine}");
+                    System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨{Environment.NewLine}");
                 }
                 catch { /* ログファイル書き込み失敗は無視 */ }
                 // 未監視タスク例外のハンドラーを登録（早期登録）
@@ -219,8 +222,9 @@ internal sealed partial class App : Avalonia.Application
                         // デバッグログ追加
                         try
                         {
+                            var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🔍 Program.ServiceProviderアクセス試行{Environment.NewLine}");
+                            System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🔍 Program.ServiceProviderアクセス試行{Environment.NewLine}");
                         }
                         catch { /* ログファイル書き込み失敗は無視 */ }
                         
@@ -253,8 +257,9 @@ internal sealed partial class App : Avalonia.Application
                     // デバッグログ追加
                     try
                     {
+                        var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🔥 EventHandlerInitializationService実行開始（最優先実行）{Environment.NewLine}");
+                        System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🔥 EventHandlerInitializationService実行開始（最優先実行）{Environment.NewLine}");
                     }
                     catch { /* ログファイル書き込み失敗は無視 */ }
                     
@@ -264,8 +269,9 @@ internal sealed partial class App : Avalonia.Application
                     // デバッグログ追加
                     try
                     {
+                        var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→✅ EventHandlerInitializationService は Program.cs で初期化済み{Environment.NewLine}");
+                        System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→✅ EventHandlerInitializationService は Program.cs で初期化済み{Environment.NewLine}");
                     }
                     catch { /* ログファイル書き込み失敗は無視 */ }
                     

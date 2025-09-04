@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
 
 namespace Baketa.Core.Performance;
@@ -27,13 +28,20 @@ public static class PerformanceLogger
     /// <summary>
     /// 旧ログファイルパス（クリーンアップ用）
     /// </summary>
-    private static readonly string[] ObsoleteLogPaths = [
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-        Path.Combine(Environment.CurrentDirectory, "debug_batch_ocr.txt"),
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
-        Path.Combine(Environment.CurrentDirectory, "bottleneck_analysis.txt"),
-        Path.Combine(Environment.CurrentDirectory, "debug_app_logs.txt")
-    ];
+    private static readonly string[] ObsoleteLogPaths = GetObsoleteLogPaths();
+    
+    private static string[] GetObsoleteLogPaths()
+    {
+        var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+        var debugLogPath = loggingSettings.GetFullDebugLogPath();
+        
+        return [
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+            Path.Combine(Environment.CurrentDirectory, "debug_batch_ocr.txt"),
+            debugLogPath,
+            Path.Combine(Environment.CurrentDirectory, "bottleneck_analysis.txt")
+        ];
+    }
 
     private static readonly object LogLock = new();
     private static bool _initialized;

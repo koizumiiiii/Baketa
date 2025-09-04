@@ -13,7 +13,9 @@ using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using System.Drawing;
+using Baketa.Core.Settings;
 using CaptureOptions = Baketa.Core.Models.Capture.CaptureOptions;
 
 namespace Baketa.Application.Services.Capture;
@@ -27,6 +29,7 @@ public class AdaptiveCaptureService(
     ICaptureStrategyFactory strategyFactory,
     ILogger<AdaptiveCaptureService> logger,
     IEventAggregator eventAggregator,
+    IOptions<LoggingSettings> loggingOptions,
     IImageChangeDetectionService? changeDetectionService = null,
     IWindowsImageAdapter? imageAdapter = null) : IAdaptiveCaptureService, IDisposable
 {
@@ -34,6 +37,7 @@ public class AdaptiveCaptureService(
     private readonly ICaptureStrategyFactory _strategyFactory = strategyFactory ?? throw new ArgumentNullException(nameof(strategyFactory));
     private readonly ILogger<AdaptiveCaptureService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly LoggingSettings _loggingSettings = loggingOptions?.Value ?? throw new ArgumentNullException(nameof(loggingOptions));
     private readonly IImageChangeDetectionService? _changeDetectionService = changeDetectionService;
     // ImageChangeDetectionSettings は新しい実装では不要
     private readonly IWindowsImageAdapter? _imageAdapter = imageAdapter;
@@ -106,14 +110,17 @@ public class AdaptiveCaptureService(
             result.ImageChangeSkipped = imageChangeSkipped; // 新機能: 変化検知結果
             
             // キャプチャ結果をログ出力
-            try 
+            if (_loggingSettings.EnableDebugFileLogging)
             {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                var imageCount = result.CapturedImages?.Count ?? 0;
-                var firstImage = result.CapturedImages?.FirstOrDefault();
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📸 キャプチャ結果: 成功={result.Success}, 戦略={result.StrategyUsed}, 画像数={imageCount}, サイズ={firstImage?.Width}x{firstImage?.Height}, エラー={result.ErrorDetails ?? "None"}{Environment.NewLine}");
+                try 
+                {
+                    var logPath = _loggingSettings.GetFullDebugLogPath();
+                    var imageCount = result.CapturedImages?.Count ?? 0;
+                    var firstImage = result.CapturedImages?.FirstOrDefault();
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📸 キャプチャ結果: 成功={result.Success}, 戦略={result.StrategyUsed}, 画像数={imageCount}, サイズ={firstImage?.Width}x{firstImage?.Height}, エラー={result.ErrorDetails ?? "None"}{Environment.NewLine}");
+                }
+                catch { /* ログファイル書き込み失敗は無視 */ }
             }
-            catch { /* ログファイル書き込み失敗は無視 */ }
             
             // 5. メトリクス記録
             RecordMetrics(result);
@@ -231,22 +238,28 @@ public class AdaptiveCaptureService(
                 fallbacksAttempted.Add(strategy.StrategyName);
                 
                 // 戦略実行前のログ
-                try 
+                if (_loggingSettings.EnableDebugFileLogging)
                 {
-                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 戦略実行: {strategy.StrategyName}, HWND=0x{hwnd.ToInt64():X}{Environment.NewLine}");
+                    try 
+                    {
+                        var logPath = _loggingSettings.GetFullDebugLogPath();
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 戦略実行: {strategy.StrategyName}, HWND=0x{hwnd.ToInt64():X}{Environment.NewLine}");
+                    }
+                    catch { /* ログファイル書き込み失敗は無視 */ }
                 }
-                catch { /* ログファイル書き込み失敗は無視 */ }
                 
                 var result = await strategy.ExecuteCaptureAsync(hwnd, options).ConfigureAwait(false);
                 
                 // 戦略実行結果のログ
-                try 
+                if (_loggingSettings.EnableDebugFileLogging)
                 {
-                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 戦略結果: {strategy.StrategyName}, 成功={result.Success}, 画像数={result.Images?.Count ?? 0}, エラー={result.ErrorMessage ?? "None"}{Environment.NewLine}");
+                    try 
+                    {
+                        var logPath = _loggingSettings.GetFullDebugLogPath();
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 戦略結果: {strategy.StrategyName}, 成功={result.Success}, 画像数={result.Images?.Count ?? 0}, エラー={result.ErrorMessage ?? "None"}{Environment.NewLine}");
+                    }
+                    catch { /* ログファイル書き込み失敗は無視 */ }
                 }
-                catch { /* ログファイル書き込み失敗は無視 */ }
                 
                 if (result.Success)
                 {

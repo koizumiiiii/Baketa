@@ -9,6 +9,7 @@ using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Performance;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.DI;
 using Baketa.Infrastructure.Platform.DI;
@@ -234,8 +235,9 @@ namespace Baketa.UI;
                 // デバッグログ記録
                 try
                 {
+                    var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→✅ [IMMEDIATE] EventHandlerInitializationService同期初期化完了！{Environment.NewLine}");
+                    System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→✅ [IMMEDIATE] EventHandlerInitializationService同期初期化完了！{Environment.NewLine}");
                 }
                 catch { /* ログファイル書き込み失敗は無視 */ }
             }
@@ -246,8 +248,9 @@ namespace Baketa.UI;
                 // デバッグログ記録
                 try
                 {
+                    var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
                     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", $"{timestamp}→🚨 [IMMEDIATE_FATAL] EventHandler即座初期化エラー: {ex.Message}{Environment.NewLine}");
+                    System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🚨 [IMMEDIATE_FATAL] EventHandler即座初期化エラー: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ログファイル書き込み失敗は無視 */ }
                 
@@ -422,6 +425,10 @@ namespace Baketa.UI;
             // OCR設定をappsettings.jsonから読み込み（DetectionThreshold統一化対応）
             services.Configure<Baketa.Core.Settings.OcrSettings>(
                 configuration.GetSection("OCR"));
+            
+            // LoggingSettings設定をappsettings.jsonから読み込み（IOptionsパターン適用）
+            services.Configure<Baketa.Core.Settings.LoggingSettings>(
+                configuration.GetSection("Logging"));
             
             // ロギングの設定
             services.AddLogging(builder => 

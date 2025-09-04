@@ -1,10 +1,13 @@
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Processing.Strategies;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
+using System.IO;
 
 namespace Baketa.Infrastructure.Processing;
 
@@ -21,13 +24,26 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
     private readonly object _disposeLock = new();
     private bool _disposed = false;
     
+    // LoggingSettings: debug_app_logs.txtハードコード解決用
+    private readonly LoggingSettings _loggingSettings;
+    
     public SmartProcessingPipelineService(
         IEnumerable<IProcessingStageStrategy> strategies,
         ILogger<SmartProcessingPipelineService> logger,
-        IOptionsMonitor<ProcessingPipelineSettings> settings)
+        IOptionsMonitor<ProcessingPipelineSettings> settings,
+        IConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        
+        // LoggingSettings初期化: debug_app_logs.txtハードコード解決用
+        _loggingSettings = new LoggingSettings
+        {
+            DebugLogPath = configuration?.GetValue<string>("Logging:DebugLogPath") ?? "debug_app_logs.txt",
+            EnableDebugFileLogging = configuration?.GetValue<bool>("Logging:EnableDebugFileLogging") ?? true,
+            MaxDebugLogFileSizeMB = configuration?.GetValue<int>("Logging:MaxDebugLogFileSizeMB") ?? 10,
+            DebugLogRetentionDays = configuration?.GetValue<int>("Logging:DebugLogRetentionDays") ?? 7
+        };
         
         // 戦略をStageTypeでディクショナリ化（重複除去してからディクショナリ化）
         var uniqueStrategies = strategies?.GroupBy(s => s.StageType)
@@ -52,13 +68,16 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
         _logger.LogDebug("段階的処理パイプライン開始 - WindowHandle: {WindowHandle}, ContextId: {ContextId}", 
             input.SourceWindowHandle, input.ContextId);
         
-        // 🚨 P0システム動作確認用 - ファイルログ出力
-        try
+        // 🚨 P0システム動作確認用 - ファイルログ出力（設定外部化済み）
+        if (_loggingSettings.EnableDebugFileLogging)
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_PIPELINE_START] SmartProcessingPipelineService.ExecuteAsync開始 - ContextId: {input.ContextId}{Environment.NewLine}");
+            try
+            {
+                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_PIPELINE_START] SmartProcessingPipelineService.ExecuteAsync開始 - ContextId: {input.ContextId}{Environment.NewLine}");
+            }
+            catch { /* ファイル出力失敗は無視 */ }
         }
-        catch { /* ファイル出力失敗は無視 */ }
 
         try
         {
@@ -69,24 +88,30 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
             {
                 _logger.LogDebug("段階的処理無効 - 従来処理モードで実行");
                 
-                // 🚨 P0システム動作確認用 - 従来処理ログ
-                try
+                // 🚨 P0システム動作確認用 - 従来処理ログ（設定外部化済み）
+                if (_loggingSettings.EnableDebugFileLogging)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🚨 [P0_LEGACY_MODE] 段階的処理無効 - 従来処理モード{Environment.NewLine}");
+                    try
+                    {
+                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                            $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🚨 [P0_LEGACY_MODE] 段階的処理無効 - 従来処理モード{Environment.NewLine}");
+                    }
+                    catch { /* ファイル出力失敗は無視 */ }
                 }
-                catch { /* ファイル出力失敗は無視 */ }
                 
                 return await ExecuteLegacyModeAsync(input, cancellationToken).ConfigureAwait(false);
             }
             
-            // 🚨 P0システム動作確認用 - 段階的処理有効ログ
-            try
+            // 🚨 P0システム動作確認用 - 段階的処理有効ログ（設定外部化済み）
+            if (_loggingSettings.EnableDebugFileLogging)
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [P0_STAGING_ENABLED] 段階的処理有効 - EnableStaging: {settings.EnableStaging}, InputOptions: {input.Options.EnableStaging}{Environment.NewLine}");
+                try
+                {
+                    System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [P0_STAGING_ENABLED] 段階的処理有効 - EnableStaging: {settings.EnableStaging}, InputOptions: {input.Options.EnableStaging}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
             }
-            catch { /* ファイル出力失敗は無視 */ }
 
             var stageOrder = GetExecutionOrder(settings);
             ProcessingStageType completedStage = ProcessingStageType.ImageChangeDetection;
@@ -119,13 +144,16 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                 // 段階実行
                 _logger.LogDebug("段階実行開始: {StageType}", stageType);
                 
-                // 🚨 P0システム動作確認用 - 段階実行ログ
-                try
+                // 🚨 P0システム動作確認用 - 段階実行ログ（設定外部化済み）
+                if (_loggingSettings.EnableDebugFileLogging)
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE_EXEC] 段階実行開始: {stageType} - ContextId: {input.ContextId}{Environment.NewLine}");
+                    try
+                    {
+                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                            $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE_EXEC] 段階実行開始: {stageType} - ContextId: {input.ContextId}{Environment.NewLine}");
+                    }
+                    catch { /* ファイル出力失敗は無視 */ }
                 }
-                catch { /* ファイル出力失敗は無視 */ }
                 
                 var stageStopwatch = Stopwatch.StartNew();
                 

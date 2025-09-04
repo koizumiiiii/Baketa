@@ -1,7 +1,9 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
+using System.IO;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Microsoft.Extensions.Logging;
 
@@ -15,6 +17,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 {
     private readonly NativeWindowsCaptureWrapper _nativeCapture;
     private readonly ILogger<WindowsGraphicsCapturer>? _logger;
+    private readonly LoggingSettings _loggingSettings;
     private WindowsCaptureOptions _options = new();
     private bool _disposed;
     private bool _isInitialized;
@@ -34,12 +37,15 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
     /// </summary>
     /// <param name="nativeCapture">ネイティブキャプチャラッパー</param>
     /// <param name="logger">ロガー</param>
+    /// <param name="loggingSettings">ログ設定</param>
     public WindowsGraphicsCapturer(
         NativeWindowsCaptureWrapper nativeCapture, 
-        ILogger<WindowsGraphicsCapturer>? logger = null)
+        ILogger<WindowsGraphicsCapturer>? logger = null,
+        LoggingSettings? loggingSettings = null)
     {
         _nativeCapture = nativeCapture ?? throw new ArgumentNullException(nameof(nativeCapture));
         _logger = logger;
+        _loggingSettings = loggingSettings ?? new LoggingSettings();
     }
 
     /// <summary>
@@ -60,7 +66,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: サポート状況チェック
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 WindowsGraphicsCapturer: サポート状況チェック開始{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -71,7 +77,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ WindowsGraphicsCapturer: APIサポートされていません{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -80,7 +86,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ WindowsGraphicsCapturer: APIサポート確認完了{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -88,7 +94,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: ネイティブキャプチャ初期化
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 WindowsGraphicsCapturer: ネイティブキャプチャ初期化開始{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -99,7 +105,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ WindowsGraphicsCapturer: ネイティブキャプチャ初期化失敗{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -108,7 +114,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ WindowsGraphicsCapturer: ネイティブキャプチャ初期化成功{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -123,7 +129,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 WindowsGraphicsCapturer: 初期化中に例外発生: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -225,7 +231,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             {
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ WindowsGraphicsCapturer: 初期化失敗{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -254,7 +260,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: WGC成功
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [P3_WGC_SUCCESS] Windows Graphics Capture成功 HWND=0x{windowHandle.ToInt64():X8}, サイズ={capturedImage.Width}x{capturedImage.Height}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -268,7 +274,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: WGC品質不良
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     var imageInfo = capturedImage != null ? $"Size={capturedImage.Width}x{capturedImage.Height}" : "null";
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [P3_WGC_QUALITY] Windows Graphics Capture品質不良 HWND=0x{windowHandle.ToInt64():X8}, Image={imageInfo}, Reason={wgcFailureReason}{Environment.NewLine}");
                 }
@@ -299,7 +305,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: フォールバック成功
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [P3_FALLBACK_SUCCESS] GDI/PrintWindowフォールバック成功 HWND=0x{windowHandle.ToInt64():X8}, サイズ={fallbackImage.Width}x{fallbackImage.Height}, WGCFailureReason={wgcFailureReason}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -314,7 +320,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 // 🔍🔍🔍 デバッグ: フォールバック品質不良
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     var imageInfo = fallbackImage != null ? $"Size={fallbackImage.Width}x{fallbackImage.Height}" : "null";
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [P3_FALLBACK_QUALITY] GDIフォールバック品質不良 HWND=0x{windowHandle.ToInt64():X8}, Image={imageInfo}{Environment.NewLine}");
                 }
@@ -571,7 +577,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                         // 🔍🔍🔍 デバッグ: ウィンドウ矩形取得失敗
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [P3_GDI_TRY] GetWindowRect失敗 HWND=0x{windowHandle.ToInt64():X8}{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -586,7 +592,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                         // 🔍🔍🔍 デバッグ: 無効なサイズ
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [P3_GDI_TRY] 無効なウィンドウサイズ HWND=0x{windowHandle.ToInt64():X8}, Size={width}x{height}{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -606,7 +612,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                         // 🔍🔍🔍 デバッグ: PrintWindow結果
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🖨️ [P3_GDI_TRY] PrintWindow結果: {printResult}, Size={width}x{height}{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -627,7 +633,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     // 🔍🔍🔍 デバッグ: 変換結果
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         var imageInfo = windowsImage != null ? $"Size={windowsImage.Width}x{windowsImage.Height}, Type={windowsImage.GetType().Name}" : "null";
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [P3_GDI_TRY] Bitmap変換結果: {imageInfo}{Environment.NewLine}");
                     }
@@ -640,7 +646,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     // 🔍🔍🔍 デバッグ: GDI例外
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [P3_GDI_TRY] GDI処理中例外: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }

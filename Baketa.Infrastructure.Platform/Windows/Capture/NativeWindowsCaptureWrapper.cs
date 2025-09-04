@@ -3,7 +3,9 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.IO;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -15,6 +17,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
 {
     private readonly ILogger<NativeWindowsCaptureWrapper>? _logger;
     private readonly WindowsImageFactory _imageFactory;
+    private readonly LoggingSettings _loggingSettings;
     private bool _disposed;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0032:Use auto property", Justification = "Field needs thread-safe access and initialization state tracking")]
     private bool _initialized;
@@ -52,12 +55,15 @@ public class NativeWindowsCaptureWrapper : IDisposable
     /// </summary>
     /// <param name="imageFactory">画像ファクトリー</param>
     /// <param name="logger">ロガー（オプション）</param>
+    /// <param name="loggingSettings">ログ設定（オプション）</param>
     public NativeWindowsCaptureWrapper(
         WindowsImageFactory imageFactory,
-        ILogger<NativeWindowsCaptureWrapper>? logger = null)
+        ILogger<NativeWindowsCaptureWrapper>? logger = null,
+        LoggingSettings? loggingSettings = null)
     {
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _logger = logger;
+        _loggingSettings = loggingSettings ?? new LoggingSettings();
     }
 
     /// <summary>
@@ -71,7 +77,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
             // 🔍🔍🔍 デバッグ: 初期化開始ログ
             try
             {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var debugPath = _loggingSettings.GetFullDebugLogPath();
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 NativeWrapper.Initialize開始: _globalInitialized={_globalInitialized}, _hasBeenShutdown={_hasBeenShutdown}, _isApplicationExiting={_isApplicationExiting}, _activeInstances={_activeInstances}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
@@ -86,7 +92,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: シャットダウン済み警告
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ NativeWrapper: 既にシャットダウン済み (_hasBeenShutdown={_hasBeenShutdown}, _isApplicationExiting={_isApplicationExiting}){Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -100,7 +106,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: DLL存在確認
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         var dllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BaketaCaptureNative.dll");
                         var dllExists = System.IO.File.Exists(dllPath);
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📁 DLL存在確認: {dllPath} = {dllExists}{Environment.NewLine}");
@@ -116,7 +122,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: サポート状況チェック先行実行
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                         var dllPath = System.IO.Path.Combine(baseDir, "BaketaCaptureNative.dll");
                         
@@ -138,23 +144,23 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     }
                     catch (DllNotFoundException dllEx)
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLL読み込み失敗: {dllEx.Message}{Environment.NewLine}");
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLL検索パス: {Environment.GetEnvironmentVariable("PATH")}{Environment.NewLine}");
                     }
                     catch (EntryPointNotFoundException entryEx)
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ エントリポイント未発見: {entryEx.Message}{Environment.NewLine}");
                     }
                     catch (BadImageFormatException imageEx)
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ DLLフォーマットエラー（x86/x64不整合？）: {imageEx.Message}{Environment.NewLine}");
                     }
                     catch (Exception supportEx)
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper: BaketaCapture_IsSupported()例外 {supportEx.GetType().Name}: {supportEx.Message}{Environment.NewLine}");
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 詳細スタックトレース: {supportEx.StackTrace}{Environment.NewLine}");
                     }
@@ -162,7 +168,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: ネイティブDLL初期化試行
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 NativeWrapper: BaketaCapture_Initialize()呼び出し開始{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -172,7 +178,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: 初期化結果
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 NativeWrapper: BaketaCapture_Initialize()結果 = {result}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -194,7 +200,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                         // 🔍🔍🔍 デバッグ: 初期化失敗詳細
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper: 初期化失敗 ErrorCode={result}, ErrorMsg='{errorMsg}'{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -207,7 +213,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: グローバル初期化成功
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ NativeWrapper: グローバル初期化成功{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -217,7 +223,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: 既に初期化済み
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ♻️ NativeWrapper: 既にグローバル初期化済み{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -230,7 +236,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 // 🔍🔍🔍 デバッグ: インスタンス初期化完了
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ NativeWrapper: インスタンス初期化完了 ActiveInstances={_activeInstances}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -245,7 +251,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
             // 🔍🔍🔍 デバッグ: 初期化例外
             try
             {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var debugPath = _loggingSettings.GetFullDebugLogPath();
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 NativeWrapper: 初期化例外 {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 スタックトレース: {ex.StackTrace}{Environment.NewLine}");
             }
@@ -386,7 +392,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 {
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します{Environment.NewLine}");
                         System.Diagnostics.Debug.WriteLine("⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します");
                         Console.WriteLine("⏸️ [WINDOW_SELECTION] キャプチャは一時停止中のため、null を返します");
@@ -411,7 +417,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: キャプチャ失敗時の詳細情報
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         var (windowInfo, screenRect) = NativeWindowsCapture.GetSessionDebugInfo(_sessionId);
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ CaptureFrame失敗: ErrorCode={result}, SessionId={_sessionId}{Environment.NewLine}");
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ エラー詳細: {errorMsg}{Environment.NewLine}");
@@ -466,7 +472,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                         
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フレーム解放例外: {ex.Message}{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -560,7 +566,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 // 🔍🔍🔍 デバッグ: 黒ピクセル統計
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     double blackPercentage = (double)totalBlackPixels / totalPixels * 100;
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 黒ピクセル統計: {totalBlackPixels}/{totalPixels} ({blackPercentage:F2}%){Environment.NewLine}");
                 }
@@ -592,7 +598,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 
                 try
                 {
-                    var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    var debugPath = _loggingSettings.GetFullDebugLogPath();
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 NativeWrapper: セッション停止 SessionId={_sessionId}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
@@ -636,7 +642,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: セッション削除成功
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ NativeWrapper: セッション削除成功 SessionId={_sessionId}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -648,7 +654,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: セッション削除失敗
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper: セッション削除失敗 {sessionEx.GetType().Name}: {sessionEx.Message}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -668,7 +674,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔍🔍🔍 デバッグ: インスタンス削除
                     try
                     {
-                        var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                        var debugPath = _loggingSettings.GetFullDebugLogPath();
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📉 NativeWrapper: インスタンス削除 ActiveInstances={_activeInstances} (削除後){Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
@@ -683,7 +689,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                         // 🔍🔍🔍 デバッグ: グローバルシャットダウン実行
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 NativeWrapper: グローバルシャットダウン実行開始{Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -696,7 +702,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                             // 🔍🔍🔍 デバッグ: グローバルシャットダウン成功
                             try
                             {
-                                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                                var debugPath = _loggingSettings.GetFullDebugLogPath();
                                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ NativeWrapper: グローバルシャットダウン完了{Environment.NewLine}");
                             }
                             catch { /* デバッグログ失敗は無視 */ }
@@ -708,7 +714,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                             // 🔍🔍🔍 デバッグ: グローバルシャットダウン失敗
                             try
                             {
-                                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                                var debugPath = _loggingSettings.GetFullDebugLogPath();
                                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ NativeWrapper: グローバルシャットダウン失敗 {shutdownEx.GetType().Name}: {shutdownEx.Message}{Environment.NewLine}");
                             }
                             catch { /* デバッグログ失敗は無視 */ }
@@ -721,7 +727,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                         // 🔍🔍🔍 デバッグ: グローバルシャットダウンスキップ
                         try
                         {
-                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            var debugPath = _loggingSettings.GetFullDebugLogPath();
                             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏭️ NativeWrapper: グローバルシャットダウンスキップ (ActiveInstances={_activeInstances}, HasBeenShutdown={_hasBeenShutdown}, IsApplicationExiting={_isApplicationExiting}){Environment.NewLine}");
                         }
                         catch { /* デバッグログ失敗は無視 */ }
@@ -737,7 +743,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
             // 🔍🔍🔍 デバッグ: Dispose例外
             try
             {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var debugPath = _loggingSettings.GetFullDebugLogPath();
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 NativeWrapper: Dispose例外 {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
@@ -767,7 +773,8 @@ public class NativeWindowsCaptureWrapper : IDisposable
             // 🔍 デバッグ: 一時停止開始ログ
             try
             {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var defaultLoggingSettings = new LoggingSettings();
+                var debugPath = defaultLoggingSettings.GetFullDebugLogPath();
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました{Environment.NewLine}");
                 System.Diagnostics.Debug.WriteLine("🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました");
                 Console.WriteLine("🔒 [WINDOW_SELECTION] ネイティブキャプチャを一時停止しました");
@@ -788,7 +795,8 @@ public class NativeWindowsCaptureWrapper : IDisposable
             // 🔍 デバッグ: 再開ログ
             try
             {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var defaultLoggingSettings = new LoggingSettings();
+                var debugPath = defaultLoggingSettings.GetFullDebugLogPath();
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました{Environment.NewLine}");
                 System.Diagnostics.Debug.WriteLine("🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました");
                 Console.WriteLine("🚀 [WINDOW_SELECTION] ネイティブキャプチャを再開しました");

@@ -1,6 +1,8 @@
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
+using Baketa.Core.Settings;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -21,6 +23,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private readonly ILogger<EnhancedImageChangeDetectionService> _logger;
     private readonly IPerceptualHashService _perceptualHashService;
     private readonly IImageChangeMetricsService _metricsService;
+    private readonly ImageChangeDetectionSettings _settings;
+    private readonly LoggingSettings _loggingSettings;
     
     // スレッドセーフキャッシュ（コンテキスト別）
     private readonly ConcurrentDictionary<string, QuickHashCache> _quickHashCache = new();
@@ -42,11 +46,64 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     public EnhancedImageChangeDetectionService(
         ILogger<EnhancedImageChangeDetectionService> logger,
         IPerceptualHashService perceptualHashService,
-        IImageChangeMetricsService metricsService)
+        IImageChangeMetricsService metricsService,
+        IConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _perceptualHashService = perceptualHashService ?? throw new ArgumentNullException(nameof(perceptualHashService));
         _metricsService = metricsService ?? throw new ArgumentNullException(nameof(metricsService));
+        
+        // 設定外部化対応: ImageChangeDetection設定セクションから読み込み
+        _settings = InitializeImageChangeDetectionSettings(configuration);
+        _loggingSettings = InitializeLoggingSettings(configuration);
+    }
+    
+    private static ImageChangeDetectionSettings InitializeImageChangeDetectionSettings(IConfiguration configuration)
+    {
+        try
+        {
+            if (configuration != null)
+            {
+                return new ImageChangeDetectionSettings
+                {
+                    Stage1SimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:Stage1SimilarityThreshold", 0.92f),
+                    Stage2ChangePercentageThreshold = configuration.GetValue<float>("ImageChangeDetection:Stage2ChangePercentageThreshold", 0.05f),
+                    Stage3SSIMThreshold = configuration.GetValue<float>("ImageChangeDetection:Stage3SSIMThreshold", 0.92f),
+                    RegionSSIMThreshold = configuration.GetValue<float>("ImageChangeDetection:RegionSSIMThreshold", 0.95f),
+                    EnableCaching = configuration.GetValue<bool>("ImageChangeDetection:EnableCaching", true),
+                    MaxCacheSize = configuration.GetValue<int>("ImageChangeDetection:MaxCacheSize", 1000),
+                    CacheExpirationMinutes = configuration.GetValue<int>("ImageChangeDetection:CacheExpirationMinutes", 30),
+                    EnablePerformanceLogging = configuration.GetValue<bool>("ImageChangeDetection:EnablePerformanceLogging", true)
+                };
+            }
+        }
+        catch (Exception)
+        {
+            // 設定取得失敗時はデフォルト値を使用
+        }
+        return ImageChangeDetectionSettings.CreateDevelopmentSettings();
+    }
+    
+    private static LoggingSettings InitializeLoggingSettings(IConfiguration configuration)
+    {
+        try
+        {
+            if (configuration != null)
+            {
+                return new LoggingSettings
+                {
+                    DebugLogPath = configuration.GetValue<string>("Logging:DebugLogPath") ?? "debug_app_logs.txt",
+                    EnableDebugFileLogging = configuration.GetValue<bool>("Logging:EnableDebugFileLogging", true),
+                    MaxDebugLogFileSizeMB = configuration.GetValue<int>("Logging:MaxDebugLogFileSizeMB", 10),
+                    DebugLogRetentionDays = configuration.GetValue<int>("Logging:DebugLogRetentionDays", 7)
+                };
+            }
+        }
+        catch (Exception)
+        {
+            // 設定取得失敗時はデフォルト値を使用
+        }
+        return LoggingSettings.CreateDevelopmentSettings();
     }
 
     /// <inheritdoc />
@@ -59,13 +116,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         ArgumentNullException.ThrowIfNull(currentImage);
         Interlocked.Increment(ref _totalProcessed);
         
-        // 🚨 P0システム動作確認用 - 変化検知開始ログ
-        try
-        {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_CHANGE_DETECT] EnhancedImageChangeDetectionService.DetectChangeAsync開始 - ContextId: {contextId}{Environment.NewLine}");
-        }
-        catch { /* ファイル出力失敗は無視 */ }
+        // 🎯 P0システム動作確認用 - 変化検知開始ログ
+        _logger.LogDebug("🎯 [P0_CHANGE_DETECT] EnhancedImageChangeDetectionService.DetectChangeAsync開始 - ContextId: {ContextId}", contextId);
         
         var overallStopwatch = Stopwatch.StartNew();
         
@@ -87,24 +139,16 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 _logger.LogDebug("📊 Stage 1で除外 - Context: {ContextId}, 処理時間: {ProcessingTimeMs}ms", 
                     contextId, quickResult.ProcessingTime.TotalMilliseconds);
                 
-                // 🚨 P0システム動作確認用 - Stage 1フィルタリングログ（Gemini推奨: 類似度情報追加）
-                try
-                {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE1_FILTERED] Stage 1で変化なし除外 - Similarity: {quickResult.MaxSimilarity:F4}, ContextId: {contextId}, 処理時間: {quickResult.ProcessingTime.TotalMilliseconds:F2}ms{Environment.NewLine}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
+                // 🎯 P0システム動作確認用 - Stage 1フィルタリングログ（Gemini推奨: 類似度情報追加）
+                _logger.LogDebug("🎯 [P0_STAGE1_FILTERED] Stage 1で変化なし除外 - Similarity: {Similarity:F4}, ContextId: {ContextId}, 処理時間: {ProcessingTimeMs:F2}ms", 
+                    quickResult.MaxSimilarity, contextId, quickResult.ProcessingTime.TotalMilliseconds);
                 
                 return ImageChangeResult.CreateNoChange(quickResult.ProcessingTime, detectionStage: 1);
             }
             
-            // 🚨 P0システム動作確認用 - Stage 1通過ログ（Gemini推奨: 類似度情報追加）
-            try
-            {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE1_PASSED] Stage 1通過 - Similarity: {quickResult.MaxSimilarity:F4}, 変化の可能性あり - ContextId: {contextId}{Environment.NewLine}");
-            }
-            catch { /* ファイル出力失敗は無視 */ }
+            // 🎯 P0システム動作確認用 - Stage 1通過ログ（Gemini推奨: 類似度情報追加）
+            _logger.LogDebug("🎯 [P0_STAGE1_PASSED] Stage 1通過 - Similarity: {Similarity:F4}, 変化の可能性あり - ContextId: {ContextId}", 
+                quickResult.MaxSimilarity, contextId);
 
             // Stage 2: 中精度検証（8%処理）
             var stage2Result = await ExecuteStage2MediumPrecisionAsync(previousImage, currentImage, contextId, cancellationToken);
@@ -209,7 +253,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             {
                 // 領域別SSIM計算（簡易実装）
                 var ssimScore = await _perceptualHashService.CalculateSSIMAsync(previousImage, currentImage);
-                var hasChanged = ssimScore < 0.95f; // SSIM閾値
+                var hasChanged = ssimScore < _settings.RegionSSIMThreshold; // SSIM閾値（設定外部化）
                 
                 results.Add(new RegionChangeResult(region, hasChanged, ssimScore));
             }
@@ -332,24 +376,17 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 : cachedHashes.DifferenceHash;
                 
             var similarity = _perceptualHashService.CompareHashes(previousHash, currentHash, quickAlgorithm);
-            var hasPotentialChange = similarity < 0.92f; // Gemini推奨: ハミング距離5を許容する閾値に調整
+            var hasPotentialChange = similarity < _settings.Stage1SimilarityThreshold; // Stage1類似度閾値（設定外部化）
             
-            // 🚨 P0システム動作確認用 - ハッシュ値デバッグログ
-            try
+            // 🔍 P0システム動作確認用 - ハッシュ値デバッグログ
+            if (_logger.IsEnabled(LogLevel.Debug))
             {
                 var prevHashShort = string.IsNullOrEmpty(previousHash) ? "NULL" : previousHash.Substring(0, Math.Min(8, previousHash.Length)) + "...";
                 var currHashShort = string.IsNullOrEmpty(currentHash) ? "NULL" : currentHash.Substring(0, Math.Min(8, currentHash.Length)) + "...";
                 
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🔍 [P0_HASH_DEBUG] " +
-                    $"Algorithm: {quickAlgorithm}, " +
-                    $"PrevHash: {prevHashShort}, " +
-                    $"CurrHash: {currHashShort}, " +
-                    $"Similarity: {similarity:F4}, " +
-                    $"HasChange: {hasPotentialChange}, " +
-                    $"ContextId: {contextId}{Environment.NewLine}");
+                _logger.LogDebug("🔍 [P0_HASH_DEBUG] Algorithm: {Algorithm}, PrevHash: {PrevHash}, CurrHash: {CurrHash}, Similarity: {Similarity:F4}, HasChange: {HasChange}, ContextId: {ContextId}", 
+                    quickAlgorithm, prevHashShort, currHashShort, similarity, hasPotentialChange, contextId);
             }
-            catch { /* ファイル出力失敗は無視 */ }
             
             // キャッシュ更新
             var updatedCache = quickAlgorithm == HashAlgorithmType.AverageHash
@@ -415,7 +452,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // 中精度比較（ハミング距離ベース）
             var hammingDistance = _perceptualHashService.CalculateHammingDistance(previousHash, currentHash);
             var changePercentage = hammingDistance / 64.0f; // 64bit正規化
-            var hasChanged = changePercentage >= 0.05f; // Stage 2閾値
+            var hasChanged = changePercentage >= _settings.Stage2ChangePercentageThreshold; // Stage2変化率閾値（設定外部化）
             
             return hasChanged 
                 ? ImageChangeResult.CreateChanged(previousHash, currentHash, changePercentage, algorithm, stopwatch.Elapsed, detectionStage: 2)
@@ -445,7 +482,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             // SSIM構造的類似性計算
             var ssimScore = await _perceptualHashService.CalculateSSIMAsync(previousImage, currentImage);
-            var hasChanged = ssimScore < 0.92f; // SSIM高精度閾値
+            var hasChanged = ssimScore < _settings.Stage3SSIMThreshold; // Stage3 SSIM高精度閾値（設定外部化）
             
             // ROI解析（変化領域特定）
             var changeRegions = hasChanged 
