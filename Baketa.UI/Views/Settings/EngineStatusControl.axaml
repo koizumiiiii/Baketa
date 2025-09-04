@@ -55,7 +55,7 @@
 
           <!-- 詳細情報 -->
           <TextBlock Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1"
-                     Text="OPUS-MT • 高速 • オフライン対応"
+                     Text="NLLB-200 • 高品質 • オフライン対応"
                      FontSize="12"
                      Opacity="0.7"
                      Margin="0,4,0,0" />

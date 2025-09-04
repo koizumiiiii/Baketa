@@ -59,7 +59,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private int _serverPort = 5556; // 動的ポート（デフォルト: OPUS-MT=5556, NLLB-200=5556）
+    private int _serverPort = 5556; // 動的ポート（NLLB-200専用: 5556）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔

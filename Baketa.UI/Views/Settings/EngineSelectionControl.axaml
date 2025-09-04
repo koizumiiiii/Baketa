@@ -38,7 +38,7 @@
                 <TextBlock Text="LocalOnly エンジン" 
                            FontWeight="Medium" 
                            FontSize="14" />
-                <TextBlock Text="OPUS-MT • 高速 • 無料 • オフライン対応"
+                <TextBlock Text="NLLB-200 • 高品質 • 無料 • オフライン対応"
                            FontSize="12"
                            Opacity="0.8" />
               </StackPanel>

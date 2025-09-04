@@ -750,7 +750,7 @@ public class SimpleSettingsViewModel : ViewModelBase
                     AutoDetectSourceLanguage = false,
                     DefaultSourceLanguage = LanguageCodeConverter.ToLanguageCode(settings.SourceLanguage),
                     DefaultTargetLanguage = LanguageCodeConverter.ToLanguageCode(settings.TargetLanguage),
-                    DefaultEngine = settings.UseLocalEngine ? "OPUS-MT" : "Gemini",
+                    DefaultEngine = settings.UseLocalEngine ? "NLLB-200" : "Gemini",
                     UseLocalEngine = settings.UseLocalEngine,
                     ConfidenceThreshold = 0.7,
                     TimeoutMs = 30000

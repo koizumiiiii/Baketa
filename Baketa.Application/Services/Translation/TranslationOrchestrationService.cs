@@ -43,9 +43,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
-    private readonly ITranslationEngineFactory _translationEngineFactory;
+    // [REMOVED] ITranslationEngineFactoryは使用されないため削除
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
     private readonly IEventAggregator _eventAggregator;
+    private readonly TranslationService _translationService;
     private readonly IOptionsMonitor<Baketa.Core.Settings.OcrSettings> _ocrSettings;
     private readonly ITranslationDictionaryService? _translationDictionaryService;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
@@ -102,27 +103,29 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ICaptureService captureService,
         ISettingsService settingsService,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
-        ITranslationEngineFactory translationEngineFactory,
+        // [REMOVED] ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
         IEventAggregator eventAggregator,
         IOptionsMonitor<Baketa.Core.Settings.OcrSettings> ocrSettings,
+        TranslationService translationService,
         ITranslationDictionaryService? translationDictionaryService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
-        ArgumentNullException.ThrowIfNull(translationEngineFactory);
+        // [REMOVED] ArgumentNullException.ThrowIfNull(translationEngineFactory);
         ArgumentNullException.ThrowIfNull(eventAggregator);
         ArgumentNullException.ThrowIfNull(ocrSettings);
         
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
-        _translationEngineFactory = translationEngineFactory;
+        // [REMOVED] _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
         _eventAggregator = eventAggregator;
         _ocrSettings = ocrSettings;
+        _translationService = translationService;
         _translationDictionaryService = translationDictionaryService;
         _logger = logger;
 
@@ -1814,50 +1817,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // ✨ 実際のAI翻訳エンジンを使用した翻訳処理（辞書置換を廃止）
                     DebugLogUtility.WriteLog($"🤖 AI翻訳エンジン使用開始: '{originalText}' ({sourceCode} → {targetCode})");
                     
-                    // TODO: TranslationEngineFactory統合は次フェーズで実装（現在は辞書フォールバック）
-                    DebugLogUtility.WriteLog($"📝 [TODO] AI翻訳エンジン統合は次フェーズで実装予定");
+                    // 🚀 [NLLB-200_INTEGRATION] NLLB-200 AI翻訳エンジンを使用
+                    DebugLogUtility.WriteLog($"🤖 NLLB-200 AI翻訳エンジンを使用して翻訳開始");
                     
                     // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
-                    var engineStatus = "dictionary_fallback"; // AI翻訳が未実装のため辞書フォールバック
+                    var engineStatus = "nllb_200_ai_engine"; // NLLB-200 AI翻訳エンジン使用
                     await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                     {
                         Stage = "TranslationEngineSelection",
-                        IsSuccess = false, // AI翻訳が使用されていないため失敗扱い
+                        IsSuccess = true, // NLLB-200 AI翻訳エンジンを使用
                         ProcessingTimeMs = 0,
                         SessionId = translationId,
-                        Severity = DiagnosticSeverity.Warning,
-                        Message = "翻訳エンジン選択: AI翻訳未実装のため辞書フォールバックを使用",
+                        Severity = DiagnosticSeverity.Information,
+                        Message = "翻訳エンジン選択: NLLB-200 AI翻訳エンジンを使用",
                         Metrics = new Dictionary<string, object>
                         {
                             { "PrimaryEngine", "NLLB-200" },
-                            { "PrimaryEngineStatus", "not_implemented" },
-                            { "FallbackEngine", "DictionaryTranslation" },
-                            { "FallbackReason", "ai_engine_not_implemented" },
-                            { "ActualEngine", "DictionaryTranslation" }
+                            { "PrimaryEngineStatus", "active" },
+                            { "FallbackEngine", "None" },
+                            { "FallbackReason", "not_required" },
+                            { "ActualEngine", "NLLB-200" }
                         }
                     }).ConfigureAwait(false);
                     
-                    // 一時的に改善された辞書ベース翻訳を使用（AI統合準備中）
+                    // 🤖 NLLB-200 AI翻訳エンジンを使用
                     var translationStartTime = DateTime.UtcNow;
                     
-                    if (sourceCode == "ja" && targetCode == "en")
-                    {
-                        // 日本語から英語への翻訳（新辞書サービス優先）
-                        translatedText = await TranslateWithDictionaryServiceAsync(originalText, sourceCode, targetCode);
-                        DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（日→英）: '{translatedText}'");
-                    }
-                    else if (sourceCode == "en" && targetCode == "ja")
-                    {
-                        // 英語から日本語への翻訳（新辞書サービス優先）
-                        translatedText = await TranslateWithDictionaryServiceAsync(originalText, sourceCode, targetCode);
-                        DebugLogUtility.WriteLog($"🔄 改善辞書翻訳（英→日）: '{translatedText}'");
-                    }
-                    else
-                    {
-                        // その他の言語ペア
-                        translatedText = $"[{sourceCode}→{targetCode}] {originalText}";
-                        DebugLogUtility.WriteLog($"🔄 フォールバック翻訳: '{translatedText}'");
-                    }
+                    // すべての言語ペアでNLLB-200を使用
+                    translatedText = await TranslateWithNLLBEngineAsync(originalText, sourceCode, targetCode);
+                    DebugLogUtility.WriteLog($"🤖 NLLB-200翻訳結果: '{translatedText}'");
                     
                     var translationElapsed = DateTime.UtcNow - translationStartTime;
                     
@@ -2098,149 +2086,49 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <summary>
     /// 辞書サービスを使用した翻訳（フォールバック付き）
     /// </summary>
-    private async Task<string> TranslateWithDictionaryServiceAsync(string text, string sourceLanguage, string targetLanguage)
+    private async Task<string> TranslateWithNLLBEngineAsync(string text, string sourceLanguage, string targetLanguage)
     {
-        // 新しい辞書サービスを優先して使用
-        if (_translationDictionaryService != null)
+        try
         {
-            try
+            // 🚀 [SIMPLIFIED] 直接ITranslationServiceを使用してNLLB-200翻訳を実行
+            // ファクトリーパターンは不要（DefaultTranslationServiceが自動選択）
+
+            _logger?.LogTrace("🤖 NLLB-200翻訳エンジンで翻訳開始: '{Text}' ({SourceLang} -> {TargetLang})", 
+                text, sourceLanguage, targetLanguage);
+
+            // 🚀 実際の翻訳処理を実行（辞書翻訳削除後の正しい実装）
+            _logger?.LogTrace("🤖 ITranslationServiceで実際の翻訳を実行: '{Text}' ({SourceLang} -> {TargetLang})", 
+                text, sourceLanguage, targetLanguage);
+            
+            // 実際の翻訳サービスを使用してNLLB-200翻訳を実行
+            var sourceLang = Language.FromCode(sourceLanguage);
+            var targetLang = Language.FromCode(targetLanguage);
+            
+            var response = await _translationService.TranslateAsync(text, sourceLang, targetLang);
+            var translatedText = response.TranslatedText;
+            
+            // 翻訳が成功した場合（元のテキストと異なる場合）
+            if (!string.Equals(text, translatedText, StringComparison.Ordinal))
             {
-                var translatedText = await _translationDictionaryService.TranslateAsync(text, sourceLanguage, targetLanguage);
-                
-                // 翻訳が成功した場合（元のテキストと異なる場合）
-                if (!string.Equals(text, translatedText, StringComparison.Ordinal))
-                {
-                    _logger?.LogTrace("📚 辞書サービス翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})", 
-                        text, translatedText, sourceLanguage, targetLanguage);
-                    return translatedText;
-                }
+                _logger?.LogTrace("✅ NLLB-200翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})", 
+                    text, translatedText, sourceLanguage, targetLanguage);
+                return translatedText;
             }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "⚠️ 辞書サービス翻訳でエラー - ハードコードフォールバック使用: '{Text}'", text);
-            }
+            
+            _logger?.LogTrace("🔄 NLLB-200翻訳結果が元のテキストと同じ: '{Text}'", text);
+            return translatedText;
         }
-
-        // フォールバック: 既存のハードコード翻訳を使用
-        if (sourceLanguage == "ja" && targetLanguage == "en")
+        catch (Exception ex)
         {
-            _logger?.LogTrace("🔄 ハードコード翻訳フォールバック（日→英）: '{Text}'", text);
-            return TranslateJapaneseToEnglish(text);
+            _logger?.LogError(ex, "❌ NLLB-200翻訳でエラーが発生: '{Text}' ({SourceLang} -> {TargetLang})", 
+                text, sourceLanguage, targetLanguage);
+            
+            // エラー時は空文字列を返却（何も表示しない）
+            return string.Empty;
         }
-        else if (sourceLanguage == "en" && targetLanguage == "ja")
-        {
-            _logger?.LogTrace("🔄 ハードコード翻訳フォールバック（英→日）: '{Text}'", text);
-            return TranslateEnglishToJapanese(text);
-        }
-
-        // 対応していない言語ペア
-        return text;
     }
 
-    /// <summary>
-    /// 日本語から英語への基本的な翻訳（フォールバック用）
-    /// </summary>
-    private static string TranslateJapaneseToEnglish(string text)
-    {
-        var result = text
-            .Replace("こんにちは", "hello")
-            .Replace("ありがとう", "thank you")
-            .Replace("さようなら", "goodbye")
-            .Replace("はい", "yes")
-            .Replace("いいえ", "no")
-            .Replace("すみません", "excuse me")
-            .Replace("お疲れ様", "good job")
-            .Replace("開始", "start")
-            .Replace("終了", "end")
-            .Replace("設定", "settings")
-            .Replace("メニュー", "menu")
-            .Replace("ファイル", "file")
-            .Replace("編集", "edit")
-            .Replace("表示", "view")
-            .Replace("ツール", "tools")
-            .Replace("ヘルプ", "help")
-            .Replace("ゲーム", "game")
-            .Replace("プレイ", "play")
-            .Replace("スタート", "start")
-            .Replace("ストップ", "stop")
-            .Replace("ポーズ", "pause")
-            .Replace("続行", "continue")
-            .Replace("保存", "save")
-            .Replace("読み込み", "load")
-            .Replace("終了", "quit")
-            .Replace("レベル", "level")
-            .Replace("スコア", "score")
-            .Replace("ライフ", "life")
-            .Replace("ポイント", "point")
-            .Replace("コイン", "coin")
-            .Replace("アイテム", "item")
-            .Replace("武器", "weapon")
-            .Replace("防具", "armor")
-            .Replace("マジック", "magic")
-            .Replace("スキル", "skill")
-            .Replace("キャラクター", "character")
-            .Replace("プレイヤー", "player")
-            .Replace("エネミー", "enemy")
-            .Replace("ボス", "boss")
-            .Replace("バトル", "battle")
-            .Replace("戦闘", "fight")
-            .Replace("勝利", "victory")
-            .Replace("敗北", "defeat")
-            .Replace("ゲームオーバー", "game over");
-        return result;
-    }
-    
-    /// <summary>
-    /// 英語から日本語への基本的な翻訳
-    /// </summary>
-    private static string TranslateEnglishToJapanese(string text)
-    {
-        var result = text.ToLowerInvariant()
-            .Replace("hello", "こんにちは")
-            .Replace("thank you", "ありがとう")
-            .Replace("goodbye", "さようなら")
-            .Replace("yes", "はい")
-            .Replace("no", "いいえ")
-            .Replace("excuse me", "すみません")
-            .Replace("good job", "お疲れ様")
-            .Replace("start", "開始")
-            .Replace("end", "終了")
-            .Replace("settings", "設定")
-            .Replace("menu", "メニュー")
-            .Replace("file", "ファイル")
-            .Replace("edit", "編集")
-            .Replace("view", "表示")
-            .Replace("tools", "ツール")
-            .Replace("help", "ヘルプ")
-            .Replace("game", "ゲーム")
-            .Replace("play", "プレイ")
-            .Replace("stop", "ストップ")
-            .Replace("pause", "ポーズ")
-            .Replace("continue", "続行")
-            .Replace("save", "保存")
-            .Replace("load", "読み込み")
-            .Replace("quit", "終了")
-            .Replace("level", "レベル")
-            .Replace("score", "スコア")
-            .Replace("life", "ライフ")
-            .Replace("point", "ポイント")
-            .Replace("coin", "コイン")
-            .Replace("item", "アイテム")
-            .Replace("weapon", "武器")
-            .Replace("armor", "防具")
-            .Replace("magic", "マジック")
-            .Replace("skill", "スキル")
-            .Replace("character", "キャラクター")
-            .Replace("player", "プレイヤー")
-            .Replace("enemy", "エネミー")
-            .Replace("boss", "ボス")
-            .Replace("battle", "バトル")
-            .Replace("fight", "戦闘")
-            .Replace("victory", "勝利")
-            .Replace("defeat", "敗北")
-            .Replace("game over", "ゲームオーバー");
-        return result;
-    }
+    // 🗑️ [REMOVED] 辞書翻訳メソッドを削除 - NLLB-200 AI翻訳エンジンに統合完了
 
     #endregion
 

@@ -32,7 +32,7 @@ using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
-// OPUS-MT ONNX実装削除済み
+// 翻訳エンジンをNLLB-200に統一
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using Baketa.Infrastructure.ResourceManagement;
@@ -79,8 +79,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
             
-            // HuggingFace Transformers OPUS-MT翻訳サービス（高品質版）を先に登録
-            RegisterTransformersOpusMTServices(services);
+            // NLLB-200翻訳サービス（高品質版）を登録
+            RegisterNllb200TranslationServices(services);
             
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
@@ -467,12 +467,12 @@ namespace Baketa.Infrastructure.DI.Modules;
         }
         
         /// <summary>
-        /// HuggingFace Transformers OPUS-MT翻訳サービスを登録します。
-        /// 語彙サイズ不整合問題を完全解決した高品質版です。
+        /// NLLB-200翻訳サービスを登録します。
+        /// Meta社開発の高品質多言語ニューラル翻訳モデルです。
         /// Issue #147: 接続プール統合による接続ロック競合問題解決
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        private static void RegisterTransformersOpusMTServices(IServiceCollection services)
+        private static void RegisterNllb200TranslationServices(IServiceCollection services)
         {
             // 既存のITranslationEngine登録を全て削除して、最適化されたエンジンを登録
             var existingTranslationEngines = services
@@ -490,7 +490,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // ✅ FixedSizeConnectionPool登録（動的ポート対応版）
             services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）");
+            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - NLLB-200専用動的ポート対応");
             
             // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 3.2 VRAMモニタリング統合）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>

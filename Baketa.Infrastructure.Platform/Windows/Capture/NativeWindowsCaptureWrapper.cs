@@ -396,9 +396,12 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 }
             }
             
+            // 🚀 安全化: フレーム構造体を初期化
+            var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+            bool frameValid = false;
+            
             try
             {
-                var frame = new NativeWindowsCapture.BaketaCaptureFrame();
                 int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, out frame, timeoutMs);
                 if (result != NativeWindowsCapture.ErrorCodes.Success)
                 {
@@ -417,8 +420,11 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     }
                     catch { /* デバッグログ失敗は無視 */ }
                     
-                    return null;
+                    return null; // フレーム無効なので解放不要
                 }
+
+                // フレームが有効であることをマーク
+                frameValid = true;
 
                 try
                 {
@@ -433,16 +439,39 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     
                     return windowsImage;
                 }
-                finally
+                catch (Exception ex)
                 {
-                    // ネイティブメモリを解放
-                    NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                    _logger?.LogError(ex, "フレームからビットマップ作成中に例外が発生");
+                    return null;
                 }
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "フレームキャプチャ中に例外が発生");
                 return null;
+            }
+            finally
+            {
+                // 🚀 安全化: フレームが有効な場合のみ解放
+                if (frameValid && frame.bgraData != IntPtr.Zero)
+                {
+                    try
+                    {
+                        NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                    }
+                    catch (Exception ex)
+                    {
+                        // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
+                        _logger?.LogError(ex, "フレーム解放中に例外が発生");
+                        
+                        try
+                        {
+                            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                            System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 フレーム解放例外: {ex.Message}{Environment.NewLine}");
+                        }
+                        catch { /* デバッグログ失敗は無視 */ }
+                    }
+                }
             }
         }).ConfigureAwait(false);
     }
@@ -543,24 +572,9 @@ public class NativeWindowsCaptureWrapper : IDisposable
             bitmap.UnlockBits(bitmapData);
         }
 
-        // 🚀 P2最適化: フレームメモリを適切に解放
-        try
-        {
-            var tempFrame = frame; // コピーで安全に渡す
-            NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref tempFrame);
-            
-            // 🔍🔍🔍 デバッグ: メモリ解放確認
-            try
-            {
-                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
-                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🗑️ P2: フレームメモリ解放完了 - サイズ={frame.width}x{frame.height}{Environment.NewLine}");
-            }
-            catch { /* デバッグログ失敗は無視 */ }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "P2: フレームメモリ解放中に警告 - サイズ={FrameSize}", $"{frame.width}x{frame.height}");
-        }
+        // 🚀 安全化: フレームメモリの安全な解放処理を削除
+        // CreateBitmapFromBGRA内でのフレーム解放は危険なため、呼び出し元で管理
+        // NOTE: フレーム解放は CaptureFrameAsync の finally ブロックで安全に行う
         
         return bitmap;
     }

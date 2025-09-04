@@ -482,7 +482,7 @@ public class TranslationFlowEventProcessor :
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] Observable購読オブジェクト作成開始（CancellationToken制御付き）");
             _continuousTranslationSubscription = _translationService.TranslationResults
                 .ObserveOn(RxApp.MainThreadScheduler) // UIスレッドスケジューラで実行
-                .Subscribe(result => 
+                .Subscribe(async result => // 🔧 [OVERLAY_FIX] async追加でawaitを使用可能に
                 {
                     // 🚀 Stop機能: キャンセル状態チェック - Stop後の遅延結果表示を防止
                     if (cancellationToken.IsCancellationRequested)
@@ -539,8 +539,23 @@ public class TranslationFlowEventProcessor :
                     var textChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk> { textChunk };
                     DebugLogUtility.WriteLog($"🔍 フォールバックTextChunk作成: '{result.OriginalText}' -> '{result.TranslatedText}'");
 
-                    // 従来モードではフォールバック表示は不要（座標ベース翻訳で既にAR表示済み）
-                    DebugLogUtility.WriteLog("⚠️ 従来モードのフォールバック表示は削除済み - ARシステムで表示済み");
+                    // 🎯 [OVERLAY_FIX] 従来モードでもオーバーレイ表示を実行
+                    DebugLogUtility.WriteLog("🎯 従来モードでオーバーレイ表示を実行中...");
+                    Console.WriteLine($"🎯 [OVERLAY_FIX] 翻訳結果オーバーレイ表示開始: '{result.TranslatedText}'");
+                    
+                    try
+                    {
+                        // InPlaceTranslationOverlayManagerを使用してオーバーレイ表示
+                        await _inPlaceOverlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+                        DebugLogUtility.WriteLog("✅ オーバーレイ表示完了");
+                        Console.WriteLine($"✅ [OVERLAY_FIX] オーバーレイ表示成功: ChunkId={textChunk.ChunkId}");
+                    }
+                    catch (Exception overlayEx)
+                    {
+                        _logger.LogError(overlayEx, "オーバーレイ表示エラー: {Error}", overlayEx.Message);
+                        Console.WriteLine($"❌ [OVERLAY_FIX] オーバーレイ表示エラー: {overlayEx.Message}");
+                        DebugLogUtility.WriteLog($"❌ オーバーレイ表示エラー: {overlayEx.Message}");
+                    }
                 });
 
             // 3. 継続的翻訳を開始

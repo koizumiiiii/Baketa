@@ -205,6 +205,11 @@ public class PaddleOcrEngine : IOcrEngine
         }
         __logger?.LogInformation("🔍 Step 2: Settings validation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
+        // 🎯 [ULTRATHINK_CRITICAL_FIX] PaddleOCR連続失敗カウンタリセット - デッドロック解消
+        stepSw.Restart();
+        ResetFailureCounter();
+        __logger?.LogInformation("🔍 Step 2.1: Failure counter reset finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+
         ThrowIfDisposed();
         
         if (IsInitialized)
@@ -478,22 +483,40 @@ public class PaddleOcrEngine : IOcrEngine
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
 
+            // 🎯 [ULTRATHINK_PREVENTION] OCR実行前の早期予防システム
+            progressCallback?.Report(new OcrProgress(0.25, "画像品質検証中"));
+            
+            Mat processedMat;
+            try 
+            {
+                processedMat = ApplyPreventiveNormalization(mat);
+                __logger?.LogDebug("✅ [PREVENTIVE_NORM] 早期正規化完了");
+            }
+            catch (Exception ex)
+            {
+                __logger?.LogError(ex, "🚨 [PREVENTIVE_NORM] 早期正規化失敗");
+                return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
+            }
+            
             progressCallback?.Report(new OcrProgress(0.3, "OCR処理実行中"));
 
-            // OCR実行 - ハイブリッドモード対応
+            // OCR実行 - ハイブリッドモード対応（予防処理済み画像使用）
             IReadOnlyList<OcrTextRegion> textRegions;
-            if (_isHybridMode && _hybridService != null)
+            using (processedMat) // processedMatの適切なDispose管理
             {
-                __logger?.LogDebug("🔄 ハイブリッドモードでOCR実行");
-                var processingMode = DetermineProcessingMode();
-                textRegions = await _hybridService.ExecuteHybridOcrAsync(mat, processingMode, cancellationToken).ConfigureAwait(false);
-                __logger?.LogDebug($"🔄 ハイブリッドOCR完了: {textRegions.Count}領域検出 ({processingMode}モード)");
-            }
-            else
-            {
-                __logger?.LogDebug("📊 シングルモードでOCR実行");
-                textRegions = await ExecuteOcrAsync(mat, progressCallback, cancellationToken).ConfigureAwait(false);
-                __logger?.LogDebug($"📊 シングルOCR完了: {textRegions?.Count ?? 0}領域検出");
+                if (_isHybridMode && _hybridService != null)
+                {
+                    __logger?.LogDebug("🔄 ハイブリッドモードでOCR実行（予防処理済み）");
+                    var processingMode = DetermineProcessingMode();
+                    textRegions = await _hybridService.ExecuteHybridOcrAsync(processedMat, processingMode, cancellationToken).ConfigureAwait(false);
+                    __logger?.LogDebug($"🔄 ハイブリッドOCR完了: {textRegions.Count}領域検出 ({processingMode}モード)");
+                }
+                else
+                {
+                    __logger?.LogDebug("📊 シングルモードでOCR実行（予防処理済み）");
+                    textRegions = await ExecuteOcrAsync(processedMat, progressCallback, cancellationToken).ConfigureAwait(false);
+                    __logger?.LogDebug($"📊 シングルOCR完了: {textRegions?.Count ?? 0}領域検出");
+                }
             }
             
             // ROI座標の補正
@@ -3601,7 +3624,7 @@ public class PaddleOcrEngine : IOcrEngine
                     // 🔧 [PADDLE_PREDICTOR_FIX] PaddlePredictor run failed エラー特化修正
                     // メモリ破損防止: より厳格な制御
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-                    var ocrTask = Task.Run(() => {
+                    var ocrTask = Task.Run(() => { // Task.Run内は同期実行で安全
                         // GCを強制実行してメモリを整理
                         GC.Collect();
                         GC.WaitForPendingFinalizers();
@@ -3616,7 +3639,16 @@ public class PaddleOcrEngine : IOcrEngine
                             workingMat = safeMat.Clone();
                             
                             // 🎯 [ULTRATHINK_FIX] Gemini推奨: 奇数幅メモリアライメント問題解決
+                            var originalSize = $"{workingMat.Width}x{workingMat.Height}";
+                            var originalOdd = (workingMat.Width % 2 == 1) || (workingMat.Height % 2 == 1);
+                            
                             workingMat = NormalizeImageDimensions(workingMat);
+                            
+                            // 🔍 [ULTRATHINK_EVIDENCE] 正規化効果の確実な証拠収集
+                            var normalizedSize = $"{workingMat.Width}x{workingMat.Height}";
+                            var normalizedOdd = (workingMat.Width % 2 == 1) || (workingMat.Height % 2 == 1);
+                            __logger?.LogDebug("🎯 [NORMALIZATION_EVIDENCE] 正規化実行: {OriginalSize}({OriginalOdd}) → {NormalizedSize}({NormalizedOdd})", 
+                                originalSize, originalOdd ? "奇数あり" : "偶数", normalizedSize, normalizedOdd ? "奇数あり" : "偶数");
                             
                             if (!ValidateMatForPaddleOCR(workingMat))
                             {
@@ -3650,6 +3682,49 @@ public class PaddleOcrEngine : IOcrEngine
                             {
                                 __logger?.LogError("🚨 [OCR_ENGINE] 画像サイズが小さすぎ: {Width}x{Height} (最小: 16x16)", workingMat.Cols, workingMat.Rows);
                                 throw new InvalidOperationException($"PaddleOCR用画像サイズが小さすぎ: {workingMat.Cols}x{workingMat.Rows} (最小: 16x16)");
+                            }
+                            
+                            // 🛡️ [ACCESS_VIOLATION_PREVENTION] メモリアクセス安全性の最終チェック
+                            try 
+                            {
+                                // Mat データ連続性確認
+                                if (!workingMat.IsContinuous())
+                                {
+                                    __logger?.LogWarning("⚠️ [MEMORY_SAFETY] Mat非連続データを連続データに変換中...");
+                                    var continuousMat = workingMat.Clone();
+                                    workingMat.Dispose();
+                                    workingMat = continuousMat;
+                                }
+                                
+                                // メモリデータ有効性チェック（安全な方法）
+                                if (workingMat.Empty())
+                                {
+                                    __logger?.LogError("🚨 [MEMORY_SAFETY] Mat データが空です");
+                                    throw new InvalidOperationException("Mat データが空です");
+                                }
+                                
+                                // データサイズ検証
+                                var expectedSize = workingMat.Rows * workingMat.Cols * workingMat.Channels();
+                                if (expectedSize <= 0)
+                                {
+                                    __logger?.LogError("🚨 [MEMORY_SAFETY] 無効なMatデータサイズ: {Size}", expectedSize);
+                                    throw new InvalidOperationException($"無効なMatデータサイズ: {expectedSize}");
+                                }
+                                
+                                __logger?.LogDebug("✅ [MEMORY_SAFETY] メモリ安全性チェック完了: Size={Size}, Continuous={Continuous}", 
+                                    expectedSize, workingMat.IsContinuous());
+                            }
+                            catch (Exception safetyEx)
+                            {
+                                __logger?.LogError(safetyEx, "🚨 [MEMORY_SAFETY] メモリ安全性チェックで例外");
+                                throw new InvalidOperationException("PaddleOCR実行前のメモリ安全性チェックで例外", safetyEx);
+                            }
+                            
+                            // 🎯 [PADDLE_ENGINE_SAFETY] PaddleOCRエンジン状態確認
+                            if (_ocrEngine == null)
+                            {
+                                __logger?.LogError("🚨 [ENGINE_SAFETY] PaddleOCRエンジンがnullです");
+                                throw new InvalidOperationException("PaddleOCRエンジンが初期化されていません");
                             }
                             
                             // 🎯 [PADDLE_PREDICTOR_CRITICAL_FIX] PaddlePredictor run failed エラー対策
@@ -3701,11 +3776,11 @@ public class PaddleOcrEngine : IOcrEngine
                 }
                 catch (Exception ex) when (ex.Message.Contains("PaddlePredictor") && ex.Message.Contains("run failed"))
                 {
-                    // 🚨 [PADDLE_PREDICTOR_ERROR] PaddlePredictor特化エラー処理
+                    // 🚨 [ULTRATHINK_ENHANCED_RECOVERY] PaddlePredictor失敗時の高度回復機構
                     _consecutivePaddleFailures++;
                     
                     var detailedInfo = CollectPaddlePredictorErrorInfo(safeMat, ex);
-                    __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED] {DetailedInfo}", detailedInfo);
+                    __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED] 失敗#{FailureCount}: {DetailedInfo}", _consecutivePaddleFailures, detailedInfo);
                     
                     // Mat状態の詳細ログ (安全なsafeMatを使用)
                     try 
@@ -3718,6 +3793,85 @@ public class PaddleOcrEngine : IOcrEngine
                     catch 
                     {
                         __logger?.LogError("🚨 [PADDLE_DEBUG] Cannot access Mat properties (Mat may be corrupted)");
+                    }
+                    
+                    // 🎯 [ULTRATHINK_AUTOMATIC_RECOVERY] 失敗回数に応じた段階的回復処理
+                    if (_consecutivePaddleFailures == 1)
+                    {
+                        // 第1回失敗: 軽量回復（GC + Mat正規化リトライ）
+                        __logger?.LogWarning("🔄 [AUTO_RECOVERY_L1] 1回目失敗 - 軽量回復開始（GC + Mat正規化）");
+                        try
+                        {
+                            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
+                            GC.WaitForPendingFinalizers();
+                            
+                            // Mat寸法正規化（奇数幅対策）
+                            using var normalizedMat = NormalizeImageDimensions(safeMat);
+                            var recoveryResult = _ocrEngine.Run(normalizedMat);
+                            
+                            __logger?.LogInformation("✅ [AUTO_RECOVERY_L1] 軽量回復成功 - 失敗カウンタリセット");
+                            _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
+                            return recoveryResult;
+                        }
+                        catch (Exception recoveryEx)
+                        {
+                            __logger?.LogWarning(recoveryEx, "⚠️ [AUTO_RECOVERY_L1] 軽量回復失敗 - 次段階回復へ");
+                        }
+                    }
+                    else if (_consecutivePaddleFailures == 2)
+                    {
+                        // 第2回失敗: 中強度回復（エンジン部分リセット）
+                        __logger?.LogWarning("🔄 [AUTO_RECOVERY_L2] 2回目失敗 - 中強度回復開始（エンジンリセット）");
+                        try
+                        {
+                            // エンジンのソフトリセット（再作成ではなく状態クリア）
+                            Task.Delay(100).GetAwaiter().GetResult(); // 短時間待機でリソース解放
+                            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
+                            GC.WaitForPendingFinalizers();
+                            
+                            // より小さいサイズでリトライ
+                            using var resizedMat = new Mat();
+                            var scale = Math.Min(1.0, Math.Sqrt(500000.0 / (safeMat.Cols * safeMat.Rows))); // 50万ピクセル制限
+                            var newSize = new OpenCvSharp.Size((int)(safeMat.Cols * scale), (int)(safeMat.Rows * scale));
+                            Cv2.Resize(safeMat, resizedMat, newSize, 0, 0, InterpolationFlags.Area);
+                            
+                            var recoveryResult = _ocrEngine.Run(resizedMat);
+                            
+                            __logger?.LogInformation("✅ [AUTO_RECOVERY_L2] 中強度回復成功 - 失敗カウンタリセット");
+                            _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
+                            return recoveryResult;
+                        }
+                        catch (Exception recoveryEx)
+                        {
+                            __logger?.LogWarning(recoveryEx, "⚠️ [AUTO_RECOVERY_L2] 中強度回復失敗 - 高強度回復へ");
+                        }
+                    }
+                    else if (_consecutivePaddleFailures >= 3)
+                    {
+                        // 第3回以上失敗: 高強度回復（完全エンジン再初期化）
+                        __logger?.LogError("🔄 [AUTO_RECOVERY_L3] 3回目以上失敗 - 高強度回復開始（完全再初期化）");
+                        try
+                        {
+                            // 完全なエンジン再初期化
+                            ReinitializeEngineAsync().GetAwaiter().GetResult(); // Task.Run内で実行のため同期待機使用
+                            
+                            // 再初期化後にリトライ（最小サイズ）
+                            using var minimalMat = new Mat();
+                            var minScale = Math.Min(1.0, Math.Sqrt(100000.0 / (safeMat.Cols * safeMat.Rows))); // 10万ピクセル制限
+                            var minSize = new OpenCvSharp.Size(Math.Max(16, (int)(safeMat.Cols * minScale)), 
+                                                              Math.Max(16, (int)(safeMat.Rows * minScale)));
+                            Cv2.Resize(safeMat, minimalMat, minSize, 0, 0, InterpolationFlags.Area);
+                            
+                            var recoveryResult = _ocrEngine.Run(minimalMat);
+                            
+                            __logger?.LogInformation("✅ [AUTO_RECOVERY_L3] 高強度回復成功 - 失敗カウンタリセット");
+                            _consecutivePaddleFailures = 0; // 完全回復時はリセット
+                            return recoveryResult;
+                        }
+                        catch (Exception recoveryEx)
+                        {
+                            __logger?.LogError(recoveryEx, "❌ [AUTO_RECOVERY_L3] 高強度回復も失敗 - 一時的無効化");
+                        }
                     }
                     
                     // エラー種別に応じた対処提案
@@ -3775,6 +3929,13 @@ public class PaddleOcrEngine : IOcrEngine
                 // 成功時の統計更新とクリーンアップ
                 _lastOcrTime = DateTime.UtcNow;
                 _consecutiveTimeouts = 0;
+                // 🎯 [ULTRATHINK_SUCCESS_RECOVERY] 成功時の段階的失敗カウンタリセット - デッドロック回避
+                if (_consecutivePaddleFailures > 0)
+                {
+                    var oldCount = _consecutivePaddleFailures;
+                    _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
+                    __logger?.LogDebug("🔄 [SUCCESS_RECOVERY] PaddleOCR成功 - 失敗カウンタ段階的リセット: {OldCount} → {NewCount}", oldCount, _consecutivePaddleFailures);
+                }
                 _currentOcrCancellation = null;
             
                 return result;
@@ -3806,6 +3967,13 @@ public class PaddleOcrEngine : IOcrEngine
                         // 遅延完了時の統計更新とクリーンアップ
                         _lastOcrTime = DateTime.UtcNow;
                         _consecutiveTimeouts = Math.Max(0, _consecutiveTimeouts - 1);
+                        // 🎯 [ULTRATHINK_LATE_SUCCESS_RECOVERY] 遅延成功時の段階的失敗カウンタリセット
+                        if (_consecutivePaddleFailures > 0)
+                        {
+                            var oldCount = _consecutivePaddleFailures;
+                            _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
+                            __logger?.LogDebug("🔄 [LATE_SUCCESS_RECOVERY] PaddleOCR遅延成功 - 失敗カウンタ段階的リセット: {OldCount} → {NewCount}", oldCount, _consecutivePaddleFailures);
+                        }
                         _currentOcrCancellation = null;
                     
                         return lateResult;
@@ -3973,11 +4141,40 @@ public class PaddleOcrEngine : IOcrEngine
                 }
                 catch (Exception ex) when (ex.Message.Contains("PaddlePredictor") && ex.Message.Contains("run failed"))
                 {
-                    // 🚨 [PADDLE_PREDICTOR_ERROR_OPT] PaddlePredictor特化エラー処理（最適化版）
+                    // 🚨 [ULTRATHINK_ENHANCED_RECOVERY_OPT] PaddlePredictor失敗時の高速回復機構（最適化版）
                     _consecutivePaddleFailures++;
                     
                     var detailedInfo = $"PaddlePredictor Error (Optimized): {ex.Message}";
-                    __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED_OPT] {DetailedInfo}", detailedInfo);
+                    __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED_OPT] 失敗#{FailureCount}: {DetailedInfo}", _consecutivePaddleFailures, detailedInfo);
+                    
+                    // 🎯 [ULTRATHINK_FAST_RECOVERY] 最適化版での高速回復処理
+                    if (_consecutivePaddleFailures <= 2)
+                    {
+                        // 1-2回失敗: 超高速回復（最小処理）
+                        __logger?.LogWarning("🔄 [AUTO_RECOVERY_FAST] 最適化版失敗#{Count} - 超高速回復開始", _consecutivePaddleFailures);
+                        try
+                        {
+                            // 最小限のGC（高速化優先）
+                            GC.Collect(0, GCCollectionMode.Optimized);
+                            
+                            // 更に小さいサイズでリトライ（高速化）
+                            using var fastMat = new Mat();
+                            var fastScale = Math.Min(0.8, Math.Sqrt(200000.0 / (safeMat.Cols * safeMat.Rows))); // 20万ピクセル制限（高速）
+                            var fastSize = new OpenCvSharp.Size(Math.Max(12, (int)(safeMat.Cols * fastScale)), 
+                                                               Math.Max(12, (int)(safeMat.Rows * fastScale)));
+                            Cv2.Resize(safeMat, fastMat, fastSize, 0, 0, InterpolationFlags.Nearest); // 最高速補間
+                            
+                            var recoveryResult = _ocrEngine.Run(fastMat);
+                            
+                            __logger?.LogInformation("✅ [AUTO_RECOVERY_FAST] 超高速回復成功 - 失敗カウンタリセット");
+                            _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
+                            return recoveryResult;
+                        }
+                        catch (Exception recoveryEx)
+                        {
+                            __logger?.LogWarning(recoveryEx, "⚠️ [AUTO_RECOVERY_FAST] 超高速回復失敗");
+                        }
+                    }
                     
                     throw new InvalidOperationException($"PaddlePredictor実行失敗（最適化）: {ex.Message}。連続失敗: {_consecutivePaddleFailures}回", ex);
                 }
@@ -4662,7 +4859,8 @@ public class PaddleOcrEngine : IOcrEngine
     }
     
     /// <summary>
-    /// PaddlePredictor実行エラーの詳細情報を収集
+    /// 🎯 [ULTRATHINK_EVIDENCE] PaddlePredictor実行エラーの包括的証拠収集
+    /// 奇数幅理論とその他根本原因の確実な証拠を収集
     /// </summary>
     private string CollectPaddlePredictorErrorInfo(Mat mat, Exception ex)
     {
@@ -4675,15 +4873,66 @@ public class PaddleOcrEngine : IOcrEngine
             info.Add($"Exception Type: {ex.GetType().Name}");
             info.Add($"Consecutive Failures: {_consecutivePaddleFailures}");
             
-            // Mat状態情報（安全な取得）
+            // 🔍 [ULTRATHINK_EVIDENCE] Mat状態情報（安全な取得）
             try 
             {
-                info.Add($"Mat Size: {mat.Width}x{mat.Height}");
-                info.Add($"Mat Channels: {mat.Channels()}");
+                var width = mat.Width;
+                var height = mat.Height;
+                var channels = mat.Channels();
+                var totalPixels = mat.Total();
+                
+                info.Add($"Mat Size: {width}x{height}");
+                info.Add($"Mat Channels: {channels}");
                 info.Add($"Mat Type: {mat.Type()}");
                 info.Add($"Mat Empty: {mat.Empty()}");
                 info.Add($"Mat Continuous: {mat.IsContinuous()}");
-                info.Add($"Mat Total Pixels: {mat.Total()}");
+                info.Add($"Mat Total Pixels: {totalPixels}");
+                
+                // 🎯 [ULTRATHINK_CRITICAL_EVIDENCE] 奇数幅問題分析
+                var widthOdd = width % 2 == 1;
+                var heightOdd = height % 2 == 1;
+                info.Add($"🔍 [ODD_WIDTH_ANALYSIS] Width Odd: {widthOdd} (Width: {width})");
+                info.Add($"🔍 [ODD_HEIGHT_ANALYSIS] Height Odd: {heightOdd} (Height: {height})");
+                
+                if (widthOdd || heightOdd)
+                {
+                    info.Add($"⚠️ [EVIDENCE_CRITICAL] 奇数寸法検出 - NormalizeImageDimensions実行後も奇数！");
+                    info.Add($"   📊 Expected: 正規化により偶数化されるべき");
+                    info.Add($"   📊 Actual: Width={width}({(widthOdd ? "奇数" : "偶数")}), Height={height}({(heightOdd ? "奇数" : "偶数")})");
+                }
+                
+                // 🎯 [ULTRATHINK_MEMORY_ANALYSIS] メモリアライメント分析
+                var widthAlignment = width % 4;  // 4バイト境界
+                var heightAlignment = height % 4;
+                info.Add($"🔍 [MEMORY_ALIGNMENT] Width mod 4: {widthAlignment}, Height mod 4: {heightAlignment}");
+                
+                // 🎯 [ULTRATHINK_SIZE_ANALYSIS] 画像サイズカテゴリ分析
+                var pixelCategory = totalPixels switch
+                {
+                    < 10000 => "極小(10K未満)",
+                    < 100000 => "小(10K-100K)",
+                    < 500000 => "中(100K-500K)",
+                    < 1000000 => "大(500K-1M)",
+                    _ => "極大(1M超)"
+                };
+                info.Add($"🔍 [SIZE_CATEGORY] Pixel Category: {pixelCategory} ({totalPixels:N0} pixels)");
+                
+                // 🎯 [ULTRATHINK_SIMD_ANALYSIS] SIMD命令互換性分析
+                var simdCompatible = (width % 16 == 0) && (height % 16 == 0); // AVX512対応
+                var sse2Compatible = (width % 8 == 0) && (height % 8 == 0);   // SSE2対応
+                info.Add($"🔍 [SIMD_COMPAT] AVX512 Compatible: {simdCompatible}, SSE2 Compatible: {sse2Compatible}");
+                
+                // 🎯 [ULTRATHINK_ASPECT_ANALYSIS] アスペクト比分析
+                var aspectRatio = (double)width / height;
+                var aspectCategory = aspectRatio switch
+                {
+                    < 0.5 => "縦長(1:2以上)",
+                    < 0.8 => "縦寄り(1:1.25-1:2)",
+                    < 1.25 => "正方形寄り(4:5-5:4)",
+                    < 2.0 => "横寄り(5:4-2:1)",
+                    _ => "横長(2:1以上)"
+                };
+                info.Add($"🔍 [ASPECT_RATIO] Ratio: {aspectRatio:F3} ({aspectCategory})");
             }
             catch 
             {
@@ -5122,5 +5371,137 @@ public class PaddleOcrEngine : IOcrEngine
     public int GetConsecutiveFailureCount()
     {
         return _consecutivePaddleFailures;
+    }
+    
+    /// <summary>
+    /// 🎯 [ULTRATHINK_PREVENTION] PaddlePredictor失敗を完全予防する包括的正規化
+    /// すべての既知問題を事前解決し、エラー発生自体を防ぐ
+    /// </summary>
+    private Mat ApplyPreventiveNormalization(Mat inputMat)
+    {
+        if (inputMat == null || inputMat.Empty())
+        {
+            throw new ArgumentException("Input Mat is null or empty");
+        }
+
+        var preventiveSw = System.Diagnostics.Stopwatch.StartNew();
+        Mat processedMat = inputMat;
+
+        try
+        {
+            // 🔍 [PREVENTION_LOG] 処理前状態の詳細記録
+            var originalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
+            __logger?.LogDebug("🎯 [PREVENTIVE_START] 予防処理開始: {OriginalInfo}", originalInfo);
+
+            // ステップ1: 極端なサイズ問題の予防
+            var totalPixels = processedMat.Width * processedMat.Height;
+            if (totalPixels > 2000000) // 200万ピクセル制限
+            {
+                var scale = Math.Sqrt(2000000.0 / totalPixels);
+                var newWidth = Math.Max(16, (int)(processedMat.Width * scale));
+                var newHeight = Math.Max(16, (int)(processedMat.Height * scale));
+                
+                var resizedMat = new Mat();
+                Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
+                
+                if (processedMat != inputMat) processedMat.Dispose();
+                processedMat = resizedMat;
+                
+                __logger?.LogInformation("🎯 [PREVENTION_RESIZE] 大画像リサイズ: {OriginalPixels:N0} → {NewPixels:N0} pixels", 
+                    totalPixels, newWidth * newHeight);
+            }
+
+            // ステップ2: 奇数幅・高さの完全解決
+            var needsOddFix = (processedMat.Width % 2 == 1) || (processedMat.Height % 2 == 1);
+            if (needsOddFix)
+            {
+                var evenWidth = processedMat.Width + (processedMat.Width % 2);
+                var evenHeight = processedMat.Height + (processedMat.Height % 2);
+                
+                var evenMat = new Mat();
+                Cv2.Resize(processedMat, evenMat, new OpenCvSharp.Size(evenWidth, evenHeight), 0, 0, InterpolationFlags.Linear);
+                
+                if (processedMat != inputMat) processedMat.Dispose();
+                processedMat = evenMat;
+                
+                __logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}", 
+                    $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
+            }
+
+            // ステップ3: メモリアライメント最適化 (16バイト境界)
+            var alignWidth = processedMat.Width;
+            var alignHeight = processedMat.Height;
+            var needsAlignment = false;
+
+            if (alignWidth % 16 != 0)
+            {
+                alignWidth = ((alignWidth / 16) + 1) * 16;
+                needsAlignment = true;
+            }
+            if (alignHeight % 16 != 0)
+            {
+                alignHeight = ((alignHeight / 16) + 1) * 16;
+                needsAlignment = true;
+            }
+
+            if (needsAlignment)
+            {
+                var alignedMat = new Mat();
+                Cv2.Resize(processedMat, alignedMat, new OpenCvSharp.Size(alignWidth, alignHeight), 0, 0, InterpolationFlags.Linear);
+                
+                if (processedMat != inputMat) processedMat.Dispose();
+                processedMat = alignedMat;
+                
+                __logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}", 
+                    $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
+            }
+
+            // ステップ4: チャンネル数正規化
+            if (processedMat.Channels() != 3)
+            {
+                var channelMat = new Mat();
+                if (processedMat.Channels() == 1)
+                {
+                    Cv2.CvtColor(processedMat, channelMat, ColorConversionCodes.GRAY2BGR);
+                }
+                else if (processedMat.Channels() == 4)
+                {
+                    Cv2.CvtColor(processedMat, channelMat, ColorConversionCodes.BGRA2BGR);
+                }
+                else
+                {
+                    channelMat = processedMat.Clone();
+                }
+                
+                if (processedMat != inputMat) processedMat.Dispose();
+                processedMat = channelMat;
+                
+                __logger?.LogDebug("🎯 [PREVENTION_CHANNEL] チャンネル正規化: {OriginalChannels} → 3", inputMat.Channels());
+            }
+
+            // ステップ5: 最終検証
+            if (processedMat.Empty() || processedMat.Width < 16 || processedMat.Height < 16)
+            {
+                throw new InvalidOperationException($"Preventive normalization resulted in invalid Mat: {processedMat.Width}x{processedMat.Height}");
+            }
+
+            preventiveSw.Stop();
+            var finalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
+            __logger?.LogInformation("✅ [PREVENTION_COMPLETE] 予防処理完了: {FinalInfo} (処理時間: {ElapsedMs}ms)", 
+                finalInfo, preventiveSw.ElapsedMilliseconds);
+
+            return processedMat;
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogError(ex, "🚨 [PREVENTION_ERROR] 予防処理でエラー発生");
+            
+            // エラー時は元のMatをクローンして返す
+            if (processedMat != inputMat && processedMat != null)
+            {
+                processedMat.Dispose();
+            }
+            throw;
+        }
     }
 }

@@ -426,7 +426,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     private string GetLocalOnlyDescription()
     {
         var status = LocalEngineStatus;
-        var baseDesc = "OPUS-MTモデルを使用したローカル翻訳。高速・無料・オフライン対応。";
+        var baseDesc = "NLLB-200モデルを使用したローカル翻訳。高品質・無料・オフライン対応。";
         
         if (!status.IsHealthy)
         {
@@ -478,7 +478,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
                 TranslationEngine.LocalOnly,
                 "LocalOnly",
                 "ローカル翻訳",
-                "OPUS-MTモデル使用、高速・無料・オフライン対応"),
+                "NLLB-200モデル使用、高品質・無料・オフライン対応"),
             new(
                 TranslationEngine.CloudOnly,
                 "CloudOnly",

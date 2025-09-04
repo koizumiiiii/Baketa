@@ -34,7 +34,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<ICaptureService> _captureServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<Baketa.Core.Abstractions.OCR.IOcrEngine> _ocrEngineMock;
-    private readonly Mock<ITranslationEngineFactory> _translationEngineFactoryMock;
+    // [REMOVED] private readonly Mock<ITranslationEngineFactory> _translationEngineFactoryMock;
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<IEventAggregator> _eventAggregatorMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
@@ -53,7 +53,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _captureServiceMock = new Mock<ICaptureService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _ocrEngineMock = new Mock<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-        _translationEngineFactoryMock = new Mock<ITranslationEngineFactory>();
+        // [REMOVED] _translationEngineFactoryMock = new Mock<ITranslationEngineFactory>();
         _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
         _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
@@ -83,10 +83,11 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
             _ocrEngineMock.Object,
-            _translationEngineFactoryMock.Object,
+            // [REMOVED] _translationEngineFactoryMock.Object,
             _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
             _eventAggregatorMock.Object,
             ocrSettingsMock.Object,
+            Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>(), // translationService（テスト用）
             null, // translationDictionaryService（テスト用にnull）
             _loggerMock.Object);
     }

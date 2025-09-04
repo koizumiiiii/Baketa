@@ -176,8 +176,9 @@ namespace Baketa.Application.DI.Modules;
                     var captureService = provider.GetRequiredService<ICaptureService>();
                     var settingsService = provider.GetRequiredService<ISettingsService>();
                     var ocrEngine = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                    var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
+                    // [REMOVED] var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
                     var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+                    var translationService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationService>();
                     var translationDictionaryService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationDictionaryService>();
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
@@ -192,10 +193,11 @@ namespace Baketa.Application.DI.Modules;
                         captureService,
                         settingsService,
                         ocrEngine,
-                        translationEngineFactory,
+                        // [REMOVED] translationEngineFactory,
                         coordinateBasedTranslation,
                         eventAggregator,
                         ocrSettings,
+                        translationService,
                         translationDictionaryService,
                         logger);
                 }

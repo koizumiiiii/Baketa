@@ -36,10 +36,7 @@ namespace Baketa.Infrastructure.Translation;
             // 1. NLLB-200エンジン（ローカル、最優先）
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, OptimizedPythonTranslationEngine>();
             
-            // 2. ONNXエンジン（ローカル、第2優先）
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, OnnxTranslationEngine>();
-            
-            // 3. Geminiエンジン（クラウド、第3優先）
+            // 2. Geminiエンジン（クラウド、第2優先）
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, GeminiTranslationEngine>();
 
 #if DEBUG
