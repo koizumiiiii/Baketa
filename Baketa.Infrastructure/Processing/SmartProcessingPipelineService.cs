@@ -33,29 +33,76 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
         IOptionsMonitor<ProcessingPipelineSettings> settings,
         IConfiguration configuration)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        
-        // LoggingSettings初期化: debug_app_logs.txtハードコード解決用
-        _loggingSettings = new LoggingSettings
+        try
         {
-            DebugLogPath = configuration?.GetValue<string>("Logging:DebugLogPath") ?? "debug_app_logs.txt",
-            EnableDebugFileLogging = configuration?.GetValue<bool>("Logging:EnableDebugFileLogging") ?? true,
-            MaxDebugLogFileSizeMB = configuration?.GetValue<int>("Logging:MaxDebugLogFileSizeMB") ?? 10,
-            DebugLogRetentionDays = configuration?.GetValue<int>("Logging:DebugLogRetentionDays") ?? 7
-        };
-        
-        // 戦略をStageTypeでディクショナリ化（重複除去してからディクショナリ化）
-        var uniqueStrategies = strategies?.GroupBy(s => s.StageType)
-            .Select(g => g.First())
-            .ToList() ?? throw new ArgumentNullException(nameof(strategies));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             
-        _logger.LogDebug("戦略重複除去 - 元: {Original}, 除去後: {Unique}", 
-            strategies?.Count() ?? 0, uniqueStrategies.Count);
+            // 🔥 UltraThink調査: コンストラクタ実行確認（必ずINFOレベルで出力）
+            _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] SmartProcessingPipelineService コンストラクタ開始");
+            Console.WriteLine("🔥 [CONSTRUCTOR_DEBUG] SmartProcessingPipelineService コンストラクタ開始 - Console出力");
             
-        _stageStrategies = uniqueStrategies.ToDictionary(s => s.StageType);
-        
-        _logger.LogInformation("段階戦略初期化完了 - 登録数: {Count}", _stageStrategies.Count);
+            // LoggingSettings初期化: debug_app_logs.txtハードコード解決用
+            _loggingSettings = new LoggingSettings
+            {
+                DebugLogPath = configuration?.GetValue<string>("Logging:DebugLogPath") ?? "debug_app_logs.txt",
+                EnableDebugFileLogging = configuration?.GetValue<bool>("Logging:EnableDebugFileLogging") ?? true,
+                MaxDebugLogFileSizeMB = configuration?.GetValue<int>("Logging:MaxDebugLogFileSizeMB") ?? 10,
+                DebugLogRetentionDays = configuration?.GetValue<int>("Logging:DebugLogRetentionDays") ?? 7
+            };
+            
+            // 🔥 UltraThink調査: 注入されたパラメータをnullチェック前にログ出力
+            Console.WriteLine($"🔥 [CONSTRUCTOR_DEBUG] strategies パラメータ: {(strategies == null ? "null" : "not null")}");
+            _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] strategies パラメータ: {StrategiesNull}", strategies == null ? "null" : "not null");
+            
+            // 🔥 UltraThink調査: 注入された戦略数確認（INFOレベル）- null チェック後
+            if (strategies == null)
+            {
+                Console.WriteLine("🚨 [CONSTRUCTOR_ERROR] strategies が null です！");
+                _logger.LogError("🚨 [CONSTRUCTOR_ERROR] strategies が null です！");
+                throw new ArgumentNullException(nameof(strategies), "IEnumerable<IProcessingStageStrategy> strategies が null です");
+            }
+            
+            var strategiesCount = strategies.Count();
+            _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] 注入された戦略数: {Count}", strategiesCount);
+            Console.WriteLine($"🔥 [CONSTRUCTOR_DEBUG] 注入された戦略数: {strategiesCount}");
+            
+            // 🔥 UltraThink調査: 各戦略の詳細情報出力
+            var strategiesList = strategies.ToList();
+            for (int i = 0; i < strategiesList.Count; i++)
+            {
+                var strategy = strategiesList[i];
+                _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] 戦略[{Index}]: Type={Type}, StageType={StageType}", 
+                    i, strategy.GetType().Name, strategy.StageType);
+                Console.WriteLine($"🔥 [CONSTRUCTOR_DEBUG] 戦略[{i}]: Type={strategy.GetType().Name}, StageType={strategy.StageType}");
+            }
+            
+            // 戦略をStageTypeでディクショナリ化（重複除去してからディクショナリ化）
+            var uniqueStrategies = strategiesList.GroupBy(s => s.StageType)
+                .Select(g => g.First())
+                .ToList();
+                
+            _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] 戦略重複除去 - 元: {Original}, 除去後: {Unique}", 
+                strategiesList.Count, uniqueStrategies.Count);
+            Console.WriteLine($"🔥 [CONSTRUCTOR_DEBUG] 戦略重複除去 - 元: {strategiesList.Count}, 除去後: {uniqueStrategies.Count}");
+                
+            _stageStrategies = uniqueStrategies.ToDictionary(s => s.StageType);
+            
+            _logger.LogInformation("🔥 [CONSTRUCTOR_DEBUG] 段階戦略初期化完了 - 登録数: {Count}", _stageStrategies.Count);
+            Console.WriteLine($"🔥 [CONSTRUCTOR_DEBUG] 段階戦略初期化完了 - 登録数: {_stageStrategies.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🚨 [CONSTRUCTOR_EXCEPTION] SmartProcessingPipelineService コンストラクタで例外: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"🚨 [CONSTRUCTOR_EXCEPTION] StackTrace: {ex.StackTrace}");
+            
+            if (logger != null)
+            {
+                logger.LogError(ex, "🚨 [CONSTRUCTOR_EXCEPTION] SmartProcessingPipelineService コンストラクタで例外");
+            }
+            
+            throw; // 例外を再スロー
+        }
     }
 
     public async Task<ProcessingPipelineResult> ExecuteAsync(ProcessingPipelineInput input, CancellationToken cancellationToken = default)

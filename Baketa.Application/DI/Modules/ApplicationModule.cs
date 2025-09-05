@@ -29,6 +29,8 @@ using Baketa.Infrastructure.DI;
 using Baketa.Application.Services.Events;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Events.Handlers;
+using Microsoft.Extensions.Configuration;
+using Baketa.Application.Configuration;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -50,6 +52,9 @@ namespace Baketa.Application.DI.Modules;
             //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
+            
+            // 🎯 UltraThink Phase 1: オーバーレイ自動削除システム設定登録（Gemini Review対応）
+            RegisterAutoOverlayCleanupSettings(services);
             
             // OCR処理モジュールは Infrastructure.DI.OcrProcessingModule で登録
             
@@ -258,6 +263,13 @@ namespace Baketa.Application.DI.Modules;
             // 🔧 ウィンドウ管理サービス（UI制御フロー責務分離 - Phase 6.2.2）
             services.AddSingleton<Services.UI.IWindowManagementService, Services.UI.WindowManagementService>();
             
+            // 🎯 オーバーレイ自動削除サービス（UltraThink Phase 1: オーバーレイ自動消去システム）
+            // Gemini Review: IHostedService統合により自動初期化を実現
+            services.AddSingleton<Services.UI.AutoOverlayCleanupService>();
+            services.AddSingleton<Baketa.Core.Abstractions.UI.IAutoOverlayCleanupService>(
+                provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
+            services.AddHostedService(provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
+            
             // 🔧 翻訳制御サービス（UI制御フロー責務分離 - Phase 6.2.3）
             services.AddSingleton<Services.Translation.ITranslationControlService, Services.Translation.TranslationControlService>();
             
@@ -383,14 +395,25 @@ namespace Baketa.Application.DI.Modules;
         }
         
         /// <summary>
+        /// オーバーレイ自動削除システムの設定を登録します。
+        /// Gemini Review: IOptionsパターンによる設定外部化
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterAutoOverlayCleanupSettings(IServiceCollection services)
+        {
+            services.ConfigureOptions<AutoOverlayCleanupOptionsSetup>();
+        }
+        
+        /// <summary>
         /// このモジュールが依存する他のモジュールの型を取得します。
         /// </summary>
         /// <returns>依存モジュールの型のコレクション</returns>
         public override IEnumerable<Type> GetDependentModules()
         {
             yield return typeof(CoreModule);
-            yield return typeof(PlatformModule);
-            yield return typeof(InfrastructureModule);
+            yield return typeof(PlatformModule); // PlatformModule → InfrastructureModule間接依存で十分
+            // 🔧 UltraThink Phase 4-6 修正: 直接InfrastructureModule依存を除去し重複登録解決
+            // yield return typeof(InfrastructureModule); // PlatformModule経由で間接取得
             yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
             yield return typeof(CaptureModule); // キャプチャサービス統合
         }
