@@ -1686,9 +1686,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             else
             {
-                DebugLogUtility.WriteLog($"📝 TextRegionsが空です");
-                DebugLogUtility.WriteLog($"❌ OCR処理でテキストが検出されませんでした");
-                DebugLogUtility.WriteLog($"🖼️ 確認事項: 画像内にテキストが含まれているか、OCRエンジンが正常に動作しているか");
+                // テキスト未検出時はデバッグログのみに変更
+                _logger?.LogDebug("TextRegions が空です - 画像内にテキストが検出されませんでした");
             }
             
             if (ocrResults.HasText)
@@ -1734,9 +1733,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             else
             {
-                DebugLogUtility.WriteLog("❌ OCR処理でテキストが検出されませんでした");
-                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCR処理でテキストが検出されませんでした{Environment.NewLine}");
-                _logger?.LogWarning("OCR処理でテキストが検出されませんでした");
+                // テキスト未検出時はデバッグログのみに変更（通常ログを抑制）
+                _logger?.LogDebug("OCR処理でテキストが検出されませんでした");
                 originalText = string.Empty;
             }
 
@@ -1930,7 +1928,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             else
             {
-                translatedText = "テキストが検出されませんでした";
+                // テキスト未検出時は翻訳結果を表示しない（UI上で空表示となる）
+                translatedText = string.Empty;
                 
                 // 🔥 [DIAGNOSTIC] 空テキスト診断イベント
                 await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent

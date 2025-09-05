@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
@@ -25,6 +27,15 @@ public interface IInPlaceTranslationOverlayManager
     /// <param name="chunkId">非表示にするチャンクID</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// 指定領域内のオーバーレイを非表示にする
+    /// UltraThink Phase 1: オーバーレイ自動削除システム対応
+    /// </summary>
+    /// <param name="area">対象領域</param>
+    /// <param name="excludeChunkId">除外するChunkID</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// すべてのインプレースオーバーレイを非表示

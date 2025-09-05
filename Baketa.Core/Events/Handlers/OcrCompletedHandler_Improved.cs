@@ -94,12 +94,8 @@ public class OcrCompletedHandler_Improved : IEventProcessor<OcrCompletedEvent>, 
         // OCR結果が存在しない場合
         if (eventData.Results == null || !eventData.Results.Any())
         {
-            var notificationEvent = new NotificationEvent(
-                "OCR処理は完了しましたが、テキストは検出されませんでした。",
-                NotificationType.Information,
-                "OCR完了");
-                
-            await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
+            // テキスト未検出時は通知を抑制（無音処理）
+            _logger.LogDebug("OCR処理完了: テキスト未検出のため処理をスキップ");
             return;
         }
         

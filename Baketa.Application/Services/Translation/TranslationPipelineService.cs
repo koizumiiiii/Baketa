@@ -140,15 +140,11 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
 
         ArgumentNullException.ThrowIfNull(eventData);
 
-        // OCR結果が存在しない場合の通知
+        // OCR結果が存在しない場合は通知を抑制（無音処理）
         if (eventData.Results == null || !eventData.Results.Any())
         {
-            var notificationEvent = new NotificationEvent(
-                "OCR処理は完了しましたが、テキストは検出されませんでした。",
-                NotificationType.Information,
-                "OCR完了");
-
-            await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
+            // テキスト未検出時は通知せずに静かに終了
+            _logger.LogDebug("OCR処理完了: テキスト未検出のため処理をスキップ");
             return;
         }
 
@@ -512,47 +508,32 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     {
         try
         {
-            // CoordinateInfoが存在しない場合はInPlace表示不可
+            // 🚫 [DUPLICATE_DISPLAY_FIX] 重複表示問題修正
+            // TranslationWithBoundsCompletedHandler → OverlayUpdateEvent 経由で表示されるため、
+            // こちらでの直接表示は無効化
+            _logger.LogDebug("InPlace表示はOverlayUpdateEvent経由で実行されます - 直接表示をスキップ: '{Text}'",
+                result.OriginalText[..Math.Min(20, result.OriginalText.Length)]);
+            
+            // CoordinateInfo が存在しない場合の警告ログは残す
             if (result.CoordinateInfo == null)
             {
-                _logger.LogDebug("CoordinateInfo不在のためInPlace表示をスキップ: '{Text}'",
+                _logger.LogDebug("CoordinateInfo不在のためInPlace表示を完全にスキップ: '{Text}'",
                     result.OriginalText[..Math.Min(20, result.OriginalText.Length)]);
                 return;
             }
 
-            // PipelineTranslationResultからTextChunkを作成
-            var textChunk = CreateTextChunkFromResult(result);
+            // 🔄 [DISPLAY_FLOW] 表示フローの詳細をログ出力
+            _logger.LogDebug("InPlace表示フロー: TranslationPipelineService → (スキップ) → TranslationWithBoundsCompletedHandler → OverlayUpdateEvent → InPlaceTranslationOverlayManager");
             
-            // TextChunkの有効性とInPlace表示可能性をチェック
-            if (!textChunk.CanShowInPlace())
-            {
-                _logger.LogWarning("InPlace表示条件を満たしていません: {LogString}", textChunk.ToInPlaceLogString());
-                return;
-            }
-
-            _logger.LogDebug("InPlace表示開始: ChunkId={ChunkId}, '{Text}' → '{Translation}'",
-                textChunk.ChunkId,
-                result.OriginalText[..Math.Min(15, result.OriginalText.Length)],
-                result.TranslatedText[..Math.Min(15, result.TranslatedText.Length)]);
-
-            // IInPlaceTranslationOverlayManager経由でオーバーレイ表示
-            await _overlayManager.ShowInPlaceOverlayAsync(textChunk, _cancellationTokenSource.Token)
-                .ConfigureAwait(false);
-
-            _logger.LogInformation("InPlace表示完了: ChunkId={ChunkId}, Position=({X},{Y}), Size=({W},{H})",
-                textChunk.ChunkId,
-                textChunk.CombinedBounds.X,
-                textChunk.CombinedBounds.Y,
-                textChunk.CombinedBounds.Width,
-                textChunk.CombinedBounds.Height);
+            // ✅ 重複表示回避のため、この処理は何もせず正常終了
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "InPlace表示処理エラー: '{Text}'",
+            _logger.LogError(ex, "InPlace表示スキップ処理でエラー: '{Text}'",
                 result.OriginalText[..Math.Min(30, result.OriginalText.Length)]);
             
-            // InPlace表示失敗時は例外を再スローせず、Defaultモードにフォールバック
-            await ProcessDefaultDisplayAsync(result).ConfigureAwait(false);
+            // エラー時もフォールバックは行わない（OverlayUpdateEvent経由で表示される）
         }
     }
 

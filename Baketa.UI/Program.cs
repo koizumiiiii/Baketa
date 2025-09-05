@@ -854,11 +854,15 @@ namespace Baketa.UI;
             services.AddSettingsSystem();
             Console.WriteLine("✅ 設定システム登録完了");
             
-            // InfrastructureModuleの登録
+            // InfrastructureModuleの登録（appsettings.json対応版）
             Console.WriteLine("🔧 Infrastructure基盤モジュール登録開始");
             var infrastructureModule = new InfrastructureModule();
-            infrastructureModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            Console.WriteLine("✅ Infrastructure基盤モジュール登録完了");
+            
+            // Configuration オブジェクトを取得してappsettings.json設定を読み込み
+            var configurationForInfrastructure = services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+            infrastructureModule.RegisterServices(services, configurationForInfrastructure);
+            registeredModules.Add(typeof(InfrastructureModule));
+            Console.WriteLine("✅ Infrastructure基盤モジュール登録完了 - appsettings.json設定読み込み済み");
             
             // PlatformModuleの登録
             Console.WriteLine("🖥️ Platform基盤モジュール登録開始");

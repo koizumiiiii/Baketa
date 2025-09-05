@@ -116,6 +116,71 @@ namespace Baketa.Infrastructure.DI.Modules;
         }
 
         /// <summary>
+        /// インフラストラクチャサービスを登録します（appsettings.json対応版）。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="configuration">設定オブジェクト</param>
+        public void RegisterServices(IServiceCollection services, IConfiguration configuration)
+        {
+            
+            // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
+            // コメントアウトし、デフォルト値を使用
+            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
+            //    ?? Core.DI.BaketaEnvironment.Production;
+            var environment = Core.DI.BaketaEnvironment.Production;
+                
+            // 設定ファイル統一: OCR設定をappsettings.jsonから読み込み
+            // 注意: これはServiceModuleの外で設定される想定（Startup.cs等）
+            
+            // OCR関連サービス
+            RegisterOcrServices(services);
+            
+            // 🔄 Phase 1: 画像変化検知システム
+            RegisterImageChangeDetectionServices(services);
+            
+            // 🔄 P1: 段階的フィルタリングシステム（appsettings.json対応）
+            RegisterStagedFilteringServices(services, configuration);
+            
+            // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
+            RegisterStickyRoiServices(services);
+            
+            // NLLB-200翻訳サービス（高品質版）を登録
+            RegisterNllb200TranslationServices(services);
+            
+            // 翻訳サービス（エンジン登録後）
+            RegisterTranslationServices(services);
+            
+            // Phase 5: ポート競合防止機構サービス
+            RegisterPortManagementServices(services);
+            
+            // Step 1: Python環境解決と診断サービス（即座の応急処置）
+            RegisterPythonEnvironmentServices(services);
+            
+            // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
+            RegisterNllbFixServices(services);
+            
+            // Phase 2: 完全安定化サービス（接続信頼性向上・キャッシュ管理強化）
+            RegisterPhase2Services(services);
+            
+            // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
+            RegisterWarmupServices(services);
+            
+            // GPU統合サービス（Issue #143 Week 2: DI統合とMulti-GPU対応）
+            RegisterGpuServices(services);
+            
+            // パフォーマンス管理サービス
+            RegisterPerformanceServices(services);
+            
+            // Phase3: リソース監視システム
+            RegisterResourceMonitoringServices(services);
+            
+            // Phase2: ハイブリッドリソース管理システム - PlatformModuleに移動（循環依存解決）
+            
+            // データ永続化
+            RegisterPersistenceServices(services, environment);
+        }
+
+        /// <summary>
         /// OCR関連サービスを登録します。
         /// </summary>
         /// <param name="services">サービスコレクション</param>
@@ -327,8 +392,8 @@ namespace Baketa.Infrastructure.DI.Modules;
                 return hybridStrategy;
             });
             
-            // 翻訳サービスを登録
-            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationService, DefaultTranslationService>();
+            // 🔧 UltraThink Phase 9.18: 重複登録削除 - TranslationModuleで既に登録済み
+            // services.AddSingleton<ITranslationService, DefaultTranslationService>(); // TranslationServiceExtensions.AddTranslationServices()で登録
             
             Console.WriteLine("✅ Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了");
         }
@@ -729,7 +794,8 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// P1: 段階的フィルタリングシステムを登録します
         /// </summary>
         /// <param name="services">サービスコレクション</param>
-        private static void RegisterStagedFilteringServices(IServiceCollection services)
+        /// <param name="configuration">設定オブジェクト（nullの場合はハードコード設定を使用）</param>
+        private static void RegisterStagedFilteringServices(IServiceCollection services, IConfiguration? configuration = null)
         {
             Console.WriteLine("🔄 [P1] 段階的フィルタリングシステム登録開始");
             
@@ -742,22 +808,34 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("✅ ISmartProcessingPipelineService登録完了 - 段階的処理パイプライン");
             
             // 段階別戦略実装（IProcessingStageStrategyインターフェースとして登録 - Geminiフィードバック反映）
-            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.ImageChangeDetectionStageStrategy>();
+            // 🔧 UltraThink修正: AddSingletonで状態保持（_previousImage）を正常化
+            services.AddSingleton<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.ImageChangeDetectionStageStrategy>();
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.OcrExecutionStageStrategy>();
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TextChangeDetectionStageStrategy>();
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TranslationExecutionStageStrategy>();
             Console.WriteLine("✅ 段階別戦略登録完了 - 4段階処理戦略");
             
-            // 段階的処理設定（appsettings.jsonから読み込み可能）
-            services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(options =>
+            // 段階的処理設定（appsettings.json対応 - ハードコード削除済み）
+            if (configuration != null)
             {
-                options.EnableStaging = true;
-                options.EnableEarlyTermination = true;
-                options.TextChangeThreshold = 0.1f; // 10%の変化で翻訳実行
-                options.EnablePerformanceMetrics = true;
-                options.StopOnFirstError = true;
-            });
-            Console.WriteLine("✅ ProcessingPipelineSettings設定完了 - テキスト変化しきい値:10%");
+                // appsettings.jsonからSmartProcessingPipeline設定を読み込み
+                services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(
+                    configuration.GetSection("SmartProcessingPipeline"));
+                Console.WriteLine("✅ ProcessingPipelineSettings設定完了 - appsettings.jsonから読み込み");
+            }
+            else
+            {
+                // フォールバック: configuration=nullの場合はハードコード設定を使用
+                services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(options =>
+                {
+                    options.EnableStaging = true;
+                    options.EnableEarlyTermination = true;
+                    options.TextChangeThreshold = 0.1f; // 10%の変化で翻訳実行
+                    options.EnablePerformanceMetrics = true;
+                    options.StopOnFirstError = false;
+                });
+                Console.WriteLine("⚠️ ProcessingPipelineSettings設定完了 - フォールバック（ハードコード設定）");
+            }
             
             Console.WriteLine("🎉 [P1] 段階的フィルタリングシステム登録完了");
         }

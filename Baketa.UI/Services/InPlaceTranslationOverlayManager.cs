@@ -545,7 +545,7 @@ public class InPlaceTranslationOverlayManager(
     /// <summary>
     /// 指定されたエリア内の既存オーバーレイを非表示にする（翻訳結果表示時の原文非表示用）
     /// </summary>
-    private async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
+    public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
     {
         try
         {

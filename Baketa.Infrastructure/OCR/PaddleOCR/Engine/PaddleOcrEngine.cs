@@ -560,7 +560,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             else
             {
-                __logger?.LogInformation("📍 OCR座標ログ - テキスト領域が検出されませんでした");
+                __logger?.LogDebug("OCR座標ログ - テキスト領域が検出されませんでした");
             }
             
             stopwatch.Stop();
@@ -2557,7 +2557,8 @@ public class PaddleOcrEngine : IOcrEngine
         }
         else
         {
-            Console.WriteLine($"⚠️ [OCRサマリー] テキストが検出されませんでした");
+            // テキスト未検出時は出力を抑制（必要時のみデバッグログ）
+            __logger?.LogDebug("OCRサマリー: テキストが検出されませんでした");
         }
         
         __logger?.LogInformation("OCR処理完了: 検出テキスト数={Count}", textRegions.Count);
