@@ -270,6 +270,10 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
             services.AddHostedService(provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
             
+            // 🎯 オーバーレイ位置調整サービス（UltraThink Phase 10.3: クリーンアーキテクチャ準拠）
+            // TextChunkから位置調整ロジックを分離し、責務の明確化を実現
+            services.AddSingleton<IOverlayPositioningService, Services.UI.OverlayPositioningService>();
+            
             // 🔧 翻訳制御サービス（UI制御フロー責務分離 - Phase 6.2.3）
             services.AddSingleton<Services.Translation.ITranslationControlService, Services.Translation.TranslationControlService>();
             
@@ -349,9 +353,9 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>());
             
             // 座標情報付き翻訳完了イベントハンドラー
-            services.AddSingleton<Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler>();
+            services.AddSingleton<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler>());
+                provider => provider.GetRequiredService<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>());
             
             // 手動イベントプロセッサー登録サービスは削除（EventHandlerInitializationServiceに置き換え）
             
@@ -416,5 +420,6 @@ namespace Baketa.Application.DI.Modules;
             // yield return typeof(InfrastructureModule); // PlatformModule経由で間接取得
             yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
             yield return typeof(CaptureModule); // キャプチャサービス統合
+            yield return typeof(Phase15OverlayModule); // 🚀 Phase 15 新オーバーレイシステム
         }
     }

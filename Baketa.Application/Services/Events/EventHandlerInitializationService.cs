@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Handlers;
+using Baketa.Application.EventHandlers;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Settings;
 

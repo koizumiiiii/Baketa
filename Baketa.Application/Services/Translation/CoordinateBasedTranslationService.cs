@@ -200,7 +200,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 DebugLogUtility.WriteLog($"   翻訳テキスト: '{chunk.TranslatedText}'");
                 
                 // 座標変換情報
-                var overlayPos = chunk.GetOverlayPosition();
+                var overlayPos = chunk.GetBasicOverlayPosition();
                 var overlaySize = chunk.GetOverlaySize();
                 DebugLogUtility.WriteLog($"   インプレース位置: ({overlayPos.X},{overlayPos.Y}) [元座標と同じ]");
                 DebugLogUtility.WriteLog($"   インプレースサイズ: ({overlaySize.Width},{overlaySize.Height}) [元サイズと同じ]");
@@ -347,13 +347,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                             
                                             if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
                                             {
-                                                Console.WriteLine($"🎯 [STREAMING_OVERLAY] 翻訳結果オーバーレイ表示開始 - チャンク {chunk.ChunkId}: '{translatedText}'");
-                                                
-                                                // 翻訳結果のオーバーレイ表示を実行
-                                                await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(chunk, cancellationToken)
-                                                    .ConfigureAwait(false);
-                                                    
-                                                Console.WriteLine($"✅ [STREAMING_OVERLAY] オーバーレイ表示完了 - チャンク {chunk.ChunkId}");
+                                                // 🚫 Phase 11.2: 重複表示修正 - 直接オーバーレイ表示を無効化
+                                                // TranslationWithBoundsCompletedEvent → OverlayUpdateEvent 経由で表示されるため、
+                                                // 直接呼び出しは重複表示の原因となる
+                                                Console.WriteLine($"🚫 [PHASE11.2] 重複表示回避: 直接オーバーレイ表示をスキップ - チャンク {chunk.ChunkId}: '{translatedText}'");
+                                                Console.WriteLine($"✅ [PHASE11.2] TranslationWithBoundsCompletedEvent経由で表示予定 - チャンク {chunk.ChunkId}");
                                             }
                                         }
                                         catch (OperationCanceledException)
@@ -553,8 +551,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 $"インプレース表示 - ChunkId:{chunk.ChunkId}, 位置:({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})")
                                 .WithAdditionalInfo($"Text:'{chunk.TranslatedText}'");
                             
-                            await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken)
-                                .ConfigureAwait(false);
+                            // 🚫 Phase 11.2: 重複表示修正 - 直接オーバーレイ表示を無効化
+                            // TranslationWithBoundsCompletedEvent → OverlayUpdateEvent 経由で表示されるため重複防止
+                            Console.WriteLine($"🚫 [PHASE11.2] 直接オーバーレイ表示スキップ - チャンク {chunk.ChunkId}: 重複表示防止");
+                            // await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
                                 
                             var overlayResult = overlayMeasurement.Complete();
                             
@@ -1048,8 +1048,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                     
                     if (hasValidTranslation)
                     {
-                        await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken)
-                            .ConfigureAwait(false);
+                        // 🚫 Phase 11.2: 重複表示修正 - DisplayInPlaceTranslationOverlay内も無効化
+                        // TranslationWithBoundsCompletedEvent → OverlayUpdateEvent 経由で既に表示されている
+                        Console.WriteLine($"🚫 [PHASE11.2] DisplayInPlaceTranslationOverlay直接表示スキップ - チャンク {textChunk.ChunkId}");
+                        // await _processingFacade.OverlayManager.ShowInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {

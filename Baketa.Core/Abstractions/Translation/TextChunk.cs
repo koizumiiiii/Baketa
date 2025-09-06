@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.UI.Monitors;
 
 namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>
 /// テキスト塊管理クラス
-/// Phase 2: 複数ウィンドウでの座標ベース翻訳表示のためのデータ構造
+/// UltraThink Phase 10.3: Clean Architecture準拠のデータモデル
+/// UI位置調整責務をIOverlayPositioningServiceに分離
 /// </summary>
+
 public sealed class TextChunk
 {
     /// <summary>テキストチャンクの一意ID</summary>
@@ -77,180 +80,6 @@ public sealed class TextChunk
     /// オーバーレイ表示用の最適位置を計算（改良版）
     /// テキスト領域の座標を正確に反映し、画面外に出ない位置を計算
     /// </summary>
-    public Point CalculateOptimalOverlayPosition(Size overlaySize, Rectangle screenBounds)
-    {
-        // 優先順位付きポジショニング戦略
-        
-        // 1. テキスト領域の直下（5px余白）
-        var positions = new[]
-        {
-            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 1 },
-            // 2. テキスト領域の直上（5px余白）
-            new { CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 2 },
-            // 3. テキスト領域の右側（5px余白）
-            new { X = CombinedBounds.Right + 5, CombinedBounds.Y, Priority = 3 },
-            // 4. テキスト領域の左側（5px余白）
-            new { X = CombinedBounds.X - overlaySize.Width - 5, CombinedBounds.Y, Priority = 4 },
-            // 5. テキスト領域の右下角
-            new { X = CombinedBounds.Right - overlaySize.Width, Y = CombinedBounds.Bottom + 5, Priority = 5 },
-            // 6. テキスト領域の左下角
-            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 6 }
-        };
-
-        // 各候補位置を優先順位順で試行
-        foreach (var pos in positions.OrderBy(p => p.Priority))
-        {
-            var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
-            
-            // 画面境界内チェック
-            if (screenBounds.Contains(candidateRect))
-            {
-                return new Point(pos.X, pos.Y);
-            }
-        }
-
-        // すべての候補が画面外の場合は座標をクランプして強制表示
-        var clampedX = Math.Max(screenBounds.Left, 
-                       Math.Min(screenBounds.Right - overlaySize.Width, CombinedBounds.X));
-        var clampedY = Math.Max(screenBounds.Top, 
-                       Math.Min(screenBounds.Bottom - overlaySize.Height, CombinedBounds.Bottom + 5));
-                       
-        return new Point(clampedX, clampedY);
-    }
-
-    /// <summary>
-    /// 既存オーバーレイとの衝突を回避した最適なオーバーレイ位置を計算
-    /// 複数オーバーレイ表示時の重なり防止機能
-    /// </summary>
-    /// <param name="overlaySize">オーバーレイのサイズ</param>
-    /// <param name="screenBounds">画面境界</param>
-    /// <param name="existingOverlayBounds">既存オーバーレイの位置情報リスト</param>
-    /// <returns>衝突を回避した最適な表示位置</returns>
-    public Point CalculateOptimalOverlayPositionWithCollisionAvoidance(Size overlaySize, Rectangle screenBounds, IReadOnlyList<Rectangle> existingOverlayBounds)
-    {
-        // 優先順位付きポジショニング戦略（衝突回避版）
-        var positions = new[]
-        {
-            // 1. テキスト領域の直上（5px余白）
-            new { CombinedBounds.X, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 1 },
-            // 2. テキスト領域の直下（5px余白）  
-            new { CombinedBounds.X, Y = CombinedBounds.Bottom + 5, Priority = 2 },
-            // 3. テキスト領域の右側（5px余白）
-            new { X = CombinedBounds.Right + 5, CombinedBounds.Y, Priority = 3 },
-            // 4. テキスト領域の左側（5px余白）
-            new { X = CombinedBounds.X - overlaySize.Width - 5, CombinedBounds.Y, Priority = 4 },
-            // 5. テキスト領域の右上角
-            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 5 },
-            // 6. テキスト領域の左上角
-            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Y - overlaySize.Height - 5, Priority = 6 },
-            // 7. テキスト領域の右下角
-            new { X = CombinedBounds.Right + 5, Y = CombinedBounds.Bottom + 5, Priority = 7 },
-            // 8. テキスト領域の左下角
-            new { X = CombinedBounds.X - overlaySize.Width - 5, Y = CombinedBounds.Bottom + 5, Priority = 8 }
-        };
-
-        // 各候補位置を優先順位順で試行（衝突チェック付き）
-        foreach (var pos in positions.OrderBy(p => p.Priority))
-        {
-            var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
-            
-            // 画面境界内チェック
-            if (!screenBounds.Contains(candidateRect))
-                continue;
-
-            // 既存オーバーレイとの衝突チェック
-            bool hasCollision = false;
-            foreach (var existingBounds in existingOverlayBounds)
-            {
-                if (candidateRect.IntersectsWith(existingBounds))
-                {
-                    hasCollision = true;
-                    break;
-                }
-            }
-
-            if (!hasCollision)
-            {
-                return new Point(pos.X, pos.Y);
-            }
-        }
-
-        // 衝突回避できない場合は動的オフセット調整
-        var basePosition = CalculateOptimalOverlayPosition(overlaySize, screenBounds);
-        return FindNonCollidingPosition(basePosition, overlaySize, screenBounds, existingOverlayBounds);
-    }
-
-    /// <summary>
-    /// 動的オフセット調整による衝突回避位置の検索
-    /// 全ての優先位置で衝突が発生した場合の最終的な回避戦略
-    /// </summary>
-    private Point FindNonCollidingPosition(Point basePosition, Size overlaySize, Rectangle screenBounds, IReadOnlyList<Rectangle> existingOverlayBounds)
-    {
-        const int stepSize = 10; // 調整ステップサイズ
-        const int maxSteps = 20;  // 最大調整回数
-        
-        // X軸方向の調整を試行
-        for (int step = 1; step <= maxSteps; step++)
-        {
-            var offsetX = step * stepSize;
-            
-            // 右方向へのオフセット
-            var rightPosition = new Point(basePosition.X + offsetX, basePosition.Y);
-            var rightRect = new Rectangle(rightPosition.X, rightPosition.Y, overlaySize.Width, overlaySize.Height);
-            if (screenBounds.Contains(rightRect) && !HasCollisionWithExistingOverlays(rightRect, existingOverlayBounds))
-            {
-                return rightPosition;
-            }
-            
-            // 左方向へのオフセット
-            var leftPosition = new Point(basePosition.X - offsetX, basePosition.Y);
-            var leftRect = new Rectangle(leftPosition.X, leftPosition.Y, overlaySize.Width, overlaySize.Height);
-            if (screenBounds.Contains(leftRect) && !HasCollisionWithExistingOverlays(leftRect, existingOverlayBounds))
-            {
-                return leftPosition;
-            }
-        }
-
-        // Y軸方向の調整を試行
-        for (int step = 1; step <= maxSteps; step++)
-        {
-            var offsetY = step * stepSize;
-            
-            // 下方向へのオフセット
-            var downPosition = new Point(basePosition.X, basePosition.Y + offsetY);
-            var downRect = new Rectangle(downPosition.X, downPosition.Y, overlaySize.Width, overlaySize.Height);
-            if (screenBounds.Contains(downRect) && !HasCollisionWithExistingOverlays(downRect, existingOverlayBounds))
-            {
-                return downPosition;
-            }
-            
-            // 上方向へのオフセット
-            var upPosition = new Point(basePosition.X, basePosition.Y - offsetY);
-            var upRect = new Rectangle(upPosition.X, upPosition.Y, overlaySize.Width, overlaySize.Height);
-            if (screenBounds.Contains(upRect) && !HasCollisionWithExistingOverlays(upRect, existingOverlayBounds))
-            {
-                return upPosition;
-            }
-        }
-
-        // 全ての調整が失敗した場合は元の位置を返す
-        return basePosition;
-    }
-
-    /// <summary>
-    /// 指定された領域が既存オーバーレイと衝突するかチェック
-    /// </summary>
-    private static bool HasCollisionWithExistingOverlays(Rectangle candidateRect, IReadOnlyList<Rectangle> existingOverlayBounds)
-    {
-        foreach (var existingBounds in existingOverlayBounds)
-        {
-            if (candidateRect.IntersectsWith(existingBounds))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
     
     /// <summary>
     /// ログ出力用の文字列表現
@@ -350,41 +179,26 @@ public sealed class TextChunk
     }
     
     /// <summary>
-    /// オーバーレイ表示用の位置を取得
-    /// 翻訳結果をテキスト上方に表示するため、最適化されたポジショニング戦略を使用
-    /// 座標ずれ修正: テキスト領域上方への最適配置
+    /// オーバーレイ表示用の基本位置を取得
+    /// UltraThink Phase 10.3: 位置調整ロジックはIOverlayPositioningServiceに分離
+    /// 注意: 実際の位置計算は消費側でIOverlayPositioningServiceを使用する
     /// </summary>
-    public Point GetOverlayPosition()
-    {
-        // 翻訳結果をテキスト上方に表示するため、最適化されたポジショニング戦略を使用
-        var defaultBounds = GetDefaultScreenBounds();
-        var overlaySize = GetOverlaySize();
-        return CalculateOptimalOverlayPosition(overlaySize, defaultBounds);
-    }
+    /// <returns>テキスト領域の基本位置（左上座標）</returns>
+    public Point GetBasicOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y - 30);
     
     /// <summary>
-    /// 指定された画面境界内での最適なオーバーレイ位置を計算
-    /// 特定の画面境界を考慮した最適な位置に翻訳テキストを表示するために使用
-    /// 元テキストを避けた配置が必要な場合に使用
+    /// テキスト領域の中心座標を取得
+    /// 位置調整サービスでの位置計算に使用される
     /// </summary>
-    /// <param name="screenBounds">対象画面の境界情報</param>
-    /// <returns>最適化された表示位置</returns>
-    public Point GetOverlayPosition(Rectangle screenBounds)
-    {
-        var overlaySize = GetOverlaySize();
-        return CalculateOptimalOverlayPosition(overlaySize, screenBounds);
-    }
+    /// <returns>テキスト領域の中心座標</returns>
+    public Point GetTextCenterPoint() => GetCenterPoint();
     
     /// <summary>
-    /// デフォルト画面境界を取得
-    /// 画面サイズが不明な場合の安全なデフォルト値を提供
+    /// テキスト領域の境界を取得
+    /// 位置調整サービスでの衝突検知に使用される
     /// </summary>
-    /// <returns>デフォルト画面境界 (Full HD 1920x1080)</returns>
-    private static Rectangle GetDefaultScreenBounds()
-    {
-        // TODO: 将来的には設定ファイルからデフォルト画面サイズを取得する実装を検討
-        return new Rectangle(0, 0, 1920, 1080);
-    }
+    /// <returns>テキスト領域の境界</returns>
+    public Rectangle GetTextBounds() => CombinedBounds;
     
     /// <summary>
     /// オーバーレイ表示用のサイズを取得
@@ -428,7 +242,7 @@ public sealed class TextChunk
     /// デバッグ・トラブルシューティング用
     /// </summary>
     public string ToInPlaceLogString() => 
-        $"InPlace Display - ChunkId: {ChunkId} | Position: ({GetOverlayPosition().X},{GetOverlayPosition().Y}) | " +
+        $"InPlace Display - ChunkId: {ChunkId} | Position: ({GetBasicOverlayPosition().X},{GetBasicOverlayPosition().Y}) | " +
         $"Size: ({GetOverlaySize().Width},{GetOverlaySize().Height}) | FontSize: {CalculateOptimalFontSize()} | " +
         $"CanShow: {CanShowInPlace()} | TranslatedText: '{TranslatedText}'";
 }

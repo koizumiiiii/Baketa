@@ -112,7 +112,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 [InPlaceTranslationOverlay] インプレース表示開始 - {textChunk.ToInPlaceLogString()}");
                 
                 // TextChunkの座標とサイズを正確に適用
-                var overlayPosition = textChunk.GetOverlayPosition();
+                var overlayPosition = textChunk.GetBasicOverlayPosition();
                 var overlaySize = textChunk.GetOverlaySize();
                 var optimalFontSize = textChunk.CalculateOptimalFontSize();
                 

@@ -42,6 +42,166 @@ namespace Baketa.UI;
         [STAThread]
         public static void Main(string[] args)
         {
+            // 🚧 Single Instance Application Check - 重複翻訳表示問題根本解決
+            const string mutexName = "Global\\BaketaTranslationOverlayApp_SingleInstance_v3";
+            const string lockFileName = "baketa_instance.lock";
+            var lockFilePath = Path.Combine(Path.GetTempPath(), lockFileName);
+            
+            System.Threading.Mutex mutex = null;
+            FileStream lockFile = null;
+            bool isOwnerOfMutex = false;
+            bool isOwnerOfFileLock = false;
+            
+            try
+            {
+                // ステップ1: ファイルベースロック試行（即座に失敗）
+                Console.WriteLine("🔍 [STEP1] Attempting file-based lock...");
+                try
+                {
+                    lockFile = new FileStream(lockFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                    var processInfo = $"PID={System.Diagnostics.Process.GetCurrentProcess().Id}|TIME={DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}|USER={Environment.UserName}";
+                    var processInfoBytes = System.Text.Encoding.UTF8.GetBytes(processInfo);
+                    lockFile.Write(processInfoBytes, 0, processInfoBytes.Length);
+                    lockFile.Flush();
+                    isOwnerOfFileLock = true;
+                    Console.WriteLine($"✅ [STEP1] File lock acquired: {lockFilePath}");
+                }
+                catch (IOException)
+                {
+                    Console.WriteLine("⚠️ [STEP1] File lock failed - another instance is running");
+                    Console.WriteLine("🎯 This prevents duplicate translation overlay displays.");
+                    Console.WriteLine("🔄 Exiting duplicate instance immediately.");
+                    return;
+                }
+                catch (Exception fileEx)
+                {
+                    Console.WriteLine($"⚠️ [STEP1] File lock error: {fileEx.Message}");
+                    // ファイルロックが失敗してもMutexロックを試行
+                }
+                
+                // ステップ2: Mutexロック試行（2秒タイムアウト）
+                Console.WriteLine("🔍 [STEP2] Attempting mutex lock...");
+                try
+                {
+                    mutex = new System.Threading.Mutex(false, mutexName);
+                    
+                    // 2秒以内にMutexが取得できない場合は他のインスタンスが実行中
+                    bool mutexAcquired = mutex.WaitOne(2000, false);
+                    if (mutexAcquired)
+                    {
+                        isOwnerOfMutex = true;
+                        Console.WriteLine("✅ [STEP2] Mutex lock acquired");
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ [STEP2] Mutex timeout - another instance holding the lock");
+                        if (isOwnerOfFileLock)
+                        {
+                            // ファイルロックは取得できたがMutexが取得できない = 異常状態
+                            Console.WriteLine("🔄 [STEP2] File lock acquired but mutex failed - proceeding cautiously");
+                        }
+                        else
+                        {
+                            Console.WriteLine("🔄 Exiting duplicate instance immediately.");
+                            return;
+                        }
+                    }
+                }
+                catch (AbandonedMutexException)
+                {
+                    // 前のインスタンスが異常終了した場合、Mutexを引き継ぎ
+                    Console.WriteLine("🔄 [STEP2] Previous instance terminated abnormally. Taking over mutex.");
+                    isOwnerOfMutex = true;
+                }
+                
+                // ステップ3: プロセス検証
+                Console.WriteLine("🔍 [STEP3] Process verification...");
+                var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+                var allBaketaProcesses = System.Diagnostics.Process.GetProcessesByName("Baketa.UI");
+                var allDotnetProcesses = System.Diagnostics.Process.GetProcessesByName("dotnet");
+                
+                Console.WriteLine($"🔍 Current process: PID {currentProcess.Id}, Name: {currentProcess.ProcessName}");
+                Console.WriteLine($"🔍 Baketa.UI processes: {allBaketaProcesses.Length}");
+                Console.WriteLine($"🔍 Dotnet processes: {allDotnetProcesses.Length}");
+                
+                // 複数のBaketa.UIプロセスが検出された場合の警告
+                if (allBaketaProcesses.Length > 1)
+                {
+                    var otherProcesses = allBaketaProcesses.Where(p => p.Id != currentProcess.Id);
+                    foreach (var proc in otherProcesses)
+                    {
+                        Console.WriteLine($"⚠️ Other Baketa.UI process detected: PID {proc.Id}");
+                    }
+                }
+                
+                // 両方のロックが成功した場合のみ継続
+                if (isOwnerOfFileLock || isOwnerOfMutex)
+                {
+                    Console.WriteLine("✅ Single instance check passed. Starting Baketa...");
+                }
+                else
+                {
+                    Console.WriteLine("🚨 Failed to acquire any locks - aborting to prevent conflicts");
+                    return;
+                }
+                
+                // プロセス終了時のロック解放設定
+                AppDomain.CurrentDomain.ProcessExit += (sender, e) => 
+                {
+                    Console.WriteLine("🔄 Baketa process terminating - releasing all locks.");
+                    try
+                    {
+                        if (isOwnerOfMutex && mutex != null)
+                        {
+                            mutex.ReleaseMutex();
+                            isOwnerOfMutex = false;
+                        }
+                        mutex?.Dispose();
+                        
+                        if (isOwnerOfFileLock && lockFile != null)
+                        {
+                            lockFile.Close();
+                            lockFile.Dispose();
+                            File.Delete(lockFilePath);
+                            isOwnerOfFileLock = false;
+                        }
+                    }
+                    catch (Exception releaseEx)
+                    {
+                        Console.WriteLine($"⚠️ Lock release error: {releaseEx.Message}");
+                    }
+                };
+                
+                // Console.CancelKeyPress時の適切な終了処理
+                Console.CancelKeyPress += (sender, e) =>
+                {
+                    Console.WriteLine("🔄 Ctrl+C detected - gracefully terminating...");
+                    e.Cancel = false; // プロセス終了を許可
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 Single instance check FAILED: {ex.Message}");
+                Console.WriteLine("🚨 Multiple instances may cause duplicate overlay displays!");
+                Console.WriteLine("🛑 ABORTING startup to prevent system conflicts.");
+                
+                // クリーンアップ
+                try
+                {
+                    mutex?.Dispose();
+                    lockFile?.Close();
+                    lockFile?.Dispose();
+                    if (isOwnerOfFileLock && File.Exists(lockFilePath))
+                    {
+                        File.Delete(lockFilePath);
+                    }
+                }
+                catch { /* クリーンアップエラーは無視 */ }
+                
+                return; // 例外発生時は起動を中止
+            }
+            
+            // Single instance確保後、通常の初期化を続行
             // 🔧 [CRITICAL_ENCODING_FIX] Windows環境でUTF-8コンソール出力を強制設定
             try
             {
@@ -958,6 +1118,12 @@ namespace Baketa.UI;
             var overlayUIModule = new OverlayUIModule();
             overlayUIModule.RegisterServices(services);
             Console.WriteLine("✅ OverlayUIModule登録完了");
+            
+            // 🚀 UltraThink Phase 16: UI統合オーバーレイモジュールの登録
+            Console.WriteLine("🚀 [PHASE16] Phase16UIOverlayModule登録開始");
+            var phase16UIOverlayModule = new Phase16UIOverlayModule();
+            phase16UIOverlayModule.RegisterWithDependencies(services, registeredModules, moduleStack);
+            Console.WriteLine("✅ [PHASE16] Phase16UIOverlayModule登録完了");
         }
         
         /// <summary>

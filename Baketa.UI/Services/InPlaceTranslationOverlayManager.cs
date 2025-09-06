@@ -13,6 +13,8 @@ using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
+using Baketa.Core.UI.Monitors;
+using Baketa.Core.UI.Geometry;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
 
@@ -21,16 +23,25 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// インプレース翻訳オーバーレイの管理サービス
 /// Google翻訳カメラのような、元テキストを翻訳テキストで置き換える表示を管理
+/// UltraThink Phase 11.1: IOverlayPositioningService統合による精密位置調整
 /// </summary>
 public class InPlaceTranslationOverlayManager(
     IEventAggregator eventAggregator,
+    IOverlayPositioningService overlayPositioningService,
+    IMonitorManager monitorManager,
     ILogger<InPlaceTranslationOverlayManager> logger) : IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IDisposable
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+    private readonly IOverlayPositioningService _overlayPositioningService = overlayPositioningService ?? throw new ArgumentNullException(nameof(overlayPositioningService));
+    private readonly IMonitorManager _monitorManager = monitorManager ?? throw new ArgumentNullException(nameof(monitorManager));
     private readonly ILogger<InPlaceTranslationOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
     // チャンクIDとインプレースオーバーレイウィンドウのマッピング
     private readonly ConcurrentDictionary<int, InPlaceTranslationOverlayWindow> _activeOverlays = new();
+    
+    // 🚑 Phase 13: 重複防止フィルター実装（Gemini推奨のReactive Extensions + ハッシュベース）
+    private readonly ConcurrentDictionary<string, DateTime> _recentTranslations = new();
+    private readonly TimeSpan _duplicatePreventionWindow = TimeSpan.FromSeconds(2);
     
     private bool _isInitialized;
     private bool _disposed;
@@ -78,6 +89,87 @@ public class InPlaceTranslationOverlayManager(
             Console.WriteLine($"💥 スタックトレース: {ex.StackTrace}");
             _logger.LogError(ex, "Failed to initialize InPlace translation overlay manager");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 🚑 Phase 13: テキストハッシュベースの重複検出
+    /// Gemini推奨のReactive Extensions活用版
+    /// </summary>
+    /// <param name="text">翻訳テキスト</param>
+    /// <returns>重複防止用ハッシュキー</returns>
+    private static string GetTextHash(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+            
+        // テキスト内容 + 長さを組み合わせたシンプルなハッシュ
+        return $"{text}_{text.Length}".GetHashCode().ToString();
+    }
+
+    /// <summary>
+    /// 🚑 Phase 13: 重複翻訳結果チェック
+    /// 2秒間の重複防止ウィンドウで同一テキストの重複表示を防止
+    /// </summary>
+    /// <param name="text">翻訳テキスト</param>
+    /// <returns>true=表示すべき, false=重複のためスキップ</returns>
+    private bool ShouldDisplayOverlay(string text)
+    {
+        var textHash = GetTextHash(text);
+        
+        if (string.IsNullOrEmpty(textHash))
+        {
+            return false; // 空テキストは表示しない
+        }
+        
+        // 重複チェック
+        if (_recentTranslations.TryGetValue(textHash, out var lastTime))
+        {
+            if (DateTime.UtcNow - lastTime < _duplicatePreventionWindow)
+            {
+                _logger.LogDebug("🚫 [PHASE13] 重複オーバーレイ防止 - Text: {Text}, Hash: {Hash}", 
+                    text.Substring(0, Math.Min(50, text.Length)), textHash);
+                return false; // 重複表示をスキップ
+            }
+        }
+        
+        // 最後の表示時刻を更新
+        _recentTranslations[textHash] = DateTime.UtcNow;
+        
+        // 古いエントリのクリーンアップ（メモリリーク防止）
+        CleanupOldTranslationEntries();
+        
+        return true;
+    }
+
+    /// <summary>
+    /// 🚑 Phase 13: 古い重複防止エントリのクリーンアップ
+    /// メモリ効率化のため、古いエントリを定期的に削除
+    /// </summary>
+    private void CleanupOldTranslationEntries()
+    {
+        // パフォーマンス考慮: 100エントリごとにクリーンアップ
+        if (_recentTranslations.Count < 100) return;
+        
+        var cutoffTime = DateTime.UtcNow - _duplicatePreventionWindow.Multiply(2);
+        var keysToRemove = new List<string>();
+        
+        foreach (var kvp in _recentTranslations)
+        {
+            if (kvp.Value < cutoffTime)
+            {
+                keysToRemove.Add(kvp.Key);
+            }
+        }
+        
+        foreach (var key in keysToRemove)
+        {
+            _recentTranslations.TryRemove(key, out _);
+        }
+        
+        if (keysToRemove.Count > 0)
+        {
+            _logger.LogDebug("🧹 [PHASE13] 重複防止エントリクリーンアップ完了 - 削除数: {Count}", keysToRemove.Count);
         }
     }
 
@@ -263,38 +355,48 @@ public class InPlaceTranslationOverlayManager(
                 // オーバーレイ表示直前のキャンセレーションチェック
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                // 🎯 衝突回避位置を計算
-                System.Drawing.Point collisionAwarePosition;
+                // 🎯 Phase 11.1: IOverlayPositioningServiceによる精密位置調整
+                System.Drawing.Point optimalPosition;
                 try
                 {
                     var overlaySize = textChunk.GetOverlaySize();
-                    var screenBounds = new Rectangle(0, 0, 1920, 1080); // デフォルト画面サイズ
-                        
-                    collisionAwarePosition = textChunk.CalculateOptimalOverlayPositionWithCollisionAvoidance(
-                        overlaySize, screenBounds, existingBounds);
-                        
-                    Console.WriteLine($"🎯 [COLLISION_AVOIDANCE] 衝突回避位置計算完了 - ChunkId: {textChunk.ChunkId}, " +
-                                    $"Position: ({collisionAwarePosition.X},{collisionAwarePosition.Y}), " +
+                    var options = new OverlayPositioningOptions(); // デフォルト設定を使用
+                    
+                    // 🎯 Phase 11.4: Gemini指摘事項対応 - 実際のモニター情報取得
+                    // textChunk.SourceWindowHandleから最適なモニターを動的に決定
+                    var actualMonitor = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
+                    
+                    var result = _overlayPositioningService.CalculateOptimalPosition(
+                        textChunk, overlaySize, actualMonitor, existingBounds, options);
+                    
+                    optimalPosition = result.Position;
+                    
+                    Console.WriteLine($"🎯 [PHASE11.4] 実モニター情報による精密位置計算完了 - ChunkId: {textChunk.ChunkId}, " +
+                                    $"Position: ({optimalPosition.X},{optimalPosition.Y}), Strategy: {result.UsedStrategy}, " +
+                                    $"Monitor: {actualMonitor.Name} ({actualMonitor.Bounds.Width}x{actualMonitor.Bounds.Height}), " +
                                     $"ExistingOverlays: {existingBounds.Count}");
+                                    
+                    _logger.LogDebug("Phase 11.4実モニター情報による精密位置調整完了 - ChunkId: {ChunkId}, Strategy: {Strategy}, Position: ({X},{Y}), Monitor: {MonitorName}",
+                        textChunk.ChunkId, result.UsedStrategy, optimalPosition.X, optimalPosition.Y, actualMonitor.Name);
                 }
                 catch (Exception ex)
                 {
-                    // 衝突回避計算失敗時は通常の位置計算にフォールバック
-                    collisionAwarePosition = textChunk.GetOverlayPosition();
-                    _logger.LogWarning(ex, "衝突回避位置計算失敗、通常位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
+                    // 精密位置計算失敗時は基本位置にフォールバック
+                    optimalPosition = textChunk.GetBasicOverlayPosition();
+                    _logger.LogWarning(ex, "精密位置計算失敗、基本位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
                 }
                 
                 // オーバーレイを コレクションに追加
                 _activeOverlays[textChunk.ChunkId] = newOverlay;
                 
-                // 一時的なTextChunkで衝突回避位置を適用
-                var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, collisionAwarePosition);
+                // 一時的なTextChunkで精密位置調整結果を適用
+                var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, optimalPosition);
                 
-                // 衝突回避位置でインプレース表示を開始
+                // Phase 11.1精密位置でインプレース表示を開始
                 await newOverlay.ShowInPlaceOverlayAsync(adjustedTextChunk, cancellationToken).ConfigureAwait(false);
                 
-                _logger.LogDebug("新規インプレースオーバーレイ表示完了（衝突回避対応） - ChunkId: {ChunkId}, Position: ({X},{Y})", 
-                    textChunk.ChunkId, collisionAwarePosition.X, collisionAwarePosition.Y);
+                _logger.LogDebug("新規インプレースオーバーレイ表示完了（Phase 11.1精密位置調整） - ChunkId: {ChunkId}, Position: ({X},{Y})", 
+                    textChunk.ChunkId, optimalPosition.X, optimalPosition.Y);
             }
             else
             {
@@ -449,6 +551,9 @@ public class InPlaceTranslationOverlayManager(
         
         _isInitialized = false;
         
+        // 🚑 Phase 13: 重複防止フィルタークリーンアップ
+        _recentTranslations.Clear();
+        
         Console.WriteLine("✅ InPlaceTranslationOverlayManager - リセット完了");
     }
 
@@ -486,11 +591,11 @@ public class InPlaceTranslationOverlayManager(
     }
 
     /// <summary>
-    /// 衝突回避位置で調整されたTextChunkを作成
-    /// 元のTextChunkのプロパティを維持しつつ、表示位置のみを衝突回避位置に調整
+    /// Phase 11.1: 精密位置調整で調整されたTextChunkを作成
+    /// 元のTextChunkのプロパティを維持しつつ、表示位置のみをIOverlayPositioningServiceによる精密位置に調整
     /// </summary>
     /// <param name="originalChunk">元のTextChunk</param>
-    /// <param name="adjustedPosition">衝突回避計算で決定された新しい位置</param>
+    /// <param name="adjustedPosition">IOverlayPositioningServiceで決定された最適位置</param>
     /// <returns>位置調整されたTextChunk</returns>
     private static TextChunk CreateAdjustedTextChunk(TextChunk originalChunk, System.Drawing.Point adjustedPosition)
     {
@@ -549,39 +654,70 @@ public class InPlaceTranslationOverlayManager(
     {
         try
         {
-            var overlaysToHide = new List<(int chunkId, InPlaceTranslationOverlayWindow overlay)>();
+            var overlaysToHide = new List<(int chunkId, InPlaceTranslationOverlayWindow overlay, Rectangle overlayBounds)>();
             
-            // 同一エリア内の既存オーバーレイを特定（除外ChunkId以外）
+            // 🎯 Phase 11.5.3: 正確な領域ベース削除実装
+            // 指定領域内の既存オーバーレイを特定（除外ChunkId以外、位置判定あり）
             foreach (var kvp in _activeOverlays)
             {
                 if (kvp.Key != excludeChunkId)
                 {
-                    // エリアが重複している場合は非表示対象とする
-                    // TODO: より精密な重複判定を実装する場合は、オーバーレイの位置情報を取得
-                    overlaysToHide.Add((kvp.Key, kvp.Value));
+                    try
+                    {
+                        // オーバーレイの実際の位置とサイズを取得
+                        var position = kvp.Value.Position;
+                        var clientSize = kvp.Value.ClientSize;
+                        var overlayBounds = new Rectangle((int)position.X, (int)position.Y, (int)clientSize.Width, (int)clientSize.Height);
+                        
+                        // 領域重複判定（交差チェック）
+                        if (area.IntersectsWith(overlayBounds))
+                        {
+                            overlaysToHide.Add((kvp.Key, kvp.Value, overlayBounds));
+                            _logger.LogDebug("🎯 [PHASE11.5.3] 領域内オーバーレイ検出 - ChunkId: {ChunkId}, OverlayBounds: {OverlayBounds}, TargetArea: {TargetArea}", 
+                                kvp.Key, overlayBounds, area);
+                        }
+                        else
+                        {
+                            _logger.LogDebug("🚫 [PHASE11.5.3] 領域外オーバーレイ保持 - ChunkId: {ChunkId}, OverlayBounds: {OverlayBounds}, TargetArea: {TargetArea}", 
+                                kvp.Key, overlayBounds, area);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "⚠️ [PHASE11.5.3] オーバーレイ位置取得エラー - ChunkId: {ChunkId}, スキップします", kvp.Key);
+                    }
                 }
             }
             
-            _logger.LogDebug("エリア内オーバーレイ非表示対象: {Count}個 - Area: {Area}", overlaysToHide.Count, area);
+            _logger.LogInformation("🎯 [PHASE11.5.3] エリア内オーバーレイ削除開始: {Count}個/{Total}個対象 - Area: {Area}", 
+                overlaysToHide.Count, _activeOverlays.Count, area);
             
             // 非表示実行
-            foreach (var (chunkId, overlay) in overlaysToHide)
+            var deletedCount = 0;
+            foreach (var (chunkId, overlay, overlayBounds) in overlaysToHide)
             {
                 if (_activeOverlays.TryRemove(chunkId, out _))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
+                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイ削除開始 - ChunkId: {ChunkId}", chunkId);
                         overlay.Hide();
+                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイHide完了 - ChunkId: {ChunkId}", chunkId);
                         overlay.Dispose();
+                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイDispose完了 - ChunkId: {ChunkId}", chunkId);
                     }, DispatcherPriority.Normal, cancellationToken);
                     
-                    _logger.LogDebug("エリア内オーバーレイ非表示完了 - ChunkId: {ChunkId}", chunkId);
+                    deletedCount++;
+                    _logger.LogInformation("✅ [PHASE11.5.3] エリア内オーバーレイ削除完了 - ChunkId: {ChunkId}, Bounds: {OverlayBounds}", chunkId, overlayBounds);
                 }
             }
+            
+            _logger.LogInformation("🎯 [PHASE11.5.3] エリア内オーバーレイ削除完了: {DeletedCount}個削除, {RemainingCount}個残存 - Area: {Area}", 
+                deletedCount, _activeOverlays.Count, area);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "エリア内オーバーレイ非表示処理エラー - Area: {Area}", area);
+            _logger.LogError(ex, "❌ [PHASE11.5.3] エリア内オーバーレイ非表示処理エラー - Area: {Area}", area);
         }
     }
 
@@ -626,6 +762,14 @@ public class InPlaceTranslationOverlayManager(
         {
             Console.WriteLine($"🚫 [EMPTY_TEXT_SKIP] 空文字の翻訳結果をスキップ - Text: '{eventData.Text}' (非表示設定)");
             _logger.LogDebug("空文字の翻訳結果をスキップ: Text={Text}", eventData.Text);
+            return;
+        }
+
+        // 🚑 Phase 13: 重複防止フィルターチェック
+        if (!ShouldDisplayOverlay(eventData.Text))
+        {
+            Console.WriteLine($"🚫 [PHASE13] 重複翻訳結果のため表示をスキップ - Text: '{eventData.Text?.Substring(0, Math.Min(50, eventData.Text?.Length ?? 0))}'");
+            _logger.LogDebug("🚑 [PHASE13] 重複翻訳結果のため表示をスキップ - Text: {Text}", eventData.Text);
             return;
         }
 
@@ -701,6 +845,10 @@ public class InPlaceTranslationOverlayManager(
             }
             
             _activeOverlays.Clear();
+            
+            // 🚑 Phase 13: 重複防止フィルタークリーンアップ
+            _recentTranslations.Clear();
+            
             _isInitialized = false;
             _disposed = true;
             
