@@ -187,9 +187,25 @@ namespace Baketa.Application.DI.Modules;
                     var translationDictionaryService = (Baketa.Core.Abstractions.Services.ITranslationDictionaryService?)null; // REMOVED: 辞書翻訳削除済み
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
                     
-                    Console.WriteLine("🔍 [NLLB_TEST] TranslationOrchestrationService - CoordinateBasedTranslationServiceはnullで注入（テスト用）");
-                    var coordinateBasedTranslation = (Baketa.Application.Services.Translation.CoordinateBasedTranslationService?)null;
-                    Console.WriteLine($"✅ [NLLB_TEST] CoordinateBasedTranslationService=null設定完了（NLLB-200テスト用）");
+                    // 🎯 [PHASE17] CoordinateBasedTranslationService有効化 - TimedChunkAggregator統合
+                    Console.WriteLine("🚀 [PHASE17] CoordinateBasedTranslationService取得開始 - TimedChunkAggregator統合用");
+                    var coordinateBasedTranslation = provider.GetService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+                    if (coordinateBasedTranslation == null)
+                    {
+                        Console.WriteLine("⚠️ [PHASE17] CoordinateBasedTranslationService未登録 - 新規作成");
+                        var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
+                        var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
+                        var streamingTranslationService = provider.GetService<Baketa.Core.Abstractions.Translation.IStreamingTranslationService>();
+                        var timedChunkAggregator = provider.GetRequiredService<Baketa.Infrastructure.OCR.PostProcessing.TimedChunkAggregator>();
+                        var loggerForCoordinate = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
+                        coordinateBasedTranslation = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
+                            processingFacade,
+                            configurationFacade,
+                            streamingTranslationService,
+                            timedChunkAggregator,
+                            loggerForCoordinate);
+                    }
+                    Console.WriteLine($"✅ [PHASE17] CoordinateBasedTranslationService準備完了 - TimedChunkAggregator統合有効");
                     Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                     Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
                     
@@ -352,7 +368,8 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.BatchTranslationRequestEvent>>(
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>());
             
-            // 座標情報付き翻訳完了イベントハンドラー
+            // 🔄 [FIX] TranslationWithBoundsCompletedHandler復活 - 翻訳結果をTextChunkに反映するため必須
+            Console.WriteLine("🔄 [FIX] TranslationWithBoundsCompletedHandler DI登録復活 - 翻訳結果反映修復");
             services.AddSingleton<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>());
@@ -420,6 +437,6 @@ namespace Baketa.Application.DI.Modules;
             // yield return typeof(InfrastructureModule); // PlatformModule経由で間接取得
             yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
             yield return typeof(CaptureModule); // キャプチャサービス統合
-            yield return typeof(Phase15OverlayModule); // 🚀 Phase 15 新オーバーレイシステム
+            // 🗑️ [PHASE18] Phase15OverlayModule削除完了 - 統一オーバーレイシステムに移行
         }
     }

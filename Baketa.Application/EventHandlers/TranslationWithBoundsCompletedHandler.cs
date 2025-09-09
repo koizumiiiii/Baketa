@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.UI.Overlay;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,15 +16,15 @@ namespace Baketa.Application.EventHandlers;
 /// コンストラクタ
 /// </remarks>
 /// <param name="eventAggregator">イベント集約インスタンス</param>
-/// <param name="overlayOrchestrator">新しいオーバーレイオーケストレーター（Phase 15対応）</param>
+/// <param name="overlayManager">インプレース翻訳オーバーレイマネージャー（PHASE18統一システム）</param>
 /// <param name="logger">ロガー</param>
 public class TranslationWithBoundsCompletedHandler(
     IEventAggregator eventAggregator,
-    IOverlayOrchestrator? overlayOrchestrator,
+    IInPlaceTranslationOverlayManager? overlayManager,
     ILogger<TranslationWithBoundsCompletedHandler> logger) : IEventProcessor<TranslationWithBoundsCompletedEvent>
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-    private readonly IOverlayOrchestrator? _overlayOrchestrator = overlayOrchestrator;
+    private readonly IInPlaceTranslationOverlayManager? _overlayManager = overlayManager;
     private readonly ILogger<TranslationWithBoundsCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
     /// <inheritdoc />
@@ -53,57 +54,48 @@ public class TranslationWithBoundsCompletedHandler(
             // 🔍 翻訳成功判定：空文字や空白文字の場合は翻訳失敗とみなす
             var isTranslationSuccessful = !string.IsNullOrWhiteSpace(eventData.TranslatedText);
 
-            // 🏗️ Phase 15: 新しいオーバーレイオーケストレーターを使用（利用可能な場合）
-            if (_overlayOrchestrator != null && isTranslationSuccessful)
+            // 🏗️ PHASE18: 統一オーバーレイシステムを使用（利用可能な場合）
+            if (_overlayManager != null && isTranslationSuccessful)
             {
-                _logger.LogDebug("🚀 [PHASE15_HANDLER] 新しいOverlayOrchestrator使用開始 - ID: {Id}", eventData.Id);
-                Console.WriteLine($"🚀 [PHASE15_HANDLER] 新しいOverlayOrchestrator使用 - EventId: {eventData.Id}");
+                _logger.LogDebug("🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用開始 - ID: {Id}", eventData.Id);
+                Console.WriteLine($"🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用 - EventId: {eventData.Id}");
                 
                 try
                 {
-                    // TranslationResultに変換
-                    var translationResult = new TranslationResult
+                    // TextChunkを作成（eventDataから）
+                    var textChunk = new TextChunk
                     {
-                        Id = eventData.Id.ToString(),
+                        ChunkId = eventData.Id.GetHashCode(), // Guidからintのハッシュコードを生成
+                        CombinedText = eventData.SourceText,
                         TranslatedText = eventData.TranslatedText,
-                        OriginalText = eventData.SourceText,
-                        DisplayArea = eventData.Bounds,
-                        SourceLanguage = eventData.SourceLanguage,
-                        TargetLanguage = eventData.TargetLanguage,
-                        EngineName = eventData.EngineName,
-                        Timestamp = DateTimeOffset.UtcNow
+                        CombinedBounds = eventData.Bounds,
+                        SourceWindowHandle = IntPtr.Zero, // TranslationWithBoundsCompletedEventにはWindowHandle情報がない
+                        DetectedLanguage = eventData.SourceLanguage,
+                        TextResults = [] // 最小限のTextChunk作成
                     };
 
-                    // 新しいオーケストレーターで処理
-                    var displayResult = await _overlayOrchestrator.HandleTranslationResultAsync(translationResult).ConfigureAwait(false);
+                    // 統一オーバーレイマネージャーで処理
+                    await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
                     
-                    if (displayResult)
-                    {
-                        _logger.LogInformation("✅ [PHASE15_HANDLER] 新システムでオーバーレイ表示成功 - ID: {Id}, Text: '{Text}'", 
-                            eventData.Id, eventData.TranslatedText.Substring(0, Math.Min(30, eventData.TranslatedText.Length)));
-                        Console.WriteLine($"✅ [PHASE15_HANDLER] 新システム表示成功 - ID: {eventData.Id}");
-                    }
-                    else
-                    {
-                        _logger.LogDebug("🚫 [PHASE15_HANDLER] 新システムで表示スキップ（重複検出） - ID: {Id}", eventData.Id);
-                        Console.WriteLine($"🚫 [PHASE15_HANDLER] 新システム表示スキップ - ID: {eventData.Id}");
-                    }
+                    _logger.LogInformation("✅ [PHASE18_HANDLER] 統一システムでオーバーレイ表示成功 - ID: {Id}, Text: '{Text}'", 
+                        eventData.Id, eventData.TranslatedText.Substring(0, Math.Min(30, eventData.TranslatedText.Length)));
+                    Console.WriteLine($"✅ [PHASE18_HANDLER] 統一システム表示成功 - ID: {eventData.Id}");
                 }
-                catch (Exception orchestratorEx)
+                catch (Exception overlayManagerEx)
                 {
-                    _logger.LogError(orchestratorEx, "❌ [PHASE15_HANDLER] 新しいオーケストレーター処理中にエラー発生 - ID: {Id}", eventData.Id);
-                    Console.WriteLine($"❌ [PHASE15_HANDLER] 新システムエラー - ID: {eventData.Id}");
+                    _logger.LogError(overlayManagerEx, "❌ [PHASE18_HANDLER] 統一オーバーレイマネージャー処理中にエラー発生 - ID: {Id}", eventData.Id);
+                    Console.WriteLine($"❌ [PHASE18_HANDLER] 統一システムエラー - ID: {eventData.Id}");
                     
-                    // 新システムでエラーが発生した場合は既存システムにフォールバック
-                    _logger.LogWarning("⚠️ [PHASE15_HANDLER] 既存システムにフォールバック実行");
+                    // 統一システムでエラーが発生した場合は既存システムにフォールバック
+                    _logger.LogWarning("⚠️ [PHASE18_HANDLER] 既存システムにフォールバック実行");
                     await PublishLegacyOverlayEvent();
                 }
             }
             else
             {
-                // 既存システムを使用（新システム無効 or 翻訳失敗）
-                _logger.LogDebug("🔄 [LEGACY_HANDLER] 既存システム使用 - NewOrchestrator: {HasOrchestrator}, Success: {Success}", 
-                    _overlayOrchestrator != null, isTranslationSuccessful);
+                // 既存システムを使用（統一システム無効 or 翻訳失敗）
+                _logger.LogDebug("🔄 [LEGACY_HANDLER] 既存システム使用 - OverlayManager: {HasManager}, Success: {Success}", 
+                    _overlayManager != null, isTranslationSuccessful);
                 await PublishLegacyOverlayEvent();
             }
 
