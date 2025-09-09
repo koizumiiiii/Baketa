@@ -1024,6 +1024,13 @@ namespace Baketa.UI;
             registeredModules.Add(typeof(InfrastructureModule));
             Console.WriteLine("✅ Infrastructure基盤モジュール登録完了 - appsettings.json設定読み込み済み");
             
+            // 🚀 NEW ARCHITECTURE: TimedAggregatorModule登録（完全自律型設定システム）
+            Console.WriteLine("🔧 TimedAggregatorModule登録開始（新設計）");
+            var timedAggregatorModule = new Baketa.Infrastructure.DI.Modules.TimedAggregatorModule();
+            timedAggregatorModule.RegisterServices(services);
+            registeredModules.Add(typeof(Baketa.Infrastructure.DI.Modules.TimedAggregatorModule));
+            Console.WriteLine("✅ TimedAggregatorModule登録完了 - 自律型設定システム統合済み");
+            
             // PlatformModuleの登録
             Console.WriteLine("🖥️ Platform基盤モジュール登録開始");
             var platformModule = new Baketa.Infrastructure.Platform.DI.Modules.PlatformModule();
@@ -1119,11 +1126,8 @@ namespace Baketa.UI;
             overlayUIModule.RegisterServices(services);
             Console.WriteLine("✅ OverlayUIModule登録完了");
             
-            // 🚀 UltraThink Phase 16: UI統合オーバーレイモジュールの登録
-            Console.WriteLine("🚀 [PHASE16] Phase16UIOverlayModule登録開始");
-            var phase16UIOverlayModule = new Phase16UIOverlayModule();
-            phase16UIOverlayModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-            Console.WriteLine("✅ [PHASE16] Phase16UIOverlayModule登録完了");
+            // 🗑️ [PHASE18] Phase16UIOverlayModule削除完了 - 統一オーバーレイシステムに移行
+            Console.WriteLine("🗑️ [PHASE18] Phase16UIOverlayModule削除 - InPlaceTranslationOverlayManager単一化");
         }
         
         /// <summary>

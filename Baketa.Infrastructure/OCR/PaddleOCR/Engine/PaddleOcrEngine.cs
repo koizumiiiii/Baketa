@@ -3542,6 +3542,9 @@ public class PaddleOcrEngine : IOcrEngine
     {
         // 🧠 [ULTRATHINK_GEMINI_FIX] Gemini推奨Mat防御的コピー戦略 - メモリ競合回避
         Mat safeMat = null;
+        // 🔧 [ULTRATHINK_CRITICAL_FIX] エラー報告用の正規化後Mat情報保存（スコープ修正）
+        string workingMatInfo = "";
+        
         try
         {
             safeMat = processedMat.Clone(); // 防御的コピー作成
@@ -3651,6 +3654,9 @@ public class PaddleOcrEngine : IOcrEngine
                             __logger?.LogDebug("🎯 [NORMALIZATION_EVIDENCE] 正規化実行: {OriginalSize}({OriginalOdd}) → {NormalizedSize}({NormalizedOdd})", 
                                 originalSize, originalOdd ? "奇数あり" : "偶数", normalizedSize, normalizedOdd ? "奇数あり" : "偶数");
                             
+                            // 🔧 [ULTRATHINK_CRITICAL_FIX] エラー報告用に正規化後の情報をキャプチャ
+                            workingMatInfo = $"Size={workingMat.Width}x{workingMat.Height}, Type={workingMat.Type()}, Channels={workingMat.Channels()}, Continuous={workingMat.IsContinuous()}";
+                            
                             if (!ValidateMatForPaddleOCR(workingMat))
                             {
                                 __logger?.LogWarning("⚠️ [MAT_PROCESSING] Mat validation failed, attempting automatic fix...");
@@ -3663,6 +3669,9 @@ public class PaddleOcrEngine : IOcrEngine
                                 __logger?.LogDebug("✅ [MAT_PROCESSING] Mat自動修正成功 - 修正後のMatを使用");
                                 workingMat.Dispose(); // 元のworkingMatを解放
                                 workingMat = fixedMat; // 修正後のMatを使用
+                                
+                                // 修正後の情報を更新
+                                workingMatInfo = $"Size={workingMat.Width}x{workingMat.Height}, Type={workingMat.Type()}, Channels={workingMat.Channels()}, Continuous={workingMat.IsContinuous()}";
                             }
                             
                             // 🔒 [EXECUTION_SAFETY] PaddleOCR実行前最終安全確認
@@ -3675,7 +3684,7 @@ public class PaddleOcrEngine : IOcrEngine
                             }
                             
                             // Mat状態の詳細ログ
-                            __logger?.LogDebug("🔍 [OCR_ENGINE] PaddleOCR.Run実行前状態: Size={Width}x{Height}, Type={Type}, Channels={Channels}, IsContinuous={IsContinuous}",
+                            __logger?.LogDebug("🔍 [OCR_ENGINE] PaddleOCR.Run実行前状況: Size={Width}x{Height}, Type={Type}, Channels={Channels}, IsContinuous={IsContinuous}",
                                 workingMat.Cols, workingMat.Rows, workingMat.Type(), workingMat.Channels(), workingMat.IsContinuous());
                             
                             // PaddleOCR最小サイズチェック
@@ -3695,6 +3704,9 @@ public class PaddleOcrEngine : IOcrEngine
                                     var continuousMat = workingMat.Clone();
                                     workingMat.Dispose();
                                     workingMat = continuousMat;
+                                    
+                                    // 連続化後の情報を更新
+                                    workingMatInfo = $"Size={workingMat.Width}x{workingMat.Height}, Type={workingMat.Type()}, Channels={workingMat.Channels()}, Continuous={workingMat.IsContinuous()}";
                                 }
                                 
                                 // メモリデータ有効性チェック（安全な方法）
@@ -3780,7 +3792,12 @@ public class PaddleOcrEngine : IOcrEngine
                     // 🚨 [ULTRATHINK_ENHANCED_RECOVERY] PaddlePredictor失敗時の高度回復機構
                     _consecutivePaddleFailures++;
                     
+                    // 🔧 [ULTRATHINK_CRITICAL_FIX] エラー報告で正規化後のworkingMat情報を使用
                     var detailedInfo = CollectPaddlePredictorErrorInfo(safeMat, ex);
+                    if (!string.IsNullOrEmpty(workingMatInfo))
+                    {
+                        detailedInfo += $", 🎯 [PROCESSED_MAT_INFO] Normalized: {workingMatInfo}";
+                    }
                     __logger?.LogError(ex, "🚨 [PADDLE_PREDICTOR_FAILED] 失敗#{FailureCount}: {DetailedInfo}", _consecutivePaddleFailures, detailedInfo);
                     
                     // Mat状態の詳細ログ (安全なsafeMatを使用)

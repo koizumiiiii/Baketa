@@ -233,6 +233,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // OCR精度測定スタートアップサービス
             services.AddOcrAccuracyStartupService();
+            
+            // REMOVED: TimedChunkAggregator統合システム
+            // → 新設計: TimedAggregatorModule（完全自律型設定システム）に移行
         }
         
         /// <summary>

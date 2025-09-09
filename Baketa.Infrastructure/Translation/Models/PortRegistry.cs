@@ -50,3 +50,30 @@ public enum ServerStatus
     Stopped,
     Error
 }
+
+/// <summary>
+/// 🔧 [HYBRID_DESIGN] グローバルポートレジストリ（新形式）
+/// </summary>
+public class GlobalPortRegistry
+{
+    [JsonPropertyName("ports")]
+    public Dictionary<string, PortEntry> Ports { get; set; } = [];
+    
+    [JsonPropertyName("last_updated")]
+    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 🔧 [HYBRID_DESIGN] ポートエントリ情報
+/// </summary>
+public class PortEntry
+{
+    [JsonPropertyName("pid")]
+    public int Pid { get; set; }
+    
+    [JsonPropertyName("last_heartbeat")]
+    public DateTime LastHeartbeat { get; set; } = DateTime.UtcNow;
+    
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, object>? Metadata { get; set; }
+}

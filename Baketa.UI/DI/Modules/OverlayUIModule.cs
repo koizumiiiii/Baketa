@@ -13,14 +13,13 @@ public sealed class OverlayUIModule : ServiceModuleBase
 {
     public override void RegisterServices(IServiceCollection services)
     {
-        // ✅ Phase 16統一: IInPlaceTranslationOverlayManagerはAvaloniaOverlayRendererが実装
-        // Legacy直接登録を除去し、依存関係として必要なクラスのみ登録
-        
-        // InPlaceTranslationOverlayManager - AvaloniaOverlayRendererの依存関係として必要
+        // InPlaceTranslationOverlayManagerクラスの登録
         services.AddSingleton<InPlaceTranslationOverlayManager>();
         
-        // 📝 注記: IInPlaceTranslationOverlayManagerインターフェースの実装は
-        // Phase16UIOverlayModuleのAvaloniaOverlayRendererが統一提供
-        Console.WriteLine("🔄 [OVERLAY_UI] IInPlaceTranslationOverlayManager実装をPhase16統一システムに委任");
+        // 🔧 [PHASE18] IInPlaceTranslationOverlayManagerインターフェース実装登録追加
+        services.AddSingleton<IInPlaceTranslationOverlayManager>(serviceProvider =>
+            serviceProvider.GetRequiredService<InPlaceTranslationOverlayManager>());
+        
+        Console.WriteLine("✅ [OVERLAY_UI] IInPlaceTranslationOverlayManager実装登録完了");
     }
 }
