@@ -7,6 +7,7 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
 using System.Drawing;
+using Moq;
 
 namespace Baketa.Infrastructure.Tests.OCR.PostProcessing;
 
@@ -29,10 +30,11 @@ public class TimedChunkAggregatorTests : IDisposable
             BufferDelayMs = 1000
         };
         
-        var optionsWrapper = Options.Create(_settings);
+        var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
+        optionsMonitorMock.Setup(x => x.CurrentValue).Returns(_settings);
         
         _aggregator = new TimedChunkAggregator(
-            optionsWrapper,
+            optionsMonitorMock.Object,
             _lineBreakProcessor,
             _logger);
     }
@@ -167,10 +169,11 @@ public class TimedChunkAggregatorTests : IDisposable
             BufferDelayMs = 5000, // Long delay to test immediate aggregation
             MaxChunkCount = 2 // Low threshold for testing
         };
-        var optionsWrapper = Options.Create(testSettings);
+        var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
+        optionsMonitorMock.Setup(x => x.CurrentValue).Returns(testSettings);
         
         using var testAggregator = new TimedChunkAggregator(
-            optionsWrapper,
+            optionsMonitorMock.Object,
             _lineBreakProcessor,
             _logger);
             
@@ -211,10 +214,11 @@ public class TimedChunkAggregatorTests : IDisposable
             IsFeatureEnabled = false,
             BufferDelayMs = 1000
         };
-        var optionsWrapper = Options.Create(disabledSettings);
+        var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
+        optionsMonitorMock.Setup(x => x.CurrentValue).Returns(disabledSettings);
         
         using var testAggregator = new TimedChunkAggregator(
-            optionsWrapper,
+            optionsMonitorMock.Object,
             _lineBreakProcessor,
             _logger);
             

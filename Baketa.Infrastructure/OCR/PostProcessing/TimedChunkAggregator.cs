@@ -31,7 +31,7 @@ public sealed class TimedChunkAggregator : IDisposable
     private volatile int _nextChunkId;
     
     public TimedChunkAggregator(
-        IOptions<TimedAggregatorSettings> settings,
+        IOptionsMonitor<TimedAggregatorSettings> settings,
         CoordinateBasedLineBreakProcessor lineBreakProcessor,
         ILogger<TimedChunkAggregator> logger)
     {
@@ -45,15 +45,15 @@ public sealed class TimedChunkAggregator : IDisposable
         
         if (settings != null)
         {
-            _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.Value: {IsNull}", settings.Value == null ? "NULL" : "NOT NULL");
-            if (settings.Value != null)
+            _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue: {IsNull}", settings.CurrentValue == null ? "NULL" : "NOT NULL");
+            if (settings.CurrentValue != null)
             {
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.Value.IsFeatureEnabled: {Enabled}", settings.Value.IsFeatureEnabled);
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.Value.BufferDelayMs: {DelayMs}", settings.Value.BufferDelayMs);
+                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.IsFeatureEnabled: {Enabled}", settings.CurrentValue.IsFeatureEnabled);
+                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.BufferDelayMs: {DelayMs}", settings.CurrentValue.BufferDelayMs);
             }
         }
         
-        _settings = settings?.Value ?? TimedAggregatorSettings.Development;
+        _settings = settings?.CurrentValue ?? TimedAggregatorSettings.Development;
         
         // フォールバック後の設定値も確認
         _logger.LogDebug("🔍 [CONFIG_DEBUG] Final _settings.IsFeatureEnabled: {Enabled}", _settings.IsFeatureEnabled);

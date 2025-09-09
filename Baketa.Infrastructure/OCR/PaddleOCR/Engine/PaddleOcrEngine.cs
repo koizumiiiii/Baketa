@@ -3646,10 +3646,23 @@ public class PaddleOcrEngine : IOcrEngine
                             var originalSize = $"{workingMat.Width}x{workingMat.Height}";
                             var originalOdd = (workingMat.Width % 2 == 1) || (workingMat.Height % 2 == 1);
                             
+                            // 🔍 [GEMINI_MAT_TRACE] 正規化前のMat.Dataポインタ追跡
+                            var beforeNormalizePtr = workingMat.Data.ToString("X16");
+                            __logger?.LogDebug("🔍 [MAT_TRACE_BEFORE] 正規化前: Ptr={Ptr}, Size={Size}", beforeNormalizePtr, originalSize);
+                            
                             workingMat = NormalizeImageDimensions(workingMat);
                             
-                            // 🔍 [ULTRATHINK_EVIDENCE] 正規化効果の確実な証拠収集
+                            // 🔍 [GEMINI_MAT_TRACE] 正規化後のMat.Dataポインタ追跡  
+                            var afterNormalizePtr = workingMat.Data.ToString("X16");
                             var normalizedSize = $"{workingMat.Width}x{workingMat.Height}";
+                            __logger?.LogDebug("🔍 [MAT_TRACE_AFTER] 正規化後: Ptr={Ptr}, Size={Size}", afterNormalizePtr, normalizedSize);
+                            
+                            // 🎯 [GEMINI_POINTER_ANALYSIS] ポインタ変化の分析
+                            var pointerChanged = beforeNormalizePtr != afterNormalizePtr;
+                            __logger?.LogDebug("🎯 [MAT_PTR_ANALYSIS] ポインタ変化: {Changed}, 前={Before}, 後={After}", 
+                                pointerChanged ? "あり" : "なし", beforeNormalizePtr, afterNormalizePtr);
+                            
+                            // 🔍 [ULTRATHINK_EVIDENCE] 正規化効果の確実な証拠収集
                             var normalizedOdd = (workingMat.Width % 2 == 1) || (workingMat.Height % 2 == 1);
                             __logger?.LogDebug("🎯 [NORMALIZATION_EVIDENCE] 正規化実行: {OriginalSize}({OriginalOdd}) → {NormalizedSize}({NormalizedOdd})", 
                                 originalSize, originalOdd ? "奇数あり" : "偶数", normalizedSize, normalizedOdd ? "奇数あり" : "偶数");
@@ -3742,7 +3755,18 @@ public class PaddleOcrEngine : IOcrEngine
                             
                             // 🎯 [PADDLE_PREDICTOR_CRITICAL_FIX] PaddlePredictor run failed エラー対策
                             __logger?.LogDebug("🏃 [OCR_ENGINE] PaddleOCR.Run実行開始...");
-                            var ocrResult = _ocrEngine.Run(workingMat);
+                            
+                            // 🔍 [GEMINI_FINAL_TRACE] PaddleOCR実行直前のMat.Dataポインタ確認
+                            var finalMatPtr = workingMat.Data.ToString("X16");
+                            var finalMatSize = $"{workingMat.Width}x{workingMat.Height}";
+                            __logger?.LogDebug("🔍 [MAT_TRACE_FINAL] PaddleOCR直前: Ptr={Ptr}, Size={Size}", finalMatPtr, finalMatSize);
+                            
+                            // 🎯 [GEMINI_FORCE_COPY] Force Copy戦略: 安全なMat.Clone()で参照管理問題解決
+                            using var safeCopyMat = workingMat.Clone();
+                            var safeCopyPtr = safeCopyMat.Data.ToString("X16");
+                            __logger?.LogDebug("🎯 [FORCE_COPY] Clone作成: 元={Original}, コピー={Copy}", finalMatPtr, safeCopyPtr);
+                            
+                            var ocrResult = _ocrEngine.Run(safeCopyMat);
                             __logger?.LogDebug("✅ [OCR_ENGINE] PaddleOCR.Run成功完了");
                             return ocrResult;
                         }
@@ -3825,7 +3849,10 @@ public class PaddleOcrEngine : IOcrEngine
                             
                             // Mat寸法正規化（奇数幅対策）
                             using var normalizedMat = NormalizeImageDimensions(safeMat);
-                            var recoveryResult = _ocrEngine.Run(normalizedMat);
+                            
+                            // 🎯 [GEMINI_FORCE_COPY_L1] Force Copy戦略: 自動回復レベル1でも安全なClone()
+                            using var safeCopyMat = normalizedMat.Clone();
+                            var recoveryResult = _ocrEngine.Run(safeCopyMat);
                             
                             __logger?.LogInformation("✅ [AUTO_RECOVERY_L1] 軽量回復成功 - 失敗カウンタリセット");
                             _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
@@ -3853,7 +3880,9 @@ public class PaddleOcrEngine : IOcrEngine
                             var newSize = new OpenCvSharp.Size((int)(safeMat.Cols * scale), (int)(safeMat.Rows * scale));
                             Cv2.Resize(safeMat, resizedMat, newSize, 0, 0, InterpolationFlags.Area);
                             
-                            var recoveryResult = _ocrEngine.Run(resizedMat);
+                            // 🎯 [GEMINI_FORCE_COPY_L2] Force Copy戦略: 自動回復レベル2でも安全なClone()
+                            using var safeCopyMat = resizedMat.Clone();
+                            var recoveryResult = _ocrEngine.Run(safeCopyMat);
                             
                             __logger?.LogInformation("✅ [AUTO_RECOVERY_L2] 中強度回復成功 - 失敗カウンタリセット");
                             _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);
@@ -3880,7 +3909,9 @@ public class PaddleOcrEngine : IOcrEngine
                                                               Math.Max(16, (int)(safeMat.Rows * minScale)));
                             Cv2.Resize(safeMat, minimalMat, minSize, 0, 0, InterpolationFlags.Area);
                             
-                            var recoveryResult = _ocrEngine.Run(minimalMat);
+                            // 🎯 [GEMINI_FORCE_COPY_L3] Force Copy戦略: 自動回復レベル3でも安全なClone()
+                            using var safeCopyMat = minimalMat.Clone();
+                            var recoveryResult = _ocrEngine.Run(safeCopyMat);
                             
                             __logger?.LogInformation("✅ [AUTO_RECOVERY_L3] 高強度回復成功 - 失敗カウンタリセット");
                             _consecutivePaddleFailures = 0; // 完全回復時はリセット
@@ -4126,7 +4157,15 @@ public class PaddleOcrEngine : IOcrEngine
                             
                             // 🎯 [PADDLE_PREDICTOR_CRITICAL_FIX_OPT] PaddlePredictor run failed エラー対策（最適化版）
                             __logger?.LogDebug("🏃 [OCR_ENGINE_OPT] PaddleOCR.Run実行開始（最適化）...");
-                            var ocrResult = _ocrEngine.Run(workingMat);
+                            
+                            // 🔍 [GEMINI_FINAL_TRACE_OPT] PaddleOCR実行直前のMat.Dataポインタ確認（最適化）
+                            var finalMatPtrOpt = workingMat.Data.ToString("X16");
+                            var finalMatSizeOpt = $"{workingMat.Width}x{workingMat.Height}";
+                            __logger?.LogDebug("🔍 [MAT_TRACE_FINAL_OPT] PaddleOCR直前（最適化）: Ptr={Ptr}, Size={Size}", finalMatPtrOpt, finalMatSizeOpt);
+                            
+                            // 🎯 [GEMINI_FORCE_COPY_OPT] Force Copy戦略: 最適化パスでも安全なClone()
+                            using var safeCopyMat = workingMat.Clone();
+                            var ocrResult = _ocrEngine.Run(safeCopyMat);
                             __logger?.LogDebug("✅ [OCR_ENGINE_OPT] PaddleOCR.Run成功完了（最適化）");
                             return ocrResult;
                         }
@@ -4182,7 +4221,9 @@ public class PaddleOcrEngine : IOcrEngine
                                                                Math.Max(12, (int)(safeMat.Rows * fastScale)));
                             Cv2.Resize(safeMat, fastMat, fastSize, 0, 0, InterpolationFlags.Nearest); // 最高速補間
                             
-                            var recoveryResult = _ocrEngine.Run(fastMat);
+                            // 🎯 [GEMINI_FORCE_COPY_FAST] Force Copy戦略: 超高速回復でも安全なClone()
+                            using var safeCopyMat = fastMat.Clone();
+                            var recoveryResult = _ocrEngine.Run(safeCopyMat);
                             
                             __logger?.LogInformation("✅ [AUTO_RECOVERY_FAST] 超高速回復成功 - 失敗カウンタリセット");
                             _consecutivePaddleFailures = Math.Max(0, _consecutivePaddleFailures - 1);

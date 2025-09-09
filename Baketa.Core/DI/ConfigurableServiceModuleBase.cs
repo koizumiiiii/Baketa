@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Configuration;
 using Microsoft.Extensions.Configuration;
+using System.Reflection;
 
 namespace Baketa.Core.DI;
 
@@ -95,9 +96,19 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
         
         var settings = ConfigurationManager.GetSettings<T>(section);
         
-        // IOptionsパターンで登録
-        services.AddSingleton<Microsoft.Extensions.Options.IOptions<T>>(
-            provider => Microsoft.Extensions.Options.Options.Create(settings));
+        // IOptionsMonitorのみ登録（IOptions削除でDI曖昧性解決）
+        services.Configure<T>(options =>
+        {
+            // 設定値を直接コピー
+            var properties = typeof(T).GetProperties();
+            foreach (var prop in properties)
+            {
+                if (prop.CanWrite)
+                {
+                    prop.SetValue(options, prop.GetValue(settings));
+                }
+            }
+        });
         
         // 直接インスタンスも登録
         services.AddSingleton(settings);

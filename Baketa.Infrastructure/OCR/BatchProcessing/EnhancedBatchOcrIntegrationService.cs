@@ -43,7 +43,7 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
         IInPlaceTranslationOverlayManager overlayManager,
         IEventAggregator eventAggregator,
         IUnifiedSettingsService unifiedSettingsService,
-        IOptions<TimedAggregatorSettings> settings,
+        IOptionsMonitor<TimedAggregatorSettings> settings,
         ILogger<EnhancedBatchOcrIntegrationService> logger)
     {
         _baseBatchService = baseBatchService ?? throw new ArgumentNullException(nameof(baseBatchService));
@@ -52,7 +52,7 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
-        _settings = settings?.Value ?? TimedAggregatorSettings.Development;
+        _settings = settings?.CurrentValue ?? TimedAggregatorSettings.Development;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
         _processingStats = new ConcurrentDictionary<string, ProcessingStatistics>();
