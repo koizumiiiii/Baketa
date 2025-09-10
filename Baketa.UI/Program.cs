@@ -145,26 +145,22 @@ namespace Baketa.UI;
                     return;
                 }
                 
-                // プロセス終了時のロック解放設定
+                // 🎯 UltraThink修正: ProcessExitでのMutex解放は同期問題を引き起こすため削除
+                // プロセス終了時のファイルロック解放のみ実行（Mutexは.NET GCが自動解放）
                 AppDomain.CurrentDomain.ProcessExit += (sender, e) => 
                 {
-                    Console.WriteLine("🔄 Baketa process terminating - releasing all locks.");
+                    Console.WriteLine("🔄 Baketa process terminating - releasing file locks.");
                     try
                     {
-                        if (isOwnerOfMutex && mutex != null)
-                        {
-                            mutex.ReleaseMutex();
-                            isOwnerOfMutex = false;
-                        }
-                        mutex?.Dispose();
-                        
+                        // ✅ ファイルロックのみ解放（同期問題なし）
                         if (isOwnerOfFileLock && lockFile != null)
                         {
                             lockFile.Close();
                             lockFile.Dispose();
                             File.Delete(lockFilePath);
-                            isOwnerOfFileLock = false;
+                            Console.WriteLine("✅ File lock released successfully");
                         }
+                        // 🚫 Mutex解放はメインスレッドでのみ実行（ProcessExitは別スレッドのため削除）
                     }
                     catch (Exception releaseEx)
                     {

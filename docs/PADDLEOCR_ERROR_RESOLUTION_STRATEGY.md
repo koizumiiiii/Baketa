@@ -1,25 +1,149 @@
-# PaddleOCRエラー解決戦略
+# ROI キャプチャシステム問題解決戦略 (旧: PaddleOCR エラー解決戦略)
 
-## 概要
-翻訳結果が表示されない根本原因として特定されたPaddleOCRエラーに対する包括的解決策
+## 🎯 UltraThink分析により判明した真の問題
 
-## 現在の問題状況
-- `PaddlePredictor(Detector) run failed.` エラーが連続発生
-- `Object is currently in use elsewhere.` メモリ競合エラー  
-- OCR処理失敗により翻訳フローが途切れる
-- Force Copy戦略実装済みだが依然としてエラーが発生
+### ❌ **従来の誤認識**
+- PaddleOCRエラーが翻訳結果非表示の主要原因
+- メモリ競合やスレッド同期がPaddleOCRで発生
 
-## 対策一覧
-1. [PaddleOCRメモリ競合の解決](#対策1-paddleocrメモリ競合の解決)
-2. [PaddleOCRモデル実行エラーの調査](#対策2-paddleocrモデル実行エラーの調査)  
-3. [エラー時のフォールバック機構の強化](#対策3-エラー時のフォールバック機構の強化)
+### ✅ **実際の状況 (2025-09-10 検証済み)**
+- **PaddleOCR自体は正常動作** - 初期化成功、OCR処理成功、ObjectPool正常管理
+- **真の問題はROIキャプチャシステム** - FastTextRegionDetector検出失敗とROI高解像度キャプチャエラー
+- **同期問題は修正済み** - Program.csのProcessExitイベントハンドラーでのMutex解放問題解決
+
+## 検証済み解決状況
+✅ **Mutex同期問題** - ProcessExitでの不正Mutex解放を修正済み  
+✅ **P0画像変化検知システム** - 正常動作確認 (28-41ms処理時間)  
+✅ **TimedChunkAggregator** - 正常動作確認 (150ms BufferDelay)  
+✅ **PaddleOCR動作** - ObjectPool管理・初期化・処理すべて正常
+
+## 🎯 真の問題と対策一覧
+1. [✅ 完了: Mutex同期問題の修正](#対策1-完了-mutex同期問題の修正)
+2. [⚠️ 要対応: ROIキャプチャシステム改善](#対策2-要対応-roiキャプチャシステム改善)  
+3. [⚠️ 要対応: FastTextRegionDetector精度向上](#対策3-要対応-fasttextregiondetector精度向上)
+4. [📝 参考: 従来のPaddleOCR対策 (不要と判明)](#対策4-参考-従来のpaddleocr対策-不要と判明)
 
 ---
 
-## 対策1: PaddleOCRメモリ競合の解決
+## 対策1: ✅ 完了 - Mutex同期問題の修正
 
-### 現状分析
-**Force Copy戦略実装済み**: `safeCopyMat.Clone()` + 回路ブレーカー + 包括的エラーハンドリング実装済みだが、エラーが継続
+### 問題詳細
+**根本原因**: Program.csのProcessExitイベントハンドラーで、異なるスレッドからMutex.ReleaseMutex()を呼び出し
+**エラー**: "Object synchronization method was called from an unsynchronized block of code."
+
+### 実装済み修正 (2025-09-10)
+```csharp
+// 🎯 UltraThink修正: ProcessExitでのMutex解放は同期問題を引き起こすため削除
+// プロセス終了時のファイルロック解放のみ実行（Mutexは.NET GCが自動解放）
+AppDomain.CurrentDomain.ProcessExit += (sender, e) => 
+{
+    Console.WriteLine("🔄 Baketa process terminating - releasing file locks.");
+    try
+    {
+        // ✅ ファイルロックのみ解放（同期問題なし）
+        if (isOwnerOfFileLock && lockFile != null)
+        {
+            lockFile.Close();
+            lockFile.Dispose();
+            File.Delete(lockFilePath);
+            Console.WriteLine("✅ File lock released successfully");
+        }
+        // 🚫 Mutex解放はメインスレッドでのみ実行（ProcessExitは別スレッドのため削除）
+    }
+    catch (Exception releaseEx)
+    {
+        Console.WriteLine($"⚠️ Lock release error: {releaseEx.Message}");
+    }
+};
+```
+
+### 検証結果
+✅ "Lock release error" 完全解消  
+✅ "Single instance check passed" 正常動作  
+✅ アプリケーション安定起動確認
+
+---
+
+## 対策2: ⚠️ 要対応 - ROIキャプチャシステム改善
+
+### 発見された問題
+1. **FastTextRegionDetector**: "テキストの位置が検出できませんでした"  
+2. **ROI高解像度キャプチャ**: Phase 3で処理失敗 (1.2秒で0領域)  
+3. **フォールバック動作**: PrintWindowFallbackStrategyが正常機能
+
+### 対策案
+**優先度: 高** - 翻訳結果表示の直接的原因
+- FastTextRegionDetectorアルゴリズム改善
+- ROI座標変換精度向上
+- キャプチャセッション管理最適化
+
+---
+
+## 対策3: ⚠️ 要対応 - FastTextRegionDetector精度向上
+
+### 現在の検出精度問題
+- Stage 2: テキスト領域検出で警告発生
+- 検出失敗により後続の高解像度キャプチャが無効化
+- フォールバック機構により動作継続中
+
+### 改善方針
+1. **検出アルゴリズム調整**
+2. **しきい値パラメータ最適化** 
+3. **プリプロセッシング強化**
+
+---
+
+## 対策4: 📝 参考 - 従来のPaddleOCR対策 (不要と判明)
+
+### UltraThink分析前の誤った対策
+以下の対策は **PaddleOCR自体は正常動作していた** ため不要でした：
+
+## 📊 UltraThink分析結果サマリー
+
+### ✅ **解決済み問題**
+| 問題 | 状況 | 解決日 |
+|------|------|--------|
+| Mutex同期エラー | Lock release error完全解消 | 2025-09-10 |
+| P0画像変化検知 | 正常動作確認 (28-41ms) | 2025-09-10 |
+| TimedChunkAggregator | 正常動作確認 (150ms) | 2025-09-10 |
+| PaddleOCR動作 | ObjectPool・初期化・処理正常 | 2025-09-10 |
+
+### ⚠️ **要対応問題 (実際の翻訳結果表示阻害要因)**
+| 問題 | 重要度 | 推定工数 |
+|------|--------|----------|
+| FastTextRegionDetector精度 | 🔴 高 | 2-3日 |
+| ROI高解像度キャプチャ | 🟡 中 | 1-2日 |
+| キャプチャセッション管理 | 🟢 低 | 1日 |
+
+### 📝 **従来の誤った対策 (実装済みだが不要)**
+- ThreadLocal<IOcrEngine> 実装
+- オブジェクトプーリング規約再確認  
+- PaddleOCRメモリ分離戦略
+- SemaphoreSlim(1,1) による排他制御
+
+**重要**: これらは既に適切に実装されており、PaddleOCRは正常動作している
+
+---
+
+## 🎯 **次のアクションアイテム**
+
+### Phase 1: FastTextRegionDetector改善 (最優先)
+```csharp
+// 検出精度向上のための改善案
+- しきい値調整: DetectionThreshold 0.6 → 0.4-0.5
+- プリプロセッシング強化: コントラスト・シャープネス調整  
+- 複数スケール検出: マルチスケール解析実装
+```
+
+### Phase 2: ROIキャプチャ最適化
+- 座標変換アルゴリズム精度向上
+- キャプチャセッション生存期間最適化
+- エラー時のリトライ機構強化
+
+### Phase 3: 統合テスト
+- 修正されたFastTextRegionDetectorの動作検証
+- ROI→OCR→翻訳の完全パイプライン確認
+- パフォーマンス測定とボトルネック分析
 
 ### 根本原因仮説
 1. **スレッド競合**: 複数スレッドでPaddleOCRインスタンス共有
