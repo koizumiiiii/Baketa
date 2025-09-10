@@ -112,8 +112,8 @@ public sealed class FastTextRegionDetector(
             
             if (ocrResults?.TextRegions == null || ocrResults.TextRegions.Count == 0)
             {
-                logger?.LogDebug("🔍 PaddleOCR検出結果が空 - フォールバックなし");
-                return [];
+                logger?.LogDebug("🔍 PaddleOCR検出結果が空 - 軽量フォールバック実行");
+                return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
             }
 
             // OcrTextRegionからRectangleに変換し、設定に基づくフィルタリングを適用
