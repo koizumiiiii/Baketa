@@ -107,6 +107,14 @@ public class PaddleOcrEngine : IOcrEngine
     // スレッドセーフティ対策：スレッドごとにOCRエンジンを保持
     private static readonly ThreadLocal<PaddleOcrAll?> _threadLocalOcrEngine = new(() => null);
     
+    /// <summary>
+    /// 🎯 [GEMINI_EMERGENCY_FIX_V2] PaddleOCR実行の真のグローバル単一スレッド化
+    /// PaddleOCRネイティブライブラリのスレッド安全性問題を根本解決
+    /// 複数インスタンス間でのスレッド競合による「PaddlePredictor run failed」エラーを防止
+    /// 静的フィールドにより全PaddleOcrEngineインスタンスで共有される真の同期を実現
+    /// </summary>
+    private static readonly SemaphoreSlim _globalOcrSemaphore = new(1, 1);
+    
     // パフォーマンス統計
     private readonly ConcurrentQueue<double> _processingTimes = new();
     
@@ -385,7 +393,12 @@ public class PaddleOcrEngine : IOcrEngine
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
         
-        var stopwatch = Stopwatch.StartNew();
+        // 🎯 [GEMINI_EMERGENCY_FIX] PaddleOCRスレッド安全性保護
+        // 単一スレッド実行でPaddlePredictor run failed エラーを根本解決
+        await _globalOcrSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
         var sessionId = Guid.NewGuid().ToString("N")[..8];
 
         // 📊 [DIAGNOSTIC] OCR処理開始イベント
@@ -695,6 +708,14 @@ public class PaddleOcrEngine : IOcrEngine
 
             __logger?.LogError(ex, "OCR処理中にエラーが発生: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"OCR処理中にエラーが発生しました: {ex.Message}", ex);
+        }
+        }
+        finally
+        {
+            // 🎯 [GEMINI_EMERGENCY_FIX_V2] グローバルSemaphoreSlim確実解放
+            // PaddleOCRスレッド制限の確実な解除でデッドロック防止
+            // 全インスタンス共有の静的SemaphoreSlimを解放
+            _globalOcrSemaphore.Release();
         }
     }
 
@@ -4950,6 +4971,11 @@ public class PaddleOcrEngine : IOcrEngine
                 _hybridService.Dispose();
                 _hybridService = null;
             }
+            
+            // 🎯 [GEMINI_EMERGENCY_FIX_V2] 静的SemaphoreSlimはDispose対象外
+            // _globalOcrSemaphore は全インスタンス共有のため個別Disposeしない
+            // アプリケーション終了時まで維持される
+            // _globalOcrSemaphore?.Dispose(); // 静的フィールドは個別廃棄不要
             
             DisposeEngines();
         }

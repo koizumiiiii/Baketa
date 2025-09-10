@@ -179,22 +179,45 @@ public class TranslationFlowEventProcessor :
                 _logger.LogError(ex, "Failed to clear existing in-place overlays");
             }
 
-            // 3. 実際の翻訳処理を開始
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ3開始 - 翻訳処理準備");
-            _logger.LogDebug("Starting translation process");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 実際の翻訳処理開始");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 [HandleAsync] ProcessTranslationAsync呼び出し直前 - TargetWindow: {eventData.TargetWindow?.Title}");
+            // 3. 正規イベントフローの開始: キャプチャ → OCR → 翻訳
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ3開始 - 正規イベントフロー開始");
+            _logger.LogDebug("Starting standard event flow: Capture -> OCR -> Translation");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 正規イベントフロー開始: キャプチャ実行");
             try
             {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ProcessTranslationAsync呼び出し開始");
-                await ProcessTranslationAsync(eventData.TargetWindow!).ConfigureAwait(false);
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ProcessTranslationAsync呼び出し完了");
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳処理完了");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ウィンドウキャプチャ開始");
+                
+                // ウィンドウキャプチャを実行
+                var captureResult = await _captureService.CaptureWindowAsync(eventData.TargetWindow!.Handle).ConfigureAwait(false);
+                
+                if (captureResult != null)
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ キャプチャ成功: {captureResult.Width}x{captureResult.Height}");
+                    _logger.LogInformation("ウィンドウキャプチャ成功: {Width}x{Height}", captureResult.Width, captureResult.Height);
+                    
+                    // CaptureCompletedEventを発行して正規フローを開始
+                    var captureCompletedEvent = new Baketa.Core.Events.EventTypes.CaptureCompletedEvent(
+                        captureResult, 
+                        System.Drawing.Rectangle.Empty, // TODO: 実際のキャプチャ領域を取得
+                        TimeSpan.Zero // キャプチャ時間（必須パラメータ）
+                    );
+                    
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 CaptureCompletedEvent発行 - 正規フロー開始");
+                    await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ CaptureCompletedEvent発行完了 - 正規フロー開始済み");
+                }
+                else
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ キャプチャ失敗: nullが返されました");
+                    _logger.LogError("ウィンドウキャプチャが失敗しました（nullが返されました）");
+                }
+                
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 正規イベントフロー処理完了");
             }
             catch (Exception ex)
             {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 翻訳処理エラー: {ex.Message}");
-                _logger.LogError(ex, "翻訳処理エラー");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 正規イベントフロー処理エラー: {ex.Message}");
+                _logger.LogError(ex, "正規イベントフロー処理エラー");
                 throw; // 外側のcatchで処理させる
             }
 

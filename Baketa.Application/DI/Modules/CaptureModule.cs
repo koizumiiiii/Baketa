@@ -51,9 +51,24 @@ public sealed class CaptureModule : ServiceModuleBase
                 var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
                 var loggingOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.LoggingSettings>>();
                 
+                // 🔄 画面変化検知サービスとイメージアダプターを取得（Phase 1対応）
+                var changeDetectionService = provider.GetService<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
+                var imageAdapter = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowsImageAdapter>();
+                
                 logger.LogDebug("AdaptiveCaptureService インスタンス作成");
-                var service = new AdaptiveCaptureService(gpuDetector, strategyFactory, logger, eventAggregator, loggingOptions);
-                logger.LogInformation("AdaptiveCaptureService 登録完了");
+                logger.LogInformation($"🎯 画面変化検知サービス: {(changeDetectionService != null ? "有効" : "無効")}");
+                logger.LogInformation($"🎯 イメージアダプター: {(imageAdapter != null ? "有効" : "無効")}");
+                
+                var service = new AdaptiveCaptureService(
+                    gpuDetector, 
+                    strategyFactory, 
+                    logger, 
+                    eventAggregator, 
+                    loggingOptions,
+                    changeDetectionService,  // 画面変化検知サービスを渡す
+                    imageAdapter);           // イメージアダプターを渡す
+                    
+                logger.LogInformation("AdaptiveCaptureService 登録完了 - 画面変化検知機能付き");
                 return service;
             }
             catch (Exception ex)
