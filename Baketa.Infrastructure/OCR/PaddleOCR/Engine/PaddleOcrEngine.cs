@@ -3853,7 +3853,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     }
                     
                     // 🚨 [CRASH_PREVENTION] 大画像サイズ制限（WER_FAULT_SIGクラッシュ対策）
-                    const int MAX_PIXELS = 1000000; // 100万ピクセル制限
+                    const int MAX_PIXELS = 35000000; // 3500万ピクセル制限（8K 7680x4320=33.18M, 4K 3840x2160=8.29Mに対応）
                     var totalPixels = reconstructedMat.Cols * reconstructedMat.Rows;
                     if (totalPixels > MAX_PIXELS)
                     {
@@ -4141,7 +4141,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 }
                 
                 // 🚀 [PERFORMANCE_BOOST] 大画像制限の軽量チェック
-                const int MAX_PIXELS_OPT = 800000; // 80万ピクセル制限（最適化版）
+                const int MAX_PIXELS_OPT = 35000000; // 3500万ピクセル制限（最適化版・8K/4K対応でメイン制限と統一）
                 var totalPixels = safeMat.Cols * safeMat.Rows;
                 if (totalPixels > MAX_PIXELS_OPT)
                 {
