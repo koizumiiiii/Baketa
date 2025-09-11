@@ -33,7 +33,7 @@ public enum ProcessingStageType
 /// パイプライン処理の入力情報
 /// Geminiフィードバック反映: Record型でイミュータブル設計
 /// </summary>
-public sealed record ProcessingPipelineInput
+public sealed record ProcessingPipelineInput : IDisposable
 {
     /// <summary>
     /// キャプチャされた画像
@@ -74,6 +74,32 @@ public sealed record ProcessingPipelineInput
     /// 処理コンテキストID（スレッドセーフ管理用）
     /// </summary>
     public string ContextId => $"Window_{SourceWindowHandle.ToInt64()}";
+
+    /// <summary>
+    /// 🎯 UltraThink: 所有権管理フラグ
+    /// </summary>
+    public bool OwnsImage { get; init; } = true;
+
+    /// <summary>
+    /// オブジェクトが破棄されたかどうかを示すフラグ
+    /// </summary>
+    private bool _disposed;
+
+    /// <summary>
+    /// 🎯 UltraThink: 適切なリソース管理でObjectDisposedException解決
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        if (OwnsImage && CapturedImage is IDisposable disposableImage)
+        {
+            disposableImage.Dispose();
+        }
+
+        _disposed = true;
+    }
 }
 
 /// <summary>

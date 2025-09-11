@@ -3808,6 +3808,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         
             var ocrTask = Task.Run(() =>
             {
+                __logger?.LogWarning("🚀 [MEMORY_SEPARATION] Task.Run開始 - OCR処理実行開始");
+                Console.WriteLine($"🚀 [OCR_TASK] Task.Run開始: {DateTime.Now:HH:mm:ss.fff}");
                 __logger?.LogDebug("🚀 [MEMORY_SEPARATION] Task.Run内で新しいMat再構築開始");
                 
                 // 🔧 [CRITICAL_FIX] PaddlePredictor初期化エラー対策
@@ -3993,8 +3995,13 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     __logger?.LogDebug("🔍 [MAT_TRACE_FINAL] PaddleOCR直前: Ptr={Ptr}, Size={Size}", finalMatPtr, finalMatSize);
                     
                     // 🧠 [GEMINI_MEMORY_SEPARATION] 完全分離されたMatを直接使用（追加Cloneは不要）
+                    __logger?.LogWarning("🏁 [CRITICAL] PaddleOCR.Run実行直前 - ここで停止する場合はPaddleOCR内部問題");
+                    Console.WriteLine($"🏁 [CRITICAL] PaddleOCR.Run実行開始: {DateTime.Now:HH:mm:ss.fff}");
+                    
                     var ocrResult = _ocrEngine.Run(reconstructedMat);
-                    __logger?.LogDebug("✅ [OCR_ENGINE] PaddleOCR.Run成功完了 - メモリ分離戦略");
+                    
+                    __logger?.LogWarning("✅ [SUCCESS] PaddleOCR.Run成功完了 - メモリ分離戦略");
+                    Console.WriteLine($"✅ [SUCCESS] PaddleOCR.Run完了: {DateTime.Now:HH:mm:ss.fff}");
                     
                     return ocrResult;
                 }
@@ -4007,6 +4014,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 {
                     _consecutivePaddleFailures++;
                     __logger?.LogError("🚨 [PADDLE_TIMEOUT] PaddleOCR実行がタイムアウトしました。連続失敗: {FailureCount}", _consecutivePaddleFailures);
+                    Console.WriteLine($"🚨 [TIMEOUT] PaddleOCR実行タイムアウト: {DateTime.Now:HH:mm:ss.fff} - 連続失敗: {_consecutivePaddleFailures}");
                     throw new TimeoutException($"PaddleOCR実行がタイムアウトしました。連続失敗: {_consecutivePaddleFailures}");
                 }
                 catch (AggregateException ex) when (ex.InnerException is AccessViolationException)
@@ -4625,8 +4633,20 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ 連続タイムアウト={_consecutiveTimeouts}回, タイムアウト追加延長");
         }
         
-        // 最大値制限
-        return Math.Min(adaptiveTimeout, baseTimeout * 3);
+        // 🎯 [LEVEL1_FIX] 大画面対応スケーリング処理を考慮したタイムアウト延長
+        // Level 1実装により、Mat再構築やスケーリング処理で追加時間が必要
+        adaptiveTimeout = (int)(adaptiveTimeout * 1.8); // 80%延長
+        __logger?.LogDebug("🎯 [LEVEL1_TIMEOUT] 大画面対応タイムアウト延長: {BaseTimeout}秒 → {AdaptiveTimeout}秒 (80%延長)", 
+            baseTimeout, adaptiveTimeout);
+        
+        // 最大値制限を緩和 (3倍 → 4倍)
+        var maxTimeout = Math.Min(adaptiveTimeout, baseTimeout * 4);
+        
+        // 🔍 [ULTRATHINK_FIX] タイムアウト設定の詳細ログ
+        __logger?.LogWarning("⏱️ [TIMEOUT_CONFIG] 最終タイムアウト設定: {FinalTimeout}秒 (ベース: {Base}秒, 適応: {Adaptive}秒, 連続失敗: {Failures}回)", 
+            maxTimeout, baseTimeout, adaptiveTimeout, _consecutiveTimeouts);
+        
+        return maxTimeout;
     }
     
     /// <summary>

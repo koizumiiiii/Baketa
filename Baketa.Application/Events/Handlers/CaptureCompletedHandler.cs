@@ -93,13 +93,15 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     {
         try
         {
-            // 段階的処理パイプラインの入力を作成
-            var input = new ProcessingPipelineInput
+            // 🎯 UltraThink: usingパターンでProcessingPipelineInputの適切な所有権管理
+            using var input = new ProcessingPipelineInput
             {
                 CapturedImage = eventData.CapturedImage,
                 CaptureRegion = eventData.CaptureRegion,
                 SourceWindowHandle = IntPtr.Zero, // TODO: eventDataから取得
                 CaptureTimestamp = DateTime.UtcNow,
+                // 🎯 UltraThink: 所有権をfalseに設定（元画像はCaptureCompletedEventが管理）
+                OwnsImage = false,
                 // TODO: 前回のハッシュやテキストを設定（キャッシュ機構が必要）
                 Options = new ProcessingPipelineOptions
                 {
