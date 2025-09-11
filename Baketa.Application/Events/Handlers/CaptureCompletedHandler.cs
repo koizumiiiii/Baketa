@@ -117,7 +117,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 pipelineResult.LastCompletedStage, pipelineResult.TotalElapsedTime.TotalMilliseconds, pipelineResult.Metrics.EarlyTerminated);
 
             // 段階別結果に応じたイベント発行
-            await PublishStageSpecificEventsAsync(pipelineResult).ConfigureAwait(false);
+            await PublishStageSpecificEventsAsync(pipelineResult, eventData).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -132,7 +132,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     /// <summary>
     /// 段階別結果に応じたイベント発行
     /// </summary>
-    private async Task PublishStageSpecificEventsAsync(ProcessingPipelineResult result)
+    private async Task PublishStageSpecificEventsAsync(ProcessingPipelineResult result, CaptureCompletedEvent eventData)
     {
         try
         {
@@ -169,6 +169,24 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
                 
                 _logger?.LogDebug("TranslationCompletedEvent発行 - 翻訳テキスト長: {TextLength}", result.TranslationResult.TranslatedText.Length);
+
+                // 🎯 UltraThink修正: UI表示用のTranslationWithBoundsCompletedEventも発行
+                var boundsEvent = new Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent(
+                    sourceText: result.OcrResult?.DetectedText ?? "",
+                    translatedText: result.TranslationResult.TranslatedText,
+                    sourceLanguage: "auto", // 段階的処理で検出言語取得時は置き換え
+                    targetLanguage: "ja",   // 設定から取得する場合は置き換え
+                    bounds: eventData.CaptureRegion, // キャプチャ領域を座標情報として使用
+                    confidence: 0.95f, // デフォルト信頼度（実装時にOCR信頼度から設定）
+                    engineName: result.TranslationResult.EngineUsed);
+
+                await _eventAggregator.PublishAsync(boundsEvent).ConfigureAwait(false);
+                
+                _logger?.LogInformation("🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行完了 - ID: {EventId}, Bounds: ({X},{Y},{Width},{Height})", 
+                    boundsEvent.Id, eventData.CaptureRegion.X, eventData.CaptureRegion.Y, 
+                    eventData.CaptureRegion.Width, eventData.CaptureRegion.Height);
+                Console.WriteLine($"🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行 - ID: {boundsEvent.Id}");
+                Console.WriteLine($"🎯 [UltraThink] 座標情報: ({eventData.CaptureRegion.X},{eventData.CaptureRegion.Y}) サイズ: {eventData.CaptureRegion.Width}x{eventData.CaptureRegion.Height}");
             }
 
             // パフォーマンスメトリクス通知（デバッグ情報）

@@ -368,6 +368,12 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.BatchTranslationRequestEvent>>(
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>());
             
+            // 🔄 [FIX] TranslationCompletedHandler登録 - TranslationCompletedEvent中継処理
+            Console.WriteLine("🔄 [FIX] TranslationCompletedHandler DI登録 - 翻訳完了イベント中継修復");
+            services.AddSingleton<Baketa.Application.EventHandlers.TranslationCompletedHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Application.EventHandlers.TranslationCompletedHandler>());
+
             // 🔄 [FIX] TranslationWithBoundsCompletedHandler復活 - 翻訳結果をTextChunkに反映するため必須
             Console.WriteLine("🔄 [FIX] TranslationWithBoundsCompletedHandler DI登録復活 - 翻訳結果反映修復");
             services.AddSingleton<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>();

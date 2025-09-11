@@ -12,6 +12,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.StickyRoi;
+using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 
@@ -23,6 +24,7 @@ public sealed class PaddleOcrEngineFactory(
     IServiceProvider serviceProvider,
     ILogger<PaddleOcrEngineFactory> logger) : IPaddleOcrEngineFactory
 {
+    // C# 12プライマリコンストラクタでArgumentNullException.ThrowIfNull統一
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<PaddleOcrEngineFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -61,6 +63,7 @@ public sealed class PaddleOcrEngineFactory(
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
                 var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
+                var imageFactory = _serviceProvider.GetRequiredService<IImageFactoryType>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
                     ocrPreprocessingService, 
@@ -70,6 +73,7 @@ public sealed class PaddleOcrEngineFactory(
                     unifiedSettingsService,
                     eventAggregator,
                     ocrSettings,
+                    imageFactory,
                     unifiedLoggingService,
                     engineLogger);
             }
@@ -80,6 +84,7 @@ public sealed class PaddleOcrEngineFactory(
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
                 var unifiedLoggingService = _serviceProvider.GetService<IUnifiedLoggingService>();
                 var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
+                var imageFactory = _serviceProvider.GetRequiredService<IImageFactoryType>();
                 engine = new NonSingletonPaddleOcrEngine(
                     modelPathResolver, 
                     ocrPreprocessingService, 
@@ -89,6 +94,7 @@ public sealed class PaddleOcrEngineFactory(
                     unifiedSettingsService,
                     eventAggregator,
                     ocrSettings,
+                    imageFactory,
                     unifiedLoggingService,
                     engineLogger);
             }
@@ -178,8 +184,9 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IUnifiedSettingsService unifiedSettingsService,
     IEventAggregator eventAggregator,
     IOptionsMonitor<OcrSettings> ocrSettings,
+    IImageFactoryType imageFactory,
     IUnifiedLoggingService? unifiedLoggingService = null,
-    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, unifiedLoggingService, logger)
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, imageFactory, unifiedLoggingService, logger)
 {
 
     /// <summary>

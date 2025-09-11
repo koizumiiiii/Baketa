@@ -143,7 +143,7 @@ public sealed class FastTextRegionDetector(
     }
 
     /// <summary>
-    /// 軽量フォールバック検出（エラー時のみ使用）
+    /// 軽量フォールバック検出（改良版：テキスト分断回避）
     /// </summary>
     private List<Rectangle> DetectRegionsLightweightFallback(IWindowsImage image)
     {
@@ -151,33 +151,26 @@ public sealed class FastTextRegionDetector(
         
         try
         {
-            logger?.LogDebug("⚡ 軽量フォールバック検出実行 - グリッドベース分析");
+            logger?.LogWarning("⚡ テキスト検出失敗 - フォールバック実行: テキスト分断回避のため画面全体を処理");
             
             var width = image.Width;
             var height = image.Height;
             
-            // グリッドベースでのサンプリング検出（フォールバック用）
-            // 元の実装より密度を下げて高速化
-            var gridSizeX = Math.Max(1, width / 12);  // 横12分割（元20→12）
-            var gridSizeY = Math.Max(1, height / 10); // 縦10分割（元15→10）
+            // 🔧 修正: 固定グリッド分割でテキスト分断するのを回避
+            // 代替案: 画面全体を1つの領域として処理（テキスト完全性を保持）
+            var fullScreenRegion = new Rectangle(0, 0, width, height);
             
-            for (int y = 0; y < height - gridSizeY; y += gridSizeY)
+            if (IsRegionValid(fullScreenRegion))
             {
-                for (int x = 0; x < width - gridSizeX; x += gridSizeX)
-                {
-                    var rect = new Rectangle(x, y, gridSizeX, gridSizeY);
-                    
-                    if (IsRegionValid(rect))
-                    {
-                        regions.Add(rect);
-                    }
-                }
+                regions.Add(fullScreenRegion);
+                logger?.LogInformation("✅ フォールバック: 画面全体を単一領域として処理（テキスト分断回避）");
+            }
+            else
+            {
+                logger?.LogWarning("⚠️ 画面全体が処理対象外サイズ - テキスト検出をスキップ");
             }
             
-            // 近接領域の統合
-            regions = MergeNearbyRegions(regions);
-            
-            logger?.LogDebug("⚡ 軽量フォールバック検出完了: {Count}個の領域を検出（緊急用）", regions.Count);
+            logger?.LogDebug("⚡ フォールバック完了: {Count}個の領域（テキスト分断回避版）", regions.Count);
         }
         catch (Exception ex)
         {

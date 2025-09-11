@@ -33,9 +33,9 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Events.EventTypes;
 using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Baketa.Infrastructure.OCR.Scaling;
+using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -43,7 +43,7 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 /// PaddleOCRエンジンの実装クラス（IOcrEngine準拠）
 /// 多重初期化防止機能付き
 /// </summary>
-public class PaddleOcrEngine : IOcrEngine
+public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 {
     // ❌ DI競合解決: 自己流シングルトン管理を廃止（DIコンテナ+ObjectPoolに一任）
     // ✅ ObjectPoolによる適切なライフサイクル管理により、独自インスタンス追跡は不要
@@ -62,6 +62,7 @@ public class PaddleOcrEngine : IOcrEngine
     private readonly ILogger<PaddleOcrEngine>? __logger;
     private readonly IEventAggregator __eventAggregator;
     private readonly IOptionsMonitor<OcrSettings> _ocrSettings;
+    private readonly IImageFactoryType __imageFactory;
 
     public PaddleOcrEngine(
         IModelPathResolver _modelPathResolver,
@@ -72,6 +73,7 @@ public class PaddleOcrEngine : IOcrEngine
         IUnifiedSettingsService _unifiedSettingsService,
         IEventAggregator _eventAggregator,
         IOptionsMonitor<OcrSettings> ocrSettings,
+        IImageFactoryType imageFactory,
         IUnifiedLoggingService? unifiedLoggingService = null,
         ILogger<PaddleOcrEngine>? _logger = null)
     {
@@ -83,6 +85,7 @@ public class PaddleOcrEngine : IOcrEngine
         __unifiedSettingsService = _unifiedSettingsService ?? throw new ArgumentNullException(nameof(_unifiedSettingsService));
         __eventAggregator = _eventAggregator ?? throw new ArgumentNullException(nameof(_eventAggregator));
         _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
+        __imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _unifiedLoggingService = unifiedLoggingService;
         __logger = _logger;
         
@@ -483,23 +486,31 @@ public class PaddleOcrEngine : IOcrEngine
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🎬 実際のOCR処理を開始");
             progressCallback?.Report(new OcrProgress(0.1, "OCR処理を開始"));
             
-            // IImageからMatに変換
+            // IImageからMatに変換（大画面対応スケーリング付き）
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 IImageからMatに変換中...");
-            using var mat = await ConvertToMatAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
+            var (mat, scaleFactor) = await ConvertToMatWithScalingAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
             
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🖼️ Mat変換完了: Empty={mat.Empty()}, Size={mat.Width}x{mat.Height}");
+            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🖼️ Mat変換完了: Empty={mat.Empty()}, Size={mat.Width}x{mat.Height}, スケール係数={scaleFactor:F3}");
             
             if (mat.Empty())
             {
+                mat.Dispose();
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("❌ 変換後の画像が空です");
                 __logger?.LogWarning("変換後の画像が空です");
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
-
-            // 🎯 [ULTRATHINK_PREVENTION] OCR実行前の早期予防システム
-            progressCallback?.Report(new OcrProgress(0.25, "画像品質検証中"));
             
-            Mat processedMat;
+            // OCR実行結果を格納する変数を宣言（スコープ問題解決）
+            IReadOnlyList<OcrTextRegion> textRegions = [];
+            string? mergedText = null;
+            string? postProcessedText = null;
+            
+            using (mat) // Matのリソース管理
+            {
+                // 🎯 [ULTRATHINK_PREVENTION] OCR実行前の早期予防システム
+                progressCallback?.Report(new OcrProgress(0.25, "画像品質検証中"));
+            
+                Mat processedMat;
             try 
             {
                 processedMat = ApplyPreventiveNormalization(mat);
@@ -512,9 +523,7 @@ public class PaddleOcrEngine : IOcrEngine
             }
             
             progressCallback?.Report(new OcrProgress(0.3, "OCR処理実行中"));
-
-            // OCR実行 - ハイブリッドモード対応（予防処理済み画像使用）
-            IReadOnlyList<OcrTextRegion> textRegions;
+            
             using (processedMat) // processedMatの適切なDispose管理
             {
                 if (_isHybridMode && _hybridService != null)
@@ -529,6 +538,44 @@ public class PaddleOcrEngine : IOcrEngine
                     __logger?.LogDebug("📊 シングルモードでOCR実行（予防処理済み）");
                     textRegions = await ExecuteOcrAsync(processedMat, progressCallback, cancellationToken).ConfigureAwait(false);
                     __logger?.LogDebug($"📊 シングルOCR完了: {textRegions?.Count ?? 0}領域検出");
+                }
+                
+                // テキスト結合アルゴリズムを適用
+                if (textRegions != null && textRegions.Count > 0)
+                {
+                    try
+                    {
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔗 テキスト結合アルゴリズム適用開始");
+                        mergedText = __textMerger.MergeTextRegions(textRegions);
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔗 テキスト結合完了: 結果文字数={mergedText.Length}");
+                        __logger?.LogDebug("テキスト結合アルゴリズム適用完了: 結果文字数={Length}", mergedText.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ テキスト結合エラー: {ex.Message}");
+                        __logger?.LogWarning(ex, "テキスト結合中にエラーが発生しました。元のテキストを使用します");
+                        mergedText = null; // フォールバック
+                    }
+                }
+                
+                // OCR後処理を適用
+                postProcessedText = mergedText;
+                if (!string.IsNullOrWhiteSpace(mergedText))
+                {
+                    try
+                    {
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 OCR後処理（誤認識修正）開始");
+                        postProcessedText = await __ocrPostProcessor.ProcessAsync(mergedText, 0.8f).ConfigureAwait(false);
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 OCR後処理完了: 修正前='{mergedText}' → 修正後='{postProcessedText}'");
+                        __logger?.LogDebug("OCR後処理完了: 修正前長={Before}, 修正後長={After}", 
+                            mergedText.Length, postProcessedText.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ OCR後処理エラー: {ex.Message}");
+                        __logger?.LogWarning(ex, "OCR後処理中にエラーが発生しました。修正前のテキストを使用します");
+                        postProcessedText = mergedText; // フォールバック
+                    }
                 }
             }
             
@@ -586,53 +633,54 @@ public class PaddleOcrEngine : IOcrEngine
             // TODO: OCR精度向上機能を後で統合予定（DI循環参照問題のため一時的に無効化）
             // IReadOnlyList<TextChunk> processedTextChunks = [];
             
-            // テキスト結合アルゴリズムを適用
-            string? mergedText = null;
-            if (textRegions != null && textRegions.Count > 0)
+            } // using (mat) の終了
+            
+            // 🎯 Level 1大画面対応: 一元化された座標復元システム活用
+            OcrResults result;
+            if (Math.Abs(scaleFactor - 1.0) >= 0.001 && textRegions != null && textRegions.Count > 0)
             {
+                __logger?.LogDebug("📍 統合座標復元開始: スケール係数={ScaleFactor}", scaleFactor);
+                
                 try
                 {
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔗 テキスト結合アルゴリズム適用開始");
-                    mergedText = __textMerger.MergeTextRegions(textRegions);
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔗 テキスト結合完了: 結果文字数={mergedText.Length}");
-                    __logger?.LogDebug("テキスト結合アルゴリズム適用完了: 結果文字数={Length}", mergedText.Length);
+                    // CoordinateRestorer.RestoreOcrResultsを活用して一元管理
+                    var tempResult = new OcrResults(
+                        textRegions,
+                        image, // スケーリング済み画像から元画像に変更される
+                        stopwatch.Elapsed,
+                        CurrentLanguage ?? "jpn",
+                        regionOfInterest,
+                        postProcessedText
+                    );
+                    
+                    result = CoordinateRestorer.RestoreOcrResults(tempResult, scaleFactor, image);
+                    __logger?.LogDebug("✅ 統合座標復元完了: {Count}個のテキスト領域とROIを復元", result.TextRegions.Count);
                 }
                 catch (Exception ex)
                 {
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ テキスト結合エラー: {ex.Message}");
-                    __logger?.LogWarning(ex, "テキスト結合中にエラーが発生しました。元のテキストを使用します");
-                    mergedText = null; // フォールバック
+                    __logger?.LogWarning(ex, "⚠️ 統合座標復元でエラーが発生しました。スケーリングされた座標を使用します");
+                    // エラー時はスケーリングされた座標をそのまま使用
+                    result = new OcrResults(
+                        textRegions,
+                        image,
+                        stopwatch.Elapsed,
+                        CurrentLanguage ?? "jpn",
+                        regionOfInterest,
+                        postProcessedText
+                    );
                 }
             }
-            
-            // OCR後処理を適用
-            string? postProcessedText = mergedText;
-            if (!string.IsNullOrWhiteSpace(mergedText))
+            else
             {
-                try
-                {
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 OCR後処理（誤認識修正）開始");
-                    postProcessedText = await __ocrPostProcessor.ProcessAsync(mergedText, 0.8f).ConfigureAwait(false);
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 OCR後処理完了: 修正前='{mergedText}' → 修正後='{postProcessedText}'");
-                    __logger?.LogDebug("OCR後処理完了: 修正前長={Before}, 修正後長={After}", 
-                        mergedText.Length, postProcessedText.Length);
-                }
-                catch (Exception ex)
-                {
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"❌ OCR後処理エラー: {ex.Message}");
-                    __logger?.LogWarning(ex, "OCR後処理中にエラーが発生しました。修正前のテキストを使用します");
-                    postProcessedText = mergedText; // フォールバック
-                }
+                result = new OcrResults(
+                    textRegions ?? [],
+                    image,
+                    stopwatch.Elapsed,
+                    CurrentLanguage ?? "jpn",
+                    regionOfInterest,
+                    postProcessedText
+                );
             }
-            
-            var result = new OcrResults(
-                textRegions ?? [],
-                image,
-                stopwatch.Elapsed,
-                CurrentLanguage ?? "jpn",
-                regionOfInterest,
-                postProcessedText
-            );
             
             // 📊 [DIAGNOSTIC] OCR処理成功イベント
             await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
@@ -951,22 +999,28 @@ public class PaddleOcrEngine : IOcrEngine
             
             var isTest = isTestProcess || isTestFromStack || isTestEnvironmentVar || isTestCommand || isTestAssembly;
             
+            // 詳細な判定結果（静的メソッドのためコメントのみ）
+            // Debug: Process={isTestProcess}, Stack={isTestFromStack}, Env={isTestEnvironmentVar}, Command={isTestCommand}, Assembly={isTestAssembly} → Result={isTest}
+            
             return isTest;
         }
-        catch (SecurityException)
+        catch (SecurityException ex)
         {
-            // セキュリティ上の理由で情報取得できない場合は安全のためテスト環境と判定
-            return true;
+            // セキュリティ上の理由で情報取得できない場合は本番環境と判定（テスト環境誤判定防止）
+            // Log: IsTestEnvironment: SecurityException発生 - 本番環境として継続: {ex.Message}
+            return false;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            // 操作エラーが発生した場合は安全のためテスト環境と判定
-            return true;
+            // 操作エラーが発生した場合は本番環境と判定（テスト環境誤判定防止）
+            // Log: IsTestEnvironment: InvalidOperationException発生 - 本番環境として継続: {ex.Message}
+            return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
-            // アクセス拒否の場合は安全のためテスト環境と判定
-            return true;
+            // アクセス拒否の場合は本番環境と判定（テスト環境誤判定防止）  
+            // Log: IsTestEnvironment: UnauthorizedAccessException発生 - 本番環境として継続: {ex.Message}
+            return false;
         }
     }
 
@@ -1515,6 +1569,133 @@ public class PaddleOcrEngine : IOcrEngine
         {
             __logger?.LogError(ex, "サポートされていない画像形式: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"サポートされていない画像形式: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 大画面対応の適応的画像変換（PaddleOCR制限に対応）
+    /// </summary>
+    /// <param name="image">変換する画像</param>
+    /// <param name="regionOfInterest">関心領域（オプション）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>変換されたMatとスケール係数</returns>
+    private async Task<(Mat mat, double scaleFactor)> ConvertToMatWithScalingAsync(
+        IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
+    {
+        // Step 1: スケーリングが必要かどうかを判定
+        var (newWidth, newHeight, scaleFactor) = AdaptiveImageScaler.CalculateOptimalSize(
+            image.Width, image.Height);
+        
+        // Step 2: スケーリング情報をログ出力
+        if (AdaptiveImageScaler.RequiresScaling(image.Width, image.Height))
+        {
+            var scalingInfo = AdaptiveImageScaler.GetScalingInfo(
+                image.Width, image.Height, newWidth, newHeight, scaleFactor);
+            var constraintType = AdaptiveImageScaler.GetConstraintType(image.Width, image.Height);
+            
+            __logger?.LogWarning("🔧 大画面自動スケーリング実行: {ScalingInfo} (制約: {ConstraintType})",
+                scalingInfo, constraintType);
+        }
+        
+        // Step 3: スケーリングが必要な場合は画像をリサイズ
+        IImage processImage = image;
+        if (Math.Abs(scaleFactor - 1.0) >= 0.001) // スケーリング必要
+        {
+            try
+            {
+                // Lanczosリサンプリングで高品質スケーリング
+                processImage = await ScaleImageWithLanczos(image, newWidth, newHeight, cancellationToken);
+                
+                __logger?.LogDebug("✅ 画像スケーリング完了: {OriginalSize} → {NewSize}", 
+                    $"{image.Width}x{image.Height}", $"{newWidth}x{newHeight}");
+            }
+            catch (Exception ex)
+            {
+                __logger?.LogError(ex, "❌ 画像スケーリング失敗 - 元画像で処理継続");
+                processImage = image; // エラー時は元画像を使用
+                scaleFactor = 1.0;
+            }
+        }
+        
+        // Step 4: ROI座標もスケーリングに合わせて調整（精度向上版）
+        Rectangle? adjustedRoi = null;
+        if (regionOfInterest.HasValue && Math.Abs(scaleFactor - 1.0) >= 0.001)
+        {
+            var roi = regionOfInterest.Value;
+            
+            // 🎯 精度向上: Math.Floor/Ceilingで認識対象領域の欠落を防止
+            var x1 = roi.X * scaleFactor;
+            var y1 = roi.Y * scaleFactor;
+            var x2 = (roi.X + roi.Width) * scaleFactor;
+            var y2 = (roi.Y + roi.Height) * scaleFactor;
+
+            var newX = (int)Math.Floor(x1);
+            var newY = (int)Math.Floor(y1);
+            
+            adjustedRoi = new Rectangle(
+                x: newX,
+                y: newY,
+                width: (int)Math.Ceiling(x2) - newX,
+                height: (int)Math.Ceiling(y2) - newY
+            );
+            
+            __logger?.LogDebug("🎯 ROI座標精密スケーリング調整: {OriginalRoi} → {AdjustedRoi} (Floor/Ceiling適用)",
+                regionOfInterest.Value, adjustedRoi.Value);
+        }
+        else
+        {
+            adjustedRoi = regionOfInterest;
+        }
+        
+        // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
+        var mat = await ConvertToMatAsync(processImage, adjustedRoi, cancellationToken);
+        
+        // Step 6: スケーリングされた画像のリソースを解放（元画像と異なる場合）
+        if (processImage != image)
+        {
+            processImage.Dispose();
+        }
+        
+        return (mat, scaleFactor);
+    }
+    
+    /// <summary>
+    /// Lanczosリサンプリングによる高品質画像スケーリング
+    /// </summary>
+    /// <param name="originalImage">元画像</param>
+    /// <param name="targetWidth">目標幅</param>
+    /// <param name="targetHeight">目標高さ</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>スケーリングされた画像</returns>
+    private async Task<IImage> ScaleImageWithLanczos(IImage originalImage, int targetWidth, int targetHeight, 
+        CancellationToken cancellationToken)
+    {
+        // テスト環境ではダミー画像を返す
+        if (IsTestEnvironment())
+        {
+            __logger?.LogDebug("テスト環境: ダミースケーリング結果を返却");
+            return originalImage; // テスト環境では元画像をそのまま返す
+        }
+        
+        try
+        {
+            // 元画像をMatに変換
+            var imageData = await originalImage.ToByteArrayAsync().ConfigureAwait(false);
+            using var originalMat = Mat.FromImageData(imageData, ImreadModes.Color);
+            
+            // Lanczosリサンプリングでリサイズ
+            using var resizedMat = new Mat();
+            Cv2.Resize(originalMat, resizedMat, new OpenCvSharp.Size(targetWidth, targetHeight), 
+                interpolation: InterpolationFlags.Lanczos4);
+            
+            // MatをIImageに変換して返す
+            var resizedImageData = resizedMat.ToBytes(".png");
+            return await __imageFactory.CreateFromBytesAsync(resizedImageData).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogError(ex, "Lanczosスケーリング失敗: {TargetSize}", $"{targetWidth}x{targetHeight}");
+            throw new OcrException($"画像スケーリングに失敗しました: {ex.Message}", ex);
         }
     }
 
@@ -4236,28 +4417,72 @@ public class PaddleOcrEngine : IOcrEngine
 
         try
         {
-            // IImageからMatに変換
-            using var mat = await ConvertToMatAsync(image, null, cancellationToken).ConfigureAwait(false);
+            // IImageからMatに変換（大画面対応スケーリング付き）
+            var (mat, scaleFactor) = await ConvertToMatWithScalingAsync(image, null, cancellationToken).ConfigureAwait(false);
             
             if (mat.Empty())
             {
+                mat.Dispose();
                 __logger?.LogWarning("変換後の画像が空です");
                 return CreateEmptyResult(image, null, stopwatch.Elapsed);
             }
 
-            // テキスト検出のみを実行（認識をスキップ）
-            var textRegions = await ExecuteTextDetectionOnlyAsync(mat, cancellationToken).ConfigureAwait(false);
+            // 検出結果を格納する変数を宣言（スコープ問題解決）
+            IReadOnlyList<OcrTextRegion> textRegions;
+            using (mat) // Matのリソース管理
+            {
+                // テキスト検出のみを実行（認識をスキップ）
+                textRegions = await ExecuteTextDetectionOnlyAsync(mat, cancellationToken).ConfigureAwait(false);
+            }
             
+            // 🎯 Level 1大画面対応: 統合座標復元（検出専用）
             stopwatch.Stop();
-
-            var result = new OcrResults(
-                textRegions ?? [],
-                image,
-                stopwatch.Elapsed,
-                CurrentLanguage ?? "jpn",
-                null,
-                "" // 検出専用なので結合テキストは空
-            );
+            
+            OcrResults result;
+            if (Math.Abs(scaleFactor - 1.0) >= 0.001 && textRegions != null && textRegions.Count > 0)
+            {
+                __logger?.LogDebug("📍 検出専用統合座標復元開始: スケール係数={ScaleFactor}", scaleFactor);
+                
+                try
+                {
+                    // CoordinateRestorer.RestoreOcrResultsを活用（検出専用モード）
+                    var tempResult = new OcrResults(
+                        textRegions,
+                        image,
+                        stopwatch.Elapsed,
+                        CurrentLanguage ?? "jpn",
+                        null,
+                        "" // 検出専用なので結合テキストは空
+                    );
+                    
+                    result = CoordinateRestorer.RestoreOcrResults(tempResult, scaleFactor, image);
+                    __logger?.LogDebug("✅ 検出専用統合座標復元完了: {Count}個のテキスト領域を復元", result.TextRegions.Count);
+                }
+                catch (Exception ex)
+                {
+                    __logger?.LogWarning(ex, "⚠️ 検出専用統合座標復元でエラーが発生しました。スケーリングされた座標を使用します");
+                    // エラー時はスケーリングされた座標をそのまま使用
+                    result = new OcrResults(
+                        textRegions,
+                        image,
+                        stopwatch.Elapsed,
+                        CurrentLanguage ?? "jpn",
+                        null,
+                        "" // 検出専用なので結合テキストは空
+                    );
+                }
+            }
+            else
+            {
+                result = new OcrResults(
+                    textRegions ?? [],
+                    image,
+                    stopwatch.Elapsed,
+                    CurrentLanguage ?? "jpn",
+                    null,
+                    "" // 検出専用なので結合テキストは空
+                );
+            }
 
             __logger?.LogDebug("✅ テキスト検出専用処理完了 - 検出領域数: {Count}, 処理時間: {Time}ms", 
                 textRegions?.Count ?? 0, stopwatch.ElapsedMilliseconds);

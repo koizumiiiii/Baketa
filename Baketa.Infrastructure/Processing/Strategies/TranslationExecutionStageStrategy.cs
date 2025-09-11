@@ -1,5 +1,10 @@
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Models.Translation;
+using Baketa.Core.Translation.Models;
+using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -12,13 +17,20 @@ namespace Baketa.Infrastructure.Processing.Strategies;
 public class TranslationExecutionStageStrategy : IProcessingStageStrategy
 {
     private readonly ILogger<TranslationExecutionStageStrategy> _logger;
+    private readonly ITranslationEngine _translationEngine;
+    private readonly IEventAggregator _eventAggregator;
     
     public ProcessingStageType StageType => ProcessingStageType.TranslationExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(200);
 
-    public TranslationExecutionStageStrategy(ILogger<TranslationExecutionStageStrategy> logger)
+    public TranslationExecutionStageStrategy(
+        ILogger<TranslationExecutionStageStrategy> logger,
+        ITranslationEngine translationEngine,
+        IEventAggregator eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
@@ -37,33 +49,54 @@ public class TranslationExecutionStageStrategy : IProcessingStageStrategy
             _logger.LogDebug("翻訳実行段階開始 - ContextId: {ContextId}, テキスト長: {TextLength}",
                 context.Input.ContextId, ocrResult.DetectedText.Length);
 
-            // TODO: 実際の翻訳サービス統合
-            // var translationRequest = new TranslationRequest
-            // {
-            //     Text = ocrResult.DetectedText,
-            //     SourceLanguage = "auto",
-            //     TargetLanguage = "ja",
-            //     TextChunks = ocrResult.TextChunks,
-            //     SourceWindowHandle = context.Input.SourceWindowHandle
-            // };
-            // var translationResult = await _translationService.TranslateAsync(translationRequest, cancellationToken);
+            // 実際の翻訳サービス統合
+            var translationRequest = new TranslationRequest
+            {
+                SourceText = ocrResult.DetectedText,
+                SourceLanguage = Language.Auto,
+                TargetLanguage = Language.Japanese
+            };
             
-            // 現在はモック翻訳処理（実装時に実際の翻訳サービスに置き換え）
-            await Task.Delay(200, cancellationToken).ConfigureAwait(false); // 翻訳処理時間をシミュレート
-            
-            var mockTranslatedText = GenerateMockTranslation(ocrResult.DetectedText);
+            var translationResult = await _translationEngine.TranslateAsync(translationRequest, cancellationToken).ConfigureAwait(false);
             
             var result = new TranslationExecutionResult
             {
-                TranslatedText = mockTranslatedText,
+                TranslatedText = translationResult?.TranslatedText ?? ocrResult.DetectedText,
                 TranslatedChunks = [], // TODO: 実際のTranslatedChunkを設定
                 ProcessingTime = stopwatch.Elapsed,
-                Success = true,
-                EngineUsed = "MockTranslationEngine"
+                Success = translationResult?.IsSuccess ?? false,
+                EngineUsed = _translationEngine.GetType().Name
             };
             
             _logger.LogDebug("翻訳実行段階完了 - 翻訳テキスト長: {TranslatedLength}, 処理時間: {ProcessingTime}ms",
-                mockTranslatedText.Length, stopwatch.Elapsed.TotalMilliseconds);
+                result.TranslatedText.Length, stopwatch.Elapsed.TotalMilliseconds);
+            
+            // 🔄 [FIX] TranslationCompletedEvent発行 - 翻訳完了をUI表示へ通知
+            if (result.Success)
+            {
+                try
+                {
+                    var translationCompletedEvent = new TranslationCompletedEvent(
+                        sourceText: ocrResult.DetectedText,
+                        translatedText: result.TranslatedText,
+                        sourceLanguage: translationRequest.SourceLanguage.ToString().ToLowerInvariant(),
+                        targetLanguage: translationRequest.TargetLanguage.ToString().ToLowerInvariant(),
+                        processingTime: stopwatch.Elapsed,
+                        engineName: result.EngineUsed
+                    );
+                    
+                    await _eventAggregator.PublishAsync(translationCompletedEvent).ConfigureAwait(false);
+                    
+                    _logger.LogInformation("🔄 [FIX] TranslationCompletedEvent発行完了 - ID: {EventId}, テキスト: {SourceText} → {TranslatedText}",
+                        translationCompletedEvent.Id, ocrResult.DetectedText, result.TranslatedText);
+                    Console.WriteLine($"🔄 [FIX] TranslationCompletedEvent発行完了 - ID: {translationCompletedEvent.Id}");
+                }
+                catch (Exception eventEx)
+                {
+                    _logger.LogError(eventEx, "❌ TranslationCompletedEvent発行エラー");
+                    Console.WriteLine($"❌ TranslationCompletedEvent発行エラー: {eventEx.Message}");
+                }
+            }
             
             return ProcessingStageResult.CreateSuccess(StageType, result);
         }
@@ -98,28 +131,4 @@ public class TranslationExecutionStageStrategy : IProcessingStageStrategy
         return false;
     }
 
-    /// <summary>
-    /// モック翻訳テキストを生成（実装時に削除）
-    /// </summary>
-    private static string GenerateMockTranslation(string originalText)
-    {
-        // 簡単な翻訳シミュレーション
-        var translations = new Dictionary<string, string>
-        {
-            { "Hello World", "こんにちは世界" },
-            { "Welcome to the game", "ゲームへようこそ" },
-            { "Press any key to continue", "何かキーを押して続行" },
-            { "Level 1 Complete", "レベル1完了" },
-            { "Game Over", "ゲームオーバー" },
-            { "New High Score", "新記録達成" }
-        };
-        
-        if (translations.TryGetValue(originalText, out var translation))
-        {
-            return translation;
-        }
-        
-        // デフォルト翻訳
-        return $"[翻訳] {originalText}";
-    }
 }
