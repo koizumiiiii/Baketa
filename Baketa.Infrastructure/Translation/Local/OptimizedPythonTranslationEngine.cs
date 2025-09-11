@@ -95,7 +95,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         var projectRoot = FindProjectRoot(currentDir);
         
         // 🎯 [NLLB-200] 動的ポート設定と動的スクリプトパス設定
-        ConfigureServerSettings(projectRoot);
+        _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings 呼び出し直前");
+        try
+        {
+            ConfigureServerSettings(projectRoot);
+            _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings 呼び出し完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [UltraThink Phase 13] ConfigureServerSettings で例外発生");
+            throw;
+        }
         
         _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}", 
             _pythonPath, _serverScriptPath);
@@ -1308,6 +1318,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     /// <summary>
     /// 現在のサーバーポート番号を取得
+    /// UltraThink Phase 13: 動的ポート検出システム統合
     /// </summary>
     private int GetCurrentServerPort()
     {
@@ -1317,7 +1328,34 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             return _managedServerInstance.Port;
         }
         
-        // 固定ポートモード
+        // UltraThink Phase 13: 動的ポート検出 - translation_ports_global.jsonから利用可能ポートを検出
+        try
+        {
+            var globalRegistryPath = Path.Combine(Environment.CurrentDirectory, "translation_ports_global.json");
+            if (File.Exists(globalRegistryPath))
+            {
+                var json = File.ReadAllText(globalRegistryPath);
+                var portRegistry = JsonSerializer.Deserialize<JsonElement>(json);
+                
+                if (portRegistry.TryGetProperty("ports", out var portsElement))
+                {
+                    foreach (var portProperty in portsElement.EnumerateObject())
+                    {
+                        if (int.TryParse(portProperty.Name, out var availablePort))
+                        {
+                            _logger.LogInformation("🎯 [UltraThink Phase 13] 動的ポート検出成功: Port {Port} を使用", availablePort);
+                            return availablePort;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "動的ポート検出失敗 - 固定ポート {Port} を使用", _serverPort);
+        }
+        
+        // 固定ポートモード（フォールバック）
         return _serverPort;
     }
 
@@ -1671,6 +1709,18 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5556);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+                
+                // UltraThink Phase 13: 起動時に動的ポート検出を実行
+                _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings: 動的ポート検出開始 (現在の固定ポート: {Port})", _serverPort);
+                var detectedPort = GetCurrentServerPort();
+                _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings: 検出結果 {ConfigPort} → {DetectedPort}", _serverPort, detectedPort);
+                if (detectedPort != _serverPort)
+                {
+                    _logger.LogInformation("🎯 [UltraThink Phase 13] 動的ポート検出: {ConfigPort} → {DetectedPort}", 
+                        _serverPort, detectedPort);
+                    _serverPort = detectedPort;
+                }
+                
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200モード - ポート: {Port}, スクリプト: {Script}", 
                     _serverPort, Path.GetFileName(_serverScriptPath));
             }
@@ -1680,6 +1730,18 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+                
+                // UltraThink Phase 13: レガシーモードでも動的ポート検出を実行
+                _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings(レガシー): 動的ポート検出開始 (現在の固定ポート: {Port})", _serverPort);
+                var detectedPort = GetCurrentServerPort();
+                _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings(レガシー): 検出結果 {ConfigPort} → {DetectedPort}", _serverPort, detectedPort);
+                if (detectedPort != _serverPort)
+                {
+                    _logger.LogInformation("🔧 [UltraThink Phase 13] レガシー動的ポート検出: {ConfigPort} → {DetectedPort}", 
+                        _serverPort, detectedPort);
+                    _serverPort = detectedPort;
+                }
+                
                 _logger.LogInformation("🔧 [NLLB-200] デフォルトモード - ポート: {Port}, スクリプト: {Script}", 
                     _serverPort, Path.GetFileName(_serverScriptPath));
             }
@@ -1690,6 +1752,22 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             _serverPort = 5556;
             var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
             _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+            
+            // UltraThink Phase 13: エラー時でも動的ポート検出を試行
+            try
+            {
+                var detectedPort = GetCurrentServerPort();
+                if (detectedPort != _serverPort)
+                {
+                    _logger.LogInformation("⚠️ [UltraThink Phase 13] エラー時動的ポート検出: {ConfigPort} → {DetectedPort}", 
+                        _serverPort, detectedPort);
+                    _serverPort = detectedPort;
+                }
+            }
+            catch (Exception detectionEx)
+            {
+                _logger.LogWarning(detectionEx, "動的ポート検出も失敗 - 固定ポート {Port} を使用", _serverPort);
+            }
         }
     }
     
