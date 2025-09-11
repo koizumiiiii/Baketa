@@ -74,7 +74,7 @@ public enum TileRegionType
 public sealed record TileGenerationOptions
 {
     /// <summary>デフォルトタイルサイズ</summary>
-    public int DefaultTileSize { get; init; } = 1024;
+    public int DefaultTileSize { get; init; } = 960;
 
     /// <summary>デバッグモード有効化</summary>
     public bool EnableDebugCapture { get; init; } = false;
@@ -86,7 +86,7 @@ public sealed record TileGenerationOptions
     public int MaxRegionCount { get; init; } = 20;
     
     /// <summary>最大タイルサイズ</summary>
-    public int MaxTileSize { get; init; } = 1024;
+    public int MaxTileSize { get; init; } = 999;
 }
 
 /// <summary>
