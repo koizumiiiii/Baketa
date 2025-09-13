@@ -138,7 +138,7 @@ public sealed class EnhancedDiagnosticReport
         try
         {
             // ポート使用状況確認
-            result.PortStatus = await GetPortStatusAsync([5556, 5557, 5558, 5559, 5560]);
+            result.PortStatus = await GetPortStatusAsync([5557, 5558, 5559, 5560, 5561]);
             
             // ファイアウォール状態確認（Windows）
             if (OperatingSystem.IsWindows())
@@ -452,7 +452,7 @@ public sealed class EnhancedDiagnosticReport
         // ネットワーク関連
         if (result.NetworkDiagnostics?.IsHealthy != true)
         {
-            actions.Add("ポート5556-5560が利用可能であることを確認してください");
+            actions.Add("ポート5557-5561が利用可能であることを確認してください");
             actions.Add("ファイアウォールでPythonの通信を許可してください");
         }
         

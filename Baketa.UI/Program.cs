@@ -586,6 +586,10 @@ namespace Baketa.UI;
             services.Configure<Baketa.Core.Settings.LoggingSettings>(
                 configuration.GetSection("Logging"));
             
+            // 🎯 UltraThink Phase 60.4: ProcessingPipelineSettings設定をappsettings.jsonから読み込み（DI解決問題修正）
+            services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(
+                configuration.GetSection("SmartProcessingPipeline"));
+            
             // ロギングの設定
             services.AddLogging(builder => 
             {
@@ -1019,6 +1023,11 @@ namespace Baketa.UI;
             infrastructureModule.RegisterServices(services, configurationForInfrastructure);
             registeredModules.Add(typeof(InfrastructureModule));
             Console.WriteLine("✅ Infrastructure基盤モジュール登録完了 - appsettings.json設定読み込み済み");
+            
+            // 🎯 UltraThink Phase 21 修正: OCR処理パイプライン復旧のためのSmartProcessingPipelineService登録
+            Console.WriteLine("🔧 ProcessingServices登録開始 - OCR処理パイプライン修復");
+            services.AddProcessingServices();
+            Console.WriteLine("✅ ProcessingServices登録完了 - SmartProcessingPipelineService + 戦略4種");
             
             // 🚀 NEW ARCHITECTURE: TimedAggregatorModule登録（完全自律型設定システム）
             Console.WriteLine("🔧 TimedAggregatorModule登録開始（新設計）");

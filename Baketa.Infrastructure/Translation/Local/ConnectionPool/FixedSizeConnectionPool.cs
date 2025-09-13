@@ -95,19 +95,19 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
 
     /// <summary>
     /// 設定に基づいて動的にポート番号を取得
-    /// NLLB-200: 5556、その他: 5556（レガシー互換性）
+    /// NLLB-200: 5557、その他: 5557（動的ポート範囲に統一）
     /// </summary>
     private int GetServerPort()
     {
         var defaultEngineString = _configuration["Translation:DefaultEngine"];
-        var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
-            ? parsedEngine 
+        var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine)
+            ? parsedEngine
             : TranslationEngine.NLLB200;
 
         return defaultEngine switch
         {
-            TranslationEngine.NLLB200 => 5556,
-            _ => 5556 // レガシー互換性のため維持
+            TranslationEngine.NLLB200 => 5557,
+            _ => 5557 // 動的ポート範囲に統一
         };
     }
 

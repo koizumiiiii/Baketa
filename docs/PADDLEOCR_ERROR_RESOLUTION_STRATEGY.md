@@ -1034,4 +1034,795 @@ services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.T
 - ✅ **SmartProcessingPipelineService構築完了**: OcrExecutionStageStrategy含む12段階正常登録
 - ✅ **イベントハンドラー初期化成功**: TranslationWithBoundsCompletedHandler等全て正常登録
 
-**最終ステータス**: **翻訳パイプライン基盤修復完了** 🎯
+---
+
+## 🎯 **UltraThink Phase 58-59: 翻訳オーバーレイ表示問題真因特定 (2025-09-13)**
+
+### **📊 Phase 59詳細調査結果**
+
+**❌ 誤った仮説**: UIボタンイベント処理問題  
+**✅ 真実**: CaptureCompletedHandlerの実行問題
+
+| **調査項目** | **Phase** | **結果** | **状態** |
+|-------------|-----------|----------|----------|
+| ReactiveCommand初期化 | 59.1 | 完全正常 | ✅ |
+| InitializeCommands詳細 | 59.2 | 完全正常 | ✅ |
+| XAMLバインディング | 59.3 | 完全正常 | ✅ |
+| IsStartStopEnabled状態 | 59.4 | True=有効 | ✅ |
+| 翻訳結果表示システム | 59.5 | **処理断絶発見** | 🚨 |
+
+### **🔥 根本問題特定: CaptureCompletedHandler実行問題**
+
+**処理フロー断絶点:**
+```
+1. StartStopCommand実行 ✅ (ログ確認済み)
+2. StartTranslationAsync実行 ✅ (ログ確認済み)  
+3. CaptureCompletedEvent発行 ✅ (ログ確認済み)
+4. CaptureCompletedHandler実行 ❌ ← ここで停止
+5. SmartProcessingPipelineService ❌
+6. 翻訳結果オーバーレイ表示 ❌
+```
+
+### **🚨 証拠資料**
+**debug_app_logs.txt分析結果:**
+- ✅ `ExecuteStartStopAsync メソッドが呼び出されました！`
+- ✅ `CaptureCompletedEvent発行 - 正規フロー開始`  
+- ❌ `CaptureCompletedHandler` ログ皆無
+- ❌ `TranslationWithBoundsCompletedHandler` ログ皆無
+
+### **📋 根本原因推定**
+1. **EventAggregator登録問題**: CaptureCompletedHandlerがEventAggregatorに登録されていない
+2. **実行時エラー**: CaptureCompletedHandler内で例外発生
+3. **DI解決問題**: CaptureCompletedHandlerの依存関係解決失敗
+
+### **🎯 Phase 60対応方針**
+1. EventHandlerInitializationServiceでCaptureCompletedHandler登録状況確認
+2. CaptureCompletedHandlerの依存関係検証  
+3. EventAggregator.PublishAsync実行時の例外処理確認
+4. 翻訳処理パイプライン復旧実装
+
+---
+
+## 🎯 **UltraThink Phase 60.1: EventHandlerInitializationService登録状況調査結果**
+
+### **✅ 調査完了項目**
+
+#### **1. EventHandlerInitializationService.cs 実装確認**
+- **ファイル**: `E:\dev\Baketa\Baketa.Application\Services\Events\EventHandlerInitializationService.cs`
+- **CaptureCompletedHandler登録コード**: ✅ **正常実装確認** (99-127行)
+- **実装内容**:
+  ```csharp
+  // ⚡ [PHASE_2_FIX] CaptureCompletedHandlerの登録
+  try
+  {
+      var captureCompletedHandler = _serviceProvider.GetRequiredService<IEventProcessor<CaptureCompletedEvent>>();
+      eventAggregator.Subscribe<CaptureCompletedEvent>(captureCompletedHandler);
+      _logger.LogInformation("CaptureCompletedHandlerを登録しました");
+  }
+  ```
+
+#### **2. 実行ログ確認結果**
+- **検索対象**: `debug_app_logs.txt`
+- **検索パターン**: `"INIT_START.*EventHandlerInitializationService|CaptureCompletedHandler.*登録"`
+- **結果**: ❌ **マッチ0件** - EventHandlerInitializationService.InitializeAsync()が実行されていない
+
+### **🚨 重大発見: EventHandlerInitializationService非実行**
+
+**問題**: EventHandlerInitializationServiceの登録コードは完璧だが、`InitializeAsync()`メソッド自体が起動時に呼ばれていない
+
+**影響**: 
+- CaptureCompletedHandler未登録 → CaptureCompletedEvent処理不可
+- OcrRequestEvent → TranslationCompletedEvent → オーバーレイ表示の連鎖が断絶
+
+### **🎯 Phase 60.2: 次期調査方針**
+1. **アプリケーション起動シーケンス調査**: EventHandlerInitializationService.InitializeAsync()の呼び出し元特定
+2. **DI登録確認**: EventHandlerInitializationServiceがDIコンテナに正しく登録されているか確認  
+3. **起動時初期化フロー解析**: App.axaml.cs、Program.cs、Startup系クラスの起動シーケンス調査
+
+## 🎯 **UltraThink Phase 60.2: アプリケーション起動シーケンス調査完了**
+
+### **✅ 重大発見: EventHandlerInitializationService内部で処理停止**
+
+#### **🔍 調査結果**
+1. **Program.cs:638行**: `InitializeEventHandlersImmediately()`正常実行
+2. **EventHandlerInitializationService取得**: ✅ 成功 - DI解決済み  
+3. **InitializeAsync()呼び出し**: ✅ 成功 - 実行開始ログ出力確認
+4. **内部処理**: ❌ **18行目から105行目の間で停止**
+
+#### **🚨 問題の本質**
+- **外部呼び出し**: ✅ 完璧に動作
+- **内部実行**: ❌ **CaptureCompletedHandler登録処理に到達せず**
+
+#### **💡 推定原因**
+EventHandlerInitializationService.InitializeAsync()内部の依存関係解決で例外発生の可能性
+
+### **🎯 Phase 60.3: 次期調査方針**
+EventHandlerInitializationService.InitializeAsync()内部の18-105行の処理を詳細調査し、例外発生箇所を特定
+
+**最終ステータス**: **EventHandlerInitializationService内部処理停止問題特定完了** 🎯
+
+---
+
+## 🎯 **UltraThink Phase 62: 画像ライフサイクル管理問題の根本解決 (2025-09-13)**
+
+### **🔍 問題の現象と根本原因**
+
+#### **現象**
+- 翻訳処理実行中だが、翻訳結果のオーバーレイが表示されない
+- OCR段階でObjectDisposedExceptionが発生し、処理が失敗
+
+#### **根本原因の特定**
+**OcrExecutionStageStrategy.ExecuteAsync**内で以下の例外が発生：
+- **例外種別**: System.ObjectDisposedException
+- **エラー箇所**: input.CapturedImage.Width/Heightアクセス時
+- **エラーメッセージ**: "この WindowsImage インスタンスは既に破棄されています"
+
+### **📊 調査により判明した問題点**
+
+#### **1. 画像所有権管理の不整合**
+**CaptureCompletedHandler.cs**:
+- ProcessingPipelineInput作成時に **OwnsImage = false** を設定
+- 理由：CaptureCompletedEventが画像を所有していると想定
+- 問題：実際には早期破棄が発生
+
+#### **2. アダプターパターンの複雑性**
+- **WindowsImageAdapter**: WindowsImageをIImageインターフェースでラップ
+- **DefaultWindowsImageAdapter**: さらに追加のアダプター層
+- 各アダプターが独自のDispose実装を持ち、連鎖的な破棄の可能性
+
+#### **3. 過去の修正履歴から見える問題パターン**
+**AdaptiveCaptureService.cs**のコメント：
+"🔧 [DISPOSE_FIX] adapter.Dispose()を削除 - WindowsImageの早期破棄を防ぐ"
+→ 同様の問題が以前にも発生していた証拠
+
+#### **4. 非同期処理とタイミング問題**
+**CaptureCompletedHandler.cs**のコメント：
+"非同期処理完了前のDispose呼び出しを防止"
+→ input?.Dispose()の呼び出しを削除している
+
+### **💡 Geminiによる技術的評価と承認**
+
+#### **提案された対応方針の評価**
+
+| 方針 | 内容 | Gemini評価 | 採用判定 |
+|------|------|------------|----------|
+| **A: 参照カウント管理** | SharedImageWrapper新規作成 | 複雑性増加 | ❌ |
+| **B: 所有権明確化** | OwnsImage=trueに変更 | **最も合理的** | ✅ |
+| **C: 画像クローン** | ディープクローン戦略 | メモリ負荷大 | ❌ |
+
+#### **Gemini推奨事項**
+1. **方針B承認**: 最小限の変更で問題を解決可能
+2. **将来的な最適化**: オブジェクトプーリングの検討
+3. **4K/8K対応**: ROI活用、リサイズ、グレースケール化
+
+### **🛠️ 実装した修正内容**
+
+#### **修正前のコード**
+```csharp
+// 問題のあったコード
+var input = new ProcessingPipelineInput
+{
+    CapturedImage = eventData.CapturedImage,
+    // 画像所有権を明示的にfalseに設定（CaptureCompletedEventが所有）
+    OwnsImage = false,
+    // ...
+};
+
+ProcessingPipelineResult pipelineResult;
+try
+{
+    pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
+}
+finally
+{
+    // input?.Dispose(); // 削除: 非同期処理中のDispose呼び出しを防止
+}
+```
+
+#### **修正後のコード**
+```csharp
+// 🎯 UltraThink Phase 62: 画像所有権をProcessingPipelineInputに移譲
+using var input = new ProcessingPipelineInput
+{
+    CapturedImage = eventData.CapturedImage,
+    // 🎯 UltraThink Phase 62: 画像所有権をtrueに変更（ProcessingPipelineInputが所有）
+    OwnsImage = true,
+    // ...
+};
+
+// usingブロックの最後でinput.Dispose()が自動的に呼ばれ、OwnsImage=trueのため画像も破棄される
+var pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
+```
+
+### **✅ 修正の効果**
+
+#### **技術的改善点**
+1. **画像ライフサイクル管理の明確化**: ProcessingPipelineInputが画像の完全な所有権を持つ
+2. **using文による確実な破棄**: 処理完了後の自動的なリソース解放
+3. **例外安全性の向上**: 例外発生時でもリソースが適切に解放される
+
+#### **期待される効果**
+- ObjectDisposedExceptionの完全解消
+- OCR処理の安定化
+- 翻訳オーバーレイ表示の復旧
+
+### **🔮 将来的な改善提案（Geminiフィードバック）**
+
+#### **1. オブジェクトプーリング**
+- ProcessingPipelineInputや画像アダプターのプール化
+- GC負荷軽減とパフォーマンス向上
+
+#### **2. アンマネージドリソース管理**
+- WindowsImageのファイナライザ実装確認
+- GDI/DirectXリソースの適切な管理
+
+#### **3. 4K/8K画像処理最適化**
+- **ROI (関心領域) の積極活用**: テキスト領域のみ処理
+- **画像リサイズ**: OCR精度を維持しつつ解像度削減
+- **ビット深度削減**: カラー→グレースケール変換
+
+### **📊 Phase 62成果総括**
+
+| 項目 | 状態 | 詳細 |
+|------|------|------|
+| **根本原因特定** | ✅ 完了 | ObjectDisposedException、画像所有権問題 |
+| **Gemini承認取得** | ✅ 完了 | 方針Bの技術的妥当性確認 |
+| **修正実装** | ✅ 完了 | CaptureCompletedHandler.cs修正 |
+| **ビルド確認** | ✅ 成功 | エラー0、警告のみ |
+| **文書化** | ✅ 完了 | 本文書への記載 |
+
+---
+
+**UltraThink Phase 62完了**: 2025-09-13
+**修正実装完了**: CaptureCompletedHandler.cs:104行 OwnsImage=true
+**Geminiレビュー完了**: 方針B承認、追加改善提案受領
+**最終ステータス**: **画像ライフサイクル管理問題根本解決完了** ✅
+
+---
+
+## 🚨 **UltraThink Phase 62検証結果 - 修正効果なし (2025-09-13 18:38)**
+
+### **❌ 検証結果: Phase 62修正は根本解決に至らず**
+
+#### **検証環境**
+- **テスト日時**: 2025-09-13 18:38
+- **検証ゲーム**: Chrono Trigger
+- **期待動作**: 翻訳オーバーレイ表示
+- **実際結果**: **オーバーレイ表示されず**
+
+#### **継続発生エラー**
+```
+🎯 [OCR_EXECUTION_DEBUG] ObjectDisposedException: キャプチャ画像は既に破棄されています
+System.ObjectDisposedException: このWindowsImageインスタンスは既に破棄されています
+System.ObjectDisposedException: Cannot access a disposed object.
+```
+
+#### **Phase 62修正の限界**
+- ✅ **理論的正しさ**: OwnsImage=trueの修正は技術的に適切
+- ✅ **Gemini承認済み**: 専門家による妥当性確認完了
+- ❌ **実効性**: 実際の問題解決には不十分
+- ❌ **深層問題**: より根本的なアーキテクチャ問題が存在
+
+### **🔍 問題の複雑性再評価**
+
+#### **新たに判明した問題構造**
+1. **多層アダプターの複雑性**: WindowsImage → WindowsImageAdapter → DefaultWindowsImageAdapter
+2. **非同期処理との競合**: Dispose()タイミングと非同期処理の競合状態
+3. **WinRT/COM相互運用**: .NET 8 WindowsRuntimeの深層問題
+4. **メモリ管理の複雑性**: アンマネージドリソースの管理が想定以上に複雑
+
+#### **アーキテクチャ上の課題**
+- 現在の設計は**複雑すぎる**状態
+- 画像ライフサイクル管理が**複数層にまたがる**
+- 依存関係が**循環的で追跡困難**
+- デバッグ・保守が**極めて困難**
+
+### **💡 UltraThink Phase 63: シンプル化方針の必要性**
+
+#### **現状認識**
+**「複雑になりすぎた設計は、技術的に正しい修正でも解決できない問題を生む」**
+
+#### **新方針の方向性**
+1. **アーキテクチャ簡素化**: 多層アダプターの削減
+2. **画像管理統一化**: シングルポイント制御
+3. **同期処理の検討**: 非同期の複雑性回避
+4. **防御的プログラミング**: 例外安全性の徹底強化
+
+---
+
+## 🎯 **UltraThink Phase 63: シンプルアーキテクチャ方針検討 (2025-09-13)**
+
+### **🧠 Think Mode分析**
+
+#### **1. 根本原因分析**
+- **問題の本質**: 複雑なオブジェクトライフサイクル管理アーキテクチャ
+- **技術的負債**: 多層アダプターパターンの過度な適用
+- **保守性問題**: デバッグとトラブルシューティングの困難さ
+- **アーキテクチャ影響**: Clean Architecture原則は維持しつつ、実装層の簡素化が必要
+
+#### **2. 影響分析**
+- **依存関係**: CaptureCompletedHandler → SmartProcessingPipelineService → 複数アダプター層
+- **インターフェース変更**: 既存のIImage、IAdvancedImage抽象化は維持
+- **テスト影響**: テストコードも同様のアダプター複雑性を抱える
+- **ビルド影響**: アーキテクチャ簡素化によりビルド時間短縮も期待
+- **パフォーマンス**: メモリ使用量削減、GC圧迫軽減
+
+### **🚀 シンプル化戦略選択肢**
+
+#### **戦略A: 画像クローン + 即座破棄パターン**
+```csharp
+// 概念実装
+public class SimplifiedImageHandler
+{
+    public async Task<ProcessingResult> ProcessAsync(IImage originalImage)
+    {
+        // Step 1: 防御的クローン作成
+        using var clonedImage = await originalImage.CloneAsync();
+
+        // Step 2: 元画像即座破棄
+        originalImage?.Dispose();
+
+        // Step 3: クローンでの安全処理
+        return await ProcessWithSafeImage(clonedImage);
+    }
+}
+```
+
+**利点**:
+- ✅ **シンプル**: 画像所有権の複雑性完全回避
+- ✅ **例外安全**: 元画像破棄済みなので競合状態なし
+- ✅ **デバッグ容易**: 処理フローが直線的
+
+**欠点**:
+- ❌ **メモリ負荷**: 2倍のメモリ使用量
+- ❌ **処理時間**: クローン作成オーバーヘッド
+
+#### **戦略B: 同期処理パターン**
+```csharp
+// 概念実装
+public class SynchronousProcessingHandler
+{
+    public ProcessingResult ProcessSynchronously(IImage image)
+    {
+        // 非同期の複雑性を排除、同期処理で確実性担保
+        var ocrResult = _ocrEngine.Recognize(image); // 同期版
+        var translationResult = _translationEngine.Translate(ocrResult); // 同期版
+        return CreateOverlay(translationResult);
+    }
+}
+```
+
+**利点**:
+- ✅ **確実性**: タイミング問題の完全排除
+- ✅ **デバッグ容易**: スタックトレース追跡が直線的
+- ✅ **理解しやすさ**: 処理フローが明確
+
+**欠点**:
+- ❌ **UI応答性**: メインスレッドブロッキング
+- ❌ **現代的でない**: 非同期パターン標準に逆行
+
+#### **戦略C: 単一責任アダプター + 防御的プログラミング**
+```csharp
+// 概念実装
+public class DefensiveImageProcessor : IImageProcessor
+{
+    public async Task<ProcessingResult> ProcessAsync(IImage image)
+    {
+        // Step 1: 画像状態検証
+        if (!IsImageValid(image)) return CreateFallbackResult();
+
+        // Step 2: 例外安全処理
+        try
+        {
+            return await ProcessWithDefense(image);
+        }
+        catch (ObjectDisposedException)
+        {
+            return CreateFallbackResult();
+        }
+    }
+
+    private bool IsImageValid(IImage image)
+    {
+        try
+        {
+            var _ = image.Width; // テストアクセス
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+}
+```
+
+**利点**:
+- ✅ **既存アーキテクチャ維持**: 最小変更
+- ✅ **防御的**: あらゆる例外状況に対処
+- ✅ **段階的導入**: 既存コードとの互換性
+
+**欠点**:
+- ❌ **根本解決でない**: 複雑性は残存
+- ❌ **パフォーマンス**: 例外処理オーバーヘッド
+
+### **🎯 推奨方針: 戦略C + 段階的簡素化**
+
+#### **Phase 1: 即座実装（戦略C）**
+- 防御的プログラミングによる安定化
+- 既存アーキテクチャとの互換性維持
+- 翻訳オーバーレイ表示機能の復旧
+
+#### **Phase 2: 長期リファクタリング（戦略A要素）**
+- アダプター層の段階的統合
+- 画像管理パターンの簡素化
+- テスト戦略の見直し
+
+### **📋 実装ロードマップ**
+
+#### **緊急対応 (1-2日)**
+1. **CaptureCompletedHandler防御的修正**: ObjectDisposedException完全キャッチ
+2. **SmartProcessingPipelineService例外安全化**: パイプライン段階での防御実装
+3. **OcrExecutionStageStrategy堅牢化**: 画像状態検証ロジック追加
+
+#### **中期改善 (1-2週間)**
+1. **ImageProcessor統一化**: 複数アダプターの統合
+2. **ライフサイクル管理明確化**: 単一責任での画像管理
+3. **テスト戦略見直し**: 簡素化されたアーキテクチャに対応
+
+### **🔮 期待効果**
+
+#### **即座の効果**
+- **翻訳オーバーレイ表示復旧**: ObjectDisposedException完全対処
+- **システム安定性向上**: 例外安全プログラミング
+- **デバッグ効率改善**: エラー追跡の容易化
+
+#### **長期的効果**
+- **保守性向上**: よりシンプルで理解しやすいアーキテクチャ
+- **パフォーマンス改善**: 不要なアダプター層削除
+- **拡張性確保**: 将来機能追加の基盤構築
+
+---
+
+**UltraThink Phase 63完了**: 2025-09-13
+**推奨方針**: 戦略C（防御的プログラミング）+ 段階的簡素化
+**次期アクション**: Geminiフィードバック取得後、緊急対応実装開始
+
+---
+
+## 🧠 **理想的処理フロー vs 再構築戦略比較分析 (2025-09-13)**
+
+### **📊 現在の問題構造**
+
+#### **現在のフロー（複雑化した問題）:**
+```
+UI起動 → CaptureCompletedEvent → CaptureCompletedHandler →
+ProcessingPipelineInput作成（OwnsImage複雑化） →
+SmartProcessingPipelineService → 複数アダプター層 →
+ObjectDisposedException発生 → 処理停止
+```
+
+#### **問題点の本質:**
+1. **所有権曖昧性**: 5層にまたがる画像参照管理
+2. **アダプター過多**: WindowsImage → WindowsImageAdapter → DefaultWindowsImageAdapter
+3. **非同期複雑化**: Dispose()タイミングとasync/awaitの競合状態
+4. **デバッグ困難性**: 複数層での例外発生箇所の特定が極めて困難
+
+### **💡 理想的な処理フロー設計**
+
+#### **シンプル統合フロー:**
+```
+UI起動 → 翻訳リクエスト →
+【統合翻訳サービス】
+├─ 画像キャプチャ（即座安全クローン）
+├─ OCR処理（クローン画像で安全実行）
+├─ 翻訳処理（OCR結果から直接実行）
+└─ オーバーレイ表示（結果を即座反映）
+→ 完了（全リソース自動解放）
+```
+
+#### **理想フローの特徴:**
+- **単一責任**: 1サービスが全プロセス管理
+- **所有権明確**: 画像クローンで完全独立処理
+- **直線的実行**: 非同期複雑性最小化
+- **例外安全**: 各ステップ独立、失敗時ロールバック容易
+
+### **⚖️ 実装戦略比較分析**
+
+#### **戦略A: 完全再構築アプローチ**
+
+**実装概要:**
+```csharp
+public class SimpleTranslationService
+{
+    public async Task<bool> ProcessTranslationAsync(WindowInfo windowInfo)
+    {
+        // Step 1: 安全な画像キャプチャ
+        using var originalImage = await CaptureWindowAsync(windowInfo);
+        using var safeImage = await originalImage.CloneAsync(); // 即座クローン
+
+        // Step 2: OCR実行（クローン画像で安全）
+        var ocrResult = await _ocrEngine.RecognizeAsync(safeImage);
+        if (!ocrResult.HasText) return false;
+
+        // Step 3: 翻訳実行
+        var translationResult = await _translationEngine.TranslateAsync(ocrResult.Text);
+
+        // Step 4: オーバーレイ表示
+        await _overlayManager.ShowTranslationAsync(translationResult, ocrResult.Bounds);
+
+        return true;
+    }
+}
+```
+
+**利点:**
+- ✅ **根本解決**: 複雑性完全排除
+- ✅ **保守性最高**: 理解・デバッグが極めて容易
+- ✅ **性能最適**: 不要抽象化層削除
+- ✅ **将来性確保**: 拡張・変更が容易
+
+**課題:**
+- ❌ **実装時間**: 推定2-3週間の大規模変更
+- ❌ **リスク高**: 既存機能の一時的破綻可能性
+- ❌ **テスト工数**: 全テスト書き直し必要
+- ❌ **アーキテクチャ調整**: Clean Architecture整合性確保
+
+#### **戦略B: 漸進的防御修正アプローチ**
+
+**実装概要:**
+```csharp
+public async Task HandleAsync(CaptureCompletedEvent eventData, CancellationToken cancellationToken)
+{
+    try
+    {
+        // 防御的画像状態確認
+        if (!IsImageValid(eventData.CapturedImage))
+        {
+            _logger.LogWarning("画像無効状態 - 処理スキップ");
+            return;
+        }
+
+        // 画像クローン作成（安全性確保）
+        using var safeImage = await eventData.CapturedImage.CloneAsync();
+
+        // 既存パイプライン安全実行
+        using var input = new ProcessingPipelineInput
+        {
+            CapturedImage = safeImage, // クローン画像使用
+            OwnsImage = true, // 明確所有権
+            // ... 他設定
+        };
+
+        var result = await _smartPipeline.ExecuteAsync(input);
+    }
+    catch (ObjectDisposedException ex)
+    {
+        _logger.LogError(ex, "画像破棄エラー - フォールバック実行");
+        // フォールバック処理
+    }
+}
+```
+
+**利点:**
+- ✅ **即座対応**: 1-2日実装可能
+- ✅ **低リスク**: 既存機能影響最小
+- ✅ **段階的解決**: 問題を徐々に解決
+- ✅ **アーキテクチャ維持**: 現設計基本維持
+
+**課題:**
+- ❌ **根本解決でない**: 複雑性残存
+- ❌ **技術的負債**: 問題先送り
+- ❌ **パフォーマンス**: 画像クローンメモリ負荷
+- ❌ **保守性低下**: 複雑防御コード追加
+
+### **📊 戦略評価マトリックス**
+
+| 評価観点 | 完全再構築 | 漸進的修正 |
+|---------|-----------|-----------|
+| **解決根本性** | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **実装速度** | ⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **リスクレベル** | ⭐⭐ | ⭐⭐⭐⭐ |
+| **保守性** | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **性能** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **将来性** | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+
+### **🎯 推奨方針: ハイブリッド段階的再構築戦略**
+
+#### **Phase 1: 緊急安定化（1-2日）**
+```csharp
+// 即座防御修正でオーバーレイ表示復旧
+private async Task<ProcessingResult> SafeProcessAsync(IImage originalImage)
+{
+    try
+    {
+        // 画像状態検証
+        if (!IsImageValid(originalImage)) return CreateFallback();
+
+        // 防御的クローン
+        using var safeImage = await originalImage.CloneAsync();
+
+        // 既存パイプライン実行
+        return await ExecuteWithSafeImage(safeImage);
+    }
+    catch (ObjectDisposedException)
+    {
+        return CreateFallback();
+    }
+}
+```
+
+#### **Phase 2: 部分再構築（1-2週間）**
+```csharp
+// 新統合TranslationFlowService並列実装
+public class StreamlinedTranslationFlow
+{
+    public async Task<bool> ExecuteTranslationAsync(WindowInfo windowInfo)
+    {
+        // 理想フロー実装
+        using var capturedImage = await _captureService.CaptureAsync(windowInfo);
+        using var processedImage = await capturedImage.CloneAsync();
+
+        var ocrResult = await _ocrService.ProcessAsync(processedImage);
+        var translation = await _translationService.TranslateAsync(ocrResult.Text);
+
+        return await _overlayService.ShowAsync(translation, ocrResult.Bounds);
+    }
+}
+```
+
+#### **Phase 3: 完全移行（1週間）**
+- 新システム安定性確認後、旧システム段階的削除
+- テスト・ドキュメント更新
+- 性能最適化
+
+### **🚀 ハイブリッド戦略の利点**
+
+1. **即座問題解決**: Phase 1で翻訳オーバーレイ表示復旧
+2. **リスク分散**: 段階実装でリグレッション防止
+3. **学習効果**: Phase 1経験をPhase 2設計活用
+4. **並列開発**: 旧システム稼働中新システム構築
+5. **検証機会**: 各段階十分テスト時間確保
+
+### **📋 推奨実装スケジュール**
+
+| Phase | 期間 | 目標 | 実装内容 |
+|-------|------|------|----------|
+| **Phase 1** | 1-2日 | 翻訳機能復旧 | 防御的修正、画像クローン化 |
+| **Phase 2** | 1-2週間 | 理想アーキテクチャ | 統合サービス実装 |
+| **Phase 3** | 1週間 | システム統合 | 旧システム削除、最適化 |
+
+**総工数**: 2-3週間
+**リスク**: 低〜中（段階的実装）
+**効果**: 根本解決 + 将来拡張性確保
+
+---
+
+**戦略比較分析完了**: 2025-09-13
+**推奨方針**: ハイブリッド段階的再構築戦略
+**即座アクション**: Phase 1緊急安定化実装開始
+
+---
+
+## 🎉 **Gemini専門技術承認結果 - 完全再構築戦略採用決定 (2025-09-13)**
+
+### **💼 ユーザー方針変更**
+**「対応のための時間的コストは許容する」** ← ユーザー明確承認
+
+**戦略転換**: ハイブリッド段階的再構築 → **完全再構築アプローチ（戦略A）採用**
+
+### **🏆 Gemini専門家評価結果**
+
+#### **1. 技術的適切性**
+**回答**: ✅ **「極めて適切」**
+
+- **責務分離**: 各サービスが単一責務に集中、理解・テストが容易
+- **データフロー明確化**: RawImage → ProcessedImage → OcrResult の一方通行で追跡容易
+- **根本問題解決**: 複雑アダプター・コールバック排除で ObjectDisposedException 完全根絶
+
+#### **2. Clean Architecture整合性**
+**回答**: ✅ **「完全に整合性を保つことが可能」**
+
+**推奨レイヤー構成:**
+- **Core/Application層**: IScreenCaptureService, IImageProcessingService, IOcrService抽象定義
+- **Infrastructure層**: Windows Graphics Capture API, OpenCV, PaddleOCR具象実装
+- **依存関係ルール**: 上位層が下位層実装詳細に依存しない原則遵守
+
+#### **3. 実装注意ポイント**
+**Gemini推奨重点項目:**
+
+**🎯 画像リソースライフサイクル管理:**
+- RawImage, ProcessedImage に IDisposable実装
+- using文による確実なDispose実行
+- アンマネージドリソース確実解放
+
+**⚡ パフォーマンス最適化:**
+- Span<T>, Memory<T>活用でメモリアロケーション最小化
+- 不必要な画像コピー回避
+
+**🔄 非同期処理設計:**
+- パイプライン全体をasync/await実装
+- ConfigureAwait(false)でデッドロック回避
+
+**🛡️ エラーハンドリング:**
+- 各ステップでの堅牢なtry-catch実装
+
+#### **4. 代替設計評価**
+**回答**: ❌ **「現在の設計が最適解」**
+
+- **理由**: シンプルさとリアルタイム性のバランスが最適
+- **複雑な代替案**: イベント駆動型等は過剰設計
+- **直線的サービス呼び出し**: イベント駆動より遅延少、リアルタイム性重視アプリに最適
+
+### **🚀 最終決定事項**
+
+#### **採用方針**: 完全再構築戦略（戦略A）
+**Gemini結論**: **「現在の問題を根本的に解決し、将来のメンテナンス性・拡張性を大幅に向上させる最も現実的で優れたアプローチ」**
+
+#### **実装方針**: SimpleTranslationService統合設計
+```csharp
+public class SimpleTranslationService
+{
+    public async Task<bool> ProcessTranslationAsync(WindowInfo windowInfo)
+    {
+        // Step 1: 安全な画像キャプチャ
+        using var originalImage = await CaptureWindowAsync(windowInfo);
+        using var safeImage = await originalImage.CloneAsync();
+
+        // Step 2: OCR実行（クローン画像で安全）
+        var ocrResult = await _ocrEngine.RecognizeAsync(safeImage);
+        if (!ocrResult.HasText) return false;
+
+        // Step 3: 翻訳実行
+        var translationResult = await _translationEngine.TranslateAsync(ocrResult.Text);
+
+        // Step 4: オーバーレイ表示
+        await _overlayManager.ShowTranslationAsync(translationResult, ocrResult.Bounds);
+
+        return true;
+    }
+}
+```
+
+### **📋 実装ロードマップ（Gemini承認済み）**
+
+#### **Phase 1: Core抽象化設計（2-3日）**
+- IScreenCaptureService, IImageProcessingService, IOcrService インターフェース設計
+- RawImage, ProcessedImage, OcrResult データ構造設計
+- TranslationOrchestrationService ビジネスロジック設計
+
+#### **Phase 2: Infrastructure具象実装（1週間）**
+- Windows Graphics Capture API統合
+- OpenCV画像処理実装
+- PaddleOCR統合実装
+- IDisposableパターン完全実装
+
+#### **Phase 3: 統合・テスト・移行（1週間）**
+- 新旧システム切り替え実装
+- 包括的テストスイート
+- 既存機能との互換性確認
+- パフォーマンス測定・最適化
+
+### **🎯 期待効果（Gemini保証）**
+
+#### **根本解決効果**:
+- ✅ ObjectDisposedException完全根絶
+- ✅ 複雑な多層アダプター完全削除
+- ✅ デバッグ・メンテナンス効率劇的向上
+
+#### **将来価値**:
+- ✅ 拡張・変更容易性確保
+- ✅ 新機能追加の基盤構築
+- ✅ 技術的負債完全解消
+
+---
+
+**Gemini専門承認完了**: 2025-09-13
+**最終採用方針**: 完全再構築戦略（戦略A）
+**開始準備**: ✅ 技術設計承認済み
+**推定工数**: 2-3週間
+**期待効果**: 根本解決 + 将来拡張性確保
+**次期アクション**: Phase 1 Core抽象化設計開始
+
+### 📄 関連設計ドキュメント
+- [Simple Translation Architecture設計書](./SIMPLE_TRANSLATION_ARCHITECTURE_DESIGN.md) - UltraThink Phase 64 Core抽象化設計詳細

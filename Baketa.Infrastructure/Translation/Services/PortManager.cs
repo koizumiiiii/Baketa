@@ -18,7 +18,7 @@ public sealed class PortManager : IPortManagementService
     private volatile bool _disposed;
     
     // Gemini推奨: 5557-5600範囲での代替ポート選択
-    private const int DefaultPort = 5556;
+    private const int DefaultPort = 5557;
     private const int PortRangeStart = 5557;
     private const int PortRangeEnd = 5600;
     

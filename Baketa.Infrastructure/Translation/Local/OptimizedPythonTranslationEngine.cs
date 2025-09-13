@@ -59,7 +59,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private int _serverPort = 5556; // 動的ポート（NLLB-200専用: 5556）
+    private int _serverPort = 5557; // 動的ポート（NLLB-200専用: 5557）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
@@ -1706,7 +1706,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (defaultEngine == TranslationEngine.NLLB200)
             {
                 // NLLB-200設定から動的にポートとスクリプトパスを取得
-                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5556);
+                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5557);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
@@ -1727,7 +1727,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             else
             {
                 // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
-                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
+                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5557);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
@@ -1749,7 +1749,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
-            _serverPort = 5556;
+            _serverPort = 5557;
             var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
             _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
             

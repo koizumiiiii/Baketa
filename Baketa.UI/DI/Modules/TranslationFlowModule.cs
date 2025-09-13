@@ -67,6 +67,17 @@ public class TranslationFlowModule : ServiceModuleBase
                 Console.WriteLine("✅ SettingsChangedEvent購読完了");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ SettingsChangedEvent購読完了");
                 logger.LogDebug("✅ SettingsChangedEvent購読完了");
+                
+                // 🎯 UltraThink Phase 23 修正: StartCaptureRequestedEvent購読追加
+                eventAggregator.Subscribe<StartCaptureRequestedEvent>(processor);
+                Console.WriteLine("✅ StartCaptureRequestedEvent購読完了");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ StartCaptureRequestedEvent購読完了");
+                logger.LogDebug("✅ StartCaptureRequestedEvent購読完了");
+                
+                eventAggregator.Subscribe<StopCaptureRequestedEvent>(processor);
+                Console.WriteLine("✅ StopCaptureRequestedEvent購読完了");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ StopCaptureRequestedEvent購読完了");
+                logger.LogDebug("✅ StopCaptureRequestedEvent購読完了");
 
                 // OverlayUpdateEventの購読を追加
                 try

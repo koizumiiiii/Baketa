@@ -42,7 +42,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         { 
             get 
             { 
-                // 🎯 UltraThink Phase 11: ThrowIfDisposed前に例外安全処理
+                // 🎯 UltraThink Phase 37: ObjectDisposedException時は再スロー（無効な画像サイズを返さない）
                 try
                 {
                     ThrowIfDisposed();
@@ -50,7 +50,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                 }
                 catch (ObjectDisposedException)
                 {
-                    return 32; // 🎯 UltraThink Phase 11: OCR処理で有効と認識される最小サイズ
+                    throw; // 🎯 Phase 37: 無効な状態では例外を再スロー（OCR処理を停止）
                 }
             } 
         }
@@ -62,7 +62,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         { 
             get 
             { 
-                // 🎯 UltraThink Phase 11: ThrowIfDisposed前に例外安全処理
+                // 🎯 UltraThink Phase 37: ObjectDisposedException時は再スロー（無効な画像サイズを返さない）
                 try
                 {
                     ThrowIfDisposed();
@@ -70,7 +70,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                 }
                 catch (ObjectDisposedException)
                 {
-                    return 32; // 🎯 UltraThink Phase 11: OCR処理で有効と認識される最小サイズ
+                    throw; // 🎯 Phase 37: 無効な状態では例外を再スロー（OCR処理を停止）
                 }
             } 
         }
@@ -131,7 +131,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         {
             ThrowIfDisposed();
             
-            // 🎯 UltraThink: 防御的コピーでObjectDisposedException解決
+            // 🎯 UltraThink Phase 17: 防御的コピーでObjectDisposedException解決
             // Task.Run内で破棄される前にネイティブイメージの参照を取得
             Image nativeImageCopy;
             try
@@ -142,7 +142,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             }
             catch (ObjectDisposedException)
             {
-                // 既に破棄されている場合は空のバイト配列を返す
+                // ObjectDisposed時は空配列を返す
                 return Task.FromResult(Array.Empty<byte>());
             }
             
@@ -160,7 +160,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                 }
                 catch (ObjectDisposedException)
                 {
-                    // 破棄済みの場合は空のバイト配列を返す
+                    // ObjectDisposed時は空配列を返す
                     return Array.Empty<byte>();
                 }
             });
@@ -416,18 +416,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             // 🎯 UltraThink Phase 6: 完全例外安全な実装
             try
             {
-                // 防御的な破棄状態チェック（例外を投げずに状態確認）
+                // 🎯 UltraThink Phase 37: 破棄状態では例外をスロー（無効な画像を生成しない）
                 if (IsDisposed() || _windowsImage == null)
                 {
-                    // 🎯 UltraThink Phase 7: OCRで有効と認識される最小サイズ（32x32）を返す
-                    var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                    using (var g = Graphics.FromImage(validBitmap))
-                    {
-                        g.Clear(Color.White); // 白い背景でOCR処理可能にする
-                    }
-                    var validWindowsImage = new WindowsImage(validBitmap);
-                    Console.WriteLine($"🛡️ [EXTRACT] 破棄状態のため有効サイズ画像を返却: {validBitmap.Width}x{validBitmap.Height}");
-                    return new WindowsImageAdapter(validWindowsImage);
+                    throw new ObjectDisposedException(nameof(WindowsImageAdapter), "🎯 Phase 37: 画像アダプターが破棄されているため処理を停止");
                 }
                 
                 if (rectangle.Width <= 0 || rectangle.Height <= 0)
@@ -442,17 +434,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                     currentWidth = Width;
                     currentHeight = Height;
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
-                    // 🎯 UltraThink Phase 7: サイズチェック時の例外でも有効サイズを返す
-                    var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                    using (var g = Graphics.FromImage(validBitmap))
-                    {
-                        g.Clear(Color.White);
-                    }
-                    var validWindowsImage = new WindowsImage(validBitmap);
-                    Console.WriteLine($"🛡️ [EXTRACT] サイズチェック例外のため有効サイズ画像を返却: {validBitmap.Width}x{validBitmap.Height}");
-                    return new WindowsImageAdapter(validWindowsImage);
+                    // 🎯 UltraThink Phase 37: サイズチェック時の例外では例外を再スロー
+                    throw new ObjectDisposedException("🎯 Phase 37: サイズ取得時に画像が破棄されました", ex);
                 }
                 
                 if (rectangle.X < 0 || rectangle.Y < 0 || 
@@ -469,17 +454,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                     var nativeImage = _windowsImage.GetNativeImage();
                     nativeImageCopy = nativeImage is Bitmap bitmap ? (Bitmap)bitmap.Clone() : nativeImage;
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
-                    // 🎯 UltraThink Phase 7: サイズチェック時の例外でも有効サイズを返す
-                    var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                    using (var g = Graphics.FromImage(validBitmap))
-                    {
-                        g.Clear(Color.White);
-                    }
-                    var validWindowsImage = new WindowsImage(validBitmap);
-                    Console.WriteLine($"🛡️ [EXTRACT] サイズチェック例外のため有効サイズ画像を返却: {validBitmap.Width}x{validBitmap.Height}");
-                    return new WindowsImageAdapter(validWindowsImage);
+                    // 🎯 UltraThink Phase 37: ネイティブイメージ取得時の例外では例外を再スロー
+                    throw new ObjectDisposedException("🎯 Phase 37: ネイティブ画像取得時に画像が破棄されました", ex);
                 }
                 
                 return await Task.Run(() => {
@@ -506,43 +484,22 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                     catch (Exception ex)
                     {
                         Console.WriteLine($"❌ [EXTRACT] 画像領域抽出エラー: {ex.Message}");
-                        // 🎯 UltraThink Phase 7: エラー時も有効サイズを返す
-                        var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                        using (var g = Graphics.FromImage(validBitmap))
-                        {
-                            g.Clear(Color.White);
-                        }
-                        var validWindowsImage = new WindowsImage(validBitmap);
-                        return (IAdvancedImage)new WindowsImageAdapter(validWindowsImage);
+                        // 🎯 UltraThink Phase 37: エラー時は例外を再スロー
+                        throw new InvalidOperationException($"🎯 Phase 37: 画像領域抽出処理でエラーが発生しました: {ex.Message}", ex);
                     }
                 }).ConfigureAwait(false);
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
-                // 最上位レベルでの例外安全性確保
-                // 🎯 UltraThink Phase 7: 最上位例外処理でも有効サイズを返す
-                var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                using (var g = Graphics.FromImage(validBitmap))
-                {
-                    g.Clear(Color.White);
-                }
-                var validWindowsImage = new WindowsImage(validBitmap);
-                Console.WriteLine($"🛡️ [EXTRACT] 最上位例外処理: 有効サイズ画像を返却: {validBitmap.Width}x{validBitmap.Height}");
-                return new WindowsImageAdapter(validWindowsImage);
+                // 🎯 UltraThink Phase 37: 最上位レベルでの例外も再スロー
+                Console.WriteLine($"💥 [EXTRACT] ObjectDisposedException: {ex.Message}");
+                throw new ObjectDisposedException("🎯 Phase 37: 画像抽出処理中に画像が破棄されました", ex);
             }
             catch (Exception ex)
             {
-                // その他の予期しない例外に対する安全性確保
+                // 🎯 UltraThink Phase 37: 予期しない例外も再スロー
                 Console.WriteLine($"❌ [EXTRACT] 予期しないエラー: {ex.Message}");
-                // 🎯 UltraThink Phase 7: 最上位例外処理でも有効サイズを返す
-                var validBitmap = new Bitmap(Math.Max(32, rectangle.Width), Math.Max(32, rectangle.Height));
-                using (var g = Graphics.FromImage(validBitmap))
-                {
-                    g.Clear(Color.White);
-                }
-                var validWindowsImage = new WindowsImage(validBitmap);
-                Console.WriteLine($"🛡️ [EXTRACT] 最上位例外処理: 有効サイズ画像を返却: {validBitmap.Width}x{validBitmap.Height}");
-                return new WindowsImageAdapter(validWindowsImage);
+                throw new InvalidOperationException($"🎯 Phase 37: 画像抽出処理で予期しないエラーが発生しました: {ex.Message}", ex);
             }
         }
         
@@ -878,6 +835,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             // デフォルトはUnknown
             return CoreImageFormat.Unknown;
         }
+        
         
         /// <summary>
         /// マネージドリソースを解放します

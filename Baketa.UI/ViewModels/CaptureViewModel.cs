@@ -6,7 +6,7 @@ using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
-// using UIEvents = Baketa.UI.Framework.Events; // 古いEventsを削除
+using UIEvents = Baketa.UI.Framework.Events;
 
 namespace Baketa.UI.ViewModels;
 
@@ -103,8 +103,8 @@ namespace Baketa.UI.ViewModels;
         // キャプチャ開始コマンド実行
         private async Task ExecuteStartCaptureAsync()
         {
-            //_logger?.LogInformation("キャプチャ開始コマンドが実行されました");
-            // await PublishEventAsync(new StartCaptureRequestedEvent()).ConfigureAwait(false);
+            Console.WriteLine("🚀 キャプチャ開始コマンドが実行されました");
+            await PublishEventAsync(new UIEvents.StartCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = true;
             await Task.CompletedTask.ConfigureAwait(false);
         }
@@ -112,8 +112,8 @@ namespace Baketa.UI.ViewModels;
         // キャプチャ停止コマンド実行
         private async Task ExecuteStopCaptureAsync()
         {
-            //_logger?.LogInformation("キャプチャ停止コマンドが実行されました");
-            // await PublishEventAsync(new StopCaptureRequestedEvent()).ConfigureAwait(false);
+            Console.WriteLine("🛑 キャプチャ停止コマンドが実行されました");
+            await PublishEventAsync(new UIEvents.StopCaptureRequestedEvent()).ConfigureAwait(false);
             IsCapturing = false;
             await Task.CompletedTask.ConfigureAwait(false);
         }

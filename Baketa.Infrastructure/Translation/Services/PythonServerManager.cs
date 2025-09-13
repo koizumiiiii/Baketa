@@ -297,7 +297,7 @@ public class PythonServerManager(
     private async Task<int?> DetectExternalServerAsync()
     {
         // 設定ファイルで指定されたポート範囲をチェック
-        var commonPorts = new[] { 5557, 5556, 5555, 5000 }; // 一般的な翻訳サーバーポート
+        var commonPorts = new[] { 5557, 5558, 5559, 5000 }; // 一般的な翻訳サーバーポート
         
         foreach (var port in commonPorts)
         {

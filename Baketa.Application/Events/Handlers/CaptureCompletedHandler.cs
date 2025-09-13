@@ -93,15 +93,15 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     {
         try
         {
-            // 🎯 UltraThink: usingパターンでProcessingPipelineInputの適切な所有権管理
+            // 🎯 UltraThink Phase 62: 画像所有権をProcessingPipelineInputに移譲
             using var input = new ProcessingPipelineInput
             {
                 CapturedImage = eventData.CapturedImage,
                 CaptureRegion = eventData.CaptureRegion,
                 SourceWindowHandle = IntPtr.Zero, // TODO: eventDataから取得
                 CaptureTimestamp = DateTime.UtcNow,
-                // 🎯 UltraThink: 所有権をfalseに設定（元画像はCaptureCompletedEventが管理）
-                OwnsImage = false,
+                // 🎯 UltraThink Phase 62: 画像所有権をtrueに変更（ProcessingPipelineInputが所有）
+                OwnsImage = true,
                 // TODO: 前回のハッシュやテキストを設定（キャッシュ機構が必要）
                 Options = new ProcessingPipelineOptions
                 {
@@ -113,6 +113,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             };
 
             // 段階的処理パイプライン実行
+            // usingブロックの最後でinput.Dispose()が自動的に呼ばれ、OwnsImage=trueのため画像も破棄される
             var pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
             
             _logger?.LogDebug("段階的処理完了 - 最終段階: {LastStage}, 総処理時間: {TotalTime}ms, 早期終了: {EarlyTerminated}",
@@ -124,10 +125,27 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         catch (Exception ex)
         {
             _logger?.LogError(ex, "段階的フィルタリングシステム処理エラー");
-            
+
             // フォールバック: 従来処理モード
-            _logger?.LogWarning("段階的処理失敗 - 従来処理モードにフォールバック");
-            await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
+            // 🎯 画像が破棄されていないか確認してからフォールバック処理を実行
+            try
+            {
+                // 画像の状態を確認（Width/Heightアクセスで破棄状態をチェック）
+                if (eventData.CapturedImage != null)
+                {
+                    var _ = eventData.CapturedImage.Width; // 破棄されていればObjectDisposedExceptionが発生
+                    _logger?.LogWarning("段階的処理失敗 - 従来処理モードにフォールバック");
+                    await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
+                }
+                else
+                {
+                    _logger?.LogWarning("段階的処理失敗 - 画像が既にnullのためフォールバック不可");
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                _logger?.LogWarning("段階的処理失敗 - 画像が既に破棄されているためフォールバック不可");
+            }
         }
     }
 

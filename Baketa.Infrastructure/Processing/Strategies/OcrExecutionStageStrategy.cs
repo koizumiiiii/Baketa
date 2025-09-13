@@ -37,11 +37,19 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
+            // 🎯 UltraThink Phase 61.26: ExecuteAsyncメソッド到達確認ログ
+            _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] ExecuteAsyncメソッド開始 - ContextId: {ContextId}", context.Input.ContextId);
+            Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] ExecuteAsyncメソッド開始 - ContextId: {context.Input.ContextId}");
+
             _logger.LogDebug("OCR実行段階開始 - ContextId: {ContextId}", context.Input.ContextId);
-            
+
+            // 🎯 UltraThink Phase 61.28: 画像null/dispose状態詳細確認
+            _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] 画像状態確認開始");
+            Console.WriteLine("🎯 [OCR_EXECUTION_DEBUG] 画像状態確認開始");
+
             // 🔧 UltraThink Phase 27: 画像リソース状態を確認してObjectDisposeExceptionを防ぐ
             if (context.Input.CapturedImage == null)
             {
@@ -53,15 +61,27 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             // 画像が破棄されているかチェック
             try
             {
+                // 🎯 UltraThink Phase 61.30: Width/Heightアクセス詳細ログ
+                _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセス開始");
+                Console.WriteLine("🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセス開始");
+
                 // 画像のWidth/Heightプロパティにアクセスして破棄状態をチェック
                 var width = context.Input.CapturedImage.Width;
                 var height = context.Input.CapturedImage.Height;
                 _logger.LogDebug("キャプチャ画像確認完了 - サイズ: {Width}x{Height}", width, height);
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
                 var error = "キャプチャ画像が既に破棄されています";
-                _logger.LogError(error);
+                _logger.LogError(ex, "🎯 [OCR_EXECUTION_DEBUG] ObjectDisposedException発生: {Error}", error);
+                Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] ObjectDisposedException: {error} - {ex.Message}");
+                return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+            }
+            catch (Exception ex)
+            {
+                var error = $"🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセスで予期しない例外: {ex.GetType().Name} - {ex.Message}";
+                _logger.LogError(ex, error);
+                Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] 予期しない例外: {ex.GetType().Name} - {ex.Message}");
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
             
@@ -272,7 +292,9 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "OCR実行段階でエラーが発生");
+            // 🎯 UltraThink Phase 61.24: 詳細なエラー情報をログ出力
+            _logger.LogError(ex, "OCR実行段階でエラーが発生 - 例外種別: {ExceptionType}, メッセージ: {Message}, スタックトレース: {StackTrace}",
+                ex.GetType().Name, ex.Message, ex.StackTrace);
             return ProcessingStageResult.CreateError(StageType, ex.Message, stopwatch.Elapsed);
         }
         finally
@@ -283,15 +305,24 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
     public bool ShouldExecute(ProcessingContext context)
     {
+        // 🎯 UltraThink Phase 61.25: OCR段階スキップ原因調査のためのデバッグログ追加
+        _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ShouldExecute呼び出し - PreviousStageResult: {HasPrevious}, Success: {Success}",
+            context.PreviousStageResult != null, context.PreviousStageResult?.Success);
+
         // Stage 1で画像変化が検知された場合のみ実行
         if (context.PreviousStageResult?.Success == true &&
             context.PreviousStageResult.Data is ImageChangeDetectionResult imageChange)
         {
+            _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ImageChangeDetection結果: HasChanged={HasChanged}, ChangePercentage={ChangePercentage}",
+                imageChange.HasChanged, imageChange.ChangePercentage);
             return imageChange.HasChanged;
         }
-        
+
         // Stage 1が実行されていない場合は実行する
-        return !context.HasStageResult(ProcessingStageType.ImageChangeDetection);
+        var hasImageChangeResult = context.HasStageResult(ProcessingStageType.ImageChangeDetection);
+        _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ImageChangeDetectionStage存在: {HasResult}, 実行判定: {WillExecute}",
+            hasImageChangeResult, !hasImageChangeResult);
+        return !hasImageChangeResult;
     }
 
 }

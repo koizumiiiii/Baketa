@@ -4,6 +4,7 @@ using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Infrastructure.OCR.Scaling;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
 
@@ -95,6 +96,10 @@ public sealed class FastTextRegionDetector(
         Baketa.Core.Abstractions.Imaging.IImage? convertedImage = null;
         try
         {
+            // 元画像サイズを記録（座標復元用）
+            var originalWidth = image.Width;
+            var originalHeight = image.Height;
+            
             // IWindowsImage → IImage 変換（バイト配列経由）
             if (imageFactory != null)
             {
@@ -107,6 +112,16 @@ public sealed class FastTextRegionDetector(
                 return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
             }
             
+            // スケールファクター計算（座標復元用）
+            var convertedWidth = convertedImage.Width;
+            var convertedHeight = convertedImage.Height;
+            var scaleFactorX = (double)convertedWidth / originalWidth;
+            var scaleFactorY = (double)convertedHeight / originalHeight;
+            var scaleFactor = Math.Min(scaleFactorX, scaleFactorY); // 縮小率を使用
+            
+            logger?.LogDebug("🎯 [COORDINATE_FIX] 座標復元情報: 元画像={OriginalWidth}x{OriginalHeight}, 変換後={ConvertedWidth}x{ConvertedHeight}, スケール={ScaleFactor:F3}", 
+                originalWidth, originalHeight, convertedWidth, convertedHeight, scaleFactor);
+            
             // PaddleOCRの検出専用機能を使用（認識処理をスキップして高速化）
             var ocrResults = await ocrEngine.DetectTextRegionsAsync(convertedImage).ConfigureAwait(false);
             
@@ -116,17 +131,21 @@ public sealed class FastTextRegionDetector(
                 return await Task.Run(() => DetectRegionsLightweightFallback(image)).ConfigureAwait(false);
             }
 
-            // OcrTextRegionからRectangleに変換し、設定に基づくフィルタリングを適用
-            var filteredRegions = ocrResults.TextRegions
+            // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
+            var restoredRegions = ocrResults.TextRegions
+                .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor))
                 .Where(region => IsRegionValid(region.Bounds))
                 .Select(region => region.Bounds)
                 .ToList();
+                
+            logger?.LogDebug("🎯 [COORDINATE_FIX] 座標復元完了: 検出={DetectionCount}個, 復元後有効={RestoredCount}個", 
+                ocrResults.TextRegions.Count, restoredRegions.Count);
 
             // 近接領域の統合（既存ロジックを活用）
-            var mergedRegions = MergeNearbyRegions(filteredRegions);
+            var mergedRegions = MergeNearbyRegions(restoredRegions);
 
-            logger?.LogInformation("✅ PaddleOCRベーステキスト領域検出完了: {OriginalCount}個 → フィルタ後{FilteredCount}個 → 統合後{MergedCount}個", 
-                ocrResults.TextRegions.Count, filteredRegions.Count, mergedRegions.Count);
+            logger?.LogInformation("✅ PaddleOCRベーステキスト領域検出完了: {OriginalCount}個 → 復元後{RestoredCount}個 → 統合後{MergedCount}個", 
+                ocrResults.TextRegions.Count, restoredRegions.Count, mergedRegions.Count);
 
             return mergedRegions;
         }
