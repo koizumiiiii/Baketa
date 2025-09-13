@@ -845,3 +845,193 @@ ocrResults = await _ocrEngine.RecognizeAsync(context.Input.CapturedImage, cancel
 **UltraThink Phase 5方針決定**: 2025-09-11 11:06  
 **Geminiコンサルティング**: 2025-09-11 11:06  
 **現在ステータス**: 🔄 **UltraThink Phase 12実行中 - OCR統合層完全修正による翻訳オーバーレイ表示最終実現**
+
+---
+
+## 🎯 **UltraThink Phase 49-50: ROI検出結果伝播問題とGemini方針B採用 (2025-09-13)**
+
+### **🔍 Phase 49: 根本原因完全解明**
+
+**翻訳オーバーレイ表示失敗の真の原因を特定**:
+
+#### **問題構造**
+1. **ROI処理は成功** (診断レポート確認済み: 1個領域、172,800ピクセル)
+2. **データ伝播の欠陥**: 検出されたテキスト領域が`ProcessingPipelineInput.CaptureRegion`に反映されない
+3. **OCR実行時の不整合**: 元の大画面領域（2560x1080等）でOCR実行を試みて1.4msで失敗
+4. **翻訳段階到達不能**: OCR失敗により最終的にオーバーレイ表示なし
+
+#### **データフロー問題詳細**
+```
+✅ CaptureCompletedHandler: ProcessingPipelineInput作成時、CaptureRegionは元の領域のまま
+✅ SmartProcessingPipelineService: ROI処理実行、1領域検出成功  
+❌ データ断絶: ROI処理結果がOCR実行段階に伝播しない
+❌ OcrExecutionStageStrategy: 全画面でOCR実行、1.4ms失敗
+❌ 翻訳段階到達せず → オーバーレイ表示なし
+```
+
+### **🛠️ Gemini専門家承認済み修正方針**
+
+#### **方針の戦略的選択肢分析**
+
+| アプローチ | 実装コスト | 保守性 | アーキテクチャ整合性 | 推奨度 |
+|------------|------------|---------|----------------------|--------|
+| **A: ROIDetection段階新設** | 高 | **高** | **最高** | ⭐⭐⭐ |
+| **B: OcrExecution統合** ⭐ | **低** | 中〜高 | 中 | ⭐⭐⭐⭐⭐ |
+| **C: ProcessingPipelineInput可変化** | 中 | 低 | **不可** | ❌ |
+| **D: ImageAnalysis拡張** | 低〜中 | 高 | 高 | ⭐⭐⭐⭐ |
+
+#### **🔥 Gemini専門家評価結果**
+- **方針B承認**: 「**許容可能な現実的妥協案**」「論理的に**非常に適切**」
+- **推奨戦略**: 「**まず方針Bで迅速に問題解決**し、システムの安定を取り戻すことを最優先」
+- **将来改善**: 「リファクタリング機会があれば方針Dを検討」
+- **クリーンアーキテクチャ**: 「**凝集度高い**、依存関係の方向は破られない」
+
+### **🚀 Phase 50: 最終採用方針 - 方針B実装**
+
+#### **採用決定: 方針B - OcrExecutionStageStrategy内ROI+OCR統合**
+
+**実装概要**:
+```csharp
+public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
+{
+    // 1. 既存ROI検出ロジック統合
+    var detectedRegions = await DetectTextRegionsAsync(context.Input.CapturedImage);
+    
+    // 2. 検出領域に基づくOCR実行
+    if (detectedRegions.Any())
+    {
+        // 領域指定OCR実行（最適化済み）
+        foreach (var region in detectedRegions)
+        {
+            ocrResults = await _ocrEngine.RecognizeAsync(image, region, cancellationToken);
+        }
+    }
+    else
+    {
+        // フォールバック: 全画面OCR実行
+        ocrResults = await _ocrEngine.RecognizeAsync(image, cancellationToken);
+    }
+}
+```
+
+#### **技術的利点**
+- ✅ **最小侵襲**: 既存アーキテクチャへの影響最小限
+- ✅ **即座実装**: 新enum/インターフェース不要（推定30分実装）
+- ✅ **論理整合性**: ROI→OCRの自然な処理フロー
+- ✅ **Gemini承認済み**: 専門家による技術的妥当性確認
+
+#### **必要な依存性注入**
+```csharp
+public OcrExecutionStageStrategy(
+    ILogger<OcrExecutionStageStrategy> logger,
+    IOcrEngine ocrEngine,
+    ITextRegionDetector textRegionDetector) // 追加
+```
+
+### **🎯 実装ロードマップ**
+
+#### **Phase 1: 即座修正（方針B実装） - 最優先**
+- **対象**: `OcrExecutionStageStrategy.ExecuteAsync`
+- **実装時間**: 推定30分
+- **依存性**: `ITextRegionDetector`注入追加
+- **変更範囲**: 単一ファイルの修正のみ
+
+#### **Phase 2: 将来改善（方針D） - 長期計画**
+- **対象**: `ImageChangeDetectionStageStrategy`
+- **概念**: ImageChangeDetection → ImageAnalysis拡張
+- **利点**: よりクリーンなアーキテクチャ実現
+
+### **📊 期待効果**
+
+#### **即座の効果（Phase 1）**
+- **翻訳オーバーレイ表示の復旧**: 根本原因解決
+- **OCR処理時間短縮**: 全画面→ROI領域での高速化
+- **ユーザー体験改善**: 1.4ms失敗→正常処理成功
+
+#### **長期的効果（Phase 2）**
+- **アーキテクチャ洗練**: より理想的な設計への進化
+- **保守性向上**: クリーンアーキテクチャ原則準拠
+- **拡張性確保**: 将来機能追加の基盤構築
+
+### **🔧 技術的詳細**
+
+#### **成功指標**
+- [x] UltraThink分析による根本原因特定完了
+- [x] Gemini専門家承認取得完了
+- [ ] Phase 1実装完了
+- [ ] OCR成功率向上確認
+- [ ] 翻訳オーバーレイ表示復旧確認
+
+#### **リスクと対策**
+- **段階責任範囲拡大**: Gemini承認により許容範囲内確認済み
+- **実装リスク**: 最小侵襲のため低リスク
+- **テスト**: 既存テスト継続利用、段階的検証
+
+---
+
+## 📋 **Phase 50実装チェックリスト**
+
+### **Phase 1: 方針B実装（最優先）**
+- [x] `ITextRegionDetector`依存性注入追加 ✅ Phase 50.1完了
+- [x] `OcrExecutionStageStrategy.ExecuteAsync`内ROI検出ロジック統合 ✅ Phase 50.1完了
+- [x] 検出結果に基づく条件分岐実装 ✅ Phase 50.2完了
+- [x] 既存フォールバック機構保持 ✅ Phase 50.3完了
+- [x] デバッグログ出力追加 ✅ 豊富なログ出力実装済み
+- [x] 動作確認テスト実行 ✅ Phase 53まで完了
+- [ ] 翻訳オーバーレイ表示復旧確認 ❌ **Phase 54で継続調査中**
+
+### **Phase 2: 将来改善（長期計画）**
+- [ ] 方針D設計書作成
+- [ ] ImageAnalysis拡張アーキテクチャ設計
+- [ ] リファクタリング計画策定
+- [ ] アーキテクチャ洗練実装
+
+---
+
+**UltraThink Phase 49-50完了**: 2025-09-13  
+**Gemini専門家承認**: 2025-09-13  
+**方針B実装準備完了**: 2025-09-13  
+
+---
+
+## 🚨 **UltraThink Phase 54: 新たなDI解決エラー特定 (2025-09-13)**
+
+### **🎯 Phase 54調査結果**
+**問題発見**: ROIBasedCaptureStrategyのDI解決エラー
+```
+System.InvalidOperationException: Unable to resolve service for type 'Baketa.Core.Abstractions.Capture.ITextRegionDetector' while attempting to activate 'Baketa.Infrastructure.Platform.Windows.Capture.Strategies.ROIBasedCaptureStrategy'.
+```
+
+### **📋 根本原因分析**
+1. **Phase 52の副作用**: AdaptiveCaptureModuleからITextRegionDetector登録を削除
+2. **依存関係の相違**: 
+   - `OcrExecutionStageStrategy`: オプション依存（`ITextRegionDetector?`）
+   - `ROIBasedCaptureStrategy`: 必須依存（`ITextRegionDetector`）
+3. **結果**: DIコンテナにITextRegionDetectorが存在せず、アプリケーション起動失敗
+
+### **💥 影響範囲**
+- OcrExecutionStageStrategy実行失敗 (`fail: OcrExecutionStageStrategy[0]`)
+- 翻訳処理パイプライン全体の中断
+- **翻訳オーバーレイ表示されない直接原因**
+
+### **🎯 Phase 55戦略: ITextRegionDetector DI登録戦略再検討**
+**優先解決方針**:
+1. **適切なモジュールでのITextRegionDetector登録復活**
+2. **ROIBasedCaptureStrategy + OcrExecutionStageStrategy両対応**
+3. **DI競合回避実装**
+
+### **✅ Phase 55実装完了: AdaptiveCaptureModuleでのITextRegionDetector登録復活**
+```csharp
+// 🎯 UltraThink Phase 55.5: 緊急修正 - ITextRegionDetector登録復活
+// 理由: プロジェクト全体でITextRegionDetectorが一切登録されていないことが判明
+//       ROIBasedCaptureStrategy（必須依存）とOcrExecutionStageStrategy（オプション依存）で必要
+services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.TextDetection.FastTextRegionDetector>();
+```
+
+### **🎉 Phase 56検証結果: 完全成功**
+- ✅ **DI解決エラー解消**: "Unable to resolve service for type 'ITextRegionDetector'" 完全消失
+- ✅ **アプリケーション正常起動**: 全DIサービス登録・ServiceProvider構築成功
+- ✅ **SmartProcessingPipelineService構築完了**: OcrExecutionStageStrategy含む12段階正常登録
+- ✅ **イベントハンドラー初期化成功**: TranslationWithBoundsCompletedHandler等全て正常登録
+
+**最終ステータス**: **翻訳パイプライン基盤修復完了** 🎯
