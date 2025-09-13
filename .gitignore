@@ -674,3 +674,4 @@ simple_*.py
 debug_captures/
 TestDirect/
 nul
+claude-code-viewer/

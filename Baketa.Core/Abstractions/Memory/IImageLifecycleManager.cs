@@ -113,7 +113,8 @@ public sealed class SafeImage : IDisposable
         int actualDataLength,
         int width,
         int height,
-        ImagePixelFormat pixelFormat)
+        ImagePixelFormat pixelFormat,
+        Guid id)
     {
         _rentedBuffer = rentedBuffer ?? throw new ArgumentNullException(nameof(rentedBuffer));
         _arrayPool = arrayPool ?? throw new ArgumentNullException(nameof(arrayPool));
@@ -121,8 +122,14 @@ public sealed class SafeImage : IDisposable
         Width = width;
         Height = height;
         PixelFormat = pixelFormat;
+        Id = id;
         CreatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// 内部ID（診断とライフサイクル管理用）
+    /// </summary>
+    internal Guid Id { get; }
 
     /// <summary>
     /// 画像データの読み取り専用スパンを取得
