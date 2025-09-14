@@ -2,11 +2,14 @@ using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Capture; // 🎯 UltraThink: ITextRegionDetector用
 using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
+using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統合
+using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Models.OCR;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Linq;
+using Rectangle = System.Drawing.Rectangle; // 🎯 UltraThink Phase 75: 名前空間競合回避
 
 namespace Baketa.Infrastructure.Processing.Strategies;
 
@@ -18,19 +21,25 @@ namespace Baketa.Infrastructure.Processing.Strategies;
 public class OcrExecutionStageStrategy : IProcessingStageStrategy
 {
     private readonly ILogger<OcrExecutionStageStrategy> _logger;
-    private readonly IOcrEngine _ocrEngine;
+    private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
     private readonly ITextRegionDetector? _textRegionDetector; // 🎯 UltraThink: ROI検出器統合
+    private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
+    private readonly IImageFactory _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     
     public ProcessingStageType StageType => ProcessingStageType.OcrExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(80);
 
     public OcrExecutionStageStrategy(
         ILogger<OcrExecutionStageStrategy> logger,
-        IOcrEngine ocrEngine,
+        Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
+        IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
+        IImageFactory imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
         ITextRegionDetector? textRegionDetector = null) // 🎯 UltraThink: ROI検出器をオプション依存で追加
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+        _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
+        _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _textRegionDetector = textRegionDetector; // null許容（フォールバック対応）
     }
 
@@ -41,16 +50,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         try
         {
             // 🎯 UltraThink Phase 61.26: ExecuteAsyncメソッド到達確認ログ
-            _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] ExecuteAsyncメソッド開始 - ContextId: {ContextId}", context.Input.ContextId);
-            Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] ExecuteAsyncメソッド開始 - ContextId: {context.Input.ContextId}");
+            _logger.LogDebug("🎯 [OCR_EXECUTION_DEBUG] ExecuteAsyncメソッド開始 - ContextId: {ContextId}", context.Input.ContextId);
 
             _logger.LogDebug("OCR実行段階開始 - ContextId: {ContextId}", context.Input.ContextId);
 
-            // 🎯 UltraThink Phase 61.28: 画像null/dispose状態詳細確認
-            _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] 画像状態確認開始");
-            Console.WriteLine("🎯 [OCR_EXECUTION_DEBUG] 画像状態確認開始");
+            // 🎯 UltraThink Phase 75: SafeImage パターンによる安全な画像処理
+            _logger.LogDebug("🎯 [OCR_EXECUTION_DEBUG] SafeImage変換開始");
 
-            // 🔧 UltraThink Phase 27: 画像リソース状態を確認してObjectDisposeExceptionを防ぐ
+            // 🔧 UltraThink Phase 75: IImage → SafeImage 変換でObjectDisposedException根絶
             if (context.Input.CapturedImage == null)
             {
                 var error = "キャプチャ画像がnullです";
@@ -58,43 +65,103 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
 
-            // 画像が破棄されているかチェック
+            SafeImage safeImage;
             try
             {
-                // 🎯 UltraThink Phase 61.30: Width/Heightアクセス詳細ログ
-                _logger.LogInformation("🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセス開始");
-                Console.WriteLine("🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセス開始");
+                // 🎯 UltraThink Phase 76: IImageからSafeImageへの完全な安全変換実装
+                _logger.LogDebug("🎯 [OCR_EXECUTION_DEBUG] IImage→SafeImage変換実行");
 
-                // 画像のWidth/Heightプロパティにアクセスして破棄状態をチェック
-                var width = context.Input.CapturedImage.Width;
-                var height = context.Input.CapturedImage.Height;
-                _logger.LogDebug("キャプチャ画像確認完了 - サイズ: {Width}x{Height}", width, height);
+                // 🔧 Phase 76: IImageから安全にデータ取得
+                int width, height;
+                byte[] imageData;
+
+                try
+                {
+                    // IImageプロパティとデータの安全な取得（ObjectDisposedException対策）
+                    _logger.LogDebug("🎯 [OCR_EXECUTION_DEBUG] 画像状態確認開始");
+
+                    width = context.Input.CapturedImage.Width;
+                    height = context.Input.CapturedImage.Height;
+
+                    _logger.LogDebug("🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセス完了");
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    var error = "🚨 [OCR_EXECUTION_DEBUG] ObjectDisposedException発生: キャプチャ画像が既に破棄されています";
+                    _logger.LogError(ex, error);
+                    Console.WriteLine($"🚨 [OCR_EXECUTION_DEBUG] ObjectDisposedException: {error} - {ex.Message}");
+                    return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+                }
+
+                // 🔧 画像データの安全な取得
+                try
+                {
+                    imageData = await context.Input.CapturedImage.ToByteArrayAsync().ConfigureAwait(false);
+                    _logger.LogDebug("🎯 [SAFE_IMAGE] 画像データ取得完了 - サイズ: {Width}x{Height}, データサイズ: {DataSize}bytes", width, height, imageData.Length);
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    var error = "画像データ取得中にObjectDisposedExceptionが発生しました";
+                    _logger.LogError(ex, error);
+                    return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+                }
+
+                // 🎯 SafeImage作成（IImageLifecycleManager使用）
+                safeImage = await _imageLifecycleManager.CreateSafeImageAsync(
+                    imageData.AsMemory(),
+                    width,
+                    height,
+                    ImagePixelFormat.Bgra32, // Windows標準フォーマット
+                    cancellationToken).ConfigureAwait(false);
+
+                _logger.LogInformation("🎯 [SAFE_IMAGE] SafeImage作成完了 - サイズ: {Width}x{Height}", width, height);
+                Console.WriteLine($"🎯 [SAFE_IMAGE] SafeImage作成完了 - サイズ: {width}x{height}");
+
+                // 🔧 Phase 76: SafeImageからOCR用IImageへの安全な変換
+                _logger.LogInformation("🎯 [SAFE_IMAGE] OCR用IImage変換開始");
+                Console.WriteLine("🎯 [SAFE_IMAGE] OCR用IImage変換開始");
             }
             catch (ObjectDisposedException ex)
             {
-                var error = "キャプチャ画像が既に破棄されています";
-                _logger.LogError(ex, "🎯 [OCR_EXECUTION_DEBUG] ObjectDisposedException発生: {Error}", error);
-                Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] ObjectDisposedException: {error} - {ex.Message}");
+                var error = "🚨 [SAFE_IMAGE] IImage変換中にObjectDisposedException発生 - 画像が破棄済み";
+                _logger.LogError(ex, error);
+                Console.WriteLine($"🚨 [SAFE_IMAGE] ObjectDisposedException: {error}");
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
             catch (Exception ex)
             {
-                var error = $"🎯 [OCR_EXECUTION_DEBUG] 画像Width/Heightアクセスで予期しない例外: {ex.GetType().Name} - {ex.Message}";
+                var error = "SafeImage変換中に予期しないエラーが発生しました";
                 _logger.LogError(ex, error);
-                Console.WriteLine($"🎯 [OCR_EXECUTION_DEBUG] 予期しない例外: {ex.GetType().Name} - {ex.Message}");
-                return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+                return ProcessingStageResult.CreateError(StageType, $"{error}: {ex.Message}", stopwatch.Elapsed);
             }
             
+            // 🔧 Phase 76: SafeImageからIImageへの変換実行（OCRエンジン用）
+            Baketa.Core.Abstractions.Imaging.IImage ocrImage;
+            try
+            {
+                var safeImageData = safeImage.GetImageData().ToArray();
+                ocrImage = await _imageFactory.CreateFromBytesAsync(safeImageData).ConfigureAwait(false);
+                _logger.LogInformation("🎯 [SAFE_IMAGE] OCR用IImage変換完了 - サイズ: {Width}x{Height}", ocrImage.Width, ocrImage.Height);
+                Console.WriteLine($"🎯 [SAFE_IMAGE] OCR用IImage変換完了 - サイズ: {ocrImage.Width}x{ocrImage.Height}");
+            }
+            catch (Exception ex)
+            {
+                var error = "SafeImageからOCR用IImageへの変換に失敗しました";
+                _logger.LogError(ex, error);
+                return ProcessingStageResult.CreateError(StageType, $"{error}: {ex.Message}", stopwatch.Elapsed);
+            }
+
             // 🎯 UltraThink Phase 50.1: ROI検出統合によるテキスト領域特定処理
+            // Note: ここではocrImageを使用してROI検出を実行
             IList<Rectangle>? detectedRegions = null;
             if (_textRegionDetector != null)
             {
                 try
                 {
                     _logger.LogDebug("🎯 UltraThink: ROI検出開始 - テキスト領域を事前検出");
-                    
-                    // IImage → IWindowsImage変換が必要な場合の処理
-                    if (context.Input.CapturedImage is IWindowsImage windowsImage)
+
+                    // OCR用IImageをIWindowsImageへ変換が必要な場合の処理
+                    if (ocrImage is IWindowsImage windowsImage)
                     {
                         detectedRegions = await _textRegionDetector.DetectTextRegionsAsync(windowsImage).ConfigureAwait(false);
                         _logger.LogInformation("🎯 UltraThink: ROI検出完了 - 検出領域数: {RegionCount}", detectedRegions.Count);
@@ -123,11 +190,12 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             OcrResults ocrResults;
             try
             {
-                // 🔧 UltraThink Phase 35: 画像とCaptureRegionの包括的検証
+                // 🔧 Phase 76: SafeImageとCaptureRegionの包括的検証（ObjectDisposedException安全）
                 try
                 {
-                    var testWidth = context.Input.CapturedImage.Width;
-                    var testHeight = context.Input.CapturedImage.Height;
+                    // SafeImage/ocrImageのサイズを使用（破棄済みの元画像にアクセスしない）
+                    var testWidth = ocrImage.Width; // SafeImage経由で安全
+                    var testHeight = ocrImage.Height; // SafeImage経由で安全
                     var testRegion = context.Input.CaptureRegion;
                     
                     // 🎯 UltraThink Phase 35: Empty span防止のため画像サイズ検証
@@ -164,11 +232,12 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     _logger.LogDebug("OCR前画像状態確認OK - サイズ: {Width}x{Height}, 領域: ({X},{Y},{Width},{Height})", 
                         testWidth, testHeight, testRegion.X, testRegion.Y, testRegion.Width, testRegion.Height);
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
-                    var error = "OCR処理前の画像状態確認で画像が破棄されていることを検出";
-                    _logger.LogError(error);
-                    return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+                    var error = "OCR処理前の画像状態確認で予期しないObjectDisposedExceptionが発生";
+                    _logger.LogError(ex, error);
+                    // Note: この時点でSafeImage経由のアクセスのため、本来は発生しないはず
+                    return ProcessingStageResult.CreateError(StageType, $"{error}: {ex.Message}", stopwatch.Elapsed);
                 }
                 
                 // 🎯 UltraThink Phase 50.2: ROI検出結果に基づくOCR実行戦略
@@ -188,8 +257,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                                 region.X, region.Y, region.Width, region.Height);
                             
                             var regionOcrResults = await _ocrEngine.RecognizeAsync(
-                                context.Input.CapturedImage, 
-                                region, 
+                                ocrImage, // 🔧 Phase 76: SafeImage経由の安全な画像使用
+                                region,
                                 cancellationToken: cancellationToken).ConfigureAwait(false);
                             
                             if (regionOcrResults?.TextRegions?.Count > 0)
@@ -221,33 +290,40 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     _logger.LogDebug("🎯 UltraThink: ROI検出結果なし - 全画面OCR実行");
                     
                     // 🎯 UltraThink Phase 35: OCR呼び出し前の最終検証
+                    // 🔧 Phase 76: SafeImage経由の安全な画像状態確認（ObjectDisposedException回避）
                     try
                     {
-                        // 画像が有効な状態か最終確認
-                        _ = context.Input.CapturedImage.Width;
-                        _ = context.Input.CapturedImage.Height;
+                        // ocrImage（SafeImage経由）の有効性確認
+                        _ = ocrImage.Width; // SafeImage経由で安全
+                        _ = ocrImage.Height; // SafeImage経由で安全
+                        _logger.LogDebug("🎯 [SAFE_IMAGE] OCR実行直前の画像状態確認成功 - サイズ: {Width}x{Height}", ocrImage.Width, ocrImage.Height);
                     }
-                    catch (ObjectDisposedException)
+                    catch (ObjectDisposedException ex)
                     {
-                        var error = "OCR実行直前に画像の破棄を検出";
-                        _logger.LogError(error);
-                        return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
+                        var error = "OCR実行直前に予期しない画像破棄を検出（SafeImage経由であるため異常）";
+                        _logger.LogError(ex, error);
+                        return ProcessingStageResult.CreateError(StageType, $"{error}: {ex.Message}", stopwatch.Elapsed);
                     }
 
                     if (context.Input.CaptureRegion != Rectangle.Empty)
                     {
-                        // 特定領域でのOCR処理
-                        _logger.LogDebug("🎯 UltraThink Phase 35: 領域指定OCR実行 - ({X},{Y},{Width},{Height})", 
-                            context.Input.CaptureRegion.X, context.Input.CaptureRegion.Y, 
+                        // 特定領域でのOCR処理（SafeImage経由で安全）
+                        _logger.LogDebug("🔧 Phase 76: 領域指定OCR実行 - ({X},{Y},{Width},{Height})",
+                            context.Input.CaptureRegion.X, context.Input.CaptureRegion.Y,
                             context.Input.CaptureRegion.Width, context.Input.CaptureRegion.Height);
-                        ocrResults = await _ocrEngine.RecognizeAsync(context.Input.CapturedImage, context.Input.CaptureRegion, cancellationToken: cancellationToken).ConfigureAwait(false);
+                        ocrResults = await _ocrEngine.RecognizeAsync(
+                            ocrImage, // 🔧 Phase 76: SafeImage経由の安全な画像
+                            context.Input.CaptureRegion,
+                            cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {
-                        // 全体画像でのOCR処理
-                        _logger.LogDebug("🎯 UltraThink Phase 35: 全体画像OCR実行 - {Width}x{Height}", 
-                            context.Input.CapturedImage.Width, context.Input.CapturedImage.Height);
-                        ocrResults = await _ocrEngine.RecognizeAsync(context.Input.CapturedImage, cancellationToken: cancellationToken).ConfigureAwait(false);
+                        // 全体画像でのOCR処理（SafeImage経由で安全）
+                        _logger.LogDebug("🔧 Phase 76: 全体画像OCR実行 - {Width}x{Height}",
+                            ocrImage.Width, ocrImage.Height); // SafeImage経由で安全
+                        ocrResults = await _ocrEngine.RecognizeAsync(
+                            ocrImage, // 🔧 Phase 76: SafeImage経由の安全な画像
+                            cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
                     
                     // OCR結果から文字列とチャンクを取得

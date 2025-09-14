@@ -24,7 +24,11 @@ public sealed class BatchOcrModule : ServiceModuleBase
         // 🔧 修正: 明示的ファクトリパターンでImageDiagnosticsSaver確実注入
         services.AddSingleton<IBatchOcrProcessor>(serviceProvider =>
         {
-            var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
+            var ocrEngine = serviceProvider.GetService<IOcrEngine>();
+            if (ocrEngine == null)
+            {
+                throw new InvalidOperationException("IOcrEngine not available - BatchOcrProcessor cannot be initialized");
+            }
             var performanceOrchestrator = serviceProvider.GetService<IPerformanceOrchestrator>();
             var performanceAnalyzer = serviceProvider.GetService<IAsyncPerformanceAnalyzer>();
             var logger = serviceProvider.GetService<ILogger<BatchOcrProcessor>>();

@@ -6,6 +6,7 @@ using System;
 using System.Threading.Tasks;
 using Xunit;
 using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Services;
@@ -46,7 +47,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         _mainWindowViewModel = new MainWindowViewModel(
             mockEventAggregator,
             new HomeViewModel(mockEventAggregator),
-            new CaptureViewModel(mockEventAggregator),
+            new CaptureViewModel(mockEventAggregator, Mock.Of<Baketa.Core.Abstractions.Translation.ISimpleTranslationService>()),
             new TranslationViewModel(mockEventAggregator),
             new OverlayViewModel(mockEventAggregator),
             new HistoryViewModel(mockEventAggregator),

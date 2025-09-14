@@ -28,6 +28,9 @@ using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.DI;
 using Baketa.Application.Services.Events;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Settings;
+using Baketa.Core.Models.Processing;
+using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Events.Handlers;
 using Microsoft.Extensions.Configuration;
 using Baketa.Application.Configuration;
@@ -254,6 +257,11 @@ namespace Baketa.Application.DI.Modules;
         /// </summary>
         /// <param name="services">サービスコレクション</param>
         /// <param name="environment">アプリケーション実行環境</param>
+        /// <summary>
+        /// その他のアプリケーションサービスを登録します。
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        /// <param name="environment">アプリケーション実行環境</param>
         private static void RegisterOtherApplicationServices(IServiceCollection services, Core.DI.BaketaEnvironment environment)
         {
             // イベント集約機構の登録
@@ -267,6 +275,12 @@ namespace Baketa.Application.DI.Modules;
             
             // フルスクリーン管理サービス
             services.AddFullscreenManagement();
+            
+            // 🎯 Phase 3.1: SafeImageFactory登録 (ISafeImageFactory DI解決エラー修正)
+            services.AddSingleton<Baketa.Core.Abstractions.Memory.ISafeImageFactory, Baketa.Application.Services.Memory.SafeImageFactory>();
+            
+            // 🎯 Phase 3.1: IImageLifecycleManager登録 (WindowsImageFactory依存関係解決)
+            services.AddSingleton<Baketa.Core.Abstractions.Memory.IImageLifecycleManager, Baketa.Application.Services.Memory.ImageLifecycleManager>();
             
             // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）
             // IHostedServiceとして登録しアプリケーションライフサイクルと連動
@@ -386,10 +400,26 @@ namespace Baketa.Application.DI.Modules;
             
             // ⚡ [ARCHITECTURAL_FIX] CaptureCompletedHandler登録 - Application層に適切配置
             Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");
-            services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>();
+            services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>(provider =>
+            {
+                var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+                var smartPipeline = provider.GetService<ISmartProcessingPipelineService>();
+                var logger = provider.GetService<ILogger<Baketa.Application.Events.Handlers.CaptureCompletedHandler>>();
+                var settings = provider.GetService<IOptionsMonitor<ProcessingPipelineSettings>>();
+                var diagnosticsSaver = provider.GetService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
+                var roiSettings = provider.GetService<IOptionsMonitor<RoiDiagnosticsSettings>>();
+
+                return new Baketa.Application.Events.Handlers.CaptureCompletedHandler(
+                    eventAggregator,
+                    smartPipeline,
+                    logger,
+                    settings,
+                    diagnosticsSaver,
+                    roiSettings);
+            });
             services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());
-            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - Clean Architecture準拠");
+            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - キャプチャ画像保存機能付き");
             
             // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
             Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");

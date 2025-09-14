@@ -1,5 +1,11 @@
 using System;
+using Baketa.Application.Services.ErrorHandling;
+using Baketa.Application.Services.Memory;
+using Baketa.Application.Services.Translation;
+using Baketa.Core.Abstractions.ErrorHandling;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
 using Baketa.Core.Events.EventTypes;
 using Baketa.UI.Framework.Events;
@@ -19,6 +25,18 @@ public class TranslationFlowModule : ServiceModuleBase
     {
         // TranslationFlowEventProcessorは既にUIServiceCollectionExtensionsで登録済み
         // ここではイベント購読の設定のみ行う
+
+        // Phase 3: Simple Translation Architecture統合
+        // Note: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで登録済み（Clean Architecture準拠）
+        services.AddSingleton<ISimpleErrorHandler, SimpleErrorHandler>();
+
+        // 設計意図：ISimpleTranslationServiceはScopedライフタイムで登録
+        // - デスクトップアプリケーションでは、特定の翻訳セッション（ウィンドウ単位）でのスコープを想定
+        // - IDisposableなサービスなので、スコープ終了時に自動的にDisposeされる
+        // - 複数の並行翻訳処理の分離とリソース管理の観点からScopedが適切
+        services.AddScoped<ISimpleTranslationService, SimpleTranslationService>();
+
+        Console.WriteLine("[TranslationFlowModule] Simple Translation Architecture services registered");
     }
 
     public void ConfigureEventAggregator(IEventAggregator eventAggregator, IServiceProvider serviceProvider)

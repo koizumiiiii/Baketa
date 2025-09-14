@@ -23,7 +23,7 @@ public sealed class SimpleTranslationModule : ServiceModuleBase
     public override void RegisterServices(IServiceCollection services)
     {
         // Core層インターフェースの実装を登録
-        services.AddSingleton<IImageLifecycleManager, ImageLifecycleManager>();
+        // Note: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで統合登録済み
         services.AddSingleton<ISimpleErrorHandler, SimpleErrorHandler>();
 
         // 設計意図：ISimpleTranslationServiceはScopedライフタイムで登録

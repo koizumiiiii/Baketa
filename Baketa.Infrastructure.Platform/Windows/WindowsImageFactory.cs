@@ -1,35 +1,52 @@
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Infrastructure.Platform.Adapters;
 using IWindowsImageInterface = Baketa.Core.Abstractions.Platform.Windows.IWindowsImage;
 using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
+using GdiRectangle = System.Drawing.Rectangle;
+using SafePixelFormat = Baketa.Core.Abstractions.Memory.ImagePixelFormat;
 
 namespace Baketa.Infrastructure.Platform.Windows;
 
 
     /// <summary>
     /// WindowsImage作成のファクトリ実装
+    /// Phase 3.1統合: SafeImage使用によるObjectDisposedException防止
     /// </summary>
     public class WindowsImageFactory : IWindowsImageFactoryInterface
     {
         private readonly ILogger<WindowsImageFactory>? _logger;
+        private readonly ISafeImageFactory _safeImageFactory;
+        private readonly IImageLifecycleManager _imageLifecycleManager;
         private static readonly object _gdiLock = new(); // GDI+操作の同期化
 
-        public WindowsImageFactory(ILogger<WindowsImageFactory>? logger = null)
+        public WindowsImageFactory(
+            ISafeImageFactory safeImageFactory,
+            IImageLifecycleManager imageLifecycleManager,
+            ILogger<WindowsImageFactory>? logger = null)
         {
+            _safeImageFactory = safeImageFactory ?? throw new ArgumentNullException(nameof(safeImageFactory));
+            _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
             _logger = logger;
         }
         /// <summary>
-        /// Bitmapからの画像作成
+        /// Bitmapからの画像作成（Phase 3.1統合: SafeImage使用）
         /// </summary>
         public IWindowsImageInterface CreateFromBitmap(Bitmap bitmap)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
-            return new WindowsImage(bitmap);
+
+            // Phase 3.1: BitmapからSafeImageを生成
+            var safeImage = CreateSafeImageFromBitmap(bitmap);
+            return new SafeImageAdapter(safeImage);
         }
 
         /// <summary>
@@ -44,7 +61,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 try
                 {
                     var bitmap = new Bitmap(filePath);
-                    return new WindowsImage(bitmap);
+                    // Phase 3.1: BitmapからSafeImageを生成
+                    var safeImage = CreateSafeImageFromBitmap(bitmap);
+                    bitmap.Dispose(); // 元のBitmapは破棄
+                    return new SafeImageAdapter(safeImage);
                 }
                 catch (Exception ex)
                 {
@@ -68,7 +88,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 {
                     using var stream = new MemoryStream(data);
                     var bitmap = new Bitmap(stream);
-                    return new WindowsImage(bitmap);
+                    // Phase 3.1: BitmapからSafeImageを生成
+                    var safeImage = CreateSafeImageFromBitmap(bitmap);
+                    bitmap.Dispose(); // 元のBitmapは破棄
+                    return new SafeImageAdapter(safeImage);
                 }
                 catch (Exception ex)
                 {
@@ -92,7 +115,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
             return await Task.Run(() =>
             {
                 var bitmap = new Bitmap(width, height);
-                
+
                 // 背景色が指定されていれば塗りつぶす
                 if (backgroundColor.HasValue)
                 {
@@ -100,8 +123,11 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     using var brush = new SolidBrush(backgroundColor.Value);
                     g.FillRectangle(brush, 0, 0, width, height);
                 }
-                
-                return new WindowsImage(bitmap);
+
+                // Phase 3.1: BitmapからSafeImageを生成
+                var safeImage = CreateSafeImageFromBitmap(bitmap);
+                bitmap.Dispose(); // 元のBitmapは破棄
+                return new SafeImageAdapter(safeImage);
             }).ConfigureAwait(false);
         }
 
@@ -127,12 +153,12 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // スレッドセーフティのため、GDI+操作を同期化
                 lock (_gdiLock)
                 {
-                    var sourceBitmap = ((WindowsImage)source).GetBitmap();
+                    var sourceBitmap = source.GetBitmap();
                     // 🔒 CRITICAL FIX: Bitmap競合状態防止のためクローン作成
                     sourceBitmapClone = new Bitmap(sourceBitmap);
                 }
 
-                resizedBitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+                resizedBitmap = new Bitmap(width, height, GdiPixelFormat.Format32bppArgb);
 
                 using (var graphics = Graphics.FromImage(resizedBitmap))
                 {
@@ -152,8 +178,11 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 _logger?.LogDebug("🎯 Thread-safe ResizeImage完了: {OriginalSize} → {NewSize}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
                     $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", $"{width}x{height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
 
-                var result = new WindowsImage(resizedBitmap);
-                resizedBitmap = null; // WindowsImageが所有権を取得
+                // Phase 3.1: BitmapからSafeImageを生成
+                var safeImage = CreateSafeImageFromBitmap(resizedBitmap);
+                resizedBitmap.Dispose(); // 元のBitmapは破棄
+                var result = new SafeImageAdapter(safeImage);
+                resizedBitmap = null; // SafeImageが所有権を取得
                 return result;
             }
             catch (OutOfMemoryException memEx)
@@ -199,7 +228,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
         /// <param name="source">元画像</param>
         /// <param name="cropArea">切り出し領域</param>
         /// <returns>切り出された画像</returns>
-        public IWindowsImageInterface CropImage(IWindowsImageInterface source, Rectangle cropArea)
+        public IWindowsImageInterface CropImage(IWindowsImageInterface source, GdiRectangle cropArea)
         {
             ArgumentNullException.ThrowIfNull(source);
             if (cropArea.Width <= 0 || cropArea.Height <= 0)
@@ -214,7 +243,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // スレッドセーフティのため、GDI+操作を同期化
                 lock (_gdiLock)
                 {
-                    var sourceBitmap = ((WindowsImage)source).GetBitmap();
+                    var sourceBitmap = source.GetBitmap();
                     
                     // 境界チェック
                     if (cropArea.X < 0 || cropArea.Y < 0 ||
@@ -228,7 +257,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 }
 
                 // ロック外でBitmap操作実行（パフォーマンス向上）
-                croppedBitmap = new Bitmap(cropArea.Width, cropArea.Height, PixelFormat.Format32bppArgb);
+                croppedBitmap = new Bitmap(cropArea.Width, cropArea.Height, GdiPixelFormat.Format32bppArgb);
                 
                 using (var graphics = Graphics.FromImage(croppedBitmap))
                 {
@@ -248,8 +277,11 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 _logger?.LogDebug("🎯 Thread-safe CropImage完了: 領域={CropArea} (元画像: {OriginalSize}), 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
                     cropArea, $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
 
-                var result = new WindowsImage(croppedBitmap);
-                croppedBitmap = null; // WindowsImageが所有権を取得
+                // Phase 3.1: BitmapからSafeImageを生成
+                var safeImage = CreateSafeImageFromBitmap(croppedBitmap);
+                croppedBitmap.Dispose(); // 元のBitmapは破棄
+                var result = new SafeImageAdapter(safeImage);
+                croppedBitmap = null; // SafeImageが所有権を取得
                 return result;
             }
             catch (OutOfMemoryException memEx)
@@ -287,5 +319,100 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     _logger?.LogWarning(cleanupEx, "⚠️ CropImage - リソースクリーンアップ時に警告: 領域={CropArea}", cropArea);
                 }
             }
+        }
+
+        /// <summary>
+        /// BitmapからSafeImageを生成するヘルパーメソッド（Phase 3.1統合）
+        /// </summary>
+        /// <param name="bitmap">変換元Bitmap</param>
+        /// <returns>生成されたSafeImage</returns>
+        private SafeImage CreateSafeImageFromBitmap(Bitmap bitmap)
+        {
+            ArgumentNullException.ThrowIfNull(bitmap);
+
+            try
+            {
+                // 🎯 UltraThink修正: PNG変換を除去し、生ピクセルデータを直接取得
+                var rect = new GdiRectangle(0, 0, bitmap.Width, bitmap.Height);
+                var bitmapData = bitmap.LockBits(rect, ImageLockMode.ReadOnly, bitmap.PixelFormat);
+
+                try
+                {
+                    // ピクセルデータサイズ計算
+                    var stride = Math.Abs(bitmapData.Stride);
+                    var pixelDataSize = stride * bitmap.Height;
+
+                    // ArrayPool<byte>からバッファを借用
+                    var arrayPool = ArrayPool<byte>.Shared;
+                    var rentedBuffer = arrayPool.Rent(pixelDataSize);
+
+                    // 生ピクセルデータを直接コピー（高品質・高速）
+                    unsafe
+                    {
+                        var srcPtr = (byte*)bitmapData.Scan0;
+                        fixed (byte* dstPtr = rentedBuffer)
+                        {
+                            System.Runtime.CompilerServices.Unsafe.CopyBlock(dstPtr, srcPtr, (uint)pixelDataSize);
+                        }
+                    }
+
+                    // PixelFormatをImagePixelFormatに変換
+                    var pixelFormat = ConvertToImagePixelFormat(bitmap.PixelFormat, _logger);
+
+                    // SafeImageを生成（生ピクセルデータ使用）
+                    var safeImage = _safeImageFactory.CreateSafeImage(
+                        rentedBuffer: rentedBuffer,
+                        arrayPool: arrayPool,
+                        actualDataLength: pixelDataSize,
+                        width: bitmap.Width,
+                        height: bitmap.Height,
+                        pixelFormat: pixelFormat,
+                        id: Guid.NewGuid());
+
+                    _logger?.LogDebug("✅ UltraThink修正: SafeImage高品質生成完了 - {Width}x{Height}, Format={Format}, RawPixelSize={Size}bytes",
+                        bitmap.Width, bitmap.Height, pixelFormat, pixelDataSize);
+
+                    return safeImage;
+                }
+                finally
+                {
+                    bitmap.UnlockBits(bitmapData);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "💥 BitmapからSafeImage生成に失敗: {Width}x{Height}, Format={Format}",
+                    bitmap.Width, bitmap.Height, bitmap.PixelFormat);
+                throw new InvalidOperationException($"BitmapからSafeImageの生成に失敗しました: {bitmap.Width}x{bitmap.Height}", ex);
+            }
+        }
+
+        /// <summary>
+        /// PixelFormatをImagePixelFormatに変換
+        /// </summary>
+        /// <param name="format">変換元PixelFormat</param>
+        /// <param name="logger">ロガー（予期しないフォーマット検出時の警告用）</param>
+        /// <returns>変換されたImagePixelFormat</returns>
+        private static SafePixelFormat ConvertToImagePixelFormat(GdiPixelFormat format, ILogger? logger = null)
+        {
+            return format switch
+            {
+                GdiPixelFormat.Format32bppArgb => SafePixelFormat.Bgra32,
+                GdiPixelFormat.Format24bppRgb => SafePixelFormat.Rgb24,
+                GdiPixelFormat.Format8bppIndexed => SafePixelFormat.Gray8,
+                _ => HandleUnexpectedPixelFormat(format, logger)
+            };
+        }
+
+        /// <summary>
+        /// 予期しないPixelFormatを処理し、警告ログを出力
+        /// </summary>
+        /// <param name="format">予期しないPixelFormat</param>
+        /// <param name="logger">ロガー</param>
+        /// <returns>デフォルトのピクセルフォーマット</returns>
+        private static SafePixelFormat HandleUnexpectedPixelFormat(GdiPixelFormat format, ILogger? logger)
+        {
+            logger?.LogWarning("予期しないPixelFormat {PixelFormat} が検出されました。デフォルトのBgra32にフォールバックします。", format);
+            return SafePixelFormat.Bgra32;
         }
     }

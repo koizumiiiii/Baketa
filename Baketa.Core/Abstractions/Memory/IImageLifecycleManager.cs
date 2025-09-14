@@ -105,9 +105,10 @@ public sealed class SafeImage : IDisposable
     public int DataLength => _actualDataLength;
 
     /// <summary>
-    /// 内部コンストラクタ（IImageLifecycleManagerのみが作成可能）
+    /// コンストラクタ（SafeImageFactoryパターンからアクセス可能）
+    /// Phase 3: Clean Architecture維持のため、Factoryパターン経由でのみ利用を想定
     /// </summary>
-    internal SafeImage(
+    public SafeImage(
         byte[] rentedBuffer,
         ArrayPool<byte> arrayPool,
         int actualDataLength,

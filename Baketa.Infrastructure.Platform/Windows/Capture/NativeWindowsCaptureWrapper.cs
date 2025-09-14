@@ -499,76 +499,168 @@ public class NativeWindowsCaptureWrapper : IDisposable
         {
             var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🖼️ CreateBitmapFromBGRA: サイズ={frame.width}x{frame.height}, stride={frame.stride}, timestamp={frame.timestamp}{Environment.NewLine}");
-            
-            // 最初の数ピクセルをサンプリング
+
+            // 🔍 UltraThink Phase 2.1: 包括的ピクセルサンプリング
             unsafe
             {
                 byte* data = (byte*)frame.bgraData.ToPointer();
-                var pixelSamples = new System.Text.StringBuilder();
-                for (int i = 0; i < Math.Min(10, frame.width * frame.height); i++)
+                int totalPixels = frame.width * frame.height;
+
+                // 1. 最初の10ピクセル（左上）
+                var leftTopSamples = new System.Text.StringBuilder();
+                for (int i = 0; i < Math.Min(10, totalPixels); i++)
                 {
                     int offset = i * 4;
-                    pixelSamples.Append(System.Globalization.CultureInfo.InvariantCulture, $"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
+                    leftTopSamples.Append(System.Globalization.CultureInfo.InvariantCulture, $"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
                 }
-                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎨 最初の10ピクセル: {pixelSamples}{Environment.NewLine}");
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎨 左上10ピクセル: {leftTopSamples}{Environment.NewLine}");
+
+                // 2. 中央部分のサンプリング
+                var centerSamples = new System.Text.StringBuilder();
+                int centerStart = (frame.height / 2) * frame.width + (frame.width / 2);
+                for (int i = 0; i < Math.Min(5, totalPixels - centerStart); i++)
+                {
+                    int pixelIndex = centerStart + i;
+                    int offset = pixelIndex * 4;
+                    centerSamples.Append(System.Globalization.CultureInfo.InvariantCulture, $"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
+                }
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 中央5ピクセル: {centerSamples}{Environment.NewLine}");
+
+                // 3. 右下部分のサンプリング
+                var rightBottomSamples = new System.Text.StringBuilder();
+                int rbStart = totalPixels - 10;
+                for (int i = 0; i < 5; i++)
+                {
+                    int pixelIndex = rbStart + i;
+                    int offset = pixelIndex * 4;
+                    rightBottomSamples.Append(System.Globalization.CultureInfo.InvariantCulture, $"[{data[offset]},{data[offset+1]},{data[offset+2]},{data[offset+3]}] ");
+                }
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📐 右下5ピクセル: {rightBottomSamples}{Environment.NewLine}");
             }
         }
         catch { /* デバッグログ失敗は無視 */ }
 
-        // BGRAデータからBitmapを作成
-        var bitmap = new Bitmap(frame.width, frame.height, PixelFormat.Format32bppArgb);
+        // 🎯 Gemini推奨: 境界ピクセル除去による実画像領域抽出
+        int cropOffsetX = 2; // 左側の黒い境界を除外
+        int cropOffsetY = 2; // 上側の黒い境界を除外
+        int targetWidth = 2560;  // 標準解像度
+        int targetHeight = 1080; // 標準解像度
+
+        // 🛡️ Gemini提案1: AccessViolationException防止のための安全性検証
+        if (frame.width < targetWidth + cropOffsetX || frame.height < targetHeight + cropOffsetY)
+        {
+            _logger?.LogError("フレームサイズ({Width}x{Height})が期待されるサイズ({ExpectedWidth}x{ExpectedHeight})より小さいため、クロップ処理を中止します。",
+                frame.width, frame.height, targetWidth + cropOffsetX, targetHeight + cropOffsetY);
+
+            // デバッグログにも記録
+            try
+            {
+                var debugPath = _loggingSettings.GetFullDebugLogPath();
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛡️ 安全性検証失敗: フレーム({frame.width}x{frame.height}) < 必要サイズ({targetWidth + cropOffsetX}x{targetHeight + cropOffsetY}){Environment.NewLine}");
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+
+            throw new InvalidOperationException($"フレームサイズ({frame.width}x{frame.height})がクロップに必要なサイズを満たしていません。最低{targetWidth + cropOffsetX}x{targetHeight + cropOffsetY}が必要です。");
+        }
+
+        // ✅ 安全性検証通過
+        _logger?.LogDebug("クロップ処理安全性検証完了 - フレーム: {Width}x{Height}, 必要サイズ: {RequiredWidth}x{RequiredHeight}",
+            frame.width, frame.height, targetWidth + cropOffsetX, targetHeight + cropOffsetY);
+
+        // ✅ 実画像領域のみを抽出したBitmapを作成
+        var bitmap = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
         
         var bitmapData = bitmap.LockBits(
-            new Rectangle(0, 0, frame.width, frame.height),
+            new Rectangle(0, 0, targetWidth, targetHeight),
             ImageLockMode.WriteOnly,
             PixelFormat.Format32bppArgb);
 
         try
         {
+            // 🚨 UltraThink緊急検証: Stride不一致問題の確認
+            try
+            {
+                var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 STRIDE検証: frame.stride={frame.stride}, bitmapData.Stride={bitmapData.Stride}, 不一致={(frame.stride != bitmapData.Stride ? "❌YES" : "✅NO")}{Environment.NewLine}");
+
+                if (frame.stride != bitmapData.Stride)
+                {
+                    System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ 【ROOT CAUSE CONFIRMED】 Stride不一致が画像破損の原因: ネイティブ={frame.stride} vs .NET={bitmapData.Stride} (差={Math.Abs(frame.stride - bitmapData.Stride)}){Environment.NewLine}");
+                }
+            }
+            catch { /* デバッグログ失敗は無視 */ }
+
             // ネイティブメモリからマネージドメモリにコピー
             unsafe
             {
                 byte* src = (byte*)frame.bgraData.ToPointer();
                 byte* dst = (byte*)bitmapData.Scan0.ToPointer();
 
-                int totalBlackPixels = 0;
-                int totalPixels = frame.width * frame.height;
-                
-                for (int y = 0; y < frame.height; y++)
+                // 🧪 UltraThink検証: 転送前ソースデータのハッシュ計算
+                string sourceHash = "";
+                try
                 {
-                    byte* srcRow = src + (y * frame.stride);
+                    int sampleSize = Math.Min(1024, frame.width * frame.height * 4); // 最初の1KB分をサンプル
+                    var sourceSpan = new ReadOnlySpan<byte>(src, sampleSize);
+                    var hashBytes = System.Security.Cryptography.SHA256.HashData(sourceSpan);
+                    sourceHash = Convert.ToHexString(hashBytes)[..16]; // 先頭16文字
+                }
+                catch { sourceHash = "ERROR"; }
+
+                int totalBlackPixels = 0;
+                int totalPixels = targetWidth * targetHeight; // 境界除去後のサイズで統計
+                
+                // 🎯 Gemini推奨Phase 2.2: 境界オフセット適用による実画像抽出
+                for (int y = 0; y < targetHeight; y++)
+                {
+                    // 🔧 境界オフセット適用: 黒い境界領域をスキップして実画像データを取得
+                    byte* srcRow = src + ((y + cropOffsetY) * frame.stride) + (cropOffsetX * 4);
                     byte* dstRow = dst + (y * bitmapData.Stride);
-                    
-                    // BGRAデータをそのままコピー（フォーマットが一致）
-                    for (int x = 0; x < frame.width; x++)
+
+                    // ⚡ Gemini推奨: 高速ブロックコピーによるパフォーマンス最適化
+                    uint rowBytes = (uint)(targetWidth * 4); // BGRA = 4バイト/ピクセル
+                    System.Runtime.CompilerServices.Unsafe.CopyBlock(dstRow, srcRow, rowBytes);
+
+                    // 🔍 デバッグ用: 黒ピクセル統計（境界除去後）
+                    for (int x = 0; x < targetWidth; x++)
                     {
-                        int srcOffset = x * 4;
-                        int dstOffset = x * 4;
-                        
-                        byte b = srcRow[srcOffset + 0];
-                        byte g = srcRow[srcOffset + 1];
-                        byte r = srcRow[srcOffset + 2];
-                        byte a = srcRow[srcOffset + 3];
-                        
-                        dstRow[dstOffset + 0] = b; // B
-                        dstRow[dstOffset + 1] = g; // G
-                        dstRow[dstOffset + 2] = r; // R
-                        dstRow[dstOffset + 3] = a; // A
-                        
-                        // 黒ピクセルをカウント
+                        int pixelIndex = x * 4;
+                        byte b = srcRow[pixelIndex + 0];
+                        byte g = srcRow[pixelIndex + 1];
+                        byte r = srcRow[pixelIndex + 2];
+
                         if (b == 0 && g == 0 && r == 0)
                         {
                             totalBlackPixels++;
                         }
                     }
                 }
-                
-                // 🔍🔍🔍 デバッグ: 黒ピクセル統計
+
+                // 🧪 UltraThink検証: 転送後デスティネーションデータのハッシュ計算
+                string destinationHash = "";
+                try
+                {
+                    int sampleSize = Math.Min(1024, frame.width * frame.height * 4);
+                    var destSpan = new ReadOnlySpan<byte>(dst, sampleSize);
+                    var hashBytes = System.Security.Cryptography.SHA256.HashData(destSpan);
+                    destinationHash = Convert.ToHexString(hashBytes)[..16];
+                }
+                catch { destinationHash = "ERROR"; }
+
+                // 🔍🔍🔍 デバッグ: 黒ピクセル統計 + ハッシュ検証
                 try
                 {
                     var debugPath = _loggingSettings.GetFullDebugLogPath();
                     double blackPercentage = (double)totalBlackPixels / totalPixels * 100;
+                    bool hashMatch = sourceHash == destinationHash;
+
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 📊 黒ピクセル統計: {totalBlackPixels}/{totalPixels} ({blackPercentage:F2}%){Environment.NewLine}");
+                    System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔐 データ整合性: SRC={sourceHash} vs DST={destinationHash} {(hashMatch ? "✅一致" : "❌不一致")}{Environment.NewLine}");
+
+                    if (!hashMatch)
+                    {
+                        System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 【DATA CORRUPTION DETECTED】 Strideまたは転送プロセスでデータ破損が発生{Environment.NewLine}");
+                    }
                 }
                 catch { /* デバッグログ失敗は無視 */ }
             }

@@ -2,6 +2,8 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -19,17 +21,23 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         private readonly ISmartProcessingPipelineService? _smartPipeline;
         private readonly ILogger<CaptureCompletedHandler>? _logger;
         private readonly IOptionsMonitor<ProcessingPipelineSettings>? _settings;
+        private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
+        private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
 
         public CaptureCompletedHandler(
             IEventAggregator eventAggregator,
             ISmartProcessingPipelineService? smartPipeline = null,
             ILogger<CaptureCompletedHandler>? logger = null,
-            IOptionsMonitor<ProcessingPipelineSettings>? settings = null)
+            IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
+            ImageDiagnosticsSaver? diagnosticsSaver = null,
+            IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null)
         {
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
             _smartPipeline = smartPipeline;
             _logger = logger;
             _settings = settings;
+            _diagnosticsSaver = diagnosticsSaver;
+            _roiSettings = roiSettings;
         }
         
         /// <inheritdoc />
@@ -46,8 +54,11 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
             try
             {
-                _logger?.LogDebug("キャプチャ完了イベント処理開始 - Image: {Width}x{Height}", 
+                _logger?.LogDebug("キャプチャ完了イベント処理開始 - Image: {Width}x{Height}",
                     eventData.CapturedImage.Width, eventData.CapturedImage.Height);
+
+                // 🎯 キャプチャ画像保存（設定が有効な場合）
+                await SaveCaptureImagesIfEnabledAsync(eventData).ConfigureAwait(false);
 
                 // 🔄 P1: 段階的フィルタリングシステム使用判定
                 if (_smartPipeline != null)
@@ -91,17 +102,18 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     /// </summary>
     private async Task HandleWithStagedFilteringAsync(CaptureCompletedEvent eventData)
     {
+        ProcessingPipelineInput? input = null;
         try
         {
-            // 🎯 UltraThink Phase 62: 画像所有権をProcessingPipelineInputに移譲
-            using var input = new ProcessingPipelineInput
+            // 🚨 UltraThink Phase 59 緊急修正: usingブロック削除（非同期処理中の早期Dispose防止）
+            input = new ProcessingPipelineInput
             {
                 CapturedImage = eventData.CapturedImage,
                 CaptureRegion = eventData.CaptureRegion,
                 SourceWindowHandle = IntPtr.Zero, // TODO: eventDataから取得
                 CaptureTimestamp = DateTime.UtcNow,
-                // 🎯 UltraThink Phase 62: 画像所有権をtrueに変更（ProcessingPipelineInputが所有）
-                OwnsImage = true,
+                // 🎯 UltraThink Phase 59: 画像所有権をfalseに変更（CaptureCompletedEventが画像を管理）
+                OwnsImage = false,
                 // TODO: 前回のハッシュやテキストを設定（キャッシュ機構が必要）
                 Options = new ProcessingPipelineOptions
                 {
@@ -113,7 +125,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             };
 
             // 段階的処理パイプライン実行
-            // usingブロックの最後でinput.Dispose()が自動的に呼ばれ、OwnsImage=trueのため画像も破棄される
+            // 🔧 非同期処理完了まで画像を保持、完了後に手動でDispose
             var pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
             
             _logger?.LogDebug("段階的処理完了 - 最終段階: {LastStage}, 総処理時間: {TotalTime}ms, 早期終了: {EarlyTerminated}",
@@ -146,6 +158,12 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             {
                 _logger?.LogWarning("段階的処理失敗 - 画像が既に破棄されているためフォールバック不可");
             }
+        }
+        finally
+        {
+            // 🔧 UltraThink Phase 59: ProcessingPipelineInputの手動Dispose
+            // OwnsImage=falseなので画像自体は破棄されず、ProcessingPipelineInputオブジェクトのみ破棄
+            input?.Dispose();
         }
     }
 
@@ -268,5 +286,64 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         await _eventAggregator.PublishAsync(ocrRequestEvent).ConfigureAwait(false);
         
         _logger?.LogDebug("OcrRequestEvent発行完了");
+    }
+
+    /// <summary>
+    /// キャプチャ画像保存（設定が有効な場合）
+    /// </summary>
+    private async Task SaveCaptureImagesIfEnabledAsync(CaptureCompletedEvent eventData)
+    {
+        try
+        {
+            // 設定チェック
+            var roiSettings = _roiSettings?.CurrentValue;
+            if (roiSettings == null || !roiSettings.EnableCaptureImageSaving || _diagnosticsSaver == null)
+            {
+                _logger?.LogTrace("キャプチャ画像保存が無効またはサービスが利用不可");
+                return;
+            }
+
+            // セッションID生成
+            var sessionId = Guid.NewGuid().ToString("N")[..8];
+
+            // 元画像のバイト配列取得
+            var originalImageBytes = await eventData.CapturedImage.ToByteArrayAsync().ConfigureAwait(false);
+            var originalWidth = eventData.CapturedImage.Width;
+            var originalHeight = eventData.CapturedImage.Height;
+
+            _logger?.LogDebug("キャプチャ画像保存開始 - セッションID: {SessionId}, サイズ: {Width}x{Height}, バイト数: {Bytes}",
+                sessionId, originalWidth, originalHeight, originalImageBytes.Length);
+
+            byte[]? scaledImageBytes = null;
+            int? scaledWidth = null;
+            int? scaledHeight = null;
+
+            // 縮小画像保存が有効な場合の処理
+            if (roiSettings.EnableScaledImageSaving)
+            {
+                // TODO: 縮小画像の取得方法を実装する必要がある
+                // 現在はOCR処理時に縮小されるが、キャプチャ時点では元サイズのみ利用可能
+                _logger?.LogTrace("縮小画像保存が有効ですが、キャプチャ時点では元画像のみ保存します");
+            }
+
+            // 画像保存実行
+            await _diagnosticsSaver.SaveCaptureImagesAsync(
+                originalImageBytes,
+                scaledImageBytes,
+                sessionId,
+                originalWidth,
+                originalHeight,
+                scaledWidth,
+                scaledHeight).ConfigureAwait(false);
+
+            _logger?.LogInformation("キャプチャ画像保存完了 - セッションID: {SessionId}", sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "キャプチャ画像保存中にエラーが発生しました: {ErrorType} - {ErrorMessage}",
+                ex.GetType().Name, ex.Message);
+
+            // 画像保存エラーはメインの処理を妨げない（ログ出力のみ）
+        }
     }
 }

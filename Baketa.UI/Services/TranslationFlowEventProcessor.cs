@@ -7,6 +7,7 @@ using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using WindowInfo = Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo;
 using Baketa.Core.Services;
 using Baketa.Core.Utilities;
 using Baketa.UI.ViewModels;

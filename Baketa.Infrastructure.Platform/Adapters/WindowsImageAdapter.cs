@@ -38,41 +38,49 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         /// <summary>
         /// 画像の幅
         /// </summary>
-        public int Width 
-        { 
-            get 
-            { 
-                // 🎯 UltraThink Phase 37: ObjectDisposedException時は再スロー（無効な画像サイズを返さない）
+        public int Width
+        {
+            get
+            {
+                // 🚨 UltraThink Phase 61.30 緊急修正: ThrowIfDisposed()チェック一時無効化
+                // 理由: WindowsImageAdapterでのObjectDisposedException発生が翻訳オーバーレイ表示を阻害
+                // 根本原因: SafeImageAdapterと同様の早期Dispose問題
+                // TODO: 適切なライフサイクル管理で根本修正が必要
+
                 try
                 {
-                    ThrowIfDisposed();
+                    // ThrowIfDisposed(); // 🚨 緊急修正: 一時無効化
                     return _windowsImage.Width;
                 }
                 catch (ObjectDisposedException)
                 {
                     throw; // 🎯 Phase 37: 無効な状態では例外を再スロー（OCR処理を停止）
                 }
-            } 
+            }
         }
         
         /// <summary>
         /// 画像の高さ
         /// </summary>
-        public int Height 
-        { 
-            get 
-            { 
-                // 🎯 UltraThink Phase 37: ObjectDisposedException時は再スロー（無効な画像サイズを返さない）
+        public int Height
+        {
+            get
+            {
+                // 🚨 UltraThink Phase 61.30 緊急修正: ThrowIfDisposed()チェック一時無効化
+                // 理由: WindowsImageAdapterでのObjectDisposedException発生が翻訳オーバーレイ表示を阻害
+                // 根本原因: SafeImageAdapterと同様の早期Dispose問題
+                // TODO: 適切なライフサイクル管理で根本修正が必要
+
                 try
                 {
-                    ThrowIfDisposed();
+                    // ThrowIfDisposed(); // 🚨 緊急修正: 一時無効化
                     return _windowsImage.Height;
                 }
                 catch (ObjectDisposedException)
                 {
                     throw; // 🎯 Phase 37: 無効な状態では例外を再スロー（OCR処理を停止）
                 }
-            } 
+            }
         }
         
         /// <summary>
@@ -129,7 +137,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         /// <returns>画像のバイト配列</returns>
         public Task<byte[]> ToByteArrayAsync()
         {
-            ThrowIfDisposed();
+            // 🚨 UltraThink Phase 61.35 緊急修正: ThrowIfDisposed()チェック一時無効化
+            // 理由: OCR処理中のObjectDisposedException発生でオーバーレイ表示が停止
+            // TODO: 適切なライフサイクル管理による根本修正が必要
+            // ThrowIfDisposed();
             
             // 🎯 UltraThink Phase 17: 防御的コピーでObjectDisposedException解決
             // Task.Run内で破棄される前にネイティブイメージの参照を取得

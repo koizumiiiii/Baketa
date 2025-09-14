@@ -855,8 +855,8 @@ namespace Baketa.UI;
             var viewModelTypes = new[]
             {
                 typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
-                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel)
-                // typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindowは使用されていないため無効化
+                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel),
+                typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindow有効化 - 翻訳オーバーレイ表示のため必須
             };
             
             foreach (var vmType in viewModelTypes)

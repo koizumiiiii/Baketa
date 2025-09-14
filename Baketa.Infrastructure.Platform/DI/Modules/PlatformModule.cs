@@ -80,8 +80,8 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
             services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager, 
                 Baketa.Infrastructure.Platform.Windows.WindowsManagerStub>();
             
-            // 画像ファクトリー
-            services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, 
+            // 画像ファクトリー（Phase 3.1: SafeImage統合対応）
+            services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory,
                 Baketa.Infrastructure.Platform.Windows.WindowsImageFactory>();
             
             // 差分検出器

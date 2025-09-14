@@ -472,7 +472,7 @@ public class CoreWindowManagerAdapterStub(Baketa.Core.Abstractions.Platform.Wind
             
             // ネイティブキャプチャラッパーを使用
             using var nativeCapture = new Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper(
-                new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(),
+                new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(null, null),
                 null);
             
             // ライブラリを初期化

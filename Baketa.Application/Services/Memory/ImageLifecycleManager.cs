@@ -19,6 +19,7 @@ namespace Baketa.Application.Services.Memory;
 public sealed class ImageLifecycleManager : IImageLifecycleManager, IDisposable
 {
     private readonly ArrayPool<byte> _arrayPool;
+    private readonly ISafeImageFactory _safeImageFactory;
     private readonly ILogger<ImageLifecycleManager> _logger;
     private readonly ConcurrentDictionary<Guid, SafeImageInfo> _activeImages;
 
@@ -26,15 +27,18 @@ public sealed class ImageLifecycleManager : IImageLifecycleManager, IDisposable
     private bool _disposed;
 
     /// <summary>
-    /// ArrayPoolとロガーを注入してImageLifecycleManagerを初期化
+    /// SafeImageFactory、ArrayPoolとロガーを注入してImageLifecycleManagerを初期化
     /// </summary>
-    public ImageLifecycleManager(ILogger<ImageLifecycleManager> logger)
+    public ImageLifecycleManager(
+        ISafeImageFactory safeImageFactory,
+        ILogger<ImageLifecycleManager> logger)
     {
+        _safeImageFactory = safeImageFactory ?? throw new ArgumentNullException(nameof(safeImageFactory));
         _arrayPool = ArrayPool<byte>.Shared;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _activeImages = new ConcurrentDictionary<Guid, SafeImageInfo>();
 
-        _logger.LogInformation("ImageLifecycleManager initialized with ArrayPool<byte>.Shared");
+        _logger.LogInformation("ImageLifecycleManager initialized with SafeImageFactory and ArrayPool<byte>.Shared");
     }
 
     /// <summary>
@@ -76,8 +80,8 @@ public sealed class ImageLifecycleManager : IImageLifecycleManager, IDisposable
             // データをArrayPoolから借りたバッファにコピー
             sourceData.Span.CopyTo(rentedBuffer);
 
-            // Phase 2暫定実装：SafeImageは正しいコンストラクタを使用
-            var safeImage = new SafeImage(rentedBuffer, _arrayPool, sourceData.Length, width, height, pixelFormat, imageId);
+            // Phase 3: SafeImageFactoryを使用して安全にインスタンス生成
+            var safeImage = _safeImageFactory.CreateSafeImage(rentedBuffer, _arrayPool, sourceData.Length, width, height, pixelFormat, imageId);
 
             var imageInfo = new SafeImageInfo
             {

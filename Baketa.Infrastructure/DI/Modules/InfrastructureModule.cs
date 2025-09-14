@@ -57,10 +57,13 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         public override void RegisterServices(IServiceCollection services)
         {
-            
+            // 🎯 Phase 3.1: NOTE: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで登録済み
+            // Clean Architecture原則により、InfrastructureがApplicationを参照することはできない
+            // SafeImageFactoryはSafeImageの内部コンストラクタアクセスのためApplication層必須
+
             // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
-            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
+            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>()
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
                 
@@ -462,19 +465,27 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("🚧 Sprint 2 Phase 1: Mock除去準備・基盤整備完了");
             Console.WriteLine("📋 IntelligentOcrEngine完全実装は Sprint 3で実施");
             
-            // 暫定的にSimpleOcrEngineAdapterを直接使用（ROI統合テスト用）
+            // 🎯 UltraThink Phase 64修正: IGpuOcrEngine登録を条件付きで実行
+            // IImageFactoryが利用可能な場合のみ登録（ApplicationModule登録完了後）
             services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuOcrEngine>(provider =>
             {
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
-                var imageFactory = provider.GetRequiredService<Baketa.Core.Abstractions.Factories.IImageFactory>();
+                var logger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
+                var imageFactory = provider.GetService<Baketa.Core.Abstractions.Factories.IImageFactory>();
+
+                if (imageFactory == null)
+                {
+                    // ApplicationModule登録が未完了のため、IGpuOcrEngineはnull実装を返す
+                    logger?.LogWarning("🔄 IImageFactory未登録のため、IGpuOcrEngine機能は無効化されます");
+                    throw new InvalidOperationException("IImageFactory not available - IGpuOcrEngine cannot be initialized");
+                }
+
                 var basePaddleOcr = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                
-                // ROI統合のためのGpuOcrEngineアダプター
+
+                // ROI統合のためのGpuOcrEngineアダプター（通常動作時のみ）
                 var adapter = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
                     basePaddleOcr, imageFactory, logger);
-                
-                // SimpleOcrEngineAdapterを暫定的にIGpuOcrEngineとして使用
-                return new SimpleOcrEngineGpuAdapter(adapter, 
+
+                return new SimpleOcrEngineGpuAdapter(adapter,
                     provider.GetRequiredService<ILogger<SimpleOcrEngineGpuAdapter>>());
             });
             Console.WriteLine("✅ IGpuOcrEngine暫定登録完了 - SimpleOcrEngineAdapter経由（Mock完全除去済み）");
@@ -501,15 +512,24 @@ namespace Baketa.Infrastructure.DI.Modules;
             // ROI拡張OCRエンジン（Sprint 2: IntelligentOcrEngine統合）
             services.AddSingleton<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>(provider =>
             {
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>>();
-                var roiManager = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IStickyRoiManager>();
+                var logger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>>();
+                var roiManager = provider.GetService<Baketa.Core.Abstractions.OCR.IStickyRoiManager>();
                 
                 // ベースエンジン: IntelligentOcrEngineをSimpleOcrEngineとして使用
                 // IntelligentOcrEngineを直接使用する代わりに、Sprint 1で実装したSimpleOcrEngineAdapterを使用
-                var imageFactory = provider.GetRequiredService<Baketa.Core.Abstractions.Factories.IImageFactory>();
+                var imageFactory = provider.GetService<Baketa.Core.Abstractions.Factories.IImageFactory>();
+
+                if (imageFactory == null || roiManager == null)
+                {
+                    // ApplicationModule登録が未完了のため、StickyRoiEnhancedOcrEngine初期化不可
+                    var errorMsg = $"Dependencies not available - IImageFactory: {imageFactory != null}, IStickyRoiManager: {roiManager != null}";
+                    logger?.LogError(errorMsg);
+                    throw new InvalidOperationException(errorMsg);
+                }
+
                 var basePaddleOcr = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                var adapterLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
-                
+                var adapterLogger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
+
                 var baseOcrEngine = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
                     basePaddleOcr, imageFactory, adapterLogger);
                 

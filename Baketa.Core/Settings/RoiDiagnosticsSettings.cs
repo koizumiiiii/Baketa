@@ -39,6 +39,21 @@ public sealed class RoiDiagnosticsSettings
     /// 注釈付き画像（テキスト領域ハイライト）を有効にするか
     /// </summary>
     public bool EnableAnnotatedImages { get; set; } = true;
+
+    /// <summary>
+    /// キャプチャ時の元画像を保存するか
+    /// </summary>
+    public bool EnableCaptureImageSaving { get; set; } = false;
+
+    /// <summary>
+    /// キャプチャ画像保存パス（環境変数展開対応）
+    /// </summary>
+    public string CaptureImageOutputPath { get; set; } = "%AppData%\\Baketa\\Capture\\Images";
+
+    /// <summary>
+    /// 縮小後画像も保存するか
+    /// </summary>
+    public bool EnableScaledImageSaving { get; set; } = false;
     
     /// <summary>
     /// 高度設定
@@ -51,6 +66,14 @@ public sealed class RoiDiagnosticsSettings
     public string GetExpandedOutputPath()
     {
         return Environment.ExpandEnvironmentVariables(RoiImageOutputPath);
+    }
+
+    /// <summary>
+    /// 環境変数展開済みのキャプチャ画像出力パスを取得
+    /// </summary>
+    public string GetExpandedCaptureOutputPath()
+    {
+        return Environment.ExpandEnvironmentVariables(CaptureImageOutputPath);
     }
 }
 

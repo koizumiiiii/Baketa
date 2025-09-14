@@ -124,6 +124,79 @@ public sealed class ImageDiagnosticsSaver : IDisposable
     }
     
     /// <summary>
+    /// キャプチャ時の元画像と縮小後画像を保存
+    /// </summary>
+    public async Task SaveCaptureImagesAsync(
+        byte[] originalImageBytes,
+        byte[]? scaledImageBytes,
+        string sessionId,
+        int originalWidth,
+        int originalHeight,
+        int? scaledWidth = null,
+        int? scaledHeight = null)
+    {
+        ArgumentNullException.ThrowIfNull(originalImageBytes);
+        ArgumentNullException.ThrowIfNull(sessionId);
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+        var captureDir = Path.Combine(_outputDirectory, "Capture");
+
+        try
+        {
+            // ディレクトリ作成
+            Directory.CreateDirectory(captureDir);
+
+            // 元画像保存
+            var originalPath = Path.Combine(captureDir, $"{timestamp}_original_{originalWidth}x{originalHeight}_{sessionId}.png");
+            await File.WriteAllBytesAsync(originalPath, originalImageBytes).ConfigureAwait(false);
+
+            _logger?.LogDebug("元画像保存完了: {OriginalPath}, サイズ: {Size}KB",
+                originalPath, originalImageBytes.Length / 1024);
+
+            // 縮小後画像保存（ある場合）
+            if (scaledImageBytes != null && scaledWidth.HasValue && scaledHeight.HasValue)
+            {
+                var scaledPath = Path.Combine(captureDir, $"{timestamp}_scaled_{scaledWidth}x{scaledHeight}_{sessionId}.png");
+                await File.WriteAllBytesAsync(scaledPath, scaledImageBytes).ConfigureAwait(false);
+
+                _logger?.LogDebug("縮小画像保存完了: {ScaledPath}, サイズ: {Size}KB",
+                    scaledPath, scaledImageBytes.Length / 1024);
+            }
+
+            // メタデータ保存
+            var metadata = new Dictionary<string, object>
+            {
+                ["SessionId"] = sessionId,
+                ["CaptureTimestamp"] = DateTime.UtcNow.ToString("O"),
+                ["OriginalWidth"] = originalWidth,
+                ["OriginalHeight"] = originalHeight,
+                ["OriginalSize"] = originalImageBytes.Length,
+                ["HasScaledImage"] = scaledImageBytes != null,
+            };
+
+            if (scaledImageBytes != null)
+            {
+                metadata["ScaledWidth"] = scaledWidth;
+                metadata["ScaledHeight"] = scaledHeight;
+                metadata["ScaledSize"] = scaledImageBytes.Length;
+            }
+
+            var metadataPath = Path.Combine(captureDir, $"{timestamp}_capture_metadata_{sessionId}.json");
+            var json = JsonSerializer.Serialize(metadata, s_jsonOptions);
+            await File.WriteAllTextAsync(metadataPath, json).ConfigureAwait(false);
+
+            _logger?.LogTrace("キャプチャ画像保存完了: {SessionId}", sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "キャプチャ画像保存失敗: {SessionId}", sessionId);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// バイト配列を受け取ってROI画像を保存
     /// </summary>
     public async Task SaveResultImageAsync(
