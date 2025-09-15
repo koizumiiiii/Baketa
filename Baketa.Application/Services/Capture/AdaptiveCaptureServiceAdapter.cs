@@ -121,13 +121,14 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogInformation("適応的ウィンドウキャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
-            // 🎯 CRITICAL FIX: SafeImageAdapterの場合はそのまま返す（二重ラッピング回避）
+            // 🎯 CRITICAL FIX: SafeImageAdapterの場合はWindowsImageAdapterでラップ（型互換性確保）
             var capturedImage = result.CapturedImages[0];
             if (capturedImage is SafeImageAdapter safeImageAdapter)
             {
-                _logger.LogInformation("🎯 [PHASE3.18.4] SafeImageAdapter直接返却 - ライフサイクル問題修正");
-                Console.WriteLine("🎯 [PHASE3.18.4] SafeImageAdapter直接返却 - 二重ラッピング回避");
-                return safeImageAdapter;
+                _logger.LogInformation("🎯 [PHASE3.18.4] SafeImageAdapter検出 - WindowsImageAdapterでラップしてIImage互換性確保");
+                Console.WriteLine("🎯 [PHASE3.18.4] SafeImageAdapter → WindowsImageAdapter変換（型安全）");
+                // SafeImageAdapterをWindowsImageAdapterでラップしてIImage互換性を確保
+                return new WindowsImageAdapter(safeImageAdapter);
             }
 
             // レガシー対応: SafeImageAdapter以外の場合はWindowsImageAdapterでラップ
