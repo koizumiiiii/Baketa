@@ -126,6 +126,24 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
             catch { /* ファイル出力失敗は無視 */ }
         }
 
+        // 🎯 Phase 3.11: ReferencedSafeImage参照カウント管理の初期化
+        var hasReferencedSafeImage = context.HasReferencedSafeImage();
+        if (hasReferencedSafeImage)
+        {
+            _logger.LogDebug("🎯 [PHASE3.11] ReferencedSafeImage検出 - 参照カウント管理開始, 初期カウント: {RefCount}", 
+                context.GetReferenceCount());
+            
+            if (_loggingSettings.EnableDebugFileLogging)
+            {
+                try
+                {
+                    System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [PHASE3.11_INIT] ReferencedSafeImage参照カウント管理開始 - 初期カウント: {context.GetReferenceCount()}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+        }
+
         try
         {
             var settings = _settings.CurrentValue;
@@ -188,26 +206,86 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                     continue;
                 }
 
-                // 段階実行
-                _logger.LogDebug("段階実行開始: {StageType}", stageType);
-                
-                // 🚨 P0システム動作確認用 - 段階実行ログ（設定外部化済み）
-                if (_loggingSettings.EnableDebugFileLogging)
+                // 🎯 Phase 3.11: 段階開始時の参照カウント増加
+                bool referenceAcquired = false;
+                if (hasReferencedSafeImage)
                 {
-                    try
+                    referenceAcquired = context.AcquireStageReference(stageType);
+                    if (referenceAcquired)
                     {
-                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
-                            $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE_EXEC] 段階実行開始: {stageType} - ContextId: {input.ContextId}{Environment.NewLine}");
+                        _logger.LogDebug("🎯 [PHASE3.11] 段階参照取得成功: {StageType} - 参照カウント: {RefCount}", 
+                            stageType, context.GetReferenceCount());
+                        
+                        if (_loggingSettings.EnableDebugFileLogging)
+                        {
+                            try
+                            {
+                                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [PHASE3.11_REF_ACQ] 段階参照取得: {stageType} - 参照カウント: {context.GetReferenceCount()}{Environment.NewLine}");
+                            }
+                            catch { /* ファイル出力失敗は無視 */ }
+                        }
                     }
-                    catch { /* ファイル出力失敗は無視 */ }
+                    else
+                    {
+                        _logger.LogWarning("🎯 [PHASE3.11] 段階参照取得失敗: {StageType} - SafeImage既に破棄済みの可能性", stageType);
+                        
+                        if (_loggingSettings.EnableDebugFileLogging)
+                        {
+                            try
+                            {
+                                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🚨 [PHASE3.11_REF_FAIL] 段階参照取得失敗: {stageType} - SafeImage破棄済み{Environment.NewLine}");
+                            }
+                            catch { /* ファイル出力失敗は無視 */ }
+                        }
+                    }
                 }
-                
+
+                ProcessingStageResult stageResult;
                 var stageStopwatch = Stopwatch.StartNew();
-                
-                var stageResult = await strategy.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
-                
-                stageStopwatch.Stop();
-                stageProcessingTimes[stageType] = stageStopwatch.Elapsed;
+
+                try
+                {
+                    // 段階実行
+                    _logger.LogDebug("段階実行開始: {StageType}", stageType);
+                    
+                    // 🚨 P0システム動作確認用 - 段階実行ログ（設定外部化済み）
+                    if (_loggingSettings.EnableDebugFileLogging)
+                    {
+                        try
+                        {
+                            System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                                $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [P0_STAGE_EXEC] 段階実行開始: {stageType} - ContextId: {input.ContextId}{Environment.NewLine}");
+                        }
+                        catch { /* ファイル出力失敗は無視 */ }
+                    }
+                    
+                    stageResult = await strategy.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // 🎯 Phase 3.11: 段階完了時の参照カウント減少（例外が発生しても必ず実行）
+                    if (hasReferencedSafeImage && referenceAcquired)
+                    {
+                        context.ReleaseStageReference(stageType);
+                        _logger.LogDebug("🎯 [PHASE3.11] 段階参照解放: {StageType} - 参照カウント: {RefCount}", 
+                            stageType, context.GetReferenceCount());
+                        
+                        if (_loggingSettings.EnableDebugFileLogging)
+                        {
+                            try
+                            {
+                                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                                    $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [PHASE3.11_REF_REL] 段階参照解放: {stageType} - 参照カウント: {context.GetReferenceCount()}{Environment.NewLine}");
+                            }
+                            catch { /* ファイル出力失敗は無視 */ }
+                        }
+                    }
+                    
+                    stageStopwatch.Stop();
+                    stageProcessingTimes[stageType] = stageStopwatch.Elapsed;
+                }
                 
                 context.AddStageResult(stageType, stageResult);
                 executedStages.Add(stageType);
@@ -234,6 +312,23 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                     _logger.LogDebug("早期終了判定: {StageType} - 後続処理不要", stageType);
                     earlyTerminated = true;
                     break;
+                }
+            }
+
+            // 🎯 Phase 3.11: パイプライン完了時の参照カウント確認
+            if (hasReferencedSafeImage)
+            {
+                var finalRefCount = context.GetReferenceCount();
+                _logger.LogInformation("🎯 [PHASE3.11] パイプライン完了 - 最終参照カウント: {RefCount}", finalRefCount);
+                
+                if (_loggingSettings.EnableDebugFileLogging)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath), 
+                            $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🎯 [PHASE3.11_FINAL] パイプライン完了 - 最終参照カウント: {finalRefCount}{Environment.NewLine}");
+                    }
+                    catch { /* ファイル出力失敗は無視 */ }
                 }
             }
 

@@ -4,6 +4,7 @@ using Baketa.Infrastructure.OCR.Preprocessing;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using System.Text.Json;
 using System.IO;
 
@@ -440,6 +441,20 @@ internal sealed class TempImageWrapper(string filePath, int width, int height) :
     public int Height { get; } = height;
     public bool IsDisposed => false;
     public ImageFormat Format => ImageFormat.Png;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        var bytes = File.ReadAllBytes(FilePath);
+        return new ReadOnlyMemory<byte>(bytes);
+    }
 
     public IImage Clone()
     {

@@ -7,12 +7,14 @@ using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Windows;
 using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 using CoreImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
 using SysRectangle = System.Drawing.Rectangle;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Infrastructure.Platform.Adapters;
 
@@ -87,6 +89,48 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         /// 画像のフォーマット
         /// </summary>
         public CoreImageFormat Format => DetermineImageFormat();
+
+        /// <summary>
+        /// ピクセルフォーマット（Gemini推奨拡張）
+        /// </summary>
+        public ImagePixelFormat PixelFormat
+        {
+            get
+            {
+                return Format switch
+                {
+                    CoreImageFormat.Rgb24 => ImagePixelFormat.Rgb24,
+                    CoreImageFormat.Rgba32 => ImagePixelFormat.Rgba32,
+                    CoreImageFormat.Grayscale8 => ImagePixelFormat.Bgra32,
+                    _ => ImagePixelFormat.Bgra32
+                };
+            }
+        }
+
+        /// <summary>
+        /// 画像データの読み取り専用メモリを取得（Gemini推奨拡張）
+        /// </summary>
+        public ReadOnlyMemory<byte> GetImageMemory()
+        {
+            try
+            {
+                // ToByteArrayAsync()の同期版を実装
+                var nativeImage = _windowsImage.GetNativeImage();
+                var nativeImageCopy = nativeImage is Bitmap bitmap ? (Bitmap)bitmap.Clone() : nativeImage;
+
+                using var stream = new MemoryStream();
+                using (nativeImageCopy)
+                {
+                    nativeImageCopy.Save(stream, DrawingImageFormat.Png);
+                }
+                return new ReadOnlyMemory<byte>(stream.ToArray());
+            }
+            catch (ObjectDisposedException)
+            {
+                // ObjectDisposed時は空のメモリを返す
+                return ReadOnlyMemory<byte>.Empty;
+            }
+        }
         
         /// <summary>
         /// 画像がグレースケールかどうかを返します
@@ -809,12 +853,12 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         public Task<List<Rectangle>> DetectTextRegionsAsync()
         {
             ThrowIfDisposed();
-            
+
             // CPU負荷の高い処理なので、Task.Runで実行
             return Task.Run(() => {
                 // テキスト領域検出の実装
                 // 実際の実装では適切なアルゴリズムを使用
-                
+
                 // サンプル実装のため、空のリストを返す
                 return new List<Rectangle>();
             });

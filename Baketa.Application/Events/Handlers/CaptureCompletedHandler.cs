@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
@@ -23,6 +24,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         private readonly IOptionsMonitor<ProcessingPipelineSettings>? _settings;
         private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
         private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
+        private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
 
         public CaptureCompletedHandler(
             IEventAggregator eventAggregator,
@@ -30,7 +32,8 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             ILogger<CaptureCompletedHandler>? logger = null,
             IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
             ImageDiagnosticsSaver? diagnosticsSaver = null,
-            IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null)
+            IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null,
+            IImageToReferencedSafeImageConverter? imageToReferencedConverter = null)
         {
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
             _smartPipeline = smartPipeline;
@@ -38,6 +41,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             _settings = settings;
             _diagnosticsSaver = diagnosticsSaver;
             _roiSettings = roiSettings;
+            _imageToReferencedConverter = imageToReferencedConverter;
         }
         
         /// <inheritdoc />
@@ -103,12 +107,46 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     private async Task HandleWithStagedFilteringAsync(CaptureCompletedEvent eventData)
     {
         ProcessingPipelineInput? input = null;
+        ReferencedSafeImage? referencedSafeImage = null;
+        
         try
         {
+            // 🎯 Phase 3.15: IImageToReferencedSafeImageConverterを使用した統合変換
+            _logger?.LogInformation("🎯 [PHASE3.15] CapturedImage型確認 - Type={ImageType}, Converter={ConverterAvailable}",
+                eventData.CapturedImage?.GetType().Name ?? "null", _imageToReferencedConverter != null);
+
+            if (_imageToReferencedConverter != null && eventData.CapturedImage != null)
+            {
+                try
+                {
+                    // Phase 3.15: 統合コンバーターで直接IImage→ReferencedSafeImage変換
+                    _logger?.LogDebug("🎯 [PHASE3.15] IImage→ReferencedSafeImage変換開始");
+
+                    referencedSafeImage = await _imageToReferencedConverter.ConvertAsync(
+                        eventData.CapturedImage
+                    ).ConfigureAwait(false);
+
+                    _logger?.LogInformation("🎯 [PHASE3.15] ReferencedSafeImage作成完了 - 初期参照カウント: {RefCount}, サイズ: {Width}x{Height}",
+                        referencedSafeImage.ReferenceCount, referencedSafeImage.Width, referencedSafeImage.Height);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "🎯 [PHASE3.15] ReferencedSafeImage作成失敗 - フォールバックして従来のIImage使用");
+                    referencedSafeImage = null;
+                }
+            }
+
+            if (referencedSafeImage == null)
+            {
+                _logger?.LogWarning("🎯 [PHASE3.15] ReferencedSafeImage作成不可 - 従来のIImage使用: Converter={ConverterAvailable}, ImageType={ImageType}",
+                    _imageToReferencedConverter != null, eventData.CapturedImage?.GetType().Name ?? "null");
+            }
+
             // 🚨 UltraThink Phase 59 緊急修正: usingブロック削除（非同期処理中の早期Dispose防止）
             input = new ProcessingPipelineInput
             {
-                CapturedImage = eventData.CapturedImage,
+                // 🎯 Phase 3.11: ReferencedSafeImageまたは従来のIImageを設定
+                CapturedImage = referencedSafeImage ?? eventData.CapturedImage,
                 CaptureRegion = eventData.CaptureRegion,
                 SourceWindowHandle = IntPtr.Zero, // TODO: eventDataから取得
                 CaptureTimestamp = DateTime.UtcNow,
@@ -164,6 +202,20 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // 🔧 UltraThink Phase 59: ProcessingPipelineInputの手動Dispose
             // OwnsImage=falseなので画像自体は破棄されず、ProcessingPipelineInputオブジェクトのみ破棄
             input?.Dispose();
+            
+            // 🎯 Phase 3.11: ReferencedSafeImageの参照カウント管理
+            // パイプライン処理完了後、初期参照を解放
+            if (referencedSafeImage != null)
+            {
+                var finalRefCount = referencedSafeImage.ReferenceCount;
+                _logger?.LogInformation("🎯 [PHASE3.11] CaptureCompletedHandler処理完了 - 初期参照解放前カウント: {RefCount}",
+                    finalRefCount);
+                
+                referencedSafeImage.ReleaseReference();
+                
+                _logger?.LogInformation("🎯 [PHASE3.11] CaptureCompletedHandler初期参照解放完了 - 最終カウント: {RefCount}",
+                    referencedSafeImage.ReferenceCount);
+            }
         }
     }
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Infrastructure.Imaging;
 using Baketa.Infrastructure.OCR.MultiScale;
 
@@ -372,6 +373,19 @@ public class BitmapImage(byte[] imageBytes) : IImage
     public int Width { get; } = 800;
     public int Height { get; } = 100;
     public ImageFormat Format => ImageFormat.Png;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(_imageBytes);
+    }
     
     public Task<byte[]> ToByteArrayAsync()
     {
@@ -409,6 +423,19 @@ public class PlaceholderImageWithSize(byte[] imageBytes, int width, int height) 
     public int Width => width;
     public int Height => height;
     public ImageFormat Format => ImageFormat.Png;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(_imageBytes);
+    }
     
     public Task<byte[]> ToByteArrayAsync()
     {

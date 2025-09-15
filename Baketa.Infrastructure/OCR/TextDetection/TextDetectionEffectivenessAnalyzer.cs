@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Rectangle = System.Drawing.Rectangle;
+using Baketa.Core.Extensions;
 using TextDetectionMethodAlias = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 using TextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 

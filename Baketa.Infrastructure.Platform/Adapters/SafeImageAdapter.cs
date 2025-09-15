@@ -241,10 +241,29 @@ public sealed class SafeImageAdapter : IWindowsImage
 
         return await Task.Run(() =>
         {
-            using var bitmap = CreateBitmapFromSafeImage();
-            using var memoryStream = new MemoryStream();
-            bitmap.Save(memoryStream, format ?? ImageFormat.Png);
-            return memoryStream.ToArray();
+            try 
+            {
+                // 🔍 Phase 3.10: SafeImageデバッグ情報
+                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ToByteArrayAsync開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}");
+                
+                using var bitmap = CreateBitmapFromSafeImage();
+                
+                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}, PixelFormat: {bitmap.PixelFormat}");
+                
+                using var memoryStream = new MemoryStream();
+                bitmap.Save(memoryStream, format ?? ImageFormat.Png);
+                
+                var result = memoryStream.ToArray();
+                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.Save完了 - 出力データサイズ: {result.Length}bytes");
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🚨 [PHASE_3_10_ERROR] ToByteArrayAsync失敗: {ex.Message}");
+                Console.WriteLine($"🚨 [PHASE_3_10_ERROR] StackTrace: {ex.StackTrace}");
+                throw;
+            }
         }).ConfigureAwait(false);
     }
 
@@ -254,43 +273,73 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// <returns>生成されたBitmap（呼び出し側でDispose必要）</returns>
     private Bitmap CreateBitmapFromSafeImage()
     {
-        var imageData = _safeImage.GetImageData();
-        var pixelFormat = ConvertToPixelFormat(_safeImage.PixelFormat);
-
-        var bitmap = new Bitmap(_safeImage.Width, _safeImage.Height, pixelFormat);
-        var bitmapData = bitmap.LockBits(
-            new GdiRectangle(0, 0, _safeImage.Width, _safeImage.Height),
-            ImageLockMode.WriteOnly,
-            pixelFormat);
-
         try
         {
-            unsafe
+            // 🔍 Phase 3.10: SafeImage状態確認
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] CreateBitmapFromSafeImage開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}");
+            
+            var imageData = _safeImage.GetImageData();
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] SafeImage.GetImageData完了 - データサイズ: {imageData.Length}bytes");
+            
+            var pixelFormat = ConvertToPixelFormat(_safeImage.PixelFormat);
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] PixelFormat変換完了 - SafeFormat: {_safeImage.PixelFormat}, GdiFormat: {pixelFormat}");
+
+            var bitmap = new Bitmap(_safeImage.Width, _safeImage.Height, pixelFormat);
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] 空Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}");
+            
+            var bitmapData = bitmap.LockBits(
+                new GdiRectangle(0, 0, _safeImage.Width, _safeImage.Height),
+                ImageLockMode.WriteOnly,
+                pixelFormat);
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.LockBits完了 - Stride: {bitmapData.Stride}");
+
+            try
             {
-                var destPtr = (byte*)bitmapData.Scan0;
-                var stride = bitmapData.Stride;
-                var imageDataSpan = imageData;
-
-                for (int y = 0; y < _safeImage.Height; y++)
+                unsafe
                 {
-                    var sourceOffset = y * _safeImage.Width * GetBytesPerPixel(_safeImage.PixelFormat);
-                    var destOffset = y * stride;
+                    var destPtr = (byte*)bitmapData.Scan0;
+                    var stride = bitmapData.Stride;
+                    var imageDataSpan = imageData;
+                    var bytesPerPixel = GetBytesPerPixel(_safeImage.PixelFormat);
+                    
+                    Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ピクセルコピー開始 - BytesPerPixel: {bytesPerPixel}, ExpectedRowBytes: {_safeImage.Width * bytesPerPixel}");
 
-                    if (sourceOffset + _safeImage.Width * GetBytesPerPixel(_safeImage.PixelFormat) <= imageDataSpan.Length)
+                    for (int y = 0; y < _safeImage.Height; y++)
                     {
-                        var sourceSpan = imageDataSpan.Slice(sourceOffset, _safeImage.Width * GetBytesPerPixel(_safeImage.PixelFormat));
-                        var destSpan = new Span<byte>(destPtr + destOffset, _safeImage.Width * GetBytesPerPixel(_safeImage.PixelFormat));
-                        sourceSpan.CopyTo(destSpan);
+                        var sourceOffset = y * _safeImage.Width * bytesPerPixel;
+                        var destOffset = y * stride;
+                        var rowBytes = _safeImage.Width * bytesPerPixel;
+
+                        if (sourceOffset + rowBytes <= imageDataSpan.Length)
+                        {
+                            var sourceSpan = imageDataSpan.Slice(sourceOffset, rowBytes);
+                            var destSpan = new Span<byte>(destPtr + destOffset, rowBytes);
+                            sourceSpan.CopyTo(destSpan);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"🚨 [PHASE_3_10_WARNING] Row {y}: ソースデータ不足 - Offset: {sourceOffset}, RowBytes: {rowBytes}, DataLength: {imageDataSpan.Length}");
+                        }
                     }
+                    
+                    Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ピクセルコピー完了 - 全{_safeImage.Height}行処理");
                 }
             }
-        }
-        finally
-        {
-            bitmap.UnlockBits(bitmapData);
-        }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.UnlockBits完了");
+            }
 
-        return bitmap;
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] CreateBitmapFromSafeImage成功 - 最終Bitmap: {bitmap.Width}x{bitmap.Height}");
+            return bitmap;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🚨 [PHASE_3_10_ERROR] CreateBitmapFromSafeImage失敗: {ex.Message}");
+            Console.WriteLine($"🚨 [PHASE_3_10_ERROR] StackTrace: {ex.StackTrace}");
+            throw;
+        }
     }
 
     /// <summary>

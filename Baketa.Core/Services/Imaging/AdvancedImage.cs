@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Services.Imaging;
 

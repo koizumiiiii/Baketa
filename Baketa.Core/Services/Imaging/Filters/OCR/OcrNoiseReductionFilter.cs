@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Extensions;
 using Microsoft.Extensions.Logging;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Services.Imaging.Filters.OCR;
 

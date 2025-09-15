@@ -1,6 +1,7 @@
 using System.Drawing;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Extensions;
 
 namespace Baketa.Infrastructure.OCR.Strategies;
 
@@ -41,7 +42,7 @@ public sealed class OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegion
             {
                 try
                 {
-                    var regionImage = await sourceImage.ExtractRegionAsync(region.Bounds)
+                    var regionImage = await sourceImage.ExtractRegionAsync(region.Bounds.ToMemoryRectangle())
                         .ConfigureAwait(false);
                     
                     regionImages.Add(new RegionImagePair(region, regionImage));

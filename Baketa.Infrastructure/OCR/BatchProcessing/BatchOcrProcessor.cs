@@ -9,7 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.OCR;
+using Rectangle = System.Drawing.Rectangle;
+using Baketa.Core.Extensions;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Performance;
 using Baketa.Core.Abstractions.Translation;
@@ -2104,7 +2107,7 @@ public sealed class BatchOcrProcessor(
                 // 🔍 UltraThink: 入力画像の型を特定
                 Console.WriteLine($"🔍 [DEBUG-TILE-{tileIndex}] 入力画像型: {image.GetType().Name} ({image.GetType().FullName})");
 
-                var croppedImage = await image.ExtractRegionAsync(tileRectangle).ConfigureAwait(false);
+                var croppedImage = await image.ExtractRegionAsync(tileRectangle.ToMemoryRectangle()).ConfigureAwait(false);
                 extractTimer.Stop();
                 
                 // 🔍 UltraThink: 切り出し後の画像型を特定
@@ -2652,6 +2655,19 @@ internal sealed class SimpleImageWrapper(int width, int height) : IImage
     public int Width { get; } = width;
     public int Height { get; } = height;
     public ImageFormat Format => ImageFormat.Rgba32;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(new byte[Width * Height * 4]); // BGRA32形式
+    }
 
     public IImage Clone()
     {

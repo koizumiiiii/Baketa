@@ -5,7 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Abstractions.Memory;
 using Xunit;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Tests.Imaging;
 
@@ -169,6 +171,11 @@ namespace Baketa.Core.Tests.Imaging;
             public Task<IAdvancedImage> RotateAsync(float _degrees) => Task.FromResult<IAdvancedImage>(this);
             public Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions _options) => Task.FromResult<IAdvancedImage>(this);
             public Task<List<Rectangle>> DetectTextRegionsAsync() => Task.FromResult(new List<Rectangle>());
+
+            // IImageの追加メンバー
+            public ReadOnlyMemory<byte> GetImageMemory() => new ReadOnlyMemory<byte>(_data);
+            public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
+
             public void Dispose() { }
         }
 

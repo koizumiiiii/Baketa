@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Abstractions.Imaging;
 

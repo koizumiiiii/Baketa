@@ -193,6 +193,19 @@ internal sealed class DummyImage(string path) : Baketa.Core.Abstractions.Imaging
     public DateTime CreatedAt { get; } = DateTime.Now;
     public long SizeInBytes => 1024; // ダミー値
 
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public Baketa.Core.Abstractions.Memory.ImagePixelFormat PixelFormat => Baketa.Core.Abstractions.Memory.ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(Array.Empty<byte>());
+    }
+
     public void Dispose() { }
     public byte[] ToByteArray() => [];
     public Task<byte[]> ToByteArrayAsync() => Task.FromResult(Array.Empty<byte>());

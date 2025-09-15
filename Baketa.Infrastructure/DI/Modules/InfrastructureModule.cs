@@ -15,6 +15,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Monitoring;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Settings;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
@@ -38,6 +39,7 @@ using Baketa.Infrastructure.Translation.Services;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Infrastructure.Patterns;
 using Baketa.Infrastructure.Imaging.ChangeDetection;
+using Baketa.Infrastructure.Services.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -66,54 +68,57 @@ namespace Baketa.Infrastructure.DI.Modules;
             //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>()
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
-                
+
             // 設定ファイル統一: OCR設定をappsettings.jsonから読み込み
             // 注意: これはServiceModuleの外で設定される想定（Startup.cs等）
-            
+
             // OCR関連サービス
             RegisterOcrServices(services);
-            
+
             // 🔄 Phase 1: 画像変化検知システム
             RegisterImageChangeDetectionServices(services);
-            
+
             // 🔄 P1: 段階的フィルタリングシステム
             RegisterStagedFilteringServices(services);
-            
+
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
-            
+
             // NLLB-200翻訳サービス（高品質版）を登録
             RegisterNllb200TranslationServices(services);
-            
+
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
-            
+
             // Phase 5: ポート競合防止機構サービス
             RegisterPortManagementServices(services);
-            
+
             // Step 1: Python環境解決と診断サービス（即座の応急処置）
             RegisterPythonEnvironmentServices(services);
-            
+
             // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
             RegisterNllbFixServices(services);
-            
+
             // Phase 2: 完全安定化サービス（接続信頼性向上・キャッシュ管理強化）
             RegisterPhase2Services(services);
-            
+
             // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
             RegisterWarmupServices(services);
-            
+
             // GPU統合サービス（Issue #143 Week 2: DI統合とMulti-GPU対応）
             RegisterGpuServices(services);
-            
+
             // パフォーマンス管理サービス
             RegisterPerformanceServices(services);
-            
+
             // Phase3: リソース監視システム
             RegisterResourceMonitoringServices(services);
-            
+
+            // Phase 3.13: Memory変換サービス
+            RegisterMemoryServices(services);
+
             // Phase2: ハイブリッドリソース管理システム - PlatformModuleに移動（循環依存解決）
-            
+
             // データ永続化
             RegisterPersistenceServices(services, environment);
         }
@@ -939,5 +944,20 @@ namespace Baketa.Infrastructure.DI.Modules;
             // どこにも見つからない場合はデフォルト（プロジェクトルート想定）
             var defaultPath = Path.GetFullPath(Path.Combine(appRoot, "..", "..", "..", "..", "Models"));
             return defaultPath;
+        }
+
+        /// <summary>
+        /// Phase 3.13: Memory変換サービスを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterMemoryServices(IServiceCollection services)
+        {
+            // IImage → SafeImage 変換コンバーター
+            services.AddSingleton<IImageToSafeImageConverter, ImageToSafeImageConverter>();
+
+            // IImage → ReferencedSafeImage 変換コンバーター (Phase 3.14)
+            services.AddSingleton<IImageToReferencedSafeImageConverter, ImageToReferencedSafeImageConverter>();
+
+            Console.WriteLine("🎯 [PHASE3.13-14] Memory変換サービス登録完了");
         }
     }

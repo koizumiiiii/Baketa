@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
+using Baketa.Core.Extensions;
 
 namespace Baketa.Application.Services;
 
@@ -95,7 +96,7 @@ public sealed class CachedOcrEngine : IOcrEngine
             if (regionOfInterest.HasValue && image is IAdvancedImage advancedImage)
             {
                 // ROIが指定されている場合は切り取り処理
-                using var croppedImage = await advancedImage.ExtractRegionAsync(regionOfInterest.Value).ConfigureAwait(false);
+                using var croppedImage = await advancedImage.ExtractRegionAsync(regionOfInterest.Value.ToMemoryRectangle()).ConfigureAwait(false);
                 imageData = await croppedImage.ToByteArrayAsync().ConfigureAwait(false);
             }
             else if (image is IAdvancedImage advancedImageFull)

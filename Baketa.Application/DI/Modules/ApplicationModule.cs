@@ -23,6 +23,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.Factories;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Services;
 using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.DI;
@@ -282,6 +283,9 @@ namespace Baketa.Application.DI.Modules;
             // 🎯 Phase 3.1: IImageLifecycleManager登録 (WindowsImageFactory依存関係解決)
             services.AddSingleton<Baketa.Core.Abstractions.Memory.IImageLifecycleManager, Baketa.Application.Services.Memory.ImageLifecycleManager>();
             
+            // 🎯 Phase 3.11: IReferencedSafeImageFactory登録 (SafeImage早期破棄問題解決)
+            services.AddSingleton<Baketa.Core.Abstractions.Memory.IReferencedSafeImageFactory, Baketa.Application.Services.Memory.ReferencedSafeImageFactory>();
+            
             // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）
             // IHostedServiceとして登録しアプリケーションライフサイクルと連動
             services.AddSingleton<Services.Diagnostics.DiagnosticReportService>();
@@ -409,13 +413,17 @@ namespace Baketa.Application.DI.Modules;
                 var diagnosticsSaver = provider.GetService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
                 var roiSettings = provider.GetService<IOptionsMonitor<RoiDiagnosticsSettings>>();
 
+                // 🎯 Phase 3.17.9: IImageToReferencedSafeImageConverter注入修正
+                var imageToReferencedConverter = provider.GetService<IImageToReferencedSafeImageConverter>();
+
                 return new Baketa.Application.Events.Handlers.CaptureCompletedHandler(
                     eventAggregator,
                     smartPipeline,
                     logger,
                     settings,
                     diagnosticsSaver,
-                    roiSettings);
+                    roiSettings,
+                    imageToReferencedConverter);
             });
             services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());

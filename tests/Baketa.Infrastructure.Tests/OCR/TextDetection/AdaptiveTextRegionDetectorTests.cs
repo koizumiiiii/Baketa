@@ -10,8 +10,10 @@ using Xunit;
 using Baketa.Infrastructure.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Infrastructure.Tests.OCR.TextDetection;
 
@@ -240,6 +242,21 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public int ChannelCount => 3;
     public ImageFormat Format => ImageFormat.Rgb24;
 
+    /// <summary>
+    /// ピクセルフォーマット（Gemini推奨拡張）
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
+
+    /// <summary>
+    /// 画像データの読み取り専用メモリを取得（Gemini推奨拡張）
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        // テスト用のダミー画像データを生成
+        var imageData = new byte[Width * Height * 3];
+        return new ReadOnlyMemory<byte>(imageData);
+    }
+
     // IImage methods
     IImage IImage.Clone() => new TestImage(Width, Height);
     public async Task<IImage> ResizeAsync(int newWidth, int newHeight) => await Task.FromResult(new TestImage(newWidth, newHeight)).ConfigureAwait(false);
@@ -256,7 +273,7 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public async Task<float> EvaluateTextProbabilityAsync(Rectangle region) { _ = region; return await Task.FromResult(0.7f).ConfigureAwait(false); }
     public async Task<IAdvancedImage> RotateAsync(float angle) { _ = angle; return await Task.FromResult(this).ConfigureAwait(false); }
     public async Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options) { _ = options; return await Task.FromResult(this).ConfigureAwait(false); }
-    public async Task<List<Rectangle>> DetectTextRegionsAsync() => await Task.FromResult<List<Rectangle>>([]);
+    public async Task<List<Rectangle>> DetectTextRegionsAsync() => await Task.FromResult(new List<Rectangle>());
     
     // 不足しているメンバー
     public Color GetPixel(int x, int y) { _ = x; _ = y; return Color.Black; }

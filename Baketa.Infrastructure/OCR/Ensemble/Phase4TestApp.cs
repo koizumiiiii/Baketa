@@ -597,6 +597,19 @@ public static class Phase4TestApp
         public int Width => 800;
         public int Height => 600;
         public Baketa.Core.Abstractions.Imaging.ImageFormat Format => Baketa.Core.Abstractions.Imaging.ImageFormat.Rgb24;
+
+        /// <summary>
+        /// PixelFormat property for IImage extension
+        /// </summary>
+        public Baketa.Core.Abstractions.Memory.ImagePixelFormat PixelFormat => Baketa.Core.Abstractions.Memory.ImagePixelFormat.Rgb24;
+
+        /// <summary>
+        /// GetImageMemory method for IImage extension
+        /// </summary>
+        public ReadOnlyMemory<byte> GetImageMemory()
+        {
+            return new ReadOnlyMemory<byte>(new byte[Width * Height * 3]); // RGB24フォーマット
+        }
         
         public async Task<byte[]> ToByteArrayAsync()
         {

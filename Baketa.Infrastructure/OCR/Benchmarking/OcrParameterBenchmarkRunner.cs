@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Enhancement;
 using Baketa.Infrastructure.Imaging;
@@ -298,20 +299,33 @@ public sealed class PlaceholderImage(string text) : IImage
     public int Width => 800;
     public int Height => 100;
     public ImageFormat Format => ImageFormat.Png;
-    
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(Array.Empty<byte>());
+    }
+
     public void Dispose() { }
-    
+
     public Task<byte[]> ToByteArrayAsync()
     {
         // 実際の実装では画像データを返す
         return Task.FromResult(Array.Empty<byte>());
     }
-    
+
     public IImage Clone()
     {
         return new PlaceholderImage(text);
     }
-    
+
     public Task<IImage> ResizeAsync(int width, int height)
     {
         return Task.FromResult<IImage>(new PlaceholderImage(text));

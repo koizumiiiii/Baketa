@@ -9,6 +9,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
+using Baketa.Core.Extensions;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
@@ -298,7 +301,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = id,
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = string.Join(" ", expectedTexts),
             Metadata = new Dictionary<string, object>
             {
@@ -380,7 +383,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "high_contrast",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = "HIGH CONTRAST TEXT",
             Metadata = new Dictionary<string, object> { ["type"] = "high_contrast" }
         };
@@ -412,7 +415,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "low_contrast",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = "Low contrast text",
             Metadata = new Dictionary<string, object> { ["type"] = "low_contrast" }
         };
@@ -450,7 +453,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "small_text",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = string.Join(" ", expectedTexts),
             Metadata = new Dictionary<string, object> { ["type"] = "small_text" }
         };
@@ -482,7 +485,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "large_text",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = "LARGE",
             Metadata = new Dictionary<string, object> { ["type"] = "large_text" }
         };
@@ -521,7 +524,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "multi_color",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = string.Join(" ", expectedTexts),
             Metadata = new Dictionary<string, object> { ["type"] = "multi_color" }
         };
@@ -569,7 +572,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "noisy_background",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = "NOISY BACKGROUND",
             Metadata = new Dictionary<string, object> { ["type"] = "noisy_background" }
         };
@@ -615,7 +618,7 @@ public sealed class TestCaseGenerator(ILogger<TestCaseGenerator> logger) : IDisp
         {
             Id = "overlapping_text",
             Image = new TestAdvancedImage(bitmap),
-            GroundTruthRegions = groundTruthRegions,
+            GroundTruthRegions = groundTruthRegions.ToDrawingRectangleList(),
             ExpectedText = string.Join(" ", expectedTexts),
             Metadata = new() { ["type"] = "overlapping_text" }
         };
@@ -647,6 +650,21 @@ internal sealed class TestAdvancedImage(Bitmap bitmap) : IAdvancedImage
     public bool IsGrayscale => false;
     public int BitsPerPixel => 32;
     public int ChannelCount => 4;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        using var stream = new MemoryStream();
+        _bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+        return new ReadOnlyMemory<byte>(stream.ToArray());
+    }
 
     public IImage Clone() => new TestAdvancedImage(new Bitmap(_bitmap));
     
@@ -720,17 +738,17 @@ internal sealed class TestAdvancedImage(Bitmap bitmap) : IAdvancedImage
     {
         return await Task.FromResult(0.5f).ConfigureAwait(false);
     }
-    
+
     public async Task<IAdvancedImage> RotateAsync(float degrees)
     {
         return await Task.FromResult(this).ConfigureAwait(false);
     }
-    
+
     public async Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options)
     {
         return await Task.FromResult(this).ConfigureAwait(false);
     }
-    
+
     public async Task<List<Rectangle>> DetectTextRegionsAsync()
     {
         return await Task.FromResult(new List<Rectangle>()).ConfigureAwait(false);

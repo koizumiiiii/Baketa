@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Memory;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Abstractions.Imaging.Filters;
 
@@ -226,6 +228,24 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
         public int Width => _imageInfo.Width;
             public int Height => _imageInfo.Height;
             public ImageFormat Format => _imageInfo.Format;
+
+            /// <summary>
+            /// ピクセルフォーマット（IImage拡張対応）
+            /// </summary>
+            public ImagePixelFormat PixelFormat
+            {
+                get
+                {
+                    // ImageFormatからImagePixelFormatへの変換
+                    return Format switch
+                    {
+                        ImageFormat.Rgb24 => ImagePixelFormat.Rgb24,
+                        ImageFormat.Rgba32 => ImagePixelFormat.Rgba32,
+                        ImageFormat.Grayscale8 => ImagePixelFormat.Bgra32, // マッピング
+                        _ => ImagePixelFormat.Bgra32 // デフォルト
+                    };
+                }
+            }
             
             // IAdvancedImageインターフェース実装
             public bool IsGrayscale => Format == ImageFormat.Grayscale8;
@@ -244,12 +264,18 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
                 _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
             };
             
+            /// <summary>
+            /// 画像データの読み取り専用メモリを取得（IImage拡張対応）
+            /// </summary>
+            /// <returns>画像データの読み取り専用メモリ</returns>
+            public ReadOnlyMemory<byte> GetImageMemory() => throw new NotImplementedException();
+
             // 以下は仮想的な実装（実際にはGetOutputImageInfoでのみ使用）
             public Task<byte[]> ToByteArrayAsync() => throw new NotImplementedException();
             public IImage Clone() => throw new NotImplementedException();
             public Task<IImage> ResizeAsync(int width, int height) => throw new NotImplementedException();
             public Task SaveAsync(string path, ImageFormat? format = null) => throw new NotImplementedException();
-            public Task<IImage> CropAsync(Rectangle rectangle) => throw new NotImplementedException();
+            public Task<IImage> CropAsync(System.Drawing.Rectangle rectangle) => throw new NotImplementedException();
             public Task<byte[]> GetPixelsAsync(int x, int y, int width, int height) => throw new NotImplementedException();
             public Task<IAdvancedImage> ApplyFilterAsync(IImageFilter filter) => throw new NotImplementedException();
             public Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters) => throw new NotImplementedException();

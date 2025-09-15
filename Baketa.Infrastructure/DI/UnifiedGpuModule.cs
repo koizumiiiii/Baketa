@@ -1,6 +1,7 @@
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.DI;
 using Baketa.Infrastructure.OCR.GPU;
 using Baketa.Infrastructure.OCR.GPU.Providers;
@@ -234,6 +235,20 @@ internal sealed class MockImage : IImage
     public int Width => 800;
     public int Height => 600;
     public ImageFormat Format => ImageFormat.Rgb24;
+    
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
+    
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        return new ReadOnlyMemory<byte>(new byte[Width * Height * 3]);
+    }
+    
     public async Task<byte[]> ToByteArrayAsync() => await Task.FromResult(new byte[Width * Height * 3]);
     public IImage Clone() => new MockImage();
     public async Task<IImage> ResizeAsync(int width, int height) => await Task.FromResult(new MockImage());

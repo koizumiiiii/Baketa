@@ -4,7 +4,9 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Xunit;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Tests.Imaging;
 
@@ -164,6 +166,15 @@ namespace Baketa.Core.Tests.Imaging;
             // テキスト領域検出のモック動作
             return Task.FromResult(new List<Rectangle> { new(10, 10, 20, 20) });
         }
+
+        // IImageの追加メンバー
+        public ReadOnlyMemory<byte> GetImageMemory()
+        {
+            // モック実装: 画像データのメモリを返す
+            return new ReadOnlyMemory<byte>(new byte[Width * Height * 4]);
+        }
+
+        public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Common;
 using Baketa.Core.Extensions;
 
@@ -31,12 +32,40 @@ public class CoreImage(byte[] pixelData, int width, int height, ImageFormat form
     /// </summary>
     public ImageFormat Format { get; } = format;
 
+    /// <summary>
+    /// ピクセルフォーマット（IImage拡張対応）
+    /// </summary>
+    public ImagePixelFormat PixelFormat
+    {
+        get
+        {
+            // ImageFormatからImagePixelFormatへの変換
+            return Format switch
+            {
+                ImageFormat.Rgb24 => ImagePixelFormat.Rgb24,
+                ImageFormat.Rgba32 => ImagePixelFormat.Rgba32,
+                ImageFormat.Grayscale8 => ImagePixelFormat.Bgra32, // マッピング
+                _ => ImagePixelFormat.Bgra32 // デフォルト
+            };
+        }
+    }
+
     /// <inheritdoc/>
     public Task<byte[]> ToByteArrayAsync()
         {
             ThrowIfDisposed();
             return Task.FromResult<byte[]>([.. _pixelData]);
         }
+
+    /// <summary>
+    /// 画像データの読み取り専用メモリを取得（IImage拡張対応）
+    /// </summary>
+    /// <returns>画像データの読み取り専用メモリ</returns>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        ThrowIfDisposed();
+        return new ReadOnlyMemory<byte>(_pixelData);
+    }
         
         /// <summary>
         /// 画像データのバイト配列を取得します
