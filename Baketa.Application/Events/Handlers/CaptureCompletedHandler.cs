@@ -237,13 +237,56 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // OCR完了時イベント
             if (result.LastCompletedStage >= ProcessingStageType.OcrExecution && result.OcrResult?.Success == true)
             {
-                // モックOcrResultを作成（実装時に実際のデータに置き換え）
-                var mockOcrResults = new List<object>(); // TODO: 実際のOcrResultリストを作成
-                
-                // 一時的にスキップ（OcrResult型が見つからない場合）
-                // TODO: 実際のOcrCompletedEventとOcrResultを使用
-                _logger?.LogDebug("OCRCompletedEvent発行スキップ - OcrResult型解決が必要");
-                _logger?.LogDebug("OCR結果検出 - テキスト長: {TextLength}", result.OcrResult.DetectedText.Length);
+                // 🎯 Phase 3.19: OcrExecutionResultからOcrResultリストを作成
+                var ocrResults = new List<Baketa.Core.Models.OCR.OcrResult>();
+
+                if (result.OcrResult.TextChunks?.Count > 0)
+                {
+                    // TextChunksからOcrResultを作成
+                    foreach (var chunk in result.OcrResult.TextChunks)
+                    {
+                        if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
+                        {
+                            ocrResults.Add(Baketa.Core.Models.OCR.OcrResult.FromTextRegion(textRegion));
+                        }
+                        else if (!string.IsNullOrWhiteSpace(chunk?.ToString()))
+                        {
+                            // フォールバック: チャンクから基本的なOcrResultを作成
+                            ocrResults.Add(new Baketa.Core.Models.OCR.OcrResult(
+                                text: chunk.ToString() ?? "",
+                                bounds: System.Drawing.Rectangle.Empty,
+                                confidence: 0.8f
+                            ));
+                        }
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(result.OcrResult.DetectedText))
+                {
+                    // フォールバック: DetectedTextからOcrResultを作成
+                    ocrResults.Add(new Baketa.Core.Models.OCR.OcrResult(
+                        text: result.OcrResult.DetectedText,
+                        bounds: System.Drawing.Rectangle.Empty,
+                        confidence: 0.8f
+                    ));
+                }
+
+                if (ocrResults.Count > 0)
+                {
+                    var ocrCompletedEvent = new OcrCompletedEvent(
+                        sourceImage: eventData.CapturedImage,
+                        results: ocrResults.AsReadOnly(),
+                        processingTime: result.OcrResult.ProcessingTime
+                    );
+
+                    _logger?.LogInformation("🎯 [PHASE3.19] OCRCompletedEvent発行 - テキスト数: {TextCount}, 総テキスト長: {TotalTextLength}",
+                        ocrResults.Count, string.Join(" ", ocrResults.Select(r => r.Text)).Length);
+
+                    await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                }
+                else
+                {
+                    _logger?.LogWarning("⚠️ [PHASE3.19] OCR結果が空のためOCRCompletedEventをスキップ");
+                }
             }
 
             // 翻訳完了時イベント
