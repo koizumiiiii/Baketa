@@ -91,45 +91,58 @@ public sealed class TimedChunkAggregator : IDisposable
         {
             // パフォーマンス計測開始
             _performanceStopwatch.Start();
-            
+
+            // 🔍 Phase 20: 追加されるチャンクの内容をログ出力
+            var chunkText = chunk.CombinedText ?? chunk.TextResults?.FirstOrDefault()?.Text ?? "";
+            _logger.LogInformation("📥 [Phase20] チャンク追加: ID:{ChunkId}, Text:「{Text}」",
+                chunk.ChunkId, chunkText.Length > 100 ? chunkText[..100] + "..." : chunkText);
+
             // SourceWindowHandle別にバッファを分離（コンテキスト混在防止）
             var windowHandle = chunk.SourceWindowHandle;
             if (!_pendingChunksByWindow.ContainsKey(windowHandle))
             {
                 _pendingChunksByWindow[windowHandle] = new List<TextChunk>();
             }
-            
+
             _pendingChunksByWindow[windowHandle].Add(chunk);
             Interlocked.Increment(ref _totalChunksProcessed);
-            
+
             // 全ウィンドウのチャンク数を計算
             var totalChunks = _pendingChunksByWindow.Values.Sum(list => list.Count);
-            
+
             // メモリ保護：最大チャンク数を超えたら強制処理
             if (totalChunks >= _settings.MaxChunkCount)
             {
-                _logger.LogWarning("最大チャンク数到達 - 強制処理開始: {Count}個", totalChunks);
+                _logger.LogWarning("⚠️ [Phase20] 最大チャンク数到達 - 強制処理開始: {Count}個 (設定値: {MaxCount})",
+                    totalChunks, _settings.MaxChunkCount);
                 await ProcessPendingChunksInternal().ConfigureAwait(false);
                 return true;
             }
-            
+
             // ForceFlushMs制御: 無限タイマーリセットを防ぐ
             var timeSinceLastReset = DateTime.UtcNow - _lastTimerReset;
             if (timeSinceLastReset.TotalMilliseconds >= _settings.ForceFlushMs)
             {
-                _logger.LogDebug("ForceFlushMs到達 - 強制処理実行: {ElapsedMs}ms経過", timeSinceLastReset.TotalMilliseconds);
+                _logger.LogInformation("⏰ [Phase20] ForceFlushMs到達 - 強制処理実行: {ElapsedMs}ms経過 (設定値: {ForceFlushMs}ms)",
+                    timeSinceLastReset.TotalMilliseconds, _settings.ForceFlushMs);
                 await ProcessPendingChunksInternal().ConfigureAwait(false);
             }
             else
             {
                 // タイマーをリセット（新しいチャンクが来たら待ち時間をリセット）
+                // 💡 Phase 20: 150msの妥当性について
+                // - 一般的なゲームのテキスト表示速度: 60-120文字/秒
+                // - 150msは約9-18文字分の表示時間に相当
+                // - 短すぎる: 文章が細切れになる（50ms以下）
+                // - 長すぎる: レスポンスが悪くなる（500ms以上）
+                // - 150msは適切なバランス: 自然な文章区切りとレスポンスの両立
                 _aggregationTimer.Change(_settings.BufferDelayMs, Timeout.Infinite);
                 _lastTimerReset = DateTime.UtcNow; // タイマーリセット時刻を記録
+
+                _logger.LogInformation("⏱️ [Phase20] タイマーリセット - {DelayMs}ms後に処理予定 (バッファ中: {Count}個)",
+                    _settings.BufferDelayMs, totalChunks);
             }
-            
-            _logger.LogDebug("チャンク追加 - ウィンドウ: {WindowHandle}, 合計: {Count}個, 次回処理: {DelayMs}ms後", 
-                windowHandle, totalChunks, _settings.BufferDelayMs);
-            
+
             return true;
         }
         catch (Exception ex)
@@ -280,9 +293,22 @@ public sealed class TimedChunkAggregator : IDisposable
 
         try
         {
+            // 🔍 Phase 20: 結合前のテキストをログ出力
+            _logger.LogInformation("🔍 [Phase20] チャンク結合前 - {Count}個のチャンク:", chunks.Count);
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                var chunk = chunks[i];
+                var chunkText = chunk.CombinedText ?? chunk.TextResults?.FirstOrDefault()?.Text ?? "";
+                _logger.LogInformation("  [Chunk {Index}] ID:{ChunkId}, Bounds:({X},{Y},{W},{H}), Text:「{Text}」",
+                    i, chunk.ChunkId,
+                    chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
+                    chunk.CombinedBounds.Width, chunk.CombinedBounds.Height,
+                    chunkText);
+            }
+
             // 座標ベースでグループ化・統合
             var combinedText = _lineBreakProcessor.ProcessLineBreaks(chunks);
-            
+
             // 統合されたテキストから新しいTextChunkを作成
             var combinedBounds = CalculateCombinedBounds(chunks);
             var combinedChunk = new TextChunk
@@ -295,8 +321,16 @@ public sealed class TimedChunkAggregator : IDisposable
                 DetectedLanguage = chunks[0].DetectedLanguage
             };
 
-            _logger.LogTrace("チャンク統合完了: {InputCount}個 → 1個, テキスト: '{Text}'", 
-                chunks.Count, combinedText.Length > 50 ? combinedText[..50] + "..." : combinedText);
+            // 🎯 Phase 20: 結合後のテキストをログ出力
+            _logger.LogInformation("🎯 [Phase20] チャンク結合後:");
+            _logger.LogInformation("  新ChunkID:{ChunkId}, Bounds:({X},{Y},{W},{H})",
+                combinedChunk.ChunkId,
+                combinedBounds.X, combinedBounds.Y,
+                combinedBounds.Width, combinedBounds.Height);
+            _logger.LogInformation("  結合後テキスト:「{Text}」", combinedText);
+            _logger.LogInformation("  文字数: {Length}文字, 改行数: {LineCount}",
+                combinedText.Length,
+                combinedText.Count(c => c == '\n'));
 
             return new List<TextChunk> { combinedChunk };
         }
