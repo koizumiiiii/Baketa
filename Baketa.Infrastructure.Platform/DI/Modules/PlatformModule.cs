@@ -77,8 +77,8 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
                 Baketa.Infrastructure.Platform.Windows.Capture.GdiScreenCapturer>();
             
             // ウィンドウマネージャー
-            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager, 
-                Baketa.Infrastructure.Platform.Windows.WindowsManagerStub>();
+            services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager,
+                Baketa.Infrastructure.Platform.Windows.WindowsManager>();
             
             // 画像ファクトリー（Phase 3.1: SafeImage統合対応）
             services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory,

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using Baketa.Core.Abstractions.Platform.Windows;
 
 namespace Baketa.Infrastructure.Platform.Windows;
@@ -13,59 +13,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
     /// IWindowManagerインターフェースのWindows特化実装
     /// Win32 APIを使用して実際のウィンドウ情報を取得
     /// </summary>
-    public class WindowsManagerStub : IWindowManager
+    public class WindowsManager : IWindowManager
     {
-        #region Win32 API宣言
-        
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-        
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern int GetWindowText(IntPtr hWnd, [Out] char[] text, int count);
-        
-        [DllImport("user32.dll")]
-        private static extern bool IsIconic(IntPtr hWnd);
-        
-        [DllImport("user32.dll")]
-        private static extern bool IsWindowVisible(IntPtr hWnd);
-        
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        
-        [DllImport("user32.dll")]
-        private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, int nFlags);
-        
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-        
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
-        
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
-        
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteDC(IntPtr hdc);
-        
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteObject(IntPtr hObject);
-        
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDC(IntPtr hWnd);
-        
-        [DllImport("user32.dll")]
-        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-        
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
-        
-        #endregion
+        // P/Invoke宣言は NativeMethods.User32Methods を使用
         
         /// <summary>
         /// ウィンドウのサムネイル画像を取得
@@ -98,9 +48,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     return null;
                 
                 // 互換DCとビットマップを作成
-                IntPtr memoryDC = CreateCompatibleDC(desktopDC);
-                IntPtr bitmap = CreateCompatibleBitmap(desktopDC, width, height);
-                IntPtr oldBitmap = SelectObject(memoryDC, bitmap);
+                IntPtr memoryDC = NativeMethods.Gdi32Methods.CreateCompatibleDC(desktopDC);
+                IntPtr bitmap = NativeMethods.Gdi32Methods.CreateCompatibleBitmap(desktopDC, width, height);
+                IntPtr oldBitmap = NativeMethods.Gdi32Methods.SelectObject(memoryDC, bitmap);
                 
                 try
                 {
@@ -124,9 +74,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 finally
                 {
                     // リソースを解放
-                    _ = SelectObject(memoryDC, oldBitmap);
-                    _ = DeleteObject(bitmap);
-                    _ = DeleteDC(memoryDC);
+                    _ = NativeMethods.Gdi32Methods.SelectObject(memoryDC, oldBitmap);
+                    _ = NativeMethods.Gdi32Methods.DeleteObject(bitmap);
+                    _ = NativeMethods.Gdi32Methods.DeleteDC(memoryDC);
                     _ = NativeMethods.User32Methods.ReleaseDC(IntPtr.Zero, desktopDC);
                 }
             }
@@ -145,7 +95,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
         {
             try
             {
-                return GetForegroundWindow();
+                return NativeMethods.User32Methods.GetForegroundWindow();
             }
             catch
             {
@@ -184,9 +134,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
         {
             try
             {
-                if (GetWindowRect(handle, out RECT rect))
+                if (NativeMethods.User32Methods.GetWindowRect(handle, out NativeMethods.RECT rect))
                 {
-                    return new Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+                    return new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
                 }
                 return null;
             }
@@ -217,9 +167,9 @@ namespace Baketa.Infrastructure.Platform.Windows;
             try
             {
                 const int maxLength = 256;
-                var titleBuffer = new char[maxLength];
-                var length = GetWindowText(handle, titleBuffer, maxLength);
-                return new string(titleBuffer, 0, length);
+                var titleBuffer = new StringBuilder(maxLength);
+                var length = NativeMethods.User32Methods.GetWindowText(handle, titleBuffer, maxLength);
+                return length > 0 ? titleBuffer.ToString() : "";
             }
             catch
             {
@@ -236,7 +186,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
         {
             try
             {
-                return IsIconic(handle);
+                return NativeMethods.User32Methods.IsIconic(handle);
             }
             catch
             {
@@ -304,8 +254,8 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // 🚀 Gemini Expert Recommendation: EnumWindows軽量実装でProcess.GetProcesses()完全置き換え
                 // メモリ競合回避 + 数十倍高速化で機能と安全性を両立
                 
-                System.Diagnostics.Debug.WriteLine("🚀 WindowsManagerStub: EnumWindows軽量実装でウィンドウ列挙開始");
-                Console.WriteLine("🚀 WindowsManagerStub: EnumWindows軽量実装でウィンドウ列挙開始");
+                System.Diagnostics.Debug.WriteLine("🚀 WindowsManager: EnumWindows軽量実装でウィンドウ列挙開始");
+                Console.WriteLine("🚀 WindowsManager: EnumWindows軽量実装でウィンドウ列挙開始");
                 
                 uint currentProcessId = (uint)Environment.ProcessId;
                 
@@ -320,7 +270,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                         // Step 1: 基本的なウィンドウ有効性チェックのみ
                         if (!NativeMethods.User32Methods.IsWindow(hWnd))
                         {
-                            Console.WriteLine($"⚠️  WindowsManagerStub: 無効ウィンドウをスキップ - ハンドル: {hWnd}");
+                            Console.WriteLine($"⚠️  WindowsManager: 無効ウィンドウをスキップ - ハンドル: {hWnd}");
                             return true; // 次のウィンドウへ
                         }
                         
@@ -328,14 +278,15 @@ namespace Baketa.Infrastructure.Platform.Windows;
                         uint threadId = NativeMethods.User32Methods.GetWindowThreadProcessId(hWnd, out uint windowProcessId);
                         if (windowProcessId == currentProcessId)
                         {
-                            Console.WriteLine($"⚠️  WindowsManagerStub: 自プロセスウィンドウをスキップ - ハンドル: {hWnd}, PID: {windowProcessId}");
+                            Console.WriteLine($"⚠️  WindowsManager: 自プロセスウィンドウをスキップ - ハンドル: {hWnd}, PID: {windowProcessId}");
                             return true; // 次のウィンドウへ
                         }
                         
-                        // Step 3: 詳細デバッグログ with タイトル長情報
+                        // Step 3: 詳細デバッグログ with タイトル長情報とタイトル文字列
                         int titleLength = NativeMethods.User32Methods.GetWindowTextLength(hWnd);
-                        Console.WriteLine($"🔍 WindowsManagerStub: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}");
-                        System.Diagnostics.Debug.WriteLine($"🔍 WindowsManagerStub: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}");
+                        string actualTitle = GetWindowTitle(hWnd);
+                        Console.WriteLine($"🔍 WindowsManager: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}, タイトル: '{actualTitle}'");
+                        System.Diagnostics.Debug.WriteLine($"🔍 WindowsManager: 候補ウィンドウ発見 - ハンドル: {hWnd}, PID: {windowProcessId}, タイトル長: {titleLength}, タイトル: '{actualTitle}'");
                         
                         // Step 4: すべての候補をリストに追加（タイトル長に関係なく）
                         visibleWindows.Add(hWnd);
@@ -344,7 +295,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     catch (Exception ex)
                     {
                         // Win32 APIエラー時はログ出力してスキップ
-                        Console.WriteLine($"❌ WindowsManagerStub: EnumWindows例外 - ハンドル: {hWnd}, エラー: {ex.Message}");
+                        Console.WriteLine($"❌ WindowsManager: EnumWindows例外 - ハンドル: {hWnd}, エラー: {ex.Message}");
                         return true;
                     }
                 }, IntPtr.Zero);
@@ -353,12 +304,12 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 if (!enumResult)
                 {
                     int lastError = Marshal.GetLastWin32Error();
-                    Console.WriteLine($"⚠️  WindowsManagerStub: EnumWindows失敗 - Win32エラーコード: {lastError}");
-                    System.Diagnostics.Debug.WriteLine($"⚠️  WindowsManagerStub: EnumWindows失敗 - Win32エラーコード: {lastError}");
+                    Console.WriteLine($"⚠️  WindowsManager: EnumWindows失敗 - Win32エラーコード: {lastError}");
+                    System.Diagnostics.Debug.WriteLine($"⚠️  WindowsManager: EnumWindows失敗 - Win32エラーコード: {lastError}");
                     // 部分的な結果でも処理を継続（完全失敗ではない場合）
                 }
                 
-                Console.WriteLine($"✅ WindowsManagerStub: EnumWindows完了 - 候補ウィンドウ数: {visibleWindows.Count}");
+                Console.WriteLine($"✅ WindowsManager: EnumWindows完了 - 候補ウィンドウ数: {visibleWindows.Count}");
                 
                 // 各ウィンドウのタイトルを取得
                 foreach (var handle in visibleWindows)
@@ -369,7 +320,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                         
                         // 🚀 UltraThink緩和: 空タイトルには代替表示名を付与
                         string displayTitle = string.IsNullOrEmpty(title) ? $"<無題ウィンドウ {handle}>" : title;
-                        Console.WriteLine($"🔍 WindowsManagerStub: ハンドル {handle} のタイトル: '{title}' → 表示名: '{displayTitle}'");
+                        Console.WriteLine($"🔍 WindowsManager: ハンドル {handle} のタイトル: '{title}' → 表示名: '{displayTitle}'");
                         
                         // IsValidApplicationWindowの判定を実行（デバッグのため）
                         bool isValid = IsValidApplicationWindow(title, handle);
@@ -377,26 +328,26 @@ namespace Baketa.Infrastructure.Platform.Windows;
                         if (isValid)
                         {
                             windows[handle] = displayTitle;  // 表示名を使用
-                            Console.WriteLine($"✅ WindowsManagerStub: 有効ウィンドウ追加 - {displayTitle}");
+                            Console.WriteLine($"✅ WindowsManager: 有効ウィンドウ追加 - {displayTitle}");
                         }
                         else
                         {
-                            Console.WriteLine($"❌ WindowsManagerStub: ウィンドウ除外 - タイトル: '{title}', 表示名: '{displayTitle}', 有効性: {isValid}");
+                            Console.WriteLine($"❌ WindowsManager: ウィンドウ除外 - タイトル: '{title}', 表示名: '{displayTitle}', 有効性: {isValid}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ WindowsManagerStub: タイトル取得エラー - ハンドル: {handle}, エラー: {ex.Message}");
+                        Console.WriteLine($"❌ WindowsManager: タイトル取得エラー - ハンドル: {handle}, エラー: {ex.Message}");
                     }
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"✅ WindowsManagerStub: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
-                Console.WriteLine($"✅ WindowsManagerStub: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
+                System.Diagnostics.Debug.WriteLine($"✅ WindowsManager: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
+                Console.WriteLine($"✅ WindowsManager: ウィンドウ列挙完了 - {windows.Count}個のウィンドウを検出");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ WindowsManagerStub: EnumWindowsエラー - {ex.Message}");
-                Console.WriteLine($"❌ WindowsManagerStub: EnumWindowsエラー - {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"❌ WindowsManager: EnumWindowsエラー - {ex.Message}");
+                Console.WriteLine($"❌ WindowsManager: EnumWindowsエラー - {ex.Message}");
             }
             
             return windows;
@@ -439,7 +390,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
             }
             
             // 🎯 追加検証: ウィンドウ可視性とスタイル
-            bool isVisible = IsWindowVisible(handle);
+            bool isVisible = NativeMethods.User32Methods.IsWindowVisible(handle);
             Console.WriteLine($"🔍 IsValidApplicationWindow: 可視性チェック - ハンドル: {handle}, 可視: {isVisible}");
             
             // 可視性に関係なく一旦通す（最小化ウィンドウ対応）

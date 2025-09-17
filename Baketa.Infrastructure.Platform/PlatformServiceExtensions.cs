@@ -41,7 +41,7 @@ namespace Baketa.Infrastructure.Platform;
             services.AddSingleton<Core.Abstractions.Factories.IWindowsImageFactory, Windows.WindowsImageFactory>();
             // AdaptiveCaptureModuleでWindowsGraphicsCapturerが登録されるため、重複登録を回避
             // services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.GdiWindowsCapturer>();
-            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManagerStub>();
+            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManager>();
 
             return services;
         }
