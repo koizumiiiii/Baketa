@@ -5,6 +5,7 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -20,14 +21,17 @@ namespace Baketa.Core.Events.Handlers;
 /// <param name="translationService">翻訳サービス</param>
 /// <param name="eventAggregator">イベント集約インスタンス</param>
 /// <param name="logger">ロガー</param>
+/// <param name="configuration">設定サービス</param>
 public class TranslationRequestHandler(
     ITranslationService translationService,
     IEventAggregator eventAggregator,
-    ILogger<TranslationRequestHandler> logger) : IEventProcessor<TranslationRequestEvent>
+    ILogger<TranslationRequestHandler> logger,
+    IConfiguration configuration) : IEventProcessor<TranslationRequestEvent>
 {
     private readonly ITranslationService _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly ILogger<TranslationRequestHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         
     /// <inheritdoc />
     public int Priority => 100;
@@ -210,22 +214,26 @@ public class TranslationRequestHandler(
 }
     
     /// <summary>
-    /// 文字列から言語を解析する
+    /// 文字列から言語を解析する（設定ベース言語使用）
     /// </summary>
     /// <param name="languageString">言語文字列</param>
     /// <returns>Language型</returns>
-    private static Language ParseLanguage(string languageString)
+    private Language ParseLanguage(string languageString)
     {
         if (string.IsNullOrEmpty(languageString))
             return Language.English;
-            
+
         var normalizedLang = languageString.ToLowerInvariant();
-        
+
+        // 設定から言語を動的取得
+        var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+        var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+
         return normalizedLang switch
         {
             "ja" or "japanese" or "ja-jp" => Language.Japanese,
             "en" or "english" or "en-us" => Language.English,
-            "auto" => Language.Auto, // 🚀 [CRITICAL_BUG_FIX] autoは正しくLanguage.Autoとして処理
+            "auto" => Language.FromCode(defaultSourceLanguage), // 設定ベース言語を使用
             _ => Language.English // デフォルトは英語
         };
     }
@@ -242,9 +250,9 @@ public class TranslationRequestHandler(
         
         try
         {
-            // ROIスケールファクタ（通常0.5）を取得
+            // ROIスケールファクタ（CaptureModels.csのデフォルト値と一致）
             // TODO: 設定から動的に取得するように改善
-            const float roiScaleFactor = 0.5f;
+            const float roiScaleFactor = 0.25f;
             var inverseScale = 1.0f / roiScaleFactor;
             
             // 1. ROI座標を実際の画面座標にスケーリング

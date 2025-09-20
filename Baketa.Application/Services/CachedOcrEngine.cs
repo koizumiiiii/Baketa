@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Memory;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
 using Baketa.Core.Extensions;
@@ -77,7 +78,7 @@ public sealed class CachedOcrEngine : IOcrEngine
 
     public async Task<OcrResults> RecognizeAsync(
         IImage image,
-        Rectangle? regionOfInterest,
+        System.Drawing.Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
     {
@@ -92,8 +93,55 @@ public sealed class CachedOcrEngine : IOcrEngine
             var hashStopwatch = Stopwatch.StartNew();
             byte[] imageData;
             
+            // 🔧 [PHASE3.5_FIX] ReferencedSafeImage防御的処理 - ObjectDisposedException完全対応
+            if (image is ReferencedSafeImage referencedSafeImage)
+            {
+                // 🛡️ 段階的防御的アクセス - オーバーレイ表示修正の決定的対応
+                try
+                {
+                    // Step 1: 参照カウント検証
+                    var refCount = referencedSafeImage.ReferenceCount;
+                    if (refCount <= 0)
+                    {
+                        _logger.LogWarning("🔧 [PHASE3.5_FIX] ReferencedSafeImage参照カウントが無効: {RefCount} - 処理スキップ", refCount);
+                        throw new InvalidOperationException($"ReferencedSafeImage has invalid reference count: {refCount}");
+                    }
+
+                    // Step 2: SafeImage本体の有効性確認
+                    var safeImage = referencedSafeImage.GetUnderlyingSafeImage();
+                    if (safeImage == null || safeImage.IsDisposed)
+                    {
+                        _logger.LogWarning("🔧 [PHASE3.5_FIX] SafeImage本体が無効または破棄済み - 処理スキップ");
+                        throw new InvalidOperationException("Underlying SafeImage is null or disposed");
+                    }
+
+                    // Step 3: 画像データの安全な取得
+                    try
+                    {
+                        imageData = safeImage.GetImageData().ToArray();
+                        _logger.LogDebug("🎯 [PHASE3.5_FIX] ReferencedSafeImage処理成功 - データ取得: {Size}bytes, RefCount: {RefCount}",
+                            imageData.Length, refCount);
+                    }
+                    catch (ObjectDisposedException imageDataEx)
+                    {
+                        _logger.LogError(imageDataEx, "🔧 [PHASE3.5_FIX] 画像データ取得中にObjectDisposedException - SafeImage内部で破棄済み");
+                        throw new InvalidOperationException("SafeImage data access failed due to disposal", imageDataEx);
+                    }
+                }
+                catch (ObjectDisposedException disposedEx)
+                {
+                    // 🔥 [PHASE3.5_FIX] ObjectDisposedException統一ハンドリング - オーバーレイ非表示問題の根本修正
+                    _logger.LogError(disposedEx, "💀 [SAFE_IMAGE] IImage変換でObjectDisposedException発生 - 画像が破棄済み");
+                    throw new InvalidOperationException("ReferencedSafeImage has been disposed and cannot be used for OCR caching", disposedEx);
+                }
+                catch (Exception unexpectedEx)
+                {
+                    _logger.LogError(unexpectedEx, "🔧 [PHASE3.5_FIX] ReferencedSafeImage処理で予期しないエラー: {ErrorType}", unexpectedEx.GetType().Name);
+                    throw new InvalidOperationException($"Unexpected error in ReferencedSafeImage processing: {unexpectedEx.Message}", unexpectedEx);
+                }
+            }
             // 🧠 [ULTRATHINK_TYPE_FIX] IAdvancedImage対応 - WindowsImageAdapter型不一致解決
-            if (regionOfInterest.HasValue && image is IAdvancedImage advancedImage)
+            else if (regionOfInterest.HasValue && image is IAdvancedImage advancedImage)
             {
                 // ROIが指定されている場合は切り取り処理
                 using var croppedImage = await advancedImage.ExtractRegionAsync(regionOfInterest.Value.ToMemoryRectangle()).ConfigureAwait(false);
@@ -127,8 +175,8 @@ public sealed class CachedOcrEngine : IOcrEngine
             }
             else
             {
-                // エラーメッセージ改善 - 対応型を明記
-                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: IAdvancedImage, IWindowsImage");
+                // エラーメッセージ改善 - ReferencedSafeImage対応を明記
+                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: ReferencedSafeImage, IAdvancedImage, IWindowsImage");
             }
             
             var imageHash = _cacheService.GenerateImageHash(imageData);

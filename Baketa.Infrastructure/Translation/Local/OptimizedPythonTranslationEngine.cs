@@ -64,6 +64,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
+    private readonly int _translationTimeoutMs; // CircuitBreakerから取得する翻訳タイムアウト（デフォルト120秒）
     
     // Python実行パス
     private readonly string _pythonPath;
@@ -87,7 +88,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         _resourceManager = resourceManager; // null許容（レガシー互換性維持）
-        
+
+        // CircuitBreakerのタイムアウト設定を取得（デフォルト120秒）
+        _translationTimeoutMs = _configuration.GetValue<int>("CircuitBreaker:TimeoutMs", 120000);
+        _logger.LogInformation("🔧 [TIMEOUT_CONFIG] 翻訳タイムアウト設定: {TimeoutMs}ms", _translationTimeoutMs);
+
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
         
@@ -1193,8 +1198,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（プール接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()にCircuitBreaker設定タイムアウト追加でNLLB-200モデルロード時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(_translationTimeoutMs));
                 jsonResponse = await connection.Reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（プール接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);
@@ -1207,8 +1212,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 _logger.LogInformation("[TIMING] ネットワーク送信（単発接続）: {ElapsedMs}ms", networkSendStopwatch.ElapsedMilliseconds);
                 
                 var networkReceiveStopwatch = Stopwatch.StartNew();
-                // 🔧 [TIMEOUT_FIX] ReadLineAsync()に15秒タイムアウト追加でPython処理時間を考慮
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                // 🔧 [TIMEOUT_FIX] ReadLineAsync()にCircuitBreaker設定タイムアウト追加でNLLB-200モデルロード時間を考慮
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(_translationTimeoutMs));
                 jsonResponse = await directReader!.ReadLineAsync(cts.Token).ConfigureAwait(false);
                 networkReceiveStopwatch.Stop();
                 _logger.LogInformation("[TIMING] ネットワーク受信（単発接続、Python処理含む）: {ElapsedMs}ms", networkReceiveStopwatch.ElapsedMilliseconds);

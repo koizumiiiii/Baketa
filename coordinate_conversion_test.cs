@@ -39,10 +39,10 @@ class CoordinateConversionTest
         
         // 期待値との比較
         var expectedScaledBounds = new Rectangle(
-            (int)(testRoiBounds.X * 2.0f), // スケールファクタ0.5の逆数
-            (int)(testRoiBounds.Y * 2.0f),
-            (int)(testRoiBounds.Width * 2.0f),
-            (int)(testRoiBounds.Height * 2.0f)
+            (int)(testRoiBounds.X * 4.0f), // スケールファクタ0.25の逆数
+            (int)(testRoiBounds.Y * 4.0f),
+            (int)(testRoiBounds.Width * 4.0f),
+            (int)(testRoiBounds.Height * 4.0f)
         );
         
         Console.WriteLine($"🎯 [EXPECTED] 期待されるスケーリング後座標: {expectedScaledBounds}");
@@ -85,9 +85,9 @@ class CoordinateConversionTest
         
         try
         {
-            // ROIスケールファクタ（通常0.5）を取得
+            // ROIスケールファクタ（CaptureModels.csのデフォルト値と一致）
             // TODO: 設定から動的に取得するように改善
-            const float roiScaleFactor = 0.5f;
+            const float roiScaleFactor = 0.25f;
             var inverseScale = 1.0f / roiScaleFactor;
             
             // 1. ROI座標を実際の画面座標にスケーリング

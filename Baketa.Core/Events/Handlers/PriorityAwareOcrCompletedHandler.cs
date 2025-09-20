@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events.EventTypes;
@@ -26,6 +27,7 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ILogger<PriorityAwareOcrCompletedHandler> _logger;
+    private readonly IConfiguration _configuration;
     
     // Phase 5設計値
     private const int MaxConcurrentTranslations = 3; // SemaphoreSlim制限値
@@ -40,11 +42,13 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     public PriorityAwareOcrCompletedHandler(
         IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
-        ILogger<PriorityAwareOcrCompletedHandler> logger)
+        ILogger<PriorityAwareOcrCompletedHandler> logger,
+        IConfiguration configuration)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     }
 
     /// <inheritdoc />
@@ -62,11 +66,13 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         {
             _logger.LogInformation("🎯 Phase5優先度付きOCR処理開始: {Count}個のテキスト領域を処理", eventData.Results.Count);
             
-            // 翻訳設定取得
+            // 翻訳設定取得（設定ベース言語使用）
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
             var translationSettings = _settingsService.GetTranslationSettings();
 
-            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
-                ? "auto" 
+            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage
+                ? defaultSourceLanguage
                 : translationSettings.DefaultSourceLanguage;
             var targetLanguageCode = translationSettings.DefaultTargetLanguage;
 

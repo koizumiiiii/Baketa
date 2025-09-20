@@ -304,16 +304,17 @@ public class PythonServerManager(
             try
             {
                 using var client = new TcpClient();
+                // Phase 25緊急修正: 接続タイムアウトを5秒に延長し、より確実な検出を実施
                 await client.ConnectAsync(IPAddress.Loopback, port)
-                    .WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-                
-                logger.LogInformation("🔍 外部翻訳サーバー検出成功: Port {Port}", port);
+                    .WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+                logger.LogInformation("🔍 [Phase 25修正] 外部翻訳サーバー検出成功: Port {Port}", port);
                 return port;
             }
-            catch
+            catch (Exception ex)
             {
                 // 接続失敗 - 次のポートをチェック
-                logger.LogDebug("🔍 外部サーバーチェック: Port {Port} - 利用不可", port);
+                logger.LogDebug("🔍 [Phase 25修正] 外部サーバーチェック: Port {Port} - 利用不可, Error: {Error}", port, ex.Message);
             }
         }
         

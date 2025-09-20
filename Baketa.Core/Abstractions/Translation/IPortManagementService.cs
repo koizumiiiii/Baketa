@@ -14,7 +14,7 @@ public interface IPortManagementService : IDisposable
     /// <returns>取得したポート番号</returns>
     /// <exception cref="InvalidOperationException">利用可能なポートがない場合</exception>
     /// <exception cref="TimeoutException">Mutex取得がタイムアウトした場合</exception>
-    Task<int> AcquireAvailablePortAsync(int startPort = 5557, int endPort = 5562);
+    Task<int> AcquireAvailablePortAsync(int startPort = 5556, int endPort = 5562);
     
     /// <summary>
     /// ポートを解放します

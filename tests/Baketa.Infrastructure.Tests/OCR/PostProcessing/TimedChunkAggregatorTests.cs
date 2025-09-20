@@ -6,6 +6,7 @@ using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Services;
 using System.Drawing;
 using Moq;
 
@@ -15,6 +16,7 @@ public class TimedChunkAggregatorTests : IDisposable
 {
     private readonly ILogger<TimedChunkAggregator> _logger;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor;
+    private readonly Mock<ICoordinateTransformationService> _coordinateTransformationServiceMock;
     private readonly TimedAggregatorSettings _settings;
     private readonly TimedChunkAggregator _aggregator;
 
@@ -23,19 +25,26 @@ public class TimedChunkAggregatorTests : IDisposable
         _logger = NullLogger<TimedChunkAggregator>.Instance;
         _lineBreakProcessor = new CoordinateBasedLineBreakProcessor(
             NullLogger<CoordinateBasedLineBreakProcessor>.Instance);
-        
+
+        // Setup coordinate transformation service mock
+        _coordinateTransformationServiceMock = new Mock<ICoordinateTransformationService>();
+        _coordinateTransformationServiceMock
+            .Setup(x => x.ConvertRoiToScreenCoordinates(It.IsAny<Rectangle>(), It.IsAny<IntPtr>(), It.IsAny<float>()))
+            .Returns((Rectangle rect, IntPtr handle, float scale) => rect); // Return original rect for testing
+
         _settings = new TimedAggregatorSettings
         {
             IsFeatureEnabled = true,
             BufferDelayMs = 1000
         };
-        
+
         var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
         optionsMonitorMock.Setup(x => x.CurrentValue).Returns(_settings);
-        
+
         _aggregator = new TimedChunkAggregator(
             optionsMonitorMock.Object,
             _lineBreakProcessor,
+            _coordinateTransformationServiceMock.Object,
             _logger);
     }
 
@@ -175,6 +184,7 @@ public class TimedChunkAggregatorTests : IDisposable
         using var testAggregator = new TimedChunkAggregator(
             optionsMonitorMock.Object,
             _lineBreakProcessor,
+            _coordinateTransformationServiceMock.Object,
             _logger);
             
         var aggregatedChunks = new List<TextChunk>();
@@ -220,6 +230,7 @@ public class TimedChunkAggregatorTests : IDisposable
         using var testAggregator = new TimedChunkAggregator(
             optionsMonitorMock.Object,
             _lineBreakProcessor,
+            _coordinateTransformationServiceMock.Object,
             _logger);
             
         var aggregationEventCount = 0;

@@ -172,8 +172,9 @@ public static class BaketaConstants
     {
         /// <summary>
         /// 基本タイムアウト（ミリ秒）
+        /// NLLB-200初回モデルロード時間を考慮して120秒に設定
         /// </summary>
-        public const int BaseTimeoutMs = 15000; // 15秒
+        public const int BaseTimeoutMs = 120000; // 120秒
 
         /// <summary>
         /// OCR処理比率

@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.Imaging;
 using IImageFactoryInterface = Baketa.Core.Abstractions.Factories.IImageFactory;
 using IWindowsImageFactoryInterface = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Infrastructure.Platform.Windows;
 
 namespace Baketa.Infrastructure.Platform.Adapters;
@@ -13,19 +14,26 @@ namespace Baketa.Infrastructure.Platform.Adapters;
 
     /// <summary>
     /// WindowsImageAdapterFactory - Windows画像をIImageに変換するファクトリー
+    /// Phase 3.2: SafeImageFactory統合対応
     /// </summary>
     public class WindowsImageAdapterFactory : IImageFactoryInterface
     {
         private readonly IWindowsImageFactoryInterface _windowsImageFactory;
-        
+        private readonly ISafeImageFactory _safeImageFactory;
+
         /// <summary>
         /// WindowsImageAdapterFactoryコンストラクタ
         /// </summary>
         /// <param name="windowsImageFactory">Windows画像ファクトリインターフェース</param>
-        public WindowsImageAdapterFactory(IWindowsImageFactoryInterface windowsImageFactory)
+        /// <param name="safeImageFactory">SafeImage ファクトリインターフェース</param>
+        public WindowsImageAdapterFactory(
+            IWindowsImageFactoryInterface windowsImageFactory,
+            ISafeImageFactory safeImageFactory)
         {
             ArgumentNullException.ThrowIfNull(windowsImageFactory, nameof(windowsImageFactory));
+            ArgumentNullException.ThrowIfNull(safeImageFactory, nameof(safeImageFactory));
             _windowsImageFactory = windowsImageFactory;
+            _safeImageFactory = safeImageFactory;
         }
 
         /// <summary>
@@ -41,12 +49,26 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         
         /// <summary>
         /// バイト配列から画像を作成します。
+        /// Phase 3.2: SafeImage統合による ObjectDisposedException防止
         /// </summary>
         /// <param name="imageData">画像データ</param>
         /// <returns>作成された画像</returns>
         public async Task<IImage> CreateFromBytesAsync(byte[] imageData)
         {
-            var windowsImage = await _windowsImageFactory.CreateFromBytesAsync(imageData).ConfigureAwait(false);
+            // 🎯 Phase 3.2: SafeImageを使用してObjectDisposedException防止
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            var width = bitmap.Width;
+            var height = bitmap.Height;
+
+            // SafeImageFactoryでメモリ安全な画像を作成
+            var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, width, height);
+
+            // SafeImageからBitmapを再構築
+            using var safeImageAdapter = new SafeImageAdapter(safeImage);
+            var safeBitmap = safeImageAdapter.GetBitmap();
+
+            // WindowsImageを作成し、WindowsImageAdapterでラップしてIImage対応
+            var windowsImage = new WindowsImage(safeBitmap);
             return new WindowsImageAdapter(windowsImage);
         }
         

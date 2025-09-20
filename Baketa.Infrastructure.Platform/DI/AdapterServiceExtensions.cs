@@ -41,7 +41,7 @@ namespace Baketa.Infrastructure.Platform.DI;
             // Core.Abstractions版のWindowManagerAdapter登録（独立した実装）
             services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>(sp => {
                 var windowManager = sp.GetRequiredService<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>();
-                return new CoreWindowManagerAdapterStub(windowManager);
+                return new CoreWindowManagerAdapter(windowManager);
             });
             
             return services;

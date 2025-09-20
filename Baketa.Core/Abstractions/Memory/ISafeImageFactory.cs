@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Drawing;
 
 namespace Baketa.Core.Abstractions.Memory;
 
@@ -28,4 +29,14 @@ public interface ISafeImageFactory
         int height,
         ImagePixelFormat pixelFormat,
         Guid id);
+
+    /// <summary>
+    /// BitmapからSafeImageインスタンスを生成
+    /// Phase 3.2: WindowsImageAdapterFactory統合のために追加
+    /// </summary>
+    /// <param name="bitmap">ソースBitmap</param>
+    /// <param name="width">画像幅</param>
+    /// <param name="height">画像高さ</param>
+    /// <returns>生成されたSafeImageインスタンス</returns>
+    SafeImage CreateFromBitmap(Bitmap bitmap, int width, int height);
 }

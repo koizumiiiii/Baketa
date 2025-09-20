@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Infrastructure.Platform.Windows;
 using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
+using GdiImageFormat = System.Drawing.Imaging.ImageFormat;
 using GdiRectangle = System.Drawing.Rectangle;
 using SafePixelFormat = Baketa.Core.Abstractions.Memory.ImagePixelFormat;
 
@@ -15,6 +16,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
 /// <summary>
 /// SafeImageをIWindowsImageインターフェースでラップするアダプター
 /// Phase 3.1: ObjectDisposedException防止のための統合アダプター
+/// Phase 3.2: シンプルな実装でWindowsImageAdapterFactory統合
 /// </summary>
 public sealed class SafeImageAdapter : IWindowsImage
 {
@@ -65,7 +67,7 @@ public sealed class SafeImageAdapter : IWindowsImage
         ThrowIfDisposed();
         using var bitmap = CreateBitmapFromSafeImage();
         using var memoryStream = new MemoryStream();
-        bitmap.Save(memoryStream, ImageFormat.Png);
+        bitmap.Save(memoryStream, GdiImageFormat.Png);
         return memoryStream.ToArray();
     }
 
@@ -74,7 +76,7 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// </summary>
     /// <param name="format">画像フォーマット</param>
     /// <returns>指定フォーマットでの画像データ</returns>
-    public byte[] ToByteArray(ImageFormat format)
+    public byte[] ToByteArray(GdiImageFormat format)
     {
         ThrowIfDisposed();
 
@@ -147,7 +149,7 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// </summary>
     /// <param name="filePath">保存先ファイルパス</param>
     /// <param name="format">画像フォーマット</param>
-    public void SaveToFile(string filePath, ImageFormat format)
+    public void SaveToFile(string filePath, GdiImageFormat format)
     {
         ThrowIfDisposed();
 
@@ -171,14 +173,14 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// <param name="path">保存先パス</param>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>
     /// <returns>非同期タスク</returns>
-    public async Task SaveAsync(string path, ImageFormat? format = null)
+    public async Task SaveAsync(string path, GdiImageFormat? format = null)
     {
         ThrowIfDisposed();
 
         await Task.Run(() =>
         {
             using var bitmap = CreateBitmapFromSafeImage();
-            bitmap.Save(path, format ?? ImageFormat.Png);
+            bitmap.Save(path, format ?? GdiImageFormat.Png);
         }).ConfigureAwait(false);
     }
 
@@ -235,7 +237,7 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// </summary>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>
     /// <returns>画像データのバイト配列</returns>
-    public async Task<byte[]> ToByteArrayAsync(ImageFormat? format = null)
+    public async Task<byte[]> ToByteArrayAsync(GdiImageFormat? format = null)
     {
         ThrowIfDisposed();
 
@@ -251,7 +253,7 @@ public sealed class SafeImageAdapter : IWindowsImage
                 Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}, PixelFormat: {bitmap.PixelFormat}");
                 
                 using var memoryStream = new MemoryStream();
-                bitmap.Save(memoryStream, format ?? ImageFormat.Png);
+                bitmap.Save(memoryStream, format ?? GdiImageFormat.Png);
                 
                 var result = memoryStream.ToArray();
                 Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.Save完了 - 出力データサイズ: {result.Length}bytes");

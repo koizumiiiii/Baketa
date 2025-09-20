@@ -31,7 +31,7 @@ public sealed class PipelineExecutionManager : IPipelineExecutionManager, IDispo
     public bool IsExecuting => _isExecuting;
 
     /// <inheritdoc />
-    public async Task<T> ExecuteExclusivelyAsync<T>(Func<Task<T>> pipelineFunc, CancellationToken cancellationToken = default)
+    public async Task<T> ExecuteExclusivelyAsync<T>(Func<CancellationToken, Task<T>> pipelineFunc, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(pipelineFunc);
@@ -47,10 +47,15 @@ public sealed class PipelineExecutionManager : IPipelineExecutionManager, IDispo
             _isExecuting = true;
             _logger.LogInformation("🎯 [STRATEGY_A] パイプライン排他実行開始 - ID: {PipelineId}", pipelineId);
 
-            var result = await pipelineFunc().ConfigureAwait(false);
+            var result = await pipelineFunc(cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("🎯 [STRATEGY_A] パイプライン排他実行完了 - ID: {PipelineId}", pipelineId);
             return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("🎯 [STRATEGY_A] パイプライン実行はキャンセルされました - ID: {PipelineId}", pipelineId);
+            throw;
         }
         catch (Exception ex)
         {

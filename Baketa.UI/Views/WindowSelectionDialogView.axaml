@@ -68,14 +68,26 @@
         </StackPanel>
         
         <Button Grid.Column="1"
-                Width="32" Height="32"
-                Background="Transparent"
-                BorderThickness="0"
+                Width="40" Height="32"
+                Background="#F0F0F0"
+                BorderBrush="#D0D0D0"
+                BorderThickness="1"
+                CornerRadius="6"
                 Command="{Binding RefreshCommand}"
                 ToolTip.Tip="ウィンドウリストを更新">
+          <Button.Styles>
+            <Style Selector="Button:pointerover">
+              <Setter Property="Background" Value="#E3F2FD"/>
+              <Setter Property="BorderBrush" Value="#0078D4"/>
+            </Style>
+            <Style Selector="Button:pressed">
+              <Setter Property="Background" Value="#BBDEFB"/>
+              <Setter Property="BorderBrush" Value="#0078D4"/>
+            </Style>
+          </Button.Styles>
           <PathIcon Width="16" Height="16"
                     Data="{StaticResource RefreshIcon}"
-                    Foreground="#606060"/>
+                    Foreground="#0078D4"/>
         </Button>
       </Grid>
     </Border>

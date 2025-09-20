@@ -20,25 +20,29 @@ public static class ProcessingServiceExtensions
     {
         // 🎯 UltraThink Phase 21 修正: OCR処理パイプライン復旧のためのDI登録
 
-        // 1. SmartProcessingPipelineService本体を登録
+        // 1. PipelineExecutionManager を登録（Strategy A: 排他制御実装）
+        services.AddSingleton<IPipelineExecutionManager, PipelineExecutionManager>();
+
+        // 2. SmartProcessingPipelineService本体を登録
         services.AddSingleton<ISmartProcessingPipelineService, SmartProcessingPipelineService>();
 
-        // 2. 処理戦略をすべて登録（IEnumerable<IProcessingStageStrategy>として注入される）
+        // 3. 処理戦略をすべて登録（IEnumerable<IProcessingStageStrategy>として注入される）
         services.AddTransient<IProcessingStageStrategy, OcrExecutionStageStrategy>();
         services.AddTransient<IProcessingStageStrategy, TranslationExecutionStageStrategy>();
         services.AddTransient<IProcessingStageStrategy, ImageChangeDetectionStageStrategy>();
         services.AddTransient<IProcessingStageStrategy, TextChangeDetectionStageStrategy>();
 
-        // 3. デバッグ用ログ出力
-        services.AddSingleton<IServiceCollection>(provider => 
+        // 4. デバッグ用ログ出力
+        services.AddSingleton<IServiceCollection>(provider =>
         {
             // サービス登録確認のログ出力
-            Console.WriteLine("🔧 [DI_FIX] ProcessingServices登録完了 - SmartProcessingPipelineService + 4戦略");
-            Console.WriteLine("🔧 [DI_FIX]   - ISmartProcessingPipelineService → SmartProcessingPipelineService");
-            Console.WriteLine("🔧 [DI_FIX]   - IProcessingStageStrategy → OcrExecutionStageStrategy");
-            Console.WriteLine("🔧 [DI_FIX]   - IProcessingStageStrategy → TranslationExecutionStageStrategy");
-            Console.WriteLine("🔧 [DI_FIX]   - IProcessingStageStrategy → ImageChangeDetectionStageStrategy");
-            Console.WriteLine("🔧 [DI_FIX]   - IProcessingStageStrategy → TextChangeDetectionStageStrategy");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX] ProcessingServices登録完了 - PipelineExecutionManager + SmartProcessingPipelineService + 4戦略");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IPipelineExecutionManager → PipelineExecutionManager (排他制御)");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - ISmartProcessingPipelineService → SmartProcessingPipelineService");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → OcrExecutionStageStrategy");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → TranslationExecutionStageStrategy");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → ImageChangeDetectionStageStrategy");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → TextChangeDetectionStageStrategy");
             return services;
         });
 

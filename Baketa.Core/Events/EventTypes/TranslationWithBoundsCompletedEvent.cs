@@ -40,7 +40,7 @@ public class TranslationWithBoundsCompletedEvent(
     /// <summary>
     /// 元言語コード
     /// </summary>
-    public string SourceLanguage { get; } = sourceLanguage ?? "auto";
+    public string SourceLanguage { get; } = sourceLanguage ?? "en";
 
     /// <summary>
     /// 翻訳先言語コード

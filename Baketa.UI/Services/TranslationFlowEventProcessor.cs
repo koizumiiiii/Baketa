@@ -98,15 +98,30 @@ public class TranslationFlowEventProcessor :
         Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
         Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
         
-        DebugLogUtility.WriteLog($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        DebugLogUtility.WriteLog($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
-        DebugLogUtility.WriteLog($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
-        
-        // ファイルログで確実に記録
-        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
-        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
-        
+        // 🚨 デッドロック問題修正: ログ出力を例外処理で囲む
+        try
+        {
+            DebugLogUtility.WriteLog($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+            DebugLogUtility.WriteLog($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
+            DebugLogUtility.WriteLog($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+        }
+        catch (Exception logEx)
+        {
+            Console.WriteLine($"⚠️ DebugLogUtility書き込みエラー（無視して継続）: {logEx.Message}");
+        }
+
+        // 🚨 デッドロック問題修正: SafeFileLoggerを例外処理で囲む
+        try
+        {
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+        }
+        catch (Exception logEx)
+        {
+            Console.WriteLine($"⚠️ SafeFileLogger書き込みエラー（無視して継続）: {logEx.Message}");
+        }
+
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
             eventData.TargetWindow?.Title ?? "null", eventData.TargetWindow?.Handle ?? IntPtr.Zero);

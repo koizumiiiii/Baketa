@@ -219,43 +219,102 @@ public class InPlaceTranslationOverlayManager(
         // 初期化後にもう一度キャンセレーションチェック
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 🔍 [DISPLAY_DEBUG] オーバーレイ表示直前のテキスト内容をログ出力
-        Console.WriteLine($"🔍 [DISPLAY_DEBUG] ShowInPlaceOverlayAsync - ChunkId: {textChunk.ChunkId}");
-        Console.WriteLine($"🔍 [DISPLAY_DEBUG] CombinedText: '{textChunk.CombinedText}'");
-        Console.WriteLine($"🔍 [DISPLAY_DEBUG] TranslatedText: '{textChunk.TranslatedText}'");
-        Console.WriteLine($"🔍 [DISPLAY_DEBUG] CanShowInPlace: {textChunk.CanShowInPlace()}");
-        Console.WriteLine($"🔍 [DISPLAY_DEBUG] Bounds: X={textChunk.CombinedBounds.X}, Y={textChunk.CombinedBounds.Y}, W={textChunk.CombinedBounds.Width}, H={textChunk.CombinedBounds.Height}");
-        
-        // 🚫 [TRANSLATION_ONLY] 失敗・エラー結果の表示を包括的に防止
-        if (!TranslationValidator.IsValid(textChunk.TranslatedText, textChunk.CombinedText))
+        // 🔍 [P2_COORDINATE_DEBUG] オーバーレイ表示直前の詳細監視
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] ShowInPlaceOverlayAsync - ChunkId: {textChunk.ChunkId}");
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] 入力ROI座標: X={textChunk.CombinedBounds.X}, Y={textChunk.CombinedBounds.Y}, W={textChunk.CombinedBounds.Width}, H={textChunk.CombinedBounds.Height}");
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] ソースウィンドウハンドル: {textChunk.SourceWindowHandle}");
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] CombinedText: '{textChunk.CombinedText}'");
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] TranslatedText: '{textChunk.TranslatedText}'");
+        Console.WriteLine($"🔍 [P2_COORDINATE_DEBUG] CanShowInPlace: {textChunk.CanShowInPlace()}");
+
+        // 🎯 [P2_DPI_DEBUG] DPI・システム情報の詳細監視
+        // TODO: Avalonia API調査後にDPI取得実装
+        Console.WriteLine($"🎯 [P2_DPI_DEBUG] システムDPIスケール取得予定（API調査中）");
+
+        // 🖥️ [P2_MONITOR_DEBUG] モニター情報の詳細監視
+        try
         {
-            Console.WriteLine($"🚫 [TRANSLATION_ONLY] 無効な翻訳結果のため表示をスキップ - ChunkId: {textChunk.ChunkId}, 結果: '{textChunk.TranslatedText}'");
-            _logger.LogDebug("無効な翻訳結果のため表示をスキップ - ChunkId: {ChunkId}, 結果: {Result}", textChunk.ChunkId, textChunk.TranslatedText ?? "null");
+            var monitor = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
+            Console.WriteLine($"🖥️ [P2_MONITOR_DEBUG] 検出モニター: {monitor.Name}");
+            Console.WriteLine($"🖥️ [P2_MONITOR_DEBUG] モニター解像度: {monitor.Bounds.Width}x{monitor.Bounds.Height}");
+            Console.WriteLine($"🖥️ [P2_MONITOR_DEBUG] モニター位置: X={monitor.Bounds.X}, Y={monitor.Bounds.Y}");
+            Console.WriteLine($"🖥️ [P2_MONITOR_DEBUG] 作業領域: モニター情報から取得予定（API調査中）");
+        }
+        catch (Exception monitorEx)
+        {
+            Console.WriteLine($"⚠️ [P2_MONITOR_DEBUG] モニター情報取得失敗: {monitorEx.Message}");
+        }
+
+        _logger.LogDebug("[P2_COORDINATE_DEBUG] オーバーレイ表示開始 - ChunkId: {ChunkId}, 入力ROI: ({X},{Y},{W},{H}), Handle: {Handle}",
+            textChunk.ChunkId, textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y,
+            textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height, textChunk.SourceWindowHandle);
+        
+        // 🚫 [P2_VALIDATION_DEBUG] 表示条件検証の詳細監視
+        Console.WriteLine($"🔍 [P2_VALIDATION_DEBUG] === 表示条件検証開始 (ChunkId: {textChunk.ChunkId}) ===");
+
+        var isTranslationValid = TranslationValidator.IsValid(textChunk.TranslatedText, textChunk.CombinedText);
+        Console.WriteLine($"🔍 [P2_VALIDATION_DEBUG] 翻訳結果妥当性: {isTranslationValid}");
+        Console.WriteLine($"🔍 [P2_VALIDATION_DEBUG] 翻訳テキスト長: {textChunk.TranslatedText?.Length ?? 0}");
+        Console.WriteLine($"🔍 [P2_VALIDATION_DEBUG] 元テキスト長: {textChunk.CombinedText?.Length ?? 0}");
+
+        if (!isTranslationValid)
+        {
+            Console.WriteLine($"🚫 [P2_VALIDATION_DEBUG] 無効な翻訳結果のため表示をスキップ - ChunkId: {textChunk.ChunkId}, 結果: '{textChunk.TranslatedText}'");
+            _logger.LogWarning("[P2_VALIDATION_DEBUG] 無効な翻訳結果スキップ - ChunkId: {ChunkId}, TranslatedText: {TranslatedText}, CombinedText: {CombinedText}",
+                textChunk.ChunkId, textChunk.TranslatedText ?? "null", textChunk.CombinedText ?? "null");
             return;
         }
-        
-        if (!textChunk.CanShowInPlace())
+
+        var canShowInPlace = textChunk.CanShowInPlace();
+        Console.WriteLine($"🔍 [P2_VALIDATION_DEBUG] インプレース表示可能: {canShowInPlace}");
+
+        if (!canShowInPlace)
         {
-            _logger.LogWarning("インプレース表示条件を満たしていません: {InPlaceLog}", textChunk.ToInPlaceLogString());
+            Console.WriteLine($"🚫 [P2_VALIDATION_DEBUG] インプレース表示条件未満 - ChunkId: {textChunk.ChunkId}");
+            _logger.LogWarning("[P2_VALIDATION_DEBUG] インプレース表示条件を満たしていません - ChunkId: {ChunkId}, Log: {InPlaceLog}",
+                textChunk.ChunkId, textChunk.ToInPlaceLogString());
             return;
         }
+
+        Console.WriteLine($"✅ [P2_VALIDATION_DEBUG] === 表示条件検証合格 (ChunkId: {textChunk.ChunkId}) ===");
 
         try
         {
             // オーバーレイ処理直前のキャンセレーションチェック
             cancellationToken.ThrowIfCancellationRequested();
             
-            // 既存のオーバーレイをチェック
-            if (_activeOverlays.TryGetValue(textChunk.ChunkId, out var existingOverlay))
+            // 🔍 [P2_OVERLAY_BRANCH] オーバーレイ処理分岐の詳細監視
+            var hasExistingOverlay = _activeOverlays.TryGetValue(textChunk.ChunkId, out var existingOverlay);
+            Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] === オーバーレイ処理分岐 (ChunkId: {textChunk.ChunkId}) ===");
+            Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 既存オーバーレイ存在: {hasExistingOverlay}");
+            Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 総アクティブオーバーレイ数: {_activeOverlays.Count}");
+
+            if (hasExistingOverlay && existingOverlay != null)
             {
+                Console.WriteLine($"🔄 [P2_OVERLAY_BRANCH] 既存オーバーレイ更新処理開始 - ChunkId: {textChunk.ChunkId}");
+
+                // 既存オーバーレイの状態確認
+                try
+                {
+                    Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 既存オーバーレイ状態: Visible={existingOverlay.IsVisible}, Position=({existingOverlay.Position.X},{existingOverlay.Position.Y})");
+                }
+                catch (Exception stateEx)
+                {
+                    Console.WriteLine($"⚠️ [P2_OVERLAY_BRANCH] 既存オーバーレイ状態確認失敗: {stateEx.Message}");
+                }
+
                 // 既存のオーバーレイを更新
                 await existingOverlay.UpdateInPlaceContentAsync(textChunk, cancellationToken).ConfigureAwait(false);
-                _logger.LogDebug("既存インプレースオーバーレイを更新 - ChunkId: {ChunkId}", textChunk.ChunkId);
+                Console.WriteLine($"✅ [P2_OVERLAY_BRANCH] 既存オーバーレイ更新完了 - ChunkId: {textChunk.ChunkId}");
+                _logger.LogInformation("[P2_OVERLAY_BRANCH] 既存インプレースオーバーレイ更新完了 - ChunkId: {ChunkId}", textChunk.ChunkId);
             }
             else
             {
+                Console.WriteLine($"🆕 [P2_OVERLAY_BRANCH] 新規オーバーレイ作成処理開始 - ChunkId: {textChunk.ChunkId}");
+
                 // 新規インプレースオーバーレイを作成・表示
                 await CreateAndShowNewInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
+                Console.WriteLine($"✅ [P2_OVERLAY_BRANCH] 新規オーバーレイ作成完了 - ChunkId: {textChunk.ChunkId}");
             }
 
             // 📊 [DIAGNOSTIC] オーバーレイ表示成功イベント
@@ -355,29 +414,53 @@ public class InPlaceTranslationOverlayManager(
                 // オーバーレイ表示直前のキャンセレーションチェック
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                // 🎯 Phase 11.1: IOverlayPositioningServiceによる精密位置調整
+                // 🎯 [P2_COORDINATE_TRANSFORM] IOverlayPositioningServiceによる精密座標変換詳細監視
                 System.Drawing.Point optimalPosition;
                 try
                 {
                     var overlaySize = textChunk.GetOverlaySize();
                     var options = new OverlayPositioningOptions(); // デフォルト設定を使用
-                    
-                    // 🎯 Phase 11.4: Gemini指摘事項対応 - 実際のモニター情報取得
-                    // textChunk.SourceWindowHandleから最適なモニターを動的に決定
+
+                    // 🔍 [P2_COORDINATE_TRANSFORM] 座標変換前の詳細情報
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] === 座標変換開始 (ChunkId: {textChunk.ChunkId}) ===");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 入力ROI座標: ({textChunk.CombinedBounds.X},{textChunk.CombinedBounds.Y}) サイズ: {textChunk.CombinedBounds.Width}x{textChunk.CombinedBounds.Height}");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 計算オーバーレイサイズ: {overlaySize.Width}x{overlaySize.Height}");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 既存オーバーレイ数: {existingBounds.Count}");
+
+                    // 🎯 Phase 11.4: 実際のモニター情報取得と詳細ログ
                     var actualMonitor = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
-                    
+
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 対象モニター: {actualMonitor.Name}");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] モニター境界: ({actualMonitor.Bounds.X},{actualMonitor.Bounds.Y}) サイズ: {actualMonitor.Bounds.Width}x{actualMonitor.Bounds.Height}");
+                    // TODO: [P2_COORDINATE_DEBUG] WorkingAreaプロパティAPI実装後に有効化
+                    // Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 作業領域: ({actualMonitor.WorkingArea.X},{actualMonitor.WorkingArea.Y}) サイズ: {actualMonitor.WorkingArea.Width}x{actualMonitor.WorkingArea.Height}");
+
+                    // 座標変換実行
                     var result = _overlayPositioningService.CalculateOptimalPosition(
                         textChunk, overlaySize, actualMonitor, existingBounds, options);
-                    
+
                     optimalPosition = result.Position;
-                    
-                    Console.WriteLine($"🎯 [PHASE11.4] 実モニター情報による精密位置計算完了 - ChunkId: {textChunk.ChunkId}, " +
-                                    $"Position: ({optimalPosition.X},{optimalPosition.Y}), Strategy: {result.UsedStrategy}, " +
-                                    $"Monitor: {actualMonitor.Name} ({actualMonitor.Bounds.Width}x{actualMonitor.Bounds.Height}), " +
-                                    $"ExistingOverlays: {existingBounds.Count}");
-                                    
-                    _logger.LogDebug("Phase 11.4実モニター情報による精密位置調整完了 - ChunkId: {ChunkId}, Strategy: {Strategy}, Position: ({X},{Y}), Monitor: {MonitorName}",
-                        textChunk.ChunkId, result.UsedStrategy, optimalPosition.X, optimalPosition.Y, actualMonitor.Name);
+
+                    // 🔍 [P2_COORDINATE_TRANSFORM] 座標変換結果の詳細ログ
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] === 座標変換完了 (ChunkId: {textChunk.ChunkId}) ===");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 最終スクリーン座標: ({optimalPosition.X},{optimalPosition.Y})");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 使用戦略: {result.UsedStrategy}");
+                    Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 座標変換量: ΔX={optimalPosition.X - textChunk.CombinedBounds.X}, ΔY={optimalPosition.Y - textChunk.CombinedBounds.Y}");
+
+                    // 🎯 [P2_COORDINATE_VALIDATION] 座標妥当性検証
+                    // TODO: [P2_COORDINATE_DEBUG] Contains・WorkingAreaプロパティAPI実装後に有効化
+                    var geometryPoint = new Baketa.Core.UI.Geometry.Point(optimalPosition.X, optimalPosition.Y);
+                    var isInMonitorBounds = actualMonitor.Bounds.Contains(geometryPoint);
+                    // var isInWorkingArea = actualMonitor.WorkingArea.Contains(geometryPoint);
+                    Console.WriteLine($"🎯 [P2_COORDINATE_VALIDATION] モニター境界内: {isInMonitorBounds}");
+
+                    if (!isInMonitorBounds)
+                    {
+                        Console.WriteLine($"⚠️ [P2_COORDINATE_VALIDATION] 警告: 座標がモニター境界外 - 座標: ({optimalPosition.X},{optimalPosition.Y}), モニター境界: {actualMonitor.Bounds}");
+                    }
+
+                    _logger.LogInformation("[P2_COORDINATE_TRANSFORM] 座標変換完了 - ChunkId: {ChunkId}, ROI: ({RoiX},{RoiY}→{FinalX},{FinalY}), Strategy: {Strategy}, Monitor: {MonitorName}",
+                        textChunk.ChunkId, textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y, optimalPosition.X, optimalPosition.Y, result.UsedStrategy, actualMonitor.Name);
                 }
                 catch (Exception ex)
                 {
@@ -392,11 +475,33 @@ public class InPlaceTranslationOverlayManager(
                 // 一時的なTextChunkで精密位置調整結果を適用
                 var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, optimalPosition);
                 
+                // 🎯 [P2_OVERLAY_DISPLAY] オーバーレイ表示前の最終状態確認
+                Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] === オーバーレイ表示開始 (ChunkId: {textChunk.ChunkId}) ===");
+                Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] 調整後TextChunk座標: ({adjustedTextChunk.CombinedBounds.X},{adjustedTextChunk.CombinedBounds.Y}) サイズ: {adjustedTextChunk.CombinedBounds.Width}x{adjustedTextChunk.CombinedBounds.Height}");
+                Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] 表示テキスト: '{adjustedTextChunk.TranslatedText}'");
+                Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] newOverlay作成状態: {newOverlay != null}");
+
                 // Phase 11.1精密位置でインプレース表示を開始
                 await newOverlay.ShowInPlaceOverlayAsync(adjustedTextChunk, cancellationToken).ConfigureAwait(false);
-                
-                _logger.LogDebug("新規インプレースオーバーレイ表示完了（Phase 11.1精密位置調整） - ChunkId: {ChunkId}, Position: ({X},{Y})", 
-                    textChunk.ChunkId, optimalPosition.X, optimalPosition.Y);
+
+                // 🎯 [P2_OVERLAY_DISPLAY] 表示完了後のオーバーレイウィンドウ状態監視
+                Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] === オーバーレイ表示完了 (ChunkId: {textChunk.ChunkId}) ===");
+                try
+                {
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ可視性: {newOverlay.IsVisible}");
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ位置: ({newOverlay.Position.X},{newOverlay.Position.Y})");
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウサイズ: {newOverlay.ClientSize.Width}x{newOverlay.ClientSize.Height}");
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Topmost設定: {newOverlay.Topmost}");
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Opacity設定: {newOverlay.Opacity}");
+                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] WindowState: {newOverlay.WindowState}");
+                }
+                catch (Exception displayEx)
+                {
+                    Console.WriteLine($"⚠️ [P2_OVERLAY_DISPLAY] ウィンドウ状態取得失敗: {displayEx.Message}");
+                }
+
+                _logger.LogInformation("[P2_OVERLAY_DISPLAY] 新規オーバーレイ表示完了 - ChunkId: {ChunkId}, FinalPosition: ({X},{Y}), Visible: {IsVisible}",
+                    textChunk.ChunkId, optimalPosition.X, optimalPosition.Y, newOverlay.IsVisible);
             }
             else
             {
@@ -775,9 +880,17 @@ public class InPlaceTranslationOverlayManager(
 
         try
         {
-            Console.WriteLine($"🎯 [OVERLAY] 翻訳結果オーバーレイ処理開始 - Text: '{eventData.Text}', Area: {eventData.DisplayArea}");
-            _logger.LogDebug("翻訳結果OverlayUpdateEvent処理開始 - Text: {Text}, DisplayArea: {Area}", 
-                eventData.Text, eventData.DisplayArea);
+            // 🔍 [P2_EVENT_DEBUG] OverlayUpdateEvent処理の詳細監視
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] === OverlayUpdateEvent処理開始 ===");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] イベントタイプ: 翻訳結果 (IsTranslationResult: {eventData.IsTranslationResult})");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] 表示テキスト: '{eventData.Text}'");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] 表示エリア: ({eventData.DisplayArea.X},{eventData.DisplayArea.Y}) サイズ: {eventData.DisplayArea.Width}x{eventData.DisplayArea.Height}");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] 元テキスト: '{eventData.OriginalText}'");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] 言語: {eventData.SourceLanguage} → {eventData.TargetLanguage}");
+            Console.WriteLine($"🔍 [P2_EVENT_DEBUG] マネージャー状態: 初期化={_isInitialized}, 破棄={_disposed}");
+
+            _logger.LogInformation("[P2_EVENT_DEBUG] OverlayUpdateEvent処理開始 - Text: {Text}, Area: ({X},{Y},{W},{H}), IsTranslation: {IsTranslation}",
+                eventData.Text, eventData.DisplayArea.X, eventData.DisplayArea.Y, eventData.DisplayArea.Width, eventData.DisplayArea.Height, eventData.IsTranslationResult);
 
             // UIスレッドでオーバーレイ表示処理を実行
             await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -789,10 +902,18 @@ public class InPlaceTranslationOverlayManager(
                     await InitializeAsync().ConfigureAwait(false);
                 }
 
+                // 🔍 [P2_EVENT_TEXTCHUNK] TextChunk作成過程の詳細監視
+                var chunkId = eventData.GetHashCode();
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] === TextChunk作成開始 ===");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] 生成ChunkId: {chunkId}");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] DisplayArea→CombinedBounds: ({eventData.DisplayArea.X},{eventData.DisplayArea.Y}) サイズ: {eventData.DisplayArea.Width}x{eventData.DisplayArea.Height}");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] SourceLanguage: {eventData.SourceLanguage ?? "null"}");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] IsTranslationResult: {eventData.IsTranslationResult}");
+
                 // オーバーレイ表示のためにTextChunkを作成
                 var textChunk = new TextChunk
                 {
-                    ChunkId = eventData.GetHashCode(), // イベントデータのハッシュをチャンクIDとして使用
+                    ChunkId = chunkId, // イベントデータのハッシュをチャンクIDとして使用
                     TextResults = [], // 空のリスト（OverlayUpdateEventからは個別結果が得られない）
                     CombinedBounds = eventData.DisplayArea,
                     CombinedText = eventData.OriginalText ?? string.Empty, // 元テキスト（表示には使用しない）
@@ -801,6 +922,10 @@ public class InPlaceTranslationOverlayManager(
                     // 🚫 [TRANSLATION_ONLY] 翻訳結果のみ設定（OCR結果は表示しない）
                     TranslatedText = eventData.IsTranslationResult ? eventData.Text : string.Empty
                 };
+
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] === TextChunk作成完了 ===");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] 最終TranslatedText: '{textChunk.TranslatedText}'");
+                Console.WriteLine($"🔍 [P2_EVENT_TEXTCHUNK] CanShowInPlace予測: {!string.IsNullOrWhiteSpace(textChunk.TranslatedText)}");
 
                 Console.WriteLine($"🔍 [TRANSLATION_FILTER] IsTranslationResult: {eventData.IsTranslationResult}, Text: '{eventData.Text}'");
                 Console.WriteLine($"🔍 [TRANSLATION_FILTER] TranslatedText設定: '{textChunk.TranslatedText}'");
@@ -815,8 +940,21 @@ public class InPlaceTranslationOverlayManager(
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ [OVERLAY] オーバーレイ更新処理エラー: {ex.Message}");
-            _logger.LogError(ex, "OverlayUpdateEvent処理中にエラーが発生: {Error}", ex.Message);
+            // 🚨 [P2_ERROR_DEBUG] 例外の詳細分析
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] === OverlayUpdateEvent処理エラー ===");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 例外タイプ: {ex.GetType().Name}");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] エラーメッセージ: {ex.Message}");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 発生箇所: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 処理中イベント: Text='{eventData?.Text}', Area=({eventData?.DisplayArea.X},{eventData?.DisplayArea.Y})");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] マネージャー状態: 初期化={_isInitialized}, 破棄={_disposed}, アクティブオーバーレイ数={_activeOverlays.Count}");
+
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 内部例外: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            }
+
+            _logger.LogError(ex, "[P2_ERROR_DEBUG] OverlayUpdateEvent処理中にエラーが発生 - EventText: {EventText}, Area: ({X},{Y},{W},{H}), ManagerState: Init={IsInit}/Disposed={IsDisposed}",
+                eventData?.Text, eventData?.DisplayArea.X, eventData?.DisplayArea.Y, eventData?.DisplayArea.Width, eventData?.DisplayArea.Height, _isInitialized, _disposed);
         }
     }
 

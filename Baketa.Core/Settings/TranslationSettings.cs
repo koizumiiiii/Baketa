@@ -80,12 +80,12 @@ public sealed class TranslationSettings
     /// <summary>
     /// 翻訳タイムアウト時間
     /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "タイムアウト時間", 
-        Description = "翻訳処理のタイムアウト時間", 
-        Unit = "秒", 
-        MinValue = 5, 
-        MaxValue = 60)]
-    public int TimeoutSeconds { get; set; } = 15;
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "タイムアウト時間",
+        Description = "翻訳処理のタイムアウト時間（NLLB-200初回モデルロード考慮）",
+        Unit = "秒",
+        MinValue = 15,
+        MaxValue = 300)]
+    public int TimeoutSeconds { get; set; } = 120;
     
     /// <summary>
     /// 最大文字数制限

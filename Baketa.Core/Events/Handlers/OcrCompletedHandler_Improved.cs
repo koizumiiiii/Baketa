@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events.EventTypes;
@@ -24,6 +25,7 @@ public class OcrCompletedHandler_Improved : IEventProcessor<OcrCompletedEvent>, 
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ILogger<OcrCompletedHandler_Improved> _logger;
+    private readonly IConfiguration _configuration;
     
     // TPL Dataflow コンポーネント
     private readonly BatchBlock<TranslationRequestData> _batchBlock;
@@ -45,13 +47,15 @@ public class OcrCompletedHandler_Improved : IEventProcessor<OcrCompletedEvent>, 
     public bool SynchronousExecution => false;
 
     public OcrCompletedHandler_Improved(
-        IEventAggregator eventAggregator, 
+        IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
-        ILogger<OcrCompletedHandler_Improved> logger)
+        ILogger<OcrCompletedHandler_Improved> logger,
+        IConfiguration configuration)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _cancellationTokenSource = new CancellationTokenSource();
 
         // BatchBlock設定: バッチサイズ3、バックプレッシャー対応
@@ -111,10 +115,12 @@ public class OcrCompletedHandler_Improved : IEventProcessor<OcrCompletedEvent>, 
         _logger.LogInformation("バッチ翻訳処理開始: {ResultCount}個のOCR結果をDataflowパイプラインに投入", 
             eventData.Results.Count);
 
-        // 翻訳設定取得
+        // 翻訳設定取得（設定ベース言語使用）
+        var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+        var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
         var translationSettings = _settingsService.GetTranslationSettings();
-        var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage 
-            ? "auto" 
+        var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage
+            ? defaultSourceLanguage
             : translationSettings.DefaultSourceLanguage;
         var targetLanguageCode = translationSettings.DefaultTargetLanguage;
 

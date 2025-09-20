@@ -61,7 +61,7 @@ public class PortManagementService : IPortManagementService
     }
     
     /// <inheritdoc />
-    public async Task<int> AcquireAvailablePortAsync(int startPort = 5557, int endPort = 5562)
+    public async Task<int> AcquireAvailablePortAsync(int startPort = 5556, int endPort = 5562)
     {
         logger.LogDebug("🔍 ポート取得開始: 範囲 {StartPort}-{EndPort}", startPort, endPort);
         

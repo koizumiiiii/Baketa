@@ -214,8 +214,27 @@ namespace Baketa.Infrastructure.Translation;
                 Context = context != null ? new TransModels.TranslationContext { DialogueId = context } : null
             };
 
+            // 🔥 [PHASE13_DEBUG] 翻訳エンジン呼び出し前のデバッグ情報
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] DefaultTranslationService.TranslateAsync 翻訳エンジン呼び出し開始");
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - ActiveEngine: {EngineName} ({EngineType})", ActiveEngine.Name, ActiveEngine.GetType().Name);
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Request Type: {RequestType}", request.GetType().FullName);
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Request SourceText: '{SourceText}'", request.SourceText);
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Request SourceLanguage: {SourceLanguage}", request.SourceLanguage);
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Request TargetLanguage: {TargetLanguage}", request.TargetLanguage);
+            Console.WriteLine($"🔥 [PHASE13_DEBUG] DefaultTranslationService -> {ActiveEngine.GetType().Name} 呼び出し開始");
+            Console.WriteLine($"🔥 [PHASE13_DEBUG] Request型: {request.GetType().FullName}");
+            Console.WriteLine($"🔥 [PHASE13_DEBUG] SourceText: '{request.SourceText}'");
+
             // 翻訳実行
             var result = await ActiveEngine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE13_DEBUG] 翻訳エンジン呼び出し後のデバッグ情報
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] DefaultTranslationService.TranslateAsync 翻訳エンジン呼び出し完了");
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Result Type: {ResultType}", result?.GetType().FullName ?? "null");
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Result IsSuccess: {IsSuccess}", result?.IsSuccess ?? false);
+            _logger.LogDebug("🔥 [PHASE13_DEBUG] - Result TranslatedText: '{TranslatedText}'", result?.TranslatedText ?? "null");
+            Console.WriteLine($"🔥 [PHASE13_DEBUG] DefaultTranslationService 翻訳エンジン呼び出し完了 - IsSuccess: {result?.IsSuccess}");
+            Console.WriteLine($"🔥 [PHASE13_DEBUG] TranslatedText: '{result?.TranslatedText ?? "null"}'");
             _logger.LogInformation("翻訳結果 - IsSuccess: {IsSuccess}, Text: '{Text}'", result?.IsSuccess, result?.TranslatedText);
             
             return result!;

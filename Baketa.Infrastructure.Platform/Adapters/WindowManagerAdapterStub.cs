@@ -82,9 +82,76 @@ namespace Baketa.Infrastructure.Platform.Adapters;
         /// <returns>ウィンドウ情報のリスト</returns>
         public IReadOnlyCollection<WindowInfo> GetRunningApplicationWindows()
         {
-            // スタブ実装では空のリストを返す
-            // 実際の実装ではWindows API を用いて実行中のアプリケーションウィンドウを列挙する
-            return [];
+            // 🚀 UltraThink修正: 実際のWindowsManagerを呼び出してWindowInfoに変換
+            try
+            {
+                var windowsDict = _windowManager.GetRunningApplicationWindows();
+                Console.WriteLine($"🔍 WindowManagerAdapterStub: {windowsDict.Count}個のウィンドウを取得");
+
+                var windowInfoList = new List<WindowInfo>();
+
+                foreach (var kvp in windowsDict)
+                {
+                    var handle = kvp.Key;
+                    var title = kvp.Value;
+
+                    try
+                    {
+                        // WindowsManagerの各メソッドを使用してWindowInfo作成
+                        var bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty;
+                        var clientBounds = _windowManager.GetClientBounds(handle) ?? Rectangle.Empty;
+                        var isMinimized = _windowManager.IsMinimized(handle);
+                        var isMaximized = _windowManager.IsMaximized(handle);
+
+                        var windowInfo = new WindowInfo
+                        {
+                            Handle = handle,
+                            Title = title,
+                            Bounds = bounds,
+                            ClientBounds = clientBounds,
+                            IsVisible = !bounds.IsEmpty, // 境界があれば可視とみなす
+                            IsMinimized = isMinimized,
+                            IsMaximized = isMaximized,
+                            WindowType = WindowType.Normal, // スタブ実装では常にNormal
+                            ClassName = "", // スタブでは空文字
+                            ProcessId = 0, // スタブでは0
+                            ProcessName = "" // スタブでは空文字
+                        };
+
+                        windowInfoList.Add(windowInfo);
+                        Console.WriteLine($"✅ WindowManagerAdapterStub: WindowInfo作成完了 - '{title}' ({handle})");
+                    }
+                    catch (Exception infoEx)
+                    {
+                        Console.WriteLine($"⚠️ WindowManagerAdapterStub: WindowInfo作成エラー - Handle: {handle}, エラー: {infoEx.Message}");
+                        // エラーがあっても基本情報だけでWindowInfoを作成
+                        var fallbackInfo = new WindowInfo
+                        {
+                            Handle = handle,
+                            Title = title,
+                            Bounds = Rectangle.Empty,
+                            ClientBounds = Rectangle.Empty,
+                            IsVisible = true, // フォールバックでは可視とする
+                            IsMinimized = false,
+                            IsMaximized = false,
+                            WindowType = WindowType.Normal,
+                            ClassName = "",
+                            ProcessId = 0,
+                            ProcessName = ""
+                        };
+                        windowInfoList.Add(fallbackInfo);
+                    }
+                }
+
+                Console.WriteLine($"✅ WindowManagerAdapterStub: {windowInfoList.Count}個のWindowInfo作成完了");
+                return windowInfoList;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ WindowManagerAdapterStub: エラー発生 - {ex.Message}");
+                // エラー時は空のリストを返す
+                return [];
+            }
         }
 
         /// <summary>

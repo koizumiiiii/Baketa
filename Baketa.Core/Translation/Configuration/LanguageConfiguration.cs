@@ -20,7 +20,7 @@ public sealed class LanguageConfiguration
     /// <summary>
     /// デフォルトのソース言語
     /// </summary>
-    public string DefaultSourceLanguage { get; set; } = "auto";
+    public string DefaultSourceLanguage { get; set; } = "en";
 
     /// <summary>
     /// デフォルトのターゲット言語

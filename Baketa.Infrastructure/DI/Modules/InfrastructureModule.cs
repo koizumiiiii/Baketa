@@ -305,13 +305,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Phase2: サーキットブレーカー設定とサービス登録
             Console.WriteLine("🔧 [PHASE2] サーキットブレーカー登録開始");
             
-            // サーキットブレーカー設定
-            services.Configure<CircuitBreakerSettings>(options =>
-            {
-                options.FailureThreshold = 5;      // 5回失敗でサーキットオープン
-                options.TimeoutMs = 30000;         // 30秒タイムアウト
-                options.RecoveryTimeoutMs = 60000; // 60秒後に復旧テスト
-            });
+            // サーキットブレーカー設定 - appsettings.jsonから読み込み
+            RegisterCircuitBreakerSettings(services);
             
             // 翻訳専用サーキットブレーカー登録
             services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, TranslationCircuitBreaker>();
@@ -831,6 +826,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService, Baketa.Infrastructure.Text.ChangeDetection.TextChangeDetectionService>();
             Console.WriteLine("✅ ITextChangeDetectionService登録完了 - Edit Distance実装");
             
+            // 🎯 Strategy A: パイプライン排他制御マネージャー
+            services.AddSingleton<Baketa.Core.Abstractions.Processing.IPipelineExecutionManager, Baketa.Infrastructure.Processing.PipelineExecutionManager>();
+            Console.WriteLine("✅ IPipelineExecutionManager登録完了 - Strategy A並行実行防止");
+
             // メイン処理パイプラインサービス
             services.AddSingleton<Baketa.Core.Abstractions.Processing.ISmartProcessingPipelineService, Baketa.Infrastructure.Processing.SmartProcessingPipelineService>();
             Console.WriteLine("✅ ISmartProcessingPipelineService登録完了 - 段階的処理パイプライン");
@@ -879,6 +878,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             yield return typeof(CoreModule);
             yield return typeof(ObjectPoolModule);
             yield return typeof(DiagnosticModule);
+            // 🔧 UltraThink Phase 29: TimedAggregatorModule依存追加 - ITextChunkAggregatorService登録確保
+            yield return typeof(TimedAggregatorModule);
         }
         
         /// <summary>
@@ -959,5 +960,54 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<IImageToReferencedSafeImageConverter, ImageToReferencedSafeImageConverter>();
 
             Console.WriteLine("🎯 [PHASE3.13-14] Memory変換サービス登録完了");
+        }
+
+        /// <summary>
+        /// CircuitBreaker設定を安全に登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterCircuitBreakerSettings(IServiceCollection services)
+        {
+            // ConfigurableServiceModuleBaseパターンを使用した安全なConfiguration取得
+            var configurationDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+
+            if (configurationDescriptor?.ImplementationInstance is IConfiguration configuration)
+            {
+                // appsettings.jsonから設定をバインド
+                services.Configure<CircuitBreakerSettings>(configuration.GetSection("CircuitBreaker"));
+
+                // 設定値検証とサニタイゼーション
+                services.PostConfigure<CircuitBreakerSettings>(options =>
+                {
+                    var originalTimeout = options.TimeoutMs;
+                    var originalThreshold = options.FailureThreshold;
+
+                    // セキュアな範囲制限 (5秒 - 5分)
+                    if (options.TimeoutMs < 5000 || options.TimeoutMs > 300000)
+                    {
+                        Console.WriteLine($"⚠️ [SECURITY] CircuitBreaker.TimeoutMs値が範囲外({originalTimeout}ms) - デフォルト値(120000ms)を使用");
+                        options.TimeoutMs = 120000;
+                    }
+
+                    if (options.FailureThreshold < 1 || options.FailureThreshold > 50)
+                    {
+                        Console.WriteLine($"⚠️ [SECURITY] CircuitBreaker.FailureThreshold値が範囲外({originalThreshold}) - デフォルト値(5)を使用");
+                        options.FailureThreshold = 5;
+                    }
+
+                    Console.WriteLine($"✅ [CONFIG] CircuitBreaker設定確定 - TimeoutMs: {options.TimeoutMs}ms, FailureThreshold: {options.FailureThreshold}");
+                });
+            }
+            else
+            {
+                // フォールバック: 設定ファイル不在時のセキュアなデフォルト値
+                Console.WriteLine("⚠️ [FALLBACK] appsettings.json不在 - CircuitBreakerデフォルト設定を使用");
+                services.Configure<CircuitBreakerSettings>(options =>
+                {
+                    options.FailureThreshold = 5;
+                    options.TimeoutMs = 120000; // 120秒 - NLLB-200初回ロード対応
+                    options.RecoveryTimeoutMs = 60000;
+                });
+            }
         }
     }

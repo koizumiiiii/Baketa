@@ -748,130 +748,204 @@ class NllbTranslationServer:
             logger.error(f"Batch translate error: {e}")
             raise
             
+    async def _send_http_response(self, writer: asyncio.StreamWriter, data: dict, status_code: int = 200):
+        """HTTPレスポンスを送信"""
+        response_json = json.dumps(data, ensure_ascii=False)
+        response_body = response_json.encode('utf-8')
+
+        # HTTP/1.1 ヘッダー作成
+        status_line = f"HTTP/1.1 {status_code} OK\r\n"
+        headers = [
+            "Content-Type: application/json; charset=utf-8\r\n",
+            f"Content-Length: {len(response_body)}\r\n",
+            "Access-Control-Allow-Origin: *\r\n",
+            "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n",
+            "Access-Control-Allow-Headers: Content-Type\r\n",
+            "Connection: close\r\n",
+            "\r\n"
+        ]
+
+        # HTTPレスポンス送信
+        writer.write(status_line.encode('utf-8'))
+        for header in headers:
+            writer.write(header.encode('utf-8'))
+        writer.write(response_body)
+        await writer.drain()
+
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """クライアント接続処理"""
+        """クライアント接続処理 - HTTP/TCP両対応版"""
         client_addr = writer.get_extra_info('peername')
         logger.info(f"Client connected: {client_addr}")
-        
+
         try:
-            while True:
-                # リクエスト受信
-                data = await reader.readline()
-                if not data:
-                    break
-                    
-                try:
-                    # デバッグ: 受信データをログ出力
-                    raw_data = data.decode('utf-8')
-                    logger.info(f"[DEBUG] Received raw data: {repr(raw_data)}")
-                    logger.info(f"[DEBUG] Data length: {len(raw_data)}")
-                    
-                    # JSONパース
-                    request_data = json.loads(raw_data)
-                    
-                    # Pingリクエスト判定（ヘルスチェック用）
-                    if 'ping' in request_data:
-                        ping_response = {
-                            'success': True,
-                            'pong': True,
-                            'status': 'ready',
-                            'model': 'NLLB-200',
-                            'processing_time': 0.001
-                        }
-                        response_json = json.dumps(ping_response, ensure_ascii=False) + '\n'
-                        writer.write(response_json.encode('utf-8'))
-                        await writer.drain()
-                        continue
-                    
-                    # バッチリクエストかどうか判定
-                    elif 'texts' in request_data and request_data.get('batch_mode', False):
-                        # バッチ翻訳処理
-                        batch_request = BatchTranslationRequest(
-                            texts=request_data['texts'],
-                            source_lang=request_data.get('source_lang', 'en'),
-                            target_lang=request_data.get('target_lang', 'ja'),
-                            batch_mode=request_data.get('batch_mode', True),
-                            max_batch_size=request_data.get('max_batch_size', 50)
-                        )
-                        
-                        batch_response = await self.translate_batch(batch_request)
-                        
-                        response_data = {
-                            'success': batch_response.success,
-                            'translations': batch_response.translations,
-                            'confidence_scores': batch_response.confidence_scores,
-                            'processing_time': batch_response.processing_time,
-                            'batch_size': batch_response.batch_size,
-                            'errors': batch_response.errors,
-                            'model': 'NLLB-200'
-                        }
-                    else:
-                        # 単一翻訳処理（従来の処理）
-                        request = TranslationRequest(
-                            text=request_data['text'],
-                            source_lang=request_data.get('source_lang', 'en'),
-                            target_lang=request_data.get('target_lang', 'ja'),
-                            request_id=request_data.get('request_id')
-                        )
-                        
-                        # 🚀 Phase 1: バッチ処理システム経由で翻訳実行
-                        response = await self.translate_via_batch(request)
-                        
-                        response_data = {
-                            'success': response.success,
-                            'translation': response.translation,
-                            'confidence': response.confidence,
-                            'error': response.error,
-                            'error_code': response.error_code,
-                            'processing_time': response.processing_time,
-                            'model': 'NLLB-200'
-                        }
-                    
-                    response_json = json.dumps(response_data, ensure_ascii=False) + '\n'
-                    writer.write(response_json.encode('utf-8'))
-                    await writer.drain()
-                    
-                except json.JSONDecodeError as e:
-                    logger.error(f"Invalid JSON: {e}")
-                    error_response = json.dumps({
-                        'success': False,
-                        'error': 'Invalid JSON format',
-                        'error_code': 'INVALID_JSON',
-                        'model': 'NLLB-200'
-                    }) + '\n'
-                    writer.write(error_response.encode('utf-8'))
-                    await writer.drain()
-                    
-                except KeyError as e:
-                    logger.error(f"Missing required field: {e}")
-                    error_response = json.dumps({
-                        'success': False,
-                        'error': f'Missing required field: {e}',
-                        'error_code': 'MISSING_FIELD',
-                        'model': 'NLLB-200'
-                    }) + '\n'
-                    writer.write(error_response.encode('utf-8'))
-                    await writer.drain()
-                    
-                except Exception as e:
-                    logger.error(f"Request processing error: {e}")
-                    error_response = json.dumps({
-                        'success': False,
-                        'error': f'Request processing failed: {str(e)}',
-                        'error_code': 'REQUEST_PROCESSING_ERROR',
-                        'model': 'NLLB-200'
-                    }) + '\n'
-                    writer.write(error_response.encode('utf-8'))
-                    await writer.drain()
-                    
+            # 最初の行を読み取りHTTPかTCPかを判定
+            first_line = await reader.readline()
+            if not first_line:
+                return
+
+            first_line_str = first_line.decode('utf-8', errors='ignore').strip()
+
+            # HTTPリクエストかどうか判定
+            if first_line_str.startswith('POST ') or first_line_str.startswith('GET '):
+                # HTTPプロトコル処理
+                await self._handle_http_request(reader, writer, first_line_str)
+            else:
+                # 従来のTCPプロトコル処理（.NET OptimizedPythonTranslationEngine対応）
+                await self._handle_tcp_request(reader, writer, first_line)
+
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"Client handler error: {e}")
+            logger.error(f"Client handling error: {e}")
         finally:
             writer.close()
             await writer.wait_closed()
             logger.info(f"Client disconnected: {client_addr}")
+
+    async def _handle_http_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, first_line: str):
+        """HTTPリクエスト処理"""
+        try:
+            # HTTPヘッダーを読み取り
+            content_length = 0
+            while True:
+                line = await reader.readline()
+                if not line or line == b"\r\n":
+                    break
+                header = line.decode('utf-8', errors='ignore').strip()
+                if header.lower().startswith('content-length:'):
+                    content_length = int(header.split(':')[1].strip())
+
+            # ボディを読み取り
+            if content_length > 0:
+                body = await reader.read(content_length)
+                data = body.decode('utf-8')
+            else:
+                data = '{"ping": true}'  # GETリクエストの場合
+
+            # JSONパース
+            request_data = json.loads(data)
+            logger.info(f"[HTTP] Received data: {data[:100]}...")
+
+            # 翻訳処理実行
+            response_data = await self._process_translation_request(request_data)
+
+            # HTTP応答送信
+            await self._send_http_response(writer, response_data)
+
+        except Exception as e:
+            logger.error(f"HTTP request error: {e}")
+            error_response = {
+                'success': False,
+                'error': f'HTTP processing failed: {str(e)}',
+                'error_code': 'HTTP_ERROR',
+                'model': 'NLLB-200'
+            }
+            await self._send_http_response(writer, error_response, 500)
+
+    async def _handle_tcp_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, first_line: bytes):
+        """TCPリクエスト処理（従来の.NET OptimizedPythonTranslationEngine対応）"""
+        try:
+            # 最初の行がJSONデータ
+            data = first_line.decode('utf-8').strip()
+            logger.info(f"[TCP] Received data: {data[:100]}...")
+
+            # JSONパース
+            request_data = json.loads(data)
+
+            # 翻訳処理実行
+            response_data = await self._process_translation_request(request_data)
+
+            # TCP応答送信（生JSON + 改行）
+            response_json = json.dumps(response_data, ensure_ascii=False) + '\n'
+            writer.write(response_json.encode('utf-8'))
+            await writer.drain()
+
+        except Exception as e:
+            logger.error(f"TCP request error: {e}")
+            error_response = {
+                'success': False,
+                'error': f'TCP processing failed: {str(e)}',
+                'error_code': 'TCP_ERROR',
+                'model': 'NLLB-200'
+            }
+            error_json = json.dumps(error_response, ensure_ascii=False) + '\n'
+            writer.write(error_json.encode('utf-8'))
+            await writer.drain()
+
+    async def _process_translation_request(self, request_data: dict) -> dict:
+        """翻訳リクエスト処理（共通）"""
+        try:
+            # Pingリクエスト判定（ヘルスチェック用）
+            if 'ping' in request_data:
+                return {
+                    'success': True,
+                    'pong': True,
+                    'status': 'ready',
+                    'model': 'NLLB-200',
+                    'processing_time': 0.001
+                }
+
+            # バッチリクエストかどうか判定
+            elif 'texts' in request_data and request_data.get('batch_mode', False):
+                # バッチ翻訳処理
+                batch_request = BatchTranslationRequest(
+                    texts=request_data['texts'],
+                    source_lang=request_data.get('source_lang', 'en'),
+                    target_lang=request_data.get('target_lang', 'ja'),
+                    batch_mode=request_data.get('batch_mode', True),
+                    max_batch_size=request_data.get('max_batch_size', 50)
+                )
+
+                batch_response = await self.translate_batch(batch_request)
+
+                return {
+                    'success': batch_response.success,
+                    'translations': batch_response.translations,
+                    'confidence_scores': batch_response.confidence_scores,
+                    'processing_time': batch_response.processing_time,
+                    'batch_size': batch_response.batch_size,
+                    'errors': batch_response.errors,
+                    'model': 'NLLB-200'
+                }
+            else:
+                # 単一翻訳処理（従来の処理）
+                request = TranslationRequest(
+                    text=request_data['text'],
+                    source_lang=request_data.get('source_lang', 'en'),
+                    target_lang=request_data.get('target_lang', 'ja'),
+                    request_id=request_data.get('request_id')
+                )
+
+                # 🚀 Phase 1: バッチ処理システム経由で翻訳実行
+                response = await self.translate_via_batch(request)
+
+                return {
+                    'success': response.success,
+                    'translation': response.translation,
+                    'confidence': response.confidence,
+                    'error': response.error,
+                    'error_code': response.error_code,
+                    'processing_time': response.processing_time,
+                    'model': 'NLLB-200'
+                }
+
+        except KeyError as e:
+            logger.error(f"Missing required field: {e}")
+            return {
+                'success': False,
+                'error': f'Missing required field: {e}',
+                'error_code': 'MISSING_FIELD',
+                'model': 'NLLB-200'
+            }
+
+        except Exception as e:
+            logger.error(f"Translation request processing error: {e}")
+            return {
+                'success': False,
+                'error': f'Request processing failed: {str(e)}',
+                'error_code': 'REQUEST_PROCESSING_ERROR',
+                'model': 'NLLB-200'
+            }
             
     async def start_server(self):
         """サーバー起動"""

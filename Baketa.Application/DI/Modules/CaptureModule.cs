@@ -30,13 +30,9 @@ public sealed class CaptureModule : ServiceModuleBase
         var adaptiveCaptureModule = new Baketa.Infrastructure.Platform.DI.Modules.AdaptiveCaptureModule();
         adaptiveCaptureModule.RegisterServices(services);
         
-        // ◆ 依存サービスの確認登録（すでに他で登録されている場合は無視される）
-        // IEventAggregatorがApplicationModuleで登録されているが、依存関係を明確にする
-        if (!services.Any(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Events.IEventAggregator)))
-        {
-            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, 
-                Baketa.Core.Events.Implementation.EventAggregator>();
-        }
+        // 🚨 [UltraThink修正] EventAggregator重複登録を削除
+        // EventAggregatorはCoreModuleで管理されているため、ここでは登録しない
+        // CoreModuleが最初に実行されることを前提とする
         
         // レガシーキャプチャサービス（フォールバック用）
         services.AddSingleton<AdvancedCaptureService>();

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using System.Drawing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.UI;
@@ -38,6 +39,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly ITranslationServiceCore _translationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ILogger<TranslationPipelineService> _logger;
+    private readonly IConfiguration _configuration;
     private readonly CancellationTokenSource _cancellationTokenSource;
     
     // TPL Dataflow Pipeline Components
@@ -68,13 +70,15 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         IUnifiedSettingsService settingsService,
         ITranslationServiceCore translationService,
         IInPlaceTranslationOverlayManager overlayManager,
-        ILogger<TranslationPipelineService> logger)
+        ILogger<TranslationPipelineService> logger,
+        IConfiguration configuration)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _cancellationTokenSource = new CancellationTokenSource();
 
         // Stage 1: Entry Block - OCR結果受付
@@ -227,10 +231,12 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     {
         try
         {
-            // 翻訳設定取得
+            // 翻訳設定取得（設定ベース言語使用）
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
             var translationSettings = _settingsService.GetTranslationSettings();
             var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage
-                ? "auto"
+                ? defaultSourceLanguage
                 : translationSettings.DefaultSourceLanguage;
             var targetLanguageCode = translationSettings.DefaultTargetLanguage;
 
@@ -542,8 +548,9 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     /// CoordinateInfoの情報を使用してTextChunkの必須プロパティを設定
     /// </summary>
     /// <param name="result">パイプライン翻訳結果</param>
+    /// <param name="defaultSourceLanguage">デフォルトソース言語</param>
     /// <returns>作成されたTextChunk</returns>
-    private static TextChunk CreateTextChunkFromResult(PipelineTranslationResult result)
+    private static TextChunk CreateTextChunkFromResult(PipelineTranslationResult result, string defaultSourceLanguage)
     {
         if (result.CoordinateInfo == null)
         {
@@ -560,7 +567,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
             Confidence = result.Confidence, // 翻訳結果の信頼度
             ChunkId = result.JobId.GetHashCode(), // JobIdからChunkIdを生成
             ProcessingTime = result.ProcessingTime,
-            DetectedLanguage = "auto", // 自動検出として設定
+            DetectedLanguage = defaultSourceLanguage, // 設定ベース言語
             Orientation = TextOrientation.Horizontal
         };
 
@@ -573,7 +580,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
             CombinedText = result.OriginalText,
             TranslatedText = result.TranslatedText,
             SourceWindowHandle = coord.WindowHandle,
-            DetectedLanguage = "auto"
+            DetectedLanguage = defaultSourceLanguage
         };
     }
 
@@ -587,8 +594,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         var completedEvent = new TranslationCompletedEvent(
             sourceText: result.OriginalText,
             translatedText: result.TranslatedText,
-            sourceLanguage: "auto", // ソース言語は結果から取得
-            targetLanguage: "ja",   // ターゲット言語は結果から取得
+            sourceLanguage: _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en"), // 設定ベース言語
+            targetLanguage: _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja"), // 設定ベース言語
             processingTime: result.ProcessingTime,
             engineName: "Pipeline");
 

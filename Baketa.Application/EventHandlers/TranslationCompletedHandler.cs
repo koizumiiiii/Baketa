@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace Baketa.Application.EventHandlers;
 
@@ -13,10 +14,12 @@ namespace Baketa.Application.EventHandlers;
 /// </summary>
 public class TranslationCompletedHandler(
     IEventAggregator eventAggregator,
-    ILogger<TranslationCompletedHandler> logger) : IEventProcessor<TranslationCompletedEvent>
+    ILogger<TranslationCompletedHandler> logger,
+    IConfiguration configuration) : IEventProcessor<TranslationCompletedEvent>
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly ILogger<TranslationCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
     /// <summary>
     /// イベント処理の優先度（低優先度でUI表示優先度を下げる）
@@ -45,13 +48,17 @@ public class TranslationCompletedHandler(
                 return;
             }
 
+            // 設定から言語を動的取得
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+
             // TranslationWithBoundsCompletedEventに変換
             // TranslationCompletedEventにはBounds情報がないため、空のRectangleを使用
             var boundsEvent = new TranslationWithBoundsCompletedEvent(
                 sourceText: eventData.SourceText ?? "",
                 translatedText: eventData.TranslatedText ?? "",
-                sourceLanguage: eventData.SourceLanguage ?? "auto",
-                targetLanguage: eventData.TargetLanguage ?? "ja",
+                sourceLanguage: eventData.SourceLanguage ?? defaultSourceLanguage,
+                targetLanguage: eventData.TargetLanguage ?? defaultTargetLanguage,
                 bounds: System.Drawing.Rectangle.Empty, // Bounds情報なし
                 confidence: 0.95f, // デフォルト信頼度
                 engineName: eventData.EngineName ?? "Default"

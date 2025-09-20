@@ -3,6 +3,9 @@ using Baketa.Core.DI;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.BatchProcessing;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Infrastructure.Services.Coordinates;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -22,7 +25,11 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
         
         // TimedAggregatorSettings の型安全な設定登録
         RegisterSettings<TimedAggregatorSettings>(services);
-        
+
+        // 🎯 [P0_COORDINATE_TRANSFORM] 座標変換サービスの登録
+        services.AddSingleton<ICoordinateTransformationService, CoordinateTransformationService>();
+        Console.WriteLine("✅ [P0_COORDINATE_TRANSFORM] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換");
+
         // CoordinateBasedLineBreakProcessorの登録
         services.AddSingleton<CoordinateBasedLineBreakProcessor>();
         Console.WriteLine("✅ [NEW_CONFIG] CoordinateBasedLineBreakProcessor登録完了");
@@ -34,7 +41,12 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
         // EnhancedBatchOcrIntegrationServiceの登録（Singleton - TimedChunkAggregator連携のため）
         services.AddSingleton<EnhancedBatchOcrIntegrationService>();
         Console.WriteLine("✅ [NEW_CONFIG] EnhancedBatchOcrIntegrationService登録完了");
-        
+
+        // Phase 26-4: ITextChunkAggregatorServiceインターフェース登録 - Clean Architecture対応
+        services.AddSingleton<ITextChunkAggregatorService>(provider =>
+            provider.GetRequiredService<EnhancedBatchOcrIntegrationService>());
+        Console.WriteLine("✅ [PHASE26] ITextChunkAggregatorService → EnhancedBatchOcrIntegrationService マッピング完了");
+
         Console.WriteLine("🎯 [NEW_CONFIG] TimedAggregatorModule - 新設定システム統合完了");
     }
     
@@ -44,8 +56,8 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
     /// <returns>依存モジュールの型のコレクション</returns>
     public override IEnumerable<Type> GetDependentModules()
     {
-        // EnhancedBatchOcrIntegrationServiceの依存関係は自動的にDIコンテナが解決
-        // ここでは直接的な依存関係のみを指定
-        yield return typeof(Baketa.Infrastructure.DI.Modules.InfrastructureModule); // ITranslationService等の基本依存関係
+        // 🔧 UltraThink Phase 29: InfrastructureModuleへの依存を削除（循環依存解消）
+        // InfrastructureModuleから先に読み込まれるため、ITranslationService等は既に登録済み
+        yield return typeof(Baketa.Core.DI.Modules.CoreModule); // 基本的な設定システムのみ依存
     }
 }

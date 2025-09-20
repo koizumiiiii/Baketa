@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.UI;
@@ -17,9 +18,9 @@ namespace Baketa.Infrastructure.OCR.BatchProcessing;
 /// <summary>
 /// TimedChunkAggregator統合型バッチOCRサービス
 /// 戦略書設計: translation-quality-improvement-strategy.md 完全準拠
-/// UltraThink Phase: 既存BatchOcrIntegrationServiceとの完全統合
+/// UltraThink Phase 26-2: ITextChunkAggregatorService実装による Clean Architecture準拠
 /// </summary>
-public sealed class EnhancedBatchOcrIntegrationService : IDisposable
+public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorService, IDisposable
 {
     private readonly BatchOcrIntegrationService _baseBatchService;
     private readonly TimedChunkAggregator _timedChunkAggregator;
@@ -29,6 +30,7 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
     private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly ILogger<EnhancedBatchOcrIntegrationService> _logger;
     private readonly TimedAggregatorSettings _settings;
+    private readonly IConfiguration _configuration;
     
     // パフォーマンス監視用
     private readonly ConcurrentDictionary<string, ProcessingStatistics> _processingStats;
@@ -44,7 +46,8 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
         IEventAggregator eventAggregator,
         IUnifiedSettingsService unifiedSettingsService,
         IOptionsMonitor<TimedAggregatorSettings> settings,
-        ILogger<EnhancedBatchOcrIntegrationService> logger)
+        ILogger<EnhancedBatchOcrIntegrationService> logger,
+        IConfiguration configuration)
     {
         _baseBatchService = baseBatchService ?? throw new ArgumentNullException(nameof(baseBatchService));
         _timedChunkAggregator = timedChunkAggregator ?? throw new ArgumentNullException(nameof(timedChunkAggregator));
@@ -54,6 +57,7 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _settings = settings?.CurrentValue ?? TimedAggregatorSettings.Development;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         
         _processingStats = new ConcurrentDictionary<string, ProcessingStatistics>();
         
@@ -258,18 +262,19 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
             // 🚀 実際の翻訳処理実行
             Console.WriteLine($"🎯 [TIMED_AGGREGATOR] 翻訳開始: '{aggregatedChunk.CombinedText}' (長さ: {aggregatedChunk.CombinedText.Length})");
             
-            // 🔧 修正: 既存システムと整合性を保つため、デフォルト言語ペアを使用
-            // Language.AutoDetectとユーザー設定のデフォルト対象言語を使用
+            // 🔧 修正: ユーザー設定の言語ペアを使用（自動検出off）
             var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+            var sourceLanguageCode = translationSettings.DefaultSourceLanguage ?? "ja";
             var targetLanguageCode = translationSettings.DefaultTargetLanguage ?? "en";
+            var sourceLanguage = Language.FromCode(sourceLanguageCode);
             var targetLanguage = Language.FromCode(targetLanguageCode);
-            
-            _logger.LogDebug("🌍 [LANGUAGE_DETECTION] ユーザー設定の翻訳先言語使用: {TargetLanguage}", targetLanguageCode);
-            
-            // 翻訳サービスで翻訳実行（自動検出 → ユーザー設定言語）
+
+            _logger.LogDebug("🌍 [LANGUAGE_DETECTION] ユーザー設定言語使用: {SourceLanguage} → {TargetLanguage}", sourceLanguageCode, targetLanguageCode);
+
+            // 翻訳サービスで翻訳実行（設定ベース言語ペア使用）
             var response = await _translationService.TranslateAsync(
-                aggregatedChunk.CombinedText, 
-                Language.AutoDetect, // 自動検出
+                aggregatedChunk.CombinedText,
+                sourceLanguage, // 設定ベース言語
                 targetLanguage
             ).ConfigureAwait(false);
             
@@ -330,19 +335,63 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
     }
 
     /// <summary>
-    /// パフォーマンス最適化設定の委譲
+    /// 🚀 Phase 22: CaptureCompletedHandlerからの個別TextChunk送信メソッド
+    /// TimedChunkAggregatorに直接チャンクを送信し、集約処理を開始
     /// </summary>
-    public async Task OptimizeEnhancedPerformanceAsync(
-        int imageWidth, 
-        int imageHeight, 
+    public async Task<bool> TryAddTextChunkDirectlyAsync(
+        TextChunk chunk,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
+        try
+        {
+            _logger.LogDebug("📥 [PHASE22] 個別TextChunk受信 - ID: {ChunkId}, テキスト: '{Text}'",
+                chunk.ChunkId, chunk.CombinedText);
+
+            if (!_settings.IsFeatureEnabled)
+            {
+                _logger.LogInformation("⚠️ [PHASE22] TimedAggregator機能無効 - チャンク送信スキップ");
+                return false;
+            }
+
+            // TimedChunkAggregatorに直接送信
+            var added = await _timedChunkAggregator.TryAddChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
+
+            if (added)
+            {
+                _logger.LogInformation("✅ [PHASE22] TextChunk → TimedChunkAggregator送信成功 - ID: {ChunkId}",
+                    chunk.ChunkId);
+                Console.WriteLine($"📥 [PHASE22] TimedChunkAggregator: '{chunk.CombinedText}' 受信完了");
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ [PHASE22] TextChunk送信失敗 - TimedAggregator処理エラー");
+            }
+
+            return added;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [PHASE22] TextChunk送信エラー - ChunkId: {ChunkId}", chunk.ChunkId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// パフォーマンス最適化設定の委譲
+    /// </summary>
+    public async Task OptimizeEnhancedPerformanceAsync(
+        int imageWidth,
+        int imageHeight,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
         // 既存BatchOcrIntegrationServiceの最適化処理を委譲
         await _baseBatchService.OptimizeBatchPerformanceAsync(imageWidth, imageHeight, cancellationToken)
             .ConfigureAwait(false);
-            
+
         _logger.LogDebug("⚙️ 拡張パフォーマンス最適化完了 - 画像: {Width}x{Height}", imageWidth, imageHeight);
     }
 
@@ -402,6 +451,24 @@ public sealed class EnhancedBatchOcrIntegrationService : IDisposable
         ThrowIfDisposed();
         return _timedChunkAggregator.GetStatistics();
     }
+
+    // ============================================
+    // ITextChunkAggregatorService インターフェース実装
+    // Phase 26-2: Clean Architecture準拠の抽象化実装
+    // ============================================
+
+    /// <inheritdoc />
+    public async Task<bool> TryAddTextChunkAsync(TextChunk chunk, CancellationToken cancellationToken = default)
+    {
+        // 既存のTryAddTextChunkDirectlyAsyncメソッドに委譲
+        return await TryAddTextChunkDirectlyAsync(chunk, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public bool IsFeatureEnabled => _settings.IsFeatureEnabled;
+
+    /// <inheritdoc />
+    public int PendingChunksCount => 0; // TODO: TimedChunkAggregatorにPendingChunksCount実装後に修正
 
     private void ThrowIfDisposed()
     {

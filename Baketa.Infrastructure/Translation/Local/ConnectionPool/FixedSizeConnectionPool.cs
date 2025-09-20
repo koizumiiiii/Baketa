@@ -106,8 +106,8 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
 
         return defaultEngine switch
         {
-            TranslationEngine.NLLB200 => 5557,
-            _ => 5557 // 動的ポート範囲に統一
+            TranslationEngine.NLLB200 => 5556,
+            _ => 5556 // 動的ポート範囲に統一
         };
     }
 

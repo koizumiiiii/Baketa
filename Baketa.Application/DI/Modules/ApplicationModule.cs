@@ -111,13 +111,15 @@ namespace Baketa.Application.DI.Modules;
                 var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
                 var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.TranslationPipelineService>>();
-                
+                var configuration = provider.GetRequiredService<IConfiguration>();
+
                 return new Baketa.Application.Services.Translation.TranslationPipelineService(
                     eventAggregator,
                     settingsService,
                     translationService,
                     overlayManager,
-                    logger);
+                    logger,
+                    configuration);
             });
             services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());

@@ -11,10 +11,10 @@ public interface IPipelineExecutionManager
     /// 並行実行を防ぎ、SafeImage早期破棄競合を完全に回避
     /// </summary>
     /// <typeparam name="T">戻り値の型</typeparam>
-    /// <param name="pipelineFunc">実行するパイプライン処理</param>
+    /// <param name="pipelineFunc">実行するパイプライン処理（CancellationTokenを受け取る）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>パイプライン処理の結果</returns>
-    Task<T> ExecuteExclusivelyAsync<T>(Func<Task<T>> pipelineFunc, CancellationToken cancellationToken = default);
+    Task<T> ExecuteExclusivelyAsync<T>(Func<CancellationToken, Task<T>> pipelineFunc, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 現在パイプラインが実行中かどうかを判定
