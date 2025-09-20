@@ -331,8 +331,9 @@ namespace Baketa.Application.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterEventAggregator(IServiceCollection services)
         {
-            // メインのイベント集約機構を登録
-            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, Baketa.Core.Events.Implementation.EventAggregator>();
+            // 🚨 [UltraThink修正] 重複登録を削除 - CoreModule.AddEventAggregator()で既に登録済み
+            // EventAggregatorはCoreModuleで登録されているため、ここでは追加登録しない
+            // services.AddSingleton<Baketa.Core.Abstractions.Events.IEventAggregator, Baketa.Core.Events.Implementation.EventAggregator>();
                 
             // 既存の自動登録サービスは削除して手動初期化に変更
         }
@@ -407,6 +408,10 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>(provider =>
             {
                 var eventAggregator = provider.GetRequiredService<IEventAggregator>();
+
+                // 🎯 Phase 26: ITextChunkAggregatorService抽象化による Clean Architecture準拠
+                var chunkAggregatorService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>();
+
                 var smartPipeline = provider.GetService<ISmartProcessingPipelineService>();
                 var logger = provider.GetService<ILogger<Baketa.Application.Events.Handlers.CaptureCompletedHandler>>();
                 var settings = provider.GetService<IOptionsMonitor<ProcessingPipelineSettings>>();
@@ -418,6 +423,8 @@ namespace Baketa.Application.DI.Modules;
 
                 return new Baketa.Application.Events.Handlers.CaptureCompletedHandler(
                     eventAggregator,
+                    chunkAggregatorService,
+                    provider.GetRequiredService<IConfiguration>(),
                     smartPipeline,
                     logger,
                     settings,

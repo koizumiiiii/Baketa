@@ -5,8 +5,10 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
+using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading.Tasks;
 
@@ -14,6 +16,7 @@ namespace Baketa.Application.Events.Handlers;
 
 /// <summary>
 /// キャプチャ完了イベントハンドラー
+/// Phase 26-3: ITextChunkAggregatorService抽象化によるClean Architecture準拠
 /// P1: 段階的フィルタリングシステム統合済み
 /// </summary>
 public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
@@ -25,9 +28,13 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
         private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
         private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
+        private readonly ITextChunkAggregatorService _chunkAggregatorService;
+        private readonly IConfiguration _configuration;
 
         public CaptureCompletedHandler(
             IEventAggregator eventAggregator,
+            ITextChunkAggregatorService chunkAggregatorService,
+            IConfiguration configuration,
             ISmartProcessingPipelineService? smartPipeline = null,
             ILogger<CaptureCompletedHandler>? logger = null,
             IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
@@ -36,6 +43,8 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             IImageToReferencedSafeImageConverter? imageToReferencedConverter = null)
         {
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+            _chunkAggregatorService = chunkAggregatorService ?? throw new ArgumentNullException(nameof(chunkAggregatorService));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _smartPipeline = smartPipeline;
             _logger = logger;
             _settings = settings;
@@ -111,7 +120,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         
         try
         {
-            // 🎯 Phase 3.15: IImageToReferencedSafeImageConverterを使用した統合変換
+            // 🎯 Phase 3.15: IImageToReferencedSafeImageConverter を使用した統合変換
             _logger?.LogInformation("🎯 [PHASE3.15] CapturedImage型確認 - Type={ImageType}, Converter={ConverterAvailable}",
                 eventData.CapturedImage?.GetType().Name ?? "null", _imageToReferencedConverter != null);
 
@@ -142,20 +151,20 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                     _imageToReferencedConverter != null, eventData.CapturedImage?.GetType().Name ?? "null");
             }
 
-            // 🚨 UltraThink Phase 59 緊急修正: usingブロック削除（非同期処理中の早期Dispose防止）
+            // 🚨 UltraThink Phase 59 緊急修正: using ブロック削除（非同期処理中の早期Dispose防止）
             input = new ProcessingPipelineInput
             {
-                // 🎯 Phase 3.11: ReferencedSafeImageまたは従来のIImageを設定
+                // 🎯 Phase 3.11: ReferencedSafeImage または従来のIImage を設定
                 CapturedImage = referencedSafeImage ?? eventData.CapturedImage,
                 CaptureRegion = eventData.CaptureRegion,
-                SourceWindowHandle = IntPtr.Zero, // TODO: eventDataから取得
+                SourceWindowHandle = IntPtr.Zero, // TODO: eventData から取得
                 CaptureTimestamp = DateTime.UtcNow,
-                // 🎯 UltraThink Phase 59: 画像所有権をfalseに変更（CaptureCompletedEventが画像を管理）
+                // 🔧 [PHASE3.2_FIX] 画像所有権をfalseに変更（OCR処理完了まで画像を保持）
                 OwnsImage = false,
                 // TODO: 前回のハッシュやテキストを設定（キャッシュ機構が必要）
                 Options = new ProcessingPipelineOptions
                 {
-                    // Geminiフィードバック反映: 設定から取得（ハードコーディング回避）
+                    // Gemini フィードバック反映: 設定から取得（ハードコーディング回避）
                     EnableStaging = _settings?.CurrentValue?.EnableStaging ?? true,
                     EnablePerformanceMetrics = _settings?.CurrentValue?.EnablePerformanceMetrics ?? true,
                     EnableEarlyTermination = _settings?.CurrentValue?.EnableEarlyTermination ?? true
@@ -163,7 +172,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             };
 
             // 段階的処理パイプライン実行
-            // 🔧 非同期処理完了まで画像を保持、完了後に手動でDispose
+            // 🔧 [PHASE3.2_FIX] 非同期処理完了まで画像を保持、完了後に手動でDispose
             var pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
             
             _logger?.LogDebug("段階的処理完了 - 最終段階: {LastStage}, 総処理時間: {TotalTime}ms, 早期終了: {EarlyTerminated}",
@@ -180,16 +189,16 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // 🎯 画像が破棄されていないか確認してからフォールバック処理を実行
             try
             {
-                // 画像の状態を確認（Width/Heightアクセスで破棄状態をチェック）
+                // 画像の状態を確認（Width/Height アクセスで破棄状態をチェック）
                 if (eventData.CapturedImage != null)
                 {
-                    var _ = eventData.CapturedImage.Width; // 破棄されていればObjectDisposedExceptionが発生
+                    var _ = eventData.CapturedImage.Width; // 破棄されていればObjectDisposedException が発生
                     _logger?.LogWarning("段階的処理失敗 - 従来処理モードにフォールバック");
                     await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
                 }
                 else
                 {
-                    _logger?.LogWarning("段階的処理失敗 - 画像が既にnullのためフォールバック不可");
+                    _logger?.LogWarning("段階的処理失敗 - 画像が既にnull のためフォールバック不可");
                 }
             }
             catch (ObjectDisposedException)
@@ -199,21 +208,22 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         }
         finally
         {
-            // 🔧 UltraThink Phase 59: ProcessingPipelineInputの手動Dispose
-            // OwnsImage=falseなので画像自体は破棄されず、ProcessingPipelineInputオブジェクトのみ破棄
+            // 🔧 [PHASE3.2_FIX] ProcessingPipelineInput の手動Dispose
+            // OwnsImage=false なので画像自体は破棄されず、ProcessingPipelineInput オブジェクトのみ破棄
             input?.Dispose();
             
-            // 🎯 Phase 3.11: ReferencedSafeImageの参照カウント管理
-            // パイプライン処理完了後、初期参照を解放
+            // 🔧 [PHASE3.2_FIX] ReferencedSafeImage の参照カウント管理を修正
+            // OCR処理完了後のみ参照を解放（処理中の早期解放を防止）
             if (referencedSafeImage != null)
             {
                 var finalRefCount = referencedSafeImage.ReferenceCount;
-                _logger?.LogInformation("🎯 [PHASE3.11] CaptureCompletedHandler処理完了 - 初期参照解放前カウント: {RefCount}",
+                _logger?.LogInformation("🔧 [PHASE3.2_FIX] CaptureCompletedHandler処理完了 - 参照解放前カウント: {RefCount}",
                     finalRefCount);
                 
+                // OCR処理が完全に終了してから参照を解放
                 referencedSafeImage.ReleaseReference();
                 
-                _logger?.LogInformation("🎯 [PHASE3.11] CaptureCompletedHandler初期参照解放完了 - 最終カウント: {RefCount}",
+                _logger?.LogInformation("🔧 [PHASE3.2_FIX] CaptureCompletedHandler参照解放完了 - 最終カウント: {RefCount}",
                     referencedSafeImage.ReferenceCount);
             }
         }
@@ -226,6 +236,17 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     {
         try
         {
+            // 🔍 [PHASE24] PublishStageSpecificEventsAsync条件分岐デバッグ開始
+            _logger?.LogInformation("🔍 [PHASE24] PublishStageSpecificEventsAsync実行 - LastStage: {LastStage}, OcrResult: {OcrResult}, OcrSuccess: {OcrSuccess}",
+                result.LastCompletedStage,
+                result.OcrResult != null ? "NotNull" : "Null",
+                result.OcrResult?.Success ?? false);
+
+            _logger?.LogInformation("🔍 [PHASE26] TextChunkAggregatorService状態確認 - Service: {ServiceState}, IsEnabled: {IsEnabled}, TextChunks: {TextChunksCount}",
+                _chunkAggregatorService != null ? "NotNull" : "Null",
+                _chunkAggregatorService?.IsFeatureEnabled ?? false,
+                result.OcrResult?.TextChunks?.Count ?? 0);
+
             // キャプチャ完了通知
             var captureNotification = new NotificationEvent(
                 $"キャプチャ完了 - 処理時間: {result.TotalElapsedTime.TotalMilliseconds:F1}ms",
@@ -234,15 +255,121 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 displayTime: 2000);
             await _eventAggregator.PublishAsync(captureNotification).ConfigureAwait(false);
 
-            // OCR完了時イベント
+            // OCR完了時イベント - 🚀 Phase 22: TimedChunkAggregator統合処理
+            _logger?.LogInformation("🔍 [PHASE24] OCR処理条件チェック - StageCheck: {StageCheck}, SuccessCheck: {SuccessCheck}",
+                result.LastCompletedStage >= ProcessingStageType.OcrExecution,
+                result.OcrResult?.Success == true);
+
             if (result.LastCompletedStage >= ProcessingStageType.OcrExecution && result.OcrResult?.Success == true)
             {
-                // 🎯 Phase 3.19: OcrExecutionResultからOcrResultリストを作成
-                var ocrResults = new List<Baketa.Core.Models.OCR.OcrResult>();
+                _logger?.LogInformation("🚀 [PHASE22] OCR完了 - TimedChunkAggregator統合処理開始");
 
+                // 🎯 Phase 22: EnhancedBatchOcrIntegrationServiceによるTimedChunkAggregator統合
                 if (result.OcrResult.TextChunks?.Count > 0)
                 {
-                    // TextChunksからOcrResultを作成
+                    _logger?.LogInformation("🎯 [PHASE22] TextChunks → TimedChunkAggregator送信開始 - チャンク数: {ChunkCount}",
+                        result.OcrResult.TextChunks.Count);
+
+                    // TextChunksをEnhancedBatchOcrIntegrationService経由でTimedChunkAggregatorに送信
+                    int successfulChunks = 0;
+                    foreach (var chunk in result.OcrResult.TextChunks)
+                    {
+                        try
+                        {
+                            // 🎯 Phase B緊急修正: OcrTextRegion → TextChunk変換アダプター
+                            if (chunk is Baketa.Core.Abstractions.Translation.TextChunk textChunk)
+                            {
+                                // 🚀 Phase 26: 既存のTextChunk処理
+                                _logger?.LogDebug("📥 [PHASE26] TextChunk送信 - ID: {ChunkId}, テキスト: '{Text}'",
+                                    textChunk.ChunkId, textChunk.CombinedText);
+
+                                var addedSuccessfully = await _chunkAggregatorService.TryAddTextChunkAsync(
+                                    textChunk,
+                                    CancellationToken.None
+                                ).ConfigureAwait(false);
+
+                                if (addedSuccessfully)
+                                {
+                                    successfulChunks++;
+                                    _logger?.LogDebug("✅ [PHASE22] TextChunk送信成功 - ID: {ChunkId}", textChunk.ChunkId);
+                                }
+                                else
+                                {
+                                    _logger?.LogWarning("⚠️ [PHASE22] TextChunk送信失敗 - ID: {ChunkId}", textChunk.ChunkId);
+                                }
+                            }
+                            else if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion ocrRegion)
+                            {
+                                // 🚀 Phase B緊急修正: OcrTextRegion → TextChunk変換アダプター
+                                _logger?.LogDebug("🔄 [PHASE_B_FIX] OcrTextRegion変換開始 - テキスト: '{Text}', 信頼度: {Confidence}",
+                                    ocrRegion.Text, ocrRegion.Confidence);
+
+                                // OcrTextRegion → PositionedTextResult変換
+                                var positionedResult = new Baketa.Core.Abstractions.OCR.Results.PositionedTextResult
+                                {
+                                    Text = ocrRegion.Text,
+                                    BoundingBox = ocrRegion.Bounds,
+                                    Confidence = (float)ocrRegion.Confidence,
+                                    ChunkId = Random.Shared.Next(1000000, 9999999),
+                                    ProcessingTime = TimeSpan.Zero,
+                                    DetectedLanguage = "jpn" // デフォルト言語
+                                };
+
+                                // PositionedTextResult → TextChunk変換
+                                var convertedTextChunk = new Baketa.Core.Abstractions.Translation.TextChunk
+                                {
+                                    ChunkId = positionedResult.ChunkId,
+                                    TextResults = [positionedResult],
+                                    CombinedBounds = positionedResult.BoundingBox,
+                                    CombinedText = positionedResult.Text,
+                                    SourceWindowHandle = IntPtr.Zero, // TODO: eventData から取得（一時的にダミー値使用）
+                                    DetectedLanguage = positionedResult.DetectedLanguage
+                                };
+
+                                _logger?.LogDebug("✅ [PHASE_B_FIX] OcrTextRegion変換完了 - ChunkId: {ChunkId}, テキスト: '{Text}'",
+                                    convertedTextChunk.ChunkId, convertedTextChunk.CombinedText);
+
+                                // 変換されたTextChunkをTimedChunkAggregatorに送信
+                                var addedSuccessfully = await _chunkAggregatorService.TryAddTextChunkAsync(
+                                    convertedTextChunk,
+                                    CancellationToken.None
+                                ).ConfigureAwait(false);
+
+                                if (addedSuccessfully)
+                                {
+                                    successfulChunks++;
+                                    _logger?.LogDebug("🎯 [PHASE_B_FIX] 変換TextChunk送信成功 - ID: {ChunkId}", convertedTextChunk.ChunkId);
+                                }
+                                else
+                                {
+                                    _logger?.LogWarning("⚠️ [PHASE_B_FIX] 変換TextChunk送信失敗 - ID: {ChunkId}", convertedTextChunk.ChunkId);
+                                }
+                            }
+                            else
+                            {
+                                _logger?.LogWarning("⚠️ [PHASE22] 未対応のChunk型 - Type: {ChunkType}",
+                                    chunk?.GetType().Name ?? "null");
+                            }
+                        }
+                        catch (Exception chunkEx)
+                        {
+                            _logger?.LogError(chunkEx, "❌ [PHASE22] TextChunk送信エラー - ChunkType: {ChunkType}",
+                                chunk?.GetType().Name ?? "null");
+                        }
+                    }
+
+                    _logger?.LogInformation("📊 [PHASE22] TextChunk送信統計 - 成功: {Successful}/{Total}",
+                        successfulChunks, result.OcrResult.TextChunks.Count);
+
+                    _logger?.LogInformation("📤 [PHASE22] TextChunks送信完了 - TimedChunkAggregator集約待機中");
+                    Console.WriteLine("📥 [PHASE22] TimedChunkAggregator統合フロー - 集約完了後に翻訳処理が実行されます");
+                }
+                else if (result.OcrResult.TextChunks?.Count > 0)
+                {
+                    // フォールバック: EnhancedBatchOcrIntegrationServiceが利用できない場合は従来のOCRCompletedEvent発行
+                    _logger?.LogWarning("⚠️ [PHASE22] EnhancedBatchOcrIntegrationService利用不可 - 従来のOCRCompletedEvent発行にフォールバック");
+
+                    var ocrResults = new List<Baketa.Core.Models.OCR.OcrResult>();
                     foreach (var chunk in result.OcrResult.TextChunks)
                     {
                         if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
@@ -251,7 +378,6 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                         }
                         else if (!string.IsNullOrWhiteSpace(chunk?.ToString()))
                         {
-                            // フォールバック: チャンクから基本的なOcrResultを作成
                             ocrResults.Add(new Baketa.Core.Models.OCR.OcrResult(
                                 text: chunk.ToString() ?? "",
                                 bounds: System.Drawing.Rectangle.Empty,
@@ -259,44 +385,57 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                             ));
                         }
                     }
+
+                    if (ocrResults.Count > 0)
+                    {
+                        var ocrCompletedEvent = new OcrCompletedEvent(
+                            sourceImage: eventData.CapturedImage,
+                            results: ocrResults.AsReadOnly(),
+                            processingTime: result.OcrResult.ProcessingTime
+                        );
+                        await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                        _logger?.LogInformation("🎯 [PHASE22] フォールバックOCRCompletedEvent発行完了");
+                    }
                 }
                 else if (!string.IsNullOrWhiteSpace(result.OcrResult.DetectedText))
                 {
-                    // フォールバック: DetectedTextからOcrResultを作成
-                    ocrResults.Add(new Baketa.Core.Models.OCR.OcrResult(
+                    // 最終フォールバック: DetectedTextのみ利用可能な場合
+                    _logger?.LogInformation("🔄 [PHASE22] DetectedTextフォールバック処理");
+                    var fallbackResult = new Baketa.Core.Models.OCR.OcrResult(
                         text: result.OcrResult.DetectedText,
                         bounds: System.Drawing.Rectangle.Empty,
                         confidence: 0.8f
-                    ));
-                }
-
-                if (ocrResults.Count > 0)
-                {
-                    var ocrCompletedEvent = new OcrCompletedEvent(
-                        sourceImage: eventData.CapturedImage,
-                        results: ocrResults.AsReadOnly(),
-                        processingTime: result.OcrResult.ProcessingTime
                     );
 
-                    _logger?.LogInformation("🎯 [PHASE3.19] OCRCompletedEvent発行 - テキスト数: {TextCount}, 総テキスト長: {TotalTextLength}",
-                        ocrResults.Count, string.Join(" ", ocrResults.Select(r => r.Text)).Length);
-
+                    var ocrCompletedEvent = new OcrCompletedEvent(
+                        sourceImage: eventData.CapturedImage,
+                        results: [fallbackResult],
+                        processingTime: result.OcrResult.ProcessingTime
+                    );
                     await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                    _logger?.LogInformation("🎯 [PHASE22] DetectedTextフォールバック完了");
                 }
                 else
                 {
-                    _logger?.LogWarning("⚠️ [PHASE3.19] OCR結果が空のためOCRCompletedEventをスキップ");
+                    _logger?.LogWarning("⚠️ [PHASE22] OCR結果が空 - 処理スキップ");
                 }
             }
 
-            // 翻訳完了時イベント
-            if (result.LastCompletedStage == ProcessingStageType.TranslationExecution && result.TranslationResult?.Success == true)
+            // 翻訳完了時イベント - 🎯 [UltraThink修正] 翻訳実行段階を通過した場合にイベント発行
+            _logger?.LogInformation("🎯 [UltraThink] 翻訳完了条件チェック - LastStage: {LastStage}, TranslationSuccess: {Success}",
+                result.LastCompletedStage, result.TranslationResult?.Success ?? false);
+
+            if (result.LastCompletedStage >= ProcessingStageType.TranslationExecution && result.TranslationResult?.Success == true)
             {
+                // 設定から言語を動的取得
+                var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+                var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+
                 var translationEvent = new TranslationCompletedEvent(
                     sourceText: result.OcrResult?.DetectedText ?? "",
                     translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: "auto", // TODO: 実際のソース言語を設定
-                    targetLanguage: "ja",   // TODO: 実際のターゲット言語を設定
+                    sourceLanguage: defaultSourceLanguage,
+                    targetLanguage: defaultTargetLanguage,
                     processingTime: result.TranslationResult.ProcessingTime,
                     engineName: result.TranslationResult.EngineUsed);
                 await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
@@ -307,8 +446,8 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 var boundsEvent = new Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent(
                     sourceText: result.OcrResult?.DetectedText ?? "",
                     translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: "auto", // 段階的処理で検出言語取得時は置き換え
-                    targetLanguage: "ja",   // 設定から取得する場合は置き換え
+                    sourceLanguage: defaultSourceLanguage,
+                    targetLanguage: defaultTargetLanguage,
                     bounds: eventData.CaptureRegion, // キャプチャ領域を座標情報として使用
                     confidence: 0.95f, // デフォルト信頼度（実装時にOCR信頼度から設定）
                     engineName: result.TranslationResult.EngineUsed);
