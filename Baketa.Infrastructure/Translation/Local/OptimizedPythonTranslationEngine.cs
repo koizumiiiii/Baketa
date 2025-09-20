@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using Baketa.Infrastructure.ResourceManagement;
+using Baketa.Core.Utilities; // DebugLogUtility用
 using ResourceTranslationRequest = Baketa.Infrastructure.ResourceManagement.TranslationRequest;
 using CoreTranslationRequest = Baketa.Core.Translation.Models.TranslationRequest;
 
@@ -59,7 +60,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     
     // 設定
     private const string ServerHost = "127.0.0.1";
-    private int _serverPort = 5557; // 動的ポート（NLLB-200専用: 5557）
+    private int _serverPort = 5556; // 動的ポート（NLLB-200専用: 5556）
     private const int ConnectionTimeoutMs = 10000; // 接続タイムアウトを10秒に延長
     private const int StartupTimeoutMs = 60000; // 起動タイムアウトを60秒に延長（モデルロード考慮）
     private const int HealthCheckIntervalMs = 30000; // ヘルスチェック間隔
@@ -134,18 +135,24 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
+            // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
+            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            var useExternalServer = _configuration.GetValue<bool>("Translation:UseExternalServer", false);
+
+            _logger.LogInformation($"🔧 [CONFIG] UseConnectionPool: {useConnectionPool}, UseExternalServer: {useExternalServer}");
+
             // Issue #147: 外部サーバー使用設定の確認
-            if (_configuration.GetValue<bool>("Translation:UseExternalServer", false))
+            if (useExternalServer)
             {
                 _logger.LogInformation("外部Pythonサーバー使用モード - プロセス起動をスキップ");
             }
             else
             {
                 _logger.LogInformation("永続化Pythonサーバー起動開始");
-                
+
                 // 既存サーバープロセスをクリーンアップ
                 await CleanupExistingProcessesAsync().ConfigureAwait(false);
-                
+
                 // サーバー起動
                 if (!await StartOptimizedServerAsync().ConfigureAwait(false))
                 {
@@ -153,11 +160,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     return false;
                 }
             }
-            
-            // 接続確認（接続プール有無に応じて処理分岐）
+
+            // 接続確認（Gemini推奨：リトライロジック付き）
             try
             {
-                if (_connectionPool != null)
+                if (useConnectionPool && _connectionPool != null)
                 {
                     using var testCts = new CancellationTokenSource(5000);
                     var testConnection = await _connectionPool.GetConnectionAsync(testCts.Token).ConfigureAwait(false);
@@ -166,9 +173,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 }
                 else
                 {
-                    // 🔄 単発接続テスト（汚染対策モード）
-                    await TestDirectConnectionAsync().ConfigureAwait(false);
-                    _logger.LogInformation("🔄 単発接続でサーバー接続を確認（汚染対策モード）");
+                    // 🔄 Gemini推奨：リトライロジック付き接続テスト（タイミング問題対策）
+                    if (!await TestDirectConnectionAsyncWithRetry().ConfigureAwait(false))
+                    {
+                        _logger.LogError("🚨 [RETRY_LOGIC] リトライ後も接続失敗 - サーバー準備未完了の可能性");
+                        return false;
+                    }
+                    _logger.LogInformation("🔄 リトライロジック経由でサーバー接続を確認（タイミング問題対策）");
                 }
             }
             catch (Exception ex)
@@ -366,22 +377,38 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     // 接続管理は FixedSizeConnectionPool が担当
 
     public async Task<TranslationResponse> TranslateAsync(
-        CoreTranslationRequest request,
+        Baketa.Core.Translation.Models.TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
-        // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
-        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
-        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
-        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
-        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
-        _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
-        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始 - RequestId: {request.RequestId}");
-        Console.WriteLine($"🔥 [TRANSLATE_DEBUG] SourceText: '{request.SourceText}', {request.SourceLanguage} → {request.TargetLanguage}");
-        
-        var stopwatch = Stopwatch.StartNew();
+        // 🔥🔥🔥 [CRITICAL_ENTRY] TranslateAsyncメソッド入口確認 🔥🔥🔥
+        Console.WriteLine("🔥🔥🔥 [CRITICAL_ENTRY] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました！");
+        DebugLogUtility.WriteLog("🔥🔥🔥 [CRITICAL_ENTRY] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました！");
         
         try
         {
+            // 🔥 [STEP1] 初期化チェック開始
+            Console.WriteLine("🔥 [STEP1] 初期化チェック開始");
+            DebugLogUtility.WriteLog("🔥 [STEP1] 初期化チェック開始");
+            
+            // 🔥 [TRANSLATE_DEBUG] TranslateAsyncメソッド開始デバッグ
+            _logger.LogDebug("🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始");
+            _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - RequestId: {RequestId}", request.RequestId);
+            _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceText: '{SourceText}'", request.SourceText);
+            _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - SourceLanguage: {SourceLanguage}", request.SourceLanguage);
+            _logger.LogDebug("🔥 [TRANSLATE_DEBUG] - TargetLanguage: {TargetLanguage}", request.TargetLanguage);
+            Console.WriteLine($"🔥 [TRANSLATE_DEBUG] TranslateAsync 呼び出し開始 - RequestId: {request.RequestId}");
+            Console.WriteLine($"🔥 [TRANSLATE_DEBUG] SourceText: '{request.SourceText}', {request.SourceLanguage} → {request.TargetLanguage}");
+            
+            // 🔥 [STEP2] Stopwatch開始
+            Console.WriteLine("🔥 [STEP2] Stopwatch開始");
+            DebugLogUtility.WriteLog("🔥 [STEP2] Stopwatch開始");
+            
+            var stopwatch = Stopwatch.StartNew();
+            
+            // 🔥 [STEP3] モデルロード完了まで待機
+            Console.WriteLine("🔥 [STEP3] モデルロード完了まで待機");
+            DebugLogUtility.WriteLog("🔥 [STEP3] モデルロード完了まで待機");
+            
             // モデルロード完了まで待機（タイムアウト付き）
             _logger.LogDebug("翻訳リクエスト開始 - モデルロード待機中...");
             using var modelLoadTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(120)); // 🔧 [TIMEOUT_TEST] 30秒→120秒に延長してタイムアウト原因を確定検証
@@ -389,26 +416,55 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             
             try
             {
+                // 🔥 [STEP4] モデルロードTask待機
+                Console.WriteLine("🔥 [STEP4] モデルロードTask待機開始");
+                DebugLogUtility.WriteLog("🔥 [STEP4] モデルロードTask待機開始");
+                
                 await _modelLoadCompletion.Task.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+                
+                // 🔥 [STEP5] モデルロード待機成功
+                Console.WriteLine("🔥 [STEP5] モデルロード待機成功");
+                DebugLogUtility.WriteLog("🔥 [STEP5] モデルロード待機成功");
+                
                 _logger.LogDebug("モデルロード完了 - 翻訳処理開始");
             }
             catch (OperationCanceledException) when (modelLoadTimeout.Token.IsCancellationRequested)
             {
+                // 🔥 [STEP_ERROR] モデルロードタイムアウト
+                Console.WriteLine("🔥 [STEP_ERROR] モデルロードタイムアウト発生");
+                DebugLogUtility.WriteLog("🔥 [STEP_ERROR] モデルロードタイムアウト発生");
+                
                 _logger.LogWarning("モデルロード待機タイムアウト（30秒） - 初期化を試行します");
                 // タイムアウト時は初期化を試行
             }
             catch (OperationCanceledException)
             {
+                // 🔥 [STEP_ERROR] 翻訳リクエストキャンセル
+                Console.WriteLine("🔥 [STEP_ERROR] 翻訳リクエストキャンセル");
+                DebugLogUtility.WriteLog("🔥 [STEP_ERROR] 翻訳リクエストキャンセル");
+                
                 _logger.LogDebug("翻訳リクエストがキャンセルされました");
                 throw;
             }
             
+            // 🔥 [STEP6] IsReadyAsync確認
+            Console.WriteLine("🔥 [STEP6] IsReadyAsync確認開始");
+            DebugLogUtility.WriteLog("🔥 [STEP6] IsReadyAsync確認開始");
+            
             // 初期化確認（テスト環境では迅速に失敗）
             if (!await IsReadyAsync().ConfigureAwait(false))
             {
+                // 🔥 [STEP7] IsReady失敗 - 初期化が必要
+                Console.WriteLine("🔥 [STEP7] IsReady失敗 - 初期化が必要");
+                DebugLogUtility.WriteLog("🔥 [STEP7] IsReady失敗 - 初期化が必要");
+                
                 // テスト環境やサーバーなし環境では初期化を試行しない
                 if (!File.Exists(_serverScriptPath))
                 {
+                    // 🔥 [STEP_ERROR] サーバースクリプトが見つからない
+                    Console.WriteLine($"🔥 [STEP_ERROR] サーバースクリプトが見つからない: {_serverScriptPath}");
+                    DebugLogUtility.WriteLog($"🔥 [STEP_ERROR] サーバースクリプトが見つからない: {_serverScriptPath}");
+                    
                     _logger.LogWarning("サーバースクリプトが見つかりません: {ScriptPath}", _serverScriptPath);
                     var error = TranslationError.Create(
                         TranslationError.ServiceUnavailable, 
@@ -418,9 +474,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     return TranslationResponse.CreateError(request, error, Name);
                 }
                 
+                // 🔥 [STEP8] InitializeAsync実行
+                Console.WriteLine("🔥 [STEP8] InitializeAsync実行開始");
+                DebugLogUtility.WriteLog("🔥 [STEP8] InitializeAsync実行開始");
+                
                 var initResult = await InitializeAsync().ConfigureAwait(false);
                 if (!initResult)
                 {
+                    // 🔥 [STEP_ERROR] 初期化失敗
+                    Console.WriteLine("🔥 [STEP_ERROR] InitializeAsync失敗");
+                    DebugLogUtility.WriteLog("🔥 [STEP_ERROR] InitializeAsync失敗");
+                    
                     var error = TranslationError.Create(
                         TranslationError.ServiceUnavailable, 
                         "翻訳サーバーの初期化に失敗しました",
@@ -429,7 +493,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     return TranslationResponse.CreateError(request, error, Name);
                 }
             }
+            else
+            {
+                // 🔥 [STEP6_OK] IsReady成功
+                Console.WriteLine("🔥 [STEP6_OK] IsReady成功 - サーバー準備完了");
+                DebugLogUtility.WriteLog("🔥 [STEP6_OK] IsReady成功 - サーバー準備完了");
+            }
 
+            // 🔥 [STEP9] 言語ペアサポート確認
+            Console.WriteLine("🔥 [STEP9] 言語ペアサポート確認開始");
+            DebugLogUtility.WriteLog("🔥 [STEP9] 言語ペアサポート確認開始");
+            
             // 言語ペアのサポート確認
             var languagePair = new LanguagePair 
             { 
@@ -439,6 +513,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             bool isSupported = await SupportsLanguagePairAsync(languagePair).ConfigureAwait(false);
             if (!isSupported)
             {
+                // 🔥 [STEP_ERROR] 言語ペアサポートなし
+                Console.WriteLine($"🔥 [STEP_ERROR] 言語ペアサポートなし: {request.SourceLanguage.Code}-{request.TargetLanguage.Code}");
+                DebugLogUtility.WriteLog($"🔥 [STEP_ERROR] 言語ペアサポートなし: {request.SourceLanguage.Code}-{request.TargetLanguage.Code}");
+                
                 var error = TranslationError.Create(
                     TranslationError.UnsupportedLanguagePair, 
                     $"言語ペア {request.SourceLanguage.Code}-{request.TargetLanguage.Code} はサポートされていません",
@@ -447,14 +525,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 return TranslationResponse.CreateError(request, error, Name);
             }
             
+            // 🔥 [STEP10] キャッシュ無効化モード
+            Console.WriteLine("🔥 [STEP10] キャッシュ無効化モード");
+            DebugLogUtility.WriteLog("🔥 [STEP10] キャッシュ無効化モード");
+            
             // 🚨 CACHE_DISABLED: キャッシュ機能完全無効化 - 汚染問題根本解決
             // キャッシュチェック処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 常に新鮮な翻訳を実行");
+            
+            // 🔥 [STEP11] HybridResourceManager確認
+            Console.WriteLine($"🔥 [STEP11] HybridResourceManager確認 - _resourceManager != null: {_resourceManager != null}");
+            DebugLogUtility.WriteLog($"🔥 [STEP11] HybridResourceManager確認 - _resourceManager != null: {_resourceManager != null}");
             
             // Phase 3.2統合: HybridResourceManager経由でVRAMモニタリング付き翻訳実行
             TranslationResponse result;
             if (_resourceManager != null)
             {
+                // 🔥 [STEP12] HybridResourceManager使用
+                Console.WriteLine("🔥 [STEP12] HybridResourceManager使用");
+                DebugLogUtility.WriteLog("🔥 [STEP12] HybridResourceManager使用");
+                
                 _logger.LogInformation("🚀 [PHASE3.2] HybridResourceManager経由でVRAMモニタリング付き翻訳実行開始");
                 
                 // 🎯 Phase 3.2: HybridResourceManagerの初期化を確実に実行
@@ -462,19 +552,35 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 {
                     if (!_resourceManager.IsInitialized)
                     {
+                        // 🔥 [STEP13] HybridResourceManager初期化
+                        Console.WriteLine("🔥 [STEP13] HybridResourceManager初期化開始");
+                        DebugLogUtility.WriteLog("🔥 [STEP13] HybridResourceManager初期化開始");
+                        
                         _logger.LogInformation("🔧 [PHASE3.2] HybridResourceManager初期化実行中...");
                         await _resourceManager.InitializeAsync(cancellationToken).ConfigureAwait(false);
                         _logger.LogInformation("✅ [PHASE3.2] HybridResourceManager初期化完了 - VRAMモニタリング開始");
                     }
                     else
                     {
+                        // 🔥 [STEP13_OK] HybridResourceManager既に初期化済み
+                        Console.WriteLine("🔥 [STEP13_OK] HybridResourceManager既に初期化済み");
+                        DebugLogUtility.WriteLog("🔥 [STEP13_OK] HybridResourceManager既に初期化済み");
+                        
                         _logger.LogDebug("✅ [PHASE3.2] HybridResourceManager既に初期化済み");
                     }
                 }
                 catch (Exception initEx)
                 {
+                    // 🔥 [STEP_ERROR] HybridResourceManager初期化失敗
+                    Console.WriteLine($"🔥 [STEP_ERROR] HybridResourceManager初期化失敗: {initEx.Message}");
+                    DebugLogUtility.WriteLog($"🔥 [STEP_ERROR] HybridResourceManager初期化失敗: {initEx.Message}");
+                    
                     _logger.LogError(initEx, "❌ [PHASE3.2] HybridResourceManager初期化失敗: {Message}", initEx.Message);
                 }
+                
+                // 🔥 [STEP14] ProcessTranslationAsync実行
+                Console.WriteLine("🔥 [STEP14] ProcessTranslationAsync実行開始");
+                DebugLogUtility.WriteLog("🔥 [STEP14] ProcessTranslationAsync実行開始");
                 
                 _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] HybridResourceManager経由で翻訳実行開始");
                 
@@ -489,32 +595,56 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 result = await _resourceManager.ProcessTranslationAsync(
                     async (req, ct) =>
                     {
+                        // 🔥 [STEP15] 内部翻訳処理実行
+                        Console.WriteLine("🔥 [STEP15] 内部翻訳処理実行開始");
+                        DebugLogUtility.WriteLog("🔥 [STEP15] 内部翻訳処理実行開始");
+                        
                         _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] 翻訳処理実行中 - OperationId: {OperationId}", req.OperationId);
                         
                         // サーキットブレーカーによる翻訳実行（既存ロジック保持）
                         if (_circuitBreaker != null)
                         {
+                            // 🔥 [STEP16] サーキットブレーカー使用
+                            Console.WriteLine("🔥 [STEP16] サーキットブレーカー使用");
+                            DebugLogUtility.WriteLog("🔥 [STEP16] サーキットブレーカー使用");
+                            
                             return await _circuitBreaker.ExecuteAsync(
                                 async cbt => await TranslateWithOptimizedServerAsync(request, cbt).ConfigureAwait(false), 
                                 ct).ConfigureAwait(false);
                         }
                         else
                         {
+                            // 🔥 [STEP17] TranslateWithOptimizedServerAsync直接実行
+                            Console.WriteLine("🔥 [STEP17] TranslateWithOptimizedServerAsync直接実行");
+                            DebugLogUtility.WriteLog("🔥 [STEP17] TranslateWithOptimizedServerAsync直接実行");
+                            
                             return await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false);
                         }
                     },
                     translationRequest,
                     cancellationToken).ConfigureAwait(false);
                     
+                // 🔥 [STEP18] ProcessTranslationAsync完了
+                Console.WriteLine("🔥 [STEP18] ProcessTranslationAsync完了");
+                DebugLogUtility.WriteLog("🔥 [STEP18] ProcessTranslationAsync完了");
+                
                 _logger.LogDebug("🔧 [HYBRID_RESOURCE_MANAGER] HybridResourceManager経由で翻訳実行完了");
             }
             else
             {
+                // 🔥 [STEP19] レガシーモード
+                Console.WriteLine("🔥 [STEP19] レガシーモード - HybridResourceManager無効");
+                DebugLogUtility.WriteLog("🔥 [STEP19] レガシーモード - HybridResourceManager無効");
+                
                 // レガシーモード: HybridResourceManager無しでの従来処理
                 _logger.LogDebug("🔧 [LEGACY_MODE] HybridResourceManager無効 - 従来の直接実行モード");
                 
                 if (_circuitBreaker != null)
                 {
+                    // 🔥 [STEP20] レガシー - サーキットブレーカー使用
+                    Console.WriteLine("🔥 [STEP20] レガシー - サーキットブレーカー使用");
+                    DebugLogUtility.WriteLog("🔥 [STEP20] レガシー - サーキットブレーカー使用");
+                    
                     _logger.LogDebug("🔧 [CIRCUIT_BREAKER] サーキットブレーカー経由で翻訳実行開始");
                     result = await _circuitBreaker.ExecuteAsync(
                         async ct => await TranslateWithOptimizedServerAsync(request, ct).ConfigureAwait(false), 
@@ -523,12 +653,20 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 }
                 else
                 {
+                    // 🔥 [STEP21] レガシー - 直接実行
+                    Console.WriteLine("🔥 [STEP21] レガシー - TranslateWithOptimizedServerAsync直接実行");
+                    DebugLogUtility.WriteLog("🔥 [STEP21] レガシー - TranslateWithOptimizedServerAsync直接実行");
+                    
                     // サーキットブレーカー無効時は従来通り直接実行
                     _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し開始");
                     result = await TranslateWithOptimizedServerAsync(request, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync 直接呼び出し完了");
                 }
             }
+            
+            // 🔥 [STEP22] 処理時間設定
+            Console.WriteLine("🔥 [STEP22] 処理時間設定とメトリクス更新");
+            DebugLogUtility.WriteLog("🔥 [STEP22] 処理時間設定とメトリクス更新");
             
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
@@ -554,13 +692,19 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // キャッシュ保存処理を完全削除
             _logger.LogDebug("キャッシュ無効化モード - 翻訳結果をキャッシュに保存しません");
             
+            // 🔥 [STEP_FINAL] 成功終了
+            Console.WriteLine($"🔥 [STEP_FINAL] 成功終了 - IsSuccess: {result.IsSuccess}, ProcessingTime: {elapsedMs}ms");
+            DebugLogUtility.WriteLog($"🔥 [STEP_FINAL] 成功終了 - IsSuccess: {result.IsSuccess}, ProcessingTime: {elapsedMs}ms");
+            
             return result;
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
-            stopwatch.Stop();
-            _logger.LogWarning("個別翻訳タイムアウト（5秒）- Text: '{Text}', 処理時間: {ElapsedMs}ms", 
-                request.SourceText, stopwatch.ElapsedMilliseconds);
+            // 🔥 [EXCEPTION] OperationCanceledException
+            Console.WriteLine($"🔥 [EXCEPTION] OperationCanceledException: {ex.Message}");
+            DebugLogUtility.WriteLog($"🔥 [EXCEPTION] OperationCanceledException: {ex.Message}");
+            
+            _logger.LogWarning("個別翻訳タイムアウト（5秒）- Text: '{Text}'", request.SourceText);
             
             return new TranslationResponse
             {
@@ -576,8 +720,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
         catch (CircuitBreakerOpenException ex)
         {
-            stopwatch.Stop();
-            _logger.LogWarning("🚨 [CIRCUIT_BREAKER] サーキットブレーカーが開いています - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            // 🔥 [EXCEPTION] CircuitBreakerOpenException
+            Console.WriteLine($"🔥 [EXCEPTION] CircuitBreakerOpenException: {ex.Message}");
+            DebugLogUtility.WriteLog($"🔥 [EXCEPTION] CircuitBreakerOpenException: {ex.Message}");
+            
+            _logger.LogWarning("🚨 [CIRCUIT_BREAKER] サーキットブレーカーが開いています");
             
             var error = TranslationError.FromException(
                 TranslationError.ServiceUnavailable, 
@@ -586,13 +733,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 true, 
                 TranslationErrorType.ServiceUnavailable);
             var response = TranslationResponse.CreateError(request, error, Name);
-            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
             return response;
         }
         catch (TranslationTimeoutException ex)
         {
-            stopwatch.Stop();
-            _logger.LogWarning("⏱️ [CIRCUIT_BREAKER] 翻訳タイムアウト - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            // 🔥 [EXCEPTION] TranslationTimeoutException
+            Console.WriteLine($"🔥 [EXCEPTION] TranslationTimeoutException: {ex.Message}");
+            DebugLogUtility.WriteLog($"🔥 [EXCEPTION] TranslationTimeoutException: {ex.Message}");
+            
+            _logger.LogWarning("⏱️ [CIRCUIT_BREAKER] 翻訳タイムアウト");
             
             var error = TranslationError.FromException(
                 TranslationError.TimeoutError, 
@@ -601,13 +750,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 true, 
                 TranslationErrorType.Timeout);
             var response = TranslationResponse.CreateError(request, error, Name);
-            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
             return response;
         }
         catch (Exception ex)
         {
-            stopwatch.Stop();
-            _logger.LogError(ex, "翻訳エラー - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            // 🔥 [EXCEPTION] その他の例外
+            Console.WriteLine($"🔥 [EXCEPTION] 一般例外: {ex.GetType().Name} - {ex.Message}");
+            DebugLogUtility.WriteLog($"🔥 [EXCEPTION] 一般例外: {ex.GetType().Name} - {ex.Message}");
+            DebugLogUtility.WriteLog($"🔥 [EXCEPTION] スタックトレース: {ex.StackTrace}");
+            
+            _logger.LogError(ex, "翻訳エラー");
             
             // 🔥 [ERROR_DEBUG] 例外の詳細情報を出力
             _logger.LogDebug("🔥 [ERROR_DEBUG] 例外詳細:");
@@ -623,7 +775,6 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 false, 
                 TranslationErrorType.Exception);
             var response = TranslationResponse.CreateError(request, error, Name);
-            response.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
             return response;
         }
     }
@@ -684,7 +835,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         try
         {
-            if (_connectionPool != null)
+            // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
+            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            if (useConnectionPool && _connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
                 connection = await _connectionPool.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -709,8 +862,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var batchRequest = new
             {
                 texts = requests.Select(r => r.SourceText).ToList(),
-                source_lang = requests[0].SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
-                target_lang = requests[0].TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                source_lang = NormalizeLanguageCode(requests[0].SourceLanguage.Code),  // 🔧 言語コード正規化
+                target_lang = NormalizeLanguageCode(requests[0].TargetLanguage.Code),  // 🔧 言語コード正規化
                 batch_mode = true,
                 max_batch_size = 50
             };
@@ -957,11 +1110,16 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         try
         {
-            // 🚨 [HANGUP_DEBUG] 接続プール確認デバッグ
-            Console.WriteLine($"🔥 [HANGUP_DEBUG] 接続プール確認開始 - _connectionPool != null: {_connectionPool != null}");
-            _logger.LogDebug("🔥 接続プール確認開始 - _connectionPool != null: {IsNotNull}", _connectionPool != null);
-            
-            if (_connectionPool != null)
+            // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
+            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            if (!useConnectionPool)
+            {
+                Console.WriteLine($"🔧 [CONFIG] 設定により接続プール無効化、単発接続を使用");
+                _logger.LogDebug("🔧 [CONFIG] 設定により接続プール無効化、単発接続を使用");
+            }
+
+            // 設定に基づく接続プール制御
+            if (useConnectionPool && _connectionPool != null)
             {
                 // Issue #147: 接続プールから接続を取得（接続ロック競合を解決）
                 // 🔧 [TIMEOUT_FIX] 接続プール取得に30秒タイムアウトを追加
@@ -1010,14 +1168,18 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var requestData = new
             {
                 text = request.SourceText,
-                source_lang = request.SourceLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
-                target_lang = request.TargetLanguage.Code,  // 🔧 CRITICAL FIX: 言語方向修正完了
+                source_lang = NormalizeLanguageCode(request.SourceLanguage.Code),  // 🔧 言語コード正規化
+                target_lang = NormalizeLanguageCode(request.TargetLanguage.Code),  // 🔧 言語コード正規化
                 request_id = request.RequestId
             };
             
             var jsonRequest = JsonSerializer.Serialize(requestData);
             serializationStopwatch.Stop();
             _logger.LogInformation("[TIMING] JSONシリアライゼーション: {ElapsedMs}ms", serializationStopwatch.ElapsedMilliseconds);
+
+            // 🎯 [DEBUG] JSONペイロード詳細ログ出力
+            _logger.LogDebug("🌐 [JSON_PAYLOAD] 送信JSONペイロード: {JsonPayload}", jsonRequest);
+            Console.WriteLine($"🌐 [JSON_PAYLOAD] 送信JSONペイロード: {jsonRequest}");
             
             var networkSendStopwatch = Stopwatch.StartNew();
             
@@ -1132,7 +1294,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             float confidenceScore;
             bool isSuccess;
             
-            if (response.Success && !string.IsNullOrEmpty(response.Translation))
+            // 🎯 [PHASE3.4] 実用的翻訳成功判定ロジック修正
+            // Successフラグに関係なく、翻訳テキストが存在すれば成功とみなす（Phase 3.3と一貫性保持）
+            if (!string.IsNullOrEmpty(response.Translation))
             {
                 translatedText = response.Translation;
                 confidenceScore = response.Confidence ?? 0.95f;
@@ -1296,7 +1460,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // Phase 5: 動的ポート対応
             var targetPort = GetCurrentServerPort();
             
-            if (_connectionPool != null)
+            // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
+            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            if (useConnectionPool && _connectionPool != null)
             {
                 // Issue #147: 接続プールによる接続テスト
                 using var testCts = new CancellationTokenSource(ConnectionTimeoutMs);
@@ -1407,6 +1573,53 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
     }
 
+    /// <summary>
+    /// サーバー接続テスト（リトライ機能付き）
+    /// Gemini推奨：タイミング問題に対する堅牢な解決策
+    /// </summary>
+    /// <param name="port">テスト対象ポート（null=現在のサーバーポート）</param>
+    /// <returns>接続成功可否</returns>
+    private async Task<bool> TestDirectConnectionAsyncWithRetry(int? port = null)
+    {
+        const int maxRetries = 5;
+        const int retryDelayMs = 2000;
+
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                _logger.LogDebug($"🔄 [RETRY_LOGIC] 接続試行 {i + 1}/{maxRetries} - ポート: {port ?? GetCurrentServerPort()}");
+                
+                if (await TestDirectConnectionAsync(port).ConfigureAwait(false))
+                {
+                    _logger.LogInformation($"✅ [RETRY_LOGIC] 接続成功 - 試行回数: {i + 1}/{maxRetries}");
+                    return true;
+                }
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
+            {
+                _logger.LogDebug($"⚠️ [RETRY_LOGIC] 接続拒否 (試行 {i + 1}/{maxRetries}) - {retryDelayMs}ms後に再試行");
+                
+                if (i < maxRetries - 1) // 最後の試行でない場合のみ待機
+                {
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"🚨 [RETRY_LOGIC] 予期しないエラー (試行 {i + 1}/{maxRetries})");
+                
+                if (i < maxRetries - 1)
+                {
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
+        }
+
+        _logger.LogError($"❌ [RETRY_LOGIC] 接続失敗 - 最大試行回数 {maxRetries} 到達");
+        return false;
+    }
+
     private void ConfigureKeepAlive(TcpClient client)
     {
         try
@@ -1515,15 +1728,53 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         return dir?.FullName ?? currentDir;
     }
 
+    /// <summary>
+    /// 言語コードをNLLB-200サーバー対応形式に正規化
+    /// </summary>
+    private static string NormalizeLanguageCode(string code)
+    {
+        return code?.ToLowerInvariant() switch
+        {
+            // autoは使わず、実際の言語コードのみ処理
+            "ja-jp" or "jpn_jpan" or "japanese" => "ja",
+            "en-us" or "eng_latn" or "english" => "en",
+            "ja" or "en" => code,  // 既に正規化済み
+            _ => "en"  // デフォルトは英語
+        };
+    }
+
     public async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
     {
+        // 設定から動的に言語を取得
+        var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+        var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+        
         return await Task.FromResult<IReadOnlyCollection<LanguagePair>>(
         [
-            new() { SourceLanguage = new() { Code = "ja", DisplayName = "Japanese" }, 
+            // ユーザー設定に基づく言語ペア
+            new() { SourceLanguage = new() { Code = defaultSourceLanguage, DisplayName = GetLanguageDisplayName(defaultSourceLanguage) },
+                   TargetLanguage = new() { Code = defaultTargetLanguage, DisplayName = GetLanguageDisplayName(defaultTargetLanguage) } },
+            
+            // 逆方向もサポート（例：ja→en, en→ja）
+            new() { SourceLanguage = new() { Code = defaultTargetLanguage, DisplayName = GetLanguageDisplayName(defaultTargetLanguage) },
+                   TargetLanguage = new() { Code = defaultSourceLanguage, DisplayName = GetLanguageDisplayName(defaultSourceLanguage) } },
+            
+            // 固定言語ペア（日本語⇔英語）
+            new() { SourceLanguage = new() { Code = "ja", DisplayName = "Japanese" },
                    TargetLanguage = new() { Code = "en", DisplayName = "English" } },
-            new() { SourceLanguage = new() { Code = "en", DisplayName = "English" }, 
+            new() { SourceLanguage = new() { Code = "en", DisplayName = "English" },
                    TargetLanguage = new() { Code = "ja", DisplayName = "Japanese" } }
         ]).ConfigureAwait(false);
+    }
+    
+    private static string GetLanguageDisplayName(string languageCode)
+    {
+        return languageCode switch
+        {
+            "ja" => "Japanese",
+            "en" => "English",
+            _ => languageCode.ToUpperInvariant()
+        };
     }
 
     public async Task<bool> SupportsLanguagePairAsync(LanguagePair languagePair)
@@ -1706,7 +1957,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             if (defaultEngine == TranslationEngine.NLLB200)
             {
                 // NLLB-200設定から動的にポートとスクリプトパスを取得
-                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5557);
+                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5556);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
@@ -1727,7 +1978,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             else
             {
                 // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
-                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5557);
+                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
                 var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
@@ -1749,7 +2000,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
-            _serverPort = 5557;
+            _serverPort = 5556;
             var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
             _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
             

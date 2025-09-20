@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
@@ -13,11 +14,13 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 public sealed class ParallelTranslationStrategy(
     ITranslationEngine translationEngine,
     HybridStrategySettings settings,
-    ILogger<ParallelTranslationStrategy> logger) : ITranslationStrategy
+    ILogger<ParallelTranslationStrategy> logger,
+    IConfiguration configuration) : ITranslationStrategy
 {
     private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
     private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     private readonly ILogger<ParallelTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
     public int Priority => 50; // 中優先度
 
@@ -41,9 +44,11 @@ public sealed class ParallelTranslationStrategy(
 
         try
         {
-            // TranslationRequestを作成
-            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? "auto");
-            var targetLanguageModel = Language.FromCode(targetLanguage ?? "ja");
+            // TranslationRequestを作成（設定から動的取得）
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
+            var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
             
             var request = new TranslationRequest
             {
@@ -91,9 +96,11 @@ public sealed class ParallelTranslationStrategy(
 
         try
         {
-            // 言語モデルを作成
-            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? "auto");
-            var targetLanguageModel = Language.FromCode(targetLanguage ?? "ja");
+            // 言語モデルを作成（設定から動的取得）
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
+            var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
 
             await Parallel.ForEachAsync(
                 texts.Select((text, index) => new { Text = text, Index = index }),

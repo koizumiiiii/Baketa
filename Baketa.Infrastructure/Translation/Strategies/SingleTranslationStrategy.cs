@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 
@@ -11,10 +12,12 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 /// </summary>
 public sealed class SingleTranslationStrategy(
     ITranslationEngine translationEngine,
-    ILogger<SingleTranslationStrategy> logger) : ITranslationStrategy
+    ILogger<SingleTranslationStrategy> logger,
+    IConfiguration configuration) : ITranslationStrategy
 {
     private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
     private readonly ILogger<SingleTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
     public int Priority => 10; // 最低優先度（フォールバック用）
 
@@ -34,9 +37,11 @@ public sealed class SingleTranslationStrategy(
 
         try
         {
-            // TranslationRequestを作成
-            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? "auto");
-            var targetLanguageModel = Language.FromCode(targetLanguage ?? "ja");
+            // TranslationRequestを作成（設定から動的取得）
+            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
+            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
+            var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
             
             var request = new TranslationRequest
             {
