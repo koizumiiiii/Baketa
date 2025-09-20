@@ -471,37 +471,49 @@ public class InPlaceTranslationOverlayManager(
                 
                 // オーバーレイを コレクションに追加
                 _activeOverlays[textChunk.ChunkId] = newOverlay;
-                
+
                 // 一時的なTextChunkで精密位置調整結果を適用
                 var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, optimalPosition);
-                
+
                 // 🎯 [P2_OVERLAY_DISPLAY] オーバーレイ表示前の最終状態確認
                 Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] === オーバーレイ表示開始 (ChunkId: {textChunk.ChunkId}) ===");
                 Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] 調整後TextChunk座標: ({adjustedTextChunk.CombinedBounds.X},{adjustedTextChunk.CombinedBounds.Y}) サイズ: {adjustedTextChunk.CombinedBounds.Width}x{adjustedTextChunk.CombinedBounds.Height}");
                 Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] 表示テキスト: '{adjustedTextChunk.TranslatedText}'");
                 Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] newOverlay作成状態: {newOverlay != null}");
 
-                // Phase 11.1精密位置でインプレース表示を開始
-                await newOverlay.ShowInPlaceOverlayAsync(adjustedTextChunk, cancellationToken).ConfigureAwait(false);
+                // UIスレッドでオーバーレイ表示を実行
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    // Phase 11.1精密位置でインプレース表示を開始
+                    await newOverlay.ShowInPlaceOverlayAsync(adjustedTextChunk, cancellationToken).ConfigureAwait(false);
+                }, DispatcherPriority.Normal, cancellationToken);
 
                 // 🎯 [P2_OVERLAY_DISPLAY] 表示完了後のオーバーレイウィンドウ状態監視
                 Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] === オーバーレイ表示完了 (ChunkId: {textChunk.ChunkId}) ===");
-                try
+
+                // UIスレッドでウィンドウ状態を確認
+                await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ可視性: {newOverlay.IsVisible}");
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ位置: ({newOverlay.Position.X},{newOverlay.Position.Y})");
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウサイズ: {newOverlay.ClientSize.Width}x{newOverlay.ClientSize.Height}");
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Topmost設定: {newOverlay.Topmost}");
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Opacity設定: {newOverlay.Opacity}");
-                    Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] WindowState: {newOverlay.WindowState}");
-                }
-                catch (Exception displayEx)
-                {
-                    Console.WriteLine($"⚠️ [P2_OVERLAY_DISPLAY] ウィンドウ状態取得失敗: {displayEx.Message}");
-                }
+                    try
+                    {
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ可視性: {newOverlay.IsVisible}");
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウ位置: ({newOverlay.Position.X},{newOverlay.Position.Y})");
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] ウィンドウサイズ: {newOverlay.ClientSize.Width}x{newOverlay.ClientSize.Height}");
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Topmost設定: {newOverlay.Topmost}");
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] Opacity設定: {newOverlay.Opacity}");
+                        Console.WriteLine($"🎯 [P2_OVERLAY_DISPLAY] WindowState: {newOverlay.WindowState}");
+                    }
+                    catch (Exception displayEx)
+                    {
+                        Console.WriteLine($"⚠️ [P2_OVERLAY_DISPLAY] ウィンドウ状態取得失敗: {displayEx.Message}");
+                    }
+                }, DispatcherPriority.Normal, cancellationToken);
+
+                // UIスレッドでIsVisibleを取得してログ出力
+                var isVisible = await Dispatcher.UIThread.InvokeAsync(() => newOverlay.IsVisible, DispatcherPriority.Normal, cancellationToken);
 
                 _logger.LogInformation("[P2_OVERLAY_DISPLAY] 新規オーバーレイ表示完了 - ChunkId: {ChunkId}, FinalPosition: ({X},{Y}), Visible: {IsVisible}",
-                    textChunk.ChunkId, optimalPosition.X, optimalPosition.Y, newOverlay.IsVisible);
+                    textChunk.ChunkId, optimalPosition.X, optimalPosition.Y, isVisible);
             }
             else
             {
