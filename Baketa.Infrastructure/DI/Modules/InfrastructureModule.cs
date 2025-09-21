@@ -31,6 +31,7 @@ using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Infrastructure.Performance;
 using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Settings;
+using Baketa.Infrastructure.Services.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
 // 翻訳エンジンをNLLB-200に統一
@@ -302,6 +303,10 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterTranslationServices(IServiceCollection services)
         {
+            // 統一言語設定サービス（Clean Architecture準拠）
+            services.AddScoped<ILanguageConfigurationService, UnifiedLanguageConfigurationService>();
+            Console.WriteLine("✅ ILanguageConfigurationService登録完了 - 統一言語設定管理");
+
             // Phase2: サーキットブレーカー設定とサービス登録
             Console.WriteLine("🔧 [PHASE2] サーキットブレーカー登録開始");
             
