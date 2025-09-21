@@ -313,9 +313,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // サーキットブレーカー設定 - appsettings.jsonから読み込み
             RegisterCircuitBreakerSettings(services);
             
-            // 翻訳専用サーキットブレーカー登録
-            services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, TranslationCircuitBreaker>();
-            Console.WriteLine("✅ [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s");
+            // 🆕 Gemini推奨: フォールバック機能付きサーキットブレーカー登録
+            services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, EnhancedTranslationCircuitBreaker>();
+            Console.WriteLine("✅ [PHASE2] EnhancedTranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s, フォールバック機能付き");
             
             // 翻訳エンジンファクトリーを登録
             services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();

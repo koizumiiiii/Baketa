@@ -115,4 +115,9 @@ public record CircuitBreakerStats
     /// サーキットブレーカーがオープンした回数
     /// </summary>
     public long CircuitOpenCount { get; init; }
+
+    /// <summary>
+    /// 🆕 フォールバック実行回数 - Gemini推奨統計機能
+    /// </summary>
+    public long FallbackExecutions { get; init; }
 }

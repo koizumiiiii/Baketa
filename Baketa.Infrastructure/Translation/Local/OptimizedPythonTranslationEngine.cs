@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Core.Utilities; // DebugLogUtility用
+using Baketa.Infrastructure.Translation.Cloud; // GeminiTranslationEngine用
 using ResourceTranslationRequest = Baketa.Infrastructure.ResourceManagement.TranslationRequest;
 using CoreTranslationRequest = Baketa.Core.Translation.Models.TranslationRequest;
 
@@ -40,6 +41,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
     private readonly IResourceManager? _resourceManager; // Phase 2: ハイブリッドリソース管理統合
+    private readonly GeminiTranslationEngine? _fallbackEngine; // 🆕 Gemini推奨: フォールバック翻訳エンジン
     
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
@@ -56,6 +58,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly TaskCompletionSource<bool> _modelLoadCompletion = new();
     private volatile bool _isModelLoaded = false;
     private readonly object _initializationLock = new();
+
+    // 🆕 Gemini推奨: 指数バックオフ再起動機構
+    private int _restartAttempts = 0;
+    private readonly int _maxRestartAttempts = 5;
+    private DateTime? _lastRestartTime;
+
+    // 🆕 接続プール制御設定
+    private readonly CircuitBreakerSettings _circuitBreakerSettings;
     
     // 設定
     private const string ServerHost = "127.0.0.1";
@@ -79,7 +89,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         ILanguageConfigurationService languageConfig,
         IPythonServerManager? serverManager = null,
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
-        IResourceManager? resourceManager = null)
+        IResourceManager? resourceManager = null,
+        IOptions<CircuitBreakerSettings>? circuitBreakerSettings = null,
+        GeminiTranslationEngine? fallbackEngine = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
@@ -87,10 +99,15 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         _resourceManager = resourceManager; // null許容（レガシー互換性維持）
+        _fallbackEngine = fallbackEngine; // 🆕 Gemini推奨: フォールバック翻訳エンジン（null許容）
 
-        // CircuitBreakerのタイムアウト設定を取得（デフォルト120秒）
-        _translationTimeoutMs = 120000; // 固定値使用
-        _logger.LogInformation("🔧 [TIMEOUT_CONFIG] 翻訳タイムアウト設定: {TimeoutMs}ms", _translationTimeoutMs);
+        // 🆕 Gemini推奨: 接続プール制御設定の初期化
+        _circuitBreakerSettings = circuitBreakerSettings?.Value ?? new CircuitBreakerSettings();
+
+        // 🆕 CircuitBreakerSettings からタイムアウト設定を取得
+        _translationTimeoutMs = _circuitBreakerSettings.TimeoutMs;
+        _logger.LogInformation("🔧 [TIMEOUT_CONFIG] 翻訳タイムアウト設定: {TimeoutMs}ms (接続プール有効: {PoolEnabled})",
+            _translationTimeoutMs, _circuitBreakerSettings.EnableConnectionPool);
 
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
@@ -140,7 +157,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = false; // 固定値使用
+            // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
+            var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
             var useExternalServer = false; // 固定値使用
 
             _logger.LogInformation($"🔧 [CONFIG] UseConnectionPool: {useConnectionPool}, UseExternalServer: {useExternalServer}");
@@ -177,13 +195,13 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 }
                 else
                 {
-                    // 🔄 Gemini推奨：リトライロジック付き接続テスト（タイミング問題対策）
-                    if (!await TestDirectConnectionAsyncWithRetry().ConfigureAwait(false))
+                    // 🆕 Gemini推奨：指数バックオフ付きサーバー健全性確認
+                    if (!await EnsureServerHealthyWithBackoffAsync().ConfigureAwait(false))
                     {
-                        _logger.LogError("🚨 [RETRY_LOGIC] リトライ後も接続失敗 - サーバー準備未完了の可能性");
+                        _logger.LogError("🚨 [EXPONENTIAL_BACKOFF] 指数バックオフ再起動機構でも復旧できませんでした");
                         return false;
                     }
-                    _logger.LogInformation("🔄 リトライロジック経由でサーバー接続を確認（タイミング問題対策）");
+                    _logger.LogInformation("🆕 指数バックオフ機構によるサーバー健全性確認完了");
                 }
             }
             catch (Exception ex)
@@ -233,7 +251,54 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             _serverLock.Release();
         }
     }
-    
+
+    /// <summary>
+    /// 🆕 Gemini推奨: 指数バックオフ付きサーバー再起動機構
+    /// 再起動ループを防止し、段階的に待機時間を延長
+    /// </summary>
+    private async Task<bool> RestartServerWithBackoffAsync()
+    {
+        if (_restartAttempts >= _maxRestartAttempts)
+        {
+            _logger.LogError("🚨 最大再起動試行回数({MaxAttempts})に到達 - 手動介入が必要", _maxRestartAttempts);
+            return false;
+        }
+
+        // 指数バックオフ: 2^n秒待機 (1, 2, 4, 8, 16秒)
+        var delay = TimeSpan.FromSeconds(Math.Pow(2, _restartAttempts));
+        _logger.LogWarning("🔄 サーバー再起動試行 {Attempt}/{Max} - {Delay}秒後に実行",
+            _restartAttempts + 1, _maxRestartAttempts, delay.TotalSeconds);
+
+        await Task.Delay(delay).ConfigureAwait(false);
+        _restartAttempts++;
+        _lastRestartTime = DateTime.UtcNow;
+
+        // 既存プロセスのクリーンアップ
+        await CleanupExistingProcessesAsync().ConfigureAwait(false);
+
+        // サーバー再起動
+        return await StartOptimizedServerAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 🆕 Gemini推奨: サーバー健全性確認 + 自動回復機構
+    /// </summary>
+    private async Task<bool> EnsureServerHealthyWithBackoffAsync()
+    {
+        // 直接接続テストで健全性確認
+        var healthCheck = await TestDirectConnectionAsync().ConfigureAwait(false);
+        if (healthCheck)
+        {
+            // 成功時はリトライカウンターをリセット
+            _restartAttempts = 0;
+            _lastRestartTime = null;
+            return true;
+        }
+
+        _logger.LogWarning("🩺 サーバー健全性チェック失敗 - 再起動を試行");
+        return await RestartServerWithBackoffAsync().ConfigureAwait(false);
+    }
+
     /// <summary>
     /// PythonServerManager経由での動的ポートサーバー起動
     /// </summary>
@@ -840,7 +905,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = false; // 固定値使用
+            // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
+            var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
             if (useConnectionPool && _connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
@@ -1115,7 +1181,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = false; // 固定値使用
+            // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
+            var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
             if (!useConnectionPool)
             {
                 Console.WriteLine($"🔧 [CONFIG] 設定により接続プール無効化、単発接続を使用");
@@ -1298,9 +1365,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             float confidenceScore;
             bool isSuccess;
             
-            // 🎯 [PHASE3.4] 実用的翻訳成功判定ロジック修正
-            // Successフラグに関係なく、翻訳テキストが存在すれば成功とみなす（Phase 3.3と一貫性保持）
-            if (!string.IsNullOrEmpty(response.Translation))
+            // 🆕 Gemini推奨: 正確な成功判定ロジック - 論理矛盾解消
+            // エラーメッセージを含む翻訳結果を適切に失敗として判定
+            bool isActualSuccess = !string.IsNullOrEmpty(response.Translation)
+                                  && !response.Translation.Contains("翻訳エラーが発生しました")
+                                  && !response.Translation.Contains("エラーが発生")
+                                  && response.Success; // Pythonサーバーのフラグも考慮
+
+            if (isActualSuccess)
             {
                 translatedText = response.Translation;
                 confidenceScore = response.Confidence ?? 0.95f;
@@ -1465,7 +1537,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var targetPort = GetCurrentServerPort();
             
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = false; // 固定値使用
+            // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
+            var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
             if (useConnectionPool && _connectionPool != null)
             {
                 // Issue #147: 接続プールによる接続テスト
