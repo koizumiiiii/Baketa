@@ -590,7 +590,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
                 var connectionPool = provider.GetRequiredService<IConnectionPool>();
-                var configuration = provider.GetRequiredService<IConfiguration>();
+                var languageConfig = provider.GetRequiredService<ILanguageConfigurationService>();
                 
                 // 🚀 Phase 3.2修正: GetRequiredServiceでHybridResourceManagerを強制取得
                 Baketa.Infrastructure.ResourceManagement.IResourceManager? resourceManager = null;
@@ -608,7 +608,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 3.2 VRAMモニタリング）");
                 logger?.LogInformation("🎯 [PHASE3.2-DI] HybridResourceManager最終状態: {ResourceManagerExists}", resourceManager != null);
                 
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, configuration, null, null, resourceManager);
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, languageConfig, null, null, resourceManager);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>

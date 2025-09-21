@@ -3,12 +3,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Translation.Models;
 using Baketa.Core.Settings;
+using Baketa.Core.Models.Translation;
+using CoreTranslationModels = Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Baketa.Core.Abstractions.Translation;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -23,7 +24,7 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
     private readonly Mock<IConnectionPool> _mockConnectionPool;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<ILanguageConfigurationService> _mockLanguageConfig;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineTests(ITestOutputHelper output)
@@ -31,9 +32,9 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
         _mockConnectionPool = new Mock<IConnectionPool>();
-        _mockConfiguration = new Mock<IConfiguration>();
-        _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("Local");
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockConfiguration.Object);
+        _mockLanguageConfig = new Mock<ILanguageConfigurationService>();
+        _mockLanguageConfig.Setup(x => x.GetCurrentLanguagePair()).Returns(new LanguagePair(Language.English, Language.Japanese));
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockLanguageConfig.Object);
     }
 
     [Fact]
@@ -67,16 +68,16 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     public async Task SupportsLanguagePairAsync_ShouldReturnTrueForSupportedPairs()
     {
         // Arrange
-        var jaToEn = new LanguagePair
+        var jaToEn = new CoreTranslationModels.LanguagePair
         {
-            SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-            TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            SourceLanguage = CoreTranslationModels.Language.Japanese,
+            TargetLanguage = CoreTranslationModels.Language.English
         };
 
-        var enToJa = new LanguagePair
+        var enToJa = new CoreTranslationModels.LanguagePair
         {
-            SourceLanguage = new Language { Code = "en", DisplayName = "English" },
-            TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" }
+            SourceLanguage = CoreTranslationModels.Language.English,
+            TargetLanguage = CoreTranslationModels.Language.Japanese
         };
 
         // Act
@@ -92,10 +93,10 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     public async Task SupportsLanguagePairAsync_ShouldReturnFalseForUnsupportedPairs()
     {
         // Arrange
-        var unsupportedPair = new LanguagePair
+        var unsupportedPair = new CoreTranslationModels.LanguagePair
         {
-            SourceLanguage = new Language { Code = "fr", DisplayName = "French" },
-            TargetLanguage = new Language { Code = "de", DisplayName = "German" }
+            SourceLanguage = new CoreTranslationModels.Language { Code = "fr", DisplayName = "French" },
+            TargetLanguage = new CoreTranslationModels.Language { Code = "de", DisplayName = "German" }
         };
 
         // Act
@@ -110,11 +111,11 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     {
         // Arrange - ユニークなテキストを使用してキャッシュ干渉を防ぐ
         var uniqueText = $"テストテキスト_{Guid.NewGuid():N}";
-        var request = new TranslationRequest
+        var request = new CoreTranslationModels.TranslationRequest
         {
             SourceText = uniqueText,
-            SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-            TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            SourceLanguage = CoreTranslationModels.Language.Japanese,
+            TargetLanguage = CoreTranslationModels.Language.English
         };
 
         var stopwatch = Stopwatch.StartNew();
@@ -156,11 +157,11 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     {
         // Arrange - ユニークなテキストを使用してキャッシュ干渉を防ぐ
         var uniqueText = $"パフォーマンステスト_{Guid.NewGuid():N}";
-        var request = new TranslationRequest
+        var request = new CoreTranslationModels.TranslationRequest
         {
             SourceText = uniqueText,
-            SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-            TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            SourceLanguage = CoreTranslationModels.Language.Japanese,
+            TargetLanguage = CoreTranslationModels.Language.English
         };
 
         var stopwatch = Stopwatch.StartNew();
@@ -180,11 +181,11 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
     public async Task TranslateAsync_WithCancellation_ShouldRespectCancellationToken()
     {
         // Arrange
-        var request = new TranslationRequest
+        var request = new CoreTranslationModels.TranslationRequest
         {
             SourceText = "キャンセルテスト",
-            SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-            TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            SourceLanguage = CoreTranslationModels.Language.Japanese,
+            TargetLanguage = CoreTranslationModels.Language.English
         };
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
@@ -210,17 +211,17 @@ public class OptimizedPythonTranslationEngineTests : IDisposable
         var batchId = Guid.NewGuid().ToString("N")[..8];
         var requests = new[]
         {
-            new TranslationRequest
+            new CoreTranslationModels.TranslationRequest
             {
                 SourceText = $"バッチテスト1_{batchId}",
-                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-                TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+                SourceLanguage = CoreTranslationModels.Language.Japanese,
+                TargetLanguage = CoreTranslationModels.Language.English
             },
-            new TranslationRequest
+            new CoreTranslationModels.TranslationRequest
             {
                 SourceText = $"バッチテスト2_{batchId}",
-                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-                TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+                SourceLanguage = CoreTranslationModels.Language.Japanese,
+                TargetLanguage = CoreTranslationModels.Language.English
             }
         };
 
@@ -294,7 +295,7 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly Mock<ILogger<OptimizedPythonTranslationEngine>> _mockLogger;
     private readonly Mock<IConnectionPool> _mockConnectionPool;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<ILanguageConfigurationService> _mockLanguageConfig;
     private readonly OptimizedPythonTranslationEngine _engine;
 
     public OptimizedPythonTranslationEngineIntegrationTests(ITestOutputHelper output)
@@ -302,9 +303,9 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
         _output = output;
         _mockLogger = new Mock<ILogger<OptimizedPythonTranslationEngine>>();
         _mockConnectionPool = new Mock<IConnectionPool>();
-        _mockConfiguration = new Mock<IConfiguration>();
-        _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("Local");
-        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockConfiguration.Object);
+        _mockLanguageConfig = new Mock<ILanguageConfigurationService>();
+        _mockLanguageConfig.Setup(x => x.GetCurrentLanguagePair()).Returns(new LanguagePair(Language.English, Language.Japanese));
+        _engine = new OptimizedPythonTranslationEngine(_mockLogger.Object, _mockConnectionPool.Object, _mockLanguageConfig.Object);
     }
 
     [Fact(Skip = "Pythonサーバーが必要")]
@@ -313,11 +314,11 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
         // Arrange - Pythonサーバーの起動を待つ
         await Task.Delay(2000);
 
-        var request = new TranslationRequest
+        var request = new CoreTranslationModels.TranslationRequest
         {
             SourceText = "こんにちは、世界！",
-            SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-            TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+            SourceLanguage = CoreTranslationModels.Language.Japanese,
+            TargetLanguage = CoreTranslationModels.Language.English
         };
 
         var stopwatch = Stopwatch.StartNew();
@@ -357,11 +358,11 @@ public class OptimizedPythonTranslationEngineIntegrationTests : IDisposable
         // Act
         foreach (var testCase in testCases)
         {
-            var request = new TranslationRequest
+            var request = new CoreTranslationModels.TranslationRequest
             {
                 SourceText = testCase,
-                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-                TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+                SourceLanguage = CoreTranslationModels.Language.Japanese,
+                TargetLanguage = CoreTranslationModels.Language.English
             };
 
             var stopwatch = Stopwatch.StartNew();

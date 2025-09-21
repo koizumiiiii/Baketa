@@ -8,7 +8,6 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading.Tasks;
 
@@ -29,12 +28,12 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
         private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
         private readonly ITextChunkAggregatorService _chunkAggregatorService;
-        private readonly IConfiguration _configuration;
+        private readonly ILanguageConfigurationService _languageConfig;
 
         public CaptureCompletedHandler(
             IEventAggregator eventAggregator,
             ITextChunkAggregatorService chunkAggregatorService,
-            IConfiguration configuration,
+            ILanguageConfigurationService languageConfig,
             ISmartProcessingPipelineService? smartPipeline = null,
             ILogger<CaptureCompletedHandler>? logger = null,
             IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
@@ -44,7 +43,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         {
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
             _chunkAggregatorService = chunkAggregatorService ?? throw new ArgumentNullException(nameof(chunkAggregatorService));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
             _smartPipeline = smartPipeline;
             _logger = logger;
             _settings = settings;
@@ -427,15 +426,14 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
             if (result.LastCompletedStage >= ProcessingStageType.TranslationExecution && result.TranslationResult?.Success == true)
             {
-                // 設定から言語を動的取得
-                var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-                var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+                // 統一言語設定サービスから言語ペア取得
+                var languagePair = _languageConfig.GetCurrentLanguagePair();
 
                 var translationEvent = new TranslationCompletedEvent(
                     sourceText: result.OcrResult?.DetectedText ?? "",
                     translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: defaultSourceLanguage,
-                    targetLanguage: defaultTargetLanguage,
+                    sourceLanguage: languagePair.Source.DisplayName,
+                    targetLanguage: languagePair.Target.DisplayName,
                     processingTime: result.TranslationResult.ProcessingTime,
                     engineName: result.TranslationResult.EngineUsed);
                 await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
@@ -446,8 +444,8 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 var boundsEvent = new Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent(
                     sourceText: result.OcrResult?.DetectedText ?? "",
                     translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: defaultSourceLanguage,
-                    targetLanguage: defaultTargetLanguage,
+                    sourceLanguage: languagePair.Source.DisplayName,
+                    targetLanguage: languagePair.Target.DisplayName,
                     bounds: eventData.CaptureRegion, // キャプチャ領域を座標情報として使用
                     confidence: 0.95f, // デフォルト信頼度（実装時にOCR信頼度から設定）
                     engineName: result.TranslationResult.EngineUsed);

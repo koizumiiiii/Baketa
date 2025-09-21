@@ -3,7 +3,7 @@ using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
+using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -66,7 +66,7 @@ public class TranslationPipelineMigrationTests
         var mockTranslationService = Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>();
         var mockOverlayManager = Mock.Of<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
         var mockLogger = Mock.Of<ILogger<TranslationPipelineService>>();
-        var mockConfiguration = Mock.Of<IConfiguration>();
+        var mockLanguageConfig = Mock.Of<ILanguageConfigurationService>();
 
         // Act
         var service = new TranslationPipelineService(
@@ -75,7 +75,7 @@ public class TranslationPipelineMigrationTests
             mockTranslationService,
             mockOverlayManager,
             mockLogger,
-            mockConfiguration);
+            mockLanguageConfig);
 
         // Assert
         service.Should().NotBeNull();

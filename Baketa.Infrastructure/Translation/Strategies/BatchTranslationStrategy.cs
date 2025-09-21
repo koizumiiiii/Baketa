@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 
@@ -14,12 +13,12 @@ public sealed class BatchTranslationStrategy(
     ITranslationEngine translationEngine,
     HybridStrategySettings settings,
     ILogger<BatchTranslationStrategy> logger,
-    IConfiguration configuration) : ITranslationStrategy
+    ILanguageConfigurationService languageConfig) : ITranslationStrategy
 {
     private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
     private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     private readonly ILogger<BatchTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ILanguageConfigurationService _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
 
     public int Priority => 100; // 最高優先度
 
@@ -60,9 +59,10 @@ public sealed class BatchTranslationStrategy(
 
         try
         {
-            // 言語モデルを作成（設定から動的取得）
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            // 言語モデルを作成（言語設定サービスから取得）
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
 

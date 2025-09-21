@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
@@ -15,12 +14,12 @@ public sealed class ParallelTranslationStrategy(
     ITranslationEngine translationEngine,
     HybridStrategySettings settings,
     ILogger<ParallelTranslationStrategy> logger,
-    IConfiguration configuration) : ITranslationStrategy
+    ILanguageConfigurationService languageConfig) : ITranslationStrategy
 {
     private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
     private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     private readonly ILogger<ParallelTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ILanguageConfigurationService _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
 
     public int Priority => 50; // 中優先度
 
@@ -44,9 +43,10 @@ public sealed class ParallelTranslationStrategy(
 
         try
         {
-            // TranslationRequestを作成（設定から動的取得）
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            // TranslationRequestを作成（言語設定サービスから取得）
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
             
@@ -96,9 +96,10 @@ public sealed class ParallelTranslationStrategy(
 
         try
         {
-            // 言語モデルを作成（設定から動的取得）
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            // 言語モデルを作成（言語設定サービスから取得）
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
 

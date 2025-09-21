@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using System.Drawing;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.UI;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
 using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;
 using Baketa.Core.Events.EventTypes;
@@ -39,7 +38,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly ITranslationServiceCore _translationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ILogger<TranslationPipelineService> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly ILanguageConfigurationService _languageConfig;
     private readonly CancellationTokenSource _cancellationTokenSource;
     
     // TPL Dataflow Pipeline Components
@@ -71,14 +70,14 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         ITranslationServiceCore translationService,
         IInPlaceTranslationOverlayManager overlayManager,
         ILogger<TranslationPipelineService> logger,
-        IConfiguration configuration)
+        ILanguageConfigurationService languageConfig)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         _cancellationTokenSource = new CancellationTokenSource();
 
         // Stage 1: Entry Block - OCR結果受付
@@ -232,13 +231,9 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         try
         {
             // 翻訳設定取得（設定ベース言語使用）
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
-            var translationSettings = _settingsService.GetTranslationSettings();
-            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage
-                ? defaultSourceLanguage
-                : translationSettings.DefaultSourceLanguage;
-            var targetLanguageCode = translationSettings.DefaultTargetLanguage;
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var sourceLanguageCode = languagePair.SourceCode;
+            var targetLanguageCode = languagePair.TargetCode;
 
             // ROI座標情報の判定（CoordinateBasedTranslationServiceロジック移植）
             var hasCoordinateInfo = HasValidCoordinateInfo(ocrResult);
@@ -590,12 +585,15 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     /// <param name="result">翻訳結果</param>
     private async Task ProcessDefaultDisplayAsync(PipelineTranslationResult result)
     {
+        // 言語設定を取得
+        var languagePair = _languageConfig.GetCurrentLanguagePair();
+
         // 通常のTranslationCompletedEventを発行
         var completedEvent = new TranslationCompletedEvent(
             sourceText: result.OriginalText,
             translatedText: result.TranslatedText,
-            sourceLanguage: _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en"), // 設定ベース言語
-            targetLanguage: _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja"), // 設定ベース言語
+            sourceLanguage: languagePair.SourceCode, // 設定ベース言語
+            targetLanguage: languagePair.TargetCode, // 設定ベース言語
             processingTime: result.ProcessingTime,
             engineName: "Pipeline");
 

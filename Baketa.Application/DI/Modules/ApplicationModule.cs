@@ -14,6 +14,7 @@ using System.Linq;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Settings;
 using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Services;
 using Baketa.Application.Services.Capture;
@@ -111,7 +112,7 @@ namespace Baketa.Application.DI.Modules;
                 var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
                 var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.TranslationPipelineService>>();
-                var configuration = provider.GetRequiredService<IConfiguration>();
+                var languageConfig = provider.GetRequiredService<ILanguageConfigurationService>();
 
                 return new Baketa.Application.Services.Translation.TranslationPipelineService(
                     eventAggregator,
@@ -119,7 +120,7 @@ namespace Baketa.Application.DI.Modules;
                     translationService,
                     overlayManager,
                     logger,
-                    configuration);
+                    languageConfig);
             });
             services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());
@@ -426,7 +427,7 @@ namespace Baketa.Application.DI.Modules;
                 return new Baketa.Application.Events.Handlers.CaptureCompletedHandler(
                     eventAggregator,
                     chunkAggregatorService,
-                    provider.GetRequiredService<IConfiguration>(),
+                    provider.GetRequiredService<TranslationAbstractions.ILanguageConfigurationService>(),
                     smartPipeline,
                     logger,
                     settings,

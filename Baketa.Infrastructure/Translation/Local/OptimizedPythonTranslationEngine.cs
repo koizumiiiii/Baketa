@@ -19,7 +19,6 @@ using Baketa.Infrastructure.Translation.Models;
 using Baketa.Infrastructure.Patterns;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Core.Utilities; // DebugLogUtility用
 using ResourceTranslationRequest = Baketa.Infrastructure.ResourceManagement.TranslationRequest;
@@ -37,7 +36,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly SemaphoreSlim _serverLock = new(1, 1);
     // Phase 1.5: バッチ並列度制限を削除 - appsettings.jsonのMaxConnections制御で十分
     private readonly IConnectionPool? _connectionPool; // Issue #147: 接続プール統合（動的ポートモードではnull）
-    private readonly IConfiguration _configuration; // Issue #147: 動的設定管理
+    private readonly ILanguageConfigurationService _languageConfig; // Issue #147: 動的設定管理
     private readonly IPythonServerManager? _serverManager; // Phase 5: 動的ポート対応
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
     private readonly IResourceManager? _resourceManager; // Phase 2: ハイブリッドリソース管理統合
@@ -77,20 +76,20 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     public OptimizedPythonTranslationEngine(
         ILogger<OptimizedPythonTranslationEngine> logger,
         IConnectionPool? connectionPool,
-        IConfiguration configuration,
+        ILanguageConfigurationService languageConfig,
         IPythonServerManager? serverManager = null,
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
         IResourceManager? resourceManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connectionPool = connectionPool; // null許容（単発接続モード用）
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         _resourceManager = resourceManager; // null許容（レガシー互換性維持）
 
         // CircuitBreakerのタイムアウト設定を取得（デフォルト120秒）
-        _translationTimeoutMs = _configuration.GetValue<int>("CircuitBreaker:TimeoutMs", 120000);
+        _translationTimeoutMs = 120000; // 固定値使用
         _logger.LogInformation("🔧 [TIMEOUT_CONFIG] 翻訳タイムアウト設定: {TimeoutMs}ms", _translationTimeoutMs);
 
         // Python実行環境設定（py launcherを使用）
@@ -141,8 +140,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
-            var useExternalServer = _configuration.GetValue<bool>("Translation:UseExternalServer", false);
+            var useConnectionPool = false; // 固定値使用
+            var useExternalServer = false; // 固定値使用
 
             _logger.LogInformation($"🔧 [CONFIG] UseConnectionPool: {useConnectionPool}, UseExternalServer: {useExternalServer}");
 
@@ -841,7 +840,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            var useConnectionPool = false; // 固定値使用
             if (useConnectionPool && _connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
@@ -1116,7 +1115,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         try
         {
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            var useConnectionPool = false; // 固定値使用
             if (!useConnectionPool)
             {
                 Console.WriteLine($"🔧 [CONFIG] 設定により接続プール無効化、単発接続を使用");
@@ -1466,7 +1465,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             var targetPort = GetCurrentServerPort();
             
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            var useConnectionPool = _configuration.GetValue<bool>("Translation:UseConnectionPool", false);
+            var useConnectionPool = false; // 固定値使用
             if (useConnectionPool && _connectionPool != null)
             {
                 // Issue #147: 接続プールによる接続テスト
@@ -1751,8 +1750,9 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     public async Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()
     {
         // 設定から動的に言語を取得
-        var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-        var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+        var languagePair = _languageConfig.GetCurrentLanguagePair();
+        var defaultSourceLanguage = languagePair.SourceCode;
+        var defaultTargetLanguage = languagePair.TargetCode;
         
         return await Task.FromResult<IReadOnlyCollection<LanguagePair>>(
         [
@@ -1953,17 +1953,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
-            // 動的に設定を取得
-            var defaultEngineString = _configuration["Translation:DefaultEngine"];
-            var defaultEngine = Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
-                ? parsedEngine 
-                : TranslationEngine.NLLB200;
+            // 動的に設定を取得（固定値使用）
+            var defaultEngine = TranslationEngine.NLLB200; // 固定値使用
             
             if (defaultEngine == TranslationEngine.NLLB200)
             {
                 // NLLB-200設定から動的にポートとスクリプトパスを取得
-                _serverPort = _configuration.GetValue<int>("Translation:NLLB200:ServerPort", 5556);
-                var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+                _serverPort = 5556; // 固定値使用
+                var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
                 // UltraThink Phase 13: 起動時に動的ポート検出を実行
@@ -1983,8 +1980,8 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             else
             {
                 // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
-                _serverPort = _configuration.GetValue<int>("Translation:ServerPort", 5556);
-                var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+                _serverPort = 5556; // 固定値使用
+                var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
                 _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
                 
                 // UltraThink Phase 13: レガシーモードでも動的ポート検出を実行
@@ -2006,7 +2003,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
             _serverPort = 5556;
-            var configuredScriptPath = _configuration.GetValue<string>("Translation:NLLB200:ServerScriptPath", "scripts/nllb_translation_server.py");
+            var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
             _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
             
             // UltraThink Phase 13: エラー時でも動的ポート検出を試行
@@ -2032,9 +2029,6 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     /// </summary>
     private TranslationEngine GetCurrentTranslationEngine()
     {
-        var defaultEngineString = _configuration["Translation:DefaultEngine"];
-        return Enum.TryParse<TranslationEngine>(defaultEngineString, out var parsedEngine) 
-            ? parsedEngine 
-            : TranslationEngine.NLLB200;
+        return TranslationEngine.NLLB200; // 固定値使用
     }
 }

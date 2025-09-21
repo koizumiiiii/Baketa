@@ -5,7 +5,7 @@ using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Baketa.Core.Abstractions.Translation;
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -26,12 +26,12 @@ public class TranslationRequestHandler(
     ITranslationService translationService,
     IEventAggregator eventAggregator,
     ILogger<TranslationRequestHandler> logger,
-    IConfiguration configuration) : IEventProcessor<TranslationRequestEvent>
+    ILanguageConfigurationService languageConfig) : IEventProcessor<TranslationRequestEvent>
 {
     private readonly ITranslationService _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly ILogger<TranslationRequestHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ILanguageConfigurationService _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         
     /// <inheritdoc />
     public int Priority => 100;
@@ -225,9 +225,10 @@ public class TranslationRequestHandler(
 
         var normalizedLang = languageString.ToLowerInvariant();
 
-        // 設定から言語を動的取得
-        var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-        var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+        // 統一言語設定サービスから言語ペア取得
+        var languagePair = _languageConfig.GetCurrentLanguagePair();
+        var defaultSourceLanguage = languagePair.SourceCode;
+        var defaultTargetLanguage = languagePair.TargetCode;
 
         return normalizedLang switch
         {

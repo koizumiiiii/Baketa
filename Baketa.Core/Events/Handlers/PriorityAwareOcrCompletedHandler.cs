@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Models.Translation;
@@ -27,7 +28,7 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ILogger<PriorityAwareOcrCompletedHandler> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly ILanguageConfigurationService _languageConfig;
     
     // Phase 5設計値
     private const int MaxConcurrentTranslations = 3; // SemaphoreSlim制限値
@@ -43,12 +44,12 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
         ILogger<PriorityAwareOcrCompletedHandler> logger,
-        IConfiguration configuration)
+        ILanguageConfigurationService languageConfig)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
     }
 
     /// <inheritdoc />
@@ -65,16 +66,11 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         try
         {
             _logger.LogInformation("🎯 Phase5優先度付きOCR処理開始: {Count}個のテキスト領域を処理", eventData.Results.Count);
-            
-            // 翻訳設定取得（設定ベース言語使用）
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
-            var translationSettings = _settingsService.GetTranslationSettings();
 
-            var sourceLanguageCode = translationSettings.AutoDetectSourceLanguage
-                ? defaultSourceLanguage
-                : translationSettings.DefaultSourceLanguage;
-            var targetLanguageCode = translationSettings.DefaultTargetLanguage;
+            // 統一言語設定サービスから言語ペア取得
+            var languagePair = await _languageConfig.GetLanguagePairAsync().ConfigureAwait(false);
+            var sourceLanguageCode = languagePair.SourceCode;
+            var targetLanguageCode = languagePair.TargetCode;
 
             // 画面サイズ情報取得（画像から推定）
             var screenWidth = eventData.SourceImage?.Width ?? 1920; // デフォルト値

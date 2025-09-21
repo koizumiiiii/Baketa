@@ -7,7 +7,6 @@ using Baketa.Core.Events.EventTypes;
 using CoreTranslationRequest = Baketa.Core.Translation.Models.TranslationRequest;
 using Baketa.Core.Utilities; // 🎯 [TRANSLATION_DEBUG_LOG] DebugLogUtility用
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using System.Diagnostics;
 
 namespace Baketa.Infrastructure.Processing.Strategies;
@@ -21,7 +20,7 @@ public class TranslationExecutionStageStrategy : IProcessingStageStrategy
     private readonly ILogger<TranslationExecutionStageStrategy> _logger;
     private readonly ITranslationEngine _translationEngine;
     private readonly IEventAggregator _eventAggregator;
-    private readonly IConfiguration _configuration;
+    private readonly ILanguageConfigurationService _languageConfig;
 
     public ProcessingStageType StageType => ProcessingStageType.TranslationExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(200);
@@ -30,12 +29,12 @@ public class TranslationExecutionStageStrategy : IProcessingStageStrategy
         ILogger<TranslationExecutionStageStrategy> logger,
         ITranslationEngine translationEngine,
         IEventAggregator eventAggregator,
-        IConfiguration configuration)
+        ILanguageConfigurationService languageConfig)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
@@ -58,16 +57,15 @@ public class TranslationExecutionStageStrategy : IProcessingStageStrategy
             DebugLogUtility.WriteLog($"🌐 [TRANSLATION_START] 翻訳処理開始 - 元テキスト: '{ocrResult.DetectedText}'");
             DebugLogUtility.WriteLog($"🌐 [TRANSLATION_START] テキスト長: {ocrResult.DetectedText.Length}文字, エンジン: {_translationEngine.GetType().Name}");
 
-            // 設定から言語を動的取得
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            // 統一言語設定サービスから言語ペア取得
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
 
-            // 実際の翻訳サービス統合
+            // 実際の翻訳サービス統合（型変換が必要）
             var translationRequest = new CoreTranslationRequest
             {
                 SourceText = ocrResult.DetectedText,
-                SourceLanguage = Language.FromCode(defaultSourceLanguage),
-                TargetLanguage = Language.FromCode(defaultTargetLanguage)
+                SourceLanguage = Baketa.Core.Translation.Models.Language.FromCode(languagePair.SourceCode),
+                TargetLanguage = Baketa.Core.Translation.Models.Language.FromCode(languagePair.TargetCode)
             };
             
             var translationResult = await _translationEngine.TranslateAsync(translationRequest, cancellationToken).ConfigureAwait(false);

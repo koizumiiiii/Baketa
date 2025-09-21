@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.UI;
@@ -30,7 +29,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly ILogger<EnhancedBatchOcrIntegrationService> _logger;
     private readonly TimedAggregatorSettings _settings;
-    private readonly IConfiguration _configuration;
+    private readonly ILanguageConfigurationService _languageConfig;
     
     // パフォーマンス監視用
     private readonly ConcurrentDictionary<string, ProcessingStatistics> _processingStats;
@@ -47,7 +46,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         IUnifiedSettingsService unifiedSettingsService,
         IOptionsMonitor<TimedAggregatorSettings> settings,
         ILogger<EnhancedBatchOcrIntegrationService> logger,
-        IConfiguration configuration)
+        ILanguageConfigurationService languageConfig)
     {
         _baseBatchService = baseBatchService ?? throw new ArgumentNullException(nameof(baseBatchService));
         _timedChunkAggregator = timedChunkAggregator ?? throw new ArgumentNullException(nameof(timedChunkAggregator));
@@ -57,7 +56,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _settings = settings?.CurrentValue ?? TimedAggregatorSettings.Development;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         
         _processingStats = new ConcurrentDictionary<string, ProcessingStatistics>();
         
@@ -263,9 +262,9 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
             Console.WriteLine($"🎯 [TIMED_AGGREGATOR] 翻訳開始: '{aggregatedChunk.CombinedText}' (長さ: {aggregatedChunk.CombinedText.Length})");
             
             // 🔧 修正: ユーザー設定の言語ペアを使用（自動検出off）
-            var translationSettings = _unifiedSettingsService.GetTranslationSettings();
-            var sourceLanguageCode = translationSettings.DefaultSourceLanguage ?? "ja";
-            var targetLanguageCode = translationSettings.DefaultTargetLanguage ?? "en";
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var sourceLanguageCode = languagePair.SourceCode;
+            var targetLanguageCode = languagePair.TargetCode;
             var sourceLanguage = Language.FromCode(sourceLanguageCode);
             var targetLanguage = Language.FromCode(targetLanguageCode);
 

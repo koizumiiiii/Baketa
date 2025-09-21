@@ -4,7 +4,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Baketa.Core.Abstractions.Translation;
 
 namespace Baketa.Application.EventHandlers;
 
@@ -15,11 +15,11 @@ namespace Baketa.Application.EventHandlers;
 public class TranslationCompletedHandler(
     IEventAggregator eventAggregator,
     ILogger<TranslationCompletedHandler> logger,
-    IConfiguration configuration) : IEventProcessor<TranslationCompletedEvent>
+    ILanguageConfigurationService languageConfig) : IEventProcessor<TranslationCompletedEvent>
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly ILogger<TranslationCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly ILanguageConfigurationService _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
 
     /// <summary>
     /// イベント処理の優先度（低優先度でUI表示優先度を下げる）
@@ -48,9 +48,10 @@ public class TranslationCompletedHandler(
                 return;
             }
 
-            // 設定から言語を動的取得
-            var defaultSourceLanguage = _configuration.GetValue<string>("Translation:DefaultSourceLanguage", "en");
-            var defaultTargetLanguage = _configuration.GetValue<string>("Translation:DefaultTargetLanguage", "ja");
+            // 統一言語設定サービスから言語ペア取得
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
 
             // TranslationWithBoundsCompletedEventに変換
             // TranslationCompletedEventにはBounds情報がないため、空のRectangleを使用
