@@ -59,7 +59,7 @@ namespace Baketa.UI;
                 try
                 {
                     lockFile = new FileStream(lockFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                    var processInfo = $"PID={System.Diagnostics.Process.GetCurrentProcess().Id}|TIME={DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}|USER={Environment.UserName}";
+                    var processInfo = $"PID={Environment.ProcessId}|TIME={DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}|USER={Environment.UserName}";
                     var processInfoBytes = System.Text.Encoding.UTF8.GetBytes(processInfo);
                     lockFile.Write(processInfoBytes, 0, processInfoBytes.Length);
                     lockFile.Flush();

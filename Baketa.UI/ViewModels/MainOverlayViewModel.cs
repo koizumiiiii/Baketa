@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
@@ -674,7 +675,7 @@ public class MainOverlayViewModel : ViewModelBase
         // 🔧 診断レポート生成（StartまたはStop操作時）- 統一サービス使用
         {
             var operation = IsTranslationActive ? "Stop" : "Start";
-            var trigger = $"execute_{operation.ToLower()}_button_pressed";
+            var trigger = $"execute_{operation.ToLower(CultureInfo.InvariantCulture)}_button_pressed";
             var context = $"ExecuteStartStopAsync {operation} operation";
             
             DebugLogUtility.WriteLog($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");

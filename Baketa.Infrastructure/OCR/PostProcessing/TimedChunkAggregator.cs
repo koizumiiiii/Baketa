@@ -105,12 +105,13 @@ public sealed class TimedChunkAggregator : IDisposable
 
             // SourceWindowHandle別にバッファを分離（コンテキスト混在防止）
             var windowHandle = chunk.SourceWindowHandle;
-            if (!_pendingChunksByWindow.ContainsKey(windowHandle))
+            if (!_pendingChunksByWindow.TryGetValue(windowHandle, out var existingChunks))
             {
-                _pendingChunksByWindow[windowHandle] = new List<TextChunk>();
+                existingChunks = [];
+                _pendingChunksByWindow[windowHandle] = existingChunks;
             }
 
-            _pendingChunksByWindow[windowHandle].Add(chunk);
+            existingChunks.Add(chunk);
             Interlocked.Increment(ref _totalChunksProcessed);
 
             // 全ウィンドウのチャンク数を計算
@@ -307,7 +308,7 @@ public sealed class TimedChunkAggregator : IDisposable
             foreach (var kvp in _pendingChunksByWindow.ToList())
             {
                 var windowHandle = kvp.Key;
-                var chunks = kvp.Value?.ToList() ?? new List<TextChunk>();
+                var chunks = kvp.Value?.ToList() ?? [];
 
                 if (chunks.Count > 0)
                 {
@@ -459,7 +460,7 @@ public sealed class TimedChunkAggregator : IDisposable
     /// </summary>
     private List<TextChunk> CombineChunks(List<TextChunk> chunks)
     {
-        if (chunks.Count == 0) return new List<TextChunk>();
+        if (chunks.Count == 0) return [];
         if (chunks.Count == 1) return chunks;
 
         try
@@ -503,7 +504,7 @@ public sealed class TimedChunkAggregator : IDisposable
                 combinedText.Length,
                 combinedText.Count(c => c == '\n'));
 
-            return new List<TextChunk> { combinedChunk };
+            return [combinedChunk];
         }
         catch (Exception ex)
         {

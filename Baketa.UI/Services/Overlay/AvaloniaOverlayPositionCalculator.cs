@@ -127,8 +127,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     {
         ThrowIfDisposed();
         
-        if (request == null)
-            throw new ArgumentNullException(nameof(request));
+        ArgumentNullException.ThrowIfNull(request);
 
         try
         {
@@ -364,7 +363,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
             // Avalonia UI のスクリーン情報を使用
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var screens = desktop.MainWindow?.Screens?.All ?? new Screen[0];
+                var screens = desktop.MainWindow?.Screens?.All ?? Array.Empty<Screen>();
                 
                 for (int i = 0; i < screens.Count; i++)
                 {
@@ -587,8 +586,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     /// </summary>
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(AvaloniaOverlayPositionCalculator));
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     /// <summary>

@@ -237,7 +237,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
     }
 
     [Fact]
-    public void GetStatistics_ShouldReturnAccurateStatistics()
+    public async Task GetStatistics_ShouldReturnAccurateStatistics()
     {
         // Arrange
         var initialStats = _service.GetStatistics();
@@ -245,10 +245,10 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         // Act - Process some events
         var highConfidenceEvent = CreateTestEvent(0.8f);
         var lowConfidenceEvent = CreateTestEvent(0.5f);
-        
-        _service.InitializeAsync().Wait();
-        _service.HandleAsync(highConfidenceEvent).Wait();
-        _service.HandleAsync(lowConfidenceEvent).Wait();
+
+        await _service.InitializeAsync();
+        await _service.HandleAsync(highConfidenceEvent);
+        await _service.HandleAsync(lowConfidenceEvent);
 
         var finalStats = _service.GetStatistics();
 
@@ -274,10 +274,10 @@ public class AutoOverlayCleanupServiceTests : IDisposable
     }
 
     [Fact]
-    public void Dispose_ShouldUnsubscribeFromEvents()
+    public async Task Dispose_ShouldUnsubscribeFromEvents()
     {
         // Arrange
-        _service.InitializeAsync().Wait();
+        await _service.InitializeAsync();
 
         // Act
         _service.Dispose();
@@ -287,10 +287,10 @@ public class AutoOverlayCleanupServiceTests : IDisposable
     }
 
     [Fact]
-    public void Dispose_MultipleCallsShould_NotThrow()
+    public async Task Dispose_MultipleCallsShould_NotThrow()
     {
         // Arrange
-        _service.InitializeAsync().Wait();
+        await _service.InitializeAsync();
 
         // Act & Assert
         _service.Dispose();

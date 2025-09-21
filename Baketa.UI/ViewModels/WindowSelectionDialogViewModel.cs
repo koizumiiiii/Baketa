@@ -286,7 +286,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                ) ||
                backgroundPatterns.Any(pattern => 
                    title.Contains(pattern, StringComparison.OrdinalIgnoreCase) ||
-                   (pattern.Contains("(") && title.EndsWith(pattern.Substring(pattern.IndexOf('(')), StringComparison.OrdinalIgnoreCase))
+                   (pattern.Contains('(') && title.EndsWith(pattern.Substring(pattern.IndexOf('(')), StringComparison.OrdinalIgnoreCase))
                );
     }
 

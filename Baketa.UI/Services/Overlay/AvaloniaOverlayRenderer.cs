@@ -907,8 +907,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// </summary>
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(AvaloniaOverlayRenderer));
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     /// <summary>
