@@ -48,6 +48,12 @@ public sealed class TimedAggregatorSettings
     /// </summary>
     [Range(1, 1000)]
     public int PerformanceLogInterval { get; set; } = 10;
+
+    /// <summary>
+    /// 近接度ベースのグループ化設定
+    /// UltraThink Phase 1: 自動適応アルゴリズム
+    /// </summary>
+    public ProximityGroupingSettings ProximityGrouping { get; set; } = new();
     
     /// <summary>
     /// 開発環境用デフォルト設定プロファイル
@@ -60,7 +66,14 @@ public sealed class TimedAggregatorSettings
         MaxChunkCount = 50,
         ForceFlushMs = 3000,
         EnablePerformanceLogging = true,
-        PerformanceLogInterval = 5
+        PerformanceLogInterval = 5,
+        ProximityGrouping = new ProximityGroupingSettings
+        {
+            Enabled = true,
+            VerticalDistanceFactor = 1.2,
+            HorizontalDistanceFactor = 3.0,
+            EnableDetailedLogging = true
+        }
     };
     
     /// <summary>
@@ -74,6 +87,13 @@ public sealed class TimedAggregatorSettings
         MaxChunkCount = 100,
         ForceFlushMs = 5000,
         EnablePerformanceLogging = false,
-        PerformanceLogInterval = 50
+        PerformanceLogInterval = 50,
+        ProximityGrouping = new ProximityGroupingSettings
+        {
+            Enabled = true,  // 本番環境でも有効化
+            VerticalDistanceFactor = 1.5,    // 本番では少し保守的に
+            HorizontalDistanceFactor = 2.5,   // 本番では少し保守的に
+            EnableDetailedLogging = false     // 本番ではログ最小化
+        }
     };
 }

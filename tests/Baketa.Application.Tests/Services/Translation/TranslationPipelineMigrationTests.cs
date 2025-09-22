@@ -87,37 +87,13 @@ public class TranslationPipelineMigrationTests
     }
 
     /// <summary>
-    /// Phase 4 Migration検証: OcrCompletedHandler_Improved が登録されていないことを確認
+    /// Phase 4 Migration検証: OcrCompletedHandler_Improved が削除されたため、テスト無効化
+    /// ✅ [PHASE_A_RESOLVED] OcrCompletedHandler_Improvedファイル完全削除により、このテストは不要
     /// </summary>
-    [Fact]
-    public void Migration_OcrCompletedHandler_Improved_ShouldNotBeRegistered()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        
-        // Mock dependencies (without OcrCompletedHandler_Improved)
-        services.AddSingleton(Mock.Of<IEventAggregator>());
-        services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>());
-        services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>());
-        
-        // Phase 4 Migration: Only TranslationPipelineService
-        services.AddSingleton<TranslationPipelineService>();
-        services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
-            provider => provider.GetRequiredService<TranslationPipelineService>());
-
-        var serviceProvider = services.BuildServiceProvider();
-
-        // Act & Assert
-        // OcrCompletedHandler_Improved should not be resolvable
-        var act = () => serviceProvider.GetRequiredService<Baketa.Core.Events.Handlers.OcrCompletedHandler_Improved>();
-        act.Should().Throw<InvalidOperationException>("OcrCompletedHandler_Improved should not be registered");
-        
-        // But TranslationPipelineService should be resolvable
-        var pipelineService = serviceProvider.GetService<TranslationPipelineService>();
-        pipelineService.Should().NotBeNull("TranslationPipelineService should be available");
-        
-        // Cleanup
-        serviceProvider.Dispose();
-    }
+    // [Fact] - OcrCompletedHandler_Improved削除により無効化
+    // public void Migration_OcrCompletedHandler_Improved_ShouldNotBeRegistered()
+    // {
+    //     // OcrCompletedHandler_Improvedクラス自体が削除されたため、
+    //     // DI登録競合は根本的に解決済み
+    // }
 }

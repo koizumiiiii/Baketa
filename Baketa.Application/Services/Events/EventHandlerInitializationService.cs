@@ -248,32 +248,32 @@ public sealed class EventHandlerInitializationService(
                 catch { /* ファイル出力失敗は無視 */ }
             }
 
-            // 🚀 [ROI_PIPELINE] TranslationPipelineService (統合翻訳パイプライン) 登録
+            // 🔥 [CRITICAL_FIX] PriorityAwareOcrCompletedHandlerの登録 - 統合翻訳処理実現
             try
             {
-                var translationPipelineService = _serviceProvider.GetRequiredService<IEventProcessor<OcrCompletedEvent>>();
-                eventAggregator.Subscribe<OcrCompletedEvent>(translationPipelineService);
-                _logger.LogInformation("TranslationPipelineService (ROI統合パイプライン) を登録しました");
-                Console.WriteLine("🔥 [DEBUG] TranslationPipelineService (ROI統合パイプライン) を登録しました");
-                
+                var priorityAwareOcrHandler = _serviceProvider.GetRequiredService<IEventProcessor<OcrCompletedEvent>>();
+                eventAggregator.Subscribe<OcrCompletedEvent>(priorityAwareOcrHandler);
+                _logger.LogInformation("🔥 PriorityAwareOcrCompletedHandlerを登録しました - 統合翻訳処理実現");
+                Console.WriteLine("🔥 [CRITICAL_FIX] PriorityAwareOcrCompletedHandlerを登録しました - 分離表示問題解決");
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] TranslationPipelineService (ROI統合パイプライン) を登録しました{Environment.NewLine}");
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] PriorityAwareOcrCompletedHandler登録完了 - 統合翻訳処理実現{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "TranslationPipelineServiceの登録に失敗しました");
-                Console.WriteLine($"🔥 [ERROR] TranslationPipelineServiceの登録失敗: {ex.Message}");
-                
+                _logger.LogError(ex, "PriorityAwareOcrCompletedHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] PriorityAwareOcrCompletedHandler登録失敗: {ex.Message}");
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationPipelineService登録失敗: {ex.Message}{Environment.NewLine}");
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] PriorityAwareOcrCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }

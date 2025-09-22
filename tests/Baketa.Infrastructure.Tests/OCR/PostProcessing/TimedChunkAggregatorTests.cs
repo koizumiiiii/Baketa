@@ -17,6 +17,7 @@ public class TimedChunkAggregatorTests : IDisposable
     private readonly ILogger<TimedChunkAggregator> _logger;
     private readonly CoordinateBasedLineBreakProcessor _lineBreakProcessor;
     private readonly Mock<ICoordinateTransformationService> _coordinateTransformationServiceMock;
+    private readonly ProximityGroupingService _proximityGroupingService;
     private readonly TimedAggregatorSettings _settings;
     private readonly TimedChunkAggregator _aggregator;
 
@@ -31,12 +32,22 @@ public class TimedChunkAggregatorTests : IDisposable
         _coordinateTransformationServiceMock
             .Setup(x => x.ConvertRoiToScreenCoordinates(It.IsAny<Rectangle>(), It.IsAny<IntPtr>(), It.IsAny<float>()))
             .Returns((Rectangle rect, IntPtr handle, float scale) => rect); // Return original rect for testing
+        _coordinateTransformationServiceMock
+            .Setup(x => x.ConvertRoiToScreenCoordinatesBatch(It.IsAny<Rectangle[]>(), It.IsAny<IntPtr>(), It.IsAny<float>()))
+            .Returns((Rectangle[] rects, IntPtr handle, float scale) => rects); // Return original rects for testing
 
         _settings = new TimedAggregatorSettings
         {
             IsFeatureEnabled = true,
             BufferDelayMs = 1000
         };
+
+        // Setup proximity grouping service with actual instances (sealed classes cannot be mocked)
+        var proximityAnalyzerLogger = NullLogger<ChunkProximityAnalyzer>.Instance;
+        var proximitySettings = ProximityGroupingSettings.Default; // Use default settings for testing
+        var proximityAnalyzer = new ChunkProximityAnalyzer(proximityAnalyzerLogger, proximitySettings);
+        var proximityGroupingLogger = NullLogger<ProximityGroupingService>.Instance;
+        _proximityGroupingService = new ProximityGroupingService(proximityAnalyzer, proximityGroupingLogger);
 
         var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
         optionsMonitorMock.Setup(x => x.CurrentValue).Returns(_settings);
@@ -45,6 +56,7 @@ public class TimedChunkAggregatorTests : IDisposable
             optionsMonitorMock.Object,
             _lineBreakProcessor,
             _coordinateTransformationServiceMock.Object,
+            _proximityGroupingService,
             _logger);
     }
 
@@ -185,6 +197,7 @@ public class TimedChunkAggregatorTests : IDisposable
             optionsMonitorMock.Object,
             _lineBreakProcessor,
             _coordinateTransformationServiceMock.Object,
+            _proximityGroupingService,
             _logger);
             
         var aggregatedChunks = new List<TextChunk>();
@@ -231,6 +244,7 @@ public class TimedChunkAggregatorTests : IDisposable
             optionsMonitorMock.Object,
             _lineBreakProcessor,
             _coordinateTransformationServiceMock.Object,
+            _proximityGroupingService,
             _logger);
             
         var aggregationEventCount = 0;

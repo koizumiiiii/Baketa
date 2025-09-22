@@ -266,9 +266,34 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 // 🎯 Phase 22: EnhancedBatchOcrIntegrationServiceによるTimedChunkAggregator統合
                 if (result.OcrResult.TextChunks?.Count > 0)
                 {
-                    _logger?.LogInformation("🎯 [PHASE22] TextChunks → TimedChunkAggregator送信開始 - チャンク数: {ChunkCount}",
+                    _logger?.LogInformation("🎯 [PHASE1_FIX] 統合OcrResult生成処理開始 - チャンク数: {ChunkCount}",
                         result.OcrResult.TextChunks.Count);
 
+                    // 🔥 Phase A+実装: 距離ベースグルーピングによる適切な統合
+                    var ocrResults = CreateOptimizedOcrResults(result.OcrResult.TextChunks);
+                    if (ocrResults.Count > 0)
+                    {
+                        _logger?.LogInformation("🎯 [PHASE_A+] 距離ベースグルーピング完了 - グループ数: {GroupCount}",
+                            ocrResults.Count);
+
+                        foreach (var ocrResult in ocrResults)
+                        {
+                            _logger?.LogInformation("🎯 [PHASE_A+] グループ - テキスト: '{Text}', Bounds: ({X},{Y},{W},{H})",
+                                ocrResult.Text.Length > 50 ? ocrResult.Text[..50] + "..." : ocrResult.Text,
+                                ocrResult.Bounds.X, ocrResult.Bounds.Y,
+                                ocrResult.Bounds.Width, ocrResult.Bounds.Height);
+                        }
+
+                        var ocrCompletedEvent = new OcrCompletedEvent(
+                            sourceImage: eventData.CapturedImage,
+                            results: ocrResults.AsReadOnly(),
+                            processingTime: result.OcrResult.ProcessingTime
+                        );
+                        await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                        _logger?.LogInformation("🎯 [PHASE_A+] OcrCompletedEvent発行完了 - 近接チャンクのみ統合");
+                    }
+
+                    /* 🔥 個別チャンク送信を無効化（分離表示の原因）
                     // TextChunksをEnhancedBatchOcrIntegrationService経由でTimedChunkAggregatorに送信
                     int successfulChunks = 0;
                     foreach (var chunk in result.OcrResult.TextChunks)
@@ -362,27 +387,22 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
                     _logger?.LogInformation("📤 [PHASE22] TextChunks送信完了 - TimedChunkAggregator集約待機中");
                     Console.WriteLine("📥 [PHASE22] TimedChunkAggregator統合フロー - 集約完了後に翻訳処理が実行されます");
+                    */
                 }
-                else if (result.OcrResult.TextChunks?.Count > 0)
+                else if (false) // 🔥 到達不可能コード無効化（Line 267と同じ条件のため絶対到達しない）
                 {
                     // フォールバック: EnhancedBatchOcrIntegrationServiceが利用できない場合は従来のOCRCompletedEvent発行
                     _logger?.LogWarning("⚠️ [PHASE22] EnhancedBatchOcrIntegrationService利用不可 - 従来のOCRCompletedEvent発行にフォールバック");
 
+                    // 🎯 Phase 1実装: 統合OcrResult生成（分離表示問題解決）
                     var ocrResults = new List<Baketa.Core.Models.OCR.OcrResult>();
-                    foreach (var chunk in result.OcrResult.TextChunks)
+                    var unifiedOcrResult = CreateUnifiedOcrResult(result.OcrResult.TextChunks);
+                    if (unifiedOcrResult != null)
                     {
-                        if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
-                        {
-                            ocrResults.Add(Baketa.Core.Models.OCR.OcrResult.FromTextRegion(textRegion));
-                        }
-                        else if (!string.IsNullOrWhiteSpace(chunk?.ToString()))
-                        {
-                            ocrResults.Add(new Baketa.Core.Models.OCR.OcrResult(
-                                text: chunk.ToString() ?? "",
-                                bounds: System.Drawing.Rectangle.Empty,
-                                confidence: 0.8f
-                            ));
-                        }
+                        ocrResults.Add(unifiedOcrResult);
+                        _logger?.LogInformation("🎯 [PHASE1] 統合OcrResult生成完了 - テキスト: '{Text}', Bounds: ({X},{Y},{W},{H})",
+                            unifiedOcrResult.Text, unifiedOcrResult.Bounds.X, unifiedOcrResult.Bounds.Y,
+                            unifiedOcrResult.Bounds.Width, unifiedOcrResult.Bounds.Height);
                     }
 
                     if (ocrResults.Count > 0)
@@ -577,5 +597,268 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
             // 画像保存エラーはメインの処理を妨げない（ログ出力のみ）
         }
+    }
+
+    /// <summary>
+    /// Phase 2: OCRチャンクを統合した単一OcrResultを生成
+    /// 分離表示問題解決のためのヘルパーメソッド
+    /// </summary>
+    private static Baketa.Core.Models.OCR.OcrResult? CreateUnifiedOcrResult(IEnumerable<object>? textChunks)
+    {
+        if (textChunks == null)
+            return null;
+
+        var validChunks = new List<(string text, System.Drawing.Rectangle bounds, float confidence)>();
+
+        foreach (var chunk in textChunks)
+        {
+            if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
+            {
+                if (!string.IsNullOrWhiteSpace(textRegion.Text))
+                {
+                    validChunks.Add((textRegion.Text, textRegion.Bounds, (float)textRegion.Confidence));
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(chunk?.ToString()))
+            {
+                validChunks.Add((chunk.ToString() ?? "", System.Drawing.Rectangle.Empty, 0.8f));
+            }
+        }
+
+        if (validChunks.Count == 0)
+            return null;
+
+        // Phase 2: テキスト統合 (Y座標→X座標順ソート + スペース結合)
+        var sortedChunks = validChunks
+            .OrderBy(c => c.bounds.Y)
+            .ThenBy(c => c.bounds.X)
+            .ToList();
+
+        var combinedText = string.Join(" ", sortedChunks.Select(c => c.text));
+        var combinedBounds = CalculateCombinedBounds(sortedChunks.Select(c => c.bounds));
+        var averageConfidence = CalculateWeightedConfidence(sortedChunks.Select(c => c.confidence));
+
+        return new Baketa.Core.Models.OCR.OcrResult(
+            text: combinedText,
+            bounds: combinedBounds,
+            confidence: averageConfidence);
+    }
+
+    /// <summary>
+    /// Phase 2: 複数のバウンディングボックスを統合
+    /// </summary>
+    private static System.Drawing.Rectangle CalculateCombinedBounds(IEnumerable<System.Drawing.Rectangle> bounds)
+    {
+        var validBounds = bounds.Where(b => !b.IsEmpty).ToList();
+        if (validBounds.Count == 0)
+            return System.Drawing.Rectangle.Empty;
+
+        var firstBound = validBounds[0];
+        var minX = firstBound.X;
+        var minY = firstBound.Y;
+        var maxX = firstBound.X + firstBound.Width;
+        var maxY = firstBound.Y + firstBound.Height;
+
+        for (int i = 1; i < validBounds.Count; i++)
+        {
+            var bound = validBounds[i];
+            minX = Math.Min(minX, bound.X);
+            minY = Math.Min(minY, bound.Y);
+            maxX = Math.Max(maxX, bound.X + bound.Width);
+            maxY = Math.Max(maxY, bound.Y + bound.Height);
+        }
+
+        return new System.Drawing.Rectangle(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /// <summary>
+    /// Phase 2: 加重平均信頼度計算
+    /// </summary>
+    private static float CalculateWeightedConfidence(IEnumerable<float> confidences)
+    {
+        var confidenceList = confidences.ToList();
+        if (confidenceList.Count == 0)
+            return 0.8f; // デフォルト値
+
+        return confidenceList.Average();
+    }
+
+    /// <summary>
+    /// Phase A+: 距離ベースグルーピングによる最適化されたOcrResult生成
+    /// 近接チャンクのみ統合し、離れたチャンクは個別に保持
+    /// </summary>
+    private static List<Baketa.Core.Models.OCR.OcrResult> CreateOptimizedOcrResults(IEnumerable<object>? textChunks)
+    {
+        var results = new List<Baketa.Core.Models.OCR.OcrResult>();
+        if (textChunks == null)
+            return results;
+
+        // チャンクを準備
+        var validChunks = new List<(string text, System.Drawing.Rectangle bounds, float confidence)>();
+        foreach (var chunk in textChunks)
+        {
+            if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
+            {
+                if (!string.IsNullOrWhiteSpace(textRegion.Text))
+                {
+                    validChunks.Add((textRegion.Text, textRegion.Bounds, (float)textRegion.Confidence));
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(chunk?.ToString()))
+            {
+                validChunks.Add((chunk.ToString() ?? "", System.Drawing.Rectangle.Empty, 0.8f));
+            }
+        }
+
+        if (validChunks.Count == 0)
+            return results;
+
+        // 距離ベースグルーピング（UltraThink修正: 文章統合に最適化）
+        var groups = GroupChunksByProximity(validChunks, threshold: 10.0f); // 10ピクセル以内を近接とみなす（文章内の単語のみ統合）
+
+        // 🔍 [DEBUG] グルーピング結果デバッグ（ファイル出力）
+        var debugLogPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\grouping_debug.txt";
+        var debugText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [GROUPING_DEBUG] グルーピング結果: {validChunks.Count}個のチャンク → {groups.Count}個のグループ{Environment.NewLine}";
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            var group = groups[i];
+            debugText += $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [GROUPING_DEBUG] グループ{i+1}: {group.Count}個のチャンク{Environment.NewLine}";
+            foreach (var chunk in group)
+            {
+                debugText += $"   - '{chunk.text}' at ({chunk.bounds.X},{chunk.bounds.Y}){Environment.NewLine}";
+            }
+        }
+
+        try
+        {
+            System.IO.File.AppendAllText(debugLogPath, debugText);
+        }
+        catch (Exception ex)
+        {
+            // ログ出力エラーは無視
+        }
+
+        // 各グループを処理
+        foreach (var group in groups)
+        {
+            if (group.Count == 1)
+            {
+                // 単独チャンクはそのまま
+                var chunk = group[0];
+                results.Add(new Baketa.Core.Models.OCR.OcrResult(
+                    text: chunk.text,
+                    bounds: chunk.bounds,
+                    confidence: chunk.confidence));
+            }
+            else
+            {
+                // 近接チャンクは統合
+                var sortedGroup = group
+                    .OrderBy(c => c.bounds.Y)
+                    .ThenBy(c => c.bounds.X)
+                    .ToList();
+
+                var combinedText = string.Join(" ", sortedGroup.Select(c => c.text));
+                var combinedBounds = CalculateCombinedBounds(sortedGroup.Select(c => c.bounds));
+                var averageConfidence = CalculateWeightedConfidence(sortedGroup.Select(c => c.confidence));
+
+                results.Add(new Baketa.Core.Models.OCR.OcrResult(
+                    text: combinedText,
+                    bounds: combinedBounds,
+                    confidence: averageConfidence));
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// チャンクを近接度でグルーピング（改善版：過剰な連鎖的グルーピングを防止）
+    /// </summary>
+    private static List<List<(string text, System.Drawing.Rectangle bounds, float confidence)>>
+        GroupChunksByProximity(List<(string text, System.Drawing.Rectangle bounds, float confidence)> chunks, float threshold)
+    {
+        var groups = new List<List<(string text, System.Drawing.Rectangle bounds, float confidence)>>();
+        var visited = new bool[chunks.Count];
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            if (visited[i])
+                continue;
+
+            var group = new List<(string text, System.Drawing.Rectangle bounds, float confidence)>();
+            group.Add(chunks[i]);
+            visited[i] = true;
+
+            // 現在のチャンクに直接近接するチャンクのみを追加（BFSではなく直接比較）
+            for (int j = i + 1; j < chunks.Count; j++)
+            {
+                if (visited[j])
+                    continue;
+
+                // グループ内の全メンバーとの距離を確認（全てが近接している場合のみ追加）
+                bool allProximate = true;
+                foreach (var member in group)
+                {
+                    if (!IsProximate(member.bounds, chunks[j].bounds, threshold))
+                    {
+                        allProximate = false;
+                        break;
+                    }
+                }
+
+                if (allProximate)
+                {
+                    group.Add(chunks[j]);
+                    visited[j] = true;
+                }
+            }
+
+            groups.Add(group);
+        }
+
+        return groups;
+    }
+
+    /// <summary>
+    /// 2つのバウンディングボックスが近接しているか判定
+    /// </summary>
+    private static bool IsProximate(System.Drawing.Rectangle rect1, System.Drawing.Rectangle rect2, float threshold)
+    {
+        // 矩形の中心間距離を計算
+        var centerX1 = rect1.X + rect1.Width / 2.0f;
+        var centerY1 = rect1.Y + rect1.Height / 2.0f;
+        var centerX2 = rect2.X + rect2.Width / 2.0f;
+        var centerY2 = rect2.Y + rect2.Height / 2.0f;
+
+        var distance = Math.Sqrt(Math.Pow(centerX2 - centerX1, 2) + Math.Pow(centerY2 - centerY1, 2));
+
+        // エッジ間の最短距離も考慮（より精密な判定）
+        var horizontalGap = Math.Max(0, Math.Max(rect1.Left - rect2.Right, rect2.Left - rect1.Right));
+        var verticalGap = Math.Max(0, Math.Max(rect1.Top - rect2.Bottom, rect2.Top - rect1.Bottom));
+        var edgeDistance = Math.Sqrt(horizontalGap * horizontalGap + verticalGap * verticalGap);
+
+        var isProximate = edgeDistance <= threshold;
+
+        // 🔍 [DEBUG] 近接判定の詳細（ファイル出力）
+        if (edgeDistance <= threshold + 5) // 閾値付近をログ出力
+        {
+            var debugLogPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\grouping_debug.txt";
+            var debugText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [PROXIMITY_DEBUG] 近接判定: エッジ距離={edgeDistance:F1}px, 閾値={threshold}px → {(isProximate ? "統合" : "分離")}{Environment.NewLine}";
+            debugText += $"   Rect1: ({rect1.X},{rect1.Y},{rect1.Width}x{rect1.Height}){Environment.NewLine}";
+            debugText += $"   Rect2: ({rect2.X},{rect2.Y},{rect2.Width}x{rect2.Height}){Environment.NewLine}";
+
+            try
+            {
+                System.IO.File.AppendAllText(debugLogPath, debugText);
+            }
+            catch (Exception ex)
+            {
+                // ログ出力エラーは無視
+            }
+        }
+
+        return isProximate;
     }
 }

@@ -122,8 +122,9 @@ namespace Baketa.Application.DI.Modules;
                     logger,
                     languageConfig);
             });
-            services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());
+            // 🚨 [PHASE_A_FIX] DI登録競合解決 - PriorityAwareOcrCompletedHandlerに一本化
+            // services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
+            //     provider => provider.GetRequiredService<Baketa.Application.Services.Translation.TranslationPipelineService>());
             
             // 🚨 [REGRESSION_FIX] エラーハンドリング統一による回帰問題を修正するため一時的に無効化
             // services.AddSingleton<Baketa.Application.Services.Translation.ITranslationErrorHandlerService, 
@@ -376,9 +377,7 @@ namespace Baketa.Application.DI.Modules;
             // OcrCompletedHandler_Improved は削除済み (TranslationPipelineService に統合)
             
             // 🎯 [PHASE5] 優先度付きOCR完了ハンドラー - 画面中央優先度翻訳システム
-            services.AddSingleton<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>();
-            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.OcrCompletedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>());
+            // PriorityAwareOcrCompletedHandler は CoreModule で登録される
             
             // 翻訳要求イベントハンドラー
             services.AddSingleton<Baketa.Core.Events.Handlers.TranslationRequestHandler>();

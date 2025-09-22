@@ -243,8 +243,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             // OCR精度測定スタートアップサービス
             services.AddOcrAccuracyStartupService();
             
-            // REMOVED: TimedChunkAggregator統合システム
-            // → 新設計: TimedAggregatorModule（完全自律型設定システム）に移行
+            // UltraThink Phase 1: 近接度ベースグループ化サービス
+            RegisterProximityGroupingServices(services);
         }
         
         /// <summary>
@@ -965,6 +965,30 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<IImageToReferencedSafeImageConverter, ImageToReferencedSafeImageConverter>();
 
             Console.WriteLine("🎯 [PHASE3.13-14] Memory変換サービス登録完了");
+        }
+
+        /// <summary>
+        /// UltraThink Phase 1: 近接度ベースグループ化サービスを登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterProximityGroupingServices(IServiceCollection services)
+        {
+            Console.WriteLine("🚀 UltraThink Phase 1: 近接度ベースグループ化サービス登録開始");
+
+            // ChunkProximityAnalyzer: 文字サイズ自動検出・近接判定（設定ファクトリ付き）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer>>();
+                var settingsMonitor = provider.GetRequiredService<IOptionsMonitor<TimedAggregatorSettings>>();
+                return new Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer(logger, settingsMonitor.CurrentValue.ProximityGrouping);
+            });
+            Console.WriteLine("✅ ChunkProximityAnalyzer登録完了 - 自動閾値計算 + 設定連携");
+
+            // ProximityGroupingService: 連結成分アルゴリズムによるグループ化
+            services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.ProximityGroupingService>();
+            Console.WriteLine("✅ ProximityGroupingService登録完了 - 連結成分グループ化");
+
+            Console.WriteLine("✅ UltraThink Phase 1: 近接度ベースグループ化サービス登録完了");
         }
 
         /// <summary>

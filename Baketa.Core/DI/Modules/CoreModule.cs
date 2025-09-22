@@ -64,17 +64,22 @@ namespace Baketa.Core.DI.Modules;
         /// <summary>
         /// その他のコアサービスを登録します。
         /// </summary>
-        /// <param name="_">サービスコレクション</param>
-        private static void RegisterCoreServices(IServiceCollection _)
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterCoreServices(IServiceCollection services)
         {
             // ロギングサービスやその他の基本サービス
             // 例: services.AddSingleton<ISettingsManager, JsonSettingsManager>();
             // 例: services.AddSingleton<IPathProvider, AppDataPathProvider>();
-            
+
             // 基本的なライフサイクル管理
             // 例: services.AddSingleton<IApplicationLifecycle, ApplicationLifecycle>();
-            
+
             // 各種プロファイル管理
             // 例: services.AddSingleton<IProfileManager, ProfileManager>();
+
+            // 🎯 [PHASE5] 優先度付きOCR完了ハンドラー - 画面中央優先度翻訳システム
+            services.AddSingleton<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>();
+            services.AddSingleton<Baketa.Core.Abstractions.Events.IEventProcessor<Baketa.Core.Events.EventTypes.OcrCompletedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>());
         }
     }
