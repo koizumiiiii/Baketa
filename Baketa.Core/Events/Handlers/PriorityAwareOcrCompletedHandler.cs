@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -58,51 +59,79 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
 
     /// <inheritdoc />
     public async Task HandleAsync(OcrCompletedEvent eventData)
+{
+    ArgumentNullException.ThrowIfNull(eventData);
+
+    if (eventData.Results == null || !eventData.Results.Any())
     {
-        ArgumentNullException.ThrowIfNull(eventData);
-
-        if (eventData.Results == null || !eventData.Results.Any())
-        {
-            _logger.LogDebug("優先度付きOCR処理: OCR結果が空のためスキップ");
-            return;
-        }
-
-        try
-        {
-            _logger.LogInformation("🎯 Phase A+処理開始: {Count}個のグループを個別処理", eventData.Results.Count);
-
-            // 統一言語設定サービスから言語ペア取得
-            var languagePair = await _languageConfig.GetLanguagePairAsync().ConfigureAwait(false);
-            var sourceLanguageCode = languagePair.SourceCode;
-            var targetLanguageCode = languagePair.TargetCode;
-
-            // 🎯 Phase A+修正: 各グループを個別に翻訳リクエスト発行
-            foreach (var ocrResult in eventData.Results)
-            {
-                if (!string.IsNullOrWhiteSpace(ocrResult.Text))
-                {
-                    _logger.LogDebug("🎯 グループ翻訳リクエスト - テキスト: '{Text}', Bounds: ({X},{Y},{W},{H})",
-                        ocrResult.Text.Length > 50 ? ocrResult.Text[..50] + "..." : ocrResult.Text,
-                        ocrResult.Bounds.X, ocrResult.Bounds.Y,
-                        ocrResult.Bounds.Width, ocrResult.Bounds.Height);
-
-                    var translationRequest = new TranslationRequestEvent(
-                        ocrResult: ocrResult,
-                        sourceLanguage: sourceLanguageCode,
-                        targetLanguage: targetLanguageCode);
-
-                    await _eventAggregator.PublishAsync(translationRequest).ConfigureAwait(false);
-                }
-            }
-
-            _logger.LogInformation("🎯 Phase A+完了: {Count}個の翻訳リクエストを発行", eventData.Results.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "優先度付きOCR処理でエラーが発生しました");
-            throw;
-        }
+        _logger.LogInformation("🎯 [OCR_RESULT_EMPTY] OCR結果が空のためグループ翻訳をスキップ - Results: {ResultsNull}, Count: {Count}",
+            eventData.Results == null, eventData.Results?.Count ?? 0);
+        Console.WriteLine($"🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
+        
+        // ログファイル直接出力追加
+        await WriteToLogFileAsync("🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
+        return;
     }
+
+    try
+    {
+        _logger.LogInformation("🎯 Phase A+処理開始: {Count}個のグループを個別処理", eventData.Results.Count);
+
+        // 統一言語設定サービスから言語ペア取得
+        var languagePair = await _languageConfig.GetLanguagePairAsync().ConfigureAwait(false);
+        var sourceLanguageCode = languagePair.SourceCode;
+        var targetLanguageCode = languagePair.TargetCode;
+
+        // 🎯 Phase A+修正: 各グループを個別に翻訳リクエスト発行
+        var groupIndex = 1;
+        foreach (var ocrResult in eventData.Results)
+        {
+            if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+            {
+                var logMessage = $"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト開始 - テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', 座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height}), 文字数: {ocrResult.Text.Length}";
+                
+                _logger.LogInformation("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト開始 - テキスト: '{Text}', 座標: ({X},{Y},{W},{H}), 文字数: {Length}",
+                    groupIndex,
+                    ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text,
+                    ocrResult.Bounds.X, ocrResult.Bounds.Y,
+                    ocrResult.Bounds.Width, ocrResult.Bounds.Height,
+                    ocrResult.Text.Length);
+
+                Console.WriteLine($"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト - " +
+                    $"テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', " +
+                    $"座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height})");
+
+                // ログファイル直接出力追加
+                await WriteToLogFileAsync(logMessage);
+
+                var translationRequest = new TranslationRequestEvent(
+                    ocrResult: ocrResult,
+                    sourceLanguage: sourceLanguageCode,
+                    targetLanguage: targetLanguageCode);
+
+                await _eventAggregator.PublishAsync(translationRequest).ConfigureAwait(false);
+
+                _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト発行完了", groupIndex);
+            }
+            else
+            {
+                _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}をスキップ - 空テキスト", groupIndex);
+            }
+            groupIndex++;
+        }
+
+        var completionMessage = $"🎯 Phase A+完了: {eventData.Results.Count}個の翻訳リクエストを発行";
+        _logger.LogInformation("🎯 Phase A+完了: {Count}個の翻訳リクエストを発行", eventData.Results.Count);
+        
+        // ログファイル直接出力追加
+        await WriteToLogFileAsync(completionMessage);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "優先度付きOCR処理でエラーが発生しました");
+        throw;
+    }
+}
 
     /// <summary>
     /// OCR結果から優先度付きテキストリストを作成
@@ -203,5 +232,23 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         }
 
         return totalWeight > 0 ? (float)(weightedSum / totalWeight) : DefaultConfidence;
+    }
+
+    /// <summary>
+    /// ログファイルに直接出力
+    /// </summary>
+    private async Task WriteToLogFileAsync(string message)
+    {
+        try
+        {
+            var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            var logEntry = $"[{timestamp}] {message}{Environment.NewLine}";
+            await File.AppendAllTextAsync(logFilePath, logEntry).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ログファイル直接出力でエラーが発生しました");
+        }
     }
 }

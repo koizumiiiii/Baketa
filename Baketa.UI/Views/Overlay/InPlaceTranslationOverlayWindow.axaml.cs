@@ -71,9 +71,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             ShowActivated = false; // アクティブ化しない
             WindowStartupLocation = WindowStartupLocation.Manual; // 手動位置設定
             
-            // クリックスルー（マウスイベント透過）を有効化
+            // クリックスルー（マウスイベント透過）を有効化してゲームプレイ阻害を防止
             // Avaloniaでは直接的なクリックスルー設定はShow後に行う
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ [InPlaceTranslationOverlay] クリックスルー設定はShow後に延期");
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎮 [InPlaceTranslationOverlay] クリックスルー設定はShow後に延期（ゲームプレイ阻害防止）");
             
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] InPlaceウィンドウプロパティ設定完了");
             
@@ -152,13 +152,13 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                         
                         var currentStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
                         
-                        // 🎯 LayeredとTopMost設定（クリックスルーは無効化で操作性向上）
-                        var newStyle = currentStyle | WS_EX_LAYERED | WS_EX_TOPMOST;
+                        // 🎯 クリックスルー有効化でゲームプレイ阻害を防止
+                        var newStyle = currentStyle | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT;
                         var result = SetWindowLong(hwnd, GWL_EXSTYLE, newStyle);
                         
                         if (result != 0)
                         {
-                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 改善されたウィンドウスタイル設定完了（透明度問題対策）");
+                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] クリックスルー有効化完了（ゲームプレイ阻害防止）");
                         }
                         else
                         {

@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace Baketa.Application.EventHandlers;
@@ -36,15 +37,39 @@ public class TranslationWithBoundsCompletedHandler(
     /// <inheritdoc />
     public async Task HandleAsync(TranslationWithBoundsCompletedEvent eventData)
     {
-        // デバッグログ: ハンドラー呼び出し確認
-        _logger.LogInformation("🎯 TranslationWithBoundsCompletedHandler.HandleAsync 呼び出し開始 - ID: {EventId}", eventData?.Id);
-        Console.WriteLine($"🎯 [DEBUG] TranslationWithBoundsCompletedHandler.HandleAsync 呼び出し開始 - ID: {eventData?.Id}");
-        Console.WriteLine($"🎯 [DEBUG] SourceText: '{eventData?.SourceText}'");
-        Console.WriteLine($"🎯 [DEBUG] TranslatedText: '{eventData?.TranslatedText}'");
-        Console.WriteLine($"🎯 [DEBUG] Bounds: {eventData?.Bounds}");
-        
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // 🎯 [GROUP_TRANSLATION_RESULT] グループ翻訳結果の詳細ログ
+        _logger.LogInformation("🎯 [GROUP_TRANSLATION_RESULT] 翻訳完了 - ID: {EventId}, エンジン: {Engine}",
+            eventData.Id, eventData.EngineName);
+
+        _logger.LogInformation("🎯 [GROUP_TRANSLATION_RESULT] 原文: '{SourceText}' ({SourceLang}) → 訳文: '{TranslatedText}' ({TargetLang})",
+            eventData.SourceText.Length > 50 ? eventData.SourceText[..50] + "..." : eventData.SourceText,
+            eventData.SourceLanguage,
+            eventData.TranslatedText.Length > 50 ? eventData.TranslatedText[..50] + "..." : eventData.TranslatedText,
+            eventData.TargetLanguage);
+
+        _logger.LogInformation("🎯 [GROUP_TRANSLATION_RESULT] 座標: Rect: ({X},{Y},{W}x{H}), 文字数: {SourceLen} → {TargetLen}",
+            eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height,
+            eventData.SourceText.Length, eventData.TranslatedText.Length);
+
+        Console.WriteLine($"🎯 [GROUP_TRANSLATION_RESULT] 翻訳完了 - " +
+            $"原文: '{(eventData.SourceText.Length > 30 ? eventData.SourceText[..30] + "..." : eventData.SourceText)}' → " +
+            $"訳文: '{(eventData.TranslatedText.Length > 30 ? eventData.TranslatedText[..30] + "..." : eventData.TranslatedText)}'");
+
+        Console.WriteLine($"🎯 [GROUP_TRANSLATION_RESULT] エンジン: {eventData.EngineName}, " +
+            $"座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height})");
+
+        // ログファイル直接出力追加
+        var resultLogMessage = $"🎯 [GROUP_TRANSLATION_RESULT] 翻訳完了 - ID: {eventData.Id}, エンジン: {eventData.EngineName}";
+        await WriteToLogFileAsync(resultLogMessage);
+
+        var translationLogMessage = $"🎯 [GROUP_TRANSLATION_RESULT] 原文: '{(eventData.SourceText.Length > 50 ? eventData.SourceText[..50] + "..." : eventData.SourceText)}' ({eventData.SourceLanguage}) → 訳文: '{(eventData.TranslatedText.Length > 50 ? eventData.TranslatedText[..50] + "..." : eventData.TranslatedText)}' ({eventData.TargetLanguage})";
+        await WriteToLogFileAsync(translationLogMessage);
+
+        var coordinateLogMessage = $"🎯 [GROUP_TRANSLATION_RESULT] 座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height}), 文字数: {eventData.SourceText.Length} → {eventData.TranslatedText.Length}";
+        await WriteToLogFileAsync(coordinateLogMessage);
 
         try
         {
@@ -76,9 +101,14 @@ public class TranslationWithBoundsCompletedHandler(
 
                     // 統一オーバーレイマネージャーで処理
                     await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
-                    
-                    _logger.LogInformation("✅ [PHASE18_HANDLER] 統一システムでオーバーレイ表示成功 - ID: {Id}, Text: '{Text}'", 
+
+                    _logger.LogInformation("✅ [PHASE18_HANDLER] 統一システムでオーバーレイ表示成功 - ID: {Id}, Text: '{Text}'",
                         eventData.Id, eventData.TranslatedText.Substring(0, Math.Min(30, eventData.TranslatedText.Length)));
+
+                    // 🎯 [OVERLAY_COORDINATES] オーバーレイ座標ログ追加
+                    _logger.LogInformation("🎯 [OVERLAY_COORDINATES] 統一システムオーバーレイ座標: Rect: ({X},{Y},{W}x{H})",
+                        eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height);
+                    Console.WriteLine($"🎯 [OVERLAY_COORDINATES] 統一システムオーバーレイ座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height})");
                     Console.WriteLine($"✅ [PHASE18_HANDLER] 統一システム表示成功 - ID: {eventData.Id}");
                 }
                 catch (Exception overlayManagerEx)
@@ -112,6 +142,11 @@ public class TranslationWithBoundsCompletedHandler(
                 Console.WriteLine($"🎯 [LEGACY_OVERLAY_SOURCE] Bounds: {eventData.Bounds}");
                 Console.WriteLine($"🎯 [LEGACY_OVERLAY_SOURCE] IsTranslationSuccessful: {isTranslationSuccessful}");
 
+                // 🎯 [OVERLAY_COORDINATES] Legacy既存システムオーバーレイ座標ログ追加
+                _logger.LogInformation("🎯 [OVERLAY_COORDINATES] 既存システムオーバーレイ座標: Rect: ({X},{Y},{W}x{H})",
+                    eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height);
+                Console.WriteLine($"🎯 [OVERLAY_COORDINATES] 既存システムオーバーレイ座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height})");
+
                 // オーバーレイ更新イベントを発行
                 var overlayEvent = new OverlayUpdateEvent(
                     text: eventData.TranslatedText,
@@ -138,6 +173,24 @@ public class TranslationWithBoundsCompletedHandler(
         catch (Exception ex)
         {
             _logger.LogError(ex, "座標情報付き翻訳完了イベント処理中にエラーが発生: '{Text}'", eventData.SourceText);
+        }
+    }
+
+    /// <summary>
+    /// ログファイルに直接出力
+    /// </summary>
+    private async Task WriteToLogFileAsync(string message)
+    {
+        try
+        {
+            var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            var logEntry = $"[{timestamp}] {message}{Environment.NewLine}";
+            await File.AppendAllTextAsync(logFilePath, logEntry).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ログファイル直接出力でエラーが発生しました");
         }
     }
 }
