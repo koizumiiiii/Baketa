@@ -8,7 +8,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Infrastructure.OCR.Scaling;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
+using TextDetectionMethod = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
+using IOcrEngine = Baketa.Core.Abstractions.OCR.IOcrEngine;
+using IImageFactory = Baketa.Core.Abstractions.Imaging.IImageFactory;
 using Timer = System.Threading.Timer;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
@@ -20,6 +24,8 @@ namespace Baketa.Infrastructure.OCR.TextDetection;
 public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposable
 {
     private readonly ILogger<AdaptiveTextRegionDetector> _logger;
+    private readonly IOcrEngine? _ocrEngine;
+    private readonly IImageFactory? _imageFactory;
     private readonly Dictionary<string, object> _parameters = [];
     private readonly ConcurrentQueue<DetectionHistoryEntry> _detectionHistory = [];
     private readonly ConcurrentDictionary<string, RegionTemplate> _regionTemplates = [];
@@ -35,18 +41,24 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     public string Description => "適応的テキスト領域検出器 - 履歴ベース最適化と動的調整";
     public TextDetectionMethod Method => TextDetectionMethod.Adaptive;
 
-    public AdaptiveTextRegionDetector(ILogger<AdaptiveTextRegionDetector> logger)
+    public AdaptiveTextRegionDetector(
+        ILogger<AdaptiveTextRegionDetector> logger,
+        IOcrEngine? ocrEngine = null,
+        IImageFactory? imageFactory = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+        _ocrEngine = ocrEngine;
+        _imageFactory = imageFactory;
+
         InitializeDefaultParameters();
-        
+
         // 定期的な適応処理を開始
-        _adaptationTimer = new Timer(PerformAdaptation, null, 
-            TimeSpan.FromMilliseconds(AdaptationIntervalMs), 
+        _adaptationTimer = new Timer(PerformAdaptation, null,
+            TimeSpan.FromMilliseconds(AdaptationIntervalMs),
             TimeSpan.FromMilliseconds(AdaptationIntervalMs));
-            
-        _logger.LogInformation("適応的テキスト領域検出器を初期化");
+
+        _logger.LogInformation("適応的テキスト領域検出器を初期化 - PaddleOCR統合: {HasOcr}, ImageFactory: {HasFactory}",
+            _ocrEngine != null, _imageFactory != null);
     }
 
     /// <summary>
@@ -156,38 +168,92 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     /// </summary>
     private async Task<List<OCRTextRegion>> DetectWithAdaptiveParametersAsync(IAdvancedImage image, CancellationToken cancellationToken)
     {
-        var regions = new List<OCRTextRegion>();
-        
-        await Task.Run(() =>
+        // PaddleOCRエンジンが利用できない場合はフォールバック
+        if (_ocrEngine == null || _imageFactory == null)
         {
-            // 適応的パラメータの取得
-            var sensitivity = GetParameter<double>("AdaptiveSensitivity");
-            var minArea = GetParameter<int>("AdaptiveMinArea");
-            var maxRegions = GetParameter<int>("MaxRegionsPerImage");
-            
-            // エッジベース検出（適応的感度）
-            var edgeRegions = DetectEdgeBasedRegions(image, sensitivity);
-            
-            // 輝度変化ベース検出
-            var luminanceRegions = DetectLuminanceBasedRegions(image, minArea);
-            
-            // テクスチャベース検出
-            var textureRegions = DetectTextureBasedRegions(image);
-            
-            // 結果の統合と重複除去
-            List<OCRTextRegion> allRegions = [.. edgeRegions, .. luminanceRegions, .. textureRegions];
-            var uniqueRegions = MergeOverlappingRegions(allRegions);
-            
-            // 上位候補のみを選択
-            regions.AddRange(uniqueRegions
-                .OrderByDescending(r => r.Confidence)
-                .Take(maxRegions));
-                
-            _logger.LogDebug("適応的パラメータ検出完了: {RegionCount}個の領域（エッジ:{Edge}, 輝度:{Luminance}, テクスチャ:{Texture}）", 
-                regions.Count, edgeRegions.Count, luminanceRegions.Count, textureRegions.Count);
-        }, cancellationToken).ConfigureAwait(false);
-        
-        return regions;
+            _logger.LogWarning("⚠️ PaddleOCRエンジンまたはImageFactoryが注入されていません - 全画面フォールバック");
+            return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
+        }
+
+        try
+        {
+            _logger.LogDebug("🔍 PaddleOCRベーステキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
+
+            // IAdvancedImage → IImage変換
+            var convertedImage = await ConvertAdvancedImageToImageAsync(image).ConfigureAwait(false);
+
+            try
+            {
+                // 元画像サイズを記録（座標復元用）
+                var originalWidth = image.Width;
+                var originalHeight = image.Height;
+
+                // スケールファクター計算（座標復元用）
+                var convertedWidth = convertedImage.Width;
+                var convertedHeight = convertedImage.Height;
+                var scaleFactorX = (double)convertedWidth / originalWidth;
+                var scaleFactorY = (double)convertedHeight / originalHeight;
+                var scaleFactor = Math.Min(scaleFactorX, scaleFactorY); // 縮小率を使用
+
+                _logger.LogDebug("🎯 [COORDINATE_FIX] 座標復元情報: 元画像={OriginalWidth}x{OriginalHeight}, 変換後={ConvertedWidth}x{ConvertedHeight}, スケール={ScaleFactor:F3}",
+                    originalWidth, originalHeight, convertedWidth, convertedHeight, scaleFactor);
+
+                // PaddleOCRの検出専用機能を使用（認識処理をスキップして高速化）
+                var ocrResults = await _ocrEngine.DetectTextRegionsAsync(convertedImage, cancellationToken).ConfigureAwait(false);
+
+                if (ocrResults?.TextRegions == null || ocrResults.TextRegions.Count == 0)
+                {
+                    _logger.LogDebug("🔍 PaddleOCR検出結果が空 - 全画面フォールバック実行");
+                    return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
+                }
+
+                // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
+                var restoredRegions = ocrResults.TextRegions
+                    .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor))
+                    .Where(region => IsRegionValid(region.Bounds))
+                    .ToList();
+
+                _logger.LogDebug("🎯 [COORDINATE_FIX] 座標復元完了: 検出={DetectionCount}個, 復元後有効={RestoredCount}個",
+                    ocrResults.TextRegions.Count, restoredRegions.Count);
+
+                // 近接領域の統合（既存ロジックを活用）
+                // OcrTextRegion → OCRTextRegion (TextDetection.TextRegion) 変換
+                var convertedRegions = restoredRegions.Select(ocrRegion => new OCRTextRegion
+                {
+                    Bounds = ocrRegion.Bounds,
+                    Confidence = ocrRegion.Confidence,
+                    RegionType = TextRegionType.Unknown, // デフォルト値
+                    DetectionMethod = "PaddleOCR"
+                }).ToList();
+
+                var mergedRegions = MergeOverlappingRegions(convertedRegions);
+
+                // 適応的パラメータによる制限
+                var maxRegions = GetParameter<int>("MaxRegionsPerImage");
+                var finalRegions = mergedRegions
+                    .OrderByDescending(r => r.Confidence)
+                    .Take(maxRegions)
+                    .ToList();
+
+                _logger.LogInformation("✅ PaddleOCRベーステキスト領域検出完了: {OriginalCount}個 → 復元後{RestoredCount}個 → 統合後{MergedCount}個 → 最終{FinalCount}個",
+                    ocrResults.TextRegions.Count, restoredRegions.Count, mergedRegions.Count, finalRegions.Count);
+
+                return finalRegions;
+            }
+            finally
+            {
+                // 変換された画像のリソース解放
+                convertedImage?.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ PaddleOCR検出処理中にエラー: {ErrorMessage}", ex.Message);
+
+            // エラー時は全画面フォールバックを使用
+            _logger.LogWarning("🔄 フォールバック: 全画面を単一領域として処理");
+            return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -245,108 +311,8 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
         return optimizedRegions;
     }
 
-    /// <summary>
-    /// エッジベース領域検出
-    /// </summary>
-    private List<OCRTextRegion> DetectEdgeBasedRegions(IAdvancedImage image, double sensitivity)
-    {
-        var regions = new List<OCRTextRegion>();
-        
-        // 簡素化されたエッジ検出アルゴリズム
-        var gridSize = Math.Max(20, Math.Min(image.Width, image.Height) / 20);
-        var threshold = sensitivity * 100;
-        
-        for (int y = 0; y < image.Height - gridSize; y += gridSize / 2)
-        {
-            for (int x = 0; x < image.Width - gridSize; x += gridSize / 2)
-            {
-                var region = new Rectangle(x, y, gridSize, gridSize);
-                var confidence = CalculateEdgeConfidence(image, region, threshold);
-                
-                if (confidence > 0.2) // 閾値を下げて文字列領域をより広く検出
-                {
-                    regions.Add(new OCRTextRegion
-                    {
-                        Bounds = region,
-                        Confidence = confidence,
-                        RegionType = TextRegionType.Edge,
-                        DetectionMethod = "EdgeBased"
-                    });
-                }
-            }
-        }
-        
-        return regions;
-    }
 
-    /// <summary>
-    /// 輝度変化ベース領域検出
-    /// </summary>
-    private List<OCRTextRegion> DetectLuminanceBasedRegions(IAdvancedImage image, int minArea)
-    {
-        var regions = new List<OCRTextRegion>();
-        
-        // 輝度変化の激しい領域を検出（テキストの特徴）
-        var blockSize = Math.Max(15, Math.Min(image.Width, image.Height) / 30);
-        
-        for (int y = 0; y < image.Height - blockSize; y += blockSize)
-        {
-            for (int x = 0; x < image.Width - blockSize; x += blockSize)
-            {
-                var region = new Rectangle(x, y, blockSize, blockSize);
-                if (region.Width * region.Height < minArea) continue;
-                
-                var luminanceVariance = CalculateLuminanceVariance(image, region);
-                var confidence = Math.Min(1.0, luminanceVariance / 50.0); // 正規化
-                
-                if (confidence > 0.25)
-                {
-                    regions.Add(new OCRTextRegion
-                    {
-                        Bounds = region,
-                        Confidence = confidence,
-                        RegionType = TextRegionType.Luminance,
-                        DetectionMethod = "LuminanceBased"
-                    });
-                }
-            }
-        }
-        
-        return regions;
-    }
 
-    /// <summary>
-    /// テクスチャベース領域検出
-    /// </summary>
-    private List<OCRTextRegion> DetectTextureBasedRegions(IAdvancedImage image)
-    {
-        var regions = new List<OCRTextRegion>();
-        
-        // テキストの特徴的なテクスチャパターンを検出
-        var patternSize = Math.Max(25, Math.Min(image.Width, image.Height) / 25);
-        
-        for (int y = 0; y < image.Height - patternSize; y += patternSize)
-        {
-            for (int x = 0; x < image.Width - patternSize; x += patternSize)
-            {
-                var region = new Rectangle(x, y, patternSize, patternSize);
-                var textureScore = CalculateTextureScore(image, region);
-                
-                if (textureScore > 0.35)
-                {
-                    regions.Add(new OCRTextRegion
-                    {
-                        Bounds = region,
-                        Confidence = textureScore,
-                        RegionType = TextRegionType.Texture,
-                        DetectionMethod = "TextureBased"
-                    });
-                }
-            }
-        }
-        
-        return regions;
-    }
 
     /// <summary>
     /// 重複する領域をマージ
@@ -655,6 +621,81 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
 
     #region Helper Methods
 
+    /// <summary>
+    /// IAdvancedImage を IImage に変換
+    /// </summary>
+    private async Task<IImage> ConvertAdvancedImageToImageAsync(IAdvancedImage advancedImage)
+    {
+        if (_imageFactory == null)
+        {
+            throw new InvalidOperationException("ImageFactoryが注入されていません");
+        }
+
+        try
+        {
+            var imageBytes = await advancedImage.ToByteArrayAsync().ConfigureAwait(false);
+            return await _imageFactory.CreateFromBytesAsync(imageBytes).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ IAdvancedImage → IImage 変換失敗");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 全画面フォールバック処理
+    /// </summary>
+    private async Task<List<OCRTextRegion>> CreateFullScreenFallbackAsync(IAdvancedImage image)
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+
+        var fullScreenRegion = new Rectangle(0, 0, image.Width, image.Height);
+
+        if (IsRegionValid(fullScreenRegion))
+        {
+            _logger.LogInformation("✅ フォールバック: 画面全体を単一領域として処理（テキスト分断回避）");
+            return
+            [
+                new OCRTextRegion
+                {
+                    Bounds = fullScreenRegion,
+                    Confidence = 0.8, // フォールバック用の固定信頼度
+                    RegionType = TextRegionType.Unknown,
+                    DetectionMethod = "FullScreenFallback"
+                }
+            ];
+        }
+        else
+        {
+            _logger.LogWarning("⚠️ 画面全体が処理対象外サイズ - テキスト検出をスキップ");
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// 領域の妥当性チェック（設定ベース）
+    /// </summary>
+    private bool IsRegionValid(Rectangle rect)
+    {
+        var minArea = GetParameter<int>("AdaptiveMinArea");
+
+        // 最小サイズフィルタリング
+        if (rect.Width < 8 || rect.Height < 8 || rect.Width * rect.Height < minArea)
+        {
+            return false;
+        }
+
+        // アスペクト比チェック（極端な縦横比を除外）
+        float aspectRatio = (float)rect.Width / rect.Height;
+        if (aspectRatio < 0.1f || aspectRatio > 10.0f)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     private static string GenerateImageKey(IAdvancedImage image)
     {
         return $"{image.Width}x{image.Height}";
@@ -676,26 +717,6 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
         return unionArea > 0 ? (double)(intersection.Width * intersection.Height) / unionArea : 0.0;
     }
 
-    private static double CalculateEdgeConfidence(IAdvancedImage image, Rectangle region, double threshold)
-    {
-        // 簡素化されたエッジ密度計算（スタブ実装）
-        _ = image; _ = region; _ = threshold;
-        return Random.Shared.NextDouble() * 0.8 + 0.2;
-    }
-
-    private static double CalculateLuminanceVariance(IAdvancedImage image, Rectangle region)
-    {
-        // 簡素化された輝度分散計算（スタブ実装）
-        _ = image; _ = region;
-        return Random.Shared.NextDouble() * 60 + 20;
-    }
-
-    private static double CalculateTextureScore(IAdvancedImage image, Rectangle region)
-    {
-        // 簡素化されたテクスチャスコア計算（スタブ実装）
-        _ = image; _ = region;
-        return Random.Shared.NextDouble() * 0.7 + 0.3;
-    }
 
     #endregion
 

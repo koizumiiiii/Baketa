@@ -11,6 +11,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.Services.OCR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 
@@ -35,7 +36,16 @@ namespace Baketa.Infrastructure.DI;
             // テキスト検出関連 - 検出器ごとに登録するが、実行時に選択可能
             services.AddTransient<MserTextRegionDetector>();
             services.AddTransient<SwtTextRegionDetector>();
-            services.AddSingleton<AdaptiveTextRegionDetector>(); // 履歴保持のためSingleton
+
+            // AdaptiveTextRegionDetector: PaddleOCR統合版 (Strategy 1実装)
+            services.AddSingleton<AdaptiveTextRegionDetector>(sp =>
+            {
+                var logger = sp.GetRequiredService<ILogger<AdaptiveTextRegionDetector>>();
+                var ocrEngine = sp.GetService<IOcrEngine>(); // オプショナル
+                var imageFactory = sp.GetService<IImageFactory>(); // オプショナル
+
+                return new AdaptiveTextRegionDetector(logger, ocrEngine, imageFactory);
+            });
             
             // ファクトリーを通じて適切な検出器を選択できるようにする
             services.AddTransient<Func<string, ITextRegionDetector>>(sp => detectorType =>
