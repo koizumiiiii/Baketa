@@ -15,6 +15,7 @@ using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
 using Baketa.Core.UI.Monitors;
 using Baketa.Core.UI.Geometry;
+using Baketa.UI.Services.Monitor;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
 
@@ -29,11 +30,13 @@ public class InPlaceTranslationOverlayManager(
     IEventAggregator eventAggregator,
     IOverlayPositioningService overlayPositioningService,
     IMonitorManager monitorManager,
+    IAdvancedMonitorService advancedMonitorService,
     ILogger<InPlaceTranslationOverlayManager> logger) : IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IDisposable
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly IOverlayPositioningService _overlayPositioningService = overlayPositioningService ?? throw new ArgumentNullException(nameof(overlayPositioningService));
     private readonly IMonitorManager _monitorManager = monitorManager ?? throw new ArgumentNullException(nameof(monitorManager));
+    private readonly IAdvancedMonitorService _advancedMonitorService = advancedMonitorService ?? throw new ArgumentNullException(nameof(advancedMonitorService));
     private readonly ILogger<InPlaceTranslationOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     
     // チャンクIDとインプレースオーバーレイウィンドウのマッピング
@@ -416,6 +419,8 @@ public class InPlaceTranslationOverlayManager(
                 
                 // 🎯 [P2_COORDINATE_TRANSFORM] IOverlayPositioningServiceによる精密座標変換詳細監視
                 System.Drawing.Point optimalPosition;
+                System.Drawing.Point avaloniaCompensatedPosition;
+                MonitorInfo actualMonitor;
                 try
                 {
                     var overlaySize = textChunk.GetOverlaySize();
@@ -428,7 +433,12 @@ public class InPlaceTranslationOverlayManager(
                     Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 既存オーバーレイ数: {existingBounds.Count}");
 
                     // 🎯 Phase 11.4: 実際のモニター情報取得と詳細ログ
-                    var actualMonitor = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
+                    var monitorResult = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
+                    if (monitorResult == null)
+                    {
+                        throw new InvalidOperationException($"モニター情報取得失敗 - ChunkId: {textChunk.ChunkId}");
+                    }
+                    actualMonitor = monitorResult;
 
                     Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] 対象モニター: {actualMonitor.Name}");
                     Console.WriteLine($"🔍 [P2_COORDINATE_TRANSFORM] モニター境界: ({actualMonitor.Bounds.X},{actualMonitor.Bounds.Y}) サイズ: {actualMonitor.Bounds.Width}x{actualMonitor.Bounds.Height}");
@@ -461,14 +471,35 @@ public class InPlaceTranslationOverlayManager(
 
                     _logger.LogInformation("[P2_COORDINATE_TRANSFORM] 座標変換完了 - ChunkId: {ChunkId}, ROI: ({RoiX},{RoiY}→{FinalX},{FinalY}), Strategy: {Strategy}, Monitor: {MonitorName}",
                         textChunk.ChunkId, textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y, optimalPosition.X, optimalPosition.Y, result.UsedStrategy, actualMonitor.Name);
+
+                    // 🖥️ [PHASE1_DPI_COMPENSATION] Avalonia DPI補正適用 (try内で実行)
+                    var monitorType = _advancedMonitorService.DetectMonitorType(actualMonitor);
+                    var advancedDpiInfo = _advancedMonitorService.GetAdvancedDpiInfo(actualMonitor);
+
+                    avaloniaCompensatedPosition = _advancedMonitorService.CompensateCoordinatesForAvalonia(
+                        optimalPosition, advancedDpiInfo);
+
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] === Avalonia DPI補正実施 (ChunkId: {textChunk.ChunkId}) ===");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] モニター種別: {monitorType}");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] Avaloniaスケーリング: {advancedDpiInfo.AvaloniaScaling}");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] 補正要否: {advancedDpiInfo.RequiresAvaloniaCompensation}");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] 補正係数: {advancedDpiInfo.CompensationFactor}");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] 補正前座標: ({optimalPosition.X},{optimalPosition.Y})");
+                    Console.WriteLine($"🖥️ [PHASE1_DPI_COMPENSATION] 補正後座標: ({avaloniaCompensatedPosition.X},{avaloniaCompensatedPosition.Y})");
+
+                    _logger.LogInformation("[PHASE1_DPI_COMPENSATION] Avalonia DPI補正完了 - ChunkId: {ChunkId}, MonitorType: {MonitorType}, " +
+                        "Before: ({BeforeX},{BeforeY}) → After: ({AfterX},{AfterY}), Factor: {Factor}",
+                        textChunk.ChunkId, monitorType, optimalPosition.X, optimalPosition.Y,
+                        avaloniaCompensatedPosition.X, avaloniaCompensatedPosition.Y, advancedDpiInfo.CompensationFactor);
                 }
                 catch (Exception ex)
                 {
-                    // 精密位置計算失敗時は基本位置にフォールバック
+                    // 精密位置計算またはDPI補正失敗時は基本位置を使用
                     optimalPosition = textChunk.GetBasicOverlayPosition();
-                    _logger.LogWarning(ex, "精密位置計算失敗、基本位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
+                    avaloniaCompensatedPosition = optimalPosition;
+                    _logger.LogWarning(ex, "精密位置計算またはDPI補正失敗、基本位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
                 }
-                
+
                 // オーバーレイを コレクションに追加
                 _activeOverlays[textChunk.ChunkId] = newOverlay;
 

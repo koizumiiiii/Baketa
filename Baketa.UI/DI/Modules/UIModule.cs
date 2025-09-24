@@ -7,6 +7,7 @@ using Baketa.Core.DI.Attributes;
 using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Services;
+using Baketa.UI.Services.Monitor;
 using Baketa.UI.Security;
 using Baketa.UI.DI.Modules;
 using Baketa.UI.DI.Extensions;
@@ -168,7 +169,10 @@ namespace Baketa.UI.DI.Modules;
             
             // オーバーレイ位置管理システム
             OverlayPositioningModule.RegisterServices(services);
-            
+
+            // 🖥️ [PHASE1_MONITOR] 高度モニター判定・DPI補正システム（Gemini推奨：Avalonia Screen API優先）
+            services.AddSingleton<IAdvancedMonitorService, AdvancedMonitorService>();
+
             // マルチモニターUIサポート
             services.AddUIMultiMonitorSupport();
             

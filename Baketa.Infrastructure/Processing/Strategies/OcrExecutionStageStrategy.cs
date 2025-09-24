@@ -10,7 +10,7 @@ using Baketa.Core.Models.OCR;
 using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Drawing; // 🎯 [ROI_IMAGE_SAVE] Graphics, Pen, Color等用
+using System.Drawing; // 🎯 UltraThink Phase 77.6: Bitmap用 + ROI_IMAGE_SAVE Graphics, Pen, Color等用
 using System.Drawing.Imaging; // 🎯 [ROI_IMAGE_SAVE] ImageFormat用
 using System.IO; // 🎯 [ROI_IMAGE_SAVE] Directory, Path用
 using System.Linq;
@@ -171,15 +171,41 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 {
                     _logger.LogDebug("🎯 UltraThink: ROI検出開始 - テキスト領域を事前検出");
 
-                    // OCR用IImageをIWindowsImageへ変換が必要な場合の処理
-                    if (ocrImage is IWindowsImage windowsImage)
+                    // 🎯 UltraThink Phase 77.6: IImage → IWindowsImage アダプター変換でROI検出器動作
+                    IWindowsImage windowsImage;
+                    bool needsDisposal = false;
+
+                    if (ocrImage is IWindowsImage directWindowsImage)
                     {
-                        detectedRegions = await _textRegionDetector.DetectTextRegionsAsync(windowsImage).ConfigureAwait(false);
-                        _logger.LogInformation("🎯 UltraThink: ROI検出完了 - 検出領域数: {RegionCount}", detectedRegions.Count);
+                        // 既に IWindowsImage の場合は直接使用
+                        windowsImage = directWindowsImage;
+                        _logger.LogDebug("🎯 [PHASE77.6] 既存 IWindowsImage を直接使用");
                     }
                     else
                     {
-                        _logger.LogWarning("🎯 UltraThink: IImage→IWindowsImage変換が必要 - ROI検出をスキップ");
+                        // IImage → IWindowsImage インライン アダプター変換
+                        _logger.LogDebug("🎯 [PHASE77.6] IImage → IWindowsImage インラインアダプター変換開始 - Type: {ImageType}", ocrImage.GetType().Name);
+
+                        windowsImage = new InlineImageToWindowsImageAdapter(ocrImage, _logger);
+                        needsDisposal = true; // アダプターは後でDispose必要
+
+                        _logger.LogInformation("✅ [PHASE77.6] IWindowsImageインラインアダプター作成完了 - Size: {Width}x{Height}", windowsImage.Width, windowsImage.Height);
+                    }
+
+                    try
+                    {
+                        // TextRegionDetectorAdapter による高精度 ROI 検出実行
+                        detectedRegions = await _textRegionDetector.DetectTextRegionsAsync(windowsImage).ConfigureAwait(false);
+                        _logger.LogInformation("🎯 UltraThink: ROI検出完了 - 検出領域数: {RegionCount}", detectedRegions.Count);
+                    }
+                    finally
+                    {
+                        // アダプターが作成された場合のリソース解放
+                        if (needsDisposal && windowsImage is IDisposable disposableAdapter)
+                        {
+                            disposableAdapter.Dispose();
+                            _logger.LogDebug("🎯 [PHASE77.6] InlineImageToWindowsImageAdapter リソース解放完了");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -532,5 +558,132 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             DebugLogUtility.WriteLog($"❌ [ROI_IMAGE_SAVE] ROI画像保存エラー: {ex.Message}");
         }
     }
+}
 
+/// <summary>
+/// 🎯 UltraThink Phase 77.6: 循環参照回避インライン実装
+/// IImage → IWindowsImage アダプター (最小限実装)
+/// </summary>
+internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposable
+{
+    private readonly IImage _underlyingImage;
+    private readonly ILogger _logger;
+    private Bitmap? _cachedBitmap;
+    private bool _disposed;
+
+    public int Width => _underlyingImage.Width;
+    public int Height => _underlyingImage.Height;
+
+    public InlineImageToWindowsImageAdapter(IImage underlyingImage, ILogger logger)
+    {
+        _underlyingImage = underlyingImage ?? throw new ArgumentNullException(nameof(underlyingImage));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _logger.LogDebug("🔄 [PHASE77.6] InlineImageToWindowsImageAdapter 作成 - Size: {Width}x{Height}", Width, Height);
+    }
+
+    public Bitmap GetBitmap()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_cachedBitmap != null)
+        {
+            return _cachedBitmap;
+        }
+
+        try
+        {
+            _logger.LogDebug("🔄 [PHASE77.6] IImage → Bitmap 変換開始");
+
+            var imageBytes = _underlyingImage.ToByteArrayAsync().Result;
+            using var memoryStream = new MemoryStream(imageBytes);
+            _cachedBitmap = new Bitmap(memoryStream);
+
+            _logger.LogDebug("✅ [PHASE77.6] Bitmap 変換成功 - Size: {Width}x{Height}",
+                _cachedBitmap.Width, _cachedBitmap.Height);
+
+            return _cachedBitmap;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [PHASE77.6] IImage → Bitmap 変換失敗: {ErrorMessage}", ex.Message);
+            throw new InvalidOperationException($"Failed to convert IImage to Bitmap: {ex.Message}", ex);
+        }
+    }
+
+    public Image GetNativeImage()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return GetBitmap();
+    }
+
+    public async Task SaveAsync(string path, System.Drawing.Imaging.ImageFormat? format = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var bitmap = GetBitmap();
+        bitmap.Save(path, format ?? System.Drawing.Imaging.ImageFormat.Png);
+        await Task.CompletedTask;
+    }
+
+    public async Task<IWindowsImage> ResizeAsync(int width, int height)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var resizedImage = await _underlyingImage.ResizeAsync(width, height);
+        return new InlineImageToWindowsImageAdapter(resizedImage, _logger);
+    }
+
+    public async Task<IWindowsImage> CropAsync(Rectangle rectangle)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var bitmap = GetBitmap();
+        var croppedBitmap = new Bitmap(rectangle.Width, rectangle.Height);
+
+        using (var graphics = Graphics.FromImage(croppedBitmap))
+        {
+            graphics.DrawImage(bitmap, 0, 0, rectangle, GraphicsUnit.Pixel);
+        }
+
+        using var memoryStream = new MemoryStream();
+        croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+        var croppedBytes = memoryStream.ToArray();
+
+        // IImageFactoryを介してIImageを作成する必要があるが、循環参照回避のため簡易実装
+        throw new NotImplementedException("CropAsync requires IImageFactory which would create circular reference");
+    }
+
+    public async Task<byte[]> ToByteArrayAsync(System.Drawing.Imaging.ImageFormat? format = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var bitmap = GetBitmap();
+        using var memoryStream = new MemoryStream();
+        bitmap.Save(memoryStream, format ?? System.Drawing.Imaging.ImageFormat.Png);
+        return memoryStream.ToArray();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            _cachedBitmap?.Dispose();
+            _cachedBitmap = null;
+            _logger.LogDebug("🔄 [PHASE77.6] InlineImageToWindowsImageAdapter リソース解放完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ [PHASE77.6] InlineImageToWindowsImageAdapter リソース解放で警告: {ErrorMessage}", ex.Message);
+        }
+        finally
+        {
+            _disposed = true;
+        }
+    }
+
+    public override string ToString()
+    {
+        return $"InlineImageToWindowsImageAdapter[{Width}x{Height}, Type: {_underlyingImage.GetType().Name}, Disposed: {_disposed}]";
+    }
 }

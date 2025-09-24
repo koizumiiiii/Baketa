@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
+// UltraThink Phase 77.4: OCR.TextDetection名前空間削除 - Capture.ITextRegionDetectorのみ使用
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;

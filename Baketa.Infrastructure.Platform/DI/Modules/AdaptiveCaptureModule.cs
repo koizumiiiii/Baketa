@@ -108,10 +108,14 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
     // 適応的キャプチャサービスは Baketa.Application プロジェクトで登録
     // services.AddSingleton<IAdaptiveCaptureService, AdaptiveCaptureService>();
     
-    // 🎯 UltraThink Phase 55.5: 緊急修正 - ITextRegionDetector登録復活
-    // 理由: プロジェクト全体でITextRegionDetectorが一切登録されていないことが判明
-    //       ROIBasedCaptureStrategy（必須依存）とOcrExecutionStageStrategy（オプション依存）で必要
-    services.AddSingleton<ITextRegionDetector, Baketa.Infrastructure.OCR.PaddleOCR.TextDetection.FastTextRegionDetector>();
+    // 🚀 UltraThink Phase 77.4: ITextRegionDetector インターフェース競合問題の完全解決
+    //
+    // 解決策: TextRegionDetectorAdapter による Capture.ITextRegionDetector 実装
+    // - OcrExecutionStageStrategy が要求する Capture.ITextRegionDetector を提供
+    // - 内部で OCR.TextDetection.ITextRegionDetector (AdaptiveTextRegionDetector) に委譲
+    // - AdaptiveTextRegionDetector の高性能 Sobel+LBP 検出を活用
+    // - ROI検出全画面フォールバック(2560x1080)問題を根本解決
+    services.AddSingleton<Baketa.Core.Abstractions.Capture.ITextRegionDetector, TextRegionDetectorAdapter>();
     
     // WindowsImageアダプター - 型変換用（Phase 1では一旦オプショナルDI対応で実装）
     // TODO: 今後のPhaseで完全なWindowsImageAdapter実装を追加

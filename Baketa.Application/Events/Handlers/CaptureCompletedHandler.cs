@@ -166,7 +166,11 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                     // Gemini フィードバック反映: 設定から取得（ハードコーディング回避）
                     EnableStaging = _settings?.CurrentValue?.EnableStaging ?? true,
                     EnablePerformanceMetrics = _settings?.CurrentValue?.EnablePerformanceMetrics ?? true,
-                    EnableEarlyTermination = _settings?.CurrentValue?.EnableEarlyTermination ?? true
+                    EnableEarlyTermination = _settings?.CurrentValue?.EnableEarlyTermination ?? true,
+
+                    // UltraThink Phase 3: 個別翻訳実行時の統合翻訳スキップ制御
+                    // グルーピング後のOCR結果が複数存在する場合は個別翻訳を実行するため統合翻訳をスキップ
+                    SkipIntegratedTranslation = ShouldSkipIntegratedTranslation()
                 }
             };
 
@@ -860,5 +864,40 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         }
 
         return isProximate;
+    }
+
+    /// <summary>
+    /// 統合翻訳をスキップすべきかどうかを判断
+    /// UltraThink Phase 3: 個別翻訳実行時の重複防止制御
+    /// </summary>
+    /// <returns>統合翻訳をスキップする場合はtrue</returns>
+    private bool ShouldSkipIntegratedTranslation()
+    {
+        // 現在の実装では、PriorityAwareOcrCompletedHandlerが有効な場合は常に個別翻訳を優先
+        // 将来的には、より詳細な条件判断（チャンク数、グルーピング設定等）を追加可能
+
+        try
+        {
+            // PriorityAwareOcrCompletedHandlerの存在確認
+            // EventAggregatorに登録されているハンドラーをチェックすることは困難なため、
+            // 設定ベースでの判断を実装
+
+            // 段階的処理が有効で、グルーピング機能を使用する場合は個別翻訳を実行
+            var enableStaging = _settings?.CurrentValue?.EnableStaging ?? true;
+
+            if (enableStaging)
+            {
+                _logger?.LogDebug("🎯 [TRANSLATION_CONTROL] 個別翻訳優先モード - 統合翻訳をスキップ");
+                return true;
+            }
+
+            _logger?.LogDebug("🎯 [TRANSLATION_CONTROL] 統合翻訳モード - 統合翻訳を実行");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "🎯 [TRANSLATION_CONTROL] 翻訳制御判定でエラー - 統合翻訳を実行");
+            return false; // エラー時は安全側（統合翻訳実行）
+        }
     }
 }

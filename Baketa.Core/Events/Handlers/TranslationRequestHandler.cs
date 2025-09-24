@@ -247,15 +247,30 @@ public class TranslationRequestHandler(
     /// <returns>画面上の座標（変換なし）</returns>
     private static System.Drawing.Rectangle ConvertRoiToScreenCoordinates(System.Drawing.Rectangle roiBounds)
     {
-        // 🎯 [COORDINATE_TRANSFORM] ROI座標を画面座標に適切に変換
-        
+        // 🎯 [COORDINATE_TRANSFORM_FIX] 重複スケーリング問題の修正
+
         try
         {
-            // ROIスケールファクタ（CaptureModels.csのデフォルト値と一致）
-            // TODO: 設定から動的に取得するように改善
-            const float roiScaleFactor = 0.25f;
+            Console.WriteLine($"🎯 [COORDINATE_DEBUG] ROI座標変換修正版:");
+            Console.WriteLine($"   入力ROI座標: {roiBounds}");
+
+            // 🚨 [SCALING_FIX] 座標が既に画面座標の場合はスケーリングをスキップ
+            // ROI座標は通常小さい値(数百ピクセル以下)、画面座標は大きい値
+            // 幅や高さが500ピクセルを超える場合は既に画面座標とみなす
+            bool alreadyScaled = roiBounds.Width > 500 || roiBounds.Height > 500 ||
+                               roiBounds.X > 2000 || roiBounds.Y > 2000;
+
+            if (alreadyScaled)
+            {
+                Console.WriteLine($"✅ [COORDINATE_DEBUG] 既に画面座標のためスケーリングをスキップ");
+                Console.WriteLine($"   最終座標(スケーリングなし): {roiBounds}");
+                return roiBounds;
+            }
+
+            // ROIスケールファクタ（座標変換問題修正：1.0f = スケーリングなし）
+            const float roiScaleFactor = 1.0f;
             var inverseScale = 1.0f / roiScaleFactor;
-            
+
             // 1. ROI座標を実際の画面座標にスケーリング
             var scaledBounds = new System.Drawing.Rectangle(
                 (int)(roiBounds.X * inverseScale),
@@ -263,10 +278,10 @@ public class TranslationRequestHandler(
                 (int)(roiBounds.Width * inverseScale),
                 (int)(roiBounds.Height * inverseScale)
             );
-            
+
             // 2. ターゲットウィンドウのオフセットを取得
             var windowOffset = GetTargetWindowOffset();
-            
+
             // 3. 最終的な画面座標を計算
             var finalBounds = new System.Drawing.Rectangle(
                 scaledBounds.X + windowOffset.X,
@@ -274,15 +289,14 @@ public class TranslationRequestHandler(
                 scaledBounds.Width,
                 scaledBounds.Height
             );
-            
+
             // デバッグログ: 座標変換の詳細を出力
-            Console.WriteLine($"🎯 [COORDINATE_DEBUG] ROI→画面座標変換:");
-            Console.WriteLine($"   入力ROI座標: {roiBounds}");
+            Console.WriteLine($"🎯 [COORDINATE_DEBUG] ROI→画面座標変換(スケーリング実行):");
             Console.WriteLine($"   スケールファクタ: {roiScaleFactor} (逆数: {inverseScale})");
             Console.WriteLine($"   スケーリング後: {scaledBounds}");
             Console.WriteLine($"   ウィンドウオフセット: {windowOffset}");
             Console.WriteLine($"   最終画面座標: {finalBounds}");
-            
+
             return finalBounds;
         }
         catch (Exception ex)

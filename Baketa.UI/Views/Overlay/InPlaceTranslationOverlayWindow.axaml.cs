@@ -10,6 +10,8 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.UI.Monitors;
+using Baketa.UI.Services.Monitor;
 using Baketa.UI.Utils;
 using DrawingPoint = System.Drawing.Point;
 using DrawingSize = System.Drawing.Size;

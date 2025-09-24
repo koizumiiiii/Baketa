@@ -185,7 +185,7 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                     catch { /* ファイル出力失敗は無視 */ }
                 }
 
-                var stageOrder = GetExecutionOrder(settings);
+                var stageOrder = GetExecutionOrder(settings, input.Options);
                 ProcessingStageType completedStage = ProcessingStageType.ImageChangeDetection;
                 bool earlyTerminated = false;
                 
@@ -414,7 +414,7 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
     public IReadOnlyList<ProcessingStageType> GetExecutableStageSuggestion(ProcessingPipelineInput input)
     {
         var settings = _settings.CurrentValue;
-        var allStages = GetExecutionOrder(settings);
+        var allStages = GetExecutionOrder(settings, input.Options);
         var context = new ProcessingContext(input);
         var executableStages = new List<ProcessingStageType>();
 
@@ -449,8 +449,9 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
 
     /// <summary>
     /// 実行順序を取得
+    /// UltraThink Phase 3: 個別翻訳実行時の統合翻訳スキップ対応
     /// </summary>
-    private static List<ProcessingStageType> GetExecutionOrder(ProcessingPipelineSettings settings)
+    private static List<ProcessingStageType> GetExecutionOrder(ProcessingPipelineSettings settings, ProcessingPipelineOptions? options = null)
     {
         var order = new List<ProcessingStageType>
         {
@@ -460,10 +461,24 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
             ProcessingStageType.TranslationExecution
         };
 
+        // UltraThink Phase 3: 個別翻訳実行時は統合翻訳をスキップ
+        if (options?.SkipIntegratedTranslation == true)
+        {
+            order.Remove(ProcessingStageType.TranslationExecution);
+        }
+
         // 設定により段階順序をカスタマイズ可能
         if (settings.CustomStageOrder?.Count > 0)
         {
-            return settings.CustomStageOrder.ToList();
+            var customOrder = settings.CustomStageOrder.ToList();
+
+            // カスタム順序でも個別翻訳時は統合翻訳をスキップ
+            if (options?.SkipIntegratedTranslation == true)
+            {
+                customOrder.Remove(ProcessingStageType.TranslationExecution);
+            }
+
+            return customOrder;
         }
 
         return order;

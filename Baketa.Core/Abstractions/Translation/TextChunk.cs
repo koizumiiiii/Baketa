@@ -182,9 +182,10 @@ public sealed class TextChunk
     /// オーバーレイ表示用の基本位置を取得
     /// UltraThink Phase 10.3: 位置調整ロジックはIOverlayPositioningServiceに分離
     /// 注意: 実際の位置計算は消費側でIOverlayPositioningServiceを使用する
+    /// 修正: 30ピクセル上オフセットを削除し、元テキストと正確に同じ位置に表示
     /// </summary>
     /// <returns>テキスト領域の基本位置（左上座標）</returns>
-    public Point GetBasicOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y - 30);
+    public Point GetBasicOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y);
     
     /// <summary>
     /// テキスト領域の中心座標を取得

@@ -37,7 +37,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
     /// ROI座標をスクリーン座標に変換
     /// coordinate_test/Program.csのConvertRoiToScreenCoordinatesと同じロジック
     /// </summary>
-    public Rectangle ConvertRoiToScreenCoordinates(Rectangle roiBounds, IntPtr windowHandle, float roiScaleFactor = 0.25f)
+    public Rectangle ConvertRoiToScreenCoordinates(Rectangle roiBounds, IntPtr windowHandle, float roiScaleFactor = 1.0f)
     {
         try
         {
@@ -85,7 +85,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
     /// 複数のROI座標を一括変換
     /// 効率化のため、ウィンドウオフセットを一度だけ取得
     /// </summary>
-    public Rectangle[] ConvertRoiToScreenCoordinatesBatch(Rectangle[] roiBounds, IntPtr windowHandle, float roiScaleFactor = 0.25f)
+    public Rectangle[] ConvertRoiToScreenCoordinatesBatch(Rectangle[] roiBounds, IntPtr windowHandle, float roiScaleFactor = 1.0f)
     {
         if (roiBounds == null || roiBounds.Length == 0)
             return [];

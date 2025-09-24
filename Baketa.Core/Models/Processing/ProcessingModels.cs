@@ -126,6 +126,12 @@ public sealed record ProcessingPipelineOptions
     /// 強制的に全段階を実行するか（デバッグ用）
     /// </summary>
     public bool ForceCompleteExecution { get; init; } = false;
+
+    /// <summary>
+    /// 統合翻訳をスキップするか（個別翻訳実行時の重複防止）
+    /// UltraThink Phase 3: グルーピング個別翻訳時は全体統合翻訳を無効化
+    /// </summary>
+    public bool SkipIntegratedTranslation { get; init; } = false;
 }
 
 /// <summary>
