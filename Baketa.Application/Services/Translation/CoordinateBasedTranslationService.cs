@@ -156,12 +156,28 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 $"バッチOCR処理 - 画像:{image.Width}x{image.Height}")
                 .WithAdditionalInfo($"WindowHandle:0x{windowHandle.ToInt64():X}");
             
+            // 🔄 [PADDLE_OCR_RESET] OCR処理前にPaddleOCR失敗カウンターをリセット（緊急修正）
+            try
+            {
+                if (_processingFacade.OcrProcessor is BatchOcrProcessor batchProcessor)
+                {
+                    Console.WriteLine("🔄 [PADDLE_OCR_RESET] PaddleOCR失敗カウンターをリセット実行");
+                    _logger?.LogInformation("🔄 [PADDLE_OCR_RESET] OCR連続失敗による無効化状態を解除");
+                    batchProcessor.ResetOcrFailureCounter();
+                }
+            }
+            catch (Exception resetEx)
+            {
+                _logger?.LogWarning(resetEx, "🔄 [PADDLE_OCR_RESET] PaddleOCRリセット中にエラー - 処理継続");
+                Console.WriteLine($"⚠️ [PADDLE_OCR_RESET] リセットエラー: {resetEx.Message}");
+            }
+
             // 🚨 [CRITICAL_FIX] OCR処理直前ログ
             Console.WriteLine($"🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
             // 🔥 [FILE_CONFLICT_FIX_4] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {IsCancellationRequested}", 
+            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチOCR処理開始直前 - CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 cancellationToken.IsCancellationRequested);
-            
+
             var textChunks = await _processingFacade.OcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken)
                 .ConfigureAwait(false);
             
