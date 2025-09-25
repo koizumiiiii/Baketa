@@ -22,7 +22,6 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
-using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Core.Abstractions.Events;
 
@@ -40,20 +39,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable
     private readonly ILogger<CoordinateBasedTranslationService>? _logger;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IStreamingTranslationService? _streamingTranslationService;
-    private readonly TimedChunkAggregator _timedChunkAggregator;
+    private readonly ITextChunkAggregatorService _textChunkAggregatorService;
     private bool _disposed;
 
     public CoordinateBasedTranslationService(
         ITranslationProcessingFacade processingFacade,
         IConfigurationFacade configurationFacade,
         IStreamingTranslationService? streamingTranslationService,
-        TimedChunkAggregator timedChunkAggregator,
+        ITextChunkAggregatorService textChunkAggregatorService,
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
         _configurationFacade = configurationFacade ?? throw new ArgumentNullException(nameof(configurationFacade));
         _streamingTranslationService = streamingTranslationService;
-        _timedChunkAggregator = timedChunkAggregator ?? throw new ArgumentNullException(nameof(timedChunkAggregator));
+        _textChunkAggregatorService = textChunkAggregatorService ?? throw new ArgumentNullException(nameof(textChunkAggregatorService));
         _logger = logger;
         
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -186,12 +185,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
             
-            // 🚀 [PHASE_2_2_FIX] OCR完了イベント発行を再有効化 - 非同期バッチ処理で65秒遅延解決
-            _logger?.LogInformation("🚀 [PHASE_2_2] OCR完了イベント発行を再開 - バッチ処理最適化済み");
-                
-            await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
-            
-            _logger?.LogInformation("🚀 [PHASE_2_2] OCR完了イベント発行完了 - 後続処理は非同期で並列実行");
+            // 🚀 [DUPLICATE_FIX] TimedAggregator機能による重複制御 - アプローチ2.5実装
+            if (!_textChunkAggregatorService.IsFeatureEnabled)
+            {
+                // TimedAggregator無効時：従来通り即座にイベント発行
+                _logger?.LogInformation("🔥 [DUPLICATE_FIX] TimedAggregator無効のため、OCR完了イベントを即座発行 - 個別処理モード");
+                await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+                _logger?.LogInformation("🔥 [DUPLICATE_FIX] OCR完了イベント発行完了 - 個別処理による翻訳開始");
+            }
+            else
+            {
+                // TimedAggregator有効時：集約処理に委ね、重複イベント発行を防止
+                _logger?.LogInformation("🚀 [DUPLICATE_FIX] TimedAggregator有効のため、OCR完了イベント即座発行をスキップ - 集約後の統一イベント発行に委ねる");
+                Console.WriteLine("🚀 [DUPLICATE_FIX] 重複解消: 個別イベント発行をスキップ、統合処理のみ実行");
+            }
             
             // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
             Console.WriteLine("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
@@ -203,7 +210,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 foreach (var chunk in textChunks)
                 {
                     // チャンクには既にSourceWindowHandleが設定済み（initプロパティのため後から変更不可）
-                    await _timedChunkAggregator.TryAddChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
+                    await _textChunkAggregatorService.TryAddTextChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
                     _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'", 
                         chunk.ChunkId, chunk.CombinedText);
                 }
@@ -590,14 +597,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                                 $"インプレース表示 - ChunkId:{chunk.ChunkId}, 位置:({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})")
                                 .WithAdditionalInfo($"Text:'{chunk.TranslatedText}'");
                             
-                            // 🚫 Phase 11.2: 重複表示修正 - 直接オーバーレイ表示を無効化
-                            // TranslationWithBoundsCompletedEvent → OverlayUpdateEvent 経由で表示されるため重複防止
-                            Console.WriteLine($"🚫 [PHASE11.2] 直接オーバーレイ表示スキップ - チャンク {chunk.ChunkId}: 重複表示防止");
-                            // await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
-                                
+                            // 🔥 [ULTRAFUIX] UltraThink Phase 9 根本修正: 実際のUI表示処理を復活
+                            // 問題: Phase 11.2でコメントアウトされた表示処理により、翻訳成功しても画面に表示されない
+                            // 解決: 実際のShowInPlaceOverlayAsyncを有効化し、真の表示完了を実現
+                            Console.WriteLine($"🔥 [ULTRAFUIX] 実際のUI表示処理を実行 - チャンク {chunk.ChunkId}: 画面オーバーレイ表示開始");
+                            DebugLogUtility.WriteLog($"🔥 [ULTRAFUIX] ShowInPlaceOverlayAsync実行開始 - チャンク {chunk.ChunkId}");
+
+                            await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
+
                             var overlayResult = overlayMeasurement.Complete();
-                            
-                            DebugLogUtility.WriteLog($"   ✅ インプレース表示完了 - チャンク {chunk.ChunkId}, 時間: {overlayResult.Duration.TotalMilliseconds:F1}ms");
+
+                            DebugLogUtility.WriteLog($"   ✅ [ULTRAFUIX] 真のインプレース表示完了 - チャンク {chunk.ChunkId}, 時間: {overlayResult.Duration.TotalMilliseconds:F1}ms");
+                            Console.WriteLine($"✅ [ULTRAFUIX] オーバーレイ表示完了 - チャンク {chunk.ChunkId}");
                         }
                         else
                         {

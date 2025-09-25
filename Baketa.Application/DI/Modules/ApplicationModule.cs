@@ -204,13 +204,13 @@ namespace Baketa.Application.DI.Modules;
                         var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
                         var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
                         var streamingTranslationService = provider.GetService<Baketa.Core.Abstractions.Translation.IStreamingTranslationService>();
-                        var timedChunkAggregator = provider.GetRequiredService<Baketa.Infrastructure.OCR.PostProcessing.TimedChunkAggregator>();
+                        var textChunkAggregatorService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>();
                         var loggerForCoordinate = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                         coordinateBasedTranslation = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                             processingFacade,
                             configurationFacade,
                             streamingTranslationService,
-                            timedChunkAggregator,
+                            textChunkAggregatorService,
                             loggerForCoordinate);
                     }
                     Console.WriteLine($"✅ [PHASE17] CoordinateBasedTranslationService準備完了 - TimedChunkAggregator統合有効");

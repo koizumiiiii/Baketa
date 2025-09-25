@@ -29,6 +29,7 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ILogger<PriorityAwareOcrCompletedHandler> _logger;
     private readonly ILanguageConfigurationService _languageConfig;
+    private readonly ITextChunkAggregatorService _textChunkAggregatorService;
 
     // Phase 5設計値
     private const int MaxConcurrentTranslations = 3; // SemaphoreSlim制限値
@@ -49,18 +50,29 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
         ILogger<PriorityAwareOcrCompletedHandler> logger,
-        ILanguageConfigurationService languageConfig)
+        ILanguageConfigurationService languageConfig,
+        ITextChunkAggregatorService textChunkAggregatorService)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
+        _textChunkAggregatorService = textChunkAggregatorService ?? throw new ArgumentNullException(nameof(textChunkAggregatorService));
     }
 
     /// <inheritdoc />
     public async Task HandleAsync(OcrCompletedEvent eventData)
 {
     ArgumentNullException.ThrowIfNull(eventData);
+
+    // 🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効時は個別処理をスキップ
+    if (_textChunkAggregatorService.IsFeatureEnabled)
+    {
+        _logger.LogInformation("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
+        Console.WriteLine("🚀 [DUPLICATE_FIX] 統合処理有効: 個別翻訳スキップ → TimedChunkAggregatorグルーピング翻訳使用");
+        await WriteToLogFileAsync("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
+        return; // 統合処理に委ねる
+    }
 
     if (eventData.Results == null || !eventData.Results.Any())
     {

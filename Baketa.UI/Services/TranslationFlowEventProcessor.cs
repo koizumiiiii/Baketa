@@ -195,46 +195,16 @@ public class TranslationFlowEventProcessor :
                 _logger.LogError(ex, "Failed to clear existing in-place overlays");
             }
 
-            // 3. 正規イベントフローの開始: キャプチャ → OCR → 翻訳
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ステップ3開始 - 正規イベントフロー開始");
-            _logger.LogDebug("Starting standard event flow: Capture -> OCR -> Translation");
-            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 正規イベントフロー開始: キャプチャ実行");
+            // 3. 継続的翻訳を開始（TranslationOrchestrationServiceを呼び出し）
+            _logger.LogDebug("Starting continuous translation via ProcessTranslationAsync");
             try
             {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [HandleAsync] ウィンドウキャプチャ開始");
-                
-                // ウィンドウキャプチャを実行
-                var captureResult = await _captureService.CaptureWindowAsync(eventData.TargetWindow!.Handle).ConfigureAwait(false);
-                
-                if (captureResult != null)
-                {
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ キャプチャ成功: {captureResult.Width}x{captureResult.Height}");
-                    _logger.LogInformation("ウィンドウキャプチャ成功: {Width}x{Height}", captureResult.Width, captureResult.Height);
-                    
-                    // CaptureCompletedEventを発行して正規フローを開始
-                    var captureCompletedEvent = new Baketa.Core.Events.EventTypes.CaptureCompletedEvent(
-                        captureResult, 
-                        System.Drawing.Rectangle.Empty, // TODO: 実際のキャプチャ領域を取得
-                        TimeSpan.Zero // キャプチャ時間（必須パラメータ）
-                    );
-                    
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 CaptureCompletedEvent発行 - 正規フロー開始");
-                    await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ CaptureCompletedEvent発行完了 - 正規フロー開始済み");
-                }
-                else
-                {
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ キャプチャ失敗: nullが返されました");
-                    _logger.LogError("ウィンドウキャプチャが失敗しました（nullが返されました）");
-                }
-                
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 正規イベントフロー処理完了");
+                await ProcessTranslationAsync(eventData.TargetWindow!).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ 正規イベントフロー処理エラー: {ex.Message}");
-                _logger.LogError(ex, "正規イベントフロー処理エラー");
-                throw; // 外側のcatchで処理させる
+                _logger.LogError(ex, "継続的翻訳開始エラー");
+                throw;
             }
 
             _logger.LogInformation("✅ 翻訳開始処理が完了しました");
@@ -584,8 +554,10 @@ public class TranslationFlowEventProcessor :
                     
                     try
                     {
-                        // InPlaceTranslationOverlayManagerを使用してオーバーレイ表示
-                        await _inPlaceOverlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+                        // 🚫 [DUPLICATE_FIX] TranslationFlowオーバーレイ表示削除 - PHASE18統一システムで処理済み
+                        // PHASE18統一システム (TranslationWithBoundsCompletedHandler) で既に表示されているため、重複防止で削除
+                        // await _inPlaceOverlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+                        Console.WriteLine($"🚫 [DUPLICATE_FIX] TranslationFlow直接表示スキップ - PHASE18統一システム使用: '{result.TranslatedText}'");
                         DebugLogUtility.WriteLog("✅ オーバーレイ表示完了");
                         Console.WriteLine($"✅ [OVERLAY_FIX] オーバーレイ表示成功: ChunkId={textChunk.ChunkId}");
                     }

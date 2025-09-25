@@ -78,7 +78,14 @@ namespace Baketa.Core.DI.Modules;
             // 例: services.AddSingleton<IProfileManager, ProfileManager>();
 
             // 🎯 [PHASE5] 優先度付きOCR完了ハンドラー - 画面中央優先度翻訳システム
-            services.AddSingleton<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>();
+            // 🚀 [DUPLICATE_FIX] TimedChunkAggregatorサービス統合対応 - DI登録を依存関係注入対応に更新
+            services.AddSingleton<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>(provider =>
+                new Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler(
+                    provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>(),
+                    provider.GetRequiredService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>(),
+                    provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>>(),
+                    provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ILanguageConfigurationService>(),
+                    provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>()));
             services.AddSingleton<Baketa.Core.Abstractions.Events.IEventProcessor<Baketa.Core.Events.EventTypes.OcrCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.PriorityAwareOcrCompletedHandler>());
         }

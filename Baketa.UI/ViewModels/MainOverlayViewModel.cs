@@ -117,6 +117,7 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(StartStopText));
                     this.RaisePropertyChanged(nameof(SettingsEnabled));
                     this.RaisePropertyChanged(nameof(ShowHideEnabled));
+                    this.RaisePropertyChanged(nameof(IsStartStopEnabled)); // 🔧 CRITICAL FIX: StartStopCommandのCanExecute更新
                 }
                 else
                 {
@@ -125,6 +126,7 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(StartStopText));
                         this.RaisePropertyChanged(nameof(SettingsEnabled));
                         this.RaisePropertyChanged(nameof(ShowHideEnabled));
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled)); // 🔧 CRITICAL FIX: StartStopCommandのCanExecute更新
                     });
                 }
             }

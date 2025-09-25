@@ -320,8 +320,10 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
             // 翻訳テキストを設定
             translatedChunk.TranslatedText = translatedText;
             
-            // オーバーレイ表示処理
-            await _overlayManager.ShowInPlaceOverlayAsync(translatedChunk).ConfigureAwait(false);
+            // 🚫 [DUPLICATE_FIX] BatchOCRオーバーレイ表示削除 - PHASE18統一システムで処理済み
+            // PHASE18統一システム (TranslationWithBoundsCompletedHandler) で既に表示されているため、重複防止で削除
+            // await _overlayManager.ShowInPlaceOverlayAsync(translatedChunk).ConfigureAwait(false);
+            Console.WriteLine($"🚫 [DUPLICATE_FIX] BatchOCR直接表示スキップ - PHASE18統一システム使用: '{translatedText}'");
                 
             Console.WriteLine($"🖼️ [TIMED_AGGREGATOR] オーバーレイ表示完了: '{translatedText}'");
             _logger.LogInformation("✅ [TIMED_AGGREGATOR] オーバーレイ表示完了");

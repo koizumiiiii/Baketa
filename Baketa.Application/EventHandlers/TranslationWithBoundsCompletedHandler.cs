@@ -79,6 +79,11 @@ public class TranslationWithBoundsCompletedHandler(
             // 🔍 翻訳成功判定：空文字や空白文字の場合は翻訳失敗とみなす
             var isTranslationSuccessful = !string.IsNullOrWhiteSpace(eventData.TranslatedText);
 
+            // 🎯 [COORDINATE_FIX] 座標が(0,0,0,0)でも翻訳テキストが有効なら成功とみなす
+            var hasValidBounds = eventData.Bounds.Width > 0 && eventData.Bounds.Height > 0;
+            _logger.LogInformation("🎯 [COORDINATE_DEBUG] Bounds: ({X},{Y},{W}x{H}), HasValidBounds: {HasValidBounds}, IsTranslationSuccessful: {IsTranslationSuccessful}",
+                eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height, hasValidBounds, isTranslationSuccessful);
+
             // 🏗️ PHASE18: 統一オーバーレイシステムを使用（利用可能な場合）
             if (_overlayManager != null && isTranslationSuccessful)
             {
@@ -93,11 +98,13 @@ public class TranslationWithBoundsCompletedHandler(
                         ChunkId = eventData.Id.GetHashCode(), // Guidからintのハッシュコードを生成
                         CombinedText = eventData.SourceText,
                         TranslatedText = eventData.TranslatedText,
-                        CombinedBounds = eventData.Bounds,
+                        CombinedBounds = hasValidBounds ? eventData.Bounds : new System.Drawing.Rectangle(100, 100, 400, 50), // 座標なしの場合は固定位置を使用
                         SourceWindowHandle = IntPtr.Zero, // TranslationWithBoundsCompletedEventにはWindowHandle情報がない
                         DetectedLanguage = eventData.SourceLanguage,
                         TextResults = [] // 最小限のTextChunk作成
                     };
+
+                    Console.WriteLine($"🎯 [COORDINATE_FIX] TextChunk作成 - OriginalBounds: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height}), UsedBounds: ({textChunk.CombinedBounds.X},{textChunk.CombinedBounds.Y},{textChunk.CombinedBounds.Width}x{textChunk.CombinedBounds.Height})");
 
                     // 統一オーバーレイマネージャーで処理
                     await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
@@ -110,12 +117,16 @@ public class TranslationWithBoundsCompletedHandler(
                         eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height);
                     Console.WriteLine($"🎯 [OVERLAY_COORDINATES] 統一システムオーバーレイ座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height})");
                     Console.WriteLine($"✅ [PHASE18_HANDLER] 統一システム表示成功 - ID: {eventData.Id}");
+
+                    // ✅ [DUPLICATE_FIX] 統一システム成功時はLegacyシステムをスキップ
+                    Console.WriteLine($"🚫 [DUPLICATE_FIX] 統一システム成功のため既存システムスキップ - ID: {eventData.Id}");
+                    return; // 統一システム成功時は処理完了
                 }
                 catch (Exception overlayManagerEx)
                 {
                     _logger.LogError(overlayManagerEx, "❌ [PHASE18_HANDLER] 統一オーバーレイマネージャー処理中にエラー発生 - ID: {Id}", eventData.Id);
                     Console.WriteLine($"❌ [PHASE18_HANDLER] 統一システムエラー - ID: {eventData.Id}");
-                    
+
                     // 統一システムでエラーが発生した場合は既存システムにフォールバック
                     _logger.LogWarning("⚠️ [PHASE18_HANDLER] 既存システムにフォールバック実行");
                     await PublishLegacyOverlayEvent();

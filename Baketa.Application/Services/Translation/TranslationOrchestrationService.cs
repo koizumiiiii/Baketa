@@ -780,7 +780,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         Console.WriteLine($"🔄 ExecuteAutomaticTranslationLoopAsync開始");
         Console.WriteLine($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         
@@ -937,6 +937,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         catch { }
         
         IImage? currentImage = null;
+        var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             // 進行状況を通知
@@ -964,6 +965,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 }
                 DebugLogUtility.WriteLog($"📷 画面全体キャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
+
+            captureStopwatch.Stop();
             
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
@@ -1037,20 +1040,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
+
             DebugLogUtility.WriteLog($"🌍 翻訳処理開始: ID={translationId}");
             try
             {
                 var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
                     .ConfigureAwait(false);
-                
+
                 // 緊急デバッグ: ExecuteTranslationAsync完了
                 try
                 {
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
+
                 DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
 
                 // キャンセルチェック
@@ -1062,14 +1065,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     lastTranslatedText = _lastTranslatedText;
                 }
-                
-                if (!string.IsNullOrEmpty(lastTranslatedText) && 
+
+                if (!string.IsNullOrEmpty(lastTranslatedText) &&
                     string.Equals(result?.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
                 {
                     DebugLogUtility.WriteLog($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result?.TranslatedText}'");
                     return;
                 }
-                
+
                 // 座標ベース翻訳モードの場合はObservable発行をスキップ
                 if (result?.IsCoordinateBasedMode == true)
                 {
@@ -1081,7 +1084,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     }
                     return;
                 }
-                
+
                 // 翻訳完了時刻と結果を記録（重複翻訳防止用）
                 lock (_lastTranslationTimeLock)
                 {
@@ -1091,7 +1094,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     _lastTranslatedText = result?.TranslatedText ?? string.Empty;
                 }
-                
+
                 // 結果を通知（UI層でスケジューラ制御）
                 if (result != null)
                 {
@@ -1104,27 +1107,27 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     DebugLogUtility.WriteLog($"⚠️ 翻訳結果がnullのためObservable発行をスキップ");
                 }
             }
-            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") || 
+            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
                                                   translationEx.Message.Contains("OCR") ||
                                                   translationEx is OperationCanceledException)
             {
                 // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
                 DebugLogUtility.WriteLog($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
                 _logger?.LogWarning(translationEx, "OCRエラーにより翻訳をスキップしました: TranslationId={TranslationId}", translationId);
-                
+
                 // PaddleOCRエラーの場合は追加の待機を設定
                 if (translationEx.Message.Contains("PaddlePredictor") || translationEx.Message.Contains("run failed"))
                 {
                     DebugLogUtility.WriteLog($"⏳ PaddleOCRエラーのため追加待機を実行: 2秒");
                     _logger?.LogInformation("PaddleOCRエラーが発生したため、次のキャプチャまで2秒待機します");
-                    
+
                     // エラー発生時のクールダウンを設定
                     lock (_lastTranslationTimeLock)
                     {
                         _lastTranslationCompletedAt = DateTime.UtcNow.AddSeconds(2);
                     }
                 }
-                
+
                 // 現在の画像を破棄して早期リターン
                 currentImage?.Dispose();
                 return;
@@ -1150,9 +1153,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 古い画像を安全に破棄
                 oldImage?.Dispose();
             }
-            
-            // 現在の画像を破棄
-            currentImage?.Dispose();
+
+            // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
+            // currentImage?.Dispose(); // CaptureCompletedEventで使用するため削除
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1353,13 +1356,44 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             catch { }
             
+            // 🚀 [FUNDAMENTAL_FIX] CaptureCompletedEventを座標ベース翻訳条件評価の前に発行
+            DebugLogUtility.WriteLog($"🎯 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行開始: ID={translationId}");
+            _logger?.LogInformation("🚀 [FUNDAMENTAL_FIX] 根本修正実装 - CaptureCompletedEventによるイベントドリブン翻訳開始: TranslationId={TranslationId}", translationId);
+
+            try
+            {
+                // キャプチャ領域を計算 (画像のサイズを使用)
+                var captureRegion = new System.Drawing.Rectangle(0, 0, image.Width, image.Height);
+
+                // CaptureCompletedEventを作成して発行
+                var captureCompletedEvent = new Baketa.Core.Events.EventTypes.CaptureCompletedEvent(
+                    capturedImage: image,
+                    captureRegion: captureRegion,
+                    captureTime: TimeSpan.FromMilliseconds(100) // 仮の処理時間
+                );
+
+                DebugLogUtility.WriteLog($"📤 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行中: CaptureRegion=({captureRegion.X},{captureRegion.Y},{captureRegion.Width}x{captureRegion.Height}), Mode={mode}");
+
+                // イベント発行 (これによりCaptureCompletedHandler → SmartProcessingPipelineService → TimedChunkAggregator の適切なフローが実行される)
+                await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
+
+                DebugLogUtility.WriteLog($"✅ [FUNDAMENTAL_FIX] CaptureCompletedEvent発行完了 - 適切なイベントドリブン翻訳フローが開始されました: ID={translationId}");
+                _logger?.LogInformation("✅ [FUNDAMENTAL_FIX] CaptureCompletedEvent発行完了 - SmartProcessingPipelineService経由でTimedChunkAggregator処理開始: TranslationId={TranslationId}", translationId);
+            }
+            catch (Exception eventEx)
+            {
+                DebugLogUtility.WriteLog($"💥 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行でエラー: ID={translationId}, Error={eventEx.Message}");
+                _logger?.LogError(eventEx, "CaptureCompletedEvent発行中にエラーが発生しました: TranslationId={TranslationId}", translationId);
+                // エラーが発生しても座標ベース翻訳処理は継続
+            }
+
             // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し直前
             try
             {
                 // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
+
             // 🚨 CRITICAL DEBUG: 座標ベース翻訳チェック（直接ファイル書き込み）
             try
             {
@@ -1409,6 +1443,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Console.WriteLine($"   🪟 hasWindowHandle: {hasWindowHandle}");
             Console.WriteLine($"   🖼️ isAdvancedImage: {isAdvancedImage}");
             
+            // 座標ベース翻訳実行フラグ
+            var coordinateBasedTranslationExecuted = false;
+
             if (overallCondition && image is IAdvancedImage advancedImage)
             {
                 // 緊急デバッグ: 座標ベース翻訳実行開始
@@ -1417,10 +1454,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
+
                 DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
                 _logger?.LogDebug("🎯 座標ベース翻訳処理を実行: ID={TranslationId}", translationId);
-                
+
                 try
                 {
                     // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
@@ -1429,23 +1466,26 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
+
                     DebugLogUtility.WriteLog($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
                     await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
-                        advancedImage, 
-                        _targetWindowHandle!.Value, 
+                        advancedImage,
+                        _targetWindowHandle!.Value,
                         cancellationToken)
                         .ConfigureAwait(false);
-                    
+
                     try
                     {
                         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
+
                     DebugLogUtility.WriteLog($"✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了");
                     _logger?.LogInformation("✅ 座標ベース翻訳処理完了: ID={TranslationId}", translationId);
-                    
+
+                    // 座標ベース翻訳が正常実行された
+                    coordinateBasedTranslationExecuted = true;
+
                     // 座標ベース処理が成功した場合、オーバーレイで直接表示されるため、
                     // 従来の翻訳結果は空の結果を返す
                     // ただし、IsCoordinateBasedModeをtrueに設定して、Observableへの発行をスキップする
@@ -1468,6 +1508,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     DebugLogUtility.WriteLog($"❌ エラーのスタックトレース: {coordinateEx.StackTrace}");
                     _logger?.LogWarning(coordinateEx, "⚠️ 座標ベース処理でエラーが発生、従来のOCR処理にフォールバック: ID={TranslationId}", translationId);
                     // 座標ベース処理でエラーが発生した場合は従来のOCR処理にフォールバック
+                    coordinateBasedTranslationExecuted = false;
                 }
             }
             else
@@ -1641,16 +1682,18 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
                 
-                // 🔧 [DUPLICATE_FIX] 重複表示修正: CoordinateBasedTranslationService使用時のみ無効化
-                if (_coordinateBasedTranslation == null)
+                // 🔧 [DUPLICATE_FIX] 重複表示修正: 座標ベース翻訳が実際に実行された場合のみ無効化
+                if (!coordinateBasedTranslationExecuted)
                 {
-                    // CoordinateBasedTranslationServiceが無効な場合のみイベント発行
+                    // 座標ベース翻訳が実行されなかった場合のみイベント発行
                     await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
-                    Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent発行完了 - 翻訳フロー開始");
+                    Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent発行完了 - 従来翻訳フロー開始");
+                    DebugLogUtility.WriteLog($"🔥 [BRIDGE_FIX] 従来翻訳フロー: 座標ベース翻訳未実行のためOcrCompletedEvent発行");
                 }
                 else
                 {
-                    Console.WriteLine($"🚫 [DUPLICATE_FIX] CoordinateBasedTranslationServiceが有効のため、OcrCompletedEvent発行をスキップ");
+                    Console.WriteLine($"🚫 [DUPLICATE_FIX] 座標ベース翻訳が実行済みのため、OcrCompletedEvent発行をスキップ");
+                    DebugLogUtility.WriteLog($"🚫 [DUPLICATE_FIX] 重複防止: 座標ベース翻訳実行済みのためOcrCompletedEvent発行スキップ");
                 }
                 _logger?.LogInformation("🔥 [BRIDGE_FIX] OCR完了イベント発行完了: TextRegions数={Count}, ID={EventId}", 
                     ocrResults.TextRegions.Count, ocrCompletedEvent.Id);

@@ -99,6 +99,16 @@ public sealed class TimedChunkAggregator : IDisposable
     }
 
     /// <summary>
+    /// TimedAggregator機能が有効かどうかを示すプロパティ
+    /// CoordinateBasedTranslationServiceの重複制御で使用
+    /// </summary>
+    /// <remarks>
+    /// 🚀 [DUPLICATE_FIX] アプローチ2.5による重複解消修正
+    /// Gemini専門家レビュー承認済みの実装
+    /// </remarks>
+    public bool IsFeatureEnabled => _settings.CurrentValue.IsFeatureEnabled;
+
+    /// <summary>
     /// 新しいチャンクを追加し、タイマーをリセット
     /// 戦略書フィードバック反映: SourceWindowHandle別管理、ForceFlushMs制御
     /// </summary>
