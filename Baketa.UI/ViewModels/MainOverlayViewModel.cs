@@ -878,30 +878,82 @@ public class MainOverlayViewModel : ViewModelBase
 
     private async Task StopTranslationAsync()
     {
-        DebugLogUtility.WriteLog("🔴 翻訳停止処理開始");
-        Logger?.LogInformation("Stopping translation");
+        var stopEventPublished = false;
 
-        // 翻訳停止（ウィンドウ選択状態は維持）
-        DebugLogUtility.WriteLog("🔴 翻訳状態をアイドルに設定");
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        try
         {
-            CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
-            IsTranslationActive = false;
-            IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
-            // IsWindowSelectedとSelectedWindowは維持（再選択不要）
-            DebugLogUtility.WriteLog($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
-        });
+            DebugLogUtility.WriteLog("🔴 翻訳停止処理開始");
+            Logger?.LogInformation("Stopping translation");
 
-        // オーバーレイを非表示にしてリセット
-        await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
-        await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
+            // 翻訳停止（ウィンドウ選択状態は維持）
+            DebugLogUtility.WriteLog("🔴 翻訳状態をアイドルに設定");
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
+                IsTranslationActive = false;
+                IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
+                // IsWindowSelectedとSelectedWindowは維持（再選択不要）
+                DebugLogUtility.WriteLog($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
+            });
 
-        var stopTranslationEvent = new StopTranslationRequestEvent();
-        await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
+            // 🚀 RACE CONDITION FIX: StopTranslationRequestEventを最優先で発行（Task.Run終了の影響を回避）
+            DebugLogUtility.WriteLog("🚀 [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行開始");
+            try
+            {
+                var stopTranslationEvent = new StopTranslationRequestEvent();
+                await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
+                stopEventPublished = true;
+                DebugLogUtility.WriteLog("✅ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行成功");
+            }
+            catch (Exception eventEx)
+            {
+                DebugLogUtility.WriteLog($"❌ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行失敗: {eventEx.Message}");
+                // イベント発行失敗でも継続（後でリトライ）
+            }
 
-        DebugLogUtility.WriteLog("✅ 翻訳停止処理完了");
-        // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 翻訳停止処理完了");
-        Logger?.LogInformation("Translation stopped successfully");
+            // オーバーレイを非表示にしてリセット（OCRリセットとは独立処理）
+            DebugLogUtility.WriteLog("🔄 オーバーレイ非表示・リセット開始");
+            try
+            {
+                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                DebugLogUtility.WriteLog("✅ オーバーレイ非表示完了");
+                await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
+                DebugLogUtility.WriteLog("✅ オーバーレイリセット完了");
+            }
+            catch (Exception overlayEx)
+            {
+                DebugLogUtility.WriteLog($"⚠️ オーバーレイ処理エラー（OCRリセットには影響なし）: {overlayEx.Message}");
+                // オーバーレイエラーはOCRリセットに影響しないため継続
+            }
+
+            DebugLogUtility.WriteLog("✅ 翻訳停止処理完了");
+            Logger?.LogInformation("Translation stopped successfully");
+        }
+        catch (Exception ex)
+        {
+            DebugLogUtility.WriteLog($"❌ StopTranslationAsync例外発生: {ex.Message}");
+            DebugLogUtility.WriteLog($"❌ StackTrace: {ex.StackTrace}");
+            Logger?.LogError(ex, "StopTranslationAsync中に例外発生");
+        }
+        finally
+        {
+            // StopTranslationRequestEventが未発行の場合、最終フォールバック実行
+            if (!stopEventPublished)
+            {
+                try
+                {
+                    DebugLogUtility.WriteLog("🔄 [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行");
+                    var fallbackStopEvent = new StopTranslationRequestEvent();
+                    await PublishEventAsync(fallbackStopEvent).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog("✅ [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行成功");
+                }
+                catch (Exception eventEx)
+                {
+                    DebugLogUtility.WriteLog($"❌ [FINAL_FALLBACK] 最終フォールバックイベント発行も失敗: {eventEx.Message}");
+                    Logger?.LogError(eventEx, "最終フォールバックStopTranslationRequestEvent発行失敗");
+                }
+            }
+        }
     }
 
     private async void ExecuteShowHide()

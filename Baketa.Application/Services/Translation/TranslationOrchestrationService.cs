@@ -58,6 +58,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // 実行制御
     private CancellationTokenSource? _automaticTranslationCts;
     private Task? _automaticTranslationTask;
+    private readonly object _ctsLock = new object(); // Phase 3.3: CTS管理のThread-safe保護
     private readonly SemaphoreSlim _singleTranslationSemaphore = new(1, 1);
     private readonly SemaphoreSlim _ocrExecutionSemaphore = new(1, 1);
     private CancellationTokenSource? _latestOcrRequestCts;
@@ -288,8 +289,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             
             _logger?.LogInformation("自動翻訳を開始します");
 
-            _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, _disposeCts.Token);
+            // Phase 3.3: CancellationTokenSource完全刷新（Stop→Start Token競合解決）
+            lock (_ctsLock)
+            {
+                // 🔥 CRITICAL FIX: 古いCTSの即座完全破棄
+                var oldCts = _automaticTranslationCts;
+                if (oldCts != null)
+                {
+                    try
+                    {
+                        oldCts.Cancel();
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTS Cancel完了");
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // 既に破棄済みの場合は無視
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTSは既に破棄済み");
+                    }
+                    finally
+                    {
+                        oldCts.Dispose();
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTS Dispose完了");
+                    }
+                }
+
+                // 🚀 新CTS即座生成
+                _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken, _disposeCts.Token);
+                _logger?.LogDebug("🔧 [PHASE3.3_FIX] 新CTS生成完了 - Hash: {TokenHash}", _automaticTranslationCts.Token.GetHashCode());
+            }
 
             _isAutomaticTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
@@ -418,10 +446,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
         try
         {
-            // キャンセルを要求
+            // Phase 3.3: 即座CTS完全破棄（finally待機なし）
+            CancellationTokenSource? ctsToDispose = null;
+            lock (_ctsLock)
+            {
+                ctsToDispose = _automaticTranslationCts;
+                _automaticTranslationCts = null; // 即座null設定でStart競合防止
+            }
+
+            // Lock外で即座Cancel + Dispose
+            if (ctsToDispose != null)
+            {
+                try
+                {
 #pragma warning disable CA1849 // CancellationTokenSource.Cancel()には非同期バージョンが存在しない
-            _automaticTranslationCts?.Cancel();
+                    ctsToDispose.Cancel();
 #pragma warning restore CA1849
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTS Cancel完了");
+                }
+                catch (ObjectDisposedException)
+                {
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTSは既に破棄済み");
+                }
+                finally
+                {
+                    ctsToDispose.Dispose();
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTS Dispose完了 - 即座実行");
+                }
+            }
 
             // タスクの完了を待機（タイムアウト付き）
             if (_automaticTranslationTask != null)
@@ -452,11 +504,16 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         }
         finally
         {
-            _automaticTranslationCts?.Dispose();
-            _automaticTranslationCts = null;
+            // Phase 3.3: 重複Dispose削除（既に即座Dispose済み）
+            lock (_ctsLock)
+            {
+                _automaticTranslationCts = null; // 安全のため再設定
+            }
             _automaticTranslationTask = null;
             _isAutomaticTranslationActive = false;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
+
+            _logger?.LogDebug("🔧 [PHASE3.3_STOP] Stop完了 - Token競合解決済み");
             
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
             lock (_lastTranslatedTextLock)

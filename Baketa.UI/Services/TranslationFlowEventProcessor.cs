@@ -16,6 +16,7 @@ using ReactiveUI;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.Translation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.UI.Services;
 
@@ -40,6 +41,7 @@ public class TranslationFlowEventProcessor :
     private readonly ISettingsService _settingsService;
     private readonly IOcrEngine _ocrEngine;
     private readonly IWindowManagerAdapter _windowManager;
+    private readonly IOcrFailureManager _ocrFailureManager;
     
     // 重複処理防止用
     private readonly HashSet<string> _processedEventIds = [];
@@ -61,7 +63,8 @@ public class TranslationFlowEventProcessor :
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
         IOcrEngine ocrEngine,
-        IWindowManagerAdapter windowManager)
+        IWindowManagerAdapter windowManager,
+        IOcrFailureManager ocrFailureManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -71,7 +74,8 @@ public class TranslationFlowEventProcessor :
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        
+        _ocrFailureManager = ocrFailureManager ?? throw new ArgumentNullException(nameof(ocrFailureManager));
+
         _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
 
@@ -333,6 +337,33 @@ public class TranslationFlowEventProcessor :
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
+
+            // 🔄 [OCR_RESET] OCR状態をリセット（Stop→Start後のOCR失敗問題対策）
+            Console.WriteLine("🔄 [Stop機能] OCR状態リセット実行中...");
+            _logger.LogInformation("🔄 [Stop機能] OCR状態リセット開始 - Stop→Start後のオーバーレイ非表示問題対策");
+            try
+            {
+                // ✅ クリーンアーキテクチャ準拠：抽象化に依存し直接メソッド呼び出し
+                _ocrFailureManager.ResetFailureCounter();
+
+                var failureCount = _ocrFailureManager.GetFailureCount();
+                var isAvailable = _ocrFailureManager.IsOcrAvailable;
+
+                Console.WriteLine($"✅ [Stop機能] OCR失敗カウンターリセット成功 - 現在の失敗回数: {failureCount}");
+                Console.WriteLine($"✅ [Stop機能] OCR利用可能状態: {(isAvailable ? "有効" : "無効")}");
+
+                _logger.LogInformation("🔄 Stop機能: OCR失敗カウンターリセット完了 - 現在の失敗回数: {FailureCount}, 利用可能: {IsAvailable}",
+                    failureCount, isAvailable);
+                _logger.LogInformation("🔄 Stop機能: PaddleOCR無効化状態を解除し、再利用可能状態に復旧");
+
+                Console.WriteLine("✅ [Stop機能] OCR状態リセット処理完了");
+                _logger.LogInformation("🚀 Stop機能: OCR状態リセット完了 - Stop→Start後の翻訳オーバーレイ表示問題を予防");
+            }
+            catch (Exception ocrResetEx)
+            {
+                Console.WriteLine($"⚠️ [Stop機能] OCR状態リセット中にエラー: {ocrResetEx.Message}");
+                _logger.LogWarning(ocrResetEx, "🔄 Stop機能: OCR状態リセット中にエラーが発生しましたが、処理を継続します");
+            }
 
             // 4. 🚀 Stop機能: CancellationTokenキャンセル → 遅延翻訳結果表示を確実に防止
             if (_currentTranslationCancellationSource != null)
