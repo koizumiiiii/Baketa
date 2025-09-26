@@ -21,15 +21,18 @@ namespace Baketa.Infrastructure.Platform.Adapters;
 public sealed class SafeImageAdapter : IWindowsImage
 {
     private readonly SafeImage _safeImage;
+    private readonly ISafeImageFactory _safeImageFactory;
     private bool _disposed;
 
     /// <summary>
-    /// SafeImageアダプターを初期化
+    /// SafeImageアダプターを初期化（Strategy B: OCRエンジン抽象化対応）
     /// </summary>
     /// <param name="safeImage">ラップするSafeImageインスタンス</param>
-    public SafeImageAdapter(SafeImage safeImage)
+    /// <param name="safeImageFactory">SafeImage生成用ファクトリー（型整合性確保）</param>
+    public SafeImageAdapter(SafeImage safeImage, ISafeImageFactory safeImageFactory)
     {
         _safeImage = safeImage ?? throw new ArgumentNullException(nameof(safeImage));
+        _safeImageFactory = safeImageFactory ?? throw new ArgumentNullException(nameof(safeImageFactory));
     }
 
     /// <summary>
@@ -102,9 +105,9 @@ public sealed class SafeImageAdapter : IWindowsImage
         using var graphics = Graphics.FromImage(croppedBitmap);
         graphics.DrawImage(bitmap, 0, 0, rect, GraphicsUnit.Pixel);
 
-        // 新しいSafeImageを作成する必要がある（今は暫定的にWindowsImageを返す）
-        // TODO: SafeImageFactoryを使用してSafeImageを生成し、SafeImageAdapterでラップする
-        return new WindowsImage(croppedBitmap);
+        // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
+        var safeImage = _safeImageFactory.CreateFromBitmap(croppedBitmap, rect.Width, rect.Height);
+        return new SafeImageAdapter(safeImage, _safeImageFactory);
     }
 
     /// <summary>
@@ -127,9 +130,9 @@ public sealed class SafeImageAdapter : IWindowsImage
             graphics.DrawImage(bitmap, 0, 0, width, height);
         }
 
-        // 新しいSafeImageを作成する必要がある（今は暫定的にWindowsImageを返す）
-        // TODO: SafeImageFactoryを使用してSafeImageを生成し、SafeImageAdapterでラップする
-        return new WindowsImage(resizedBitmap);
+        // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
+        var safeImage = _safeImageFactory.CreateFromBitmap(resizedBitmap, width, height);
+        return new SafeImageAdapter(safeImage, _safeImageFactory);
     }
 
     /// <summary>
@@ -204,9 +207,9 @@ public sealed class SafeImageAdapter : IWindowsImage
                 graphics.DrawImage(bitmap, 0, 0, width, height);
             }
 
-            // 新しいSafeImageを作成する必要がある（今は暫定的にWindowsImageを返す）
-            // TODO: SafeImageFactoryを使用してSafeImageを生成し、SafeImageAdapterでラップする
-            return new WindowsImage(resizedBitmap);
+            // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
+            var safeImage = _safeImageFactory.CreateFromBitmap(resizedBitmap, width, height);
+            return new SafeImageAdapter(safeImage, _safeImageFactory);
         }).ConfigureAwait(false);
     }
 
@@ -226,9 +229,9 @@ public sealed class SafeImageAdapter : IWindowsImage
             using var graphics = Graphics.FromImage(croppedBitmap);
             graphics.DrawImage(bitmap, 0, 0, rectangle, GraphicsUnit.Pixel);
 
-            // 新しいSafeImageを作成する必要がある（今は暫定的にWindowsImageを返す）
-            // TODO: SafeImageFactoryを使用してSafeImageを生成し、SafeImageAdapterでラップする
-            return new WindowsImage(croppedBitmap);
+            // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
+            var safeImage = _safeImageFactory.CreateFromBitmap(croppedBitmap, rectangle.Width, rectangle.Height);
+            return new SafeImageAdapter(safeImage, _safeImageFactory);
         }).ConfigureAwait(false);
     }
 
@@ -245,25 +248,25 @@ public sealed class SafeImageAdapter : IWindowsImage
         {
             try 
             {
-                // 🔍 Phase 3.10: SafeImageデバッグ情報
-                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ToByteArrayAsync開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}");
+                // 🔧 [PHASE3.2_DEBUG] SafeImageAdapter状態詳細ログ
+                Console.WriteLine($"🔧 [PHASE3.2_DEBUG] ToByteArrayAsync開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}, IsDisposed: {_safeImage.IsDisposed}");
                 
                 using var bitmap = CreateBitmapFromSafeImage();
                 
-                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}, PixelFormat: {bitmap.PixelFormat}");
+                Console.WriteLine($"🔧 [PHASE3.2_DEBUG] Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}, PixelFormat: {bitmap.PixelFormat}");
                 
                 using var memoryStream = new MemoryStream();
                 bitmap.Save(memoryStream, format ?? GdiImageFormat.Png);
                 
                 var result = memoryStream.ToArray();
-                Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.Save完了 - 出力データサイズ: {result.Length}bytes");
+                Console.WriteLine($"🔧 [PHASE3.2_DEBUG] Bitmap.Save完了 - 出力データサイズ: {result.Length}bytes");
                 
                 return result;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"🚨 [PHASE_3_10_ERROR] ToByteArrayAsync失敗: {ex.Message}");
-                Console.WriteLine($"🚨 [PHASE_3_10_ERROR] StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"🚨 [PHASE3.2_ERROR] ToByteArrayAsync失敗: {ex.Message}");
+                Console.WriteLine($"🚨 [PHASE3.2_ERROR] StackTrace: {ex.StackTrace}");
                 throw;
             }
         }).ConfigureAwait(false);

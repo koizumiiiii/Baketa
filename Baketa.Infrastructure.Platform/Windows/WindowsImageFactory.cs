@@ -46,7 +46,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
 
             // Phase 3.1: BitmapからSafeImageを生成
             var safeImage = CreateSafeImageFromBitmap(bitmap);
-            return new SafeImageAdapter(safeImage);
+            return new SafeImageAdapter(safeImage, _safeImageFactory);
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     // Phase 3.1: BitmapからSafeImageを生成
                     var safeImage = CreateSafeImageFromBitmap(bitmap);
                     bitmap.Dispose(); // 元のBitmapは破棄
-                    return new SafeImageAdapter(safeImage);
+                    return new SafeImageAdapter(safeImage, _safeImageFactory);
                 }
                 catch (Exception ex)
                 {
@@ -91,7 +91,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                     // Phase 3.1: BitmapからSafeImageを生成
                     var safeImage = CreateSafeImageFromBitmap(bitmap);
                     bitmap.Dispose(); // 元のBitmapは破棄
-                    return new SafeImageAdapter(safeImage);
+                    return new SafeImageAdapter(safeImage, _safeImageFactory);
                 }
                 catch (Exception ex)
                 {
@@ -127,7 +127,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(bitmap);
                 bitmap.Dispose(); // 元のBitmapは破棄
-                return new SafeImageAdapter(safeImage);
+                return new SafeImageAdapter(safeImage, _safeImageFactory);
             }).ConfigureAwait(false);
         }
 
@@ -181,7 +181,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(resizedBitmap);
                 resizedBitmap.Dispose(); // 元のBitmapは破棄
-                var result = new SafeImageAdapter(safeImage);
+                var result = new SafeImageAdapter(safeImage, _safeImageFactory);
                 resizedBitmap = null; // SafeImageが所有権を取得
                 return result;
             }
@@ -280,7 +280,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(croppedBitmap);
                 croppedBitmap.Dispose(); // 元のBitmapは破棄
-                var result = new SafeImageAdapter(safeImage);
+                var result = new SafeImageAdapter(safeImage, _safeImageFactory);
                 croppedBitmap = null; // SafeImageが所有権を取得
                 return result;
             }

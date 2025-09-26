@@ -64,7 +64,7 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, width, height);
 
             // SafeImageからBitmapを再構築
-            using var safeImageAdapter = new SafeImageAdapter(safeImage);
+            using var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
             var safeBitmap = safeImageAdapter.GetBitmap();
 
             // WindowsImageを作成し、WindowsImageAdapterでラップしてIImage対応
