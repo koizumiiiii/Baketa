@@ -104,6 +104,10 @@ namespace Baketa.Application.DI.Modules;
                 services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
             }
             
+            // 🚀 翻訳モデル事前ロード戦略 - Clean Architecture準拠実装
+            services.AddSingleton<Baketa.Application.Services.IApplicationInitializer,
+                Baketa.Application.Services.TranslationModelLoader>();
+
             // 🔧 PHASE 3: TranslationPipelineService DI Registration (Critical Issue対応)
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationPipelineService>(provider =>
             {

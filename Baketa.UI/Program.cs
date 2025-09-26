@@ -656,7 +656,16 @@ namespace Baketa.UI;
                     Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー: {ex.Message}");
                 }
             });
-            
+
+            // 🔥 UltraThink翻訳モデル事前ロード戦略 - Program.cs統合実装
+            var startMessage = "🔥🔥🔥 [PRELOAD] 翻訳モデル事前ロード戦略実行開始！ 🔥🔥🔥";
+            Console.WriteLine(startMessage);
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(startMessage);
+            _ = Task.Run(PreloadTranslationModelAsync);
+            var completedMessage = "🔥🔥🔥 [PRELOAD] 翻訳モデル事前ロード戦略バックグラウンド開始完了！ 🔥🔥🔥";
+            Console.WriteLine(completedMessage);
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completedMessage);
+
             // ReactiveUIスケジューラの設定
             ConfigureReactiveUI();
             
@@ -990,7 +999,79 @@ namespace Baketa.UI;
                 System.Diagnostics.Debug.WriteLine($"💥 OCRエンジン事前初期化エラー: {ex.Message}");
             }
         }
-        
+
+        /// <summary>
+        /// 翻訳モデルを事前ロードして初回翻訳6秒待機問題を解決
+        /// UltraThink翻訳モデル事前ロード戦略 - Program.cs統合実装
+        /// </summary>
+        private static async Task PreloadTranslationModelAsync()
+        {
+            try
+            {
+                var message = "🚀 [PRELOAD_START] 翻訳モデル事前ロード開始";
+                Console.WriteLine(message);
+                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(message);
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+
+                // ServiceProviderが利用可能になるまで待機
+                while (ServiceProvider == null)
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                    if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
+                    {
+                        var timeoutMessage = "⚠️ [PRELOAD_TIMEOUT] ServiceProvider初期化タイムアウト - 翻訳モデル事前ロードを中止";
+                        Console.WriteLine(timeoutMessage);
+                        Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(timeoutMessage);
+                        return;
+                    }
+                }
+
+                var initMessage = "🔄 [PRELOAD_INIT] ServiceProvider取得完了 - IApplicationInitializer解決開始";
+                Console.WriteLine(initMessage);
+                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(initMessage);
+
+                // IApplicationInitializerサービスを取得（Clean Architecture準拠）
+                var appInitializer = ServiceProvider.GetService<Baketa.Application.Services.IApplicationInitializer>();
+                if (appInitializer != null)
+                {
+                    var successMessage = "🔥 [PRELOAD] TranslationModelLoader取得成功 - バックグラウンド実行開始";
+                    Console.WriteLine(successMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(successMessage);
+
+                    try
+                    {
+                        // 翻訳モデルの事前初期化実行
+                        await appInitializer.InitializeAsync().ConfigureAwait(false);
+                        timer.Stop();
+
+                        var completedMessage = $"✅ [PRELOAD] 翻訳モデル事前ロード完了 - 初回翻訳は即座実行可能 (時間: {timer.ElapsedMilliseconds}ms)";
+                        Console.WriteLine(completedMessage);
+                        Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completedMessage);
+                    }
+                    catch (Exception preloadEx)
+                    {
+                        timer.Stop();
+                        var failedMessage = $"⚠️ [PRELOAD] 事前ロード失敗 - 従来動作継続: {preloadEx.Message} (経過時間: {timer.ElapsedMilliseconds}ms)";
+                        Console.WriteLine(failedMessage);
+                        Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(failedMessage);
+                    }
+                }
+                else
+                {
+                    timer.Stop();
+                    var notRegisteredMessage = $"ℹ️ [PRELOAD] IApplicationInitializer未登録 - 従来動作で継続 (経過時間: {timer.ElapsedMilliseconds}ms)";
+                    Console.WriteLine(notRegisteredMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(notRegisteredMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"💥 [PRELOAD_ERROR] 翻訳モデル事前ロードエラー: {ex.Message}";
+                Console.WriteLine(errorMessage);
+                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(errorMessage);
+            }
+        }
+
         // OPUS-MT削除済み: StartOpusMtPrewarmingAsyncメソッドはNLLB-200統一により不要
         
         /// <summary>
