@@ -210,6 +210,17 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        // 🔥 Phase 12.1: Translation Channel Readerバックグラウンドタスク開始（初回のみ）
+        if (_translationChannelReaderTask == null)
+        {
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動中...");
+            _translationChannelReaderTask = Task.Run(
+                () => ProcessTranslationChannelAsync(_disposalCts.Token),
+                _disposalCts.Token);
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了！");
+            _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了");
+        }
+
         if (_isInitialized)
             return;
 
@@ -230,17 +241,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             // 🎯 動的VRAM容量取得（8192MB固定問題解決）
             await DetectActualVramCapacityAsync(cancellationToken).ConfigureAwait(false);
 
-            // 🔥 Phase 12.1: Translation Channel Readerバックグラウンドタスク開始
-            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動中...");
-            _translationChannelReaderTask = Task.Run(
-                () => ProcessTranslationChannelAsync(_disposalCts.Token),
-                _disposalCts.Token);
-            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了！");
-
             _isInitialized = true;
 
             _logger.LogInformation("HybridResourceManager初期化完了 - 動的リソース管理開始");
-            _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了");
 
             if (_settings.EnableDetailedLogging)
             {
