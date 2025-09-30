@@ -9,6 +9,9 @@ transformers>=4.30.0
 torch>=2.0.0
 sentencepiece>=0.1.99
 
+# CTranslate2 for optimized inference (80% memory reduction)
+ctranslate2>=3.20.0
+
 # Optional: GPU support (uncomment if CUDA is available)
 # torch[cuda]>=2.0.0
 

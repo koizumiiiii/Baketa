@@ -18,6 +18,7 @@ using Baketa.UI.Views;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.Infrastructure.Platform.Windows.Capture;
+using Baketa.Application.Services;
 using ReactiveUI;
 
 namespace Baketa.UI;
@@ -140,7 +141,10 @@ internal sealed partial class App : Avalonia.Application
                             }
                         });
                     }
-                    
+
+                    // ✅ [FIXED] UltraPhase 14.6: TranslationInitializationService手動実行削除
+                    // HostedService登録復旧により自動実行されるため手動実行コードは不要
+
                     Console.WriteLine("🩺 [APP_INIT] 診断システム初期化非同期開始完了");
                 }
                 else
@@ -617,6 +621,48 @@ internal sealed partial class App : Avalonia.Application
                     }
                     throw; // 致命的なエラーなので再スロー
                 }
+            }
+
+            // 🚀 翻訳モデル事前ロード戦略 - Clean Architecture準拠実装
+            Console.WriteLine("🚀 [APP_INIT] 翻訳エンジン事前ロード開始済み");
+            try
+            {
+                // Clean Architecture準拠：DIコンテナから抽象化されたサービスを取得
+                var serviceProvider = Program.ServiceProvider;
+                if (serviceProvider != null)
+                {
+                    var appInitializer = serviceProvider.GetService<IApplicationInitializer>();
+                    if (appInitializer != null)
+                    {
+                        Console.WriteLine("🔥 [PRELOAD] TranslationModelLoader取得成功 - バックグラウンド実行開始");
+
+                        // UIスレッドをブロックしないようにバックグラウンドで実行
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await appInitializer.InitializeAsync().ConfigureAwait(false);
+                                Console.WriteLine("✅ [PRELOAD] 翻訳モデル事前ロード完了 - 初回翻訳は即座実行可能");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"⚠️ [PRELOAD] 事前ロード失敗 - 従来動作継続: {ex.Message}");
+                                _logger?.LogWarning(ex, "翻訳モデル事前ロード失敗 - 従来の遅延初期化で継続");
+                            }
+                        });
+
+                        Console.WriteLine("🎯 [PRELOAD] バックグラウンド事前ロード開始完了");
+                    }
+                    else
+                    {
+                        Console.WriteLine("ℹ️ [PRELOAD] IApplicationInitializer未登録 - 従来動作で継続");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ [PRELOAD] 事前ロードサービス取得失敗 - 従来動作継続: {ex.Message}");
+                _logger?.LogWarning(ex, "事前ロードサービスの取得に失敗 - 従来動作を継続");
             }
 
             base.OnFrameworkInitializationCompleted();

@@ -28,8 +28,9 @@ namespace Baketa.UI;
     {
         /// <summary>
         /// DIコンテナとサービスプロバイダー
+        /// UltraPhase 4.3 FIX: volatile修飾子追加でマルチスレッド可視性問題解決
         /// </summary>
-        public static ServiceProvider? ServiceProvider { get; private set; }
+        public static volatile ServiceProvider? ServiceProvider;
         
         /// <summary>
         /// EventHandler初期化完了フラグ（UI安全性向上）
@@ -644,18 +645,52 @@ namespace Baketa.UI;
             
             // 🚀 CRITICAL: IHostedService手動起動（ModelPrewarmingService等を確実に起動）
             Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動開始！ 🚀🚀🚀");
-            Task.Run(async () =>
+            try
             {
-                try
+                var hostedServiceTask = Task.Run(async () =>
                 {
-                    await StartHostedServicesAsync().ConfigureAwait(false);
-                    Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動完了！ 🚀🚀🚀");
-                }
-                catch (Exception ex)
+                    try
+                    {
+                        Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動開始！");
+                        await StartHostedServicesAsync().ConfigureAwait(false);
+                        Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動完了！");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー: {ex.GetType().Name}");
+                        Console.WriteLine($"💥 [CRITICAL] Message: {ex.Message}");
+                        Console.WriteLine($"💥 [CRITICAL] StackTrace: {ex.StackTrace}");
+                        if (ex.InnerException != null)
+                        {
+                            Console.WriteLine($"💥 [CRITICAL] InnerException: {ex.InnerException.GetType().Name}");
+                            Console.WriteLine($"💥 [CRITICAL] InnerMessage: {ex.InnerException.Message}");
+                        }
+                        throw; // Re-throw to explicitly fail
+                    }
+                });
+
+                // 同期的に待機してエラーを可視化
+                hostedServiceTask.Wait();
+                Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動同期待機完了！ 🚀🚀🚀");
+            }
+            catch (AggregateException aggEx)
+            {
+                Console.WriteLine($"💥💥💥 [CRITICAL] AggregateException発生: {aggEx.GetType().Name}");
+                foreach (var innerEx in aggEx.InnerExceptions)
                 {
-                    Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー: {ex.Message}");
+                    Console.WriteLine($"💥 [CRITICAL] InnerException: {innerEx.GetType().Name}");
+                    Console.WriteLine($"💥 [CRITICAL] InnerMessage: {innerEx.Message}");
+                    Console.WriteLine($"💥 [CRITICAL] InnerStackTrace: {innerEx.StackTrace}");
                 }
-            });
+                throw; // Re-throw to explicitly fail
+            }
+            catch (Exception directEx)
+            {
+                Console.WriteLine($"💥💥💥 [CRITICAL] 直接Exception発生: {directEx.GetType().Name}");
+                Console.WriteLine($"💥 [CRITICAL] Message: {directEx.Message}");
+                Console.WriteLine($"💥 [CRITICAL] StackTrace: {directEx.StackTrace}");
+                throw; // Re-throw to explicitly fail
+            }
 
             // 🔥 UltraThink翻訳モデル事前ロード戦略 - Program.cs統合実装
             var startMessage = "🔥🔥🔥 [PRELOAD] 翻訳モデル事前ロード戦略実行開始！ 🔥🔥🔥";
@@ -1034,27 +1069,59 @@ namespace Baketa.UI;
                 var appInitializer = ServiceProvider.GetService<Baketa.Application.Services.IApplicationInitializer>();
                 if (appInitializer != null)
                 {
+                    // 🔍 UltraPhase 9.1: appInitializer型の詳細確認
+                    var actualType = appInitializer.GetType().FullName;
+                    var typeInfoMessage = $"🔍 [TYPE_INFO] appInitializer実際の型: {actualType}";
+                    Console.WriteLine(typeInfoMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(typeInfoMessage);
+
+                    var isTranslationModelLoader = appInitializer is Baketa.Application.Services.TranslationModelLoader;
+                    var loaderCheckMessage = $"🔍 [TYPE_INFO] TranslationModelLoader型チェック: {isTranslationModelLoader}";
+                    Console.WriteLine(loaderCheckMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(loaderCheckMessage);
+
                     var successMessage = "🔥 [PRELOAD] TranslationModelLoader取得成功 - バックグラウンド実行開始";
                     Console.WriteLine(successMessage);
                     Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(successMessage);
 
-                    try
-                    {
-                        // 翻訳モデルの事前初期化実行
-                        await appInitializer.InitializeAsync().ConfigureAwait(false);
-                        timer.Stop();
+                    // 🔥 UltraPhase 4 FIX: Task.Run実行追跡のため明示的デバッグログ追加
+                    var taskRunStartMessage = "🎯 [TASK_RUN_START] Task.Run呼び出し直前 - ラムダ式開始確認";
+                    Console.WriteLine(taskRunStartMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(taskRunStartMessage);
 
-                        var completedMessage = $"✅ [PRELOAD] 翻訳モデル事前ロード完了 - 初回翻訳は即座実行可能 (時間: {timer.ElapsedMilliseconds}ms)";
-                        Console.WriteLine(completedMessage);
-                        Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completedMessage);
-                    }
-                    catch (Exception preloadEx)
+                    // 🔥 Phase 2.2 FIX: メインスレッドブロック回避のため、Task.Runでバックグラウンド実行
+                    var preloadTask = Task.Run(async () =>
                     {
-                        timer.Stop();
-                        var failedMessage = $"⚠️ [PRELOAD] 事前ロード失敗 - 従来動作継続: {preloadEx.Message} (経過時間: {timer.ElapsedMilliseconds}ms)";
-                        Console.WriteLine(failedMessage);
-                        Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(failedMessage);
-                    }
+                        try
+                        {
+                            var lambdaStartMessage = "🎯 [LAMBDA_START] Task.Runラムダ式内部実行開始";
+                            Console.WriteLine(lambdaStartMessage);
+                            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(lambdaStartMessage);
+
+                            var initStartMessage = "🎯 [INIT_START] appInitializer.InitializeAsync()呼び出し直前";
+                            Console.WriteLine(initStartMessage);
+                            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(initStartMessage);
+
+                            // 翻訳モデルの事前初期化実行
+                            await appInitializer.InitializeAsync().ConfigureAwait(false);
+                            timer.Stop();
+
+                            var completedMessage = $"✅ [PRELOAD] 翻訳モデル事前ロード完了 - 初回翻訳は即座実行可能 (時間: {timer.ElapsedMilliseconds}ms)";
+                            Console.WriteLine(completedMessage);
+                            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completedMessage);
+                        }
+                        catch (Exception preloadEx)
+                        {
+                            timer.Stop();
+                            var failedMessage = $"⚠️ [PRELOAD] 事前ロード失敗 - 従来動作継続: {preloadEx.Message} (経過時間: {timer.ElapsedMilliseconds}ms)";
+                            Console.WriteLine(failedMessage);
+                            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(failedMessage);
+                        }
+                    });
+
+                    var taskRunEndMessage = "🎯 [TASK_RUN_END] Task.Run呼び出し完了 - ラムダ式実行中";
+                    Console.WriteLine(taskRunEndMessage);
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(taskRunEndMessage);
                 }
                 else
                 {

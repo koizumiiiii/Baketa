@@ -201,20 +201,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
             
-            // 🚀 [DUPLICATE_FIX] TimedAggregator機能による重複制御 - アプローチ2.5実装
-            if (!_textChunkAggregatorService.IsFeatureEnabled)
-            {
-                // TimedAggregator無効時：従来通り即座にイベント発行
-                _logger?.LogInformation("🔥 [DUPLICATE_FIX] TimedAggregator無効のため、OCR完了イベントを即座発行 - 個別処理モード");
-                await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
-                _logger?.LogInformation("🔥 [DUPLICATE_FIX] OCR完了イベント発行完了 - 個別処理による翻訳開始");
-            }
-            else
-            {
-                // TimedAggregator有効時：集約処理に委ね、重複イベント発行を防止
-                _logger?.LogInformation("🚀 [DUPLICATE_FIX] TimedAggregator有効のため、OCR完了イベント即座発行をスキップ - 集約後の統一イベント発行に委ねる");
-                Console.WriteLine("🚀 [DUPLICATE_FIX] 重複解消: 個別イベント発行をスキップ、統合処理のみ実行");
-            }
+            // 🚀 [PHASE10_FIX] 個別イベント発行を完全無効化 - バッチ翻訳処理のみ実行
+            // 理由: PublishOcrCompletedEventAsync()により個別翻訳が実行されるが、結果がtextChunksに反映されない
+            //       二重処理（個別翻訳 + バッチ翻訳）を防止し、バッチ翻訳結果のみを使用
+            _logger?.LogInformation("🚀 [PHASE10_FIX] 個別イベント発行をスキップ - バッチ翻訳処理のみ実行");
+            Console.WriteLine("🚀 [PHASE10_FIX] 個別翻訳スキップ → バッチ翻訳処理のみ実行");
+
+            // 🚨 [PHASE10_FIX] 従来のTimedAggregator判定は無効化
+            // if (!_textChunkAggregatorService.IsFeatureEnabled)
+            // {
+            //     // TimedAggregator無効時：従来通り即座にイベント発行
+            //     _logger?.LogInformation("🔥 [DUPLICATE_FIX] TimedAggregator無効のため、OCR完了イベントを即座発行 - 個別処理モード");
+            //     await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
+            //     _logger?.LogInformation("🔥 [DUPLICATE_FIX] OCR完了イベント発行完了 - 個別処理による翻訳開始");
+            // }
+            // else
+            // {
+            //     // TimedAggregator有効時：集約処理に委ね、重複イベント発行を防止
+            //     _logger?.LogInformation("🚀 [DUPLICATE_FIX] TimedAggregator有効のため、OCR完了イベント即座発行をスキップ - 集約後の統一イベント発行に委ねる");
+            //     Console.WriteLine("🚀 [DUPLICATE_FIX] 重複解消: 個別イベント発行をスキップ、統合処理のみ実行");
+            // }
             
             // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
             Console.WriteLine("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");

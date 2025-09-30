@@ -13,6 +13,7 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Infrastructure.OCR.BatchProcessing;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,6 +63,11 @@ internal static class UIServiceCollectionExtensions
         // ローディングオーバーレイマネージャー
         services.AddSingleton<LoadingOverlayManager>();
         
+        // IOcrFailureManagerインターフェース登録（IBatchOcrProcessorと同じインスタンス）
+        services.AddSingleton<IOcrFailureManager>(provider =>
+            provider.GetRequiredService<IBatchOcrProcessor>() as IOcrFailureManager
+            ?? throw new InvalidOperationException("IBatchOcrProcessor must implement IOcrFailureManager"));
+
         // 翻訳フロー統合イベントプロセッサー
         services.AddSingleton<TranslationFlowEventProcessor>(provider =>
         {
@@ -73,7 +79,8 @@ internal static class UIServiceCollectionExtensions
             var settingsService = provider.GetRequiredService<ISettingsService>();
             var ocrEngine = provider.GetRequiredService<IOcrEngine>();
             var windowManager = provider.GetRequiredService<IWindowManagerAdapter>();
-            
+            var ocrFailureManager = provider.GetRequiredService<IOcrFailureManager>(); // クリーンアーキテクチャ準拠
+
             return new TranslationFlowEventProcessor(
                 logger,
                 eventAggregator,
@@ -82,7 +89,8 @@ internal static class UIServiceCollectionExtensions
                 translationService,
                 settingsService,
                 ocrEngine,
-                windowManager);
+                windowManager,
+                ocrFailureManager); // IServiceProviderの代わりに抽象化を注入
         });
         
         // メインオーバーレイViewModel

@@ -405,7 +405,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 🔧 UltraThink Phase 9.18: 重複登録削除 - TranslationModuleで既に登録済み
             // services.AddSingleton<ITranslationService, DefaultTranslationService>(); // TranslationServiceExtensions.AddTranslationServices()で登録
-            
+
             Console.WriteLine("✅ Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了");
         }
         
@@ -604,11 +604,38 @@ namespace Baketa.Infrastructure.DI.Modules;
                     logger?.LogError(ex, "❌ [PHASE3.2] HybridResourceManager注入失敗 - 依存関係問題: {Message}", ex.Message);
                     logger?.LogWarning("⚠️ [PHASE3.2] HybridResourceManagerなしで継続（レガシーモード）");
                 }
-                
+
+                // 🔥 Phase 2.2.9: IPythonServerManagerとICircuitBreakerの注入追加
+                IPythonServerManager? serverManager = null;
+                try
+                {
+                    serverManager = provider.GetRequiredService<IPythonServerManager>();
+                    logger?.LogInformation("✅ [PHASE2.2.9] PythonServerManager注入成功 - 動的ポート管理アクティブ");
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "❌ [PHASE2.2.9] PythonServerManager注入失敗: {Message}", ex.Message);
+                    logger?.LogWarning("⚠️ [PHASE2.2.9] PythonServerManagerなしで継続（固定ポートモード）");
+                }
+
+                ICircuitBreaker<TranslationResponse>? circuitBreaker = null;
+                try
+                {
+                    circuitBreaker = provider.GetRequiredService<ICircuitBreaker<TranslationResponse>>();
+                    logger?.LogInformation("✅ [PHASE2.2.9] CircuitBreaker注入成功 - エラー回復機能アクティブ");
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "❌ [PHASE2.2.9] CircuitBreaker注入失敗: {Message}", ex.Message);
+                    logger?.LogWarning("⚠️ [PHASE2.2.9] CircuitBreakerなしで継続（エラー回復機能無効）");
+                }
+
                 logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 3.2 VRAMモニタリング）");
                 logger?.LogInformation("🎯 [PHASE3.2-DI] HybridResourceManager最終状態: {ResourceManagerExists}", resourceManager != null);
-                
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, languageConfig, null, null, resourceManager);
+                logger?.LogInformation("🎯 [PHASE2.2.9-DI] PythonServerManager最終状態: {ServerManagerExists}", serverManager != null);
+                logger?.LogInformation("🎯 [PHASE2.2.9-DI] CircuitBreaker最終状態: {CircuitBreakerExists}", circuitBreaker != null);
+
+                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, languageConfig, serverManager, circuitBreaker, resourceManager);
             });
             
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>

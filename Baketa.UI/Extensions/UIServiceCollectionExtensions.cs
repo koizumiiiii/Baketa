@@ -87,7 +87,7 @@ public static class UIServiceCollectionExtensions
             options.StatusUpdateIntervalSeconds = 5; // テスト用に短縮
             options.AutoSaveSettings = false; // テスト時は自動保存無効
             options.DefaultEngineStrategy = "LocalOnly";
-            options.DefaultLanguagePair = "ja-en";
+            options.DefaultLanguagePair = "en-ja";
             options.DefaultChineseVariant = "Simplified";
             options.DefaultTranslationStrategy = "Direct";
         });

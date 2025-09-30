@@ -263,6 +263,7 @@ namespace Baketa.UI.ViewModels;
             SubscribeToEvent<CaptureEvents.CaptureStatusChangedEvent>(OnCaptureStatusChanged);
             SubscribeToEvent<TranslationEvents.TranslationSettingsChangedEvent>(OnTranslationSettingsChanged);
             SubscribeToEvent<TranslationEvents.TranslationErrorEvent>(OnTranslationError);
+            SubscribeToEvent<EventTypes.PythonServerStatusChangedEvent>(HandleAsync);
         }
         
         /// <summary>

@@ -118,4 +118,24 @@ namespace Baketa.Core.Translation.Models;
 
             return new LanguagePair { SourceLanguage = Language.FromCode(parts[0]), TargetLanguage = Language.FromCode(parts[1]) };
         }
+
+        /// <summary>
+        /// サーバー管理用の標準化されたキーを生成
+        /// STEP7 IsReady失敗問題の根本解決 - 一貫した言語ペアキー形式
+        /// </summary>
+        /// <returns>標準化された言語ペアキー（"source-target"形式）</returns>
+        public string ToServerKey()
+        {
+            return $"{SourceLanguage.Code}-{TargetLanguage.Code}";
+        }
+
+        /// <summary>
+        /// ソース言語コードを取得
+        /// </summary>
+        public string SourceCode => SourceLanguage?.Code ?? string.Empty;
+
+        /// <summary>
+        /// ターゲット言語コードを取得
+        /// </summary>
+        public string TargetCode => TargetLanguage?.Code ?? string.Empty;
     }

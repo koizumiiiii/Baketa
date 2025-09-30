@@ -77,14 +77,17 @@ public sealed class CaptureModule : ServiceModuleBase
         
         // 適応的キャプチャサービスアダプター
         services.AddSingleton<AdaptiveCaptureServiceAdapter>(provider => {
-            try 
+            try
             {
                 var adaptiveService = provider.GetRequiredService<AdaptiveCaptureService>();
                 var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AdaptiveCaptureServiceAdapter>>();
-                
+                var changeDetectionService = provider.GetService<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
+
                 logger.LogDebug("AdaptiveCaptureServiceAdapter インスタンス作成");
-                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger);
-                logger.LogInformation("AdaptiveCaptureServiceAdapter 登録完了");
+                logger.LogInformation($"🎯 [PHASE_C] EnhancedImageChangeDetectionService統合: {(changeDetectionService != null ? "有効" : "無効")}");
+
+                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger, changeDetectionService);
+                logger.LogInformation("AdaptiveCaptureServiceAdapter 登録完了 - Phase C画面変化検知機能統合済み");
                 return adapter;
             }
             catch (Exception ex)

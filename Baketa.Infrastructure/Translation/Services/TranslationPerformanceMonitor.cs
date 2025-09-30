@@ -18,7 +18,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
     private readonly ILogger<TranslationPerformanceMonitor> _logger;
     private readonly ConcurrentDictionary<string, PerformanceMetrics> _engineMetrics = new();
     private readonly ConcurrentQueue<TranslationTimingData> _recentTimings = new();
-    private readonly System.Threading.Timer _reportTimer;
+    private System.Threading.Timer? _reportTimer;
     private readonly int _targetLatencyMs;
     private readonly int _maxTimingRecords;
     
@@ -37,15 +37,35 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _targetLatencyMs = targetLatencyMs;
         _maxTimingRecords = maxTimingRecords;
-        
-        // 定期レポート（1分ごと）
-        _reportTimer = new System.Threading.Timer(
-            callback: _ => GeneratePerformanceReport(),
-            state: null,
-            dueTime: TimeSpan.FromMinutes(1),
-            period: TimeSpan.FromMinutes(1));
-        
+
+        // 🔧 UltraPhase 8: Timer初期化を遅延させてDI初期化ハング問題を解決
+        // DI初期化中のTimer作成は危険なため、初回使用時まで遅延
+        _reportTimer = null;
+
         _logger.LogInformation("TranslationPerformanceMonitor初期化 - 目標レイテンシ: {TargetMs}ms", _targetLatencyMs);
+    }
+
+    /// <summary>
+    /// 遅延Timer初期化（初回使用時のみ実行）
+    /// </summary>
+    private void EnsureTimerInitialized()
+    {
+        if (_reportTimer == null)
+        {
+            lock (this)
+            {
+                if (_reportTimer == null)
+                {
+                    _reportTimer = new System.Threading.Timer(
+                        callback: _ => GeneratePerformanceReport(),
+                        state: null,
+                        dueTime: TimeSpan.FromMinutes(1),
+                        period: TimeSpan.FromMinutes(1));
+
+                    _logger.LogInformation("🔧 [DELAYED_INIT] Timer初期化完了 - パフォーマンスレポート開始");
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -56,6 +76,8 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
+        // 🔧 UltraPhase 8: 初回使用時にTimer遅延初期化
+        EnsureTimerInitialized();
         var stopwatch = Stopwatch.StartNew();
         var engineName = engine.Name;
         
@@ -135,6 +157,9 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         IReadOnlyList<TranslationRequest> requests,
         CancellationToken cancellationToken = default)
     {
+        // 🔧 UltraPhase 8: 初回使用時にTimer遅延初期化
+        EnsureTimerInitialized();
+
         var stopwatch = Stopwatch.StartNew();
         var engineName = engine.Name;
         

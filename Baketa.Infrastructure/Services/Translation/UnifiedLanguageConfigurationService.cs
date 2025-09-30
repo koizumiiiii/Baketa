@@ -122,8 +122,8 @@ public sealed class UnifiedLanguageConfigurationService : ILanguageConfiguration
     {
         try
         {
-            var sourceCode = settings.DefaultSourceLanguage ?? "ja";
-            var targetCode = settings.DefaultTargetLanguage ?? "en";
+            var sourceCode = settings.DefaultSourceLanguage ?? "en";
+            var targetCode = settings.DefaultTargetLanguage ?? "ja";
 
             var source = Language.FromCode(sourceCode);
             var target = Language.FromCode(targetCode);

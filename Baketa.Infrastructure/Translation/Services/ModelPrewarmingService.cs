@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Models.Translation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +22,7 @@ public sealed class ModelPrewarmingService : IHostedService, IDisposable
     private readonly IPythonServerManager _pythonServerManager;
     private readonly ModelCacheManager _modelCacheManager;
     private readonly IEventAggregator _eventAggregator;
+    private readonly ILanguageConfigurationService _languageConfig;
     private readonly ILogger<ModelPrewarmingService> _logger;
     
     private CancellationTokenSource? _cancellationTokenSource;
@@ -31,11 +33,13 @@ public sealed class ModelPrewarmingService : IHostedService, IDisposable
         IPythonServerManager pythonServerManager,
         ModelCacheManager modelCacheManager,
         IEventAggregator eventAggregator,
+        ILanguageConfigurationService languageConfig,
         ILogger<ModelPrewarmingService> logger)
     {
         _pythonServerManager = pythonServerManager ?? throw new ArgumentNullException(nameof(pythonServerManager));
         _modelCacheManager = modelCacheManager ?? throw new ArgumentNullException(nameof(modelCacheManager));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -153,8 +157,13 @@ public sealed class ModelPrewarmingService : IHostedService, IDisposable
                 _logger.LogInformation("🔄 Pythonサーバー起動試行 {Attempt}/{MaxRetries} (Cache: {IsCache})", 
                     attempt, maxRetries, isFromCache);
                 
-                // デフォルト言語ペア（en-ja）でサーバー起動
-                var serverInfo = await _pythonServerManager.StartServerAsync("en-ja").ConfigureAwait(false);
+                // 現在の言語設定に基づくサーバー起動（STEP7 IsReady失敗修正）
+                var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+                var languagePairKey = currentLanguagePair.ToServerKey();
+
+                _logger.LogInformation("🔄 動的言語ペア使用: {LanguagePairKey} (ハードコード'en-ja'から修正)", languagePairKey);
+
+                var serverInfo = await _pythonServerManager.StartServerAsync(languagePairKey).ConfigureAwait(false);
                 
                 _logger.LogInformation("🎉 事前ウォーミング成功: Port {Port}", serverInfo.Port);
                 

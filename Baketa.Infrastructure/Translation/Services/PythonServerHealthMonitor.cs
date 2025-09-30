@@ -535,18 +535,20 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             
             if (defaultEngine == TranslationEngine.NLLB200)
             {
-                // NLLB-200サーバー使用
-                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-                    @"..\..\..\..\scripts\nllb_translation_server.py");
-                    
+                // CTranslate2版NLLB-200サーバー優先使用
+                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    @"..\..\..\..\scripts\nllb_translation_server_ct2.py");
+
                 if (!File.Exists(serverScriptPath))
                 {
+                    // フォールバック: 旧版サーバー（互換性維持）
                     serverScriptPath = @"scripts\nllb_translation_server.py";
+                    _logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Path}", serverScriptPath);
                 }
-                
+
                 // NLLB-200用のポート設定（動的ポート範囲に統一）
                 _currentServerPort = 5556;
-                
+
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200高品質翻訳サーバーを起動: {ScriptPath} Port:{Port}", serverScriptPath, _currentServerPort);
             }
             else

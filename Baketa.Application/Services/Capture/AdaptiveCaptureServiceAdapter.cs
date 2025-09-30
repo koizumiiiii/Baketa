@@ -17,10 +17,12 @@ namespace Baketa.Application.Services.Capture;
 /// </summary>
 public partial class AdaptiveCaptureServiceAdapter(
     IAdaptiveCaptureService adaptiveCaptureService,
-    ILogger<AdaptiveCaptureServiceAdapter> logger) : ICaptureService, IDisposable
+    ILogger<AdaptiveCaptureServiceAdapter> logger,
+    IImageChangeDetectionService? imageChangeDetectionService = null) : ICaptureService, IDisposable
 {
     private readonly IAdaptiveCaptureService _adaptiveCaptureService = adaptiveCaptureService ?? throw new ArgumentNullException(nameof(adaptiveCaptureService));
     private readonly ILogger<AdaptiveCaptureServiceAdapter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IImageChangeDetectionService? _imageChangeDetectionService = imageChangeDetectionService;
     private ServicesCaptureOptions _currentOptions = new();
     private bool _disposed;
 
@@ -176,23 +178,50 @@ public partial class AdaptiveCaptureServiceAdapter(
     {
         try
         {
-            // 基本的な差分検出の実装
-            // より高度な差分検出は適応的キャプチャシステム内で実装される
+            // 🚀 [PHASE_C_IMPLEMENTATION] EnhancedImageChangeDetectionServiceを活用した3段階フィルタリング
             if (previousImage == null || currentImage == null)
+            {
+                _logger.LogTrace("🎯 [PHASE_C] 画像がnullのため変更ありと判定");
                 return true;
+            }
 
             // 画像サイズが異なる場合は変更ありとみなす
             if (previousImage.Width != currentImage.Width || previousImage.Height != currentImage.Height)
+            {
+                _logger.LogTrace("🎯 [PHASE_C] 画像サイズ変更検出: {PrevSize} → {CurrentSize}",
+                    $"{previousImage.Width}x{previousImage.Height}",
+                    $"{currentImage.Width}x{currentImage.Height}");
                 return true;
+            }
 
-            // 簡易的な差分検出（より高度な実装は将来的に適応的キャプチャシステムに移行）
-            await Task.CompletedTask.ConfigureAwait(false);
-            return true; // 一時的に常に変更ありとする
+            // EnhancedImageChangeDetectionServiceが利用可能な場合は高度な3段階フィルタリングを使用
+            if (_imageChangeDetectionService != null)
+            {
+                _logger.LogTrace("🎯 [PHASE_C] EnhancedImageChangeDetectionService使用 - 3段階フィルタリング開始");
+
+                var changeResult = await _imageChangeDetectionService.DetectChangeAsync(
+                    previousImage,
+                    currentImage,
+                    "adaptive_capture_adapter", // 一意のコンテキストID
+                    CancellationToken.None).ConfigureAwait(false);
+
+                _logger.LogTrace("🎯 [PHASE_C] 画面変化検知結果: {HasChanged}, Stage: {DetectionStage}, 変化率: {ChangePercentage:F3}%, 処理時間: {ProcessingTimeMs}ms",
+                    changeResult.HasChanged,
+                    changeResult.DetectionStage,
+                    changeResult.ChangePercentage * 100,
+                    changeResult.ProcessingTime.TotalMilliseconds);
+
+                return changeResult.HasChanged;
+            }
+
+            // フォールバック: EnhancedImageChangeDetectionServiceが利用できない場合は基本検出
+            _logger.LogTrace("🎯 [PHASE_C] EnhancedImageChangeDetectionService未利用 - 基本検出にフォールバック");
+            return true; // 安全のため変更ありとする
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "差分検出でエラー");
-            return true; // エラー時は変更ありとみなす
+            _logger.LogError(ex, "🚨 [PHASE_C] 画面変化検知でエラー - 安全のため変更ありと判定");
+            return true; // エラー時は変更ありとみなす（安全性優先）
         }
     }
 

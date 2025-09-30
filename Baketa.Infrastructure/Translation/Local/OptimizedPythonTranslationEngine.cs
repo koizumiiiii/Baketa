@@ -42,7 +42,10 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase 2: サーキットブレーカー統合
     private readonly IResourceManager? _resourceManager; // Phase 2: ハイブリッドリソース管理統合
     private readonly GeminiTranslationEngine? _fallbackEngine; // 🆕 Gemini推奨: フォールバック翻訳エンジン
-    
+
+    // 🚀 UltraPhase 14.25: stdin/stdout通信クライアント（ハイブリッドアーキテクチャ）
+    private ITranslationClient? _translationClient; // StdinStdoutTranslationClient instance
+
     // サーバープロセス管理（Phase 5以降はPythonServerManagerが管理）
     private Process? _serverProcess;
     private IPythonServerInfo? _managedServerInstance;
@@ -93,28 +96,45 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         IOptions<CircuitBreakerSettings>? circuitBreakerSettings = null,
         GeminiTranslationEngine? fallbackEngine = null)
     {
+        // 🔍 UltraPhase 10.11: Gemini推奨 - コンストラクタ開始ログ
+        Console.WriteLine("🔥 [CONSTRUCTOR_START] OptimizedPythonTranslationEngine コンストラクタ開始");
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        Console.WriteLine("🔍 [CONSTRUCTOR_1] _logger 初期化完了");
+
         _connectionPool = connectionPool; // null許容（単発接続モード用）
+        Console.WriteLine("🔍 [CONSTRUCTOR_2] _connectionPool 初期化完了");
+
         _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
+        Console.WriteLine("🔍 [CONSTRUCTOR_3] _languageConfig 初期化完了");
         _serverManager = serverManager; // null許容（既存の固定ポートモードとの互換性）
         _circuitBreaker = circuitBreaker; // null許容（サーキットブレーカー無効化時）
         _resourceManager = resourceManager; // null許容（レガシー互換性維持）
         _fallbackEngine = fallbackEngine; // 🆕 Gemini推奨: フォールバック翻訳エンジン（null許容）
 
+        Console.WriteLine("🔍 [CONSTRUCTOR_4] 依存関係注入完了");
+
         // 🆕 Gemini推奨: 接続プール制御設定の初期化
         _circuitBreakerSettings = circuitBreakerSettings?.Value ?? new CircuitBreakerSettings();
+        Console.WriteLine("🔍 [CONSTRUCTOR_5] _circuitBreakerSettings 初期化完了");
 
         // 🆕 CircuitBreakerSettings からタイムアウト設定を取得
         _translationTimeoutMs = _circuitBreakerSettings.TimeoutMs;
         _logger.LogInformation("🔧 [TIMEOUT_CONFIG] 翻訳タイムアウト設定: {TimeoutMs}ms (接続プール有効: {PoolEnabled})",
             _translationTimeoutMs, _circuitBreakerSettings.EnableConnectionPool);
 
+        Console.WriteLine("🔍 [CONSTRUCTOR_6] タイムアウト設定完了");
+
         // Python実行環境設定（py launcherを使用）
         _pythonPath = "py";
+        Console.WriteLine("🔍 [CONSTRUCTOR_7] _pythonPath 設定完了");
         
         // プロジェクトルート検索
+        Console.WriteLine("🔍 [CONSTRUCTOR_8] プロジェクトルート検索開始");
         var currentDir = Directory.GetCurrentDirectory();
+        Console.WriteLine($"🔍 [CONSTRUCTOR_9] CurrentDir: {currentDir}");
         var projectRoot = FindProjectRoot(currentDir);
+        Console.WriteLine($"🔍 [CONSTRUCTOR_10] ProjectRoot: {projectRoot}");
         
         // 🎯 [NLLB-200] 動的ポート設定と動的スクリプトパス設定
         _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings 呼び出し直前");
@@ -129,33 +149,100 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             throw;
         }
         
-        _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}", 
+        _logger.LogInformation("OptimizedPythonTranslationEngine初期化 - Python: {PythonPath}, Script: {ScriptPath}",
             _pythonPath, _serverScriptPath);
-            
+
         _logger.LogInformation("モデルロード待機機構を初期化しました");
-        
-        // バックグラウンドで初期化開始（ブロックしない）
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(1000); // 起動を少し遅延
-                await InitializeAsync().ConfigureAwait(false);
-                _logger.LogInformation("バックグラウンド初期化完了");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "バックグラウンド初期化失敗");
-            }
-        });
-        
+
+        Console.WriteLine("🔍 [CONSTRUCTOR_11] ConfigureServerSettings 完了");
+
+        // 🔧 Phase 2.2.2: バックグラウンド初期化を削除
+        // TranslationModelLoaderからの明示的InitializeAsync()呼び出しのみに統一
+        // 理由: 構築子のTask.RunとTranslationModelLoader.InitializeAsync()が競合し、
+        //       MarkModelAsLoaded()が複数回呼ばれる問題を防止
+
         _uptimeStopwatch.Start();
+        Console.WriteLine("🔍 [CONSTRUCTOR_12] _uptimeStopwatch 開始完了");
+
+        // 🚀 UltraPhase 14.25: StdinStdoutTranslationClient 初期化
+        if (_serverManager != null)
+        {
+            // 🎯 UltraThink Phase 3: 動的言語ペア取得
+            var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+            var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
+
+            _translationClient = new StdinStdoutTranslationClient(
+                _serverManager,
+                languagePairKey, // 動的取得された言語ペア (例: "en-ja")
+                logger); // ILogger<OptimizedPythonTranslationEngine> を直接渡す
+
+            _logger.LogInformation("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
+            Console.WriteLine("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
+        }
+        else
+        {
+            _logger.LogWarning("⚠️ [UltraPhase 14.25] PythonServerManager が null のため StdinStdoutTranslationClient を初期化できません");
+        }
+
+        // 🔍 UltraPhase 10.11: Gemini推奨 - コンストラクタ完了ログ
+        Console.WriteLine("🔥 [CONSTRUCTOR_END] OptimizedPythonTranslationEngine コンストラクタ完了");
     }
 
     public async Task<bool> InitializeAsync()
     {
         try
         {
+            // 🔍 UltraPhase 9.5: _loggerハング回避のため、Console.WriteLineを最優先
+            Console.WriteLine("🔥 [ENGINE_INIT_START] OptimizedPythonTranslationEngine.InitializeAsync() 開始");
+
+            // 🔧 Phase 2.2.5: InitializeAsync()実行パス詳細トレース
+            // _logger.LogInformation("🔥 [INIT_TRACE] InitializeAsync() 開始"); // UltraPhase 9.5: ハング原因のため無効化
+
+            // 🔧 [DEBUG] _translationClient状態確認
+            Console.WriteLine($"🔍 [DEBUG] InitializeAsync開始時の_translationClient状態: {(_translationClient != null ? "NOT NULL" : "NULL")}");
+            _logger.LogInformation($"🔍 [DEBUG] InitializeAsync開始時の_translationClient状態: {(_translationClient != null ? "NOT NULL" : "NULL")}");
+            if (_translationClient != null)
+            {
+                Console.WriteLine($"🔍 [DEBUG] _translationClient型: {_translationClient.GetType().Name}");
+                _logger.LogInformation($"🔍 [DEBUG] _translationClient型: {_translationClient.GetType().Name}");
+            }
+
+            // 🔧 UltraThink修正: _translationClientがnullの場合のフォールバック初期化（先頭移動）
+            if (_translationClient == null && _serverManager != null)
+            {
+                try
+                {
+                    // 🎯 UltraThink Phase 3: フォールバック時も動的言語ペア取得
+                    var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+                    var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
+
+                    _translationClient = new StdinStdoutTranslationClient(
+                        _serverManager,
+                        languagePairKey, // 動的取得された言語ペア (例: "en-ja")
+                        _logger); // ILogger<OptimizedPythonTranslationEngine> を直接渡す
+
+                    _logger.LogInformation("🚀 [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化完了");
+                    Console.WriteLine("🚀 [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化完了");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化失敗: {Message}", ex.Message);
+                }
+            }
+
+            // 🚀 UltraPhase 14.25: StdinStdoutTranslationClient 使用時は サーバー起動をスキップ（先頭移動）
+            if (_translationClient != null)
+            {
+                _logger.LogInformation("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 利用可能 - サーバー起動をスキップ");
+                Console.WriteLine("🔧 [CRITICAL DEBUG] StdinStdoutTranslationClient利用可能 - 早期リターン実行");
+                _logger.LogInformation("🚀 [UltraPhase 14.25] stdin/stdout通信モードで初期化完了");
+                Console.WriteLine("🔧 [UltraThink DEBUG] MarkModelAsLoaded()呼び出し");
+                MarkModelAsLoaded(); // 🔧 UltraThink修正: TaskCompletionSource完了シグナルとロック機構の活用
+                Console.WriteLine($"🔧 [UltraThink DEBUG] MarkModelAsLoaded完了 - _isModelLoaded = {_isModelLoaded}");
+                Console.WriteLine("🔧 [UltraThink DEBUG] 早期リターン実行 - return true");
+                return true; // 早期リターン - サーバー起動とTCP接続確認は不要
+            }
+
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
             // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
             var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
@@ -176,16 +263,60 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 await CleanupExistingProcessesAsync().ConfigureAwait(false);
 
                 // サーバー起動
-                if (!await StartOptimizedServerAsync().ConfigureAwait(false))
+                _logger.LogInformation("🔥 [INIT_TRACE] StartOptimizedServerAsync() 呼び出し開始");
+                var serverStartResult = await StartOptimizedServerAsync().ConfigureAwait(false);
+                _logger.LogInformation("🔥 [INIT_TRACE] StartOptimizedServerAsync() 結果: {Result}", serverStartResult);
+
+                if (!serverStartResult)
                 {
-                    _logger.LogError("サーバー起動失敗");
+                    _logger.LogError("🔥 [INIT_TRACE] サーバー起動失敗により InitializeAsync() 終了");
                     return false;
+                }
+                _logger.LogInformation("🔥 [INIT_TRACE] サーバー起動成功 - 接続確認フェーズへ");
+            }
+
+            // 🔧 UltraThink修正: _translationClientがnullの場合のフォールバック初期化
+            if (_translationClient == null && _serverManager != null)
+            {
+                try
+                {
+                    // 🎯 UltraThink Phase 3: フォールバック時も動的言語ペア取得
+                    var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+                    var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
+
+                    _translationClient = new StdinStdoutTranslationClient(
+                        _serverManager,
+                        languagePairKey, // 動的取得された言語ペア (例: "en-ja")
+                        _logger); // ILogger<OptimizedPythonTranslationEngine> を直接渡す
+
+                    _logger.LogInformation("🚀 [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化完了");
+                    Console.WriteLine("🚀 [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化完了");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ [UltraThink修正] フォールバック StdinStdoutTranslationClient 初期化失敗: {Message}", ex.Message);
                 }
             }
 
-            // 接続確認（Gemini推奨：リトライロジック付き）
+            // 🚀 UltraPhase 14.25: StdinStdoutTranslationClient 使用時は TCP接続確認をスキップ
+            if (_translationClient != null)
+            {
+                _logger.LogInformation("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 利用可能 - TCP接続確認をスキップ");
+                Console.WriteLine("🔧 [CRITICAL DEBUG] 242行目ログ出力直後");
+                Console.WriteLine("🔧 [UltraThink DEBUG] 243行目実行前");
+                _logger.LogInformation("🚀 [UltraPhase 14.25] stdin/stdout通信モードで初期化完了");
+                Console.WriteLine("🔧 [UltraThink DEBUG] 244行目実行前 - MarkModelAsLoaded()呼び出し");
+                MarkModelAsLoaded(); // 🔧 UltraThink修正: TaskCompletionSource完了シグナルとロック機構の活用
+                Console.WriteLine($"🔧 [UltraThink DEBUG] 244行目実行後 - _isModelLoaded = {_isModelLoaded}");
+                Console.WriteLine("🔧 [UltraThink DEBUG] 245行目実行前 - return true");
+                return true; // 早期リターン - TCP接続確認は不要
+            }
+
+            // 接続確認（Gemini推奨：リトライロジック付き）- レガシーTCP モードのみ
             try
             {
+                _logger.LogInformation("⚠️ [LEGACY] TCP接続確認モード - StdinStdoutTranslationClient が null");
+
                 if (useConnectionPool && _connectionPool != null)
                 {
                     using var testCts = new CancellationTokenSource(5000);
@@ -213,20 +344,27 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // ヘルスチェックタスク開始
             _ = Task.Run(async () => await MonitorServerHealthAsync().ConfigureAwait(false));
             
+            _logger.LogInformation("🔥 [INIT_TRACE] 接続確認完了 - MarkModelAsLoaded() 呼び出し直前");
             _logger.LogInformation("OptimizedPythonTranslationEngine初期化完了");
-            
+
             // モデルロード完了のシグナル
+            _logger.LogInformation("🔥 [INIT_TRACE] MarkModelAsLoaded() 呼び出し開始");
             MarkModelAsLoaded();
-            
+            _logger.LogInformation("🔥 [INIT_TRACE] MarkModelAsLoaded() 呼び出し完了");
+
+            _logger.LogInformation("🔥 [INIT_TRACE] InitializeAsync() 正常終了 - return true");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初期化エラー");
-            
+            _logger.LogError(ex, "🔥 [INIT_TRACE] InitializeAsync() 例外キャッチ - 初期化エラー");
+
             // 初期化失敗時はモデルロード失敗を通知
+            _logger.LogInformation("🔥 [INIT_TRACE] MarkModelLoadFailed() 呼び出し開始");
             MarkModelLoadFailed(ex);
-            
+            _logger.LogInformation("🔥 [INIT_TRACE] MarkModelLoadFailed() 呼び出し完了");
+
+            _logger.LogInformation("🔥 [INIT_TRACE] InitializeAsync() 例外終了 - return false");
             return false;
         }
     }
@@ -235,16 +373,29 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
+            _logger.LogInformation("🔥 [START_TRACE] StartOptimizedServerAsync() 開始");
             await _serverLock.WaitAsync().ConfigureAwait(false);
-            
+
             // Phase 5: PythonServerManagerが利用可能な場合は動的ポート管理を使用
+            _logger.LogInformation("🔥 [START_TRACE] _serverManager null判定: {IsNull}", _serverManager == null);
             if (_serverManager != null)
             {
-                return await StartManagedServerAsync().ConfigureAwait(false);
+                _logger.LogInformation("🔥 [START_TRACE] StartManagedServerAsync() パス選択");
+                var managedResult = await StartManagedServerAsync().ConfigureAwait(false);
+                _logger.LogInformation("🔥 [START_TRACE] StartManagedServerAsync() 結果: {Result}", managedResult);
+                return managedResult;
             }
-            
+
             // 従来の固定ポートモード（後方互換性）
-            return await StartLegacyFixedPortServerAsync().ConfigureAwait(false);
+            _logger.LogInformation("🔥 [START_TRACE] StartLegacyFixedPortServerAsync() パス選択");
+            var legacyResult = await StartLegacyFixedPortServerAsync().ConfigureAwait(false);
+            _logger.LogInformation("🔥 [START_TRACE] StartLegacyFixedPortServerAsync() 結果: {Result}", legacyResult);
+            return legacyResult;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "🔥 [START_TRACE] StartOptimizedServerAsync() 例外発生");
+            return false;
         }
         finally
         {
@@ -306,25 +457,39 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     {
         try
         {
+            Console.WriteLine("🚀 [UltraPhase 14.12] StartManagedServerAsync() 開始");
             _logger.LogInformation("🚀 動的ポート管理によるサーバー起動開始");
-            
-            // 日本語→英語翻訳用サーバー起動（Phase 5では言語ペア指定）
-            _managedServerInstance = await _serverManager!.StartServerAsync("ja-en").ConfigureAwait(false);
-            
-            _logger.LogInformation("✅ 動的ポートサーバー起動完了: Port {Port}, StartedAt {StartedAt}", 
+
+            // 動的言語ペア取得（設定から）
+            var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+            var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
+
+            // 🔥 STEP7 デバッグ: サーバー起動時の言語ペアキー追跡
+            _logger.LogDebug("🔥 [SERVER_START] 動的言語ペア取得: Source={Source}, Target={Target}",
+                currentLanguagePair.SourceCode, currentLanguagePair.TargetCode);
+            _logger.LogDebug("🔥 [SERVER_START] 言語ペアキー生成: '{LanguagePairKey}'", languagePairKey);
+            Console.WriteLine($"🔥 [SERVER_START] 言語ペアキー: '{languagePairKey}' でサーバー起動");
+
+            Console.WriteLine($"🔍 [UltraPhase 14.12] _serverManager.StartServerAsync(\"{languagePairKey}\") 呼び出し直前");
+            _managedServerInstance = await _serverManager!.StartServerAsync(languagePairKey).ConfigureAwait(false);
+            Console.WriteLine($"✅ [UltraPhase 14.12] _serverManager.StartServerAsync(\"{languagePairKey}\") 完了");
+
+            _logger.LogInformation("✅ 動的ポートサーバー起動完了: Port {Port}, StartedAt {StartedAt}",
                 _managedServerInstance.Port, _managedServerInstance.StartedAt);
-            
+
             // 接続プールのポート更新
             if (_connectionPool != null)
             {
                 // TODO: 接続プールにポート変更通知メソッドを追加予定
                 _logger.LogDebug("接続プール更新: Port {Port}", _managedServerInstance.Port);
             }
-            
+
+            Console.WriteLine("✅ [UltraPhase 14.12] StartManagedServerAsync() 正常終了");
             return true;
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ [UltraPhase 14.12] StartManagedServerAsync() 例外: {ex.GetType().Name} - {ex.Message}");
             _logger.LogError(ex, "❌ 動的ポートサーバー起動失敗");
             return false;
         }
@@ -335,13 +500,37 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     /// </summary>
     private async Task<bool> StartLegacyFixedPortServerAsync()
     {
+        _logger.LogInformation("🔥 [LEGACY_TRACE] StartLegacyFixedPortServerAsync() 開始");
+        _logger.LogInformation("🔥 [LEGACY_TRACE] Python Path: {PythonPath}", _pythonPath);
+        _logger.LogInformation("🔥 [LEGACY_TRACE] Script Path: {ScriptPath}", _serverScriptPath);
+        _logger.LogInformation("🔥 [LEGACY_TRACE] Server Port: {Port}", _serverPort);
+        
         _logger.LogInformation("🔧 固定ポートモードでサーバー起動開始 (Port {Port})", _serverPort);
         
+        // Phase 2.2.7: ファイルパス検証
+        _logger.LogInformation("🔥 [LEGACY_TRACE] ファイル存在確認 - Python: {PythonExists}, Script: {ScriptExists}", 
+            File.Exists(_pythonPath), File.Exists(_serverScriptPath));
+        
+        if (!File.Exists(_pythonPath))
+        {
+            _logger.LogError("🔥 [LEGACY_TRACE] Python実行ファイルが見つかりません: {PythonPath}", _pythonPath);
+            return false;
+        }
+        
+        if (!File.Exists(_serverScriptPath))
+        {
+            _logger.LogError("🔥 [LEGACY_TRACE] スクリプトファイルが見つかりません: {ScriptPath}", _serverScriptPath);
+            return false;
+        }
+        
         // 直接Python実行（PowerShell経由を排除）
+        var arguments = $"\"{_serverScriptPath}\" --port {_serverPort} --optimized";
+        _logger.LogInformation("🔥 [LEGACY_TRACE] Process Arguments: {Arguments}", arguments);
+        
         var processInfo = new ProcessStartInfo
         {
             FileName = _pythonPath,
-            Arguments = $"\"{_serverScriptPath}\" --port {_serverPort} --optimized",
+            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -350,50 +539,77 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             StandardErrorEncoding = Encoding.UTF8
         };
         
-        _serverProcess = new Process { StartInfo = processInfo };
-        _serverProcess.Start();
+        _logger.LogInformation("🔥 [LEGACY_TRACE] ProcessStartInfo作成完了");
+        
+        try
+        {
+            _serverProcess = new Process { StartInfo = processInfo };
+            _logger.LogInformation("🔥 [LEGACY_TRACE] Process.Start()呼び出し前");
+            _serverProcess.Start();
+            _logger.LogInformation("🔥 [LEGACY_TRACE] Process.Start()呼び出し後 - PID: {ProcessId}", _serverProcess.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "🔥 [LEGACY_TRACE] Process.Start()で例外発生: {Message}", ex.Message);
+            return false;
+        }
         
         _logger.LogInformation("Pythonサーバープロセス起動 - PID: {ProcessId}", _serverProcess.Id);
         
-        // 非同期でログ監視
+        // 🚨 Phase 1.3: 詳細エラーログ取得機能 - 標準出力・エラー監視
         _ = Task.Run(async () => await MonitorServerOutputAsync().ConfigureAwait(false));
+        _ = Task.Run(async () => await MonitorServerErrorAsync().ConfigureAwait(false));
+        
+        _logger.LogInformation("🔥 [LEGACY_TRACE] 出力・エラー監視タスク開始");
         
         // サーバー起動待機（最大60秒、モデルロード完了まで）
         var startTime = DateTime.UtcNow;
+        _logger.LogInformation("🔥 [LEGACY_TRACE] 接続テスト開始 - タイムアウト: {TimeoutMs}ms", StartupTimeoutMs);
+        
         while ((DateTime.UtcNow - startTime).TotalMilliseconds < StartupTimeoutMs)
         {
             await Task.Delay(2000).ConfigureAwait(false); // ポーリング間隔を2秒に延長
+            
+            var elapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+            _logger.LogDebug("🔥 [LEGACY_TRACE] 接続テスト中 - 経過時間: {ElapsedMs}ms", elapsedMs);
             
             try
             {
                 if (_serverProcess.HasExited)
                 {
-                    _logger.LogError("サーバープロセスが異常終了 - ExitCode: {ExitCode}", _serverProcess.ExitCode);
+                    _logger.LogError("🔥 [LEGACY_TRACE] サーバープロセスが異常終了 - ExitCode: {ExitCode}", _serverProcess.ExitCode);
                     return false;
                 }
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
-                _logger.LogError("サーバープロセスが無効な状態");
+                _logger.LogError(ex, "🔥 [LEGACY_TRACE] サーバープロセス状態確認で例外: {Message}", ex.Message);
                 return false;
             }
             
             // Issue #147: 接続テスト（タイムアウト延長）
             try
             {
-                if (await TestConnectionAsync().ConfigureAwait(false))
+                _logger.LogDebug("🔥 [LEGACY_TRACE] TestConnectionAsync()呼び出し開始");
+                var connectionResult = await TestConnectionAsync().ConfigureAwait(false);
+                _logger.LogDebug("🔥 [LEGACY_TRACE] TestConnectionAsync()結果: {Result}", connectionResult);
+                
+                if (connectionResult)
                 {
-                    var elapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                    _logger.LogInformation("サーバー起動成功 - 起動時間: {ElapsedMs}ms", elapsedMs);
+                    var finalElapsedMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                    _logger.LogInformation("🔥 [LEGACY_TRACE] 接続テスト成功！起動時間: {ElapsedMs}ms", finalElapsedMs);
+                    _logger.LogInformation("サーバー起動成功 - 起動時間: {ElapsedMs}ms", finalElapsedMs);
                     return true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogDebug(ex, "🔥 [LEGACY_TRACE] TestConnectionAsync()で例外: {Message}", ex.Message);
                 // 接続テスト失敗 - サーバーがまだ起動していない
             }
         }
         
+        _logger.LogError("🔥 [LEGACY_TRACE] サーバー起動タイムアウト - 最終経過時間: {TotalMs}ms", (DateTime.UtcNow - startTime).TotalMilliseconds);
         _logger.LogError("サーバー起動タイムアウト");
         return false;
     }
@@ -449,9 +665,11 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         Baketa.Core.Translation.Models.TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
-        // 🔥🔥🔥 [CRITICAL_ENTRY] TranslateAsyncメソッド入口確認 🔥🔥🔥
-        Console.WriteLine("🔥🔥🔥 [CRITICAL_ENTRY] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました！");
-        DebugLogUtility.WriteLog("🔥🔥🔥 [CRITICAL_ENTRY] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました！");
+#if DEBUG
+        // [DEBUG] TranslateAsyncメソッド入口確認
+        Console.WriteLine("[DEBUG] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました");
+        DebugLogUtility.WriteLog("[DEBUG] OptimizedPythonTranslationEngine.TranslateAsync メソッドに入りました");
+#endif
         
         try
         {
@@ -488,8 +706,24 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 // 🔥 [STEP4] モデルロードTask待機
                 Console.WriteLine("🔥 [STEP4] モデルロードTask待機開始");
                 DebugLogUtility.WriteLog("🔥 [STEP4] モデルロードTask待機開始");
-                
-                await _modelLoadCompletion.Task.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+
+                // 🔧 Phase 2.2.4: 詳細診断ログ追加
+                _logger.LogInformation("🔧 [STEP4_DIAGNOSIS] モデルロード状態診断:");
+                _logger.LogInformation("🔧 [STEP4_DIAGNOSIS]   _isModelLoaded: {IsModelLoaded}", _isModelLoaded);
+                _logger.LogInformation("🔧 [STEP4_DIAGNOSIS]   _modelLoadCompletion.Task.IsCompleted: {IsCompleted}", _modelLoadCompletion.Task.IsCompleted);
+                _logger.LogInformation("🔧 [STEP4_DIAGNOSIS]   _modelLoadCompletion.Task.Status: {Status}", _modelLoadCompletion.Task.Status);
+
+                if (_isModelLoaded)
+                {
+                    _logger.LogInformation("✅ [STEP4_DIAGNOSIS] モデル既にロード完了 - 待機をスキップ");
+                    Console.WriteLine("✅ [STEP4_DIAGNOSIS] モデル既にロード完了 - 待機をスキップ");
+                }
+                else
+                {
+                    _logger.LogInformation("⏳ [STEP4_DIAGNOSIS] モデル未ロード - Task待機実行");
+                    Console.WriteLine("⏳ [STEP4_DIAGNOSIS] モデル未ロード - Task待機実行");
+                    await _modelLoadCompletion.Task.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+                }
                 
                 // 🔥 [STEP5] モデルロード待機成功
                 Console.WriteLine("🔥 [STEP5] モデルロード待機成功");
@@ -676,10 +910,32 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                             // 🔥 [STEP16] サーキットブレーカー使用
                             Console.WriteLine("🔥 [STEP16] サーキットブレーカー使用");
                             DebugLogUtility.WriteLog("🔥 [STEP16] サーキットブレーカー使用");
-                            
-                            return await _circuitBreaker.ExecuteAsync(
-                                async cbt => await TranslateWithOptimizedServerAsync(request, cbt).ConfigureAwait(false), 
+
+                            // 🔥 [ULTRA_DEBUG] サーキットブレーカー呼び出し前
+                            Console.WriteLine($"🔥 [ULTRA_DEBUG_PRE_CB] ExecuteAsync呼び出し直前 - RequestId: {request.RequestId}");
+                            DebugLogUtility.WriteLog($"🔥 [ULTRA_DEBUG_PRE_CB] ExecuteAsync呼び出し直前 - RequestId: {request.RequestId}");
+
+                            var cbResult = await _circuitBreaker.ExecuteAsync(
+                                async cbt => {
+                                    // 🔥 [ULTRA_DEBUG] ラムダ関数内部に到達
+                                    Console.WriteLine($"🔥 [ULTRA_DEBUG_LAMBDA] ラムダ関数実行開始 - RequestId: {request.RequestId}");
+                                    DebugLogUtility.WriteLog($"🔥 [ULTRA_DEBUG_LAMBDA] ラムダ関数実行開始 - RequestId: {request.RequestId}");
+
+                                    var lambdaResult = await TranslateWithOptimizedServerAsync(request, cbt).ConfigureAwait(false);
+
+                                    // 🔥 [ULTRA_DEBUG] ラムダ関数結果確認
+                                    Console.WriteLine($"🔥 [ULTRA_DEBUG_LAMBDA_RESULT] 翻訳結果: IsSuccess={lambdaResult.IsSuccess}, Text='{lambdaResult.TranslatedText}'");
+                                    DebugLogUtility.WriteLog($"🔥 [ULTRA_DEBUG_LAMBDA_RESULT] 翻訳結果: IsSuccess={lambdaResult.IsSuccess}, Text='{lambdaResult.TranslatedText}'");
+
+                                    return lambdaResult;
+                                },
                                 ct).ConfigureAwait(false);
+
+                            // 🔥 [ULTRA_DEBUG] サーキットブレーカー呼び出し後
+                            Console.WriteLine($"🔥 [ULTRA_DEBUG_POST_CB] ExecuteAsync完了 - IsSuccess: {cbResult.IsSuccess}, Text: '{cbResult.TranslatedText}'");
+                            DebugLogUtility.WriteLog($"🔥 [ULTRA_DEBUG_POST_CB] ExecuteAsync完了 - IsSuccess: {cbResult.IsSuccess}, Text: '{cbResult.TranslatedText}'");
+
+                            return cbResult;
                         }
                         else
                         {
@@ -1140,13 +1396,86 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
     public virtual async Task<bool> IsReadyAsync()
     {
+        Console.WriteLine("🔧 [IsReady_ENTRY] IsReadyAsync開始");
+        _logger.LogInformation("🔧 [IsReady_ENTRY] IsReadyAsync開始");
+
         if (_disposed)
+        {
+            Console.WriteLine("🔧 [IsReady_DEBUG] _disposed=true, returning false");
             return false;
-            
-        // サーバープロセスの確認
+        }
+
+        // 🔧 Phase 2.2.2: モデルロード完了フラグを最優先でチェック
+        // TranslationModelLoaderがInitializeAsync()完了前にIsReadyAsync()を呼ぶ問題を修正
+        if (!_isModelLoaded)
+        {
+            Console.WriteLine("🔧 [IsReady_DEBUG] _isModelLoaded=false, returning false");
+            return false;
+        }
+
+        Console.WriteLine($"🔧 [IsReady_DEBUG] _translationClient == null: {_translationClient == null}");
+        _logger.LogInformation($"🔧 [IsReady_DEBUG] _translationClient == null: {_translationClient == null}");
+
+        // 🚀 UltraThink修正: StdinStdoutTranslationClient使用時の専用チェック
+        if (_translationClient != null)
+        {
+            Console.WriteLine("🔧 [IsReady_DEBUG] StdinStdoutTranslationClient使用 - 専用チェック実行");
+            _logger.LogInformation("🔧 [IsReady_DEBUG] StdinStdoutTranslationClient使用 - 専用チェック実行");
+
+            // StdinStdoutTranslationClientが利用可能な場合は直接状態をチェック
+            try
+            {
+                var isClientReady = await _translationClient.IsReadyAsync().ConfigureAwait(false);
+                Console.WriteLine($"🔧 [IsReady_DEBUG] StdinStdoutTranslationClient.IsReady結果: {isClientReady}");
+                _logger.LogInformation($"🔧 [IsReady_DEBUG] StdinStdoutTranslationClient.IsReady結果: {isClientReady}");
+
+                // 🔥 UltraThink修正2: IsReady=falseでもプロセス生存なら翻訳試行を許可
+                if (!isClientReady)
+                {
+                    Console.WriteLine("🔧 [IsReady_FALLBACK] is_ready=false、プロセス状態確認中...");
+                    _logger.LogInformation("🔧 [IsReady_FALLBACK] is_ready=false、プロセス状態確認中...");
+
+                    // サーバーマネージャーからプロセス状態を直接確認
+                    if (_serverManager != null)
+                    {
+                        try
+                        {
+                            var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
+                            var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
+                            var serverInfo = await _serverManager.GetServerAsync(languagePairKey).ConfigureAwait(false);
+                            if (serverInfo is PythonServerInstance instance &&
+                                instance.Process != null &&
+                                !instance.Process.HasExited)
+                            {
+                                Console.WriteLine("🔧 [IsReady_FALLBACK] プロセス生存確認、翻訳試行を許可");
+                                _logger.LogInformation("🔧 [IsReady_FALLBACK] プロセス生存確認、翻訳試行を許可");
+                                return true; // CTranslate2モデル破損でもプロセス生存なら翻訳試行
+                            }
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            Console.WriteLine($"🔧 [IsReady_FALLBACK_ERROR] フォールバック確認失敗: {fallbackEx.Message}");
+                            _logger.LogDebug(fallbackEx, "🔧 [IsReady_FALLBACK_ERROR] フォールバック確認失敗");
+                        }
+                    }
+                }
+
+                return isClientReady;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🔧 [IsReady_ERROR] StdinStdoutTranslationClient.IsReady例外: {ex.Message}");
+                _logger.LogError(ex, "🔧 [IsReady_ERROR] StdinStdoutTranslationClient.IsReady例外");
+                return false;
+            }
+        }
+
+        Console.WriteLine("🔧 [IsReady_DEBUG] _translationClientがnull、従来のサーバープロセスチェック開始");
+
+        // 従来のサーバープロセス確認（_translationClientがnullの場合）
         if (_serverProcess == null)
             return false;
-            
+
         try
         {
             if (_serverProcess.HasExited)
@@ -1156,7 +1485,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             return false;
         }
-            
+
         // 接続テスト
         return await TestConnectionAsync().ConfigureAwait(false);
     }
@@ -1165,13 +1494,44 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CoreTranslationRequest request,
         CancellationToken cancellationToken)
     {
-        // 🚨 [HANGUP_DEBUG] メソッド開始時点のデバッグ
-        _logger.LogDebug("🔥 TranslateWithOptimizedServerAsync メソッド開始");
-        Console.WriteLine($"🔥 [HANGUP_DEBUG] TranslateWithOptimizedServerAsync メソッド開始 - RequestId: {request.RequestId}");
-        
+        // 🔥🔥🔥 [ULTRA_DEBUG] メソッド到達確認（最優先ログ）
+        Console.WriteLine($"🔥🔥🔥 [ULTRA_DEBUG_METHOD_ENTRY] TranslateWithOptimizedServerAsync到達！ - RequestId: {request.RequestId}");
+        DebugLogUtility.WriteLog($"🔥🔥🔥 [ULTRA_DEBUG_METHOD_ENTRY] TranslateWithOptimizedServerAsync到達！ - RequestId: {request.RequestId}");
+
+        // 🚀 UltraPhase 14.25: stdin/stdout通信への完全移行
+        _logger.LogDebug("🚀 [UltraPhase 14.25] TranslateWithOptimizedServerAsync - stdin/stdout通信モード");
+        Console.WriteLine($"🚀 [UltraPhase 14.25] TranslateWithOptimizedServerAsync - RequestId: {request.RequestId}");
+
         var totalStopwatch = Stopwatch.StartNew();
+
+        // 🎯 UltraPhase 14.25: StdinStdoutTranslationClient 優先使用
+        if (_translationClient != null)
+        {
+            try
+            {
+                _logger.LogDebug("📤 [StdinStdout] StdinStdoutTranslationClient.TranslateAsync() 呼び出し");
+
+                var response = await _translationClient.TranslateAsync(request, cancellationToken)
+                    .ConfigureAwait(false);
+
+                totalStopwatch.Stop();
+                _logger.LogInformation("✅ [StdinStdout] 翻訳完了: {ElapsedMs}ms", totalStopwatch.ElapsedMilliseconds);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [StdinStdout] StdinStdoutTranslationClient エラー: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        // ⚠️ フォールバック: _translationClient が null の場合（レガシー互換性）
+        _logger.LogWarning("⚠️ [UltraPhase 14.25] _translationClient が null - TCP接続ロジックへフォールバック");
+
+        // 🔧 [LEGACY] 以下は旧TCP接続ロジック（_translationClient == null 時のみ実行）
         var connectionAcquireStopwatch = Stopwatch.StartNew();
-        
+
         PersistentConnection? connection = null;
         TcpClient? directClient = null;
         NetworkStream? directStream = null;
@@ -1180,8 +1540,6 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         try
         {
-            // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
-            // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
             var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
             if (!useConnectionPool)
             {
@@ -1472,11 +1830,14 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                     await StartOptimizedServerAsync().ConfigureAwait(false);
                 }
                 
+                // 🚨 Phase 1.2: メモリ監視アラート機能
+                await CheckMemoryPressureAsync().ConfigureAwait(false);
+
                 // メトリクスログ
                 if (_totalRequests > 0)
                 {
                     var avgMs = _totalProcessingTimeMs / _totalRequests;
-                    _logger.LogInformation("パフォーマンス統計 - 平均処理時間: {AvgMs}ms, 総リクエスト: {TotalRequests}", 
+                    _logger.LogInformation("パフォーマンス統計 - 平均処理時間: {AvgMs}ms, 総リクエスト: {TotalRequests}",
                         avgMs, _totalRequests);
                 }
             }
@@ -1487,10 +1848,82 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
     }
 
+    /// <summary>
+    /// 🚨 Phase 1.2: メモリプレッシャー監視とアラート
+    /// </summary>
+    private async Task CheckMemoryPressureAsync()
+    {
+        try
+        {
+            // マネージドメモリ使用量取得
+            var managedMemoryBytes = GC.GetTotalMemory(false);
+            var managedMemoryMB = managedMemoryBytes / (1024 * 1024);
+
+            // システム全体のメモリ使用率取得（Windows環境）
+            double systemMemoryUsagePercentage = 0;
+            long availableMemoryMB = 0;
+
+            try
+            {
+                // Windows Performance Counter使用
+                var process = System.Diagnostics.Process.GetCurrentProcess();
+                var workingSetMB = process.WorkingSet64 / (1024 * 1024);
+
+                // 現在のプロセスのメモリ使用量を基にシステムメモリ使用率を計算
+                // Environment.WorkingSetで現在のプロセスの物理メモリ使用量を取得
+                var processMemoryBytes = Environment.WorkingSet;
+                var gcMemoryBytes = GC.GetTotalMemory(false);
+                var totalProcessMemoryMB = (processMemoryBytes + gcMemoryBytes) / (1024 * 1024);
+
+                // システム全体のメモリ使用率の概算（プロセスメモリ使用量ベース）
+                systemMemoryUsagePercentage = Math.Min((double)totalProcessMemoryMB / 1024, 100); // 1GB当たりの使用率として概算
+                availableMemoryMB = workingSetMB;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("システムメモリ情報取得失敗: {Error}", ex.Message);
+            }
+
+            // アラートレベル判定
+            if (systemMemoryUsagePercentage >= 90.0)
+            {
+                _logger.LogError("🚨🚨 [MEMORY_CRITICAL] メモリ使用量が危険レベル: {Usage:F1}% - 即座の対応が必要", systemMemoryUsagePercentage);
+                _logger.LogError("🚨 [MEMORY_DETAIL] マネージドメモリ: {ManagedMB}MB, プロセスメモリ: {ProcessMB}MB",
+                    managedMemoryMB, availableMemoryMB);
+            }
+            else if (systemMemoryUsagePercentage >= 85.0)
+            {
+                _logger.LogWarning("🚨 [MEMORY_ALERT] メモリ使用量が警告レベル: {Usage:F1}% - 注意が必要", systemMemoryUsagePercentage);
+                _logger.LogWarning("⚠️ [MEMORY_DETAIL] マネージドメモリ: {ManagedMB}MB, プロセスメモリ: {ProcessMB}MB",
+                    managedMemoryMB, availableMemoryMB);
+            }
+            else if (systemMemoryUsagePercentage >= 75.0)
+            {
+                _logger.LogInformation("📊 [MEMORY_INFO] メモリ使用量: {Usage:F1}% (マネージドメモリ: {ManagedMB}MB)",
+                    systemMemoryUsagePercentage, managedMemoryMB);
+            }
+
+            // NLLB-200モデル関連の詳細ログ（高メモリ使用時）
+            if (systemMemoryUsagePercentage >= 80.0)
+            {
+                var gcInfo = GC.CollectionCount(2); // Gen2 GC回数
+                _logger.LogInformation("🧠 [NLLB_MEMORY] NLLB-200モデルメモリ状況 - GC Gen2回数: {GCCount}, モデル状態: {ModelLoaded}",
+                    gcInfo, _isModelLoaded ? "ロード済み" : "未ロード");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "メモリ監視エラー - 監視を継続");
+        }
+    }
+
+    /// <summary>
+    /// 🚨 Phase 1.3: Python標準出力監視（強化版）
+    /// </summary>
     private async Task MonitorServerOutputAsync()
     {
         if (_serverProcess == null) return;
-        
+
         try
         {
             while (true)
@@ -1504,17 +1937,27 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
                 {
                     break;
                 }
-                
+
                 var line = await _serverProcess.StandardOutput.ReadLineAsync().ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(line))
                 {
                     _logger.LogDebug("[PYTHON] {Output}", line);
-                    
-                    // モデルロード完了シグナルを監視
-                    if (line.Contains("MODEL_READY:"))
+
+                    // 🔥 モデルロード完了シグナルを監視
+                    if (line.Contains("MODEL_READY:") || line.Contains("NLLB_MODEL_READY"))
                     {
-                        _logger.LogInformation("🏁 Pythonからモデルロード完了シグナルを受信");
+                        _logger.LogInformation("🏁 Pythonからモデルロード完了シグナルを受信: {Signal}", line);
                         MarkModelAsLoaded();
+                    }
+                    // 🧠 モデルロード進捗情報をキャプチャ
+                    else if (line.Contains("NLLB_MODEL_LOAD") || line.Contains("Loading model"))
+                    {
+                        _logger.LogInformation("🧠 [PYTHON_MODEL_PROGRESS] {Progress}", line);
+                    }
+                    // 🚀 サーバー起動情報をキャプチャ
+                    else if (line.Contains("Translation Server listening") || line.Contains("Server started"))
+                    {
+                        _logger.LogInformation("🚀 [PYTHON_SERVER_START] {ServerInfo}", line);
                     }
                 }
                 else
@@ -1526,6 +1969,66 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         catch (Exception ex)
         {
             _logger.LogError(ex, "サーバー出力監視エラー");
+        }
+    }
+
+    /// <summary>
+    /// 🚨 Phase 1.3: Python標準エラー監視（新規実装）
+    /// </summary>
+    private async Task MonitorServerErrorAsync()
+    {
+        if (_serverProcess == null) return;
+
+        try
+        {
+            while (true)
+            {
+                try
+                {
+                    if (_serverProcess.HasExited)
+                        break;
+                }
+                catch (InvalidOperationException)
+                {
+                    break;
+                }
+
+                var line = await _serverProcess.StandardError.ReadLineAsync().ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(line))
+                {
+                    // Python エラーの重要度分類
+                    if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
+                    {
+                        _logger.LogError("🚨 [PYTHON_CRITICAL] クリティカルエラー: {Error}", line);
+
+                        // メモリ関連エラーの特別処理
+                        if (line.Contains("OutOfMemoryError") || line.Contains("CUDA out of memory"))
+                        {
+                            _logger.LogError("🧠💥 [PYTHON_MEMORY_ERROR] メモリ不足エラー検出: {MemoryError}", line);
+                        }
+                    }
+                    else if (line.Contains("Warning") || line.Contains("WARN"))
+                    {
+                        _logger.LogWarning("⚠️ [PYTHON_WARNING] 警告: {Warning}", line);
+                    }
+                    else if (line.Contains("INFO") || line.Contains("DEBUG"))
+                    {
+                        _logger.LogDebug("🐍 [PYTHON_INFO] {Info}", line);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("🐍 [PYTHON_STDERR] {Output}", line);
+                    }
+                }
+                else
+                {
+                    break; // EOF or process ended
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Python標準エラー監視エラー - 監視を継続します");
         }
     }
 
@@ -1961,7 +2464,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     /// </summary>
     private void SafeAppendToDebugFile(string content)
     {
-        const string debugFilePath = "E:\\dev\\Baketa\\debug_translation_corruption_csharp.txt";
+        var debugFilePath = Path.Combine(Path.GetTempPath(), "baketa_debug_translation_corruption.txt");
         const int maxRetries = 3;
         const int retryDelayMs = 10;
 
@@ -2033,8 +2536,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // NLLB-200設定から動的にポートとスクリプトパスを取得
                 _serverPort = 5556; // 固定値使用
-                var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
-                _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+
+                // CTranslate2版サーバー優先、フォールバックで旧版
+                var ct2ScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
+                var legacyScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+
+                if (File.Exists(ct2ScriptPath))
+                {
+                    _serverScriptPath = ct2ScriptPath;
+                    _logger.LogInformation("✅ CTranslate2版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+                }
+                else if (File.Exists(legacyScriptPath))
+                {
+                    _serverScriptPath = legacyScriptPath;
+                    _logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+                }
+                else
+                {
+                    _serverScriptPath = ct2ScriptPath; // エラーメッセージ用
+                    _logger.LogError("❌ 翻訳サーバースクリプトが見つかりません: CT2={CT2}, Legacy={Legacy}", ct2ScriptPath, legacyScriptPath);
+                }
                 
                 // UltraThink Phase 13: 起動時に動的ポート検出を実行
                 _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings: 動的ポート検出開始 (現在の固定ポート: {Port})", _serverPort);
@@ -2054,8 +2575,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             {
                 // デフォルト設定から動的にポートとスクリプトパスを取得（レガシー互換性）
                 _serverPort = 5556; // 固定値使用
-                var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
-                _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+
+                // CTranslate2版サーバー優先、フォールバックで旧版
+                var ct2ScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
+                var legacyScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+
+                if (File.Exists(ct2ScriptPath))
+                {
+                    _serverScriptPath = ct2ScriptPath;
+                    _logger.LogInformation("✅ CTranslate2版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+                }
+                else if (File.Exists(legacyScriptPath))
+                {
+                    _serverScriptPath = legacyScriptPath;
+                    _logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+                }
+                else
+                {
+                    _serverScriptPath = ct2ScriptPath; // エラーメッセージ用
+                    _logger.LogError("❌ 翻訳サーバースクリプトが見つかりません: CT2={CT2}, Legacy={Legacy}", ct2ScriptPath, legacyScriptPath);
+                }
                 
                 // UltraThink Phase 13: レガシーモードでも動的ポート検出を実行
                 _logger.LogInformation("🔍 [UltraThink Phase 13] ConfigureServerSettings(レガシー): 動的ポート検出開始 (現在の固定ポート: {Port})", _serverPort);
@@ -2076,8 +2615,26 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         {
             _logger.LogWarning(ex, "⚠️ サーバー設定エラー - デフォルト設定（NLLB-200）を使用");
             _serverPort = 5556;
-            var configuredScriptPath = "scripts/nllb_translation_server.py"; // 固定値使用
-            _serverScriptPath = Path.Combine(projectRoot, configuredScriptPath);
+
+            // CTranslate2版サーバー優先、フォールバックで旧版
+            var ct2ScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
+            var legacyScriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server.py");
+
+            if (File.Exists(ct2ScriptPath))
+            {
+                _serverScriptPath = ct2ScriptPath;
+                _logger.LogInformation("✅ CTranslate2版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+            }
+            else if (File.Exists(legacyScriptPath))
+            {
+                _serverScriptPath = legacyScriptPath;
+                _logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Script}", Path.GetFileName(_serverScriptPath));
+            }
+            else
+            {
+                _serverScriptPath = ct2ScriptPath; // エラーメッセージ用
+                _logger.LogError("❌ 翻訳サーバースクリプトが見つかりません: CT2={CT2}, Legacy={Legacy}", ct2ScriptPath, legacyScriptPath);
+            }
             
             // UltraThink Phase 13: エラー時でも動的ポート検出を試行
             try

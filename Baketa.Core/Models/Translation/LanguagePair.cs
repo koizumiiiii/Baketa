@@ -79,6 +79,16 @@ public sealed record LanguagePair(Language Source, Language Target)
     }
 
     /// <summary>
+    /// サーバー管理用の標準化されたキーを生成
+    /// STEP7 IsReady失敗問題の根本解決 - 一貫した言語ペアキー形式
+    /// </summary>
+    /// <returns>標準化された言語ペアキー（"source-target"形式）</returns>
+    public string ToServerKey()
+    {
+        return $"{SourceCode}-{TargetCode}";
+    }
+
+    /// <summary>
     /// よく使用される言語ペアの一覧
     /// </summary>
     public static IReadOnlyList<LanguagePair> CommonPairs =>
