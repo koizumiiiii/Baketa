@@ -46,9 +46,59 @@ public sealed record ResourceStatusSnapshot(
 /// </summary>
 public sealed class HybridResourceManager : IResourceManager, IDisposable
 {
+    /// <summary>
+    /// Phase 12.1: 翻訳Channel要素（TaskCompletionSource統合）
+    /// </summary>
+    private interface ITranslationChannelItem
+    {
+        string OperationId { get; }
+        TranslationRequest Request { get; }
+        CancellationToken CancellationToken { get; }
+        Task ExecuteAndSetResultAsync(Func<TranslationRequest, CancellationToken, Task<object?>> executor);
+    }
+
+    /// <summary>
+    /// Phase 12.1: 翻訳Channel要素の具象実装
+    /// </summary>
+    private sealed class TranslationChannelItem<TResult> : ITranslationChannelItem
+    {
+        public string OperationId { get; }
+        public TranslationRequest Request { get; }
+        public CancellationToken CancellationToken { get; }
+        public Func<TranslationRequest, CancellationToken, Task<TResult>> TaskFactory { get; }
+        public TaskCompletionSource<TResult> CompletionSource { get; }
+
+        public TranslationChannelItem(
+            string operationId,
+            Func<TranslationRequest, CancellationToken, Task<TResult>> taskFactory,
+            TranslationRequest request,
+            TaskCompletionSource<TResult> completionSource,
+            CancellationToken cancellationToken)
+        {
+            OperationId = operationId;
+            TaskFactory = taskFactory;
+            Request = request;
+            CompletionSource = completionSource;
+            CancellationToken = cancellationToken;
+        }
+
+        public async Task ExecuteAndSetResultAsync(Func<TranslationRequest, CancellationToken, Task<object?>> executor)
+        {
+            try
+            {
+                var result = await TaskFactory(Request, CancellationToken).ConfigureAwait(false);
+                CompletionSource.SetResult(result);
+            }
+            catch (Exception ex)
+            {
+                CompletionSource.SetException(ex);
+            }
+        }
+    }
+
     // === パイプライン制御 ===
     private readonly Channel<ProcessingRequest> _ocrChannel;
-    private readonly Channel<TranslationRequest> _translationChannel;
+    private readonly Channel<ITranslationChannelItem> _translationChannel;
 
     // === 並列度制御（SemaphoreSlimベース） ===
     private SemaphoreSlim _ocrSemaphore;
@@ -80,7 +130,10 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     // === 状態管理 ===
     private bool _isInitialized = false;
     private readonly CancellationTokenSource _disposalCts = new();
-    
+
+    // === Phase 12.1: Channel Readerバックグラウンドタスク ===
+    private Task? _translationChannelReaderTask;
+
     /// <summary>
     /// リソース管理システムの初期化状態
     /// </summary>
@@ -126,11 +179,11 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 SingleWriter = false
             });
 
-        _translationChannel = Channel.CreateBounded<TranslationRequest>(
+        _translationChannel = Channel.CreateBounded<ITranslationChannelItem>(
             new BoundedChannelOptions(_settings.TranslationChannelCapacity)
             {
                 FullMode = BoundedChannelFullMode.Wait,
-                SingleReader = false,
+                SingleReader = true,  // Phase 12.1: 単一Readerパターン
                 SingleWriter = false
             });
 
@@ -177,9 +230,17 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             // 🎯 動的VRAM容量取得（8192MB固定問題解決）
             await DetectActualVramCapacityAsync(cancellationToken).ConfigureAwait(false);
 
+            // 🔥 Phase 12.1: Translation Channel Readerバックグラウンドタスク開始
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動中...");
+            _translationChannelReaderTask = Task.Run(
+                () => ProcessTranslationChannelAsync(_disposalCts.Token),
+                _disposalCts.Token);
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了！");
+
             _isInitialized = true;
 
             _logger.LogInformation("HybridResourceManager初期化完了 - 動的リソース管理開始");
+            _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了");
 
             if (_settings.EnableDetailedLogging)
             {
@@ -398,12 +459,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     }
 
     /// <summary>
-    /// 翻訳処理実行（動的クールダウン付き）
-    /// 実際の処理を関数として受け取り、リソース管理下で実行する
+    /// Phase 12.1修正: 翻訳処理実行（Channel + TaskCompletionSourceパターン）
+    /// Channelに書き込み、バックグラウンドタスクが処理完了後に結果を返す
     /// </summary>
     public async Task<TResult> ProcessTranslationAsync<TResult>(
         Func<TranslationRequest, CancellationToken, Task<TResult>> translationTaskFactory,
-        TranslationRequest request, 
+        TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(translationTaskFactory);
@@ -412,37 +473,90 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         if (!_isInitialized)
             await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
-        // 動的クールダウン計算
-        var cooldownMs = await CalculateDynamicCooldownAsync(cancellationToken).ConfigureAwait(false);
-        if (cooldownMs > 0)
-        {
-            if (_settings.EnableDetailedLogging)
-            {
-                _logger.LogDebug("翻訳前クールダウン: {Cooldown}ms (OperationId: {OperationId})", cooldownMs, request.OperationId);
-            }
-            await Task.Delay(cooldownMs, cancellationToken).ConfigureAwait(false);
-        }
+        // 🔥 Phase 12.1: TaskCompletionSourceパターン
+        Console.WriteLine($"🔥 [PHASE12.1] ProcessTranslationAsync呼び出し: {request.OperationId}");
+        var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // チャネルに投入
-        await _translationChannel.Writer.WriteAsync(request, cancellationToken).ConfigureAwait(false);
+        var channelItem = new TranslationChannelItem<TResult>(
+            operationId: request.OperationId,
+            taskFactory: translationTaskFactory,
+            request: request,
+            completionSource: tcs,
+            cancellationToken: cancellationToken);
 
-        // リソース取得待機
-        await _translationSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // Channelに書き込み（バックグラウンドタスクが処理）
+        Console.WriteLine($"🔥 [PHASE12.1] 翻訳リクエストをChannelに送信中: {request.OperationId}");
+        await _translationChannel.Writer.WriteAsync(channelItem, cancellationToken).ConfigureAwait(false);
+        Console.WriteLine($"🔥 [PHASE12.1] 翻訳リクエストをChannelに送信完了: {request.OperationId}");
+        _logger.LogInformation("🔥 [PHASE12.1] 翻訳リクエストをChannelに送信: {OperationId}", request.OperationId);
+
+        // TaskCompletionSourceの完了を待機（バックグラウンドタスクが結果をセット）
+        Console.WriteLine($"🔥 [PHASE12.1] TaskCompletionSource待機開始: {request.OperationId}");
+        var result = await tcs.Task.ConfigureAwait(false);
+        Console.WriteLine($"🔥 [PHASE12.1] TaskCompletionSource待機完了: {request.OperationId}");
+        return result;
+    }
+
+    /// <summary>
+    /// Phase 12.1: Translation Channel Readerバックグラウンドタスク
+    /// Channelから翻訳リクエストを読み取り、Semaphore制御下で逐次実行
+    /// </summary>
+    private async Task ProcessTranslationChannelAsync(CancellationToken cancellationToken)
+    {
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク開始！");
+        _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Reader開始");
+
         try
         {
-            // 実際の翻訳処理を関数で実行し、結果を受け取る
-            var result = await translationTaskFactory(request, cancellationToken).ConfigureAwait(false);
-
-            if (_settings.EnableDetailedLogging)
+            await foreach (var item in _translationChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                _logger.LogDebug("翻訳処理完了: {OperationId}", request.OperationId);
-            }
+                Console.WriteLine($"🔥 [PHASE12.1] 翻訳リクエスト受信: {item.OperationId}");
+                _logger.LogInformation("🔥 [PHASE12.1] 翻訳リクエスト受信: {OperationId}", item.OperationId);
 
-            return result;
+                // 動的クールダウン適用
+                var cooldownMs = await CalculateDynamicCooldownAsync(cancellationToken).ConfigureAwait(false);
+                if (cooldownMs > 0)
+                {
+                    Console.WriteLine($"🔥 [PHASE12.1] 翻訳前クールダウン: {cooldownMs}ms (OperationId: {item.OperationId})");
+                    await Task.Delay(cooldownMs, cancellationToken).ConfigureAwait(false);
+                }
+
+                // Semaphore取得（並列度制御）
+                Console.WriteLine($"🔥 [PHASE12.1] Semaphore待機開始: {item.OperationId}");
+                await _translationSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                Console.WriteLine($"🔥 [PHASE12.1] Semaphore取得成功: {item.OperationId}");
+
+                try
+                {
+                    Console.WriteLine($"🔥 [PHASE12.1] 翻訳処理実行開始: {item.OperationId}");
+
+                    // 翻訳処理を実行し、TaskCompletionSourceに結果をセット
+                    await item.ExecuteAndSetResultAsync(null!).ConfigureAwait(false);
+
+                    Console.WriteLine($"🔥 [PHASE12.1] 翻訳処理完了: {item.OperationId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🔥 [PHASE12.1] 翻訳処理エラー: {item.OperationId} - {ex.Message}");
+                    _logger.LogError(ex, "🔥 [PHASE12.1] 翻訳処理エラー: {OperationId}", item.OperationId);
+                    // 例外はExecuteAndSetResultAsync内部でTaskCompletionSource.SetExceptionで処理済み
+                }
+                finally
+                {
+                    _translationSemaphore.Release();
+                    Console.WriteLine($"🔥 [PHASE12.1] Semaphore解放: {item.OperationId}");
+                }
+            }
         }
-        finally
+        catch (OperationCanceledException)
         {
-            _translationSemaphore.Release();
+            Console.WriteLine("🔥 [PHASE12.1] Translation Channel Readerが正常停止しました");
+            _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Readerが正常停止しました");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"🔥 [PHASE12.1] Translation Channel Reader予期しないエラー: {ex.Message}");
+            _logger.LogError(ex, "🔥 [PHASE12.1] Translation Channel Reader予期しないエラー");
         }
     }
 
@@ -1160,13 +1274,28 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
         try
         {
+            // Phase 12.1: Translation Channel Readerバックグラウンドタスクの停止
+            if (_translationChannelReaderTask != null)
+            {
+                _translationChannel?.Writer.TryComplete();
+                try
+                {
+                    _translationChannelReaderTask.Wait(TimeSpan.FromSeconds(5));
+                    _logger.LogInformation("🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク正常停止");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク停止時警告");
+                }
+            }
+
             // Phase 3: 設定変更監視の停止
             _settingsChangeSubscription?.Dispose();
-            
+
             _ocrSemaphore?.Dispose();
             _translationSemaphore?.Dispose();
             _ocrChannel?.Writer.TryComplete();
-            _translationChannel?.Writer.TryComplete();
+            // _translationChannel?.Writer.TryComplete(); ← 既に上で実行済み
             _resourceMonitor?.Dispose();
 
             _logger.LogInformation("🔄 [PHASE3] HybridResourceManager正常終了（ホットリロード機能含む）");
