@@ -216,14 +216,14 @@ public readonly record struct LanguageInfo
 /// ⚡ 高性能非同期処理版 - パフォーマンス分析機能付き
 /// </summary>
 public sealed class BatchOcrProcessor(
-    IOcrEngine ocrEngine, 
+    IOcrEngine ocrEngine,
     IPerformanceOrchestrator? performanceOrchestrator = null,
     IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
     ILogger<BatchOcrProcessor>? logger = null,
     OcrRegionGenerator? regionGenerator = null,
     IOptions<AdvancedSettings>? advancedOptions = null,
     IOptions<RoiDiagnosticsSettings>? roiDiagnosticsOptions = null,
-    ImageDiagnosticsSaver? diagnosticsSaver = null) : IBatchOcrProcessor, IDisposable
+    ImageDiagnosticsSaver? diagnosticsSaver = null) : IBatchOcrProcessor, IOcrFailureManager, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
     private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
@@ -256,6 +256,7 @@ public sealed class BatchOcrProcessor(
     private double _totalProcessingTime;
     private readonly DateTime _startTime = DateTime.UtcNow;
     private int _errorCount;
+    private DateTime? _lastResetTime;
     private readonly ConcurrentDictionary<int, TextChunk> _chunkCache = new();
     private readonly object _configLock = new();
 
@@ -543,9 +544,14 @@ public sealed class BatchOcrProcessor(
                                 var imageSize = new System.Drawing.Size(tile.Image.Width, tile.Image.Height);
                                 
                                 Console.WriteLine($"🔧 [TILE-{index}] 画像バイト配列取得完了 - サイズ: {imageBytes.Length:N0}bytes, 解像度: {imageSize.Width}x{imageSize.Height}");
-                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt", 
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
                                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 [TILE-{index}] 画像バイト配列取得完了 - サイズ: {imageBytes.Length:N0}bytes, 解像度: {imageSize.Width}x{imageSize.Height}{Environment.NewLine}");
-                                
+
+                                // 🔥 UltraThink Phase 9.2: roiSaveTasks.Add()直前ログ
+                                Console.WriteLine($"🔍 [TILE-{index}] roiSaveTasks.Add()実行直前 - Count={roiSaveTasks.Count}");
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TILE-{index}] roiSaveTasks.Add()実行直前 - Count={roiSaveTasks.Count}{Environment.NewLine}");
+
                                 roiSaveTasks.Add(Task.Run(async () =>
                                 {
                                     try
@@ -569,6 +575,11 @@ public sealed class BatchOcrProcessor(
                                         _logger?.LogWarning(roiEx, "ROI画像保存エラー - Tile {TileIndex}", index);
                                     }
                                 }, cancellationToken));
+
+                                // 🔥 UltraThink Phase 9.2: roiSaveTasks.Add()直後ログ
+                                Console.WriteLine($"✅ [TILE-{index}] roiSaveTasks.Add()実行完了 - Count={roiSaveTasks.Count}");
+                                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
+                                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [TILE-{index}] roiSaveTasks.Add()実行完了 - Count={roiSaveTasks.Count}{Environment.NewLine}");
                             }
                             else
                             {
@@ -625,8 +636,18 @@ public sealed class BatchOcrProcessor(
                         tile.Image?.Dispose();
                     }
                 } // 🔧 [FIXED] usingブロック終了時に自動的にsemaphore.Release()が実行される
+
+                // 🔥 UltraThink Phase 9.3: usingブロック終了直後ログ
+                Console.WriteLine($"✅ [TILE-{index}] usingブロック終了 - semaphore.Dispose()完了");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [TILE-{index}] usingブロック終了 - semaphore.Dispose()完了{Environment.NewLine}");
             }).ToArray();
-            
+
+            // 🔥 UltraThink Phase 9.3: .ToArray()実行完了ログ
+            Console.WriteLine($"✅ [STAGE-3] .ToArray()実行完了 - Task数={ocrTasks.Length}");
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [STAGE-3] .ToArray()実行完了 - Task数={ocrTasks.Length}{Environment.NewLine}");
+
             // 全タイルのOCR完了を待機
             Console.WriteLine($"🔥 [STAGE-3] 並列OCRタスク待機開始");
             var tileResults = await Task.WhenAll(ocrTasks).ConfigureAwait(false);
@@ -2580,14 +2601,67 @@ public sealed class BatchOcrProcessor(
         }
     }
 
+    #region IOcrFailureManager Implementation
+
+    /// <summary>
+    /// IOcrFailureManager.ResetFailureCounterの明示的実装
+    /// 既存のResetOcrFailureCounterメソッドを呼び出し、リセット時刻を記録します
+    /// </summary>
+    void IOcrFailureManager.ResetFailureCounter()
+    {
+        ResetOcrFailureCounter(); // 既存の実装を活用
+        _lastResetTime = DateTime.UtcNow; // リセット時刻を記録
+    }
+
+    /// <summary>
+    /// IOcrFailureManager.GetFailureCountの明示的実装
+    /// 既存のGetOcrFailureCountメソッドを呼び出します
+    /// </summary>
+    int IOcrFailureManager.GetFailureCount()
+    {
+        return GetOcrFailureCount(); // 既存の実装を活用
+    }
+
+    /// <summary>
+    /// IOcrFailureManager.IsOcrAvailableの明示的実装
+    /// 失敗回数がしきい値未満の場合にtrueを返します
+    /// </summary>
+    bool IOcrFailureManager.IsOcrAvailable
+    {
+        get
+        {
+            var failureCount = GetOcrFailureCount();
+            return failureCount >= 0 && failureCount < ((IOcrFailureManager)this).MaxFailureThreshold;
+        }
+    }
+
+    /// <summary>
+    /// IOcrFailureManager.MaxFailureThresholdの明示的実装
+    /// PaddleOCRエンジンのデフォルトしきい値（3回）を返します
+    /// </summary>
+    int IOcrFailureManager.MaxFailureThreshold
+    {
+        get => 3; // PaddleOCRエンジンのデフォルトしきい値
+    }
+
+    /// <summary>
+    /// IOcrFailureManager.LastResetTimeの明示的実装
+    /// 最後にResetFailureCounterが呼び出された日時を返します
+    /// </summary>
+    DateTime? IOcrFailureManager.LastResetTime
+    {
+        get => _lastResetTime;
+    }
+
+    #endregion
 
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _chunkCache.Clear();
         _disposed = true;
-        
+
         _logger?.LogInformation("🧹 BatchOcrProcessor リソース解放完了");
     }
 }

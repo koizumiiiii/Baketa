@@ -65,11 +65,44 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             _logger.LogDebug("✅ Operation completed successfully: {OperationName} in {ExecutionTime:F2}ms", 
                 operationName, stopwatch.Elapsed.TotalMilliseconds);
         }
+        catch (OperationCanceledException oce)
+        {
+            stopwatch.Stop();
+            var endTime = DateTime.UtcNow;
+
+            measurement = measurement with
+            {
+                ExecutionTime = stopwatch.Elapsed,
+                EndTime = endTime,
+                IsSuccessful = false,
+                ErrorMessage = "Operation Canceled"
+            };
+
+            // エラーカウンターを更新
+            UpdateOperationCounter(operationName, stopwatch.Elapsed, false);
+
+            // 🔥 UltraThink Phase 9.1: 確実なログ出力（Console + ファイル + Logger）
+            var cancelMessage = $"⏸️ [PERF_CANCEL] Operation '{operationName}' was canceled after {stopwatch.Elapsed.TotalMilliseconds:F2}ms";
+            Console.WriteLine($"🚨🚨🚨 {cancelMessage}");
+
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_performance.txt",
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {cancelMessage}{Environment.NewLine}" +
+                    $"  Exception: {oce.GetType().Name}{Environment.NewLine}" +
+                    $"  Message: {oce.Message}{Environment.NewLine}" +
+                    $"  StackTrace: {oce.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* ファイル書き込み失敗を無視 */ }
+
+            _logger.LogInformation(oce, "⏸️ Operation '{OperationName}' was canceled after {ExecutionTime:F2}ms",
+                operationName, stopwatch.Elapsed.TotalMilliseconds);
+        }
         catch (Exception ex)
         {
             stopwatch.Stop();
             var endTime = DateTime.UtcNow;
-            
+
             measurement = measurement with
             {
                 ExecutionTime = stopwatch.Elapsed,
@@ -81,7 +114,21 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             // エラーカウンターを更新
             UpdateOperationCounter(operationName, stopwatch.Elapsed, false);
 
-            _logger.LogWarning(ex, "❌ Operation failed: {OperationName} after {ExecutionTime:F2}ms", 
+            // 🔥 UltraThink Phase 9.1: 確実なログ出力（Console + ファイル + Logger）
+            var errorMessage = $"❌ [PERF_ERROR] Operation '{operationName}' failed after {stopwatch.Elapsed.TotalMilliseconds:F2}ms - {ex.GetType().Name}: {ex.Message}";
+            Console.WriteLine($"🚨🚨🚨 {errorMessage}");
+
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_performance.txt",
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {errorMessage}{Environment.NewLine}" +
+                    $"  Exception: {ex.GetType().FullName}{Environment.NewLine}" +
+                    $"  Message: {ex.Message}{Environment.NewLine}" +
+                    $"  StackTrace: {ex.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* ファイル書き込み失敗を無視 */ }
+
+            _logger.LogWarning(ex, "❌ Operation failed: {OperationName} after {ExecutionTime:F2}ms",
                 operationName, stopwatch.Elapsed.TotalMilliseconds);
         }
 
