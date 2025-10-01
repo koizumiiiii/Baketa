@@ -146,6 +146,17 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         IGpuEnvironmentDetector? gpuEnvironmentDetector = null,
         IPerformanceMetricsCollector? metricsCollector = null)
     {
+        // 🔥🔥🔥 ABSOLUTE FIRST LINE - ログファイルに直接書き込み
+        try
+        {
+            System.IO.File.AppendAllText(@"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\CTOR_EXECUTED.txt",
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] HybridResourceManager CONSTRUCTOR CALLED\r\n");
+        }
+        catch { /* ignore */ }
+
+        // 🔥🔥🔥 Gemini推奨: コンストラクタ先頭で確実に実行されることを確認
+        Console.WriteLine("🔥🔥🔥 [CTOR_ENTRY_CHECK_20251001_0107] CONSTRUCTOR HAS BEEN ENTERED! 🔥🔥🔥");
+
         ArgumentNullException.ThrowIfNull(resourceMonitor);
         ArgumentNullException.ThrowIfNull(optionsMonitor);
         ArgumentNullException.ThrowIfNull(logger);
@@ -157,20 +168,17 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         _gpuEnvironmentDetector = gpuEnvironmentDetector;
         _metricsCollector = metricsCollector;
 
+        _logger.LogInformation("🔥🔥🔥 [CTOR_ENTRY_CHECK_20250930_2200] CONSTRUCTOR HAS BEEN ENTERED! 🔥🔥🔥");
         _logger.LogInformation("🔥🔥🔥 [PHASE12.1_CTOR] HybridResourceManagerコンストラクタ完了");
-        
+
         if (_metricsCollector != null)
         {
             _logger.LogInformation("📊 [PHASE4.1] パフォーマンスメトリクス統合が有効化されました");
         }
-        
-        // Phase 3: 設定変更の監視を開始
-        if (_settings.EnableHotReload)
-        {
-            _settingsChangeSubscription = _optionsMonitor.OnChange(OnSettingsChanged);
-            _logger.LogInformation("🔄 [PHASE3] ホットリロード機能が有効化されました - ポーリング間隔: {Interval}ms", 
-                _settings.ConfigurationPollingIntervalMs);
-        }
+
+        // 🔥 Phase 12.1修正: Channelを先に初期化（Task.Runの前）
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1_FIX] Channel初期化開始");
+        _logger.LogInformation("🔥🔥🔥 [PHASE12.1_FIX] Channel初期化開始");
 
         // BoundedChannel で バックプレッシャー管理
         _ocrChannel = Channel.CreateBounded<ProcessingRequest>(
@@ -188,6 +196,26 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 SingleReader = true,  // Phase 12.1: 単一Readerパターン
                 SingleWriter = false
             });
+
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1_FIX] Channel初期化完了");
+        _logger.LogInformation("🔥🔥🔥 [PHASE12.1_FIX] Channel初期化完了");
+
+        // 🔥 Phase 12.1: Translation Channel Readerバックグラウンドタスクをコンストラクタで即座に起動
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1_CTOR] バックグラウンドタスク起動開始");
+        _logger.LogInformation("🔥🔥🔥 [PHASE12.1_CTOR] バックグラウンドタスク起動開始");
+        _translationChannelReaderTask = Task.Run(
+            () => ProcessTranslationChannelAsync(_disposalCts.Token),
+            _disposalCts.Token);
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1_CTOR] バックグラウンドタスク起動完了");
+        _logger.LogInformation("🔥🔥🔥 [PHASE12.1_CTOR] バックグラウンドタスク起動完了");
+
+        // Phase 3: 設定変更の監視を開始
+        if (_settings.EnableHotReload)
+        {
+            _settingsChangeSubscription = _optionsMonitor.OnChange(OnSettingsChanged);
+            _logger.LogInformation("🔄 [PHASE3] ホットリロード機能が有効化されました - ポーリング間隔: {Interval}ms",
+                _settings.ConfigurationPollingIntervalMs);
+        }
 
         // 初期並列度設定
         _ocrSemaphore = new SemaphoreSlim(
@@ -212,21 +240,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"🔥🔥🔥 [PHASE12.1_DEBUG] InitializeAsync呼び出し - _translationChannelReaderTask == null: {_translationChannelReaderTask == null}, _isInitialized: {_isInitialized}");
-
-        // 🔥 Phase 12.1: Translation Channel Readerバックグラウンドタスク開始（初回のみ）
-        if (_translationChannelReaderTask == null)
-        {
-            _logger.LogInformation("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動中...");
-            _translationChannelReaderTask = Task.Run(
-                () => ProcessTranslationChannelAsync(_disposalCts.Token),
-                _disposalCts.Token);
-            _logger.LogInformation("🔥🔥🔥 [PHASE12.1] Translation Channel Readerバックグラウンドタスク起動完了！");
-        }
-        else
-        {
-            _logger.LogWarning($"🔥🔥🔥 [PHASE12.1_SKIP] バックグラウンドタスク既存 - Status: {_translationChannelReaderTask.Status}");
-        }
+        _logger.LogInformation($"🔥🔥🔥 [PHASE12.1_DEBUG] InitializeAsync呼び出し - _translationChannelReaderTask Status: {_translationChannelReaderTask?.Status}, _isInitialized: {_isInitialized}");
 
         if (_isInitialized)
         {
@@ -480,13 +494,26 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         TranslationRequest request,
         CancellationToken cancellationToken = default)
     {
+        // 🔥🔥🔥 Phase 12.1 検証: 確実に出力されるConsole.WriteLineを追加
+        Console.WriteLine($"🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！ OperationId={request?.OperationId ?? "NULL"}");
+        Core.Utilities.DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！ OperationId={request?.OperationId ?? "NULL"}");
+
         ArgumentNullException.ThrowIfNull(translationTaskFactory);
         ArgumentNullException.ThrowIfNull(request);
 
+        Console.WriteLine("🔥🔥🔥 [PHASE12.1_NULLCHECK] Null チェック完了");
+        Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.1_NULLCHECK] Nullチェック完了");
+
         if (!_isInitialized)
+        {
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1_INIT] InitializeAsync呼び出し");
+            Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.1_INIT] InitializeAsync呼び出し");
             await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         // 🔥 Phase 12.1: TaskCompletionSourceパターン
+        Console.WriteLine($"🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始 - OperationId={request.OperationId}");
+        Core.Utilities.DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始 - OperationId={request.OperationId}");
         _logger.LogInformation("🔥 [PHASE12.1] ProcessTranslationAsync呼び出し: {OperationId}", request.OperationId);
         var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 

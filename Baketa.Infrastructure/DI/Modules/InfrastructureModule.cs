@@ -795,7 +795,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         private static void RegisterResourceMonitoringServices(IServiceCollection services)
         {
             Console.WriteLine("🔧 [PHASE3] 動的リソース監視システム登録開始");
-            
+
             // リソース監視設定（デフォルト値でシングルトン登録）
             var defaultSettings = new Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings(
                 MonitoringIntervalMs: 5000,        // 5秒間隔で監視
@@ -807,18 +807,29 @@ namespace Baketa.Infrastructure.DI.Modules;
                 EnableNetworkMonitoring: false,    // ネットワーク監視無効（将来実装）
                 EnableDiskMonitoring: false        // ディスク監視無効（将来実装）
             );
-            
+
             // 設定をシングルトンとして登録（IOptionsパターンとダイレクト参照の両方をサポート）
             services.AddSingleton(defaultSettings);
             services.AddSingleton<IOptions<Baketa.Core.Abstractions.Monitoring.ResourceMonitoringSettings>>(
                 provider => Options.Create(defaultSettings));
             Console.WriteLine("✅ [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分");
-            
+
             // 注意: WindowsSystemResourceMonitorは Platform プロジェクトで登録される
             // Infrastructure レイヤーでは抽象インターフェースのみ認識
             // 実際の実装は PlatformModule で登録される予定
             Console.WriteLine("ℹ️ [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます");
-            
+
+            // 🔥 Phase 12.1: HybridResourceSettings設定登録
+            services.Configure<Baketa.Infrastructure.ResourceManagement.HybridResourceSettings>(options =>
+            {
+                // デフォルト設定を使用
+            });
+            Console.WriteLine("✅ [PHASE12.1] HybridResourceSettings登録完了 - デフォルト設定使用");
+
+            // 🔥 Phase 12.1: HybridResourceManager登録（30秒待機問題解決）
+            services.AddSingleton<Baketa.Infrastructure.ResourceManagement.IResourceManager, Baketa.Infrastructure.ResourceManagement.HybridResourceManager>();
+            Console.WriteLine("🔥🔥🔥 [PHASE12.1] HybridResourceManager登録完了 - Translation Channel Reader有効化");
+
             Console.WriteLine("🎉 [PHASE3] 動的リソース監視システム登録完了");
         }
 

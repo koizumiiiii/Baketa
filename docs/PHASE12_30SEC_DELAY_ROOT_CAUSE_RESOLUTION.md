@@ -502,5 +502,219 @@ services.AddScoped<IEventProcessor<AggregatedChunksReadyEvent>, AggregatedChunks
 
 ---
 
+## 🔧 Phase 12.1 実装報告 (2025-09-30 23:00-23:16)
+
+### 実施内容
+
+#### 1. HybridResourceManager DI登録 ✅
+**実装箇所**: `E:\dev\Baketa\Baketa.Infrastructure\DI\Modules\InfrastructureModule.cs:822-831`
+
+```csharp
+// RegisterResourceMonitoringServices メソッド内
+services.Configure<Baketa.Infrastructure.ResourceManagement.HybridResourceSettings>(options =>
+{
+    // デフォルト設定を使用
+});
+
+services.AddSingleton<Baketa.Infrastructure.ResourceManagement.IResourceManager,
+    Baketa.Infrastructure.ResourceManagement.HybridResourceManager>();
+```
+
+**実施理由**: HybridResourceManagerがDIコンテナに未登録だったため、コンストラクタが呼び出されず、Channel Readerバックグラウンドタスクが起動していなかった。
+
+#### 2. ビルドとデプロイ ✅
+- Infrastructureプロジェクトリビルド完了
+- 新DLL (23:04:18) をUI binディレクトリにコピー完了
+
+### 動作確認結果
+
+#### ✅ 確認できたこと
+
+1. **HybridResourceManagerインスタンス化成功**
+   ```
+   [23:14:29.942][T21] 🔥 [STEP11] HybridResourceManager確認 - _resourceManager != null: True
+   [23:14:29.946][T21] 🔥 [STEP13_OK] HybridResourceManager既に初期化済み
+   ```
+
+2. **ProcessTranslationAsync実行確認**
+   ```
+   [23:14:29.951][T21] 🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！
+   [23:14:29.954][T21] 🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始
+   ```
+
+3. **翻訳処理時間の短縮確認**
+   - 1回目: 1266ms ✅
+   - 2回目: 784ms ✅
+   - 3回目: 1103ms ✅
+   - 4回目: 661ms ✅
+
+   **すべて1秒前後で完了** → 個別の翻訳リクエストは高速化された
+
+#### ❓ 未確認事項
+
+1. **コンストラクタログ未出力**
+   - `[CTOR_ENTRY_CHECK_20250930_2200]` ログが見つからない
+   - `[PHASE12.1_CTOR]` ログも見つからない
+   - 推定原因: BaketaLogManager初期化前にコンストラクタが実行された
+
+2. **Channel Readerバックグラウンドタスクの起動確認不可**
+   - `[PHASE12.1] Translation Channel Readerバックグラウンドタスク開始！` ログなし
+   - ProcessTranslationAsyncは実行されているため、何らかの形で機能している可能性
+
+### 🚨 発見された問題
+
+#### 問題1: 1回目の翻訳でオーバーレイ表示されない
+
+**タイムライン分析**:
+```
+[23:14:29.951] 1回目翻訳開始 (TimedChunkAggregator)
+[23:14:31.192] 1回目翻訳完了 (1266ms) - オーバーレイ表示なし ❌
+
+[23:14:31.372] 2回目翻訳開始 (ProcessBatchTranslationAsync)
+[23:14:32.136] 2回目翻訳完了 (784ms) - オーバーレイ表示なし ❌
+
+【28.9秒の空白期間】← 自動翻訳ループが停止
+
+[23:15:01.275] 3回目翻訳開始 (ユーザーがゲーム画面進行)
+[23:15:03.149] オーバーレイ表示成功 ✅ (初めて表示)
+```
+
+**根本原因の仮説**:
+1. **TimedChunkAggregatorによる1回目の翻訳**が、Channel Writerに書き込むがReaderが処理していない
+2. Phase 12.1で実装したChannel Readerバックグラウンドタスクが、1回目の翻訳時には起動していない可能性
+3. 2重翻訳アーキテクチャ（Phase 12.2の問題）により、1回目と2回目の結果が統合されていない
+
+#### 問題2: 自動翻訳ループの28.9秒停止
+
+2回目翻訳完了後、3回目の翻訳まで28.9秒間何も起きていない。これは自動翻訳ループ（連続キャプチャ）が停止していることを示す。
+
+### 次のアクション
+
+#### 🔍 緊急調査タスク (UltraThink)
+
+1. **Channel Readerバックグラウンドタスクの起動確認**
+   - HybridResourceManagerコンストラクタで`Task.Run(() => ProcessTranslationChannelAsync())`が実行されているか
+   - バックグラウンドタスクが実際に動作しているか
+   - 1回目の翻訳時に`_translationChannel.Reader.ReadAllAsync()`がアイテムを読み取っているか
+
+2. **1回目翻訳のChannel動作分析**
+   - `_translationChannel.Writer.WriteAsync()`でアイテムが書き込まれているか
+   - Channel Readerがアイテムを即座に処理しているか
+   - TaskCompletionSource.SetResultが呼び出されているか
+
+3. **2重翻訳とオーバーレイ表示の関係調査**
+   - なぜ3回目の翻訳でのみオーバーレイが表示されるのか
+   - TimedChunkAggregatorの翻訳結果がどこに格納されているか
+   - ProcessBatchTranslationAsyncの結果とTimedChunkAggregatorの結果の統合メカニズム
+
+### 結論
+
+**Phase 12.1の部分的成功**:
+- ✅ HybridResourceManagerのDI登録成功
+- ✅ ProcessTranslationAsyncの実行確認
+- ✅ 個別翻訳リクエストの処理時間短縮（1秒前後）
+
+**未解決の問題**:
+- ❌ 1回目の翻訳でオーバーレイが表示されない
+- ❌ 2回目翻訳後の28.9秒停止
+- ❓ Channel Readerバックグラウンドタスクの起動と動作確認が必要
+
+**Phase 12.2の必要性**: 2重翻訳アーキテクチャの根本的解決が依然として必要
+
+---
+
+## 🎉 Phase 12.1 完全解決報告 (2025-10-01 10:27)
+
+### 実装完了確認
+
+#### ✅ 30秒セマフォ待機問題の完全解消
+
+**決定的証拠（タイムライン分析）**:
+```
+[10:27:25.076] 1回目翻訳開始 (TimedChunkAggregator)
+[10:27:26.038] 1回目翻訳完了 - ProcessingTime: 987ms ✅
+         ↓ 0.184秒後 ← 30秒待機完全解消！
+[10:27:26.222] 2回目翻訳開始 (ProcessBatchTranslationAsync)
+[10:27:27.006] 2回目翻訳完了 - ProcessingTime: 803ms ✅
+```
+
+**Phase 11で観測された30秒待機**:
+```
+15:39:27.386 2回目翻訳開始
+━━━━━━━━━━━━━ 30秒のブラックホール ━━━━━━━━━━━━━
+15:39:57.410 セマフォ取得成功
+```
+
+**Phase 12.1実装後**: **0.184秒** → **99.4%改善** ✅
+
+#### ✅ HybridResourceManager正常動作確認
+
+1. **コンストラクタ実行確認**:
+   ```
+   [10:27:13.802] HybridResourceManager CONSTRUCTOR CALLED
+   ```
+
+2. **Channel Readerバックグラウンドタスク起動**:
+   - ProcessTranslationAsyncが即座実行（TaskCompletionSourceパターン）
+   - セマフォ競合が完全解消
+
+3. **翻訳処理時間**:
+   - 1回目: 987ms
+   - 2回目: 803ms
+   - 3回目: 830ms
+   - 4回目: 694ms
+
+   **すべて1秒以内で完了** ✅
+
+### ❌ 残存問題: オーバーレイ表示30秒遅延
+
+**問題の本質**:
+- 翻訳処理は1秒以内で完了 ✅
+- オーバーレイ表示されない ❌
+- ユーザーが翻訳結果を確認できるのは**依然として30秒後**
+
+**タイムライン証拠**:
+```
+[10:27:25.076] 1回目翻訳開始
+[10:27:26.038] 1回目翻訳完了
+[10:27:27.006] 2回目翻訳完了
+         ↓
+    ❌ オーバーレイ表示ログなし
+         ↓
+    (29秒間の空白期間)
+         ↓
+[10:27:56.144] 3回目翻訳開始（ユーザーがゲーム画面進行）
+[10:27:57.670] 🎯 インプレースオーバーレイ表示開始 ← 初めて表示
+[10:27:57.916] ✅ 真のインプレース表示完了
+```
+
+### 🎯 Phase 12.2への移行
+
+**Phase 12.1の成果**:
+- ✅ セマフォ競合による30秒待機 → **完全解消**
+- ✅ 翻訳処理時間 → **1秒以内**
+- ❌ オーバーレイ表示 → **依然として30秒遅延**
+
+**Phase 12.2で解決すべき問題**:
+- **2重翻訳アーキテクチャの排除**
+- TimedChunkAggregator（1回目）とProcessBatchTranslationAsync（2回目）の統合
+- 1回目の翻訳でオーバーレイ即座表示（約1秒）
+
+**期待効果**:
+```
+【Phase 12.2実装後】
+
+1回目翻訳のみ実行 (800ms) → 完了 ✅
+  ↓ 即座
+オーバーレイ表示 ✅ ← ユーザーが翻訳結果を見られる！
+  ↓
+2回目翻訳は実行されない（2重翻訳排除）
+
+総所要時間: 約1秒（現状: 30秒） → 97%改善
+```
+
+---
+
 **ドキュメント作成日時**: 2025-09-30
-**次回更新予定**: Phase 12.1実装完了時
+**最終更新日時**: 2025-10-01 10:30 (Phase 12.1完全解決報告追加)
+**次回更新予定**: Phase 12.2実装完了時
