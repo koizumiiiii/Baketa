@@ -178,6 +178,12 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
             _logger.LogInformation("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
             Console.WriteLine("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
+
+            // 🔥 [PHASE12.4] Gemini推奨: StdinStdout通信モード時はTCP接続プール無効化
+            // 理由: stdin/stdout通信ではTCP接続不要、不要なTCP接続試行を防止
+            _circuitBreakerSettings.EnableConnectionPool = false;
+            _logger.LogInformation("🔧 [PHASE12.4] StdinStdout通信モード検出 - TCP接続プールを無効化");
+            Console.WriteLine("🔧 [PHASE12.4] EnableConnectionPool = false (StdinStdout通信モード)");
         }
         else
         {

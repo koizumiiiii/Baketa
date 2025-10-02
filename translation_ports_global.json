@@ -1,15 +1,15 @@
 {
   "ports": {
     "5556": {
-      "pid": 41076,
-      "last_heartbeat": "2025-10-01T23:49:15.1348777Z",
+      "pid": 30696,
+      "last_heartbeat": "2025-10-02T01:51:21.8613843Z",
       "metadata": null
     },
     "5557": {
-      "pid": 41076,
-      "last_heartbeat": "2025-10-01T23:49:15.1348779Z",
+      "pid": 30696,
+      "last_heartbeat": "2025-10-02T01:51:21.8613853Z",
       "metadata": null
     }
   },
-  "last_updated": "2025-10-01T23:47:45.1279323Z"
+  "last_updated": "2025-10-02T01:49:51.8566864Z"
 }

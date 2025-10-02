@@ -85,8 +85,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
 
-            // NLLB-200翻訳サービス（高品質版）を登録
-            RegisterNllb200TranslationServices(services);
+            // 🔥 [PHASE12.5.3_FIX] NLLB-200翻訳サービス登録を削除
+            // 理由: RegisterServices(services, config)メソッドで既に登録されるため重複を回避
+            // RegisterNllb200TranslationServices(services);
 
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
@@ -153,14 +154,17 @@ namespace Baketa.Infrastructure.DI.Modules;
             // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
             RegisterStickyRoiServices(services);
             
+            // 🔥 [PHASE12.5.4_FIX] RegisterPortManagementServicesを最優先実行
+            // 理由: RegisterNllb200TranslationServicesがIPythonServerManager登録状況を確認するため、
+            //       先にIPythonServerManagerを登録する必要がある
+            RegisterPortManagementServices(services);
+
             // NLLB-200翻訳サービス（高品質版）を登録
+            // IPythonServerManager登録済みの状態でConnectionPool登録判定を実行
             RegisterNllb200TranslationServices(services);
-            
+
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
-            
-            // Phase 5: ポート競合防止機構サービス
-            RegisterPortManagementServices(services);
             
             // Step 1: Python環境解決と診断サービス（即座の応急処置）
             RegisterPythonEnvironmentServices(services);
@@ -567,11 +571,15 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         private static void RegisterNllb200TranslationServices(IServiceCollection services)
         {
+            // 🔥 [PHASE12.5.2_DEBUG] メソッド実行確認用ログ（最優先出力）
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] RegisterNllb200TranslationServices 開始\r\n");
+
             // 既存のITranslationEngine登録を全て削除して、最適化されたエンジンを登録
             var existingTranslationEngines = services
                 .Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine))
                 .ToList();
-            
+
             foreach (var service in existingTranslationEngines)
             {
                 services.Remove(service);
@@ -580,16 +588,43 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 🎭 Issue #147 Phase 3.2: Mock翻訳エンジン登録（ハイブリッド戦略テスト用）
             // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
             Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
-            
-            // ✅ FixedSizeConnectionPool登録（動的ポート対応版）
-            services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - NLLB-200専用動的ポート対応");
+
+            // 🔥 [PHASE12.5] Gemini推奨: StdinStdout通信モード時はConnectionPool登録をスキップ
+            // 理由: stdin/stdout通信ではTCP接続不要、ConnectionPool初期化時のTCP接続試行を完全防止
+            // 動的ポート管理使用時（PythonServerManager登録済み）はStdinStdout通信モード
+            // 🔥 [PHASE12.5.1_FIX] 型修正: PythonServerManager → IPythonServerManager（インターフェース型で判定）
+            var pythonServerManagerRegistered = services.Any(sd =>
+                sd.ServiceType == typeof(IPythonServerManager));
+
+            // 🔥 [PHASE12.5.2_DEBUG] 判定結果ログ
+            System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] IPythonServerManager登録済み: {pythonServerManagerRegistered}\r\n");
+
+            if (!pythonServerManagerRegistered)
+            {
+                // ✅ FixedSizeConnectionPool登録（レガシーTCP接続モード専用）
+                services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
+                Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - レガシーTCP接続モード");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] FixedSizeConnectionPool登録完了 - レガシーTCP接続モード\r\n");
+            }
+            else
+            {
+                // ✅ ConnectionPool未登録（StdinStdout通信モード）
+                Console.WriteLine("🔧 [PHASE12.5] ConnectionPool登録スキップ - StdinStdout通信モード（TCP接続不要）");
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 🔧 [PHASE12.5] ConnectionPool登録スキップ - StdinStdout通信モード\r\n");
+            }
             
             // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 3.2 VRAMモニタリング統合）
             services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                var connectionPool = provider.GetRequiredService<IConnectionPool>();
+
+                // 🔥 [PHASE12.5] ConnectionPoolはオプショナル取得（StdinStdout通信モード時は未登録）
+                var connectionPool = provider.GetService<IConnectionPool>();
+                logger?.LogInformation("🔧 [PHASE12.5] ConnectionPool取得結果: {Exists}", connectionPool != null);
+
                 var languageConfig = provider.GetRequiredService<ILanguageConfigurationService>();
                 
                 // 🚀 Phase 3.2修正: GetRequiredServiceでHybridResourceManagerを強制取得
