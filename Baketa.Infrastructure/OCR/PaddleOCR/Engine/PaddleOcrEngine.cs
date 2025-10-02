@@ -1058,7 +1058,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     _ocrEngine = new PaddleOcrAll(models)
                     {
                         AllowRotateDetection = true,
-                        Enable180Classification = true // V5では180度回転認識を有効化して高速化
+                        Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
+                        // 根本原因: PaddleOcrClassifier.ShouldRotate180()内でPD_PredictorRunがメモリアクセス違反
+                        // 180度回転テキストは未対応となるが、ゲーム翻訳では実用上問題なし
                     };
                     
                     // 🎯 【重要】パラメーター最適化を一時的に無効化してテスト
@@ -4185,12 +4187,29 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                             // 🧠 [GEMINI_MAT_FIX] 既に防御的コピー済safeMatを使用（最適化版）
                             workingMat = safeMat.Clone();
                             
-                            // 🚀 [VALIDATION_OPTIMIZATION] 軽量Mat検証（最適化版）
-                            if (workingMat.IsDisposed || workingMat.Empty() || workingMat.Cols < 16 || workingMat.Rows < 16)
+                            // 🛡️ [ENHANCED_VALIDATION] Mat状態の詳細検証（強化版）
+                            var matIsDisposed = workingMat.IsDisposed;
+                            var matIsEmpty = workingMat.Empty();
+                            var matCols = workingMat.Cols;
+                            var matRows = workingMat.Rows;
+                            var matChannels = matIsEmpty ? -1 : workingMat.Channels();
+                            var matDepth = matIsEmpty ? -1 : workingMat.Depth();
+                            var matDataPtr = workingMat.Data.ToString("X16");
+
+                            __logger?.LogDebug(
+                                "🔍 [MAT_VALIDATION] PaddleOCR実行前Mat検証 - " +
+                                "Disposed={Disposed}, Empty={Empty}, Size={Width}x{Height}, " +
+                                "Channels={Channels}, Depth={Depth}, DataPtr={Ptr}",
+                                matIsDisposed, matIsEmpty, matCols, matRows, matChannels, matDepth, matDataPtr);
+
+                            if (matIsDisposed || matIsEmpty || matCols < 16 || matRows < 16)
                             {
-                                __logger?.LogError("🚨 [OCR_ENGINE_OPT] 不正なMat状態でPaddleOCR.Run中止（最適化）: IsDisposed={IsDisposed}, Empty={Empty}, Size={Width}x{Height}",
-                                    workingMat.IsDisposed, workingMat.Empty(), workingMat.Cols, workingMat.Rows);
-                                throw new InvalidOperationException("PaddleOCR実行直前にMatが無効になりました（最適化版）");
+                                __logger?.LogCritical(
+                                    "💥 [MAT_INVALID] 不正なMat状態でPaddleOCR.Run中止 - " +
+                                    "Disposed={Disposed}, Empty={Empty}, Size={Width}x{Height}, Ptr={Ptr}",
+                                    matIsDisposed, matIsEmpty, matCols, matRows, matDataPtr);
+                                throw new InvalidOperationException(
+                                    $"PaddleOCR実行直前にMatが無効になりました: Disposed={matIsDisposed}, Empty={matIsEmpty}, Size={matCols}x{matRows}");
                             }
                             
                             // 🎯 [PADDLE_PREDICTOR_CRITICAL_FIX_OPT] PaddlePredictor run failed エラー対策（最適化版）
@@ -4274,6 +4293,26 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     }
                     
                     throw new InvalidOperationException($"PaddlePredictor実行失敗（最適化）: {ex.Message}。連続失敗: {_consecutivePaddleFailures}回", ex);
+                }
+                catch (AccessViolationException avEx)
+                {
+                    // 🛡️ [CRITICAL_FIX] AccessViolationException専用処理
+                    // PaddleOCRネイティブライブラリ内でのメモリアクセス違反を捕捉
+                    _consecutivePaddleFailures += 3; // AVEは致命的なので大きくカウント
+
+                    __logger?.LogCritical(avEx,
+                        "💥 [ACCESS_VIOLATION] PaddleOCRネイティブライブラリでメモリアクセス違反 - " +
+                        "連続失敗: {FailureCount}回。180度分類器またはモデル互換性の問題が疑われます。",
+                        _consecutivePaddleFailures);
+
+                    // 180度分類が無効化されているか確認してログ
+                    var clsEnabled = _ocrEngine?.Enable180Classification ?? false;
+                    __logger?.LogCritical("🔍 [AVE_DEBUG] Enable180Classification状態: {ClsEnabled}", clsEnabled);
+
+                    // AccessViolationExceptionは回復不能なため、即座にスロー
+                    throw new InvalidOperationException(
+                        $"PaddleOCRネイティブエラー（AccessViolationException）。連続失敗: {_consecutivePaddleFailures}回。" +
+                        "180度分類器が無効化されているか確認してください。", avEx);
                 }
                 catch (Exception ex)
                 {

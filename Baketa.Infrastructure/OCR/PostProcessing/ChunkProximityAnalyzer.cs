@@ -28,6 +28,10 @@ public sealed class ChunkProximityAnalyzer
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
+        // 設定値をプロパティに反映
+        VerticalDistanceFactor = settings.VerticalDistanceFactor;
+        HorizontalDistanceFactor = settings.HorizontalDistanceFactor;
     }
 
     /// <summary>
@@ -90,6 +94,7 @@ public sealed class ChunkProximityAnalyzer
 
     /// <summary>
     /// 2つのチャンクが近接しているかを判定
+    /// Gemini推奨: 同一行と異なる行で異なる水平距離閾値を適用
     /// </summary>
     public bool IsProximityClose(TextChunk a, TextChunk b, ProximityContext context)
     {
@@ -107,27 +112,32 @@ public sealed class ChunkProximityAnalyzer
             return false;
         }
 
-        // 2. 同一行の場合は水平方向もチェック
-        if (context.IsSameLine(rectA, rectB))
+        // 2. 水平距離の計算（共通化）
+        var hGap = context.GetHorizontalGap(rectA, rectB);
+        var isSameLine = context.IsSameLine(rectA, rectB);
+
+        // 3. 同一行 vs 異なる行で閾値を切り替え
+        var horizontalThreshold = isSameLine
+            ? context.HorizontalThreshold
+            : Math.Min(
+                context.HorizontalThreshold * _settings.CrossRowHorizontalDistanceFactor,
+                _settings.MaxCrossRowHorizontalGapPixels  // 絶対値上限
+              );
+
+        var isClose = hGap <= horizontalThreshold;
+
+        // 4. デバッグログ（トラブルシューティング用）
+        if (_settings.EnableDetailedLogging)
         {
-            var hGap = context.GetHorizontalGap(rectA, rectB);
-            var isClose = hGap <= context.HorizontalThreshold;
-
             _logger.LogTrace(
-                "同一行判定 - ChunkA:{AId} vs ChunkB:{BId}, " +
-                "水平距離:{HGap:F1}px, 閾値:{HThreshold:F1}px, 結果:{Result}",
-                a.ChunkId, b.ChunkId, hGap, context.HorizontalThreshold, isClose);
-
-            return isClose;
+                "近接判定 - ChunkA:{AId}「{AText}」 vs ChunkB:{BId}「{BText}」, " +
+                "水平距離:{HGap:F1}px, 閾値:{HThreshold:F1}px, " +
+                "同一行:{SameLine}, 結果:{Result}",
+                a.ChunkId, a.CombinedText, b.ChunkId, b.CombinedText,
+                hGap, horizontalThreshold, isSameLine, isClose);
         }
 
-        // 3. 異なる行だが垂直距離が近い場合は近接と判定
-        _logger.LogDebug(
-            "異なる行近接 - ChunkA:{AId} vs ChunkB:{BId}, " +
-            "垂直距離:{VGap:F1}px ≤ 閾値:{VThreshold:F1}px",
-            a.ChunkId, b.ChunkId, vGap, context.VerticalThreshold);
-
-        return true;
+        return isClose;
     }
 
     /// <summary>

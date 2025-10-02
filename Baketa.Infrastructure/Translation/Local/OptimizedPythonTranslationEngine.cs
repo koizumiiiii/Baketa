@@ -1110,45 +1110,40 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
     }
 
     public virtual async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
-        IReadOnlyList<CoreTranslationRequest> requests, 
+        IReadOnlyList<CoreTranslationRequest> requests,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(requests);
-            
+
         if (requests.Count == 0)
             return [];
 
-        // 言語ペアでグループ化
-        var groupedRequests = requests.GroupBy(r => $"{r.SourceLanguage.Code}_{r.TargetLanguage.Code}");
-        var allResponses = new List<TranslationResponse>();
+        // 🎯 [PHASE12.5_COMPLETE] TCP接続完全削除 - StdinStdout個別処理の並列実行に統一
+        // バッチ処理を廃止し、_translationClient（StdinStdoutTranslationClient）経由の個別処理を並列実行
+        _logger.LogDebug("🔥 [PHASE12.5] TranslateBatchAsync - StdinStdout個別処理並列実行モード: {Count}件", requests.Count);
 
-        foreach (var group in groupedRequests)
+        // 全リクエストを並列で個別処理（StdinStdout通信）
+        var translateTasks = requests.Select(async req =>
         {
-            var groupList = group.ToList();
-            
-            // バッチサイズ制限確認
-            const int maxBatchSize = 50;
-            if (groupList.Count > maxBatchSize)
+            try
             {
-                // 大きなバッチを分割処理
-                var splitResponses = await ProcessLargeBatchAsync(groupList, maxBatchSize, cancellationToken).ConfigureAwait(false);
-                allResponses.AddRange(splitResponses);
+                return await TranslateAsync(req, cancellationToken).ConfigureAwait(false);
             }
-            else
+            catch (Exception ex)
             {
-                // 通常のバッチ処理
-                var batchResponses = await ProcessSingleBatchAsync(groupList, cancellationToken).ConfigureAwait(false);
-                allResponses.AddRange(batchResponses);
+                _logger.LogError(ex, "❌ [BATCH_INDIVIDUAL] 個別翻訳エラー - RequestId: {RequestId}", req.RequestId);
+                return TranslationResponse.CreateError(req,
+                    new TranslationError { ErrorCode = "INDIVIDUAL_TRANSLATION_ERROR", Message = ex.Message },
+                    Name);
             }
-        }
+        });
 
-        // 元の順序を保持するため、RequestIdでソート
-        var responseMap = allResponses.ToDictionary(r => r.RequestId);
-        return [..requests.Select(req => responseMap.TryGetValue(req.RequestId, out var response) 
-            ? response 
-            : TranslationResponse.CreateError(req, 
-                new TranslationError { ErrorCode = "BATCH_PROCESSING_ERROR", Message = "Response not found" }, 
-                Name))];
+        var allResponses = await Task.WhenAll(translateTasks).ConfigureAwait(false);
+
+        _logger.LogDebug("✅ [PHASE12.5] TranslateBatchAsync完了 - 成功: {SuccessCount}/{TotalCount}件",
+            allResponses.Count(r => r.IsSuccess), allResponses.Length);
+
+        return allResponses;
     }
 
     private async Task<IReadOnlyList<TranslationResponse>> ProcessSingleBatchAsync(

@@ -15,11 +15,11 @@ public sealed class ProximityGroupingSettings
 
     /// <summary>
     /// 垂直距離倍率（文字高さに対する倍率）
+    /// 0.4 = 文字高さの0.4倍まで同一グループ（非常に厳格）
     /// 1.0 = 文字高さと同じ距離まで同一グループ
-    /// 1.2 = 文字高さの1.2倍まで同一グループ（推奨）
     /// </summary>
     [Range(0.5, 3.0)]
-    public double VerticalDistanceFactor { get; set; } = 1.2;
+    public double VerticalDistanceFactor { get; set; } = 0.4;
 
     /// <summary>
     /// 水平距離倍率（平均文字幅に対する倍率）
@@ -29,10 +29,26 @@ public sealed class ProximityGroupingSettings
     public double HorizontalDistanceFactor { get; set; } = 3.0;
 
     /// <summary>
+    /// 異なる行のチャンクをグルーピングする際の水平距離係数
+    /// 改行・折り返しテキストを考慮して、同一行より寛容な値を設定
+    /// 2.0 = HorizontalThresholdの2倍まで異なる行でもグルーピング（推奨）
+    /// </summary>
+    [Range(1.0, 5.0)]
+    public double CrossRowHorizontalDistanceFactor { get; set; } = 2.0;
+
+    /// <summary>
+    /// 異なる行のチャンクグルーピングの絶対値上限（ピクセル）
+    /// 超高解像度画面でも過剰なグルーピングを防ぐための上限値
+    /// 100px = 離れたUI要素（左メニューと中央ステータスなど）を確実に分離
+    /// </summary>
+    [Range(50, 500)]
+    public int MaxCrossRowHorizontalGapPixels { get; set; } = 100;
+
+    /// <summary>
     /// 詳細ログの有効化
     /// 開発時のデバッグやチューニングに使用
     /// </summary>
-    public bool EnableDetailedLogging { get; set; } = false;
+    public bool EnableDetailedLogging { get; set; } = true;
 
     /// <summary>
     /// 最小チャンク高さ（ピクセル）
@@ -61,8 +77,10 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Default => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 1.2,
+        VerticalDistanceFactor = 0.4,
         HorizontalDistanceFactor = 3.0,
+        CrossRowHorizontalDistanceFactor = 2.0,
+        MaxCrossRowHorizontalGapPixels = 100,
         EnableDetailedLogging = false,
         MinChunkHeight = 8,
         MaxChunkHeight = 200,
@@ -75,8 +93,10 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Development => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 1.2,
+        VerticalDistanceFactor = 0.4,
         HorizontalDistanceFactor = 3.0,
+        CrossRowHorizontalDistanceFactor = 2.5,
+        MaxCrossRowHorizontalGapPixels = 120,
         EnableDetailedLogging = true,
         MinChunkHeight = 6,
         MaxChunkHeight = 300,
@@ -89,8 +109,10 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Conservative => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 1.0,
+        VerticalDistanceFactor = 0.3,
         HorizontalDistanceFactor = 2.0,
+        CrossRowHorizontalDistanceFactor = 1.5,
+        MaxCrossRowHorizontalGapPixels = 80,
         EnableDetailedLogging = false,
         MinChunkHeight = 10,
         MaxChunkHeight = 150,
@@ -103,8 +125,10 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Aggressive => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 2.0,
+        VerticalDistanceFactor = 1.0,
         HorizontalDistanceFactor = 5.0,
+        CrossRowHorizontalDistanceFactor = 3.0,
+        MaxCrossRowHorizontalGapPixels = 150,
         EnableDetailedLogging = false,
         MinChunkHeight = 5,
         MaxChunkHeight = 400,

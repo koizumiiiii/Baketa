@@ -485,22 +485,27 @@ public sealed class TimedChunkAggregator : IDisposable
         }
         
         var totalInputChunks = chunksToProcessByWindow.Values.Sum(list => list.Count);
-        _logger.LogDebug("統合処理開始 - {WindowCount}ウィンドウ, {Count}個のチャンク", 
+        Console.WriteLine($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク");
+        _logger.LogCritical("🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {WindowCount}ウィンドウ, {Count}個のチャンク",
             chunksToProcessByWindow.Count, totalInputChunks);
 
         try
         {
             var allAggregatedChunks = new List<TextChunk>();
-            
+
             // ウィンドウハンドル別に統合処理（コンテキスト分離）
             foreach (var kvp in chunksToProcessByWindow)
             {
                 var windowHandle = kvp.Key;
                 var chunksForWindow = kvp.Value;
-                
+
+                Console.WriteLine($"🚨 [COMBINE_DEBUG] ウィンドウ {windowHandle}: {chunksForWindow.Count}個のチャンク処理開始");
+
                 if (chunksForWindow.Count > 0)
                 {
+                    Console.WriteLine($"🚨 [COMBINE_DEBUG] CombineChunks呼び出し直前 - Count: {chunksForWindow.Count}");
                     var aggregatedChunks = CombineChunks(chunksForWindow);
+                    Console.WriteLine($"🚨 [COMBINE_DEBUG] CombineChunks呼び出し完了 - 結果: {aggregatedChunks.Count}個");
                     allAggregatedChunks.AddRange(aggregatedChunks);
                     
                     _logger.LogDebug("ウィンドウ {WindowHandle}: {InputCount}個→{OutputCount}個のチャンク統合",
@@ -581,8 +586,14 @@ public sealed class TimedChunkAggregator : IDisposable
 
         try
         {
+            // 🔍 [DEBUG] 設定値のログ出力
+            var enabled = _settings.CurrentValue.ProximityGrouping.Enabled;
+            var verticalFactor = _settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor;
+            _logger.LogCritical("🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {Enabled}, VerticalDistanceFactor: {Factor}",
+                enabled, verticalFactor);
+
             // 近接度グループ化が無効の場合は従来通りの統合
-            if (!_settings.CurrentValue.ProximityGrouping.Enabled)
+            if (!enabled)
             {
                 _logger.LogInformation("🔄 [LEGACY] 近接度グループ化無効 - 従来の統合処理実行: {Count}個", chunks.Count);
                 return LegacyCombineChunks(chunks);
