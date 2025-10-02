@@ -1,7 +1,8 @@
 using System.Drawing;
 using Baketa.Core.Abstractions.Translation;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Settings;
+using Baketa.Core.Utilities;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.PostProcessing;
 
@@ -29,6 +30,17 @@ public sealed class ChunkProximityAnalyzer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
+        // 🚨 [CRITICAL_DEBUG] ProximityGroupingSettings クラス自体のデフォルト値確認
+        var defaultInstance = new ProximityGroupingSettings();
+        var defaultLog = $"🔥 [DEFAULT_CHECK] ProximityGroupingSettings.csのデフォルト値: {defaultInstance.VerticalDistanceFactor}";
+        Console.WriteLine(defaultLog);
+        DebugLogUtility.WriteLog(defaultLog);
+
+        // 🚨 [CONSTRUCTOR_DEBUG] 設定値確認
+        var ctorLog = $"🚨 [CTOR_DEBUG] ChunkProximityAnalyzer初期化 - VerticalDistanceFactor: {settings.VerticalDistanceFactor}, HorizontalDistanceFactor: {settings.HorizontalDistanceFactor}";
+        Console.WriteLine(ctorLog);
+        DebugLogUtility.WriteLog(ctorLog);
+
         // 設定値をプロパティに反映
         VerticalDistanceFactor = settings.VerticalDistanceFactor;
         HorizontalDistanceFactor = settings.HorizontalDistanceFactor;
@@ -45,11 +57,21 @@ public sealed class ChunkProximityAnalyzer
             return ProximityContext.Default;
         }
 
+        // 🚨 [HEIGHT_DEBUG] 全チャンクの高さをログ出力
+        var allHeights = chunks.Select(c => c.CombinedBounds.Height).ToList();
+        var heightsLog = $"🚨 [HEIGHT_DEBUG] 全{chunks.Count}個のチャンク高さ: [{string.Join(", ", allHeights)}]";
+        Console.WriteLine(heightsLog);
+        DebugLogUtility.WriteLog(heightsLog);
+
         // 有効な高さのみを取得（ノイズ除去）
         var validHeights = chunks
             .Select(c => c.CombinedBounds.Height)
             .Where(h => h >= _settings.MinChunkHeight && h <= _settings.MaxChunkHeight) // 設定値で範囲制限
             .ToList();
+
+        var validLog = $"🚨 [HEIGHT_DEBUG] 有効な高さ{validHeights.Count}個: [{string.Join(", ", validHeights)}]";
+        Console.WriteLine(validLog);
+        DebugLogUtility.WriteLog(validLog);
 
         if (validHeights.Count == 0)
         {
@@ -62,6 +84,10 @@ public sealed class ChunkProximityAnalyzer
         var medianHeight = CalculateMedian(validHeights);
         var minHeight = Math.Max(validHeights.Min(), _settings.MinChunkHeight);  // 設定値から最小値
         var maxHeight = Math.Min(validHeights.Max(), _settings.MaxChunkHeight); // 設定値から最大値
+
+        var statsLog = $"🚨 [HEIGHT_DEBUG] 統計 - 平均:{avgHeight:F1}px, 中央値:{medianHeight:F1}px, 最小:{minHeight}px, 最大:{maxHeight}px";
+        Console.WriteLine(statsLog);
+        DebugLogUtility.WriteLog(statsLog);
 
         // より信頼性の高い値を選択（中央値の方が外れ値に強い）
         var charHeight = medianHeight;
@@ -103,13 +129,30 @@ public sealed class ChunkProximityAnalyzer
 
         // 1. 垂直方向の距離チェック
         var vGap = context.GetVerticalGap(rectA, rectB);
+
+        // 🚨 [PROXIMITY_DEBUG] 垂直距離判定の詳細ログ
+        var rectAInfo = $"A(Y:{rectA.Y}, H:{rectA.Height})";
+        var rectBInfo = $"B(Y:{rectB.Y}, H:{rectB.Height})";
+        var vgapLog = $"  🔍 [VGAP] ChunkA:{a.ChunkId}「{a.CombinedText}」{rectAInfo} vs ChunkB:{b.ChunkId}「{b.CombinedText}」{rectBInfo} → vGap:{vGap:F1}px, 閾値:{context.VerticalThreshold:F1}px";
+        Console.WriteLine(vgapLog);
+        DebugLogUtility.WriteLog(vgapLog);
+
         if (vGap > context.VerticalThreshold)
         {
+            var rejectLog = $"    ❌ [VGAP_REJECT] 垂直距離超過 - {vGap:F1}px > {context.VerticalThreshold:F1}px";
+            Console.WriteLine(rejectLog);
+            DebugLogUtility.WriteLog(rejectLog);
             _logger.LogTrace(
                 "垂直距離超過 - ChunkA:{AId} vs ChunkB:{BId}, " +
                 "距離:{VGap:F1}px > 閾値:{VThreshold:F1}px",
                 a.ChunkId, b.ChunkId, vGap, context.VerticalThreshold);
             return false;
+        }
+        else
+        {
+            var okLog = $"    ✅ [VGAP_OK] 垂直距離OK - {vGap:F1}px <= {context.VerticalThreshold:F1}px";
+            Console.WriteLine(okLog);
+            DebugLogUtility.WriteLog(okLog);
         }
 
         // 2. 水平距離の計算（共通化）
@@ -125,6 +168,11 @@ public sealed class ChunkProximityAnalyzer
               );
 
         var isClose = hGap <= horizontalThreshold;
+
+        // 🚨 [PROXIMITY_DEBUG] 水平距離判定の詳細ログ
+        var hgapLog = $"  🔍 [HGAP] hGap:{hGap:F1}px, 閾値:{horizontalThreshold:F1}px, 同一行:{isSameLine}, 結果:{(isClose ? "✅統合" : "❌分離")}";
+        Console.WriteLine(hgapLog);
+        DebugLogUtility.WriteLog(hgapLog);
 
         // 4. デバッグログ（トラブルシューティング用）
         if (_settings.EnableDetailedLogging)

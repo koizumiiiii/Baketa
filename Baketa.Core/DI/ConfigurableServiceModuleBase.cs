@@ -20,7 +20,9 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
     /// </summary>
     public override void RegisterServices(IServiceCollection services)
     {
+        var assemblyPath = GetType().Assembly.Location;
         Console.WriteLine($"🔧 [PHASE12.2_DIAG] {GetType().Name}.RegisterServices() 開始");
+        Console.WriteLine($"🔧 [ASSEMBLY_DEBUG] Baketa.Core.dll Location: {assemblyPath}");
 
         try
         {

@@ -1005,7 +1005,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 var windowHandle = _targetWindowHandle.Value;
                 DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ開始: Handle={windowHandle}");
+
+                // 🔥🔥🔥 [CRITICAL_DEBUG] CaptureService状態確認
+                DebugLogUtility.WriteLog($"🔥 [CAPTURE_DEBUG] _captureService is null: {_captureService is null}");
+                DebugLogUtility.WriteLog($"🔥 [CAPTURE_DEBUG] _captureService type: {_captureService?.GetType().FullName ?? "NULL"}");
+                DebugLogUtility.WriteLog($"🔥 [CAPTURE_DEBUG] CaptureWindowAsync呼び出し直前");
+
                 currentImage = await _captureService!.CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+
+                DebugLogUtility.WriteLog($"🔥 [CAPTURE_DEBUG] CaptureWindowAsync呼び出し完了");
                 if (currentImage is null)
                 {
                     throw new TranslationException("ウィンドウキャプチャに失敗しました");

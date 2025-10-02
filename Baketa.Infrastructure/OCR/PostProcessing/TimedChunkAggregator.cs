@@ -299,6 +299,10 @@ public sealed class TimedChunkAggregator : IDisposable
     /// </summary>
     private async void ProcessPendingChunks(object? state)
     {
+        // 🚨 [CALLBACK_ENTRY] 絶対最初に実行されるログ（例外発生前診断）
+        try { Console.WriteLine("🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {0}", Thread.CurrentThread.ManagedThreadId); } catch { }
+        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Thread.CurrentThread.ManagedThreadId}"); } catch { }
+
         // 🔥 [PHASE12.2_CALLBACK] タイマーコールバック実行開始
         Console.WriteLine("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
         DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
@@ -466,6 +470,11 @@ public sealed class TimedChunkAggregator : IDisposable
         DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
         _logger.LogCritical("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
 
+        // 🚨 [STACK_TRACE] 呼び出し元特定のためスタックトレースをログ出力
+        var stackTrace = new System.Diagnostics.StackTrace(1, true); // 1フレームスキップ（自身を除く）
+        Console.WriteLine($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
+        DebugLogUtility.WriteLog($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
+
         if (_pendingChunksByWindow.IsEmpty)
         {
             Console.WriteLine("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
@@ -484,8 +493,14 @@ public sealed class TimedChunkAggregator : IDisposable
             }
         }
         
+        // 🚨 [CRITICAL_DEBUG] Line 496診断
+        try { Console.WriteLine("🚨 [LINE496_BEFORE] Sum計算直前"); } catch { }
         var totalInputChunks = chunksToProcessByWindow.Values.Sum(list => list.Count);
-        Console.WriteLine($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク");
+        try { Console.WriteLine($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
+        try { DebugLogUtility.WriteLog($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
+
+        try { Console.WriteLine($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
+        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
         _logger.LogCritical("🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {WindowCount}ウィンドウ, {Count}個のチャンク",
             chunksToProcessByWindow.Count, totalInputChunks);
 
@@ -499,13 +514,42 @@ public sealed class TimedChunkAggregator : IDisposable
                 var windowHandle = kvp.Key;
                 var chunksForWindow = kvp.Value;
 
-                Console.WriteLine($"🚨 [COMBINE_DEBUG] ウィンドウ {windowHandle}: {chunksForWindow.Count}個のチャンク処理開始");
+                var windowLog = $"🚨 [COMBINE_DEBUG] ウィンドウ {windowHandle}: {chunksForWindow.Count}個のチャンク処理開始";
+                Console.WriteLine(windowLog);
+                DebugLogUtility.WriteLog(windowLog);
+                _logger.LogCritical(windowLog);
 
                 if (chunksForWindow.Count > 0)
                 {
-                    Console.WriteLine($"🚨 [COMBINE_DEBUG] CombineChunks呼び出し直前 - Count: {chunksForWindow.Count}");
+                    // 🚨 [COMBINE_DEBUG] 入力チャンクの詳細情報をログ出力
+                    var logMsg = $"🚨 [COMBINE_DEBUG] CombineChunks呼び出し直前 - Count: {chunksForWindow.Count}";
+                    Console.WriteLine(logMsg);
+                    DebugLogUtility.WriteLog(logMsg);
+                    _logger.LogCritical(logMsg);
+
+                    var maxLog = Math.Min(chunksForWindow.Count, 5); // 最初の5個だけログ出力
+                    for (int i = 0; i < maxLog; i++)
+                    {
+                        var chunk = chunksForWindow[i];
+                        var chunkLog = $"  🔍 [INPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})";
+                        Console.WriteLine(chunkLog);
+                        DebugLogUtility.WriteLog(chunkLog);
+                    }
+                    if (chunksForWindow.Count > 5)
+                    {
+                        var omitLog = $"  ... (残り {chunksForWindow.Count - 5} 個のチャンクは省略)";
+                        Console.WriteLine(omitLog);
+                        DebugLogUtility.WriteLog(omitLog);
+                    }
+
                     var aggregatedChunks = CombineChunks(chunksForWindow);
+
                     Console.WriteLine($"🚨 [COMBINE_DEBUG] CombineChunks呼び出し完了 - 結果: {aggregatedChunks.Count}個");
+                    for (int i = 0; i < aggregatedChunks.Count; i++)
+                    {
+                        var chunk = aggregatedChunks[i];
+                        Console.WriteLine($"  ✅ [OUTPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})");
+                    }
                     allAggregatedChunks.AddRange(aggregatedChunks);
                     
                     _logger.LogDebug("ウィンドウ {WindowHandle}: {InputCount}個→{OutputCount}個のチャンク統合",
@@ -586,9 +630,16 @@ public sealed class TimedChunkAggregator : IDisposable
 
         try
         {
+            // 🚨 [ULTRA_DEBUG] CombineChunksメソッド実行確認
+            Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
+            DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
+            _logger.LogCritical("🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {Count}", chunks.Count);
+
             // 🔍 [DEBUG] 設定値のログ出力
             var enabled = _settings.CurrentValue.ProximityGrouping.Enabled;
             var verticalFactor = _settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor;
+            Console.WriteLine($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
+            DebugLogUtility.WriteLog($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
             _logger.LogCritical("🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {Enabled}, VerticalDistanceFactor: {Factor}",
                 enabled, verticalFactor);
 

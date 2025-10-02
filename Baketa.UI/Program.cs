@@ -563,8 +563,19 @@ namespace Baketa.UI;
             Console.WriteLine($"🔍 [CONFIG_DETAILED] All configuration keys:");
             foreach (var kvp in configuration.AsEnumerable())
             {
-                if (kvp.Key.Contains("OCR"))
+                if (kvp.Key.Contains("OCR") || kvp.Key.Contains("TimedAggregator") || kvp.Key.Contains("ProximityGrouping"))
                     Console.WriteLine($"🔍 [CONFIG_DETAILED] {kvp.Key} = {kvp.Value}");
+            }
+
+            // 🔥🔥🔥 [CRITICAL_DEBUG] TimedAggregator.ProximityGrouping.VerticalDistanceFactor直接読み取り
+            var verticalDistanceFactor = configuration["TimedAggregator:ProximityGrouping:VerticalDistanceFactor"];
+            Console.WriteLine($"🔥🔥🔥 [CRITICAL_DEBUG] Program.cs ConfigurationBuilder直後 - VerticalDistanceFactor: {verticalDistanceFactor}");
+
+            // すべての読み込まれた設定ファイルを列挙
+            var providers = ((IConfigurationRoot)configuration).Providers;
+            foreach (var provider in providers)
+            {
+                Console.WriteLine($"🔍 [CONFIG_PROVIDERS] Provider: {provider.GetType().Name}");
             }
             
             // DIコンテナの構成
@@ -591,7 +602,12 @@ namespace Baketa.UI;
             // 🎯 UltraThink Phase 60.4: ProcessingPipelineSettings設定をappsettings.jsonから読み込み（DI解決問題修正）
             services.Configure<Baketa.Core.Models.Processing.ProcessingPipelineSettings>(
                 configuration.GetSection("SmartProcessingPipeline"));
-            
+
+            // 🔥 [CRITICAL_FIX] TimedAggregatorSettings設定をappsettings.jsonから読み込み（0.4問題修正）
+            services.Configure<Baketa.Core.Settings.TimedAggregatorSettings>(
+                configuration.GetSection("TimedAggregator"));
+            Console.WriteLine("🔥 [CONFIG_FIX] TimedAggregatorSettings登録完了 - appsettings.jsonから読み込み");
+
             // ロギングの設定
             services.AddLogging(builder => 
             {

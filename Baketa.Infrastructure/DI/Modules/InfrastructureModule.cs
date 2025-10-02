@@ -1052,8 +1052,63 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer>>();
+
+                // 🔥🔥🔥 [CRITICAL_TRACE] IConfigurationから直接値を読み取る
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                var configValue = configuration["TimedAggregator:ProximityGrouping:VerticalDistanceFactor"];
+                Console.WriteLine($"🔥🔥🔥 [CRITICAL_TRACE] IConfiguration直接読取: VerticalDistanceFactor={configValue}");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥🔥🔥 [CRITICAL_TRACE] IConfiguration直接読取: VerticalDistanceFactor={configValue}");
+
+                // 🔥 [VALUE_TRACE] IOptionsMonitor<TimedAggregatorSettings>の完全追跡
+                Console.WriteLine("🔥 [VALUE_TRACE] IOptionsMonitor<TimedAggregatorSettings>取得開始");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [VALUE_TRACE] IOptionsMonitor<TimedAggregatorSettings>取得開始");
+
                 var settingsMonitor = provider.GetRequiredService<IOptionsMonitor<TimedAggregatorSettings>>();
-                return new Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer(logger, settingsMonitor.CurrentValue.ProximityGrouping);
+                Console.WriteLine($"🔥 [VALUE_TRACE] IOptionsMonitor型: {settingsMonitor?.GetType().FullName ?? "NULL"}");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] IOptionsMonitor型: {settingsMonitor?.GetType().FullName ?? "NULL"}");
+
+                var settings = settingsMonitor.CurrentValue;
+                Console.WriteLine($"🔥 [VALUE_TRACE] CurrentValue型: {settings?.GetType().FullName ?? "NULL"}");
+                Console.WriteLine($"🔥 [VALUE_TRACE] CurrentValue == null: {settings == null}");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] CurrentValue型: {settings?.GetType().FullName ?? "NULL"}");
+
+                if (settings != null)
+                {
+                    // 🔥 [VALUE_TRACE] TimedAggregatorSettings全体をJSON出力
+                    var settingsJson = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                    Console.WriteLine($"🔥 [VALUE_TRACE] TimedAggregatorSettings全体:\n{settingsJson}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] TimedAggregatorSettings JSON: {settingsJson}");
+
+                    Console.WriteLine($"🔥 [VALUE_TRACE] TimedAggregatorSettings.IsFeatureEnabled: {settings.IsFeatureEnabled}");
+                    Console.WriteLine($"🔥 [VALUE_TRACE] TimedAggregatorSettings.BufferDelayMs: {settings.BufferDelayMs}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] TimedAggregatorSettings.IsFeatureEnabled: {settings.IsFeatureEnabled}");
+
+                    var proximitySettings = settings.ProximityGrouping;
+                    Console.WriteLine($"🔥 [VALUE_TRACE] ProximityGrouping == null: {proximitySettings == null}");
+                    Console.WriteLine($"🔥 [VALUE_TRACE] ProximityGrouping型: {proximitySettings?.GetType().FullName ?? "NULL"}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] ProximityGrouping == null: {proximitySettings == null}");
+
+                    if (proximitySettings != null)
+                    {
+                        Console.WriteLine($"🔥 [VALUE_TRACE] ProximityGrouping.VerticalDistanceFactor: {proximitySettings.VerticalDistanceFactor}");
+                        Console.WriteLine($"🔥 [VALUE_TRACE] ProximityGrouping.HorizontalDistanceFactor: {proximitySettings.HorizontalDistanceFactor}");
+                        Console.WriteLine($"🔥 [VALUE_TRACE] ProximityGrouping.Enabled: {proximitySettings.Enabled}");
+                        Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [VALUE_TRACE] VerticalDistanceFactor={proximitySettings.VerticalDistanceFactor}, HorizontalDistanceFactor={proximitySettings.HorizontalDistanceFactor}");
+
+                        // 🔥 [VALUE_TRACE] 新規インスタンス作成との比較
+                        var freshInstance = new Baketa.Core.Settings.ProximityGroupingSettings();
+                        Console.WriteLine($"🔥 [COMPARE] new ProximityGroupingSettings().VerticalDistanceFactor: {freshInstance.VerticalDistanceFactor}");
+                        Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [COMPARE] DI注入={proximitySettings.VerticalDistanceFactor}, 新規作成={freshInstance.VerticalDistanceFactor}");
+                    }
+
+                    return new Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer(logger, proximitySettings ?? new Baketa.Core.Settings.ProximityGroupingSettings());
+                }
+                else
+                {
+                    Console.WriteLine("🔥 [VALUE_TRACE] settings == null のためデフォルトインスタンス作成");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [VALUE_TRACE] settings == null のためデフォルトインスタンス作成");
+                    return new Baketa.Infrastructure.OCR.PostProcessing.ChunkProximityAnalyzer(logger, new Baketa.Core.Settings.ProximityGroupingSettings());
+                }
             });
             Console.WriteLine("✅ ChunkProximityAnalyzer登録完了 - 自動閾値計算 + 設定連携");
 
