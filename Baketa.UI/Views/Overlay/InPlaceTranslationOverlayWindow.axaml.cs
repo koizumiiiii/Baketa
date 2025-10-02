@@ -120,10 +120,11 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 
                 // ウィンドウ位置設定
                 Position = new PixelPoint(overlayPosition.X, overlayPosition.Y);
-                
-                // ウィンドウサイズ設定
+
+                // 🔧 [TEXT_WRAPPING] ウィンドウサイズ設定: 横幅固定、縦幅は自動調整
+                // 横幅: OCR検知領域の幅に固定 (テキストが収まらない場合は折り返し)
+                // 縦幅: SizeToContent="Height" により TextBlock の折り返し後の高さに自動調整
                 Width = overlaySize.Width;
-                Height = overlaySize.Height;
                 
                 // 🛡️ [CORRUPTED_TRANSLATION_FILTER] 汚染翻訳とエラーメッセージを完全フィルタリング
                 if (IsCorruptedOrErrorTranslation(textChunk.TranslatedText))
@@ -227,9 +228,10 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // ユーザー設定フォントサイズを適用
                 textBlock.FontSize = effectiveFontSize;
                 
-                // インプレース表示用のスタイル設定
-                textBlock.TextWrapping = TextWrapping.NoWrap;
-                textBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+                // 🔧 [TEXT_WRAPPING] インプレース表示用のスタイル設定
+                // 横幅固定・縦方向折り返し対応: TextWrapping.Wrap で長文を折り返し
+                textBlock.TextWrapping = TextWrapping.Wrap;  // 折り返し有効化
+                textBlock.TextTrimming = TextTrimming.None;   // 省略記号無効化（全文表示）
                 textBlock.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
                 textBlock.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
                 
