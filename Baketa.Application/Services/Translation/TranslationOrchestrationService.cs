@@ -1503,6 +1503,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 座標ベース翻訳実行フラグ
             var coordinateBasedTranslationExecuted = false;
 
+            // 🎉 [PHASE12.2_COMPLETE] Phase 12.2イベント駆動アーキテクチャ
+            // ProcessWithCoordinateBasedTranslationAsync内部でTimedChunkAggregatorを呼び出し
+            // CoordinateBasedTranslationService.cs Line 315でreturnして2重翻訳を防止済み
             if (overallCondition && image is IAdvancedImage advancedImage)
             {
                 // 緊急デバッグ: 座標ベース翻訳実行開始
@@ -1543,9 +1546,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 座標ベース翻訳が正常実行された
                     coordinateBasedTranslationExecuted = true;
 
-                    // 座標ベース処理が成功した場合、オーバーレイで直接表示されるため、
-                    // 従来の翻訳結果は空の結果を返す
-                    // ただし、IsCoordinateBasedModeをtrueに設定して、Observableへの発行をスキップする
+                    // 🎉 [PHASE12.2_COMPLETE] Phase 12.2イベント駆動アーキテクチャ
+                    // ProcessWithCoordinateBasedTranslationAsync内部でTimedChunkAggregatorに追加済み
+                    // AggregatedChunksReadyEventHandler経由で翻訳・オーバーレイ表示されるため、
+                    // ここでは2重翻訳を防止するため、IsCoordinateBasedMode=trueで即座にreturn
+                    DebugLogUtility.WriteLog($"🎉 [PHASE12.2_COMPLETE] Phase 12.2早期リターン - AggregatedChunksReadyEventHandler経由で処理");
+                    _logger?.LogInformation("🎉 [PHASE12.2_COMPLETE] 2重翻訳防止: AggregatedChunksReadyEventHandler経由で処理 - ID={TranslationId}", translationId);
+
+                    // クールダウン設定（次回の自動翻訳を適切に制御）
+                    lock (_lastTranslationTimeLock)
+                    {
+                        _lastTranslationCompletedAt = DateTime.UtcNow;
+                    }
+
                     return new TranslationResult
                     {
                         Id = translationId,
@@ -1556,7 +1569,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                         Confidence = 1.0f,
                         ProcessingTime = DateTime.UtcNow - startTime,
-                        IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ
+                        IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ - Observableスキップ + クールダウン設定
                     };
                 }
                 catch (Exception coordinateEx)
@@ -1739,18 +1752,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
                 
-                // 🔧 [DUPLICATE_FIX] 重複表示修正: 座標ベース翻訳が実際に実行された場合のみ無効化
-                if (!coordinateBasedTranslationExecuted)
+                // 🎉 [PHASE12.2_COMPLETE] イベント駆動アーキテクチャ完全移行
+                // 座標ベース翻訳モードの場合、AggregatedChunksReadyEventHandlerが処理するため発行不要
+                // overallCondition: 座標ベース翻訳の実行条件（coordinateAvailable && hasWindowHandle && isAdvancedImage）
+                if (!overallCondition)
                 {
-                    // 座標ベース翻訳が実行されなかった場合のみイベント発行
+                    // 従来の翻訳モード（非座標ベース）の場合のみイベント発行
                     await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
-                    Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent発行完了 - 従来翻訳フロー開始");
-                    DebugLogUtility.WriteLog($"🔥 [BRIDGE_FIX] 従来翻訳フロー: 座標ベース翻訳未実行のためOcrCompletedEvent発行");
+                    Console.WriteLine($"🔥 [PHASE12.2] OcrCompletedEvent発行完了 - 従来翻訳フロー");
+                    DebugLogUtility.WriteLog($"🔥 [PHASE12.2] 従来翻訳フロー: 非座標ベースモードのためOcrCompletedEvent発行");
                 }
                 else
                 {
-                    Console.WriteLine($"🚫 [DUPLICATE_FIX] 座標ベース翻訳が実行済みのため、OcrCompletedEvent発行をスキップ");
-                    DebugLogUtility.WriteLog($"🚫 [DUPLICATE_FIX] 重複防止: 座標ベース翻訳実行済みのためOcrCompletedEvent発行スキップ");
+                    Console.WriteLine($"🎉 [PHASE12.2_COMPLETE] 座標ベース翻訳モード - AggregatedChunksReadyEventHandlerが処理");
+                    DebugLogUtility.WriteLog($"🎉 [PHASE12.2_COMPLETE] イベント駆動処理: TimedChunkAggregator → AggregatedChunksReadyEventHandler");
                 }
                 _logger?.LogInformation("🔥 [BRIDGE_FIX] OCR完了イベント発行完了: TextRegions数={Count}, ID={EventId}", 
                     ocrResults.TextRegions.Count, ocrCompletedEvent.Id);

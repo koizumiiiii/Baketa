@@ -20,11 +20,29 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
     /// </summary>
     public override void RegisterServices(IServiceCollection services)
     {
-        // 設定管理システムの初期化
-        InitializeConfigurationSystem(services);
-        
-        // サブクラスのサービス登録
-        RegisterConfigurableServices(services);
+        Console.WriteLine($"🔧 [PHASE12.2_DIAG] {GetType().Name}.RegisterServices() 開始");
+
+        try
+        {
+            // 設定管理システムの初期化
+            Console.WriteLine($"🔧 [PHASE12.2_DIAG] {GetType().Name} - InitializeConfigurationSystem() 実行直前");
+            InitializeConfigurationSystem(services);
+            Console.WriteLine($"✅ [PHASE12.2_DIAG] {GetType().Name} - InitializeConfigurationSystem() 完了");
+
+            // サブクラスのサービス登録
+            Console.WriteLine($"🔧 [PHASE12.2_DIAG] {GetType().Name} - RegisterConfigurableServices() 実行直前");
+            RegisterConfigurableServices(services);
+            Console.WriteLine($"✅ [PHASE12.2_DIAG] {GetType().Name} - RegisterConfigurableServices() 完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] {GetType().Name}.RegisterServices() 失敗: {ex.GetType().Name}");
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] Message: {ex.Message}");
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] StackTrace: {ex.StackTrace}");
+            throw;
+        }
+
+        Console.WriteLine($"✅ [PHASE12.2_DIAG] {GetType().Name}.RegisterServices() 完全完了");
     }
     
     /// <summary>

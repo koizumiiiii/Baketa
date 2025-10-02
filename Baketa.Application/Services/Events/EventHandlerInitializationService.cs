@@ -225,11 +225,11 @@ public sealed class EventHandlerInitializationService(
                 eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent>(translationWithBoundsCompletedHandler);
                 _logger.LogInformation("TranslationWithBoundsCompletedHandlerを登録しました - 翻訳結果反映修復");
                 Console.WriteLine("🔄 [FIX] TranslationWithBoundsCompletedHandlerを登録しました - 翻訳結果反映修復");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [FIX] TranslationWithBoundsCompletedHandler復活 - 翻訳結果反映修復{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -238,12 +238,44 @@ public sealed class EventHandlerInitializationService(
             {
                 _logger.LogError(ex, "TranslationWithBoundsCompletedHandlerの登録に失敗しました");
                 Console.WriteLine($"🔥 [ERROR] TranslationWithBoundsCompletedHandlerの登録失敗: {ex.Message}");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationWithBoundsCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+
+            // 🎉 [PHASE12.2] AggregatedChunksReadyEventHandler登録 - 2重翻訳アーキテクチャ排除
+            try
+            {
+                var aggregatedChunksReadyHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.Translation.AggregatedChunksReadyEvent>>();
+                eventAggregator.Subscribe<Baketa.Core.Events.Translation.AggregatedChunksReadyEvent>(aggregatedChunksReadyHandler);
+                _logger.LogInformation("🎉 AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
+                Console.WriteLine("🎉 [PHASE12.2] AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎉 [PHASE12.2] AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
+
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [PHASE12.2] AggregatedChunksReadyHandler登録完了 - TimedChunkAggregatorイベント駆動処理{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "AggregatedChunksReadyHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}");
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}");
+
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }

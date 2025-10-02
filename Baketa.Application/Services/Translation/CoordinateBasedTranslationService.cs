@@ -150,6 +150,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             // 🔥 [FILE_CONFLICT_FIX_3] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {Width}x{Height}", image.Width, image.Height);
 
+            // 🔍 [PHASE12.2_TRACE] トレースログ1: メソッド開始直後
+            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
+            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
+
             // バッチOCR処理でテキストチャンクを取得（詳細時間測定）
             var ocrMeasurement = new PerformanceMeasurement(
                 MeasurementType.BatchOcrProcessing, 
@@ -198,9 +202,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var ocrResult = ocrMeasurement.Complete();
             var ocrProcessingTime = ocrResult.Duration;
             
-            _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms", 
+            _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms",
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
-            
+
+            // 🔍 [PHASE12.2_TRACE] トレースログ2: OCR処理完了直後
+            DebugLogUtility.WriteLog($"🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {textChunks.Count}");
+            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {Count}", textChunks.Count);
+
             // 🚀 [PHASE10_FIX] 個別イベント発行を完全無効化 - バッチ翻訳処理のみ実行
             // 理由: PublishOcrCompletedEventAsync()により個別翻訳が実行されるが、結果がtextChunksに反映されない
             //       二重処理（個別翻訳 + バッチ翻訳）を防止し、バッチ翻訳結果のみを使用
@@ -221,19 +229,56 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             //     _logger?.LogInformation("🚀 [DUPLICATE_FIX] TimedAggregator有効のため、OCR完了イベント即座発行をスキップ - 集約後の統一イベント発行に委ねる");
             //     Console.WriteLine("🚀 [DUPLICATE_FIX] 重複解消: 個別イベント発行をスキップ、統合処理のみ実行");
             // }
-            
+
+            // 🔍 [PHASE12.2_TRACE] トレースログ3: TIMED_AGGREGATOR処理直前
+            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
+            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
+
+            // 🚨 [ULTRA_DEBUG] Line 238-239が実行されるか確認
+            DebugLogUtility.WriteLog("🚨🚨🚨 [ULTRA_DEBUG] Line 238直前に到達！");
+
             // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
-            Console.WriteLine("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
+            DebugLogUtility.WriteLog("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
             _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - OCRチャンク数: {Count}", textChunks.Count);
             
             try
             {
+                // 🚨 [ULTRA_DEBUG] tryブロック到達確認
+                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] tryブロック開始 - チャンク数: {textChunks.Count}");
+                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] _textChunkAggregatorService is null: {_textChunkAggregatorService == null}");
+                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] IsFeatureEnabled: {_textChunkAggregatorService?.IsFeatureEnabled}");
+
+                // 🔥 [DI_RESOLUTION_CHECK] DI解決されたインスタンス型を完全診断
+                var aggregatorServiceType = _textChunkAggregatorService?.GetType().FullName ?? "NULL";
+                var aggregatorBaseType = _textChunkAggregatorService?.GetType().BaseType?.FullName ?? "NULL";
+                var aggregatorInterfaces = _textChunkAggregatorService?.GetType().GetInterfaces()
+                    .Select(i => i.Name).ToList() ?? new List<string>();
+
+                DebugLogUtility.WriteLog(
+                    $"🔥🔥🔥 [DI_RESOLUTION_CHECK] " +
+                    $"Service Type: {aggregatorServiceType}, " +
+                    $"Base Type: {aggregatorBaseType}, " +
+                    $"Interfaces: [{string.Join(", ", aggregatorInterfaces)}]"
+                );
+
+                _logger?.LogCritical(
+                    "🔥🔥🔥 [DI_RESOLUTION_CHECK] " +
+                    "Service Type: {ServiceType}, " +
+                    "Base Type: {BaseType}, " +
+                    "Interfaces: [{Interfaces}]",
+                    aggregatorServiceType,
+                    aggregatorBaseType,
+                    string.Join(", ", aggregatorInterfaces)
+                );
+
                 // 各チャンクをTimedChunkAggregatorに追加
                 foreach (var chunk in textChunks)
                 {
+                    DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync呼び出し直前 - ChunkId: {chunk.ChunkId}");
                     // チャンクには既にSourceWindowHandleが設定済み（initプロパティのため後から変更不可）
-                    await _textChunkAggregatorService.TryAddTextChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
-                    _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'", 
+                    var added = await _textChunkAggregatorService.TryAddTextChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
+                    DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync結果: {added}, ChunkId: {chunk.ChunkId}");
+                    _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'",
                         chunk.ChunkId, chunk.CombinedText);
                 }
                 
@@ -250,14 +295,34 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 Console.WriteLine($"🚨 [TIMED_AGGREGATOR] エラーのため元のチャンクを使用: {ex.Message}");
             }
             
+            // 🚨 [ULTRA_DEBUG] tryブロック完了確認
+            DebugLogUtility.WriteLog("🚨🚨🚨 [ULTRA_DEBUG] tryブロック完了 - Line 268到達");
+
             Console.WriteLine($"🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {textChunks.Count}");
             _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {Count}", textChunks.Count);
-            
+
+            // 🔍 [PHASE12.2_TRACE] トレースログ4: Phase 12.2早期リターン直前
+            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
+            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
+
+            // 🎉 [PHASE12.2] 2重翻訳アーキテクチャ排除 - AggregatedChunksReadyEventHandler経由で処理
+            _logger?.LogInformation("🎉 [PHASE12.2] 2重翻訳排除により従来の翻訳処理をスキップ - AggregatedChunksReadyEventHandler経由で処理");
+            Console.WriteLine("🎉 [PHASE12.2] 2重翻訳排除: TimedChunkAggregator → AggregatedChunksReadyEvent → AggregatedChunksReadyEventHandler");
+            Console.WriteLine($"🎉 [PHASE12.2] オーバーレイ表示はイベントハンドラーで実行 - チャンク数: {textChunks.Count}");
+
+            // Phase 12.2完全移行により、この先の処理（2回目翻訳 + オーバーレイ表示）は不要
+            // TimedChunkAggregatorがAggregatedChunksReadyEventを発行 → AggregatedChunksReadyEventHandlerで翻訳 + オーバーレイ表示
+            return;
+
+            // 🚨 [PHASE12.2_TRACE] トレースログ5: returnの後（実行されないはず）
+            Console.WriteLine("🚨🚨🚨 [PHASE12.2_TRACE] TRACE-5: ❌ returnの後が実行されている！！ ❌");
+
+            // ========== 以下、Phase 12.2完全移行後に削除予定（後方互換性のため一時保持） ==========
             // チャンクの詳細情報をデバッグ出力
             DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
             DebugLogUtility.WriteLog($"   入力画像サイズ: {image.Width}x{image.Height}");
             DebugLogUtility.WriteLog($"   検出されたテキストチャンク数: {textChunks.Count}");
-            
+
             for (int i = 0; i < textChunks.Count; i++)
             {
                 var chunk = textChunks[i];
@@ -266,7 +331,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 DebugLogUtility.WriteLog($"   OCR生サイズ: W={chunk.CombinedBounds.Width}, H={chunk.CombinedBounds.Height}");
                 DebugLogUtility.WriteLog($"   元テキスト: '{chunk.CombinedText}'");
                 DebugLogUtility.WriteLog($"   翻訳テキスト: '{chunk.TranslatedText}'");
-                
+
                 // 座標変換情報
                 var overlayPos = chunk.GetBasicOverlayPosition();
                 var overlaySize = chunk.GetOverlaySize();
@@ -274,7 +339,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable
                 DebugLogUtility.WriteLog($"   インプレースサイズ: ({overlaySize.Width},{overlaySize.Height}) [元サイズと同じ]");
                 DebugLogUtility.WriteLog($"   計算フォントサイズ: {chunk.CalculateOptimalFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
                 DebugLogUtility.WriteLog($"   インプレース表示可能: {chunk.CanShowInPlace()}");
-                
+
                 // TextResultsの詳細情報
                 DebugLogUtility.WriteLog($"   構成TextResults数: {chunk.TextResults.Count}");
                 for (int j = 0; j < Math.Min(chunk.TextResults.Count, 3); j++) // 最初の3個だけ表示
@@ -288,20 +353,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable
             var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
             var screenWidth = screenBounds.Width;
             var screenHeight = screenBounds.Height;
-            
+
             for (int i = 0; i < textChunks.Count; i++)
             {
                 var chunk = textChunks[i];
                 var originalBounds = chunk.CombinedBounds;
-                
+
                 // 画面外座標をチェックし修正
                 if (originalBounds.Y > screenHeight || originalBounds.X > screenWidth)
                 {
                     var clampedX = Math.Max(0, Math.Min(originalBounds.X, screenWidth - originalBounds.Width));
                     var clampedY = Math.Max(0, Math.Min(originalBounds.Y, screenHeight - originalBounds.Height));
-                    
+
                     DebugLogUtility.WriteLog($"🚨 画面外座標を修正: チャンク[{i}] 元座標({originalBounds.X},{originalBounds.Y}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
-                    
+
                     // チャンクの座標を修正（注：実際のチャンク座標修正は別途実装が必要）
                     // この段階ではログ出力のみで警告
                     DebugLogUtility.WriteLog($"⚠️ このテキストは画面外のため表示されません: '{chunk.CombinedText}'");

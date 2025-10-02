@@ -19,35 +19,56 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
     protected override void RegisterConfigurableServices(IServiceCollection services)
     {
         Console.WriteLine("🚀 [NEW_CONFIG] TimedAggregatorModule - 新設定システムによる登録開始");
-        
-        // 設定デバッグ情報出力
-        LogConfigurationDebug();
-        
-        // TimedAggregatorSettings の型安全な設定登録
-        RegisterSettings<TimedAggregatorSettings>(services);
+        Console.WriteLine("🔧 [PHASE12.2_DIAG] TimedAggregatorModule.RegisterConfigurableServices() 開始");
 
-        // 🎯 [P0_COORDINATE_TRANSFORM] 座標変換サービスの登録
-        services.AddSingleton<ICoordinateTransformationService, CoordinateTransformationService>();
-        Console.WriteLine("✅ [P0_COORDINATE_TRANSFORM] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換");
+        try
+        {
+            // 設定デバッグ情報出力
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] LogConfigurationDebug() 実行直前");
+            LogConfigurationDebug();
+            Console.WriteLine("✅ [PHASE12.2_DIAG] LogConfigurationDebug() 完了");
 
-        // CoordinateBasedLineBreakProcessorの登録
-        services.AddSingleton<CoordinateBasedLineBreakProcessor>();
-        Console.WriteLine("✅ [NEW_CONFIG] CoordinateBasedLineBreakProcessor登録完了");
-        
-        // TimedChunkAggregatorの登録（Singleton - バッファ状態維持のため）
-        services.AddSingleton<TimedChunkAggregator>();
-        Console.WriteLine("✅ [NEW_CONFIG] TimedChunkAggregator登録完了 - Singleton（バッファ状態維持）");
-        
-        // EnhancedBatchOcrIntegrationServiceの登録（Singleton - TimedChunkAggregator連携のため）
-        services.AddSingleton<EnhancedBatchOcrIntegrationService>();
-        Console.WriteLine("✅ [NEW_CONFIG] EnhancedBatchOcrIntegrationService登録完了");
+            // TimedAggregatorSettings の型安全な設定登録
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] RegisterSettings<TimedAggregatorSettings>() 実行直前");
+            RegisterSettings<TimedAggregatorSettings>(services);
+            Console.WriteLine("✅ [PHASE12.2_DIAG] RegisterSettings<TimedAggregatorSettings>() 完了");
 
-        // Phase 26-4: ITextChunkAggregatorServiceインターフェース登録 - Clean Architecture対応
-        services.AddSingleton<ITextChunkAggregatorService>(provider =>
-            provider.GetRequiredService<EnhancedBatchOcrIntegrationService>());
-        Console.WriteLine("✅ [PHASE26] ITextChunkAggregatorService → EnhancedBatchOcrIntegrationService マッピング完了");
+            // 🎯 [P0_COORDINATE_TRANSFORM] 座標変換サービスの登録
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] CoordinateTransformationService登録直前");
+            services.AddSingleton<ICoordinateTransformationService, CoordinateTransformationService>();
+            Console.WriteLine("✅ [P0_COORDINATE_TRANSFORM] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換");
 
-        Console.WriteLine("🎯 [NEW_CONFIG] TimedAggregatorModule - 新設定システム統合完了");
+            // CoordinateBasedLineBreakProcessorの登録
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] CoordinateBasedLineBreakProcessor登録直前");
+            services.AddSingleton<CoordinateBasedLineBreakProcessor>();
+            Console.WriteLine("✅ [NEW_CONFIG] CoordinateBasedLineBreakProcessor登録完了");
+
+            // TimedChunkAggregatorの登録（Singleton - バッファ状態維持のため）
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] TimedChunkAggregator登録直前");
+            services.AddSingleton<TimedChunkAggregator>();
+            Console.WriteLine("✅ [NEW_CONFIG] TimedChunkAggregator登録完了 - Singleton（バッファ状態維持）");
+
+            // EnhancedBatchOcrIntegrationServiceの登録（Singleton - TimedChunkAggregator連携のため）
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] EnhancedBatchOcrIntegrationService登録直前");
+            services.AddSingleton<EnhancedBatchOcrIntegrationService>();
+            Console.WriteLine("✅ [NEW_CONFIG] EnhancedBatchOcrIntegrationService登録完了");
+
+            // Phase 26-4: ITextChunkAggregatorServiceインターフェース登録 - Clean Architecture対応
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] ITextChunkAggregatorService登録直前");
+            services.AddSingleton<ITextChunkAggregatorService>(provider =>
+                provider.GetRequiredService<EnhancedBatchOcrIntegrationService>());
+            Console.WriteLine("✅ [PHASE26] ITextChunkAggregatorService → EnhancedBatchOcrIntegrationService マッピング完了");
+
+            Console.WriteLine("🎯 [NEW_CONFIG] TimedAggregatorModule - 新設定システム統合完了");
+            Console.WriteLine("✅ [PHASE12.2_DIAG] TimedAggregatorModule.RegisterConfigurableServices() 完全完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] TimedAggregatorModule.RegisterConfigurableServices() 失敗: {ex.GetType().Name}");
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] Message: {ex.Message}");
+            Console.WriteLine($"❌ [PHASE12.2_DIAG] StackTrace: {ex.StackTrace}");
+            throw;
+        }
     }
     
     /// <summary>

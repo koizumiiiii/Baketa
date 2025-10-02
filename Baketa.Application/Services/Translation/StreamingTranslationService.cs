@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -45,12 +46,16 @@ public class StreamingTranslationService : IStreamingTranslationService
         ILogger<StreamingTranslationService> logger,
         IEventAggregator? eventAggregator = null)
     {
+        Console.WriteLine("🚨🚨🚨 [CTOR_DEBUG] StreamingTranslationService コンストラクター開始");
+        DebugLogUtility.WriteLog("🚨🚨🚨 [CTOR_DEBUG] StreamingTranslationService コンストラクター開始");
+
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator;
         _progress = new Core.Translation.Models.TranslationProgress();
-        
-        Console.WriteLine("🔥 [STREAMING] StreamingTranslationService初期化完了");
+
+        Console.WriteLine($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
+        DebugLogUtility.WriteLog($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
         _logger.LogInformation("StreamingTranslationService初期化完了");
     }
     
@@ -62,12 +67,25 @@ public class StreamingTranslationService : IStreamingTranslationService
         Action<int, string> onChunkCompleted,
         CancellationToken cancellationToken = default)
     {
+        // 🚨🚨🚨 [ULTRA_CRITICAL] メソッド本体に到達したことを確実に記録
+        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        var threadId = Thread.CurrentThread.ManagedThreadId;
+
+        System.IO.File.AppendAllText(logPath, $"[{timestamp}][T{threadId:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync メソッド本体到達！ - テキスト数: {texts?.Count ?? 0}\r\n");
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE77] Console.WriteLine実行直前\r\n");
+
         // 🚨 [CRITICAL_DEBUG] メソッド開始の即座ログ出力
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] TranslateBatchWithStreamingAsync開始 - テキスト数: {texts?.Count ?? 0}");
+
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE78] Console.WriteLine実行完了\r\n");
+
         Console.WriteLine($"🔍 [LANGUAGE_DEBUG] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName})");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化 → Target={targetLanguage?.Code}({targetLanguage?.DisplayName}){Environment.NewLine}");
-            
+
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE82] texts nullチェック直前\r\n");
+
         if (texts == null || texts.Count == 0)
         {
             var textsStatus = texts == null ? "null" : "empty";
@@ -75,11 +93,15 @@ public class StreamingTranslationService : IStreamingTranslationService
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             return [];
         }
-        
+
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE90] Stopwatch開始直前\r\n");
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Stopwatch開始前");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            
+
         var stopwatch = Stopwatch.StartNew();
+
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE93] Stopwatch開始完了\r\n");
         
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Logger情報出力前");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -137,12 +159,18 @@ public class StreamingTranslationService : IStreamingTranslationService
         ).ToArray(); // 🔧 [HANGUP_FIX] ToArray()で即座に評価、遅延実行を回避
         
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync配列作成完了 - タスク数: {processingTasks.Length}");
-        
+
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE161] ProcessChunkAsync配列作成完了 - タスク数: {processingTasks.Length}\r\n");
+
         // 🚀 [TRUE_BATCH_PROCESSING] バッチ翻訳により例外は各チャンク内で処理済み
         try
         {
             Console.WriteLine($"🚨 [CHUNK_DEBUG] Task.WhenAll実行開始");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE166] Task.WhenAll実行開始\r\n");
+
             await Task.WhenAll(processingTasks).ConfigureAwait(false);
+
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [LINE168] Task.WhenAll実行完了\r\n");
             Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] 全チャンク処理完了");
         }
         finally
@@ -182,6 +210,9 @@ public class StreamingTranslationService : IStreamingTranslationService
         Stopwatch stopwatch,
         CancellationToken cancellationToken)
     {
+        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🚨🚨🚨 [PROCESS_CHUNK] ProcessChunkAsync メソッド本体到達！ - インデックス: {chunk.StartIndex}-{chunk.EndIndex}\r\n");
+
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
         Console.WriteLine($"🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前");
         
@@ -192,15 +223,20 @@ public class StreamingTranslationService : IStreamingTranslationService
         try
         {
             Console.WriteLine($"🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}");
-            
+
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [SEMAPHORE] WaitAsyncDisposableWithTimeout呼び出し直前 - 利用可能数: {semaphore.CurrentCount}\r\n");
+
             // 🔧 [CRITICAL_FIX] SemaphoreSlimExtensionsによる堅牢なリソース管理（Gemini推奨）
             var semaphoreScope = await semaphore.WaitAsyncDisposableWithTimeout(TimeSpan.FromSeconds(60), semaphoreCts.Token).ConfigureAwait(false);
-            
+
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [SEMAPHORE] WaitAsyncDisposableWithTimeout呼び出し完了 - semaphoreScope: {(semaphoreScope == null ? "null" : "not null")}\r\n");
+
             if (semaphoreScope == null)
             {
                 // タイムアウト時の処理
                 Console.WriteLine($"⚠️ [DEADLOCK_DEBUG] セマフォ取得タイムアウト(60秒) - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-                
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [SEMAPHORE] タイムアウト発生！\r\n");
+
                 for (int j = 0; j < chunk.Texts.Count; j++)
                 {
                     results[chunk.StartIndex + j] = "[セマフォ取得タイムアウト]";
@@ -208,7 +244,9 @@ public class StreamingTranslationService : IStreamingTranslationService
                 }
                 return; // 🔧 [FIXED] セマフォが取得されていないので、リリース不要で安全にreturn
             }
-            
+
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] ✅ [SEMAPHORE] セマフォ取得成功 - 残り利用可能数: {semaphore.CurrentCount}\r\n");
+
             Console.WriteLine($"✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}");
             
             // 🔧 [FIXED] usingパターンで自動的にセマフォが解放されるため、安全に処理を実行
@@ -290,7 +328,9 @@ public class StreamingTranslationService : IStreamingTranslationService
                     
                     // 🚀 [TRUE_BATCH_PROCESSING] 真のバッチ翻訳実装 - GPU最適化されたバッチ推論を活用
                     Console.WriteLine($"🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳開始 - テキスト数: {chunkTexts.Count}");
-                    
+
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [TRANSLATE_BATCH] TranslateBatchAsync呼び出し直前 - テキスト数: {chunkTexts.Count}\r\n");
+
                     // チャンク全体を一度にバッチ翻訳で処理（個別翻訳から真のバッチ推論へ移行）
                     var batchTranslationResults = await _translationService.TranslateBatchAsync(
                         chunkTexts.AsReadOnly(),
@@ -298,7 +338,9 @@ public class StreamingTranslationService : IStreamingTranslationService
                         targetLanguage,
                         null, // context
                         combinedCts.Token).ConfigureAwait(false);
-                    
+
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [TRANSLATE_BATCH] TranslateBatchAsync呼び出し完了 - 結果数: {batchTranslationResults.Count}\r\n");
+
                     Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] バッチ翻訳完了 - 結果数: {batchTranslationResults.Count}");
                     
                     // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 翻訳実行結果
