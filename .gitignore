@@ -675,3 +675,4 @@ debug_captures/
 TestDirect/
 nul
 claude-code-viewer/
+run_output*.txt
