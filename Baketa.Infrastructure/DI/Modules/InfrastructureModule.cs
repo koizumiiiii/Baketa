@@ -216,6 +216,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrLanguageOptimizer, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrLanguageOptimizer>();
             Console.WriteLine("✅ Phase 2.3: PaddleOCRエラーハンドラー・言語最適化登録完了");
 
+            // Phase 2.4: PaddleOCRモデルマネージャー（リファクタリング）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrModelManager, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrModelManager>();
+            Console.WriteLine("✅ Phase 2.4: PaddleOCRモデルマネージャー登録完了");
+
             // OCRエンジンやプロセッサーの登録
             // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
             // 例: services.AddSingleton<IOcrModelProvider, LocalOcrModelProvider>();
