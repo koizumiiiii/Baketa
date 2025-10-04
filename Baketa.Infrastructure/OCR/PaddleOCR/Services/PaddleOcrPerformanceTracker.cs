@@ -18,17 +18,24 @@ public sealed class PaddleOcrPerformanceTracker : IPaddleOcrPerformanceTracker
 {
     private readonly ILogger<PaddleOcrPerformanceTracker>? _logger;
 
+    // 🔒 [GEMINI_REVIEW] スレッドセーフティ強化：マジックナンバー定数化
+    private const double ContinuousProcessingThresholdSeconds = 10.0;
+    private const double ContinuousProcessingTimeoutMultiplier = 1.5;
+    private const double ConsecutiveTimeoutIncrementFactor = 0.3;
+    private const double LargeScreenScalingMultiplier = 1.8;
+    private const int MaxTimeoutMultiplier = 4;
+
     // パフォーマンス統計フィールド（スレッドセーフ）
     private readonly ConcurrentQueue<double> _processingTimes = new();
     private int _totalProcessedImages;
     private int _errorCount;
     private readonly DateTime _startTime = DateTime.UtcNow;
 
-    // 適応的タイムアウト用の統計
-    private DateTime _lastOcrTime = DateTime.MinValue;
+    // 🔒 [GEMINI_REVIEW] 適応的タイムアウト用の統計（スレッドセーフ強化）
+    private long _lastOcrTimeTicks = DateTime.MinValue.Ticks; // DateTime → long Ticks (Interlocked対応)
     private int _consecutiveTimeouts;
 
-    // PaddlePredictor失敗統計
+    // 🔒 [GEMINI_REVIEW] PaddlePredictor失敗統計（スレッドセーフ強化）
     private int _consecutivePaddleFailures;
 
     public PaddleOcrPerformanceTracker(ILogger<PaddleOcrPerformanceTracker>? logger = null)
@@ -185,40 +192,42 @@ public sealed class PaddleOcrPerformanceTracker : IPaddleOcrPerformanceTracker
     /// </summary>
     public int GetAdaptiveTimeout(int baseTimeout)
     {
-        var timeSinceLastOcr = DateTime.UtcNow - _lastOcrTime;
+        // 🔒 [GEMINI_REVIEW] スレッドセーフな時刻読み取り
+        var lastOcrTicks = Interlocked.Read(ref _lastOcrTimeTicks);
+        var timeSinceLastOcr = DateTime.UtcNow - new DateTime(lastOcrTicks);
 
         // 連続処理による性能劣化を考慮
         var adaptiveTimeout = baseTimeout;
 
-        // 短時間での連続処理の場合、タイムアウトを延長
-        if (timeSinceLastOcr.TotalSeconds < 10)
+        // 🔒 [GEMINI_REVIEW] 定数化：短時間での連続処理の場合、タイムアウトを延長
+        if (timeSinceLastOcr.TotalSeconds < ContinuousProcessingThresholdSeconds)
         {
-            adaptiveTimeout = (int)(baseTimeout * 1.5);
+            adaptiveTimeout = (int)(baseTimeout * ContinuousProcessingTimeoutMultiplier);
             _logger?.LogDebug("🔄 連続処理検出: 前回から{TimeSinceLastOcr:F1}秒, タイムアウト延長", timeSinceLastOcr.TotalSeconds);
         }
 
-        // 連続タイムアウトの場合、さらに延長
-        if (_consecutiveTimeouts > 0)
+        // 🔒 [GEMINI_REVIEW] 定数化：連続タイムアウトの場合、さらに延長
+        var consecutiveTimeouts = _consecutiveTimeouts; // スナップショット読み取り（int読み取りはアトミック）
+        if (consecutiveTimeouts > 0)
         {
-            adaptiveTimeout = (int)(adaptiveTimeout * (1 + 0.3 * _consecutiveTimeouts));
-            _logger?.LogDebug("⚠️ 連続タイムアウト={ConsecutiveTimeouts}回, タイムアウト追加延長", _consecutiveTimeouts);
+            adaptiveTimeout = (int)(adaptiveTimeout * (1 + ConsecutiveTimeoutIncrementFactor * consecutiveTimeouts));
+            _logger?.LogDebug("⚠️ 連続タイムアウト={ConsecutiveTimeouts}回, タイムアウト追加延長", consecutiveTimeouts);
         }
 
-        // 🎯 [LEVEL1_FIX] 大画面対応スケーリング処理を考慮したタイムアウト延長
-        // Level 1実装により、Mat再構築やスケーリング処理で追加時間が必要
-        adaptiveTimeout = (int)(adaptiveTimeout * 1.8); // 80%延長
-        _logger?.LogDebug("🎯 [LEVEL1_TIMEOUT] 大画面対応タイムアウト延長: {BaseTimeout}秒 → {AdaptiveTimeout}秒 (80%延長)",
-            baseTimeout, adaptiveTimeout);
+        // 🔒 [GEMINI_REVIEW] 定数化：大画面対応スケーリング処理を考慮したタイムアウト延長
+        adaptiveTimeout = (int)(adaptiveTimeout * LargeScreenScalingMultiplier);
+        _logger?.LogDebug("🎯 [LEVEL1_TIMEOUT] 大画面対応タイムアウト延長: {BaseTimeout}秒 → {AdaptiveTimeout}秒 ({Multiplier}%延長)",
+            baseTimeout, adaptiveTimeout, (LargeScreenScalingMultiplier - 1) * 100);
 
-        // 最大値制限を緩和 (3倍 → 4倍)
-        var maxTimeout = Math.Min(adaptiveTimeout, baseTimeout * 4);
+        // 🔒 [GEMINI_REVIEW] 定数化：最大値制限を緩和
+        var maxTimeout = Math.Min(adaptiveTimeout, baseTimeout * MaxTimeoutMultiplier);
 
         // 🔍 [ULTRATHINK_FIX] タイムアウト設定の詳細ログ
         _logger?.LogWarning("⏱️ [TIMEOUT_CONFIG] 最終タイムアウト設定: {FinalTimeout}秒 (ベース: {Base}秒, 適応: {Adaptive}秒, 連続失敗: {Failures}回)",
-            maxTimeout, baseTimeout, adaptiveTimeout, _consecutiveTimeouts);
+            maxTimeout, baseTimeout, adaptiveTimeout, consecutiveTimeouts);
 
-        // 最後のOCR時刻を更新
-        _lastOcrTime = DateTime.UtcNow;
+        // 🔒 [GEMINI_REVIEW] スレッドセーフな時刻更新
+        Interlocked.Exchange(ref _lastOcrTimeTicks, DateTime.UtcNow.Ticks);
 
         return maxTimeout;
     }
@@ -228,8 +237,8 @@ public sealed class PaddleOcrPerformanceTracker : IPaddleOcrPerformanceTracker
     /// </summary>
     public void ResetFailureCounter()
     {
-        var previousCount = _consecutivePaddleFailures;
-        _consecutivePaddleFailures = 0;
+        // 🔒 [GEMINI_REVIEW] スレッドセーフなリセット（Interlocked.Exchange）
+        var previousCount = Interlocked.Exchange(ref _consecutivePaddleFailures, 0);
         _logger?.LogWarning("🔄 [MANUAL_RESET] PaddleOCR失敗カウンターを手動リセット: {PreviousCount} → 0", previousCount);
     }
 
@@ -238,6 +247,7 @@ public sealed class PaddleOcrPerformanceTracker : IPaddleOcrPerformanceTracker
     /// </summary>
     public int GetConsecutiveFailureCount()
     {
+        // 🔒 [GEMINI_REVIEW] スレッドセーフな読み取り（int読み取りはアトミック、明示的スナップショット）
         return _consecutivePaddleFailures;
     }
 }
