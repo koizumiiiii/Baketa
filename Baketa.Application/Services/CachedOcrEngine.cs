@@ -271,6 +271,25 @@ public sealed class CachedOcrEngine : IOcrEngine
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // ベースエンジンに委譲
+        return _baseEngine.GetConsecutiveFailureCount();
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // ベースエンジンに委譲
+        _baseEngine.ResetFailureCounter();
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// キャッシュ対応版
     /// </summary>

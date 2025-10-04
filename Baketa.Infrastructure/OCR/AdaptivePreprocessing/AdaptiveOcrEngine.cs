@@ -195,6 +195,25 @@ public class AdaptiveOcrEngine(
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // ベースエンジンに委譲
+        return baseOcrEngine.GetConsecutiveFailureCount();
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // ベースエンジンに委譲
+        baseOcrEngine.ResetFailureCounter();
+    }
+
+    /// <summary>
     /// Dispose実装
     /// </summary>
     public void Dispose()

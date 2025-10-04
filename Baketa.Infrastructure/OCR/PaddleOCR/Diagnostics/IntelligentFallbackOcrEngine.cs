@@ -358,6 +358,36 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // 最初の利用可能な戦略の失敗回数を返す
+        var firstAvailableStrategy = _strategies.FirstOrDefault(s => s.IsAvailable);
+        return firstAvailableStrategy?.Engine.GetConsecutiveFailureCount() ?? 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // すべての戦略のエンジンのカウンタをリセット
+        foreach (var strategy in _strategies.Where(s => s.IsAvailable))
+        {
+            try
+            {
+                strategy.Engine.ResetFailureCounter();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "フォールバック戦略失敗カウンタリセット失敗: {StrategyName}", strategy.Name);
+            }
+        }
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// </summary>
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)

@@ -590,6 +590,16 @@ public interface IOcrEngine : IDisposable
         IImage image,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    int GetConsecutiveFailureCount();
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    void ResetFailureCounter();
 }
 
 /// <summary>

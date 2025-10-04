@@ -296,6 +296,25 @@ public class SafeTestPaddleOcrEngine(
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // テストエンジンは失敗カウントを追跡しないため、常に0を返す
+        return 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // テストエンジンは失敗カウントを追跡しないため、何もしない
+        _logger?.LogDebug("SafeTestPaddleOcrEngine: ResetFailureCounter呼び出し（スタブ実装）");
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// テスト用の簡易実装
     /// </summary>

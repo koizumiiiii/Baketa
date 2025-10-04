@@ -367,7 +367,7 @@ public class EnsembleOcrEngine(
     public void CancelCurrentOcrTimeout()
     {
         logger.LogDebug("EnsembleOcrEngine: CancelCurrentOcrTimeout呼び出し");
-        
+
         foreach (var engineInfo in _engines)
         {
             try
@@ -377,6 +377,36 @@ public class EnsembleOcrEngine(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "子エンジンでのタイムアウトキャンセルエラー: {EngineName}", engineInfo.EngineName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // アンサンブルエンジンでは、最も重みの高い有効エンジンの失敗回数を返す
+        var primaryEngine = _engines.Where(e => e.IsEnabled).OrderByDescending(e => e.Weight).FirstOrDefault();
+        return primaryEngine?.Engine.GetConsecutiveFailureCount() ?? 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // すべての子エンジンのカウンタをリセット
+        foreach (var engineInfo in _engines)
+        {
+            try
+            {
+                engineInfo.Engine.ResetFailureCounter();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "子エンジンでの失敗カウンタリセットエラー: {EngineName}", engineInfo.EngineName);
             }
         }
     }

@@ -1214,6 +1214,24 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // GPUアクセラレーターは失敗カウントを追跡しないため、常に0を返す
+        return 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // GPUアクセラレーターは失敗カウントを追跡しないため、何もしない
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// </summary>
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)

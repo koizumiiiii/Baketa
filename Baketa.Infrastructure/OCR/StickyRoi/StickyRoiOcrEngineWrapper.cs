@@ -144,6 +144,25 @@ public sealed class StickyRoiOcrEngineWrapper : IOcrEngine
         _fallbackEngine.CancelCurrentOcrTimeout();
     }
 
+    /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // フォールバックエンジンに委譲
+        return _fallbackEngine.GetConsecutiveFailureCount();
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // フォールバックエンジンに委譲
+        _fallbackEngine.ResetFailureCounter();
+    }
+
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
     {
         SafeFileWriter.WriteDebugLog("🚨 [WRAPPER_DEBUG] DetectTextRegionsAsync開始");

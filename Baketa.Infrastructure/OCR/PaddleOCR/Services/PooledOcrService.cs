@@ -208,6 +208,31 @@ public sealed class PooledOcrService : IOcrEngine
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        ThrowIfDisposed();
+
+        // プール化環境では個別エンジンの失敗カウントを追跡しないため、常に0を返す
+        // 各エンジンインスタンスが独自にカウントを保持している可能性はあるが、
+        // プールレベルでの統合カウントは複雑なため実装しない
+        return 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        ThrowIfDisposed();
+
+        // プール化環境では個別エンジンの失敗カウントを追跡しないため、何もしない
+        _logger.LogDebug("🔄 PooledOcrService: 失敗カウンタリセット要求（プール化環境では効果なし）");
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// </summary>
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
