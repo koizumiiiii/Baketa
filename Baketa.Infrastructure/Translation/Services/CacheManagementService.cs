@@ -341,8 +341,6 @@ public sealed class CacheManagementService
             _logger.LogError(ex, "❌ 破損ファイルチェック失敗");
             return 0;
         }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -377,8 +375,6 @@ public sealed class CacheManagementService
             _logger.LogError(ex, "❌ 古いファイルチェック失敗");
             return 0;
         }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>

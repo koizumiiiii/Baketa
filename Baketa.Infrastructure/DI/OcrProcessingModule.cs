@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
+using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
 
 namespace Baketa.Infrastructure.DI;
 

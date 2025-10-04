@@ -369,7 +369,8 @@ public sealed class BatchOcrProcessor(
                 return [];
             }
         }
-        
+
+        // パフォーマンス分析機能なしで直接実行
         return await ProcessBatchInternalAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
     }
 
@@ -636,11 +637,6 @@ public sealed class BatchOcrProcessor(
                         tile.Image?.Dispose();
                     }
                 } // 🔧 [FIXED] usingブロック終了時に自動的にsemaphore.Release()が実行される
-
-                // 🔥 UltraThink Phase 9.3: usingブロック終了直後ログ
-                Console.WriteLine($"✅ [TILE-{index}] usingブロック終了 - semaphore.Dispose()完了");
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_batch_ocr.txt",
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [TILE-{index}] usingブロック終了 - semaphore.Dispose()完了{Environment.NewLine}");
             }).ToArray();
 
             // 🔥 UltraThink Phase 9.3: .ToArray()実行完了ログ

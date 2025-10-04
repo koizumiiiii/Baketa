@@ -12,7 +12,7 @@ using Baketa.Infrastructure.OCR.Scaling;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using TextDetectionMethod = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 using IOcrEngine = Baketa.Core.Abstractions.OCR.IOcrEngine;
-using IImageFactory = Baketa.Core.Abstractions.Imaging.IImageFactory;
+using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
 using Timer = System.Threading.Timer;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;

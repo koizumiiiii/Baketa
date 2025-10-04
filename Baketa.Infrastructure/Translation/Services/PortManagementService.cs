@@ -168,15 +168,13 @@ public class PortManagementService : IPortManagementService
                 .Select(kvp => int.Parse(kvp.Key))
                 .ToList()
                 .AsReadOnly();
-                
+
             return activePorts;
         }
         finally
         {
             _globalMutex.ReleaseMutex();
         }
-        
-        await Task.CompletedTask;
     }
 
     /// <inheritdoc />

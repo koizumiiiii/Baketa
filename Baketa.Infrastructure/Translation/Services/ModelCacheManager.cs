@@ -57,8 +57,6 @@ public sealed class ModelCacheManager
             _logger.LogError(ex, "❌ モデルキャッシュ確認失敗");
             return false;
         }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -128,8 +126,6 @@ public sealed class ModelCacheManager
             _logger.LogError(ex, "❌ キャッシュクリーンアップ失敗");
             return false;
         }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -236,8 +232,6 @@ public sealed class ModelCacheManager
         {
             return 0;
         }
-        
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 }
 

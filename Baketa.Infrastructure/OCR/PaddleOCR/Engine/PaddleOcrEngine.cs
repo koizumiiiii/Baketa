@@ -5274,54 +5274,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     {
         try
         {
-            // 1. 明示的なV5フラグをチェック
-            if (!false /* V5統一により常にfalse */)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 初期化時V5フラグ検出: true");
-                return true;
-            }
-
-            // 2. OCRエンジンのプロパティからモデル情報を取得
-            if (_ocrEngine != null)
-            {
-                var engineType = _ocrEngine.GetType();
-                var modelProp = engineType.GetProperty("Model") ?? 
-                              engineType.GetProperty("FullModel") ??
-                              engineType.GetProperty("OcrModel");
-                              
-                if (modelProp != null)
-                {
-                    var model = modelProp.GetValue(_ocrEngine);
-                    if (model != null)
-                    {
-                        var modelTypeName = model.GetType().Name;
-                        if (modelTypeName.Contains("V5") || modelTypeName.Contains("Chinese"))
-                        {
-                            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 モデル名からV5検出: {modelTypeName}");
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            // 3. エンジンからバージョン情報を取得
-            if (_ocrEngine != null)
-            {
-                var engineType = _ocrEngine.GetType();
-                var versionProp = engineType.GetProperty("Version");
-                if (versionProp != null)
-                {
-                    var version = versionProp.GetValue(_ocrEngine)?.ToString();
-                    if (version != null && (version.Contains("v5") || version.Contains("V5")))
-                    {
-                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 エンジンバージョンからV5検出: {version}");
-                        return true;
-                    }
-                }
-            }
-
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 V4以前のモデルと判定");
-            return false;
+            // V5統一により常にtrueを返す
+            return true;
         }
         catch (Exception ex)
         {

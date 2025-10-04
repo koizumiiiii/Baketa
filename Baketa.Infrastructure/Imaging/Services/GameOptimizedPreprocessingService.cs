@@ -284,86 +284,11 @@ public sealed class GameOptimizedPreprocessingService(
             }
 
             // ✨ Step 3: OCR精度向上処理（新機能）
-            
-            // Step 3a: コントラスト強化 (CLAHE) - TODO: OpenCvContrastEnhancementFilter実装後に有効化
-            if (false) // profile.EnableContrastEnhancement) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ コントラスト強化適用中（CLAHE使用）...");
-                
-                try
-                {
-                    // var contrastFilter = CreateContrastEnhancementFilter(profile);
-                    // var enhancedImage = await contrastFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = enhancedImage;
-                    
-                    _logger.LogDebug("✅ コントラスト強化完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ コントラスト強化でエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3b: ノイズ除去 (バイラテラルフィルター) - TODO: OpenCvNoiseReductionFilter実装後に有効化
-            if (false) // profile.EnableNoiseReduction) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ ノイズ除去適用中（バイラテラルフィルター使用）...");
-                
-                try
-                {
-                    // var noiseReductionFilter = CreateNoiseReductionFilter(profile);
-                    // var denoisedImage = await noiseReductionFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = denoisedImage;
-                    
-                    _logger.LogDebug("✅ ノイズ除去完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ ノイズ除去でエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3c: シャープニング - TODO: OpenCvSharpeningFilter実装後に有効化
-            if (false) // profile.EnableSharpening) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ シャープニング適用中...");
-                
-                try
-                {
-                    // var sharpeningFilter = CreateSharpeningFilter(profile);
-                    // var sharpenedImage = await sharpeningFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = sharpenedImage;
-                    
-                    _logger.LogDebug("✅ シャープニング完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ シャープニングでエラーが発生、スキップして続行");
-                }
-            }
-
-            // Step 3d: エッジ強化 - TODO: OpenCvEdgeEnhancementFilter実装後に有効化
-            if (false) // profile.EnableEdgeEnhancement) // 一時的に無効化
-            {
-                _logger.LogDebug("✨ エッジ強化適用中...");
-                
-                try
-                {
-                    // var edgeEnhancementFilter = CreateEdgeEnhancementFilter(profile);
-                    // var edgeEnhancedImage = await edgeEnhancementFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                    // currentImage = edgeEnhancedImage;
-                    
-                    _logger.LogDebug("✅ エッジ強化完了（プール効率: HitRate={HitRate:P1}）", 
-                        _imagePool.Statistics.HitRate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ エッジ強化でエラーが発生、スキップして続行");
-                }
-            }
+            // TODO: OpenCvフィルター実装後に以下の処理を有効化
+            // - Step 3a: コントラスト強化 (CLAHE) - CreateContrastEnhancementFilter
+            // - Step 3b: ノイズ除去 (バイラテラルフィルター) - CreateNoiseReductionFilter
+            // - Step 3c: シャープニング - CreateSharpeningFilter
+            // - Step 3d: エッジ強化 - CreateEdgeEnhancementFilter
 
             _logger.LogInformation("🎮 ゲーム最適化処理完了: ColorMasking={ColorMasking}, AdaptiveThreshold={AdaptiveThreshold}, " +
                 "OCR精度向上={ContrastEnhancement}/{NoiseReduction}/{Sharpening}/{EdgeEnhancement}, " +
