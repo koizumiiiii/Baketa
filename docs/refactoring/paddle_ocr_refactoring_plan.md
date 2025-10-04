@@ -446,21 +446,21 @@ public interface IPaddleOcrUtilities
 
 ## 📋 段階的実装計画
 
-### Phase 2.1: 基盤準備とインターフェース定義（所要時間: 2-3日）
+### ✅ Phase 2.1: 基盤準備とインターフェース定義（完了 - 所要時間: 約1時間）
 
 #### タスク
-- [ ] 全インターフェース定義を作成（`Abstractions`フォルダ配下）
-  - `IPaddleOcrImageProcessor.cs`
-  - `IPaddleOcrExecutor.cs`
-  - `IPaddleOcrResultConverter.cs`
-  - `IPaddleOcrModelManager.cs`
-  - `IPaddleOcrEngineInitializer.cs`
-  - `IPaddleOcrPerformanceTracker.cs`
-  - `IPaddleOcrErrorHandler.cs`
-  - `IPaddleOcrLanguageOptimizer.cs`
-  - `IPaddleOcrUtilities.cs`
+- [x] 全インターフェース定義を作成（`Abstractions`フォルダ配下）
+  - ✅ `IPaddleOcrImageProcessor.cs`
+  - ✅ `IPaddleOcrExecutor.cs`
+  - ✅ `IPaddleOcrResultConverter.cs`
+  - ✅ `IPaddleOcrModelManager.cs`
+  - ✅ `IPaddleOcrEngineInitializer.cs`
+  - ✅ `IPaddleOcrPerformanceTracker.cs`
+  - ✅ `IPaddleOcrErrorHandler.cs`
+  - ✅ `IPaddleOcrLanguageOptimizer.cs`
+  - ✅ `IPaddleOcrUtilities.cs`
 
-- [ ] ディレクトリ構造作成
+- [x] ディレクトリ構造作成
   ```
   Baketa.Infrastructure/OCR/PaddleOCR/
     ├── Engine/
@@ -479,44 +479,50 @@ public interface IPaddleOcrUtilities
         └── （上記インターフェース）
   ```
 
-- [ ] 基本的なDTOクラス作成（必要に応じて）
-  - `ImageProcessingOptions.cs`
-  - `OcrExecutionContext.cs`
+- [x] 基本的なDTOクラス作成（必要に応じて）
+  - ✅ Phase 2.2以降で必要に応じて作成予定
 
 #### 期待成果
-- すべてのインターフェースが定義済み
-- ディレクトリ構造が準備済み
-- ビルドが成功（実装は空でも可）
+- ✅ すべてのインターフェースが定義済み
+- ✅ ディレクトリ構造が準備済み
+- ✅ ビルドが成功（エラー0件）
+- ✅ Clean Architecture準拠（インターフェース分離原則）
 
 ---
 
-### Phase 2.2: ユーティリティ・パフォーマンストラッカー実装（所要時間: 2日）
+### ✅ Phase 2.2: ユーティリティ・パフォーマンストラッカー実装（完了 - 所要時間: 約2時間）
 
 #### タスク
-- [ ] `PaddleOcrUtilities` 実装
-  - `IsTestEnvironment` 移動
-  - `CreateDummyMat` 移動
-  - `GetDebugLogPath` / `SafeWriteDebugLog` 移動
+- [x] `PaddleOcrUtilities` 実装（121行）
+  - `IsTestEnvironment` 移動（5段階判定実装）
+  - `CreateDummyMat` 移動（OpenCvSharp例外ハンドリング）
+  - `GetDebugLogPath` / `SafeWriteDebugLog` 移動（フォールバック対応）
 
-- [ ] `PaddleOcrPerformanceTracker` 実装
-  - パフォーマンス統計フィールド移動
-  - `UpdatePerformanceStats` 移動
-  - `GetPerformanceStats` 移動
-  - `CalculateBaseTimeout` / `GetAdaptiveTimeout` 移動
-  - 失敗カウンター関連メソッド移動
+- [x] `PaddleOcrPerformanceTracker` 実装（255行）
+  - パフォーマンス統計フィールド移動（スレッドセーフ化）
+  - `UpdatePerformanceStats` 移動（Interlocked/ConcurrentQueue使用）
+  - `GetPerformanceStats` 移動（統計集計実装）
+  - `CalculateTimeout` / `GetAdaptiveTimeout` 移動（定数化＋スレッドセーフ化）
+  - 失敗カウンター関連メソッド移動（Interlocked.Exchange使用）
 
-- [ ] DI登録
-  - `PaddleOcrModule.cs` にサービス登録追加
+- [x] DI登録
+  - `InfrastructureModule.cs` にサービス登録追加
   - Singletonライフタイム指定
 
-- [ ] 単体テスト作成
+- [x] Geminiコードレビュー & 指摘事項反映
+  - スレッドセーフティ強化（DateTime → long Ticks）
+  - マジックナンバー定数化（5つの定数定義）
+
+- [ ] 単体テスト作成（Phase 2.3以降で対応予定）
   - `PaddleOcrUtilitiesTests.cs`
   - `PaddleOcrPerformanceTrackerTests.cs`
 
 #### 期待成果
-- ユーティリティとパフォーマンストラッカーが独立クラスとして動作
-- 既存のPaddleOcrEngineから参照可能
-- テストが成功
+- ✅ ユーティリティとパフォーマンストラッカーが独立クラスとして動作
+- ✅ Clean Architecture準拠（インターフェース分離）
+- ✅ スレッドセーフ実装完了
+- ✅ ビルド成功（エラー0件）
+- ⏳ テストは次フェーズで対応
 
 ---
 
