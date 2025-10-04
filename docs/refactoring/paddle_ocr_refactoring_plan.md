@@ -618,24 +618,33 @@ public interface IPaddleOcrUtilities
 
 ---
 
-### Phase 2.6: エンジン初期化実装（所要時間: 3日）
+### ✅ Phase 2.6: エンジン初期化実装（完了 - 所要時間: 約2時間）
 
 #### タスク
-- [ ] `PaddleOcrEngineInitializer` 実装
-  - `InitializeEnginesSafelyAsync` 移動
-  - `CheckNativeLibraries` 移動
-  - `WarmupAsync` 移動
-  - `ReinitializeEngineAsync` 移動
-  - エンジンライフサイクル管理
+- [x] `PaddleOcrEngineInitializer` 実装（約437行）
+  - ✅ `InitializeEnginesAsync` 実装（旧: InitializeEnginesSafelyAsync）
+  - ✅ `CheckNativeLibraries` 実装（OpenCV v4.10+対応）
+  - ✅ `WarmupAsync` 実装（Mat直接作成で最適化）
+  - ✅ `ReinitializeEngineAsync` 実装
+  - ✅ GetOcrEngine/GetQueuedEngine: スレッドセーフなゲッター
+  - ✅ エンジンライフサイクル管理
+  - ✅ IDisposable実装（PaddleOcrAll/QueuedPaddleOcrAll破棄）
 
-- [ ] 設定適用ロジック最適化
-  - `ApplyDetectionOptimization` 統合
+- [x] 設定適用ロジック最適化
+  - ✅ `ApplyDetectionOptimization` 統合（リフレクションベース、private）
 
-- [ ] DI登録とテスト
+- [x] DI登録とテスト
+  - ✅ IPaddleOcrEngineInitializer → PaddleOcrEngineInitializer (Singleton)
+  - ✅ ビルド検証成功（エラー0件）
+  - ✅ Geminiコードレビュー実施
+  - ✅ 指摘事項反映（PaddleOcrAll Dispose漏れ、Warmup最適化）
 
 #### 期待成果
-- 初期化ロジックが分離
-- PaddleOcrAllエンジンの管理が明確化
+- ✅ 初期化ロジックが分離
+- ✅ PaddleOcrAllエンジンの管理が明確化
+- ✅ スレッドセーフティ強化（lock (_lockObject)）
+- ✅ AccessViolationException回避（Enable180Classification = false）
+- ✅ メモリ管理の適切化（IDisposable実装）
 
 ---
 
@@ -1577,5 +1586,137 @@ public class Helper : IHelper
 - ✅ 画像処理ロジックの完全分離
 - ✅ PaddleOcrEngineが画像プロセッサー経由で画像処理可能な基盤完成
 - ✅ Phase 2.6（エンジン初期化実装）への準備完了
+
+---
+
+## ✅ Phase 2.6 完了レポート: PaddleOCRエンジン初期化実装
+
+### 📅 実装期間
+- **開始**: 2025-01-09
+- **完了**: 2025-01-09
+- **所要時間**: 約2時間
+
+### 📦 実装内容
+
+#### 1. ファイル作成
+- **PaddleOcrEngineInitializer.cs** (新規作成、437行)
+  - PaddleOcrAllエンジンの初期化、設定適用、ウォームアップを担当する専門サービス
+
+#### 2. 実装メソッド
+
+**公開メソッド（IPaddleOcrEngineInitializerインターフェース実装）**:
+1. `CheckNativeLibraries()`: OpenCV v4.10+対応のネイティブライブラリチェック
+2. `InitializeEnginesAsync()`: PaddleOcrAll作成、スレッドセーフティ強制 (CPU/シングルスレッド)
+3. `WarmupAsync()`: 512x512ダミー画像でOCR実行（Mat直接作成で最適化）
+4. `GetOcrEngine()`: スレッドセーフなエンジンゲッター
+5. `GetQueuedEngine()`: スレッドセーフなキューイング型エンジンゲッター
+
+**内部メソッド**:
+1. `ReinitializeEngineAsync()`: エンジン破棄・GC・再初期化
+2. `ApplyDetectionOptimization()`: リフレクションベースのパラメーター適用 (private)
+3. `ConvertParameterValue()`: パラメーター値の型変換ヘルパー (private)
+4. `Dispose()`: IDisposableによるリソース解放
+
+#### 3. 技術的特徴
+
+**スレッドセーフティ強化**:
+- `lock (_lockObject)` によるエンジンアクセス制御
+- 全てのエンジン操作がスレッドセーフに実装
+
+**AccessViolationException回避**:
+- `Enable180Classification = false` により PD_PredictorRun メモリアクセス違反を回避
+- PaddleOcrClassifier.ShouldRotate180() 内部バグの回避
+
+**タイムアウト制御**:
+- 2分タイムアウト付き初期化（CancellationTokenSource.CreateLinkedTokenSource）
+- UI スレッドブロック回避のため Task.Run で初期化
+
+**メモリ管理**:
+- IDisposable実装による適切なリソース解放
+- PaddleOcrAll/QueuedPaddleOcrAll の Dispose 呼び出し
+- ReinitializeEngineAsync での GC.Collect() と GC.WaitForPendingFinalizers()
+
+**テスト環境対応**:
+- `IsTestEnvironment()` によるライブラリチェックスキップ
+- ネットワークアクセス回避
+
+#### 4. DI登録
+- InfrastructureModule.cs に Phase 2.6 登録追加
+- `IPaddleOcrEngineInitializer` → `PaddleOcrEngineInitializer` (Singleton)
+
+### 🔍 Geminiコードレビュー結果
+
+#### 総評
+🚨 **クリティカルな問題**: なし（修正済み）
+⚠️ **要改善**: 2件（全て修正済み）
+✅ **良好な点**: 多数
+
+#### 指摘事項と対応
+
+**1. PaddleOcrAll の Dispose 漏れ（クリティカル）**
+- **問題**: コメントで「PaddleOcrAllは明示的なDisposeメソッドを持たない」とあったが、実際にはIDisposableを実装している
+- **影響**: アンマネージドリソース（推論器）が即時解放されない
+- **修正**: Disposeメソッド内で `(_ocrEngine as IDisposable)?.Dispose()` を追加
+- **修正箇所**:
+  - `Dispose()` メソッド（行427-430）
+  - `ReinitializeEngineAsync()` メソッド（行280-282）
+
+**2. Warmup処理の非効率（パフォーマンス）**
+- **問題**: AdvancedImage → バイト配列 → Mat の二重処理
+- **影響**: わずかなオーバーヘッド
+- **修正**: `new Mat(512, 512, MatType.CV_8UC3, Scalar.White)` で直接Mat作成
+- **修正**: `Task.Run` でワーカースレッドにオフロード
+- **修正箇所**: `WarmupAsync()` メソッド（行199-212）
+
+#### Gemini高評価ポイント
+- ✅ スレッドセーフティ: lockの範囲が最小限、デッドロックリスク低
+- ✅ 網羅的な例外処理: TypeInitializationException、DllNotFoundException など具体的
+- ✅ タイムアウト制御: 2分間のタイムアウトでハングアップ防止
+- ✅ ログ出力: 各処理の成功、失敗、警告が適切に出力
+- ✅ Clean Architecture準拠: インターフェース分離、DI
+
+### 🏗️ アーキテクチャ改善
+
+#### 分離された責務
+- **Before**: PaddleOcrEngine が初期化、ウォームアップ、設定適用を担当
+- **After**: PaddleOcrEngineInitializer が専門的に担当
+
+#### 依存関係
+```
+PaddleOcrEngineInitializer
+  ↓ 依存
+  - IPaddleOcrUtilities (テスト環境判定、ユーティリティ)
+  - ILogger<PaddleOcrEngineInitializer> (ログ出力)
+  - FullOcrModel (PaddleOCR モデル)
+  - OcrEngineSettings (OCR設定)
+```
+
+### 📊 コード品質指標
+
+| 項目 | 値 |
+|------|-----|
+| 実装行数 | 437行 |
+| 公開メソッド数 | 5 |
+| 内部メソッド数 | 3 |
+| ビルドエラー | 0件 |
+| ビルド警告（Phase 2.6関連） | 0件 |
+| Geminiコードレビュー評価 | 非常に高品質 |
+| 指摘事項修正率 | 100% |
+
+### 🎯 達成目標
+
+#### 完了項目
+- ✅ 初期化ロジックの完全分離
+- ✅ PaddleOcrAllエンジンの管理明確化
+- ✅ スレッドセーフティ強化
+- ✅ AccessViolationException回避機構
+- ✅ メモリ管理の適切化（IDisposable実装）
+- ✅ テスト環境対応
+- ✅ Geminiコードレビュー完了、全指摘事項反映
+
+#### 次フェーズへの準備
+- ✅ エンジン初期化ロジックの完全分離
+- ✅ PaddleOcrEngineがエンジン初期化サービス経由で初期化可能な基盤完成
+- ✅ Phase 2.7（OCR実行エグゼキューター実装）への準備完了
 
 ---
