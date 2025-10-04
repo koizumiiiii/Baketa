@@ -1315,8 +1315,7 @@ namespace Baketa.UI;
             overlayUIModule.RegisterServices(services);
             Console.WriteLine("✅ OverlayUIModule登録完了");
             
-            // 🗑️ [PHASE18] Phase16UIOverlayModule削除完了 - 統一オーバーレイシステムに移行
-            Console.WriteLine("🗑️ [PHASE18] Phase16UIOverlayModule削除 - InPlaceTranslationOverlayManager単一化");
+            // ✅ [Phase 1.4] Phase16UIOverlayModule完全削除完了 - OverlayUIModuleに統合済み
         }
         
         /// <summary>

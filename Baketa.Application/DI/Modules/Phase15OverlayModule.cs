@@ -75,9 +75,9 @@ public class Phase15OverlayModule : ServiceModuleBase
         // 中央調整オーケストレーター
         services.AddSingleton<IOverlayOrchestrator, OverlayOrchestrator>();
 
-        // ✅ Phase 16統一: UI層依存サービスはPhase16UIOverlayModuleで実装
-        // Stub実装の登録を除去し、Phase16UIOverlayModuleの統一実装に委任
-        logger.LogInformation("🔄 [PHASE15_DI] UI層サービス登録はPhase16UIOverlayModuleに委任");
+        // ✅ Phase 16統一完了: UI層サービスはOverlayUIModuleで実装済み
+        // Stub実装は削除され、統一オーバーレイシステムに移行完了
+        logger.LogInformation("🔄 [PHASE15_DI] UI層サービス登録はOverlayUIModuleに委任");
 
         logger.LogDebug("✅ [PHASE15_DI] Application層サービス登録完了");
     }
