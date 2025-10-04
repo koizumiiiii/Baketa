@@ -205,7 +205,12 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Sprint 1: PaddleOCR診断システム（Gemini推奨）
             services.AddSingleton<Baketa.Core.Abstractions.Diagnostics.IPaddleOcrDiagnostics, Baketa.Infrastructure.Diagnostics.PaddleOcrDiagnosticsService>();
             Console.WriteLine("✅ Sprint 1: PaddleOCR診断システム登録完了 - CPU First戦略対応");
-            
+
+            // Phase 2.2: PaddleOCR専門サービス（リファクタリング）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrUtilities, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrUtilities>();
+            services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrPerformanceTracker, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrPerformanceTracker>();
+            Console.WriteLine("✅ Phase 2.2: PaddleOCRユーティリティ・パフォーマンストラッカー登録完了");
+
             // OCRエンジンやプロセッサーの登録
             // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
             // 例: services.AddSingleton<IOcrModelProvider, LocalOcrModelProvider>();
