@@ -1201,11 +1201,75 @@ public class Helper : IHelper
 
 ---
 
-### 🔄 Phase 2.2: ユーティリティ・パフォーマンストラッカー実装 (予定)
+### ✅ Phase 2.2: ユーティリティ・パフォーマンストラッカー実装 (完了)
 
-**予定期間**: 2日
-**実装対象**:
-1. `PaddleOcrUtilities` - ユーティリティメソッド、テスト環境判定、ログ出力
-2. `PaddleOcrPerformanceTracker` - パフォーマンス統計、失敗カウント管理
+**実装期間**: 2025-10-04
+**所要時間**: 約2時間（予定2日から大幅短縮）
+
+#### 完了内容
+
+1. **PaddleOcrUtilities.cs（121行実装）**
+   - `IsTestEnvironment()`: 5段階テスト環境判定
+     - プロセス名検出（testhost, vstest）
+     - スタックトレース解析（xunit, Microsoft.TestPlatform）
+     - 環境変数チェック（CI, DOTNET_RUNNING_IN_CONTAINER等）
+     - コマンドライン引数解析
+     - アセンブリ名検証
+   - `CreateDummyMat()`: テスト用ダミーMat生成（OpenCvSharp例外ハンドリング）
+   - `GetDebugLogPath()`: デバッグログパス取得（フォールバック対応）
+   - `SafeWriteDebugLog(string message)`: 安全なデバッグログ書き込み
+
+2. **PaddleOcrPerformanceTracker.cs（255行実装）**
+   - `UpdatePerformanceStats(double, bool)`: スレッドセーフなパフォーマンス統計更新
+     - Interlocked操作による競合回避
+     - ConcurrentQueue（最新1000件保持）
+   - `GetPerformanceStats()`: 統計集計（平均・最小・最大・成功率）
+   - `CalculateTimeout(Mat mat)`: 解像度ベースタイムアウト計算
+     - 1M~2.5M+ pixel対応（30~50秒）
+     - ObjectDisposedException/AccessViolationException防御的処理
+   - `GetAdaptiveTimeout(int baseTimeout)`: 適応的タイムアウト調整
+     - 連続処理検出（10秒以内→1.5倍延長）
+     - 連続タイムアウト対応（0.3倍増分）
+     - 大画面対応（1.8倍延長）
+     - 最大4倍制限
+   - `ResetFailureCounter() / GetConsecutiveFailureCount()`: 失敗カウント管理
+
+3. **DIコンテナ登録**
+   - InfrastructureModule.cs: Singleton登録（IPaddleOcrUtilities, IPaddleOcrPerformanceTracker）
+
+4. **Geminiコードレビュー & 指摘事項反映**
+   - **総合評価**: ✅ Good（改善提案あり）
+   - **主要指摘事項**:
+     1. スレッドセーフティ強化 → ✅ 完全対応
+     2. マジックナンバー定数化 → ✅ 完全対応
+     3. 責務分割検討 → 別Issue対応（将来課題）
+   - **修正内容**:
+     - `_lastOcrTime` (DateTime) → `_lastOcrTimeTicks` (long) 変更
+     - Interlocked.Read/Exchange による完全スレッドセーフ実装
+     - 5つの定数化（ContinuousProcessingThresholdSeconds等）
+
+#### 技術的特徴
+
+- **スレッドセーフ実装**:
+  - Interlocked操作（Read, Exchange, Increment）
+  - ConcurrentQueue使用
+  - int読み取りのアトミック性（明示的コメント化）
+- **ILogger<T>注入対応**（nullable）
+- **Clean Architecture準拠**（インターフェース分離）
+- **エラーハンドリング強化**（ObjectDisposedException, AccessViolationException対応）
+
+#### 成果物
+
+- **コミット**: 2件
+  - `33ed4dd`: Phase 2.2初回実装（414行追加、3ファイル変更）
+  - `762a93e`: Geminiレビュー指摘事項反映（スレッドセーフティ強化）
+
+- **ビルド結果**: エラー0件 ✅
+
+#### 次フェーズへの準備
+
+- ✅ ユーティリティ・パフォーマンス追跡機能の基盤完成
+- ✅ スレッドセーフ実装によりマルチスレッド環境での堅牢性確保
+- ✅ Phase 2.3（エラーハンドラー・言語最適化）への準備完了
 
 ---
