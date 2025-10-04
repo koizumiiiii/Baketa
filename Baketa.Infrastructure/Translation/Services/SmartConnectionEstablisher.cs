@@ -57,10 +57,11 @@ public class TcpPortListeningStrategy : IConnectionStrategy
 /// <summary>
 /// HTTP ヘルスチェック戦略
 /// </summary>
-public class HttpHealthCheckStrategy : IConnectionStrategy
+public class HttpHealthCheckStrategy : IConnectionStrategy, IDisposable
 {
     private readonly ILogger<HttpHealthCheckStrategy> _logger;
     private readonly HttpClient _httpClient;
+    private bool _disposed;
 
     public string StrategyName => "HttpHealthCheck";
 
@@ -72,6 +73,8 @@ public class HttpHealthCheckStrategy : IConnectionStrategy
 
     public async Task<bool> IsServerReady(int port, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         try
         {
             var response = await _httpClient.GetAsync($"http://127.0.0.1:{port}/health", cancellationToken);
@@ -81,7 +84,7 @@ public class HttpHealthCheckStrategy : IConnectionStrategy
                 _logger.LogDebug("💚 ヘルスチェック成功: Port {Port}, Response: {Response}", port, content);
                 return true;
             }
-            
+
             _logger.LogDebug("💛 ヘルスチェック応答異常: Port {Port}, Status: {Status}", port, response.StatusCode);
             return false;
         }
@@ -90,6 +93,17 @@ public class HttpHealthCheckStrategy : IConnectionStrategy
             _logger.LogDebug("💔 ヘルスチェック失敗: Port {Port}, Error: {Error}", port, ex.Message);
             return false;
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _httpClient.Dispose();
+        _disposed = true;
     }
 }
 
@@ -162,15 +176,16 @@ public class TcpHandshakeStrategy : IConnectionStrategy
 /// スマート接続確立サービス
 /// 複数の戦略を用いて接続の信頼性を向上させます
 /// </summary>
-public sealed class SmartConnectionEstablisher
+public sealed class SmartConnectionEstablisher : IDisposable
 {
     private readonly ILogger<SmartConnectionEstablisher> _logger;
     private readonly IConnectionStrategy[] _strategies;
+    private bool _disposed;
 
     public SmartConnectionEstablisher(ILogger<SmartConnectionEstablisher> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // 戦略インスタンス作成（ロガー共有で軽量化）
         _strategies = new IConnectionStrategy[]
         {
@@ -178,7 +193,7 @@ public sealed class SmartConnectionEstablisher
             new HttpHealthCheckStrategy(logger as ILogger<HttpHealthCheckStrategy> ?? new NullLogger<HttpHealthCheckStrategy>()),
             new TcpHandshakeStrategy(logger as ILogger<TcpHandshakeStrategy> ?? new NullLogger<TcpHandshakeStrategy>())
         };
-        
+
         _logger.LogDebug("🧠 SmartConnectionEstablisher初期化: {StrategyCount}戦略", _strategies.Length);
     }
 
@@ -191,11 +206,13 @@ public sealed class SmartConnectionEstablisher
     /// <returns>準備完了の場合true</returns>
     public async Task<bool> WaitForServerReady(int port, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var startTime = DateTime.UtcNow;
         var endTime = startTime + timeout;
         var retryCount = 0;
 
-        _logger.LogInformation("⏳ サーバー準備完了待機開始: Port {Port}, Timeout {Timeout}秒", 
+        _logger.LogInformation("⏳ サーバー準備完了待機開始: Port {Port}, Timeout {Timeout}秒",
             port, timeout.TotalSeconds);
 
         while (DateTime.UtcNow < endTime && !cancellationToken.IsCancellationRequested)
@@ -254,6 +271,8 @@ public sealed class SmartConnectionEstablisher
     /// <returns>準備完了の場合true</returns>
     public async Task<bool> IsServerReady(int port, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         foreach (var strategy in _strategies)
         {
             try
@@ -272,5 +291,24 @@ public sealed class SmartConnectionEstablisher
 
         _logger.LogDebug("❌ サーバー準備未完了: Port {Port} (全戦略失敗)", port);
         return false;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        // IDisposable実装戦略のDispose
+        foreach (var strategy in _strategies)
+        {
+            if (strategy is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+
+        _disposed = true;
     }
 }

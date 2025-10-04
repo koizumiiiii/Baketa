@@ -9,10 +9,11 @@ namespace Baketa.Infrastructure.Services;
 /// バックグラウンドタスクキューの実装
 /// Channel-based高性能キューでメイン処理をブロックしない
 /// </summary>
-public sealed class BackgroundTaskQueue : IBackgroundTaskQueue
+public sealed class BackgroundTaskQueue : IBackgroundTaskQueue, IDisposable
 {
     private readonly Channel<Func<CancellationToken, Task>> _queue;
     private readonly SemaphoreSlim _semaphore;
+    private bool _disposed;
 
     public BackgroundTaskQueue(int capacity = 100)
     {
@@ -32,6 +33,7 @@ public sealed class BackgroundTaskQueue : IBackgroundTaskQueue
 
     public void QueueBackgroundWorkItem(Func<CancellationToken, Task> workItem)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(workItem);
 
         if (!_queue.Writer.TryWrite(workItem))
@@ -51,10 +53,22 @@ public sealed class BackgroundTaskQueue : IBackgroundTaskQueue
 
     public async Task<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-        
+
         var workItem = await _queue.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         return workItem;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _semaphore.Dispose();
+        _disposed = true;
     }
 }
 
