@@ -363,9 +363,9 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     /// <returns>連続失敗回数</returns>
     public int GetConsecutiveFailureCount()
     {
-        // 最初の利用可能な戦略の失敗回数を返す
-        var firstAvailableStrategy = _strategies.FirstOrDefault(s => s.IsAvailable);
-        return firstAvailableStrategy?.Engine.GetConsecutiveFailureCount() ?? 0;
+        // 次に実行される可能性が最も高い戦略の失敗回数を返す
+        var nextStrategy = GetOrderedStrategies().FirstOrDefault();
+        return nextStrategy?.Engine.GetConsecutiveFailureCount() ?? 0;
     }
 
     /// <summary>
