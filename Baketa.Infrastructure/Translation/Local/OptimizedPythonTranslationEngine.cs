@@ -1151,7 +1151,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CancellationToken cancellationToken)
     {
         var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] ProcessSingleBatchAsync開始 - リクエスト数: {requests.Count}\r\n");
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] ProcessSingleBatchAsync開始 - リクエスト数: {requests.Count}\r\n");
 
         var batchStopwatch = Stopwatch.StartNew();
 
@@ -1163,17 +1163,17 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         try
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] tryブロック開始\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] tryブロック開始\r\n");
             // 🔧 [GEMINI_REVIEW] 設定ファイルベースの接続プール制御
             // 🆕 Gemini推奨: 設定ファイルベースの接続プール制御
             var useConnectionPool = _circuitBreakerSettings.EnableConnectionPool;
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CONNECTION_MODE] useConnectionPool: {useConnectionPool}, _connectionPool != null: {_connectionPool != null}\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CONNECTION_MODE] useConnectionPool: {useConnectionPool}, _connectionPool != null: {_connectionPool != null}\r\n");
             if (useConnectionPool && _connectionPool != null)
             {
                 // Phase 1統合: 接続プールから接続を取得
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥🔥🔥 [GET_CONNECTION] GetConnectionAsync呼び出し直前\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥🔥🔥 [GET_CONNECTION] GetConnectionAsync呼び出し直前\r\n");
                 connection = await _connectionPool.GetConnectionAsync(cancellationToken).ConfigureAwait(false);
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅✅✅ [GET_CONNECTION] GetConnectionAsync完了 - connection != null: {connection != null}\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅✅✅ [GET_CONNECTION] GetConnectionAsync完了 - connection != null: {connection != null}\r\n");
             }
             else
             {
@@ -1204,47 +1204,47 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             // JSON送信
             var jsonRequest = JsonSerializer.Serialize(batchRequest);
 
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [BATCH_REQUEST] JSON送信準備完了 - connection: {(connection != null ? "接続プール" : "単発接続")}\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [BATCH_REQUEST] JSON送信準備完了 - connection: {(connection != null ? "接続プール" : "単発接続")}\r\n");
 
             string? jsonResponse;
             if (connection != null)
             {
                 // 接続プール使用モード
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CONNECTION_POOL] WriteLineAsync実行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CONNECTION_POOL] WriteLineAsync実行開始\r\n");
                 await connection.Writer.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CONNECTION_POOL] WriteLineAsync実行完了\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CONNECTION_POOL] WriteLineAsync実行完了\r\n");
 
                 // 🔥 [PHASE12.2_FIX] Task.WhenAnyパターンで確実な10秒タイムアウト実装（Gemini推奨）
                 // CancellationTokenは協調的キャンセルであり、ReadLineAsync内部I/Oを強制中断できない
                 // Task.WhenAnyで基盤ストリームに依存せず確実にタイムアウトを検知
                 // 🔥 [GEMINI_REVIEW] Task.Delayから上位層のcancellationTokenを削除し、独立した10秒タイムアウトを実装
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] ReadLineAsync.AsTask()実行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] ReadLineAsync.AsTask()実行開始\r\n");
                 var readTask = connection.Reader.ReadLineAsync(cancellationToken).AsTask();
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.Delay(10秒)実行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.Delay(10秒)実行開始\r\n");
                 var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10)); // 上位層のキャンセルに影響されない独立タイマー
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行開始\r\n");
 
                 var completedTask = await Task.WhenAny(readTask, timeoutTask).ConfigureAwait(false);
 
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行完了 - completedTask == timeoutTask: {completedTask == timeoutTask}\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行完了 - completedTask == timeoutTask: {completedTask == timeoutTask}\r\n");
 
                 if (completedTask == timeoutTask)
                 {
                     // タイムアウト発生 - Python側がバッチリクエストに応答していない
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [TIMEOUT] ReadLineAsync 10秒タイムアウト発生（接続プールモード）\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [TIMEOUT] ReadLineAsync 10秒タイムアウト発生（接続プールモード）\r\n");
 
                     // 🔥 [GEMINI_CRITICAL] タイムアウト後、接続を破棄してバックグラウンドのreadTaskを強制終了
                     // 放置された接続は後続リクエストを汚染する危険性があるため、破棄が必須
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CLEANUP] 接続破棄開始（接続プールモード）\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CLEANUP] 接続破棄開始（接続プールモード）\r\n");
                     try
                     {
                         // PersistentConnectionはIAsyncDisposableだが、即座にクローズするためTcpClientを直接クローズ
                         connection.TcpClient?.Close(); // ReadLineAsyncを強制終了し、ソケットをクローズ
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [CLEANUP] 接続破棄完了（接続プールモード）\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [CLEANUP] 接続破棄完了（接続プールモード）\r\n");
                     }
                     catch (Exception cleanupEx)
                     {
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [CLEANUP] 接続破棄エラー: {cleanupEx.Message}\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [CLEANUP] 接続破棄エラー: {cleanupEx.Message}\r\n");
                     }
 
                     throw new TimeoutException("The read operation timed out after 10 seconds.");
@@ -1256,39 +1256,39 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
             else
             {
                 // 単発接続モード（汚染対策）
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [DIRECT_CONNECTION] WriteLineAsync実行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DIRECT_CONNECTION] WriteLineAsync実行開始\r\n");
                 await directWriter!.WriteLineAsync(jsonRequest).ConfigureAwait(false);
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [DIRECT_CONNECTION] WriteLineAsync実行完了\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DIRECT_CONNECTION] WriteLineAsync実行完了\r\n");
 
                 // 🔥 [PHASE12.2_FIX] Task.WhenAnyパターンで確実な10秒タイムアウト実装（Gemini推奨）
                 // 🔥 [GEMINI_REVIEW] Task.Delayから上位層のcancellationTokenを削除し、独立した10秒タイムアウトを実装
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] ReadLineAsync.AsTask()実行開始（単発接続）\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] ReadLineAsync.AsTask()実行開始（単発接続）\r\n");
                 var readTask = directReader!.ReadLineAsync(cancellationToken).AsTask();
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.Delay(10秒)実行開始（単発接続）\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.Delay(10秒)実行開始（単発接続）\r\n");
                 var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10)); // 上位層のキャンセルに影響されない独立タイマー
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行開始（単発接続）\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行開始（単発接続）\r\n");
 
                 var completedTask = await Task.WhenAny(readTask, timeoutTask).ConfigureAwait(false);
 
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行完了（単発接続） - completedTask == timeoutTask: {completedTask == timeoutTask}\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [WHEN_ANY] Task.WhenAny実行完了（単発接続） - completedTask == timeoutTask: {completedTask == timeoutTask}\r\n");
 
                 if (completedTask == timeoutTask)
                 {
                     // タイムアウト発生 - Python側がバッチリクエストに応答していない
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [TIMEOUT] ReadLineAsync 10秒タイムアウト発生（単発接続モード）\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [TIMEOUT] ReadLineAsync 10秒タイムアウト発生（単発接続モード）\r\n");
 
                     // 🔥 [GEMINI_CRITICAL] タイムアウト後、接続を破棄してバックグラウンドのreadTaskを強制終了
                     // 放置された接続は後続リクエストを汚染する危険性があるため、破棄が必須
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CLEANUP] ストリーム破棄開始（単発接続モード）\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CLEANUP] ストリーム破棄開始（単発接続モード）\r\n");
                     try
                     {
                         directReader?.Dispose(); // ReadLineAsyncを強制終了
                         directWriter?.Dispose(); // WriteLineAsyncリソースも解放
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [CLEANUP] ストリーム破棄完了（単発接続モード）\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [CLEANUP] ストリーム破棄完了（単発接続モード）\r\n");
                     }
                     catch (Exception cleanupEx)
                     {
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [CLEANUP] ストリーム破棄エラー: {cleanupEx.Message}\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [CLEANUP] ストリーム破棄エラー: {cleanupEx.Message}\r\n");
                     }
 
                     throw new TimeoutException("The read operation timed out after 10 seconds.");
@@ -1313,37 +1313,37 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         }
         catch (TimeoutException ex)
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] TimeoutException catchブロック - 10秒タイムアウト\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] TimeoutException catchブロック - 10秒タイムアウト\r\n");
             batchStopwatch.Stop();
             _logger.LogWarning("🔥 [PHASE12.2] バッチ翻訳タイムアウト（10秒）: Python側がバッチリクエストに応答していない - Fallback to individual processing");
 
             // タイムアウト時は個別処理でフォールバック
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（10秒タイムアウト）\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（10秒タイムアウト）\r\n");
             return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] OperationCanceledException catchブロック\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] OperationCanceledException catchブロック\r\n");
             batchStopwatch.Stop();
             _logger.LogWarning("バッチ翻訳キャンセル: ユーザーによるキャンセル操作");
 
             // キャンセル時は個別処理でフォールバック
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（キャンセル）\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（キャンセル）\r\n");
             return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] Exception catchブロック - {ex.GetType().Name}: {ex.Message}\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] Exception catchブロック - {ex.GetType().Name}: {ex.Message}\r\n");
             batchStopwatch.Stop();
             _logger.LogError(ex, "バッチ翻訳エラー: {Error}", ex.Message);
 
             // エラー時は個別処理でフォールバック
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（エラー）\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] FallbackToIndividualProcessingAsync呼び出し（エラー）\r\n");
             return await FallbackToIndividualProcessingAsync(requests, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] finallyブロック開始\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [PROCESS_SINGLE_BATCH] finallyブロック開始\r\n");
             if (connection != null)
             {
                 // Phase 1統合: 接続をプールに返却
@@ -1460,7 +1460,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         CancellationToken cancellationToken)
     {
         var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [FALLBACK] FallbackToIndividualProcessingAsync開始 - リクエスト数: {requests.Count}\r\n");
+        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [FALLBACK] FallbackToIndividualProcessingAsync開始 - リクエスト数: {requests.Count}\r\n");
 
         const string engineName = "OptimizedPythonTranslation";
         _logger.LogInformation("バッチ処理失敗 - 個別処理にフォールバック: {Count}件", requests.Count);
@@ -1469,7 +1469,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
 
         foreach (var request in requests)
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [FALLBACK] TranslateAsync呼び出し直前 - Text: {request.SourceText.Substring(0, Math.Min(20, request.SourceText.Length))}\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [FALLBACK] TranslateAsync呼び出し直前 - Text: {request.SourceText.Substring(0, Math.Min(20, request.SourceText.Length))}\r\n");
             if (cancellationToken.IsCancellationRequested)
                 break;
                 

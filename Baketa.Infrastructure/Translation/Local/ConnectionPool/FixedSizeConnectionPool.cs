@@ -140,33 +140,33 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
                     "baketa_debug.log");
 
                 // 既存接続の取得を試行
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔍 [GET_CONNECTION_PATH] TryRead試行開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔍 [GET_CONNECTION_PATH] TryRead試行開始\r\n");
                 if (_connectionChannel.Reader.TryRead(out var existingConnection))
                 {
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [GET_CONNECTION_PATH] 既存接続取得成功 - ConnectionId: {existingConnection.Id}\r\n");
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔍 [HEALTH_CHECK] IsConnectionHealthyAsync呼び出し開始\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [GET_CONNECTION_PATH] 既存接続取得成功 - ConnectionId: {existingConnection.Id}\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔍 [HEALTH_CHECK] IsConnectionHealthyAsync呼び出し開始\r\n");
                     if (await IsConnectionHealthyAsync(existingConnection, finalCts.Token))
                     {
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [HEALTH_CHECK] ヘルスチェック成功 - 接続再利用\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [HEALTH_CHECK] ヘルスチェック成功 - 接続再利用\r\n");
                         _logger.LogDebug("既存接続を再利用: {ConnectionId}", existingConnection.Id);
                         return existingConnection;
                     }
 
                     // 不健全な接続は破棄
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ❌ [HEALTH_CHECK] ヘルスチェック失敗 - 接続破棄\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ❌ [HEALTH_CHECK] ヘルスチェック失敗 - 接続破棄\r\n");
                     _logger.LogWarning("不健全な接続を破棄: {ConnectionId}", existingConnection.Id);
                     await DisposeConnectionSafelyAsync(existingConnection);
                     Interlocked.Decrement(ref _activeConnections);
                 }
                 else
                 {
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [GET_CONNECTION_PATH] 既存接続なし - 新規作成へ\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [GET_CONNECTION_PATH] 既存接続なし - 新規作成へ\r\n");
                 }
 
                 // 新しい接続を作成
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [CREATE_NEW] CreateNewConnectionAsync呼び出し開始\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [CREATE_NEW] CreateNewConnectionAsync呼び出し開始\r\n");
                 var newConnection = await CreateNewConnectionAsync(finalCts.Token);
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [CREATE_NEW] CreateNewConnectionAsync完了 - ConnectionId: {newConnection.Id}\r\n");
+                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [CREATE_NEW] CreateNewConnectionAsync完了 - ConnectionId: {newConnection.Id}\r\n");
                 Interlocked.Increment(ref _activeConnections);
                 Interlocked.Increment(ref _totalConnectionsCreated);
 
@@ -330,7 +330,7 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
         try
         {
             var serverPort = GetServerPort();
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔍 [CREATE_NEW_DETAIL] ServerPort: {serverPort}, ConnectionId: {connectionId}\r\n");
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔍 [CREATE_NEW_DETAIL] ServerPort: {serverPort}, ConnectionId: {connectionId}\r\n");
 
             // 🔥 [PHASE12.2.5_FIX] TCP接続リトライロジック実装
             // 理由: Pythonサーバー起動に時間がかかる場合があるため、リトライが必要
@@ -345,26 +345,26 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
                 {
                     if (retry > 0)
                     {
-                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔄 [TCP_RETRY] リトライ {retry}/{maxRetries} - {retryDelayMs}ms待機後に再試行\r\n");
+                        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔄 [TCP_RETRY] リトライ {retry}/{maxRetries} - {retryDelayMs}ms待機後に再試行\r\n");
                         await Task.Delay(retryDelayMs, cancellationToken);
                     }
 
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 🔥 [TCP_CONNECT] TcpClient.ConnectAsync呼び出し開始 (試行 {retry + 1}/{maxRetries})\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [TCP_CONNECT] TcpClient.ConnectAsync呼び出し開始 (試行 {retry + 1}/{maxRetries})\r\n");
                     tcpClient = new TcpClient();
                     await tcpClient.ConnectAsync("127.0.0.1", serverPort, cancellationToken);
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ✅ [TCP_CONNECT] TcpClient.ConnectAsync完了 (試行 {retry + 1}/{maxRetries}で成功)\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ✅ [TCP_CONNECT] TcpClient.ConnectAsync完了 (試行 {retry + 1}/{maxRetries}で成功)\r\n");
                     break; // 成功したらループを抜ける
                 }
                 catch (SocketException ex) when (retry < maxRetries - 1)
                 {
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] ⚠️ [TCP_FAILED] 接続失敗（リトライ {retry + 1}/{maxRetries}）: {ex.Message}\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] ⚠️ [TCP_FAILED] 接続失敗（リトライ {retry + 1}/{maxRetries}）: {ex.Message}\r\n");
                     tcpClient?.Dispose();
                     tcpClient = null;
                     // 次のリトライへ
                 }
                 catch (SocketException ex) when (retry == maxRetries - 1)
                 {
-                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Threading.Thread.CurrentThread.ManagedThreadId:D2}] 💥 [TCP_FINAL_FAIL] 接続失敗（最終試行 {maxRetries}/{maxRetries}）: {ex.Message}\r\n");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 💥 [TCP_FINAL_FAIL] 接続失敗（最終試行 {maxRetries}/{maxRetries}）: {ex.Message}\r\n");
                     throw; // 最終試行失敗は例外を再スロー
                 }
             }

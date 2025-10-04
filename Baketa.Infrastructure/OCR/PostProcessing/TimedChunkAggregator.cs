@@ -300,8 +300,8 @@ public sealed class TimedChunkAggregator : IDisposable
     private async void ProcessPendingChunks(object? state)
     {
         // 🚨 [CALLBACK_ENTRY] 絶対最初に実行されるログ（例外発生前診断）
-        try { Console.WriteLine("🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {0}", Thread.CurrentThread.ManagedThreadId); } catch { }
-        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Thread.CurrentThread.ManagedThreadId}"); } catch { }
+        try { Console.WriteLine("🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {0}", Environment.CurrentManagedThreadId); } catch { }
+        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Environment.CurrentManagedThreadId}"); } catch { }
 
         // 🔥 [PHASE12.2_CALLBACK] タイマーコールバック実行開始
         Console.WriteLine("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");

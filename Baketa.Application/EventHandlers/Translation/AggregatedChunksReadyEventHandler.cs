@@ -165,7 +165,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し直前を確実に記録
                 var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var threadId1 = Thread.CurrentThread.ManagedThreadId;
+                var threadId1 = Environment.CurrentManagedThreadId;
                 System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp1}][T{threadId1:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し実行！\r\n");
 
@@ -178,7 +178,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し完了を確実に記録
                 var timestamp2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var threadId2 = Thread.CurrentThread.ManagedThreadId;
+                var threadId2 = Environment.CurrentManagedThreadId;
                 System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp2}][T{threadId2:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し完了！ - 結果数: {results.Count}\r\n");
 

@@ -176,7 +176,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
 
                 stopwatch.Stop();
                 _logger?.LogDebug("🎯 Thread-safe ResizeImage完了: {OriginalSize} → {NewSize}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
-                    $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", $"{width}x{height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
+                    $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", $"{width}x{height}", stopwatch.ElapsedMilliseconds, Environment.CurrentManagedThreadId);
 
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(resizedBitmap);
@@ -203,7 +203,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
             {
                 stopwatch.Stop();
                 _logger?.LogError(ex, "💥 ResizeImage - 予期しないエラー: {TargetSize}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}", 
-                    $"{width}x{height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
+                    $"{width}x{height}", stopwatch.ElapsedMilliseconds, Environment.CurrentManagedThreadId);
                 throw new InvalidOperationException($"画像のリサイズに失敗しました: {width}x{height}", ex);
             }
             finally
@@ -275,7 +275,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
 
                 stopwatch.Stop();
                 _logger?.LogDebug("🎯 Thread-safe CropImage完了: 領域={CropArea} (元画像: {OriginalSize}), 処理時間={ElapsedMs}ms, スレッド={ThreadId}",
-                    cropArea, $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
+                    cropArea, $"{sourceBitmapClone.Width}x{sourceBitmapClone.Height}", stopwatch.ElapsedMilliseconds, Environment.CurrentManagedThreadId);
 
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(croppedBitmap);
@@ -302,7 +302,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
             {
                 stopwatch.Stop();
                 _logger?.LogError(ex, "💥 CropImage - 予期しないエラー: 領域={CropArea}, 処理時間={ElapsedMs}ms, スレッド={ThreadId}", 
-                    cropArea, stopwatch.ElapsedMilliseconds, System.Threading.Thread.CurrentThread.ManagedThreadId);
+                    cropArea, stopwatch.ElapsedMilliseconds, Environment.CurrentManagedThreadId);
                 throw new InvalidOperationException($"画像の切り出しに失敗しました: {cropArea}", ex);
             }
             finally
