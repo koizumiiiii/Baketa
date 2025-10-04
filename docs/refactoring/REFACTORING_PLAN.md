@@ -26,18 +26,20 @@
 
 ## ✅ 実施タスクリスト
 
-### Phase 0: 現状分析・調査 (3-4日) - 🔴 未着手
+### Phase 0: 現状分析・調査 (3-4日) - 🟡 進行中
 
-#### 0.1 静的解析実施 (1日)
-- [ ] Roslyn Analyzerセットアップ
-- [ ] Visual Studio Code Metrics実行
-- [ ] デッドコード検出レポート作成
-- [ ] 循環依存検出
-- [ ] 複雑度測定（Cyclomatic Complexity > 15）
-- [ ] 重複コード検出
-- [ ] 成果物: `analysis_report.md` 作成
-- [ ] 成果物: `deadcode_list.md` 作成
-- [ ] 成果物: `refactoring_targets.md` 作成
+#### 0.1 静的解析実施 - ✅ 完了 (2025-10-04)
+- [x] Roslyn Analyzerセットアップ → Roslynator 0.10.2使用
+- [x] 静的解析実行 → 165+件の警告検出
+- [x] デッドコード検出レポート作成 → P0問題2件、デッドコード22+件特定
+- [x] 循環依存検出 → 循環依存なし確認
+- [x] 複雑度測定 → PaddleOcrEngine.cs (5,741行) 他Top16特定
+- [x] 重複コード検出 → ベストプラクティス不統一を特定
+- [x] 成果物: `analysis_report.md` 作成 ✅
+- [x] 成果物: `dependency_analysis.md` 作成 ✅
+- [x] 成果物: `complexity_report.md` 作成 ✅
+- [x] 成果物: `phase0_summary.md` 作成 ✅
+- [x] **主要発見**: CA1001 (Dispose未実装2件)、CS0162 (到達不能20+件)、削減見込み485-585行
 
 #### 0.2 全体フロー調査 (1-2日)
 - [ ] キャプチャフロー調査・文書化
