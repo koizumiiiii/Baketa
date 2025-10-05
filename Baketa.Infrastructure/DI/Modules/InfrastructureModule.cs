@@ -232,6 +232,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrExecutor, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrExecutor>();
             Console.WriteLine("✅ Phase 2.7: PaddleOCR実行エグゼキューター登録完了");
 
+            // Phase 2.8: PaddleOCR結果コンバーター（リファクタリング）
+            services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrResultConverter, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrResultConverter>();
+            Console.WriteLine("✅ Phase 2.8: PaddleOCR結果コンバーター登録完了");
+
             // OCRエンジンやプロセッサーの登録
             // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
             // 例: services.AddSingleton<IOcrModelProvider, LocalOcrModelProvider>();
