@@ -914,9 +914,11 @@ public interface IPaddleOcrUtilities
   - [x] ExecuteDetectionOnlyInternalOptimizedメソッド削除（105行）
   - [x] コミット: b6932b9
 
-- [ ] **Phase 2.9.4d: 残存重複メソッドの確認と削除**
-  - [ ] ProcessSinglePaddleResult系メソッド確認
-  - [ ] その他重複実装の洗い出し
+- [x] **Phase 2.9.4d: 残存重複メソッドの確認と削除**（304行削減）
+  - [x] ProcessSinglePaddleResultメソッド削除（109行）
+  - [x] ProcessPaddleRegionメソッド削除（195行）
+  - [x] 未使用メソッドの完全削除完了
+  - [x] コミット: c5544c2
 
 - [ ] DI注入フィールドの整理
   - [x] 新規サービスへの依存追加 ✅ Phase 2.9.3.2で完了
@@ -932,7 +934,7 @@ public interface IPaddleOcrUtilities
 #### 期待成果
 - **PaddleOcrExecutorが247行 → 467行に拡張（220行追加、完全実装）** ✅ **Phase 2.9.2で完了**
 - **PaddleOcrResultConverterが242行 → 695行に拡張（453行移行、Phase 2.9.1で完了）** ✅ 完了
-- **PaddleOcrEngineが5,695行 → 4,887行に削減（808行削減、Phase 2.9.4b-cで達成）** 🔄 進行中
+- **PaddleOcrEngineが5,695行 → 4,583行に削減（1,112行削減、Phase 2.9.4b-dで達成）** ✅ **Phase 2.9.4完了**
 - 各メソッドが明確な責任を持つ ✅ 達成
 - 可読性・保守性が大幅向上 ✅ 達成
 - エラーハンドリング・パフォーマンス計測の一元化 ✅ 達成
