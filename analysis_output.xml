@@ -1,0 +1,1181 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Roslynator>
+  <CodeAnalysis>
+    <Summary>
+      <Diagnostic Id="CA1001" Title="破棄可能なフィールドを所有する型は、破棄可能でなければなりません" Count="2">
+        <Description>クラスが System.IDisposable 型であるインスタンス フィールドを宣言および実装していますが、IDisposable を実装していません。IDisposable フィールドを宣言するクラスは間接的にアンマネージ リソースを所有しているため、IDisposable インターフェイスを実装する必要があります。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1001</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1068" Title="CancellationToken パラメーターは最後に指定する必要があります" Count="1">
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1068</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1304" Title="CultureInfo を指定します" Count="2">
+        <Description>メソッドまたはコンストラクターは、System.Globalization.CultureInfo パラメーターを受け取るオーバーロードを持つメンバーを呼び出します。CultureInfo パラメーターを受け取るオーバーロードは呼び出しません。CultureInfo または System.IFormatProvider オブジェクトが指定されない場合、オーバーロードされたメンバーによって指定される既定値は、一部のロケールでは期待どおりの効果がないことがあります。結果がユーザーに表示される場合は、'CultureInfo' パラメーターとして 'CultureInfo.CurrentCulture' を指定してください。そうではなく、結果がソフトウェアによって格納およびアクセスされる場合 (結果がディスクやデータベースに永続的に保存される場合など) は、'CultureInfo.InvariantCulture' を指定します。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1304</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1310" Title="正確さのために StringComparison を指定する" Count="7">
+        <Description>文字列比較操作では、StringComparison パラメーターを設定しないメソッド オーバーロードが使用されるため、その動作は、現在のユーザーのロケール設定によって異なる場合があります。正確さと意図の明確さのために、StringComparison パラメーターを指定してオーバーロードを使用することを強くお勧めします。結果がユーザーに表示される場合 (リスト ボックスに表示するために項目のリストを並べ替える場合など) は、'StringComparison' パラメーターとして 'StringComparison.CurrentCulture' または 'StringComparison.CurrentCultureIgnoreCase' を指定します。大文字と小文字が区別されない識別子 (ファイル パス、環境変数、レジストリのキーと値など) を比較する場合は、'StringComparison.OrdinalIgnoreCase' を指定します。そうではなく、大文字と小文字が区別される識別子を比較する場合は、'StringComparison.Ordinal' を指定します。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1310</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1311" Title="カルチャの指定またはインバリアント バージョンの使用" Count="2">
+        <Description>現在のカルチャで偶発的に暗黙的な依存関係が発生することを回避するためにカルチャを指定します。インバリアント バージョンを使用すると、アプリケーションのカルチャに関係なく、一貫性のある結果が得られます。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1311</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1510" Title="ArgumentNullException スロー ヘルパーを使用する" Count="7">
+        <Description>スロー ヘルパーは、if ブロックが新しい例外インスタンスを構築する場合よりもシンプルで効率的です。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1510</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1513" Title="ObjectDisposedException スロー ヘルパーを使用する" Count="3">
+        <Description>スロー ヘルパーは、if ブロックが新しい例外インスタンスを構築する場合よりもシンプルで効率的です。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1513</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1707" Title="識別子はアンダースコアを含むことはできません" Count="7">
+        <Description>規則により、識別子名にアンダースコア (_) 文字を含めることができません。この規則では名前空間、型、メンバー、およびパラメーターをチェックします。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1707</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1711" Title="識別子は、不適切なサフィックスを含むことはできません" Count="1">
+        <Description>規則によると、特定の基本型を拡張する型、特定のインターフェイスを実装する型、またはそのような型から派生した型の名前のみ、末尾に特定の予約済みサフィックスが付きます。その他の型名では、これらの予約済みサフィックスを使用しないでください。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1711</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1725" Title="パラメーター名は基本宣言と同一でなければなりません" Count="1">
+        <Description>オーバーライド階層でのパラメーターに対する一貫した名前付けにより、メソッド オーバーライドの使いやすさが向上します。派生メソッドのパラメーター名が基本宣言のパラメーター名と異なると、メソッドが基本メソッドのオーバーライドかメソッドの新しいオーバーロードかに関して混乱が生じる可能性があります。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1725</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1806" Title="メソッドの結果を無視しない" Count="2">
+        <Description>新しいオブジェクトが作成されても使用されていないか、新しい文字列を作成して返すメソッドが呼び出されても新しい文字列が使用されていないか、COM メソッドまたは P/Invoke メソッドから返された HRESULT またはエラー コードが使用されていません。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1806</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1840" Title="'Environment.CurrentManagedThreadId' を使用する" Count="77">
+        <Description>'Environment.CurrentManagedThreadId' は、'Thread.CurrentThread.ManagedThreadId' よりもシンプルで高速です。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1840</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1845" Title="スパンベースの 'string.Concat' を使用します。" Count="2">
+        <Description>'Substring' と連結演算子を使うよりも 'AsSpan' と 'string.Concat' を使用する方が効率的です。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1845</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1853" Title="'Dictionary.ContainsKey(key)' への不要な呼び出し" Count="1">
+        <Description>'Dictionary.ContainsKey(key)' を使用して 'Dictionary.Remove(key)' をガードしないでください。キーが存在するかどうかは、'Dictionary.Remove(key)' で既に確認されています。存在しない場合はスローしません。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1853</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1854" Title="'IDictionary.TryGetValue(TKey, out TValue)' メソッドを優先します" Count="4">
+        <Description>'ContainsKey' チェックによって保護された Dictionary インデクサー アクセスよりも 'TryGetValue' 呼び出しを優先します。'ContainsKey' とインデクサーの両方が内部のキーを参照するため、'TryGetValue' を使用すると余分な参照が削除されます。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1854</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA1862" Title="大文字と小文字を区別しない文字列比較を実行するには、'StringComparison' メソッド オーバーロードを使用します" Count="1">
+        <Description>大文字と小文字を区別しない文字列比較を実行するために、'ToLower'、'ToUpper'、'ToLowerInvariant'、および 'ToUpperInvariant' を呼び出さないようにしてください。'string.ToLower() == string.ToLower()' のように、割り当てにつながるためです。代わりに、'string.Equals(string, StringComparison)' を使用して大文字と小文字を区別しない比較を実行してください。'StringComparison' を受け取るオーバーロードの使用に切り替えると、動作が微妙に変化する可能性があるため、提案を適用した後に十分なテストを実施することが重要です。また、文化的に敏感な比較を行う必要がない場合は、'StringComparison.OrdinalIgnoreCase' の使用を検討してください。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1862</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA2017" Title="パラメーター カウントが不一致" Count="2">
+        <Description>ログ メッセージ テンプレートで指定されたパラメーターの数が、名前付きプレースホルダーの数と一致しません。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2017</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA2263" Title="型が既知の場合はジェネリック オーバーロードを優先する" Count="1">
+        <Description>ジェネリック オーバーロードの使用は、型が既知の場合に 'System.Type' オーバーロードに適しており、改善されたコンパイル時チェックで、よりクリーンでよりタイプ セーフなコードを促進します。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2263</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CA2264" Title="NULL 非許容値を 'ArgumentNullException.ThrowIfNull' に渡さない" Count="2">
+        <Description>渡された引数が 'null' の場合、'ArgumentNullException.ThrowIfNull' がスローされます。null 非許容構造体、'nameof()'、'new' 式などの特定のコンストラクトは null になることはないため、'ArgumentNullException.ThrowIfNull' はスローされません。</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2264</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS0067" Title="イベントは使用されていません" Count="2">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS0067)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS0105" Title="使用中のディレクティブは、以前この名前空間に使用されています" Count="1">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS0105)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS0162" Title="到達できないコードが検出されました" Count="15">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS0162)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS0618" Title="型またはメンバーが旧型式です" Count="5">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS0618)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS0728" Title="using または lock ステートメントの引数であるローカルへの代入が正しくない可能性があります" Count="1">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS0728)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS4014" Title="この呼び出しは待機されなかったため、現在のメソッドの実行は呼び出しの完了を待たずに続行されます" Count="1">
+        <Description>現在のメソッドでは、Task または Task&lt;TResult&gt; を返す非同期メソッドを呼び出すため、await 演算子は結果に適用されません。非同期メソッド呼び出しにより、非同期タスクが開始されます。しかし、await 演算子が適用されないため、プログラムはタスクが完了するのを待たずに継続されます。ほとんどの場合、この動作は期待されているものではありません。通常、呼び出しているメソッドの他のアスペクトは呼び出し結果に依存します。または最低限でも、呼び出されたメソッドは、呼び出しを含んでいるメソッドから復帰する前に完了していることが必要とされます。
+
+同様に重要な問題として、呼び出された非同期メソッドでどんな例外が発生するかということがあります。Task または Task&lt;TResult&gt; を返すメソッドで発生した例外は、返されたタスクに保管されます。タスクを待機しないか例外を明示的にチェックしない場合、例外は失われます。タスクを待機する場合、例外は再スローされます。
+
+ベスト プラクティスとして、常に呼び出しを待機するようにしてください。
+
+警告を表示しないことを考慮するのは、非同期の呼び出しの完了の待機を行う必要がなく、呼び出されたメソッドが例外を起こさないことが確実な場合だけにしてください。その場合、呼び出しのタスク結果を変数に割り当てて、警告を表示しないようにできます。</Description>
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS4014)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS8073" Title="この型の値が 'null' に等しくなることはないので、式の結果は常に同じです" Count="1">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS8073)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS8600" Title="Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。" Count="8">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS8600)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS8603" Title="Null 参照戻り値である可能性があります。" Count="3">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS8603)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="CS8625" Title="null リテラルを null 非許容参照型に変換できません。" Count="3">
+        <HelpLink>https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&amp;k=k(CS8625)</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="SYSLIB1045" Title="'GeneratedRegexAttribute' に変換します。" Count="2">
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/syslib-diagnostics/syslib1045</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="SYSLIB1054" Title="コンパイル時に P/Invoke マーシャリング コードを生成するには、'DllImportAttribute' の代わりに 'LibraryImportAttribute' を使用します" Count="3">
+        <Description>コンパイル時に P/Invoke マーシャリング コードを生成するには、'DllImportAttribute' の代わりに 'LibraryImportAttribute' を使用します</Description>
+        <HelpLink>https://learn.microsoft.com/dotnet/fundamentals/syslib-diagnostics/syslib1054</HelpLink>
+      </Diagnostic>
+      <Diagnostic Id="xUnit2002" Title="Do not use null check on value type" Count="1">
+        <HelpLink>https://xunit.net/xunit.analyzers/rules/xUnit2002</HelpLink>
+      </Diagnostic>
+    </Summary>
+    <Projects>
+      <Project Name="Baketa.Application" FilePath="E:\dev\Baketa\Baketa.Application\Baketa.Application.csproj">
+        <Diagnostics>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\DI\Modules\StagedOcrStrategyModule.cs</FilePath>
+            <Location Line="84" Character="13" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\EventHandlers\Translation\AggregatedChunksReadyEventHandler.cs</FilePath>
+            <Location Line="168" Character="33" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\EventHandlers\Translation\AggregatedChunksReadyEventHandler.cs</FilePath>
+            <Location Line="181" Character="33" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Events\Handlers\CaptureCompletedHandler.cs</FilePath>
+            <Location Line="399" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\ErrorHandling\SimpleErrorHandler.cs</FilePath>
+            <Location Line="29" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\CoordinateBasedTranslationService.cs</FilePath>
+            <Location Line="318" Character="13" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\SimpleTranslationService.cs</FilePath>
+            <Location Line="77" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="73" Character="24" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="76" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="81" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="87" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="97" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="104" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="163" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="169" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="173" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="214" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="227" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="232" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="238" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="248" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="332" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\StreamingTranslationService.cs</FilePath>
+            <Location Line="342" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1304">
+            <Severity>Warning</Severity>
+            <Message>CultureInfo を指定します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationControlService.cs</FilePath>
+            <Location Line="89" Character="38" />
+          </Diagnostic>
+          <Diagnostic Id="CA1311">
+            <Severity>Warning</Severity>
+            <Message>カルチャの指定またはインバリアント バージョンの使用</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationControlService.cs</FilePath>
+            <Location Line="89" Character="48" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationControlService.cs</FilePath>
+            <Location Line="138" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationDictionaryService.cs</FilePath>
+            <Location Line="129" Character="61" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationDictionaryService.cs</FilePath>
+            <Location Line="129" Character="86" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationDictionaryService.cs</FilePath>
+            <Location Line="131" Character="65" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationDictionaryService.cs</FilePath>
+            <Location Line="131" Character="90" />
+          </Diagnostic>
+          <Diagnostic Id="CS8603">
+            <Severity>Warning</Severity>
+            <Message>Null 参照戻り値である可能性があります。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationOrchestrationService.cs</FilePath>
+            <Location Line="2237" Character="24" />
+          </Diagnostic>
+          <Diagnostic Id="CS8603">
+            <Severity>Warning</Severity>
+            <Message>Null 参照戻り値である可能性があります。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\Translation\TranslationOrchestrationService.cs</FilePath>
+            <Location Line="2241" Character="20" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\UI\Overlay\OverlayLifecycleManager.cs</FilePath>
+            <Location Line="90" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\UI\Overlay\OverlayLifecycleManager.cs</FilePath>
+            <Location Line="157" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\UI\Overlay\StubOverlayPositionCalculator.cs</FilePath>
+            <Location Line="74" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1510">
+            <Severity>Warning</Severity>
+            <Message>ArgumentNullException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Application\Services\UI\WindowManagementService.cs</FilePath>
+            <Location Line="106" Character="9" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+      <Project Name="Baketa.Core" FilePath="E:\dev\Baketa\Baketa.Core\Baketa.Core.csproj">
+        <Diagnostics>
+          <Diagnostic Id="CS0105">
+            <Severity>Warning</Severity>
+            <Message>使用中のディレクティブは、以前この名前空間に使用されています</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Core\Events\Handlers\TranslationRequestHandler.cs</FilePath>
+            <Location Line="8" Character="7" />
+          </Diagnostic>
+          <Diagnostic Id="SYSLIB1054">
+            <Severity>Info</Severity>
+            <Message>コンパイル時に P/Invoke マーシャリング コードを生成するには、'DllImportAttribute' の代わりに 'LibraryImportAttribute' を使用します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Core\Events\Handlers\TranslationRequestHandler.cs</FilePath>
+            <Location Line="340" Character="34" />
+          </Diagnostic>
+          <Diagnostic Id="SYSLIB1054">
+            <Severity>Info</Severity>
+            <Message>コンパイル時に P/Invoke マーシャリング コードを生成するには、'DllImportAttribute' の代わりに 'LibraryImportAttribute' を使用します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Core\Events\Handlers\TranslationRequestHandler.cs</FilePath>
+            <Location Line="343" Character="32" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Core\Utilities\SafeFileWriter.cs</FilePath>
+            <Location Line="28" Character="55" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+      <Project Name="Baketa.Infrastructure.Platform" FilePath="E:\dev\Baketa\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj">
+        <Diagnostics>
+          <Diagnostic Id="CS8625">
+            <Severity>Warning</Severity>
+            <Message>null リテラルを null 非許容参照型に変換できません。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Adapters\CoreWindowManagerAdapter.cs</FilePath>
+            <Location Line="519" Character="80" />
+          </Diagnostic>
+          <Diagnostic Id="CS8625">
+            <Severity>Warning</Severity>
+            <Message>null リテラルを null 非許容参照型に変換できません。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Adapters\CoreWindowManagerAdapter.cs</FilePath>
+            <Location Line="519" Character="86" />
+          </Diagnostic>
+          <Diagnostic Id="CA1806">
+            <Severity>Warning</Severity>
+            <Message>メソッドの結果を無視しない</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\Services\WindowsGameStateProvider.cs</FilePath>
+            <Location Line="120" Character="13" />
+          </Diagnostic>
+          <Diagnostic Id="CA2263">
+            <Severity>Warning</Severity>
+            <Message>型が既知の場合はジェネリック オーバーロードを優先する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\Services\WindowsSystemStateMonitor.cs</FilePath>
+            <Location Line="237" Character="30" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\WindowsImageFactory.cs</FilePath>
+            <Location Line="179" Character="130" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\WindowsImageFactory.cs</FilePath>
+            <Location Line="206" Character="73" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\WindowsImageFactory.cs</FilePath>
+            <Location Line="278" Character="119" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\WindowsImageFactory.cs</FilePath>
+            <Location Line="305" Character="62" />
+          </Diagnostic>
+          <Diagnostic Id="CA1806">
+            <Severity>Warning</Severity>
+            <Message>メソッドの結果を無視しない</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure.Platform\Windows\WindowsManager.cs</FilePath>
+            <Location Line="309" Character="37" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+      <Project Name="Baketa.Infrastructure" FilePath="E:\dev\Baketa\Baketa.Infrastructure\Baketa.Infrastructure.csproj">
+        <Diagnostics>
+          <Diagnostic Id="CS0618">
+            <Severity>Warning</Severity>
+            <Message>型またはメンバーが旧型式です</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\DI\OcrProcessingModule.cs</FilePath>
+            <Location Line="45" Character="50" />
+          </Diagnostic>
+          <Diagnostic Id="CA1845">
+            <Severity>Warning</Severity>
+            <Message>スパンベースの 'string.Concat' を使用します。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\ChangeDetection\EnhancedImageChangeDetectionService.cs</FilePath>
+            <Location Line="384" Character="83" />
+          </Diagnostic>
+          <Diagnostic Id="CA1845">
+            <Severity>Warning</Severity>
+            <Message>スパンベースの 'string.Concat' を使用します。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\ChangeDetection\EnhancedImageChangeDetectionService.cs</FilePath>
+            <Location Line="385" Character="82" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\Services\GameOptimizedPreprocessingService.cs</FilePath>
+            <Location Line="291" Character="17" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\Services\GameOptimizedPreprocessingService.cs</FilePath>
+            <Location Line="311" Character="17" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\Services\GameOptimizedPreprocessingService.cs</FilePath>
+            <Location Line="331" Character="17" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Imaging\Services\GameOptimizedPreprocessingService.cs</FilePath>
+            <Location Line="351" Character="17" />
+          </Diagnostic>
+          <Diagnostic Id="CA1304">
+            <Severity>Warning</Severity>
+            <Message>CultureInfo を指定します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\BatchProcessing\BatchOcrProcessor.cs</FilePath>
+            <Location Line="2285" Character="29" />
+          </Diagnostic>
+          <Diagnostic Id="CA1311">
+            <Severity>Warning</Severity>
+            <Message>カルチャの指定またはインバリアント バージョンの使用</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\BatchProcessing\BatchOcrProcessor.cs</FilePath>
+            <Location Line="2285" Character="68" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\BatchProcessing\BatchOcrProcessor.cs</FilePath>
+            <Location Line="641" Character="17" />
+          </Diagnostic>
+          <Diagnostic Id="CA1862">
+            <Severity>Warning</Severity>
+            <Message>大文字と小文字を区別しない文字列比較を実行するには、'StringComparison' メソッド オーバーロードを使用します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\GPU\EnhancedGpuOcrAccelerator.cs</FilePath>
+            <Location Line="215" Character="73" />
+          </Diagnostic>
+          <Diagnostic Id="CA2017">
+            <Severity>Warning</Severity>
+            <Message>パラメーター カウントが不一致</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4742" Character="36" />
+          </Diagnostic>
+          <Diagnostic Id="CA2017">
+            <Severity>Warning</Severity>
+            <Message>パラメーター カウントが不一致</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4749" Character="36" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="5285" Character="13" />
+          </Diagnostic>
+          <Diagnostic Id="CS0728">
+            <Severity>Warning</Severity>
+            <Message>using または lock ステートメントの引数であるローカルへの代入が正しくない可能性があります</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4164" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="3825" Character="40" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4096" Character="23" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4184" Character="42" />
+          </Diagnostic>
+          <Diagnostic Id="CS8603">
+            <Severity>Warning</Severity>
+            <Message>Null 参照戻り値である可能性があります。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Engine\PaddleOcrEngine.cs</FilePath>
+            <Location Line="4840" Character="20" />
+          </Diagnostic>
+          <Diagnostic Id="CA1513">
+            <Severity>Warning</Severity>
+            <Message>ObjectDisposedException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PaddleOCR\Services\HybridPaddleOcrService.cs</FilePath>
+            <Location Line="490" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PostProcessing\TimedChunkAggregator.cs</FilePath>
+            <Location Line="303" Character="103" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\PostProcessing\TimedChunkAggregator.cs</FilePath>
+            <Location Line="304" Character="106" />
+          </Diagnostic>
+          <Diagnostic Id="CS0618">
+            <Severity>Warning</Severity>
+            <Message>型またはメンバーが旧型式です</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\TextDetection\AdaptiveTextRegionDetector.cs</FilePath>
+            <Location Line="28" Character="22" />
+          </Diagnostic>
+          <Diagnostic Id="CS0618">
+            <Severity>Warning</Severity>
+            <Message>型またはメンバーが旧型式です</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\TextDetection\AdaptiveTextRegionDetector.cs</FilePath>
+            <Location Line="28" Character="22" />
+          </Diagnostic>
+          <Diagnostic Id="CS0618">
+            <Severity>Warning</Severity>
+            <Message>型またはメンバーが旧型式です</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\TextDetection\AdaptiveTextRegionDetector.cs</FilePath>
+            <Location Line="47" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0618">
+            <Severity>Warning</Severity>
+            <Message>型またはメンバーが旧型式です</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\OCR\TextDetection\AdaptiveTextRegionDetector.cs</FilePath>
+            <Location Line="47" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1854">
+            <Severity>Warning</Severity>
+            <Message>'IDictionary.TryGetValue(TKey, out TValue)' メソッドを優先します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Performance\DetailedPerformanceMetrics.cs</FilePath>
+            <Location Line="139" Character="25" />
+          </Diagnostic>
+          <Diagnostic Id="CA1854">
+            <Severity>Warning</Severity>
+            <Message>'IDictionary.TryGetValue(TKey, out TValue)' メソッドを優先します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Performance\DetailedPerformanceMetrics.cs</FilePath>
+            <Location Line="144" Character="25" />
+          </Diagnostic>
+          <Diagnostic Id="CA1854">
+            <Severity>Warning</Severity>
+            <Message>'IDictionary.TryGetValue(TKey, out TValue)' メソッドを優先します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Performance\DetailedPerformanceMetrics.cs</FilePath>
+            <Location Line="149" Character="25" />
+          </Diagnostic>
+          <Diagnostic Id="CA1854">
+            <Severity>Warning</Severity>
+            <Message>'IDictionary.TryGetValue(TKey, out TValue)' メソッドを優先します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Performance\DetailedPerformanceMetrics.cs</FilePath>
+            <Location Line="154" Character="25" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\ResourceManagement\GameProfileHotReloadManager.cs</FilePath>
+            <Location Line="295" Character="27" />
+          </Diagnostic>
+          <Diagnostic Id="CA1853">
+            <Severity>Warning</Severity>
+            <Message>'Dictionary.ContainsKey(key)' への不要な呼び出し</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\ResourceManagement\GameProfileHotReloadManager.cs</FilePath>
+            <Location Line="461" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CS0067">
+            <Severity>Warning</Severity>
+            <Message>イベントは使用されていません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\ResourceManagement\HybridResourceManagerEnhanced.cs</FilePath>
+            <Location Line="61" Character="69" />
+          </Diagnostic>
+          <Diagnostic Id="CA1513">
+            <Severity>Warning</Severity>
+            <Message>ObjectDisposedException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\ResourceManagement\HysteresisParallelismController.cs</FilePath>
+            <Location Line="54" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1513">
+            <Severity>Warning</Severity>
+            <Message>ObjectDisposedException スロー ヘルパーを使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\ResourceManagement\VramCapacityDetector.cs</FilePath>
+            <Location Line="48" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1001">
+            <Severity>Warning</Severity>
+            <Message>破棄可能なフィールドを所有する型は、破棄可能でなければなりません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Services\BackgroundTaskQueue.cs</FilePath>
+            <Location Line="12" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CA1725">
+            <Severity>Warning</Severity>
+            <Message>パラメーター名は基本宣言と同一でなければなりません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Services\BackgroundTaskQueue.cs</FilePath>
+            <Location Line="104" Character="60" />
+          </Diagnostic>
+          <Diagnostic Id="SYSLIB1054">
+            <Severity>Info</Severity>
+            <Message>コンパイル時に P/Invoke マーシャリング コードを生成するには、'DllImportAttribute' の代わりに 'LibraryImportAttribute' を使用します</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Services\Coordinates\CoordinateTransformationService.cs</FilePath>
+            <Location Line="20" Character="32" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\DefaultTranslationService.cs</FilePath>
+            <Location Line="277" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\DefaultTranslationService.cs</FilePath>
+            <Location Line="297" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\DefaultTranslationService.cs</FilePath>
+            <Location Line="315" Character="86" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\DefaultTranslationService.cs</FilePath>
+            <Location Line="320" Character="86" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="143" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="146" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="147" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="150" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="156" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="163" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="167" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="169" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="333" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="348" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="352" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="355" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="360" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\ConnectionPool\FixedSizeConnectionPool.cs</FilePath>
+            <Location Line="367" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1154" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1166" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1170" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1174" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1176" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1207" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1213" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1215" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1221" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1223" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1225" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1229" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1234" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1238" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1243" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1247" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1259" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1261" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1265" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1267" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1269" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1273" Character="89" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1278" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1282" Character="93" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1287" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1291" Character="97" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1316" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1321" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1326" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1331" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1336" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1341" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1346" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1463" Character="81" />
+          </Diagnostic>
+          <Diagnostic Id="CA1840">
+            <Severity>Warning</Severity>
+            <Message>'Environment.CurrentManagedThreadId' を使用する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1472" Character="85" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="1837" Character="34" />
+          </Diagnostic>
+          <Diagnostic Id="SYSLIB1045">
+            <Severity>Info</Severity>
+            <Message>'GeneratedRegexAttribute' に変換します。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Local\OptimizedPythonTranslationEngine.cs</FilePath>
+            <Location Line="2616" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\CacheManagementService.cs</FilePath>
+            <Location Line="345" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\CacheManagementService.cs</FilePath>
+            <Location Line="381" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\ModelCacheManager.cs</FilePath>
+            <Location Line="61" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\ModelCacheManager.cs</FilePath>
+            <Location Line="132" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\ModelCacheManager.cs</FilePath>
+            <Location Line="240" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1068">
+            <Severity>Warning</Severity>
+            <Message>CancellationToken パラメーターは最後に指定する必要があります</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\ModelPrewarmingService.cs</FilePath>
+            <Location Line="146" Character="24" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\PortManagementService.cs</FilePath>
+            <Location Line="252" Character="21" />
+          </Diagnostic>
+          <Diagnostic Id="CA1310">
+            <Severity>Warning</Severity>
+            <Message>正確さのために StringComparison を指定する</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\PortManagementService.cs</FilePath>
+            <Location Line="252" Character="66" />
+          </Diagnostic>
+          <Diagnostic Id="CS0162">
+            <Severity>Warning</Severity>
+            <Message>到達できないコードが検出されました</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\PortManagementService.cs</FilePath>
+            <Location Line="179" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="SYSLIB1045">
+            <Severity>Info</Severity>
+            <Message>'GeneratedRegexAttribute' に変換します。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\PythonEnvironmentResolver.cs</FilePath>
+            <Location Line="128" Character="32" />
+          </Diagnostic>
+          <Diagnostic Id="CS8625">
+            <Severity>Warning</Severity>
+            <Message>null リテラルを null 非許容参照型に変換できません。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\PythonServerManager.cs</FilePath>
+            <Location Line="95" Character="101" />
+          </Diagnostic>
+          <Diagnostic Id="CA1001">
+            <Severity>Warning</Severity>
+            <Message>破棄可能なフィールドを所有する型は、破棄可能でなければなりません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.Infrastructure\Translation\Services\SmartConnectionEstablisher.cs</FilePath>
+            <Location Line="60" Character="14" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+      <Project Name="Baketa.UI" FilePath="E:\dev\Baketa\Baketa.UI\Baketa.UI.csproj">
+        <Diagnostics>
+          <Diagnostic Id="CS4014">
+            <Severity>Warning</Severity>
+            <Message>この呼び出しは待機されなかったため、現在のメソッドの実行は呼び出しの完了を待たずに続行されます</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\App.axaml.cs</FilePath>
+            <Location Line="480" Character="29" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Program.cs</FilePath>
+            <Location Line="52" Character="44" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Program.cs</FilePath>
+            <Location Line="53" Character="35" />
+          </Diagnostic>
+          <Diagnostic Id="CS8600">
+            <Severity>Warning</Severity>
+            <Message>Null リテラルまたは Null の可能性がある値を Null 非許容型に変換しています。</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Program.cs</FilePath>
+            <Location Line="365" Character="31" />
+          </Diagnostic>
+          <Diagnostic Id="CS8073">
+            <Severity>Warning</Severity>
+            <Message>この型の値が 'null' に等しくなることはないので、式の結果は常に同じです</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\InPlaceTranslationOverlayManager.cs</FilePath>
+            <Location Line="437" Character="25" />
+          </Diagnostic>
+          <Diagnostic Id="CA2264">
+            <Severity>Warning</Severity>
+            <Message>NULL 非許容値を 'ArgumentNullException.ThrowIfNull' に渡さない</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\AdvancedMonitorService.cs</FilePath>
+            <Location Line="42" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA2264">
+            <Severity>Warning</Severity>
+            <Message>NULL 非許容値を 'ArgumentNullException.ThrowIfNull' に渡さない</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\AdvancedMonitorService.cs</FilePath>
+            <Location Line="78" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CS0067">
+            <Severity>Warning</Severity>
+            <Message>イベントは使用されていません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\AdvancedMonitorService.cs</FilePath>
+            <Location Line="27" Character="70" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="46" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="49" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="52" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="55" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="58" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="61" Character="5" />
+          </Diagnostic>
+          <Diagnostic Id="CA1707">
+            <Severity>Warning</Severity>
+            <Message>識別子はアンダースコアを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\Baketa.UI\Services\Monitor\IAdvancedMonitorService.cs</FilePath>
+            <Location Line="64" Character="5" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+      <Project Name="Baketa.Infrastructure.Tests" FilePath="E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Baketa.Infrastructure.Tests.csproj">
+        <Diagnostics>
+          <Diagnostic Id="xUnit2002">
+            <Severity>Warning</Severity>
+            <Message>Do not use null check on value type</Message>
+            <FilePath>E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\Services\Coordinates\CoordinateTransformationServiceTests.cs</FilePath>
+            <Location Line="127" Character="9" />
+          </Diagnostic>
+          <Diagnostic Id="CA1711">
+            <Severity>Warning</Severity>
+            <Message>識別子は、不適切なサフィックスを含むことはできません</Message>
+            <FilePath>E:\dev\Baketa\tests\Baketa.Infrastructure.Tests\TestCollections\PortManagementCollection.cs</FilePath>
+            <Location Line="10" Character="14" />
+          </Diagnostic>
+        </Diagnostics>
+      </Project>
+    </Projects>
+  </CodeAnalysis>
+</Roslynator>
