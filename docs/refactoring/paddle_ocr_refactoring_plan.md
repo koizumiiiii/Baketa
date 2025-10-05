@@ -683,7 +683,11 @@ public interface IPaddleOcrUtilities
 - ✅ タイムアウト管理の基本構造実装（30秒/15秒）
 - ✅ 非同期処理とキャンセル機構の実装
 - ✅ Clean Architecture準拠のDI設計
-- 📝 完全実装は約1,500行の移行が必要（将来対応）
+- 📝 完全実装は約1,500行の移行が必要（**Phase 2.9で実施予定**）
+  - PaddleOcrEngineから1,500行を移行（ExecuteOcrAsync系メソッド）
+  - エラーハンドラー・パフォーマンストラッカー統合
+  - メモリ分離戦略・適応的タイムアウト実装
+  - 詳細は Phase 2.9タスクを参照
 
 #### ビルド結果
 - エラー: 0件
@@ -728,6 +732,35 @@ public interface IPaddleOcrUtilities
 ### Phase 2.9: PaddleOcrEngineリファクタリング（所要時間: 3-4日）
 
 #### タスク
+
+##### 🔥 Phase 2.7完全実装（スケルトン → 完全版）
+- [ ] **PaddleOcrExecutorの完全実装**（約1,500行をPaddleOcrEngineから移行）
+  - `ExecuteOcrAsync` 完全実装（~400行）
+    - GameOptimizedPreprocessingService統合
+    - 前処理パイプライン統合
+    - 詳細なエラーハンドリング
+  - `ExecuteTextDetectionOnlyAsync` 移動（~150行）
+  - `ExecuteDetectionOnlyInternal` 移動（~80行）
+  - `ExecuteDetectionOnlyInternalOptimized` 移動（~100行）
+  - `ExecuteOcrInSeparateTask` 完全実装（~350行）
+    - メモリ分離戦略（byte[]抽出によるスレッドセーフティ向上）
+    - 適応的タイムアウト計算（画像サイズに基づく動的タイムアウト）
+  - `ExecuteOcrInSeparateTaskOptimized` 完全実装（~300行）
+  - タイムアウト・リトライロジック実装（~120行）
+
+- [ ] **エラーハンドリング統合**
+  - `_errorHandler.HandleOcrError()` 呼び出し実装
+  - try-catchブロックでの適切なエラー処理委譲
+
+- [ ] **パフォーマンストラッキング統合**
+  - `_performanceTracker.TrackOcrExecution()` 実装
+  - OCR実行時間の詳細計測
+
+- [ ] **タイムアウト設定の外部化**
+  - appsettings.jsonに設定項目追加
+  - `IOptions<OcrSettings>` 経由でのタイムアウト値注入
+
+##### PaddleOcrEngine本体のリファクタリング
 - [ ] PaddleOcrEngine本体のリファクタリング
   - すべての実装ロジックを各サービスへの委譲に変更
   - Facadeパターンの完全実装
@@ -744,9 +777,11 @@ public interface IPaddleOcrUtilities
   - 診断イベント発行の一元化
 
 #### 期待成果
-- PaddleOcrEngineが約800行に削減
+- **PaddleOcrExecutorが240行 → 約1,740行に拡張（完全実装）**
+- **PaddleOcrEngineが5,548行 → 約800行に削減（1,500行のExecutor移行による）**
 - 各メソッドが明確な責任を持つ
 - 可読性・保守性が大幅向上
+- エラーハンドリング・パフォーマンス計測の一元化
 
 ---
 
