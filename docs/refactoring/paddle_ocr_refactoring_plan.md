@@ -926,21 +926,23 @@ public interface IPaddleOcrUtilities
   - [x] Phase 3診断ログ削除（_serviceTypeLogged, 診断コード）
   - [x] コミット: c769221
 
-- [ ] **Phase 2.9.6: IOcrEngineインターフェース実装の最適化**（簡易メソッドの委譲）
+- [x] **Phase 2.9.6: IOcrEngineインターフェース実装の最適化**（簡易メソッドの委譲） ✅ **完了**
   - [x] RecognizeAsyncがサービス呼び出しに変更 ✅ Phase 2.9.4bで完了
-  - [ ] 調査完了: 既存サービスインターフェースで対応可能と判明 ✅
-  - [ ] IPaddleOcrModelManager拡張（3メソッド追加）
-    - [ ] GetAvailableLanguages() 追加
-    - [ ] GetAvailableModels() 追加
-    - [ ] IsLanguageAvailableAsync() 追加
-  - [ ] PaddleOcrEngine委譲実装（7メソッド → 1行委譲）
-    - [ ] GetPerformanceStats() → _performanceTracker.GetPerformanceStats()
-    - [ ] ResetFailureCounter() → _performanceTracker.ResetFailureCounter()
-    - [ ] GetConsecutiveFailureCount() → _performanceTracker.GetConsecutiveFailureCount()
-    - [ ] CancelCurrentOcrTimeout() → _executor.CancelCurrentOcrTimeout()
-    - [ ] GetAvailableLanguages() → _modelManager.GetAvailableLanguages()
-    - [ ] GetAvailableModels() → _modelManager.GetAvailableModels()
-    - [ ] IsLanguageAvailableAsync() → _modelManager.IsLanguageAvailableAsync()
+  - [x] 調査完了: 既存サービスインターフェースで対応可能と判明 ✅
+  - [x] IPaddleOcrModelManager拡張（3メソッド追加）
+    - [x] GetAvailableLanguages() 追加
+    - [x] GetAvailableModels() 追加
+    - [x] IsLanguageAvailableAsync() 追加
+  - [x] PaddleOcrModelManager実装（44行追加、3メソッド実装）
+  - [x] PaddleOcrEngine委譲実装（7メソッド → 1行委譲、59行削減）
+    - [x] GetPerformanceStats() → _performanceTracker.GetPerformanceStats()
+    - [x] ResetFailureCounter() → _performanceTracker.ResetFailureCounter()
+    - [x] GetConsecutiveFailureCount() → _performanceTracker.GetConsecutiveFailureCount()
+    - [x] CancelCurrentOcrTimeout() → _executor.CancelCurrentOcrTimeout()
+    - [x] GetAvailableLanguages() → _modelManager.GetAvailableLanguages()
+    - [x] GetAvailableModels() → _modelManager.GetAvailableModels()
+    - [x] IsLanguageAvailableAsync() → _modelManager.IsLanguageAvailableAsync()
+  - [x] コミット: b90b9d2
   - [ ] 延期項目（Phase 2.10で実施）
     - [ ] InitializeAsync（約200行、複雑な初期化ロジック）
     - [ ] ApplySettingsAsync（約60行、設定適用ロジック）
@@ -951,9 +953,11 @@ public interface IPaddleOcrUtilities
 #### 期待成果
 - **PaddleOcrExecutorが247行 → 467行に拡張（220行追加、完全実装）** ✅ **Phase 2.9.2で完了**
 - **PaddleOcrResultConverterが242行 → 695行に拡張（453行移行、Phase 2.9.1で完了）** ✅ 完了
-- **PaddleOcrEngineが5,695行 → 4,606行に削減（1,089行削減、Phase 2.9.4-5で達成）** ✅ **Phase 2.9.5完了**
+- **PaddleOcrModelManagerが313行 → 357行に拡張（44行追加、3メソッド実装）** ✅ **Phase 2.9.6で完了**
+- **PaddleOcrEngineが5,695行 → 4,547行に削減（1,148行削減、20.2%）** ✅ **Phase 2.9.6完了**
   - Phase 2.9.4b-d: 1,112行削減（重複メソッド削除）
   - Phase 2.9.5: DI注入フィールド整理（未使用依存削除）
+  - Phase 2.9.6: 59行削減（IOcrEngineメソッド委譲）
 - 各メソッドが明確な責任を持つ ✅ 達成
 - 可読性・保守性が大幅向上 ✅ 達成
 - エラーハンドリング・パフォーマンス計測の一元化 ✅ 達成
