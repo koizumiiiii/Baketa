@@ -34,6 +34,7 @@ using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Baketa.Infrastructure.OCR.Scaling;
 using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 // ✅ [PHASE2.9.3.1] 型の曖昧性解決用エイリアス
@@ -54,7 +55,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     // private static volatile int _instanceCount;
     // private static readonly ConcurrentDictionary<string, PaddleOcrEngine> _instances = new();
 
-    // Dependencies
+    // ✅ [PHASE2.9.3.2] New Service Dependencies (Facade Pattern)
+    private readonly IPaddleOcrImageProcessor _imageProcessor;
+    private readonly IPaddleOcrResultConverter _resultConverter;
+    private readonly IPaddleOcrExecutor _executor;
+    private readonly IPaddleOcrModelManager _modelManager;
+    private readonly IPaddleOcrPerformanceTracker _performanceTracker;
+    private readonly IPaddleOcrErrorHandler _errorHandler;
+
+    // Legacy Dependencies (段階的に削減予定)
     private readonly IModelPathResolver __modelPathResolver;
     private readonly IOcrPreprocessingService __ocrPreprocessingService;
     private readonly ITextMerger __textMerger;
@@ -68,6 +77,14 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     private readonly IImageFactoryType __imageFactory;
 
     public PaddleOcrEngine(
+        // ✅ [PHASE2.9.3.2] New Service Dependencies
+        IPaddleOcrImageProcessor imageProcessor,
+        IPaddleOcrResultConverter resultConverter,
+        IPaddleOcrExecutor executor,
+        IPaddleOcrModelManager modelManager,
+        IPaddleOcrPerformanceTracker performanceTracker,
+        IPaddleOcrErrorHandler errorHandler,
+        // Legacy Dependencies
         IModelPathResolver _modelPathResolver,
         IOcrPreprocessingService _ocrPreprocessingService,
         ITextMerger _textMerger,
@@ -80,6 +97,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         IUnifiedLoggingService? unifiedLoggingService = null,
         ILogger<PaddleOcrEngine>? _logger = null)
     {
+        // ✅ [PHASE2.9.3.2] New Service Initialization
+        _imageProcessor = imageProcessor ?? throw new ArgumentNullException(nameof(imageProcessor));
+        _resultConverter = resultConverter ?? throw new ArgumentNullException(nameof(resultConverter));
+        _executor = executor ?? throw new ArgumentNullException(nameof(executor));
+        _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
+        _performanceTracker = performanceTracker ?? throw new ArgumentNullException(nameof(performanceTracker));
+        _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
+
+        // Legacy Initialization
         __modelPathResolver = _modelPathResolver ?? throw new ArgumentNullException(nameof(_modelPathResolver));
         __ocrPreprocessingService = _ocrPreprocessingService ?? throw new ArgumentNullException(nameof(_ocrPreprocessingService));
         __textMerger = _textMerger ?? throw new ArgumentNullException(nameof(_textMerger));

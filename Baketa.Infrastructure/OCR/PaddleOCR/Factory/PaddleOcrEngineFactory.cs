@@ -12,6 +12,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.StickyRoi;
+using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Factory;
@@ -36,8 +37,16 @@ public sealed class PaddleOcrEngineFactory(
         try
         {
             _logger.LogDebug("🏭 PaddleOcrEngineFactory: 新しいエンジンインスタンス作成開始");
-            
-            // 必要な依存関係を解決（PaddleOcrModuleと同じロジック）
+
+            // ✅ [PHASE2.9.3.2] 新サービス依存関係を解決
+            var imageProcessor = _serviceProvider.GetRequiredService<IPaddleOcrImageProcessor>();
+            var resultConverter = _serviceProvider.GetRequiredService<IPaddleOcrResultConverter>();
+            var executor = _serviceProvider.GetRequiredService<IPaddleOcrExecutor>();
+            var modelManager = _serviceProvider.GetRequiredService<IPaddleOcrModelManager>();
+            var performanceTracker = _serviceProvider.GetRequiredService<IPaddleOcrPerformanceTracker>();
+            var errorHandler = _serviceProvider.GetRequiredService<IPaddleOcrErrorHandler>();
+
+            // Legacy 依存関係を解決
             var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
             var ocrPreprocessingService = _serviceProvider.GetRequiredService<IOcrPreprocessingService>();
             var textMerger = _serviceProvider.GetRequiredService<ITextMerger>();
@@ -65,10 +74,18 @@ public sealed class PaddleOcrEngineFactory(
                 var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
                 var imageFactory = _serviceProvider.GetRequiredService<IImageFactoryType>();
                 engine = new NonSingletonPaddleOcrEngine(
-                    modelPathResolver, 
-                    ocrPreprocessingService, 
-                    textMerger, 
-                    ocrPostProcessor, 
+                    // ✅ [PHASE2.9.3.2] New Services
+                    imageProcessor,
+                    resultConverter,
+                    executor,
+                    modelManager,
+                    performanceTracker,
+                    errorHandler,
+                    // Legacy Services
+                    modelPathResolver,
+                    ocrPreprocessingService,
+                    textMerger,
+                    ocrPostProcessor,
                     gpuMemoryManager,
                     unifiedSettingsService,
                     eventAggregator,
@@ -86,10 +103,18 @@ public sealed class PaddleOcrEngineFactory(
                 var ocrSettings = _serviceProvider.GetRequiredService<IOptionsMonitor<OcrSettings>>();
                 var imageFactory = _serviceProvider.GetRequiredService<IImageFactoryType>();
                 engine = new NonSingletonPaddleOcrEngine(
-                    modelPathResolver, 
-                    ocrPreprocessingService, 
-                    textMerger, 
-                    ocrPostProcessor, 
+                    // ✅ [PHASE2.9.3.2] New Services
+                    imageProcessor,
+                    resultConverter,
+                    executor,
+                    modelManager,
+                    performanceTracker,
+                    errorHandler,
+                    // Legacy Services
+                    modelPathResolver,
+                    ocrPreprocessingService,
+                    textMerger,
+                    ocrPostProcessor,
                     gpuMemoryManager,
                     unifiedSettingsService,
                     eventAggregator,
@@ -176,6 +201,14 @@ public sealed class PaddleOcrEngineFactory(
 /// プール化で複数インスタンスを許可するため
 /// </summary>
 internal sealed class NonSingletonPaddleOcrEngine(
+    // ✅ [PHASE2.9.3.2] New Services
+    IPaddleOcrImageProcessor imageProcessor,
+    IPaddleOcrResultConverter resultConverter,
+    IPaddleOcrExecutor executor,
+    IPaddleOcrModelManager modelManager,
+    IPaddleOcrPerformanceTracker performanceTracker,
+    IPaddleOcrErrorHandler errorHandler,
+    // Legacy Dependencies
     IModelPathResolver modelPathResolver,
     IOcrPreprocessingService ocrPreprocessingService,
     ITextMerger textMerger,
@@ -186,7 +219,7 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IOptionsMonitor<OcrSettings> ocrSettings,
     IImageFactoryType imageFactory,
     IUnifiedLoggingService? unifiedLoggingService = null,
-    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, imageFactory, unifiedLoggingService, logger)
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(imageProcessor, resultConverter, executor, modelManager, performanceTracker, errorHandler, modelPathResolver, ocrPreprocessingService, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, imageFactory, unifiedLoggingService, logger)
 {
 
     /// <summary>
