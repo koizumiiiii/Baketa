@@ -943,12 +943,24 @@ public interface IPaddleOcrUtilities
     - [x] GetAvailableModels() → _modelManager.GetAvailableModels()
     - [x] IsLanguageAvailableAsync() → _modelManager.IsLanguageAvailableAsync()
   - [x] コミット: b90b9d2
-  - [ ] 延期項目（Phase 2.10で実施）
-    - [ ] InitializeAsync（約200行、複雑な初期化ロジック）
-    - [ ] ApplySettingsAsync（約60行、設定適用ロジック）
 
-- [ ] イベント発行の整理（Phase 2.10で実施）
-  - [ ] 診断イベント発行の一元化
+**✅ Phase 2.9 基本完了** (2025-10-05)
+- Facadeパターン実装完了（PaddleOcrEngine 20.2%削減）
+- 7メソッド委譲実装完了
+- 残タスクはPhase 2.11に延期（UltraThink推奨方針）
+
+#### 延期項目（Phase 2.11で実施）
+
+**Phase 2.11: 残存複雑メソッドの委譲** (Phase 2.10完了後に実施)
+- [ ] InitializeAsync委譲（約200行、6段階初期化ステップ、複雑度：極めて高）
+- [ ] ApplySettingsAsync委譲（約60行、設定変更判定ロジック）
+- [ ] イベント発行の整理（診断イベント発行の一元化）
+
+**延期理由（UltraThink分析結果）**:
+1. **複雑性**: InitializeAsyncは約200行、大規模リファクタリング必要
+2. **リスク最小化**: 統合テスト完了後に実施が安全
+3. **品質優先**: Phase 2.10で全体品質確保後に実施
+4. **現状成果**: 20.2%削減で十分な成果達成済み
 
 #### 期待成果
 - **PaddleOcrExecutorが247行 → 467行に拡張（220行追加、完全実装）** ✅ **Phase 2.9.2で完了**
@@ -991,6 +1003,32 @@ public interface IPaddleOcrUtilities
 - すべてのテストが成功
 - パフォーマンス劣化がないこと確認
 - ドキュメントが完備
+- **Phase 2.11実施の基盤確立**（統合テスト済みの安定基盤）
+
+---
+
+### Phase 2.11: 残存複雑メソッドの委譲（Phase 2.10完了後）
+
+**前提条件**: Phase 2.10の統合テスト・品質確保完了
+
+#### タスク
+- [ ] InitializeAsync委譲実装
+  - 約200行、6段階初期化ステップの分解
+  - IPaddleOcrModelManager拡張
+  - 複雑度：極めて高、慎重な実装必要
+
+- [ ] ApplySettingsAsync委譲実装
+  - 約60行、設定変更判定ロジックの分離
+  - IPaddleOcrModelManager拡張
+
+- [ ] イベント発行の整理
+  - 診断イベント発行の一元化
+  - IPaddleOcrPerformanceTrackerまたは専用サービスに委譲
+
+#### 期待成果
+- PaddleOcrEngine更に200-300行削減
+- InitializeAsyncが薄い委譲層に変換
+- Facadeパターン完全実装
 
 ---
 
