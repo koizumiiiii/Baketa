@@ -45,6 +45,8 @@ public sealed class PaddleOcrEngineFactory(
             var modelManager = _serviceProvider.GetRequiredService<IPaddleOcrModelManager>();
             var performanceTracker = _serviceProvider.GetRequiredService<IPaddleOcrPerformanceTracker>();
             var errorHandler = _serviceProvider.GetRequiredService<IPaddleOcrErrorHandler>();
+            // ✅ [PHASE2.11.4] エンジン初期化サービス解決
+            var engineInitializer = _serviceProvider.GetRequiredService<IPaddleOcrEngineInitializer>();
 
             // Legacy 依存関係を解決
             var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
@@ -81,6 +83,8 @@ public sealed class PaddleOcrEngineFactory(
                     modelManager,
                     performanceTracker,
                     errorHandler,
+                    // ✅ [PHASE2.11.4] エンジン初期化サービス
+                    engineInitializer,
                     // Legacy Services
                     modelPathResolver,
                     // ✅ [PHASE2.9.5] ocrPreprocessingService削除
@@ -110,6 +114,8 @@ public sealed class PaddleOcrEngineFactory(
                     modelManager,
                     performanceTracker,
                     errorHandler,
+                    // ✅ [PHASE2.11.4] エンジン初期化サービス
+                    engineInitializer,
                     // Legacy Services
                     modelPathResolver,
                     // ✅ [PHASE2.9.5] ocrPreprocessingService削除
@@ -208,6 +214,8 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IPaddleOcrModelManager modelManager,
     IPaddleOcrPerformanceTracker performanceTracker,
     IPaddleOcrErrorHandler errorHandler,
+    // ✅ [PHASE2.11.4] エンジン初期化サービス
+    IPaddleOcrEngineInitializer engineInitializer,
     // Legacy Dependencies
     IModelPathResolver modelPathResolver,
     // ✅ [PHASE2.9.5] IOcrPreprocessingService削除
@@ -219,7 +227,7 @@ internal sealed class NonSingletonPaddleOcrEngine(
     IOptionsMonitor<OcrSettings> ocrSettings,
     IImageFactoryType imageFactory,
     // ✅ [PHASE2.9.5] IUnifiedLoggingService削除
-    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(imageProcessor, resultConverter, executor, modelManager, performanceTracker, errorHandler, modelPathResolver, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, imageFactory, logger)
+    ILogger<PaddleOcrEngine>? logger = null) : PaddleOcrEngine(imageProcessor, resultConverter, executor, modelManager, performanceTracker, errorHandler, engineInitializer, modelPathResolver, textMerger, ocrPostProcessor, gpuMemoryManager, unifiedSettingsService, eventAggregator, ocrSettings, imageFactory, logger)
 {
 
     /// <summary>

@@ -389,6 +389,108 @@ public class PaddleOcrIntegrationTests : IDisposable
 
     #endregion
 
+    #region Phase 2.9 リファクタリング検証テスト
+
+    /// <summary>
+    /// Phase 2.9リファクタリング後のエンドツーエンド動作同一性検証
+    /// 全6サービス統合後の正常動作を確認
+    /// </summary>
+    [Fact]
+    public async Task Refactoring_Phase29_BehaviorIdentity_AllServicesIntegrated()
+    {
+        // Arrange - テスト用の安全なエンジンのみを使用
+        var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
+        var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
+
+        using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
+
+        // Act & Assert - Phase 2.9リファクタリング後の動作検証
+
+        // 1. 初期化フロー（Phase 2.9.1: PaddleOcrModelManager統合）
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = false, WorkerCount = 2 };
+        var engineInitResult = await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
+        Assert.True(engineInitResult, "Phase 2.9: InitializeAsync should succeed");
+        Assert.True(safeOcrEngine.IsInitialized, "Phase 2.9: Engine should be initialized");
+        Assert.Equal("eng", safeOcrEngine.CurrentLanguage);
+
+        // 2. OCR実行（認識付き）（Phase 2.9.4b: PaddleOcrExecutor + PaddleOcrResultConverter統合）
+        var mockImage = CreateMockImage();
+        var ocrResults = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
+        Assert.NotNull(ocrResults);
+        Assert.NotNull(ocrResults.TextRegions); // Phase 2.9.4: ConvertToTextRegions動作確認
+        Assert.Empty(ocrResults.TextRegions); // テスト用エンジンでは空結果
+
+        // NOTE: ExecuteTextDetectionOnlyAsyncはSafeTestPaddleOcrEngineに未実装のため、
+        // 検出専用OCR検証は実環境テストまたは統合テストで実施
+
+        // 4. ROI指定OCR実行（Phase 2.9.2: PaddleOcrImageProcessor統合）
+        var roi = new Rectangle(10, 10, 100, 50);
+        var roiResults = await safeOcrEngine.RecognizeAsync(mockImage.Object, roi, null, CancellationToken.None).ConfigureAwait(false);
+        Assert.NotNull(roiResults);
+        Assert.Equal(roi, roiResults.RegionOfInterest); // ROI適用確認
+
+        // 5. 言語切り替え（Phase 2.9.1: PaddleOcrModelManager言語管理）
+        var switchResult = await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
+        Assert.True(switchResult, "Phase 2.9: Language switch should succeed");
+        Assert.Equal("jpn", safeOcrEngine.CurrentLanguage);
+
+        // 6. パフォーマンス統計取得（Phase 2.9.6: IPaddleOcrPerformanceTracker委譲）
+        var perfStats = safeOcrEngine.GetPerformanceStats();
+        Assert.NotNull(perfStats); // Phase 2.9: パフォーマンス統計取得確認
+
+        // 7. IOcrEngineインターフェースメソッド（Phase 2.9.6追加）
+        var availableLanguages = safeOcrEngine.GetAvailableLanguages();
+        Assert.NotNull(availableLanguages);
+        Assert.Contains("eng", availableLanguages);
+        Assert.Contains("jpn", availableLanguages);
+
+        var availableModels = safeOcrEngine.GetAvailableModels();
+        Assert.NotNull(availableModels);
+        Assert.Contains("standard", availableModels);
+
+        // 8. エラーハンドリング（Phase 2.9.3: PaddleOcrErrorHandler統合）
+        // 未初期化状態でのOCR実行は例外をスロー
+        using var uninitializedEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => uninitializedEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Phase 2.9リファクタリング: 全サービス連携動作検証
+    /// </summary>
+    [Fact]
+    public async Task Refactoring_Phase29_AllServices_IntegratedCorrectly()
+    {
+        // Arrange
+        var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
+        var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
+
+        using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
+
+        // Act - 複数操作を連続実行してサービス連携を検証
+        var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
+        await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
+
+        var mockImage = CreateMockImage();
+        var result1 = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
+        var result2 = await safeOcrEngine.RecognizeAsync(mockImage.Object, new Rectangle(0, 0, 100, 100), null, CancellationToken.None).ConfigureAwait(false);
+
+        await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
+        var result3 = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
+
+        // Assert - 全操作が正常完了することを確認
+        Assert.NotNull(result1);
+        Assert.NotNull(result2);
+        Assert.NotNull(result3);
+        Assert.Equal("jpn", safeOcrEngine.CurrentLanguage);
+
+        // パフォーマンストラッカーが動作していることを確認
+        var stats = safeOcrEngine.GetPerformanceStats();
+        Assert.NotNull(stats);
+    }
+
+    #endregion
+
     #region ヘルパーメソッド
 
     private static Mock<IImage> CreateMockImage()

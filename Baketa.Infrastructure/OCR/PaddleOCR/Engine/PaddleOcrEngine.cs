@@ -62,6 +62,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     private readonly IPaddleOcrModelManager _modelManager;
     private readonly IPaddleOcrPerformanceTracker _performanceTracker;
     private readonly IPaddleOcrErrorHandler _errorHandler;
+    // ✅ [PHASE2.11.4] エンジン初期化サービス統合（Phase 2.6実装）
+    private readonly IPaddleOcrEngineInitializer _engineInitializer;
 
     // Legacy Dependencies (段階的に削減予定)
     private readonly IModelPathResolver __modelPathResolver;
@@ -84,6 +86,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         IPaddleOcrModelManager modelManager,
         IPaddleOcrPerformanceTracker performanceTracker,
         IPaddleOcrErrorHandler errorHandler,
+        // ✅ [PHASE2.11.4] エンジン初期化サービス
+        IPaddleOcrEngineInitializer engineInitializer,
         // Legacy Dependencies
         IModelPathResolver _modelPathResolver,
         // ✅ [PHASE2.9.5] IOcrPreprocessingService削除
@@ -104,6 +108,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
         _performanceTracker = performanceTracker ?? throw new ArgumentNullException(nameof(performanceTracker));
         _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
+        // ✅ [PHASE2.11.4] エンジン初期化サービス初期化
+        _engineInitializer = engineInitializer ?? throw new ArgumentNullException(nameof(engineInitializer));
 
         // Legacy Initialization
         __modelPathResolver = _modelPathResolver ?? throw new ArgumentNullException(nameof(_modelPathResolver));
@@ -216,41 +222,24 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
     /// <summary>
     /// OCRエンジンを初期化
+    /// ✅ [PHASE2.11.5] Facade Pattern完全実装 - 専門サービスへの完全委譲
     /// </summary>
     /// <param name="settings">エンジン設定（省略時はデフォルト設定）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>初期化が成功した場合はtrue</returns>
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
-        // 🚨 Gemini推奨：詳細ボトルネック分析開始
-        var totalSw = System.Diagnostics.Stopwatch.StartNew();
-        var stepSw = System.Diagnostics.Stopwatch.StartNew();
-        
-        __logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis started.");
-
-        // ❌ DI競合解決: インスタンス作成追跡を無効化（ObjectPool管理に一任）
-        stepSw.Restart();
-        // TrackInstanceCreation();
-        __logger?.LogInformation("🔍 Step 1: Instance tracking finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
-        
         settings ??= new OcrEngineSettings();
-        
-        // 設定の妥当性チェック
-        stepSw.Restart();
+
         if (!settings.IsValid())
         {
             __logger?.LogError("無効な設定でOCRエンジンの初期化が試行されました");
             return false;
         }
-        __logger?.LogInformation("🔍 Step 2: Settings validation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
-        // 🎯 [ULTRATHINK_CRITICAL_FIX] PaddleOCR連続失敗カウンタリセット - デッドロック解消
-        stepSw.Restart();
         ResetFailureCounter();
-        __logger?.LogInformation("🔍 Step 2.1: Failure counter reset finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
-
         ThrowIfDisposed();
-        
+
         if (IsInitialized)
         {
             __logger?.LogDebug("PaddleOCRエンジンは既に初期化されています");
@@ -259,63 +248,42 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
         try
         {
-            // Gemini推奨：スレッドセーフティ問題解決のため、一時的にCPUモード、シングルスレッドに強制
-            stepSw.Restart();
-            if (true) // デバッグ用：常に適用
-            {
-                settings.UseGpu = false;
-                settings.EnableMultiThread = false;
-                settings.WorkerCount = 1;
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 [DEBUG] スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
-            }
-            
-            __logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}, GPU: {UseGpu}, マルチスレッド: {EnableMultiThread}", 
-                settings.Language, settings.UseGpu, settings.EnableMultiThread);
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🚀 OCRエンジン初期化開始 - PP-OCRv5を優先的に使用");
-            __logger?.LogInformation("🔍 Step 3: Settings preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            // スレッドセーフティのためCPU/シングルスレッド強制
+            settings.UseGpu = false;
+            settings.EnableMultiThread = false;
+            settings.WorkerCount = 1;
 
-            // ネイティブライブラリの事前チェック
-            stepSw.Restart();
-            if (!CheckNativeLibraries())
+            __logger?.LogInformation("PaddleOCRエンジンの初期化開始 - 言語: {Language}", settings.Language);
+
+            // ✅ [PHASE2.11.5] ネイティブライブラリチェック → IPaddleOcrEngineInitializer委譲
+            if (!_engineInitializer.CheckNativeLibraries())
             {
                 __logger?.LogError("必要なネイティブライブラリが見つかりません");
                 return false;
             }
-            __logger?.LogInformation("🔍 Step 4: Native library check finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
 
-            // モデル設定の準備 - 🚨 このステップが17秒の主犯と予想
-            stepSw.Restart();
-            var models = await PrepareModelsAsync(settings.Language, cancellationToken).ConfigureAwait(false);
-            __logger?.LogInformation("🔍 Step 5: Model preparation finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
+            // ✅ [PHASE2.11.5] モデル準備 → IPaddleOcrModelManager委譲
+            var models = await _modelManager.PrepareModelsAsync(settings.Language, cancellationToken).ConfigureAwait(false);
             if (models == null)
             {
                 __logger?.LogError("モデルの準備に失敗しました");
                 return false;
             }
 
-            // 安全な初期化処理 - 🚨 またはこのステップが犯人
-            stepSw.Restart();
-            var success = await InitializeEnginesSafelyAsync(models, settings, cancellationToken).ConfigureAwait(false);
-            __logger?.LogInformation("🔍 Step 6: Engine initialization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
-            
+            // ✅ [PHASE2.11.5] エンジン初期化 → IPaddleOcrEngineInitializer委譲
+            var success = await _engineInitializer.InitializeEnginesAsync(models, settings, cancellationToken).ConfigureAwait(false);
+
             if (success)
             {
-                stepSw.Restart();
                 _settings = settings.Clone();
                 CurrentLanguage = settings.Language;
-                
-                // ハイブリッドモード初期化
+
                 await InitializeHybridModeAsync(settings, cancellationToken).ConfigureAwait(false);
-                
+
                 IsInitialized = true;
                 __logger?.LogInformation("PaddleOCRエンジンの初期化完了");
-                __logger?.LogInformation("🔍 Step 7: Finalization finished in {ElapsedMilliseconds}ms.", stepSw.ElapsedMilliseconds);
             }
-            
-            totalSw.Stop();
-            __logger?.LogInformation("🔍 PaddleOCR initialization bottleneck analysis completed. Total time: {ElapsedMilliseconds}ms.", totalSw.ElapsedMilliseconds);
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 【ボトルネック分析完了】Total: {totalSw.ElapsedMilliseconds}ms");
-            
+
             return success;
         }
         catch (OperationCanceledException)
@@ -323,24 +291,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             __logger?.LogInformation("OCRエンジンの初期化がキャンセルされました");
             throw;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            __logger?.LogError(ex, "OCRエンジン初期化で操作エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (ArgumentException ex)
-        {
-            __logger?.LogError(ex, "OCRエンジン初期化で引数エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (TypeInitializationException ex)
-        {
-            __logger?.LogError(ex, "OCRエンジン初期化で型初期化エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (OutOfMemoryException ex)
-        {
-            __logger?.LogError(ex, "OCRエンジン初期化でメモリ不足: {ExceptionType}", ex.GetType().Name);
+            __logger?.LogError(ex, "OCRエンジン初期化エラー: {ExceptionType}", ex.GetType().Name);
             return false;
         }
     }
@@ -829,7 +782,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
         // 言語変更の確認
         bool languageChanged = _settings.Language != settings.Language;
-        
+
         if (languageChanged)
         {
             // 新しい言語のモデルが利用可能かチェック
@@ -839,12 +792,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             }
         }
 
-        bool requiresReinitialization = languageChanged ||
-                                         _settings.ModelName != settings.ModelName ||
-                                         _settings.UseGpu != settings.UseGpu ||
-                                         _settings.GpuDeviceId != settings.GpuDeviceId ||
-                                         _settings.EnableMultiThread != settings.EnableMultiThread ||
-                                         _settings.WorkerCount != settings.WorkerCount;
+        // ✅ [PHASE2.11.6] 再初期化要否判定をヘルパーメソッドに抽出（可読性向上）
+        bool requiresReinitialization = RequiresReinitialization(settings, languageChanged);
                                         
         _settings = settings.Clone();
         
@@ -900,56 +849,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
     #region Private Methods
 
-    /// <summary>
-    /// ネイティブライブラリの存在確認
-    /// </summary>
-    private bool CheckNativeLibraries()
-    {
-        try
-        {
-            // テスト環境での安全性チェックを強化
-            if (IsTestEnvironment())
-            {
-                __logger?.LogDebug("テスト環境でのネイティブライブラリチェックをスキップ");
-                return false; // テスト環境では安全のため初期化を失敗させる
-            }
-
-            // OpenCV初期化テスト - バージョン 4.10.0.20240616 対応
-            using var testMat = new Mat(1, 1, MatType.CV_8UC3);
-            
-            // 基本的なプロパティアクセスでライブラリの動作を確認
-            var width = testMat.Width;
-            var height = testMat.Height;
-            
-            __logger?.LogDebug("ネイティブライブラリのチェック成功 - OpenCvSharp4 v4.10+ (Size: {Width}x{Height})", width, height);
-            return true;
-        }
-        catch (TypeInitializationException ex)
-        {
-            __logger?.LogError(ex, "ネイティブライブラリ初期化エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (DllNotFoundException ex)
-        {
-            __logger?.LogError(ex, "ネイティブライブラリが見つかりません: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (FileNotFoundException ex)
-        {
-            __logger?.LogError(ex, "必要なファイルが見つかりません: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (BadImageFormatException ex)
-        {
-            __logger?.LogError(ex, "ネイティブライブラリ形式エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            __logger?.LogError(ex, "ネイティブライブラリ操作エラー: {ExceptionType}", ex.GetType().Name);
-            return false;
-        }
-    }
+    // ✅ [PHASE2.11.5] CheckNativeLibraries削除 - IPaddleOcrEngineInitializerに完全委譲済み
 
     /// <summary>
     /// テスト環境の検出（厳格版）
@@ -1016,459 +916,21 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         }
     }
 
-    /// <summary>
-    /// エンジンの安全な初期化（テスト環境完全安全版）
-    /// </summary>
-    private async Task<bool> InitializeEnginesSafelyAsync(
-        FullOcrModel models, 
-        OcrEngineSettings settings, 
-        CancellationToken cancellationToken)
-    {
-        // Gemini推奨：スレッドセーフティ問題解決のため、一時的にCPUモード、シングルスレッドに強制
-        if (true) // デバッグ用：常に適用
-        {
-            settings.UseGpu = false;
-            settings.EnableMultiThread = false;
-            settings.WorkerCount = 1;
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔧 [DEBUG] スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
-        }
-        
-        try
-        {
-            // PaddleOcrAllの安全な初期化（診断トレーシング簡素化）
-            var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            combinedCts.CancelAfter(TimeSpan.FromMinutes(2)); // 2分でタイムアウト
-            
-            var taskCompletionSource = new TaskCompletionSource<bool>();
-            
-            // UI スレッドでの初期化を避けるためにTask.Runを使用
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    // PaddleOcrAllの作成（正しいFullOcrModelを使用）
-                    _ocrEngine = new PaddleOcrAll(models)
-                    {
-                        AllowRotateDetection = true,
-                        Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
-                        // 根本原因: PaddleOcrClassifier.ShouldRotate180()内でPD_PredictorRunがメモリアクセス違反
-                        // 180度回転テキストは未対応となるが、ゲーム翻訳では実用上問題なし
-                    };
-                    
-                    // 🎯 【重要】パラメーター最適化を一時的に無効化してテスト
-                    /*
-                    try
-                    {
-                        // 検出感度向上パラメーター適用（低コントラスト・小文字対応）
-                        ApplyDetectionOptimization(_ocrEngine);
-                        __logger?.LogInformation("✅ PaddleOCR検出精度最適化パラメーター適用完了");
-                    }
-                    catch (Exception optEx)
-                    {
-                        __logger?.LogWarning(optEx, "⚠️ PaddleOCR最適化パラメーター適用で警告発生（処理継続）");
-                    }
-                    */
-                    __logger?.LogWarning("🚧 【テスト中】PaddleOCR最適化パラメーターを一時的に無効化 - デフォルト設定で実行");
-                    
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"✅ PaddleOcrAll作成完了 - エンジン型: {_ocrEngine?.GetType()?.Name}");
-                    
-                    // Gemini推奨：初期化パラメータの確認
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔧 [DEBUG] OCRエンジン初期化パラメータ:");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   UseGpu: {settings.UseGpu}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   EnableMultiThread: {settings.EnableMultiThread}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   WorkerCount: {settings.WorkerCount}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   Language: {settings.Language}");
-                    
-                    await Task.Delay(50, combinedCts.Token).ConfigureAwait(false); // わずかな初期化遅延
-                    taskCompletionSource.SetResult(true);
-                }
-                catch (OperationCanceledException) when (combinedCts.Token.IsCancellationRequested)
-                {
-                    __logger?.LogWarning("PaddleOCRエンジン初期化がタイムアウトしました");
-                    taskCompletionSource.SetResult(false);
-                }
-                catch (Exception ex)
-                {
-                    __logger?.LogError(ex, "PaddleOCRエンジン初期化エラー: {ExceptionType}", ex.GetType().Name);
-                    taskCompletionSource.SetException(ex);
-                }
-            }, combinedCts.Token);
-            
-            return await taskCompletionSource.Task.ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            __logger?.LogError(ex, "OCRエンジンの安全な初期化に失敗しました");
-            return false;
-        }
-    }
+    // ✅ [PHASE2.11.8] InitializeEnginesSafelyAsync削除 - IPaddleOcrEngineInitializer.InitializeEnginesAsyncに完全委譲済み
 
-    /// <summary>
-    /// モデル設定の準備（PP-OCRv5対応版）
-    /// </summary>
-    private async Task<FullOcrModel?> PrepareModelsAsync(string language, CancellationToken cancellationToken)
-    {
-        // テスト環境ではモデル準備を完全にスキップ
-        if (IsTestEnvironment())
-        {
-            __logger?.LogDebug("テスト環境: モデル準備を完全にスキップ（ネットワークアクセス回避）");
-            await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのためのダミー
-            return null; // テスト環境では安全のためnullを返す
-        }
-        
-        try
-        {
-            // 🧠 UltraThink段階的検証戦略: 安全なモデルから順次試行
-            __logger?.LogInformation("🧠 UltraThink: PaddleOCRモデル段階的検証開始 - 言語: {Language}", language);
-            
-            // Phase 1: 最も安全とされるEnglishV3で初期検証
-            __logger?.LogInformation("🔍 Phase 1: EnglishV3モデルでの安全性検証");
-            try
-            {
-                var testModel = LocalFullModels.EnglishV3;
-                if (testModel != null)
-                {
-                    __logger?.LogInformation("✅ EnglishV3モデル取得成功 - 基本的なPaddleOCR動作確認済み");
-                    
-                    // Phase 2: 言語別の最適化されたモデル選択
-                    __logger?.LogInformation("🔍 Phase 2: 言語別最適モデル選択");
-                    var selectedModel = language.ToLowerInvariant() switch
-                    {
-                        "jpn" or "ja" => LocalFullModels.JapanV4 ?? testModel, // 日本語優先、失敗時は英語
-                        "eng" or "en" => LocalFullModels.EnglishV4 ?? testModel, // 英語優先
-                        "chs" or "zh" or "chi" => LocalFullModels.ChineseV4 ?? testModel, // 中国語優先  
-                        _ => testModel // 安全なフォールバック
-                    };
-                    
-                    __logger?.LogInformation("🎯 選択モデル確定: {Language} → {ModelType}", language, selectedModel?.GetType().Name ?? "null");
-                    return await Task.FromResult(selectedModel).ConfigureAwait(false);
-                }
-            }
-            catch (Exception modelEx)
-            {
-                __logger?.LogError(modelEx, "❌ Phase 1: EnglishV3モデル検証失敗 - より安全な手法に切り替え");
-            }
-            
-            // Phase 3: 完全フォールバック - OCR無効化で安定性優先
-            __logger?.LogWarning("⚠️ Phase 3: 全モデル検証失敗 - OCR機能を一時無効化（アプリ安定性優先）");
-            await Task.Delay(10, cancellationToken).ConfigureAwait(false);
-            return null;
-            
-            /*
-            // 🔧 シンプルフィックス: 言語別に直接LocalFullModelsを使用
-            __logger?.LogInformation("LocalFullModels直接使用による高速モデル準備 - 言語: {Language}", language);
-            
-            var selectedModel = language.ToLowerInvariant() switch
-            {
-                "jpn" or "ja" => LocalFullModels.ChineseV5, // V5多言語モデル統一
-                "eng" or "en" => LocalFullModels.ChineseV5, // V5多言語モデル統一
-                "chs" or "zh" or "chi" => LocalFullModels.ChineseV5, // V5多言語モデル統一
-                _ => LocalFullModels.ChineseV5 // デフォルトもV5統一
-            };
-            
-            if (selectedModel != null)
-            {
-                __logger?.LogInformation("LocalFullModelsモデル選択成功: {Language} → V5統一モデル", language);
-                return await Task.FromResult(selectedModel).ConfigureAwait(false);
-            }
-            
-            // フォールバック: 万が一選択に失敗した場合
-            __logger?.LogWarning("モデル選択失敗。デフォルトのV5統一モデルを使用");
-            return await Task.FromResult(LocalFullModels.ChineseV5).ConfigureAwait(false);
-            */
-        }
-        catch (Exception ex)
-        {
-            __logger?.LogError(ex, "PrepareModelsAsyncエラー: {ExceptionType} - 一時的にnullを返却", ex.GetType().Name);
-            // 最終的なフォールバック（一時的にnull返却）
-            return null;
-        }
-    }
+    // ✅ [PHASE2.11.8] PrepareModelsAsync削除 - IPaddleOcrModelManager.PrepareModelsAsyncに完全委譲済み
 
-    /// <summary>
-    /// PP-OCRv5モデルの作成を試行
-    /// </summary>
-    private async Task<FullOcrModel?> TryCreatePPOCRv5ModelAsync(string language, CancellationToken cancellationToken)
-    {
-        await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのためのダミー
+    // ✅ [PHASE2.11.8] TryCreatePPOCRv5ModelAsync削除 - IPaddleOcrModelManager.TryCreatePPOCRv5ModelAsyncに完全委譲済み
 
-        try
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔍 PP-OCRv5モデル作成開始");
-            
-            // PP-OCRv5モデルが利用可能かチェック
-            var isAvailable = Models.PPOCRv5ModelProvider.IsAvailable();
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PPOCRv5ModelProvider.IsAvailable() = {isAvailable}");
-            
-            if (!isAvailable)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("❌ PP-OCRv5モデルが利用できません");
-                return null;
-            }
-            
-            // PP-OCRv5多言語モデルを取得
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel()呼び出し");
-            var ppocrv5Model = Models.PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel();
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel() = {ppocrv5Model != null}");
-            
-            if (ppocrv5Model != null)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("✅ PP-OCRv5多言語モデルを使用します");
-                __logger?.LogInformation("PP-OCRv5多言語モデルを使用 - 言語: {Language}", language);
-                return ppocrv5Model;
-            }
-            
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル作成失敗 - GetPPOCRv5MultilingualModel()がnullを返しました");
-            return null;
-        }
-        catch (Exception ex)
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル作成エラー: {ex.Message}");
-            __logger?.LogWarning(ex, "PP-OCRv5モデルの作成に失敗しました");
-            return null;
-        }
-    }
+    // ✅ [PHASE2.11.8] CreatePPOCRv5CustomModelAsync削除 - IPaddleOcrModelManagerに完全委譲済み
 
-    /// <summary>
-    /// PP-OCRv5カスタムモデルの作成
-    /// </summary>
-    private async Task<FullOcrModel?> CreatePPOCRv5CustomModelAsync(
-        string detectionModelPath, 
-        string recognitionModelPath, 
-        string language, 
-        CancellationToken cancellationToken)
-    {
-        await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのためのダミー
+    // ✅ [PHASE2.11.8] GetPPOCRv5RecognitionModelPath削除 - IPaddleOcrModelManagerに完全委譲済み
 
-        try
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔨 PP-OCRv5カスタムモデル作成開始");
-            
-            // PP-OCRv5検出モデルのディレクトリパス
-            var detectionModelDir = Path.GetDirectoryName(detectionModelPath);
-            
-            // PP-OCRv5認識モデルのディレクトリパス
-            var recognitionModelDir = Path.GetDirectoryName(recognitionModelPath);
-            
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📁 検出モデルディレクトリ: {detectionModelDir}");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📁 認識モデルディレクトリ: {recognitionModelDir}");
-            
-            // PP-OCRv5の実際のカスタムモデルファイルを使用
-            if (string.IsNullOrEmpty(detectionModelDir) || string.IsNullOrEmpty(recognitionModelDir))
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ モデルディレクトリが無効です");
-                return null;
-            }
-            
-            // PP-OCRv5の5言語統合モデルを使用
-            // 日本語用には korean_rec ディレクトリの認識モデルを使用（5言語統合モデル）
-            var actualRecognitionModelDir = language switch
-            {
-                "jpn" => Path.Combine(Path.GetDirectoryName(recognitionModelDir)!, "korean_rec"),
-                "eng" => Path.Combine(Path.GetDirectoryName(recognitionModelDir)!, "latin_rec"),
-                _ => Path.Combine(Path.GetDirectoryName(recognitionModelDir)!, "korean_rec")
-            };
-            
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌍 PP-OCRv5統合モデルディレクトリ: {actualRecognitionModelDir}");
-            
-            // 文字辞書ファイルのパスを設定（PP-OCRv5の5言語統合用）
-            var dictPath = language switch
-            {
-                "jpn" => Path.Combine(actualRecognitionModelDir, "ppocr_keys_v1.txt"),
-                "eng" => Path.Combine(actualRecognitionModelDir, "en_dict.txt"),
-                _ => Path.Combine(actualRecognitionModelDir, "ppocr_keys_v1.txt")
-            };
-            
-            // 辞書ファイルが存在しない場合はデフォルトを使用
-            if (!File.Exists(dictPath))
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ 専用辞書ファイルが見つかりません: {dictPath}");
-                dictPath = null; // デフォルト辞書を使用
-            }
-            
-            // 現在のSdcb.PaddleOCR 3.0.1 では、カスタムモデルファイルの直接読み込みに制限があるため
-            // PP-OCRv5モデルファイルが存在することを確認したが、一旦は改良された事前定義モデルを使用
-            // TODO: 将来的にAPI改善があった際にPP-OCRv5の実際のモデルファイルを使用
-            
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ Sdcb.PaddleOCR 3.0.1 API制限により、PP-OCRv5ファイルの直接読み込みを一時的にスキップ");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 改良された事前定義モデルを使用（より高精度なV4ベース）");
-            
-            // V4モデルハングアップ原因調査: 段階的初期化でデバッグ
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔬 V4モデル初期化テスト開始 - 言語: {language}");
-            
-            FullOcrModel? improvedModel = null;
-            try
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 V4モデル取得中...");
-                improvedModel = language switch
-                {
-                    "jpn" => LocalFullModels.ChineseV5, // V5統一モデル
-                    "eng" => LocalFullModels.ChineseV5, // V5統一モデル
-                    _ => LocalFullModels.ChineseV5 // V5統一モデル
-                };
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ✅ V4モデル取得成功: {improvedModel?.GetType()?.Name ?? "null"}");
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル完全型名: {improvedModel?.GetType()?.FullName ?? "null"}");
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル基底型: {improvedModel?.GetType()?.BaseType?.Name ?? "null"}");
-                
-                // モデルの基本プロパティ確認
-                if (improvedModel != null)
-                {
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔍 V4モデル詳細確認中...");
-                    // LocalFullModels.JapanV4の実際の型情報をログ出力
-                    var japanV4Type = LocalFullModels.JapanV4?.GetType();
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 LocalFullModels.JapanV4型名: {japanV4Type?.Name ?? "null"}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📋 LocalFullModels.JapanV4完全型: {japanV4Type?.FullName ?? "null"}");
-                    
-                    // 型の比較をテスト
-                    var isV4Test1 = improvedModel?.RecognizationModel?.Version == V4;
-                    var isV4Test2 = improvedModel?.RecognizationModel?.Version == V4;
-                    var isV4Test3 = improvedModel?.DetectionModel?.Version == V4;
-                    var isV4TestFinal = isV4Test1 || isV4Test2 || isV4Test3;
-                    
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト1 (認識モデルV4): {isV4Test1}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト2 (認識モデルバージョンV4): {isV4Test2}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出テスト3 (検出モデルV4): {isV4Test3}");
-                    // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧪 V4検出最終結果: {isV4TestFinal}");
-                }
-            }
-            catch (Exception modelEx)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ V4モデル初期化エラー: {modelEx.Message}");
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 V5フォールバックに切り替え");
-                improvedModel = language switch
-                {
-                    "jpn" => LocalFullModels.ChineseV5, // 日本語はV5多言語モデルを使用
-                    "eng" => LocalFullModels.ChineseV5, // 英語もV5多言語モデルを使用
-                    _ => LocalFullModels.ChineseV5
-                };
-            }
-            
-            // モデル確認と適切なメッセージ
-            var selectedModelInfo = improvedModel?.RecognizationModel?.Version switch
-            {
-                V4 => "V4高精度モデル",
-                V5 => "V5多言語モデル",
-                _ => "フォールバックモデル"
-            };
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🎯 改良モデル選択成功: {selectedModelInfo}");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🌍 使用モデル: {improvedModel?.GetType()?.Name ?? "null"} ({language})");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 PP-OCRv5モデルファイル確認済み: {detectionModelDir}");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📝 PP-OCRv5認識モデル確認済み: {actualRecognitionModelDir}");
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   📚 今後のAPI改善時に実装予定");
-            
-            return improvedModel;
-        }
-        catch (Exception ex)
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5カスタムモデル作成エラー: {ex.Message}");
-            __logger?.LogError(ex, "PP-OCRv5カスタムモデルの作成に失敗しました");
-            
-            // カスタムモデル作成に失敗した場合は標準モデルにフォールバック
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔄 標準モデルにフォールバック");
-            var fallbackModel = language switch
-            {
-                "jpn" => LocalFullModels.ChineseV5, // V5多言語モデルを使用
-                "eng" => LocalFullModels.ChineseV5, // V5多言語モデルを使用
-                _ => LocalFullModels.ChineseV5
-            };
-            return fallbackModel;
-        }
-    }
+    // ✅ [PHASE2.11.8] GetPPOCRv5Model削除 - IPaddleOcrModelManagerに完全委譲済み
 
-    /// <summary>
-    /// PP-OCRv5認識モデルのパスを取得
-    /// </summary>
-    private string GetPPOCRv5RecognitionModelPath(string language)
-    {
-        var modelBasePath = @"E:\dev\Baketa\models\ppocrv5";
-        
-        return language switch
-        {
-            "jpn" => Path.Combine(modelBasePath, "korean_rec", "inference.pdiparams"), // 韓国語モデルが日本語にも対応
-            "eng" => Path.Combine(modelBasePath, "latin_rec", "inference.pdiparams"),
-            _ => Path.Combine(modelBasePath, "korean_rec", "inference.pdiparams") // デフォルトは韓国語モデル
-        };
-    }
+    // ✅ [PHASE2.11.8] GetDefaultLocalModel削除 - IPaddleOcrModelManagerに完全委譲済み
 
-    /// <summary>
-    /// PP-OCRv5モデルの取得
-    /// </summary>
-    private FullOcrModel? GetPPOCRv5Model(string language)
-    {
-        try
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 GetPPOCRv5Model呼び出し - 言語: {language}");
-            
-            // PP-OCRv5多言語モデルを使用
-            var model = language switch
-            {
-                "jpn" => LocalFullModels.ChineseV5, // 日本語はV5多言語モデルを使用
-                "eng" => LocalFullModels.ChineseV5, // 英語もV5多言語モデルを使用
-                _ => LocalFullModels.ChineseV5 // デフォルト
-            };
-            
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 PP-OCRv5ベースモデル選択: {model?.GetType()?.Name ?? "null"}");
-            
-            return model;
-        }
-        catch (Exception ex)
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ❌ PP-OCRv5モデル取得エラー: {ex.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// デフォルトローカルモデルの取得
-    /// </summary>
-    private static FullOcrModel? GetDefaultLocalModel(string language)
-    {
-        // Note: ログ出力は統一ログサービス導入により、静的メソッドでは利用不可
-        
-        var model = language switch
-        {
-            "jpn" => LocalFullModels.JapanV4, // V4モデルを使用
-            "eng" => LocalFullModels.EnglishV4, // V4モデルを使用
-            _ => LocalFullModels.EnglishV4
-        };
-        
-        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 選択されたモデル: {model?.GetType()?.Name ?? "null"}");
-        
-        // モデルの詳細情報をログ出力
-        if (model != null)
-        {
-            try
-            {
-                var modelType = model.GetType();
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"🔍 モデル詳細:");
-                foreach (var prop in modelType.GetProperties().Where(p => p.CanRead))
-                {
-                    try
-                    {
-                        var value = prop.GetValue(model);
-                        // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   {prop.Name}: {value}");
-                    }
-                    catch { /* プロパティ取得エラーは無視 */ }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   ⚠️ モデル詳細取得エラー: {ex.Message}");
-            }
-        }
-        
-        return model;
-    }
-
-    /// <summary>
-    /// 認識モデル名の取得
-    /// </summary>
-    private static string GetRecognitionModelName(string language) => language switch
-    {
-        "jpn" => "rec_japan_standard",
-        "eng" => "rec_english_standard",
-        _ => "rec_english_standard"
-    };
+    // ✅ [PHASE2.11.8] GetRecognitionModelName削除 - IPaddleOcrModelManagerに完全委譲済み
 
     /// <summary>
     /// IImageからOpenCV Matに変換
@@ -2360,20 +1822,34 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     {
         // 基本的なOCRモデル用メモリ
         var baseMemoryMB = 512;
-        
+
         // 言語モデル使用時の追加メモリ
         if (settings.UseLanguageModel)
         {
             baseMemoryMB += 256;
         }
-        
+
         // マルチスレッド処理時の追加メモリ
         if (settings.EnableMultiThread)
         {
             baseMemoryMB += settings.WorkerCount * 128;
         }
-        
+
         return baseMemoryMB;
+    }
+
+    /// <summary>
+    /// 設定変更によりエンジンの再初期化が必要かを判定
+    /// ✅ [PHASE2.11.6] ApplySettingsAsyncから抽出（可読性・保守性向上）
+    /// </summary>
+    private bool RequiresReinitialization(OcrEngineSettings newSettings, bool languageChanged)
+    {
+        return languageChanged ||
+               _settings.ModelName != newSettings.ModelName ||
+               _settings.UseGpu != newSettings.UseGpu ||
+               _settings.GpuDeviceId != newSettings.GpuDeviceId ||
+               _settings.EnableMultiThread != newSettings.EnableMultiThread ||
+               _settings.WorkerCount != newSettings.WorkerCount;
     }
 
     private void ThrowIfDisposed()
