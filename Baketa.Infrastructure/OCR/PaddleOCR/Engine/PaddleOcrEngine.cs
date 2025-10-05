@@ -65,12 +65,12 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
     // Legacy Dependencies (段階的に削減予定)
     private readonly IModelPathResolver __modelPathResolver;
-    private readonly IOcrPreprocessingService __ocrPreprocessingService;
+    // ✅ [PHASE2.9.5] IOcrPreprocessingService削除 - 診断ログのみで使用、実質未使用
     private readonly ITextMerger __textMerger;
     private readonly IOcrPostProcessor __ocrPostProcessor;
     private readonly IGpuMemoryManager __gpuMemoryManager;
     private readonly IUnifiedSettingsService __unifiedSettingsService;
-    private readonly IUnifiedLoggingService? _unifiedLoggingService;
+    // ✅ [PHASE2.9.5] IUnifiedLoggingService削除 - 全168箇所コメントアウト済み、完全未使用
     private readonly ILogger<PaddleOcrEngine>? __logger;
     private readonly IEventAggregator __eventAggregator;
     private readonly IOptionsMonitor<OcrSettings> _ocrSettings;
@@ -86,7 +86,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         IPaddleOcrErrorHandler errorHandler,
         // Legacy Dependencies
         IModelPathResolver _modelPathResolver,
-        IOcrPreprocessingService _ocrPreprocessingService,
+        // ✅ [PHASE2.9.5] IOcrPreprocessingService削除
         ITextMerger _textMerger,
         IOcrPostProcessor _ocrPostProcessor,
         IGpuMemoryManager _gpuMemoryManager,
@@ -94,7 +94,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         IEventAggregator _eventAggregator,
         IOptionsMonitor<OcrSettings> ocrSettings,
         IImageFactoryType imageFactory,
-        IUnifiedLoggingService? unifiedLoggingService = null,
+        // ✅ [PHASE2.9.5] IUnifiedLoggingService削除
         ILogger<PaddleOcrEngine>? _logger = null)
     {
         // ✅ [PHASE2.9.3.2] New Service Initialization
@@ -107,7 +107,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
         // Legacy Initialization
         __modelPathResolver = _modelPathResolver ?? throw new ArgumentNullException(nameof(_modelPathResolver));
-        __ocrPreprocessingService = _ocrPreprocessingService ?? throw new ArgumentNullException(nameof(_ocrPreprocessingService));
+        // ✅ [PHASE2.9.5] __ocrPreprocessingService削除
         __textMerger = _textMerger ?? throw new ArgumentNullException(nameof(_textMerger));
         __ocrPostProcessor = _ocrPostProcessor ?? throw new ArgumentNullException(nameof(_ocrPostProcessor));
         __gpuMemoryManager = _gpuMemoryManager ?? throw new ArgumentNullException(nameof(_gpuMemoryManager));
@@ -115,7 +115,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         __eventAggregator = _eventAggregator ?? throw new ArgumentNullException(nameof(_eventAggregator));
         _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
         __imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
-        _unifiedLoggingService = unifiedLoggingService;
+        // ✅ [PHASE2.9.5] _unifiedLoggingService削除
         __logger = _logger;
         
         // ❌ DI競合解決: インスタンス作成追跡を無効化（ObjectPool管理に一任）
@@ -126,10 +126,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     
     // インスタンス追跡
     private readonly int _instanceId;
-    
-    // 🔍 Phase 3診断: 使用中の前処理サービス
-    private static bool _serviceTypeLogged;
-    
+
+    // ✅ [PHASE2.9.5] _serviceTypeLogged削除 - Phase 3診断ログ廃止に伴い不要
+
     private PaddleOcrAll? _ocrEngine;
     private QueuedPaddleOcrAll? _queuedEngine;
     private OcrEngineSettings _settings = new();
@@ -622,15 +621,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
                 textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
             }
-            
-            // 🔍 Phase 3診断: 使用中の前処理サービスを初回のみログ出力
-            if (!_serviceTypeLogged)
-            {
-                var serviceType = __ocrPreprocessingService.GetType().Name;
-                SafeWriteDebugLog($"🔍 [PHASE3-DIAG] 使用中の前処理サービス: {serviceType}");
-                _serviceTypeLogged = true;
-            }
-            
+
+            // ✅ [PHASE2.9.5] Phase 3診断ログ削除 - __ocrPreprocessingService未使用のため不要
+
             // 📍 座標ログ出力 (ユーザー要求: 認識したテキストとともに座標位置もログで確認)
             // 直接ファイル書き込みでOCR結果を記録
             SafeWriteDebugLog($"📍 [DIRECT] PaddleOcrEngine - OCR処理完了: 検出領域数={textRegions?.Count ?? 0}");
