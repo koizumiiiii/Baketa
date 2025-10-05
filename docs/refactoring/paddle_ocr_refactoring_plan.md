@@ -890,7 +890,7 @@ public interface IPaddleOcrUtilities
   - [x] Clean Architecture準拠（Infrastructure → Core依存方向）
   - [x] コミット: 33c0df4
 
-###### Phase 2.9.4: Facadeパターン実装 - 重複メソッド削除 🔄 **Phase 2.9.4bで進行中** (2025-10-05)
+###### Phase 2.9.4: Facadeパターン実装 - 重複メソッド削除 🔄 **Phase 2.9.4b-cで進行中** (2025-10-05)
 
 - [x] **Phase 2.9.4b: ExecuteOcrAsync置換**（462行削減）
   - [x] RecognizeAsync内の呼び出しを_executor + _resultConverterに置換
@@ -903,9 +903,16 @@ public interface IPaddleOcrUtilities
   - [x] scaleFactor/regionOfInterestの受け渡し実装
   - [x] コミット: c13c63f
 
-- [ ] **Phase 2.9.4c: ConvertDetectionOnlyResult置換**（予定）
-  - [ ] ExecuteTextDetectionOnlyAsync内の呼び出し置換
-  - [ ] ConvertDetectionOnlyResultメソッド削除
+- [x] **Phase 2.9.4c: ConvertDetectionOnlyResult置換**（346行削減）
+  - [x] ExecuteTextDetectionOnlyAsync内を_executor + _resultConverter使用に置換
+  - [x] ConvertDetectionOnlyResultメソッド削除（68行）
+  - [x] ヘルパーメソッド4つ削除（154行）:
+    - ProcessSinglePaddleResultForDetectionOnly（42行）
+    - ExtractBoundsFromRegion（37行）
+    - ExtractBoundsFromResult（45行）
+    - ExtractRectangleFromObject（30行）
+  - [x] ExecuteDetectionOnlyInternalOptimizedメソッド削除（105行）
+  - [x] コミット: b6932b9
 
 - [ ] **Phase 2.9.4d: 残存重複メソッドの確認と削除**
   - [ ] ProcessSinglePaddleResult系メソッド確認
@@ -925,7 +932,7 @@ public interface IPaddleOcrUtilities
 #### 期待成果
 - **PaddleOcrExecutorが247行 → 467行に拡張（220行追加、完全実装）** ✅ **Phase 2.9.2で完了**
 - **PaddleOcrResultConverterが242行 → 695行に拡張（453行移行、Phase 2.9.1で完了）** ✅ 完了
-- **PaddleOcrEngineが5,695行 → 5,233行に削減（462行削減、Phase 2.9.4bで達成）** 🔄 進行中
+- **PaddleOcrEngineが5,695行 → 4,887行に削減（808行削減、Phase 2.9.4b-cで達成）** 🔄 進行中
 - 各メソッドが明確な責任を持つ ✅ 達成
 - 可読性・保守性が大幅向上 ✅ 達成
 - エラーハンドリング・パフォーマンス計測の一元化 ✅ 達成
