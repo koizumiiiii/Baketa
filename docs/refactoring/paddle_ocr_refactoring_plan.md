@@ -862,25 +862,70 @@ public interface IPaddleOcrUtilities
 - **レビュー結果**: Excellent（問題なし）
 
 ##### PaddleOcrEngine本体のリファクタリング
-- [ ] PaddleOcrEngine本体のリファクタリング
-  - すべての実装ロジックを各サービスへの委譲に変更
-  - Facadeパターンの完全実装
-  - コメント・ログの整理
+
+###### Phase 2.9.3: 型統一とDI統合 ✅ **Phase 2.9.3.1-3.3で完了** (2025-10-05)
+
+- [x] **Phase 2.9.3.1: 型エイリアス追加**
+  - [x] OcrProgress型の曖昧性解消（Core vs Infrastructure）
+  - [x] ImageCharacteristics型の曖昧性解消
+  - [x] 11箇所の型参照を明示的に修正
+  - [x] コミット: 81ce3b6
+
+- [x] **Phase 2.9.3.2: 新サービスDI統合**
+  - [x] PaddleOcrEngineに6つの新サービス依存追加
+    - IPaddleOcrImageProcessor
+    - IPaddleOcrResultConverter
+    - IPaddleOcrExecutor
+    - IPaddleOcrModelManager
+    - IPaddleOcrPerformanceTracker
+    - IPaddleOcrErrorHandler
+  - [x] PaddleOcrEngineFactoryの更新
+  - [x] NonSingletonPaddleOcrEngineの更新
+  - [x] コミット: 6abd04a
+
+- [x] **Phase 2.9.3.3: Infrastructure層OcrProgress型をCore層に統一**
+  - [x] IPaddleOcrExecutor.cs: Infrastructure独自OcrProgress record削除
+  - [x] PaddleOcrExecutor.cs: CoreOcrProgressコンストラクタ修正（3箇所）
+    - progress値を 0-100 → 0.0-1.0 の範囲に変更
+  - [x] Clean Architecture準拠（Infrastructure → Core依存方向）
+  - [x] コミット: 33c0df4
+
+###### Phase 2.9.4: Facadeパターン実装 - 重複メソッド削除 🔄 **Phase 2.9.4bで進行中** (2025-10-05)
+
+- [x] **Phase 2.9.4b: ExecuteOcrAsync置換**（462行削減）
+  - [x] RecognizeAsync内の呼び出しを_executor + _resultConverterに置換
+  - [x] ExecuteOcrAsyncメソッド削除（373行）
+    - Phase 3前処理、PaddleOCR実行、リトライロジック含む
+    - _executor.ExecuteOcrAsyncに責務移譲済み
+  - [x] ConvertPaddleOcrResultメソッド削除（89行）
+    - PaddleOcrResult → OcrTextRegion変換
+    - _resultConverter.ConvertToTextRegionsに責務移譲済み
+  - [x] scaleFactor/regionOfInterestの受け渡し実装
+  - [x] コミット: c13c63f
+
+- [ ] **Phase 2.9.4c: ConvertDetectionOnlyResult置換**（予定）
+  - [ ] ExecuteTextDetectionOnlyAsync内の呼び出し置換
+  - [ ] ConvertDetectionOnlyResultメソッド削除
+
+- [ ] **Phase 2.9.4d: 残存重複メソッドの確認と削除**
+  - [ ] ProcessSinglePaddleResult系メソッド確認
+  - [ ] その他重複実装の洗い出し
 
 - [ ] DI注入フィールドの整理
-  - 新規サービスへの依存追加
-  - 不要な依存削除
+  - [x] 新規サービスへの依存追加 ✅ Phase 2.9.3.2で完了
+  - [ ] 不要な依存削除
 
 - [ ] IOcrEngineインターフェース実装の最適化
-  - 各メソッドがサービス呼び出しのみになるよう簡素化
+  - [x] RecognizeAsyncがサービス呼び出しに変更 ✅ Phase 2.9.4bで部分達成
+  - [ ] 他メソッドの簡素化
 
 - [ ] イベント発行の整理
-  - 診断イベント発行の一元化
+  - [ ] 診断イベント発行の一元化
 
 #### 期待成果
 - **PaddleOcrExecutorが247行 → 467行に拡張（220行追加、完全実装）** ✅ **Phase 2.9.2で完了**
 - **PaddleOcrResultConverterが242行 → 695行に拡張（453行移行、Phase 2.9.1で完了）** ✅ 完了
-- **PaddleOcrEngineが5,548行 → 約5,000行に削減済み（Executor 220行 + Converter 453行 = 673行削減完了）**
+- **PaddleOcrEngineが5,695行 → 5,233行に削減（462行削減、Phase 2.9.4bで達成）** 🔄 進行中
 - 各メソッドが明確な責任を持つ ✅ 達成
 - 可読性・保守性が大幅向上 ✅ 達成
 - エラーハンドリング・パフォーマンス計測の一元化 ✅ 達成
