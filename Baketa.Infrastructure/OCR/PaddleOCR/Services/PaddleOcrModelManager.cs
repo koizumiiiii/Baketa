@@ -310,4 +310,49 @@ public sealed class PaddleOcrModelManager : IPaddleOcrModelManager
         "eng" => "rec_english_standard",
         _ => "rec_english_standard"
     };
+
+    // ✅ [PHASE2.9.6] IOcrEngineインターフェース実装の委譲用メソッド実装
+
+    /// <summary>
+    /// 使用可能な言語のリストを取得
+    /// </summary>
+    public IReadOnlyList<string> GetAvailableLanguages()
+    {
+        // PP-OCRv5は日本語・英語・中国語をサポート
+        return ["eng", "jpn", "chi_sim"];
+    }
+
+    /// <summary>
+    /// 使用可能なモデルのリストを取得
+    /// </summary>
+    public IReadOnlyList<string> GetAvailableModels()
+    {
+        // 現在はPP-OCRv5標準モデルのみ
+        return ["standard", "ppocrv5"];
+    }
+
+    /// <summary>
+    /// 指定言語のモデルが利用可能かを確認
+    /// </summary>
+    public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(languageCode))
+            return false;
+
+        var availableLanguages = GetAvailableLanguages();
+        if (!availableLanguages.Contains(languageCode))
+            return false;
+
+        // 実際のモデルファイルの存在確認（簡易版）
+        try
+        {
+            var model = await PrepareModelsAsync(languageCode, cancellationToken).ConfigureAwait(false);
+            return model != null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "言語 '{LanguageCode}' のモデル可用性確認でエラー", languageCode);
+            return false;
+        }
+    }
 }

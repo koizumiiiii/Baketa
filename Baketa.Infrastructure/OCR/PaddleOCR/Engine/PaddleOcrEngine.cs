@@ -871,21 +871,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// 使用可能な言語のリストを取得します
     /// </summary>
     /// <returns>言語コードのリスト</returns>
-    public IReadOnlyList<string> GetAvailableLanguages()
-    {
-        // 初期実装では英語・日本語のみ
-        return ["eng", "jpn"];
-    }
+    // ✅ [PHASE2.9.6] _modelManager に委譲
+    public IReadOnlyList<string> GetAvailableLanguages() => _modelManager.GetAvailableLanguages();
 
     /// <summary>
     /// 使用可能なモデルのリストを取得します
     /// </summary>
     /// <returns>モデル名のリスト</returns>
-    public IReadOnlyList<string> GetAvailableModels()
-    {
-        // 初期実装では標準モデルのみ
-        return ["standard"];
-    }
+    // ✅ [PHASE2.9.6] _modelManager に委譲
+    public IReadOnlyList<string> GetAvailableModels() => _modelManager.GetAvailableModels();
 
     /// <summary>
     /// 指定言語のモデルが利用可能かを確認します
@@ -893,48 +887,16 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// <param name="languageCode">言語コード</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>利用可能な場合はtrue</returns>
+    // ✅ [PHASE2.9.6] _modelManager に委譲
     public async Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrEmpty(languageCode))
-            return false;
-            
-        var availableLanguages = GetAvailableLanguages();
-        if (!availableLanguages.Contains(languageCode))
-            return false;
-            
-        await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
-            
-        // モデルファイルの存在確認
-        var modelPath = __modelPathResolver.GetRecognitionModelPath(languageCode, _settings.ModelName);
-        return __modelPathResolver.FileExists(modelPath);
-    }
+        => await _modelManager.IsLanguageAvailableAsync(languageCode, cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// エンジンのパフォーマンス統計を取得
     /// </summary>
     /// <returns>パフォーマンス統計</returns>
-    public OcrPerformanceStats GetPerformanceStats()
-    {
-        var times = _processingTimes.ToArray();
-        var avgTime = times.Length > 0 ? times.Average() : 0.0;
-        var minTime = times.Length > 0 ? times.Min() : 0.0;
-        var maxTime = times.Length > 0 ? times.Max() : 0.0;
-        var successRate = _totalProcessedImages > 0 
-            ? (double)(_totalProcessedImages - _errorCount) / _totalProcessedImages 
-            : 0.0;
-
-        return new OcrPerformanceStats
-        {
-            TotalProcessedImages = _totalProcessedImages,
-            AverageProcessingTimeMs = avgTime,
-            MinProcessingTimeMs = minTime,
-            MaxProcessingTimeMs = maxTime,
-            ErrorCount = _errorCount,
-            SuccessRate = successRate,
-            StartTime = _startTime,
-            LastUpdateTime = DateTime.UtcNow
-        };
-    }
+    // ✅ [PHASE2.9.6] _performanceTracker に委譲
+    public OcrPerformanceStats GetPerformanceStats() => _performanceTracker.GetPerformanceStats();
 
     #region Private Methods
 
@@ -3295,22 +3257,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// <summary>
     /// 翻訳結果が表示された際に進行中のタイムアウト処理をキャンセル
     /// </summary>
-    public void CancelCurrentOcrTimeout()
-    {
-        try
-        {
-            if (_currentOcrCancellation?.Token.CanBeCanceled == true && !_currentOcrCancellation.Token.IsCancellationRequested)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🛑 翻訳結果表示により進行中OCRタイムアウトをキャンセル");
-                _currentOcrCancellation.Cancel();
-                _currentOcrCancellation = null;
-            }
-        }
-        catch (Exception ex)
-        {
-            // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"⚠️ OCRタイムアウトキャンセル中にエラー: {ex.Message}");
-        }
-    }
+    // ✅ [PHASE2.9.6] _executor に委譲
+    public void CancelCurrentOcrTimeout() => _executor.CancelCurrentOcrTimeout();
 
     /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
@@ -4456,21 +4404,14 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// <summary>
     /// PaddleOCR連続失敗カウンターを強制リセット
     /// </summary>
-    public void ResetFailureCounter()
-    {
-        var previousCount = _consecutivePaddleFailures;
-        _consecutivePaddleFailures = 0;
-        __logger?.LogWarning("🔄 [MANUAL_RESET] PaddleOCR失敗カウンターを手動リセット: {PreviousCount} → 0", previousCount);
-        Console.WriteLine($"🔄 [MANUAL_RESET] PaddleOCR失敗カウンターを手動リセット: {previousCount} → 0");
-    }
+    // ✅ [PHASE2.9.6] _performanceTracker に委譲
+    public void ResetFailureCounter() => _performanceTracker.ResetFailureCounter();
 
     /// <summary>
     /// 現在の連続失敗回数を取得
     /// </summary>
-    public int GetConsecutiveFailureCount()
-    {
-        return _consecutivePaddleFailures;
-    }
+    // ✅ [PHASE2.9.6] _performanceTracker に委譲
+    public int GetConsecutiveFailureCount() => _performanceTracker.GetConsecutiveFailureCount();
     
     /// <summary>
     /// 🎯 [ULTRATHINK_PREVENTION] PaddlePredictor失敗を完全予防する包括的正規化

@@ -26,4 +26,21 @@ public interface IPaddleOcrModelManager
     /// V5モデル検出
     /// </summary>
     bool DetectIfV5Model(FullOcrModel model);
+
+    // ✅ [PHASE2.9.6] IOcrEngineインターフェース実装の委譲用メソッド追加
+
+    /// <summary>
+    /// 使用可能な言語のリストを取得
+    /// </summary>
+    IReadOnlyList<string> GetAvailableLanguages();
+
+    /// <summary>
+    /// 使用可能なモデルのリストを取得
+    /// </summary>
+    IReadOnlyList<string> GetAvailableModels();
+
+    /// <summary>
+    /// 指定言語のモデルが利用可能かを確認
+    /// </summary>
+    Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken);
 }
