@@ -11,12 +11,12 @@ public interface IPaddleOcrExecutor
     /// <summary>
     /// OCR実行（認識付き）
     /// </summary>
-    Task<PaddleOcrResult[]> ExecuteOcrAsync(Mat processedMat, IProgress<OcrProgress>? progress, CancellationToken cancellationToken);
+    Task<PaddleOcrResult> ExecuteOcrAsync(Mat processedMat, IProgress<OcrProgress>? progress, CancellationToken cancellationToken);
 
     /// <summary>
     /// 検出専用OCR実行
     /// </summary>
-    Task<PaddleOcrResult[]> ExecuteDetectionOnlyAsync(Mat processedMat, CancellationToken cancellationToken);
+    Task<PaddleOcrResult> ExecuteDetectionOnlyAsync(Mat processedMat, CancellationToken cancellationToken);
 
     /// <summary>
     /// 現在のOCRタイムアウトをキャンセル
