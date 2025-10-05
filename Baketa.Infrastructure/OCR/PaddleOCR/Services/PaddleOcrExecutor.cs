@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using Sdcb.PaddleOCR;
 using OcrException = Baketa.Core.Abstractions.OCR.OcrException;
+using CoreOcrProgress = Baketa.Core.Abstractions.OCR.OcrProgress;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 
@@ -59,17 +60,18 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor
     /// <summary>
     /// OCR実行（認識付き）
     /// Phase 2.9.2: 完全実装（リトライロジック、エラーハンドリング、パフォーマンストラッキング統合）
+    /// ✅ [PHASE2.9.3.3] 型統一: OcrProgress → CoreOcrProgress
     /// </summary>
     public async Task<PaddleOcrResult> ExecuteOcrAsync(
         Mat processedMat,
-        IProgress<OcrProgress>? progress,
+        IProgress<CoreOcrProgress>? progress,
         CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
         var imageSize = new System.Drawing.Size(processedMat.Width, processedMat.Height);
 
         _logger?.LogDebug("⚙️ ExecuteOcrAsync開始: {Width}x{Height}", imageSize.Width, imageSize.Height);
-        progress?.Report(new OcrProgress(0, 100, "OCR実行開始"));
+        progress?.Report(new CoreOcrProgress(0.0, "OCR実行開始"));
 
         var engine = _engineInitializer.GetOcrEngine();
         if (engine == null)
@@ -99,7 +101,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor
                     {
                         _logger?.LogWarning("🔄 OCRリトライ {Attempt}/{Max} - 前回エラー: {Error}",
                             attemptCount, MaxRetryAttempts, lastException?.Message);
-                        progress?.Report(new OcrProgress(0, 100, $"OCRリトライ {attemptCount}/{MaxRetryAttempts}"));
+                        progress?.Report(new CoreOcrProgress(0.0, $"OCRリトライ {attemptCount}/{MaxRetryAttempts}"));
                         await Task.Delay(RetryDelayMilliseconds * attemptCount, cancellationToken).ConfigureAwait(false);
                     }
 
@@ -150,7 +152,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor
             // ✅ [PHASE2.9.2] パフォーマンストラッキング統合
             _performanceTracker.UpdatePerformanceStats(sw.Elapsed.TotalMilliseconds, success: true);
 
-            progress?.Report(new OcrProgress(100, 100, "OCR完了"));
+            progress?.Report(new CoreOcrProgress(1.0, "OCR完了"));
 
             _logger?.LogInformation("✅ OCR完了: {Time}ms, 試行回数={Attempts}, 検出領域数={Count}",
                 sw.ElapsedMilliseconds, attemptCount, result.Regions.Length);
