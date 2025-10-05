@@ -36,6 +36,9 @@ using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using Baketa.Infrastructure.OCR.Scaling;
 using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
+// ✅ [PHASE2.9.3.1] 型の曖昧性解決用エイリアス
+using CoreOcrProgress = Baketa.Core.Abstractions.OCR.OcrProgress;
+using PreprocessingImageCharacteristics = Baketa.Infrastructure.OCR.Preprocessing.ImageCharacteristics;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 
@@ -373,7 +376,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// <returns>OCR結果</returns>
     public async Task<OcrResults> RecognizeAsync(
         IImage image,
-        IProgress<OcrProgress>? progressCallback = null,
+        IProgress<CoreOcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
     {
         return await RecognizeAsync(image, null, progressCallback, cancellationToken).ConfigureAwait(false);
@@ -390,7 +393,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     public async Task<OcrResults> RecognizeAsync(
         IImage image,
         Rectangle? regionOfInterest,
-        IProgress<OcrProgress>? progressCallback = null,
+        IProgress<CoreOcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
@@ -484,7 +487,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         try
         {
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🎬 実際のOCR処理を開始");
-            progressCallback?.Report(new OcrProgress(0.1, "OCR処理を開始"));
+            progressCallback?.Report(new CoreOcrProgress(0.1, "OCR処理を開始"));
             
             // IImageからMatに変換（大画面対応スケーリング付き）
             // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog("🔄 IImageからMatに変換中...");
@@ -508,7 +511,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             using (mat) // Matのリソース管理
             {
                 // 🎯 [ULTRATHINK_PREVENTION] OCR実行前の早期予防システム
-                progressCallback?.Report(new OcrProgress(0.25, "画像品質検証中"));
+                progressCallback?.Report(new CoreOcrProgress(0.25, "画像品質検証中"));
             
                 Mat processedMat;
             try 
@@ -522,7 +525,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
             
-            progressCallback?.Report(new OcrProgress(0.3, "OCR処理実行中"));
+            progressCallback?.Report(new CoreOcrProgress(0.3, "OCR処理実行中"));
             
             using (processedMat) // processedMatの適切なDispose管理
             {
@@ -628,7 +631,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // 統計更新
             UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, true);
             
-            progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了"));
+            progressCallback?.Report(new CoreOcrProgress(1.0, "OCR処理完了"));
             
             // TODO: OCR精度向上機能を後で統合予定（DI循環参照問題のため一時的に無効化）
             // IReadOnlyList<TextChunk> processedTextChunks = [];
@@ -1771,7 +1774,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// </summary>
     private async Task<IReadOnlyList<OcrTextRegion>> ExecuteOcrAsync(
         Mat mat,
-        IProgress<OcrProgress>? progressCallback,
+        IProgress<CoreOcrProgress>? progressCallback,
         CancellationToken cancellationToken)
     {
         // 統一設定からDetectionThresholdを取得・適用
@@ -1816,7 +1819,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🔧 GPU使用: {_settings.UseGpu}");
         // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"   🧵 マルチスレッド: {_settings.EnableMultiThread}");
         
-        progressCallback?.Report(new OcrProgress(0.4, "テキスト検出"));
+        progressCallback?.Report(new CoreOcrProgress(0.4, "テキスト検出"));
         
         // OCR実行
         object result;
@@ -2134,7 +2137,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             }
         }
         
-        progressCallback?.Report(new OcrProgress(0.8, "結果処理"));
+        progressCallback?.Report(new CoreOcrProgress(0.8, "結果処理"));
         
         // PaddleOCRの結果をOcrTextRegionに変換
         return ConvertPaddleOcrResult(result);
@@ -5289,7 +5292,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// </summary>
     /// <param name="characteristics">画像特性</param>
     /// <returns>最適なプロファイル名</returns>
-    private static string SelectOptimalGameProfile(ImageCharacteristics characteristics)
+    private static string SelectOptimalGameProfile(PreprocessingImageCharacteristics characteristics)
     {
         // 明度とコントラストに基づいてプロファイルを選択
         if (characteristics.IsDarkBackground)
