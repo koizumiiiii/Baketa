@@ -926,11 +926,26 @@ public interface IPaddleOcrUtilities
   - [x] Phase 3診断ログ削除（_serviceTypeLogged, 診断コード）
   - [x] コミット: c769221
 
-- [ ] IOcrEngineインターフェース実装の最適化
-  - [x] RecognizeAsyncがサービス呼び出しに変更 ✅ Phase 2.9.4bで部分達成
-  - [ ] 他メソッドの簡素化
+- [ ] **Phase 2.9.6: IOcrEngineインターフェース実装の最適化**（簡易メソッドの委譲）
+  - [x] RecognizeAsyncがサービス呼び出しに変更 ✅ Phase 2.9.4bで完了
+  - [ ] 調査完了: 既存サービスインターフェースで対応可能と判明 ✅
+  - [ ] IPaddleOcrModelManager拡張（3メソッド追加）
+    - [ ] GetAvailableLanguages() 追加
+    - [ ] GetAvailableModels() 追加
+    - [ ] IsLanguageAvailableAsync() 追加
+  - [ ] PaddleOcrEngine委譲実装（7メソッド → 1行委譲）
+    - [ ] GetPerformanceStats() → _performanceTracker.GetPerformanceStats()
+    - [ ] ResetFailureCounter() → _performanceTracker.ResetFailureCounter()
+    - [ ] GetConsecutiveFailureCount() → _performanceTracker.GetConsecutiveFailureCount()
+    - [ ] CancelCurrentOcrTimeout() → _executor.CancelCurrentOcrTimeout()
+    - [ ] GetAvailableLanguages() → _modelManager.GetAvailableLanguages()
+    - [ ] GetAvailableModels() → _modelManager.GetAvailableModels()
+    - [ ] IsLanguageAvailableAsync() → _modelManager.IsLanguageAvailableAsync()
+  - [ ] 延期項目（Phase 2.10で実施）
+    - [ ] InitializeAsync（約200行、複雑な初期化ロジック）
+    - [ ] ApplySettingsAsync（約60行、設定適用ロジック）
 
-- [ ] イベント発行の整理
+- [ ] イベント発行の整理（Phase 2.10で実施）
   - [ ] 診断イベント発行の一元化
 
 #### 期待成果
