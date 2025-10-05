@@ -787,25 +787,37 @@ public interface IPaddleOcrUtilities
   - appsettings.jsonに設定項目追加
   - `IOptions<OcrSettings>` 経由でのタイムアウト値注入
 
-##### 🔥 Phase 2.8完全実装（スケルトン → 完全版）
-- [ ] **PaddleOcrResultConverterの完全実装**（約800行をPaddleOcrEngineから移行）
-  - `ConvertPaddleOcrResult` 完全実装（~150行）
-    - リフレクションによるPaddleOcrResult動的処理
-    - CharacterSimilarityCorrector統合（文字形状類似性補正）
-  - `ProcessSinglePaddleResult` 移動（~100行）
-  - `ProcessPaddleRegion` 移動（~150行）
-  - `ConvertDetectionOnlyResult` 完全実装（~80行）
-  - `ProcessSinglePaddleResultForDetectionOnly` 移動（~100行）
-  - `AdjustCoordinatesForRoi` 移動（~50行）
-    - CoordinateRestorer統合（座標復元）
+##### 🔥 Phase 2.8完全実装（スケルトン → 完全版） ✅ **Phase 2.9.1で完了** (2025-10-05)
 
-- [ ] **テキスト結合・後処理統合**
-  - `ITextMerger` 統合（テキスト結合）
-  - `IOcrPostProcessor` 統合（OCR後処理）
+- [x] **PaddleOcrResultConverterの完全実装**（約665行をPaddleOcrEngineから移行）
+  - [x] `ConvertPaddleOcrResult` 完全実装（~106行）
+    - [x] リフレクションによるPaddleOcrResult動的処理
+    - [x] CharacterSimilarityCorrector統合（文字形状類似性補正）
+  - [x] `ProcessSinglePaddleResult` 移動（~86行）
+  - [x] `ProcessPaddleRegion` 移動（~149行）
+  - [x] `ConvertDetectionOnlyResult` 完全実装（~45行）
+  - [x] `ProcessSinglePaddleResultForDetectionOnly` 移動（~41行）
+  - [x] `ExtractBoundsFromRegion` 移動（~36行）
+  - [x] `ExtractBoundsFromResult` 移動（~44行）
+  - [x] `ExtractRectangleFromObject` 移動（~29行）
+  - [x] `ApplyScalingAndRoi` 新規実装（~68行）
+    - [x] スケーリング適用（Math.Round使用）
+    - [x] ROI座標調整（画面境界チェック付き）
 
-- [ ] **信頼度スコアとContour情報の実装**
-  - `region.Score` → `OcrTextRegion.confidence` マッピング
-  - `region.Rect.Points()` → `OcrTextRegion.contour` マッピング
+- [x] **信頼度スコアとContour情報の実装**
+  - [x] `region.Score/Confidence` → `OcrTextRegion.confidence` マッピング
+  - [x] Contour調整（ROI対応）
+
+- [ ] **テキスト結合・後処理統合**（将来拡張）
+  - [ ] `ITextMerger` 統合（テキスト結合）
+  - [ ] `IOcrPostProcessor` 統合（OCR後処理）
+  - [ ] `CoordinateRestorer` 統合（現在は直接計算で実装済み）
+
+**実装サマリー**:
+- **ファイル**: `PaddleOcrResultConverter.cs`
+- **行数変化**: 242行 → 695行（**+453行**）
+- **コミットID**: （次のコミットで記録）
+- **レビュー結果**: Excellent（問題なし）
 
 ##### PaddleOcrEngine本体のリファクタリング
 - [ ] PaddleOcrEngine本体のリファクタリング
@@ -824,13 +836,13 @@ public interface IPaddleOcrUtilities
   - 診断イベント発行の一元化
 
 #### 期待成果
-- **PaddleOcrExecutorが240行 → 約1,740行に拡張（1,500行移行、完全実装）**
-- **PaddleOcrResultConverterが242行 → 約1,042行に拡張（800行移行、完全実装）**
-- **PaddleOcrEngineが5,548行 → 約800行に削減（Executor 1,500行 + Converter 800行 = 2,300行削減）**
+- **PaddleOcrExecutorが240行 → 約1,740行に拡張（1,500行移行、完全実装）** 🔜 Phase 2.9.2で実施予定
+- **PaddleOcrResultConverterが242行 → 695行に拡張（453行移行、Phase 2.9.1で完了）** ✅ 完了
+- **PaddleOcrEngineが5,548行 → 約800行に削減予定（Executor 1,500行 + Converter 665行 = 2,165行削減予定）**
 - 各メソッドが明確な責任を持つ
 - 可読性・保守性が大幅向上
 - エラーハンドリング・パフォーマンス計測の一元化
-- 変換ロジックの独立テスト可能化
+- 変換ロジックの独立テスト可能化 ✅ Phase 2.9.1で達成
 
 ---
 
