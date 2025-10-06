@@ -406,31 +406,38 @@
 - [ ] ビルド成功確認
 - [ ] 全テストケース実行
 
-#### 3.4A **OCRグルーピングロジック分離（Union-Find）** (1日) - 🔥 **Gemini推奨Clean Architecture改善**
-- [ ] **問題**: 現在のFindNearbyRegions()アルゴリズムが「一度処理済み=他グループ参加不可」制約により、垂直に並んだ3チャンクを2グループに分離
+#### 3.4A **OCRグルーピングロジック分離（Union-Find）** (1日) - ✅ **完了 (2025-10-07)** 🔥 **Gemini推奨Clean Architecture改善**
+- [x] **問題**: 現在のFindNearbyRegions()アルゴリズムが「一度処理済み=他グループ参加不可」制約により、垂直に並んだ3チャンクを2グループに分離
   - OCR検出: 3チャンク → ProximityGrouping後: 2チャンク（Chunk 0+2が1グループ、Chunk 1が単独）
   - 根本原因: processedRegionsセットによる逐次的グルーピング
   - 期待動作: 3チャンク全て1グループに統合（deltaY=113.5px < verticalThreshold=166.86px）
-- [ ] **IRegionGroupingStrategy**インターフェース定義（Core層）
+- [x] **IRegionGroupingStrategy**インターフェース定義（Core層）
   - GroupRegions(IReadOnlyList<OcrTextRegion>, ProximityContext) メソッド
   - Clean Architecture準拠、Strategyパターン適用
-- [ ] **UnionFind**データ構造実装（Infrastructure層）
+- [x] **UnionFind**データ構造実装（Infrastructure層）
   - `Infrastructure/OCR/Clustering/UnionFind.cs` 作成
   - Union(int x, int y) メソッド
   - Find(int x) メソッド（経路圧縮最適化）
-- [ ] **UnionFindRegionGroupingStrategy**実装（Infrastructure層）
+- [x] **UnionFindRegionGroupingStrategy**実装（Infrastructure層）
   - `Infrastructure/OCR/Clustering/UnionFindRegionGroupingStrategy.cs` 作成
   - 全ペアの距離計算 → Union-Findで連結成分検出
   - AreRegionsClose()メソッド（既存の距離判定ロジック再利用）
-- [ ] **BatchOcrProcessor**リファクタリング
+- [x] **BatchOcrProcessor**リファクタリング
   - GroupTextIntoChunksAsync()内のprocessedRegions削除
   - FindNearbyRegions()メソッド削除
   - IRegionGroupingStrategy注入（DI）
   - 一度の呼び出しで全グループ取得
-- [ ] DI登録（InfrastructureModule）
-- [ ] ビルド成功確認
-- [ ] 3チャンク→1グループ統合動作確認
-- [ ] 翻訳結果統合確認（1バッチ翻訳）
+- [x] DI登録（InfrastructureModule）
+- [x] ビルド成功確認
+- [x] 3チャンク→1グループ統合動作確認
+- [x] 翻訳結果統合確認（1バッチ翻訳）
+- [x] **Geminiコードレビュー実施** (2025-10-07)
+  - ✅ Union-Find実装正確性: 経路圧縮とランク結合を正しく実装
+  - ✅ 計算量O(N² α(N))達成確認
+  - ✅ Clean Architecture準拠確認
+  - ⚠️ 指摘: 閾値の硬直性リスク（フォントサイズ多様性）
+  - 💡 改善提案: 動的閾値調整（既に部分実装済み - IsTextWrappedOrNextLine等）
+  - 💡 将来課題: k-d木/四分木でO(N log N)近傍探索最適化
 
 **技術詳細（Geminiレビュー推奨）**:
 ```
