@@ -29,21 +29,27 @@ public sealed class BatchOcrModule : ServiceModuleBase
             {
                 throw new InvalidOperationException("IOcrEngine not available - BatchOcrProcessor cannot be initialized");
             }
+
+            // Phase 3.4A: IRegionGroupingStrategy注入（必須）
+            var regionGroupingStrategy = serviceProvider.GetRequiredService<IRegionGroupingStrategy>();
+
             var performanceOrchestrator = serviceProvider.GetService<IPerformanceOrchestrator>();
             var performanceAnalyzer = serviceProvider.GetService<IAsyncPerformanceAnalyzer>();
             var logger = serviceProvider.GetService<ILogger<BatchOcrProcessor>>();
             var regionGenerator = serviceProvider.GetService<OcrRegionGenerator>();
             var advancedOptions = serviceProvider.GetService<IOptions<AdvancedSettings>>();
             var roiDiagnosticsOptions = serviceProvider.GetService<IOptions<RoiDiagnosticsSettings>>();
-            
+
             // 🎯 CRITICAL: ImageDiagnosticsSaverを明示的に取得・注入
             var diagnosticsSaver = serviceProvider.GetService<ImageDiagnosticsSaver>();
-            
+
             Console.WriteLine($"🔍 [BATCH-DI] ImageDiagnosticsSaver注入確認: {diagnosticsSaver != null}");
             Console.WriteLine($"🔍 [BATCH-DI] 他の依存関係確認: OCR={ocrEngine != null}, Options={advancedOptions != null}");
-            
+            Console.WriteLine($"🔍 [PHASE3.4A] RegionGroupingStrategy注入確認: {regionGroupingStrategy != null}");
+
             var processor = new BatchOcrProcessor(
                 ocrEngine,
+                regionGroupingStrategy,  // Phase 3.4A: 2nd parameter
                 performanceOrchestrator,
                 performanceAnalyzer,
                 logger,

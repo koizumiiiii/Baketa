@@ -60,6 +60,8 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="services">サービスコレクション</param>
         public override void RegisterServices(IServiceCollection services)
         {
+            Console.WriteLine("🔍🔍🔍 [DIAGNOSTIC] InfrastructureModule.RegisterServices(1-parameter) 開始");
+
             // 🎯 Phase 3.1: NOTE: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで登録済み
             // Clean Architecture原則により、InfrastructureがApplicationを参照することはできない
             // SafeImageFactoryはSafeImageの内部コンストラクタアクセスのためApplication層必須
@@ -132,7 +134,7 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="configuration">設定オブジェクト</param>
         public void RegisterServices(IServiceCollection services, IConfiguration configuration)
         {
-            
+
             // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
             //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
@@ -162,6 +164,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // NLLB-200翻訳サービス（高品質版）を登録
             // IPythonServerManager登録済みの状態でConnectionPool登録判定を実行
             RegisterNllb200TranslationServices(services);
+
+            // 🚀 Phase 2.3: TranslationSettings登録（gRPC Client対応）
+            RegisterTranslationSettings(services);
 
             // 翻訳サービス（エンジン登録後）
             RegisterTranslationServices(services);
@@ -276,7 +281,11 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // OCR精度測定スタートアップサービス
             services.AddOcrAccuracyStartupService();
-            
+
+            // Phase 3.4A: OCRテキスト領域グルーピング戦略（Union-Find）
+            services.AddSingleton<IRegionGroupingStrategy, Baketa.Infrastructure.OCR.Clustering.UnionFindRegionGroupingStrategy>();
+            Console.WriteLine("✅ Phase 3.4A: UnionFindRegionGroupingStrategy登録完了 - グラフベース連結成分検出");
+
             // UltraThink Phase 1: 近接度ベースグループ化サービス
             RegisterProximityGroupingServices(services);
         }
@@ -341,9 +350,11 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddScoped<ILanguageConfigurationService, UnifiedLanguageConfigurationService>();
             Console.WriteLine("✅ ILanguageConfigurationService登録完了 - 統一言語設定管理");
 
+            // 🚀 Phase 2.3: TranslationSettings登録は RegisterServices(2-parameter) で既に実行済み（重複削除）
+
             // Phase2: サーキットブレーカー設定とサービス登録
             Console.WriteLine("🔧 [PHASE2] サーキットブレーカー登録開始");
-            
+
             // サーキットブレーカー設定 - appsettings.jsonから読み込み
             RegisterCircuitBreakerSettings(services);
             
@@ -1147,6 +1158,66 @@ namespace Baketa.Infrastructure.DI.Modules;
             Console.WriteLine("✅ ProximityGroupingService登録完了 - 連結成分グループ化");
 
             Console.WriteLine("✅ UltraThink Phase 1: 近接度ベースグループ化サービス登録完了");
+        }
+
+        /// <summary>
+        /// 🚀 Phase 2.3: TranslationSettings（gRPC Client設定含む）をDIコンテナに登録します
+        /// </summary>
+        /// <param name="services">サービスコレクション</param>
+        private static void RegisterTranslationSettings(IServiceCollection services)
+        {
+#if DEBUG
+            Console.WriteLine("🚀 [PHASE2.3] TranslationSettings登録開始 - gRPC Client対応");
+#endif
+
+            try
+            {
+                // IConfigurationがDIコンテナに登録されているか確認
+                var configurationDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+
+                if (configurationDescriptor?.ImplementationInstance is IConfiguration configuration)
+                {
+                    // appsettings.jsonのTranslationセクションから設定をバインド
+                    services.Configure<TranslationSettings>(configuration.GetSection("Translation"));
+
+#if DEBUG
+                    // 開発時のみgRPC設定値を出力
+                    var useGrpc = configuration["Translation:UseGrpcClient"];
+                    var serverAddr = configuration["Translation:GrpcServerAddress"];
+                    Console.WriteLine($"✅ [PHASE2.3] TranslationSettings登録完了 - UseGrpcClient: {useGrpc ?? "NULL"}, ServerAddress: {serverAddr ?? "NULL"}");
+#endif
+                }
+                else
+                {
+                    // フォールバック: IConfiguration未登録時はデフォルト値を使用
+#if DEBUG
+                    Console.WriteLine("⚠️ [FALLBACK] IConfiguration未登録 - TranslationSettingsデフォルト設定を使用");
+#endif
+                    services.Configure<TranslationSettings>(options =>
+                    {
+                        options.UseGrpcClient = false; // デフォルトはStdinStdoutクライアント
+                        options.GrpcServerAddress = "http://localhost:50051";
+                    });
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                // IConfiguration解決失敗時
+                Console.WriteLine($"⚠️ [PHASE2.3] IConfiguration resolution failed: {ex.Message}");
+
+                // フォールバック処理
+                services.Configure<TranslationSettings>(options =>
+                {
+                    options.UseGrpcClient = false;
+                    options.GrpcServerAddress = "http://localhost:50051";
+                });
+            }
+            catch (Exception ex)
+            {
+                // 予期しないエラー
+                Console.WriteLine($"💥 [PHASE2.3] RegisterTranslationSettings failed: {ex.GetType().Name} - {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>

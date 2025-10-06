@@ -217,6 +217,7 @@ public readonly record struct LanguageInfo
 /// </summary>
 public sealed class BatchOcrProcessor(
     IOcrEngine ocrEngine,
+    IRegionGroupingStrategy regionGroupingStrategy,
     IPerformanceOrchestrator? performanceOrchestrator = null,
     IAsyncPerformanceAnalyzer? performanceAnalyzer = null,
     ILogger<BatchOcrProcessor>? logger = null,
@@ -226,6 +227,7 @@ public sealed class BatchOcrProcessor(
     ImageDiagnosticsSaver? diagnosticsSaver = null) : IBatchOcrProcessor, IOcrFailureManager, IDisposable
 {
     private readonly IOcrEngine _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
+    private readonly IRegionGroupingStrategy _regionGroupingStrategy = regionGroupingStrategy ?? throw new ArgumentNullException(nameof(regionGroupingStrategy));
     private readonly IPerformanceOrchestrator? _performanceOrchestrator = performanceOrchestrator;
     private readonly IAsyncPerformanceAnalyzer? _performanceAnalyzer = performanceAnalyzer;
     private readonly AdvancedSettings _advancedSettings = advancedOptions?.Value ?? new();
@@ -1102,19 +1104,14 @@ public sealed class BatchOcrProcessor(
             }
 
             var chunks = new List<TextChunk>();
-            var processedRegions = new HashSet<OcrTextRegion>();
             var chunkId = 0;
 
-            foreach (var region in ocrResults.TextRegions)
+            // Phase 3.4A: Union-Find戦略でグループ化（processedRegions制約を完全解消）
+            var groupedRegionsList = _regionGroupingStrategy.GroupRegions(ocrResults.TextRegions, _options);
+
+            foreach (var groupedRegions in groupedRegionsList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
-                if (processedRegions.Contains(region))
-                    continue;
-
-                // 近接テキスト領域をグループ化
-                var groupedRegions = FindNearbyRegions(region, ocrResults.TextRegions, processedRegions);
-                processedRegions.UnionWith(groupedRegions);
 
                 // PositionedTextResultに変換
                 var positionedResults = groupedRegions.Select(r => new PositionedTextResult
@@ -1289,138 +1286,6 @@ public sealed class BatchOcrProcessor(
             
         // ASCII範囲外の単一文字は有効とみなす（日本語、中国語等）
         return false;
-    }
-
-    /// <summary>
-    /// 近接テキスト領域を検索（改良版：垂直方向と水平方向で異なる閾値を使用）
-    /// </summary>
-    private List<OcrTextRegion> FindNearbyRegions(
-        OcrTextRegion baseRegion, 
-        IReadOnlyList<OcrTextRegion> allRegions, 
-        HashSet<OcrTextRegion> processedRegions)
-    {
-        var nearbyRegions = new List<OcrTextRegion> { baseRegion };
-        
-        // 大幅に拡張されたテキストグループ化: 折り返しテキストをより広範囲で認識
-        var verticalThreshold = _options.ChunkGroupingDistance * 3.0; // 垂直方向を大幅拡張（複数行の段落対応）
-        var horizontalThreshold = _options.ChunkGroupingDistance * 2.0; // 水平方向も拡張（長い文章対応）
-        
-        foreach (var region in allRegions)
-        {
-            if (processedRegions.Contains(region) || nearbyRegions.Contains(region))
-                continue;
-
-            // baseRegionとの距離と位置関係を計算
-            var deltaX = Math.Abs(region.Bounds.X + region.Bounds.Width / 2 - (baseRegion.Bounds.X + baseRegion.Bounds.Width / 2));
-            var deltaY = Math.Abs(region.Bounds.Y + region.Bounds.Height / 2 - (baseRegion.Bounds.Y + baseRegion.Bounds.Height / 2));
-            
-            // 水平方向に近い（同じ行）の場合 - より寛容な判定
-            if (deltaY <= region.Bounds.Height * 1.0 && deltaX <= horizontalThreshold)
-            {
-                nearbyRegions.Add(region);
-            }
-            // 垂直方向に近い（次の行/折り返し）の場合 - 大幅に拡張された条件
-            else if (IsTextWrappedOrNextLine(baseRegion, region, deltaY, verticalThreshold))
-            {
-                nearbyRegions.Add(region);
-            }
-            // 段落内の遠い行も検出（より広範囲のテキストブロック認識）
-            else if (IsParagraphText(baseRegion, region, deltaY, verticalThreshold * 1.5))
-            {
-                nearbyRegions.Add(region);
-            }
-        }
-
-        return nearbyRegions;
-    }
-
-    /// <summary>
-    /// テキストが折り返しまたは次の行かどうかを判定（拡張版）
-    /// </summary>
-    /// <param name="baseRegion">基準テキスト領域</param>
-    /// <param name="targetRegion">対象テキスト領域</param>
-    /// <param name="deltaX">水平距離</param>
-    /// <param name="deltaY">垂直距離</param>
-    /// <param name="verticalThreshold">垂直閾値</param>
-    /// <returns>折り返し/次行と判定される場合true</returns>
-    private static bool IsTextWrappedOrNextLine(OcrTextRegion baseRegion, OcrTextRegion targetRegion, 
-        double deltaY, double verticalThreshold)
-    {
-        // 基本的な垂直距離チェック（拡張）
-        if (deltaY > verticalThreshold)
-            return false;
-
-        // 水平位置の重複または近接をチェック（折り返しテキストの特徴）
-        var baseLeft = baseRegion.Bounds.Left;
-        var baseRight = baseRegion.Bounds.Right;
-        var targetLeft = targetRegion.Bounds.Left;
-        var targetRight = targetRegion.Bounds.Right;
-
-        // 水平方向のオーバーラップまたは近接判定（より寛容に）
-        var horizontalOverlap = Math.Max(0, Math.Min(baseRight, targetRight) - Math.Max(baseLeft, targetLeft));
-        var horizontalDistance = Math.Max(0, Math.Max(targetLeft - baseRight, baseLeft - targetRight));
-
-        // 条件1: 垂直方向に近い（次の行）- より寛容な判定
-        var isVerticallyClose = deltaY <= Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height) * 2.5;
-
-        // 条件2: 水平方向で重複または適度に近い（同じテキストブロック内）- より寛容に
-        var maxWidth = Math.Max(baseRegion.Bounds.Width, targetRegion.Bounds.Width);
-        var isHorizontallyRelated = horizontalOverlap > 0 || horizontalDistance <= maxWidth * 0.8;
-
-        // 条件3: 左端が揃っている（段落の開始位置が同じ）- より寛容に
-        var isLeftAligned = Math.Abs(baseLeft - targetLeft) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.5;
-
-        // 条件4: 右端が揃っている（右揃えテキスト対応）
-        var isRightAligned = Math.Abs(baseRight - targetRight) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.5;
-
-        // 条件5: センター揃い（中央揃えテキスト対応）
-        var baseCenterX = baseLeft + baseRegion.Bounds.Width / 2;
-        var targetCenterX = targetLeft + targetRegion.Bounds.Width / 2;
-        var isCenterAligned = Math.Abs(baseCenterX - targetCenterX) <= Math.Min(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 0.3;
-
-        // 折り返しまたは次の行と判定（より多様な条件で）
-        return isVerticallyClose && (isHorizontallyRelated || isLeftAligned || isRightAligned || isCenterAligned);
-    }
-
-    /// <summary>
-    /// 同一段落内のテキストかどうかを判定（より広範囲）
-    /// </summary>
-    /// <param name="baseRegion">基準テキスト領域</param>
-    /// <param name="targetRegion">対象テキスト領域</param>
-    /// <param name="deltaX">水平距離</param>
-    /// <param name="deltaY">垂直距離</param>
-    /// <param name="extendedVerticalThreshold">拡張垂直閾値</param>
-    /// <returns>同一段落と判定される場合true</returns>
-    private static bool IsParagraphText(OcrTextRegion baseRegion, OcrTextRegion targetRegion, 
-        double deltaY, double extendedVerticalThreshold)
-    {
-        // 非常に遠い場合は段落が異なる
-        if (deltaY > extendedVerticalThreshold)
-            return false;
-
-        var baseLeft = baseRegion.Bounds.Left;
-        var baseRight = baseRegion.Bounds.Right;
-        var targetLeft = targetRegion.Bounds.Left;
-        var targetRight = targetRegion.Bounds.Right;
-
-        // 段落レベルでの位置関係判定
-        var paragraphWidth = Math.Max(baseRegion.Bounds.Width, targetRegion.Bounds.Width) * 2;
-        
-        // 条件1: 水平方向で大きく重複または近接している
-        var horizontalOverlap = Math.Max(0, Math.Min(baseRight, targetRight) - Math.Max(baseLeft, targetLeft));
-        var isInSameParagraphHorizontally = horizontalOverlap > 0 || 
-                                          Math.Abs(baseLeft - targetLeft) <= paragraphWidth * 0.5;
-
-        // 条件2: 垂直方向で段落内の距離範囲内
-        var maxHeight = Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height);
-        var isInSameParagraphVertically = deltaY <= maxHeight * 4.0; // 4行分程度まで許容
-
-        // 条件3: テキストサイズが類似している（同じフォント・同じ文書の可能性）
-        var heightRatio = Math.Min(baseRegion.Bounds.Height, targetRegion.Bounds.Height) / 
-                         Math.Max(baseRegion.Bounds.Height, targetRegion.Bounds.Height);
-        var isSimilarSize = heightRatio >= 0.5; // 高さが50%以上類似
-
-        return isInSameParagraphHorizontally && isInSameParagraphVertically && isSimilarSize;
     }
 
     /// <summary>
