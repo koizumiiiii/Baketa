@@ -52,46 +52,29 @@ public class TranslationInitializationService : BackgroundService
             _logger.LogInformation("🚀 [INIT_SERVICE] 翻訳サービス初期化開始");
             Console.WriteLine("🚀 [INIT_SERVICE] 翻訳サービス初期化開始");
 
-            Console.WriteLine("🔍 [UltraPhase 14.11] ステップ2: 翻訳エンジン型チェック開始");
-            Console.WriteLine($"🔍 [UltraPhase 14.11] _translationEngine型: {_translationEngine?.GetType()?.Name ?? "NULL"}");
+            Console.WriteLine($"🔍 [PHASE3.1] 翻訳エンジン型: {_translationEngine?.GetType()?.Name ?? "NULL"}");
 
-            // OptimizedPythonTranslationEngineの場合のみ初期化実行
-            if (_translationEngine is OptimizedPythonTranslationEngine optimizedEngine)
+            // 🔥 [PHASE3.1] すべてのITranslationEngineでInitializeAsync呼び出し（型チェック不要）
+            _logger.LogInformation("✅ [PHASE3.1] 翻訳エンジン初期化開始: {EngineType}", _translationEngine.GetType().Name);
+            Console.WriteLine($"✅ [PHASE3.1] 翻訳エンジン初期化開始: {_translationEngine.GetType().Name}");
+
+            // Task.Run()でHostedServiceデッドロック回避
+            var result = await Task.Run(async () =>
             {
-                Console.WriteLine("🔍 [UltraPhase 14.11] ステップ3: OptimizedPythonTranslationEngine型確認成功");
-                _logger.LogInformation("✅ [INIT_SERVICE] OptimizedPythonTranslationEngine検出 - 初期化実行開始");
-                Console.WriteLine("✅ [INIT_SERVICE] OptimizedPythonTranslationEngine検出 - 初期化実行開始");
+                Console.WriteLine("🔍 [PHASE3.1] Task.Run内でInitializeAsync実行開始");
+                var initResult = await _translationEngine.InitializeAsync().ConfigureAwait(false);
+                Console.WriteLine($"🔍 [PHASE3.1] InitializeAsync結果: {initResult}");
+                return initResult;
+            });
 
-                Console.WriteLine("🔍 [UltraPhase 14.11] ステップ4: InitializeAsync呼び出し直前");
+            Console.WriteLine($"🔍 [PHASE3.1] Task.Run完了 - 結果: {result}");
+            _logger.LogInformation("🎉 [PHASE3.1] 翻訳エンジン初期化完了: {EngineType}", _translationEngine.GetType().Name);
+            Console.WriteLine($"🎉 [PHASE3.1] 翻訳エンジン初期化完了: {_translationEngine.GetType().Name}");
 
-                // 🔧 UltraPhase 14.8.2: Task.Run()でHostedServiceデッドロック回避
-                var result = await Task.Run(async () =>
-                {
-                    Console.WriteLine("🔍 [UltraPhase 14.11] ステップ5: Task.Run内でInitializeAsync実行開始");
-                    var initResult = await optimizedEngine.InitializeAsync().ConfigureAwait(false);
-                    Console.WriteLine($"🔍 [UltraPhase 14.11] ステップ6: InitializeAsync結果: {initResult}");
-                    return initResult;
-                });
-
-                Console.WriteLine($"🔍 [UltraPhase 14.11] ステップ7: Task.Run完了 - 結果: {result}");
-                _logger.LogInformation("🎉 [INIT_SERVICE] OptimizedPythonTranslationEngine初期化完了 - Python服务器起動成功");
-                Console.WriteLine("🎉 [INIT_SERVICE] OptimizedPythonTranslationEngine初期化完了 - Python服务器起動成功");
-
-                // 🆕 UltraThink Phase 2: StartButton制御のためのイベント発行
-                Console.WriteLine("📡 [INIT_SERVICE] PythonServerStatusChangedEvent発行開始 - UIのStartButton有効化");
-                await PublishServerReadyEventAsync().ConfigureAwait(false);
-                Console.WriteLine("✅ [INIT_SERVICE] PythonServerStatusChangedEvent発行完了");
-            }
-            else
-            {
-                Console.WriteLine("🔍 [UltraPhase 14.11] ステップ3: OptimizedPythonTranslationEngine以外を検出");
-                _logger.LogInformation("ℹ️ [INIT_SERVICE] 初期化不要な翻訳エンジン: {EngineType}",
-                    _translationEngine.GetType().Name);
-                Console.WriteLine($"ℹ️ [INIT_SERVICE] 初期化不要な翻訳エンジン: {_translationEngine.GetType().Name}");
-
-                // 🆕 UltraThink Phase 2: 非Optimizedエンジンでも即座に準備完了通知
-                await PublishServerReadyEventAsync().ConfigureAwait(false);
-            }
+            // StartButton制御のためのイベント発行
+            Console.WriteLine("📡 [PHASE3.1] PythonServerStatusChangedEvent発行開始 - UIのStartButton有効化");
+            await PublishServerReadyEventAsync().ConfigureAwait(false);
+            Console.WriteLine("✅ [PHASE3.1] PythonServerStatusChangedEvent発行完了");
 
             Console.WriteLine("🔍 [UltraPhase 14.11] ステップ8: 正常終了処理");
             _logger.LogInformation("✅ [INIT_SERVICE] 翻訳サービス初期化プロセス完了");

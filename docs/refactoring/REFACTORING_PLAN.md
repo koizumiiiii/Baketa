@@ -378,17 +378,23 @@
 
 ---
 
-### Phase 3: 通信層抽象化・クリーンアップ (4.5-5.5日) - 🔴 未着手
+### Phase 3: 通信層抽象化・クリーンアップ (4.5-5.5日) - 🟡 進行中 (Phase 3.1完了)
 
-#### 3.1 OptimizedPythonTranslationEngine削除 (1日)
-- [ ] **参照**: `dependency_graph.md` - Infrastructure層依存関係、影響範囲確認（Application層、テストプロジェクト）
-- [ ] GrpcTranslationEngineAdapter.cs実装
-- [ ] DI登録切り替え（ITranslationClient使用）
-- [ ] OptimizedPythonTranslationEngine.cs削除（2,765行）
-- [ ] OperationId手動管理コード削除
-- [ ] TaskCompletionSource複雑な制御削除
-- [ ] ビルド成功確認
-- [ ] 翻訳機能動作確認
+#### 3.1 OptimizedPythonTranslationEngine削除 ✅ 完了 (2025-10-07)
+- [x] **参照**: `dependency_graph.md` - Infrastructure層依存関係、影響範囲確認（Application層、テストプロジェクト）
+- [x] GrpcTranslationEngineAdapter.cs実装（220行、Adapter Pattern）
+- [x] DI登録切り替え（ITranslationClient使用、3層シンプル登録）
+- [x] OptimizedPythonTranslationEngine.cs削除（2,765行 → 220行、92%削減）
+- [x] OperationId手動管理コード削除（Adapter内包）
+- [x] TaskCompletionSource複雑な制御削除（Task.WhenAll並行実行）
+- [x] ビルド成功確認（0エラー）
+- [ ] 翻訳機能動作確認（ユーザー実施待ち）
+
+**成果**:
+- コード削減: 2,765行 → 220行（92%削減）
+- Geminiレビュー: ✅ 全項目合格（Clean Architecture準拠確認）
+- DI簡素化: ConnectionPool/ResourceManager等の複雑な依存削除
+- 型安全性向上: OptimizedPythonTranslationEngine型チェック削除、ITranslationEngineポリモーフィズム活用
 
 #### 3.2 TranslationService階層整理 (1日)
 - [ ] **参照**: `dependency_graph.md` - Application層依存関係、責任分離設計

@@ -81,45 +81,18 @@ public class TranslationModelLoader : IApplicationInitializer
             Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔥 [PRELOAD_START] 翻訳モデル事前ロード開始");
             OnProgressChanged("開始", 0);
 
-            Console.WriteLine("🔄 [PRELOAD_INIT] OptimizedPythonTranslationEngine初期化中...");
-            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔄 [PRELOAD_INIT] OptimizedPythonTranslationEngine初期化中...");
+            Console.WriteLine($"🔄 [PHASE3.1] 翻訳エンジン初期化中... 型: {_translationEngine?.GetType().Name ?? "NULL"}");
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"🔄 [PHASE3.1] 翻訳エンジン初期化中... 型: {_translationEngine?.GetType().Name ?? "NULL"}");
             OnProgressChanged("初期化中", 25);
 
-            // OptimizedPythonTranslationEngineの初期化
-            if (_translationEngine is Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine engine)
-            {
-                Console.WriteLine("🔧 [PRELOAD_TYPECAST] OptimizedPythonTranslationEngine型キャスト成功");
-                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔧 [PRELOAD_TYPECAST] OptimizedPythonTranslationEngine型キャスト成功");
+            // 🔥 [PHASE3.1] すべてのITranslationEngineでInitializeAsync呼び出し（型チェック不要）
+            Console.WriteLine("🔍 [PHASE3.1] InitializeAsync呼び出し直前");
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔍 [PHASE3.1] InitializeAsync呼び出し直前");
 
-                // 🔍 UltraPhase 9.5: engine.InitializeAsync()呼び出し前後のトレース
-                Console.WriteLine("🔍 [ENGINE_INIT_BEFORE] engine.InitializeAsync()呼び出し直前");
-                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔍 [ENGINE_INIT_BEFORE] engine.InitializeAsync()呼び出し直前");
+            await _translationEngine.InitializeAsync().ConfigureAwait(false);
 
-                await engine.InitializeAsync().ConfigureAwait(false);
-
-                Console.WriteLine("🔍 [ENGINE_INIT_AFTER] engine.InitializeAsync()呼び出し完了");
-                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔍 [ENGINE_INIT_AFTER] engine.InitializeAsync()呼び出し完了");
-            }
-            else
-            {
-                var actualType = _translationEngine?.GetType().FullName ?? "null";
-                Console.WriteLine($"❌ [PRELOAD_TYPECAST_FAILED] _translationEngine型キャスト失敗 - 実際の型: {actualType}");
-                Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"❌ [PRELOAD_TYPECAST_FAILED] _translationEngine型キャスト失敗 - 実際の型: {actualType}");
-
-                // 🔧 Phase 2.2.3: 動的キャスト試行
-                var optimizedEngine = _translationEngine as Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine;
-                if (optimizedEngine != null)
-                {
-                    Console.WriteLine("🔧 [PRELOAD_DYNAMIC_CAST] 動的キャスト成功 - InitializeAsync実行");
-                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔧 [PRELOAD_DYNAMIC_CAST] 動的キャスト成功 - InitializeAsync実行");
-                    await optimizedEngine.InitializeAsync().ConfigureAwait(false);
-                }
-                else
-                {
-                    Console.WriteLine("❌ [PRELOAD_DYNAMIC_CAST_FAILED] 動的キャストも失敗 - DIコンテナ登録問題");
-                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("❌ [PRELOAD_DYNAMIC_CAST_FAILED] 動的キャストも失敗 - DIコンテナ登録問題");
-                }
-            }
+            Console.WriteLine("🔍 [PHASE3.1] InitializeAsync呼び出し完了");
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔍 [PHASE3.1] InitializeAsync呼び出し完了");
 
             Console.WriteLine("🧠 [PRELOAD_MODEL] NLLB-200モデルロード中 (2.4GB)...");
             Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🧠 [PRELOAD_MODEL] NLLB-200モデルロード中 (2.4GB)...");

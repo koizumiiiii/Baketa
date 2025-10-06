@@ -657,75 +657,35 @@ namespace Baketa.Infrastructure.DI.Modules;
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 🔧 [PHASE12.5] ConnectionPool登録スキップ - StdinStdout通信モード\r\n");
             }
             
-            // ✅ 接続プール統合版OptimizedPythonTranslationEngine（動的ポート対応 + Phase 3.2 VRAMモニタリング統合）
-            services.AddSingleton<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>(provider =>
+            // ✅ [PHASE3.1] gRPC Translation Adapter - OptimizedPythonTranslationEngine削除、シンプルなAdapter実装
+            services.AddSingleton<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>(provider =>
             {
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>>();
+                var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
 
-                // 🔥 [PHASE12.5] ConnectionPoolはオプショナル取得（StdinStdout通信モード時は未登録）
-                var connectionPool = provider.GetService<IConnectionPool>();
-                logger?.LogInformation("🔧 [PHASE12.5] ConnectionPool取得結果: {Exists}", connectionPool != null);
+                var serverAddress = translationSettings.GrpcServerAddress ?? "http://localhost:50051";
+                logger.LogInformation("🔄 [PHASE3.1] GrpcTranslationClient初期化: {ServerAddress}", serverAddress);
 
-                var languageConfig = provider.GetRequiredService<ILanguageConfigurationService>();
-                
-                // 🚀 Phase 3.2修正: GetRequiredServiceでHybridResourceManagerを強制取得
-                Baketa.Infrastructure.ResourceManagement.IResourceManager? resourceManager = null;
-                try
-                {
-                    resourceManager = provider.GetRequiredService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
-                    logger?.LogInformation("✅ [PHASE3.2] HybridResourceManager注入成功 - VRAMモニタリング機能アクティブ");
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogError(ex, "❌ [PHASE3.2] HybridResourceManager注入失敗 - 依存関係問題: {Message}", ex.Message);
-                    logger?.LogWarning("⚠️ [PHASE3.2] HybridResourceManagerなしで継続（レガシーモード）");
-                }
-
-                // 🔥 Phase 2.2.9: IPythonServerManagerとICircuitBreakerの注入追加
-                IPythonServerManager? serverManager = null;
-                try
-                {
-                    serverManager = provider.GetRequiredService<IPythonServerManager>();
-                    logger?.LogInformation("✅ [PHASE2.2.9] PythonServerManager注入成功 - 動的ポート管理アクティブ");
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogError(ex, "❌ [PHASE2.2.9] PythonServerManager注入失敗: {Message}", ex.Message);
-                    logger?.LogWarning("⚠️ [PHASE2.2.9] PythonServerManagerなしで継続（固定ポートモード）");
-                }
-
-                ICircuitBreaker<TranslationResponse>? circuitBreaker = null;
-                try
-                {
-                    circuitBreaker = provider.GetRequiredService<ICircuitBreaker<TranslationResponse>>();
-                    logger?.LogInformation("✅ [PHASE2.2.9] CircuitBreaker注入成功 - エラー回復機能アクティブ");
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogError(ex, "❌ [PHASE2.2.9] CircuitBreaker注入失敗: {Message}", ex.Message);
-                    logger?.LogWarning("⚠️ [PHASE2.2.9] CircuitBreakerなしで継続（エラー回復機能無効）");
-                }
-
-                logger?.LogInformation("🔄 OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応 + Phase 3.2 VRAMモニタリング）");
-                logger?.LogInformation("🎯 [PHASE3.2-DI] HybridResourceManager最終状態: {ResourceManagerExists}", resourceManager != null);
-                logger?.LogInformation("🎯 [PHASE2.2.9-DI] PythonServerManager最終状態: {ServerManagerExists}", serverManager != null);
-                logger?.LogInformation("🎯 [PHASE2.2.9-DI] CircuitBreaker最終状態: {CircuitBreakerExists}", circuitBreaker != null);
-
-                return new Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine(logger, connectionPool, languageConfig, serverManager, circuitBreaker, resourceManager);
+                return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(serverAddress, logger);
             });
-            
+
+            services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationClient>(provider =>
+            {
+                var client = provider.GetRequiredService<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>();
+                return client;
+            });
+
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
             {
-                var logger = provider.GetService<ILogger<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>>();
-                logger?.LogInformation("🔥 OptimizedPythonTranslationEngine（接続プール統合版）をITranslationEngineとして登録");
-                var optimizedEngine = provider.GetRequiredService<Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine>();
-                // OptimizedPythonTranslationEngineは両方のITranslationEngineインターフェースを実装
-                return (Baketa.Core.Abstractions.Translation.ITranslationEngine)optimizedEngine;
+                var client = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationClient>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter>>();
+
+                logger.LogInformation("🔥 [PHASE3.1] GrpcTranslationEngineAdapterをITranslationEngineとして登録");
+                return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger);
             });
-            
-            Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み");
-            
-            Console.WriteLine($"🚀 Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: {existingTranslationEngines.Count}）");
+
+            Console.WriteLine("🚀 [PHASE3.1] GrpcTranslationEngineAdapter登録完了 - OptimizedPythonTranslationEngine削除済み");
+            Console.WriteLine($"🚀 [PHASE3.1] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
         }
         
         /// <summary>
