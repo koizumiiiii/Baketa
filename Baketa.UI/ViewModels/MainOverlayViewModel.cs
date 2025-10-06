@@ -63,7 +63,7 @@ public class MainOverlayViewModel : ViewModelBase
         _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         
         // 初期状態設定 - OCR初期化状態を動的に管理
-        _isOcrInitialized = true; // Phase 3デバッグのため一時的に初期化済みとする
+        _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
         _currentStatus = TranslationStatus.Idle; // アイドル状態から開始
         
         DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");

@@ -337,9 +337,25 @@ public sealed class TranslationSettings
     /// 外部サーバー使用フラグ（trueの場合、独自プロセス起動を回避）
     /// Issue #147: 既存サーバー利用のための設定
     /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Translation", "外部サーバー使用", 
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "外部サーバー使用",
         Description = "既に起動しているPythonサーバーを使用します（開発/テスト時用）")]
     public bool UseExternalServer { get; set; } = false;
+
+    /// <summary>
+    /// gRPCクライアント使用フラグ
+    /// Phase 2.3: gRPC通信への切り替え設定
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "gRPCクライアント使用",
+        Description = "gRPC通信を使用します（stdin/stdoutの代わり、Phase 2.3+）")]
+    public bool UseGrpcClient { get; set; } = false;
+
+    /// <summary>
+    /// gRPCサーバーアドレス
+    /// Phase 2.3: gRPC通信サーバーのURL
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "gRPCサーバーアドレス",
+        Description = "gRPCサーバーのURL（例: http://localhost:50051）")]
+    public string GrpcServerAddress { get; set; } = "http://localhost:50051";
     
     // 🚨 サーバー監視・自動再起動設定（安定化対応）
     
@@ -429,6 +445,9 @@ public sealed class TranslationSettings
             ConnectionTimeoutMs = ConnectionTimeoutMs,
             HealthCheckIntervalMs = HealthCheckIntervalMs,
             UseExternalServer = UseExternalServer,
+            // Phase 2.3: gRPC設定のクローン
+            UseGrpcClient = UseGrpcClient,
+            GrpcServerAddress = GrpcServerAddress,
             // サーバー監視・自動再起動設定のクローン
             EnableServerAutoRestart = EnableServerAutoRestart,
             MaxConsecutiveFailures = MaxConsecutiveFailures,

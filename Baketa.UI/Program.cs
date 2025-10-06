@@ -541,23 +541,37 @@ namespace Baketa.UI;
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Current Directory: {currentDirectory}");
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] appsettings.json exists in BaseDirectory: {File.Exists(Path.Combine(baseDirectory, "appsettings.json"))}");
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] appsettings.json exists in CurrentDirectory: {File.Exists(Path.Combine(currentDirectory, "appsettings.json"))}");
-            
-            // appsettings.jsonが存在するディレクトリを優先して使用
-            var configBasePath = File.Exists(Path.Combine(currentDirectory, "appsettings.json")) 
-                ? currentDirectory 
-                : baseDirectory;
+
+            // 🔥 Phase 2.3修正: BaseDirectory（実行ファイルの場所）を優先して使用（環境非依存）
+            // 理由: CurrentDirectory優先だと実行場所に依存してしまい、他環境で動作しない
+            var configBasePath = File.Exists(Path.Combine(baseDirectory, "appsettings.json"))
+                ? baseDirectory
+                : currentDirectory;
                 
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Selected config base path: {configBasePath}");
-            
+
             var environmentConfigFile = $"appsettings.{(environment == BaketaEnvironment.Development ? "Development" : "Production")}.json";
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file: {environmentConfigFile}");
             Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file exists: {File.Exists(Path.Combine(configBasePath, environmentConfigFile))}");
+
+            // 🔥 Phase 2.3診断: 設定ファイルパスをファイルに出力
+            var diagLog = Path.Combine(baseDirectory, "config_diagnostic.log");
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Config Base Path: {configBasePath}\n");
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Environment Config: {environmentConfigFile}\n");
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Env Config Exists: {File.Exists(Path.Combine(configBasePath, environmentConfigFile))}\n");
             
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(configBasePath)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .AddJsonFile(environmentConfigFile, optional: true, reloadOnChange: true)
                 .Build();
+
+            // 🔥 Phase 2.3診断: Translation設定の内容を確認
+            var translationSection = configuration.GetSection("Translation");
+            var translationKeys = string.Join(", ", translationSection.GetChildren().Select(c => c.Key));
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Translation Keys: {translationKeys}\n");
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] UseGrpcClient: {configuration["Translation:UseGrpcClient"] ?? "NULL"}\n");
+            File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] GrpcServerAddress: {configuration["Translation:GrpcServerAddress"] ?? "NULL"}\n");
             
             // 設定内容の詳細デバッグ
             Console.WriteLine($"🔍 [CONFIG_DETAILED] All configuration keys:");

@@ -22,6 +22,7 @@ using Microsoft.Extensions.Options;
 using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Core.Utilities; // DebugLogUtility用
 using Baketa.Infrastructure.Translation.Cloud; // GeminiTranslationEngine用
+using Baketa.Infrastructure.Translation.Clients; // GrpcTranslationClient用 (Phase 2.3)
 using ResourceTranslationRequest = Baketa.Infrastructure.ResourceManagement.TranslationRequest;
 using CoreTranslationRequest = Baketa.Core.Translation.Models.TranslationRequest;
 
@@ -94,6 +95,7 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
         IResourceManager? resourceManager = null,
         IOptions<CircuitBreakerSettings>? circuitBreakerSettings = null,
+        IOptions<TranslationSettings>? translationSettings = null,
         GeminiTranslationEngine? fallbackEngine = null)
     {
         // 🔍 UltraPhase 10.11: Gemini推奨 - コンストラクタ開始ログ
@@ -164,30 +166,45 @@ public class OptimizedPythonTranslationEngine : ITranslationEngine
         _uptimeStopwatch.Start();
         Console.WriteLine("🔍 [CONSTRUCTOR_12] _uptimeStopwatch 開始完了");
 
-        // 🚀 UltraPhase 14.25: StdinStdoutTranslationClient 初期化
-        if (_serverManager != null)
+        // 🚀 Phase 2.3: TranslationClient 初期化（gRPC or StdinStdout）
+        Console.WriteLine($"🔍 [PHASE2.3_DEBUG] translationSettings is null: {translationSettings == null}");
+        var settings = translationSettings?.Value;
+        Console.WriteLine($"🔍 [PHASE2.3_DEBUG] settings is null: {settings == null}");
+        Console.WriteLine($"🔍 [PHASE2.3_DEBUG] UseGrpcClient: {settings?.UseGrpcClient}");
+        Console.WriteLine($"🔍 [PHASE2.3_DEBUG] GrpcServerAddress: {settings?.GrpcServerAddress}");
+
+        if (settings?.UseGrpcClient == true)
         {
-            // 🎯 UltraThink Phase 3: 動的言語ペア取得
+            // gRPCクライアント使用
+            _translationClient = new GrpcTranslationClient(
+                settings.GrpcServerAddress,
+                logger);
+
+            _logger.LogInformation("🚀 [Phase 2.3] GrpcTranslationClient 初期化完了 - Server: {ServerAddress}", settings.GrpcServerAddress);
+            Console.WriteLine($"🚀 [Phase 2.3] GrpcTranslationClient 初期化完了 - Server: {settings.GrpcServerAddress}");
+        }
+        else if (_serverManager != null)
+        {
+            // StdinStdoutクライアント使用（デフォルト）
             var currentLanguagePair = _languageConfig.GetCurrentLanguagePair();
             var languagePairKey = $"{currentLanguagePair.SourceCode}-{currentLanguagePair.TargetCode}";
 
             _translationClient = new StdinStdoutTranslationClient(
                 _serverManager,
-                languagePairKey, // 動的取得された言語ペア (例: "en-ja")
-                logger); // ILogger<OptimizedPythonTranslationEngine> を直接渡す
+                languagePairKey,
+                logger);
 
             _logger.LogInformation("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
             Console.WriteLine("🚀 [UltraPhase 14.25] StdinStdoutTranslationClient 初期化完了");
 
-            // 🔥 [PHASE12.4] Gemini推奨: StdinStdout通信モード時はTCP接続プール無効化
-            // 理由: stdin/stdout通信ではTCP接続不要、不要なTCP接続試行を防止
+            // StdinStdout通信モード時はTCP接続プール無効化
             _circuitBreakerSettings.EnableConnectionPool = false;
             _logger.LogInformation("🔧 [PHASE12.4] StdinStdout通信モード検出 - TCP接続プールを無効化");
             Console.WriteLine("🔧 [PHASE12.4] EnableConnectionPool = false (StdinStdout通信モード)");
         }
         else
         {
-            _logger.LogWarning("⚠️ [UltraPhase 14.25] PythonServerManager が null のため StdinStdoutTranslationClient を初期化できません");
+            _logger.LogWarning("⚠️ [Phase 2.3] PythonServerManager が null かつ gRPCクライアントも未設定のため TranslationClient を初期化できません");
         }
 
         // 🔍 UltraPhase 10.11: Gemini推奨 - コンストラクタ完了ログ

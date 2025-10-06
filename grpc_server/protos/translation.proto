@@ -1,0 +1,240 @@
+// translation.proto
+// Baketa Translation Service gRPC Interface Definition
+// Version: 1.0.0
+// Phase 2.1: Protoファイル設計
+
+syntax = "proto3";
+
+package baketa.translation.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+/// <summary>
+/// 翻訳エラーの種類
+/// </summary>
+enum TranslationErrorType {
+  TRANSLATION_ERROR_TYPE_UNSPECIFIED = 0;  // Proto3 requires zero value
+  TRANSLATION_ERROR_TYPE_UNKNOWN = 1;
+  TRANSLATION_ERROR_TYPE_NETWORK = 2;
+  TRANSLATION_ERROR_TYPE_AUTHENTICATION = 3;
+  TRANSLATION_ERROR_TYPE_QUOTA_EXCEEDED = 4;
+  TRANSLATION_ERROR_TYPE_ENGINE = 5;
+  TRANSLATION_ERROR_TYPE_UNSUPPORTED_LANGUAGE = 6;
+  TRANSLATION_ERROR_TYPE_INVALID_INPUT = 7;
+  TRANSLATION_ERROR_TYPE_TIMEOUT = 8;
+  TRANSLATION_ERROR_TYPE_EXCEPTION = 9;
+  TRANSLATION_ERROR_TYPE_NETWORK_ERROR = 10;
+  TRANSLATION_ERROR_TYPE_PROCESSING_ERROR = 11;
+  TRANSLATION_ERROR_TYPE_SERVICE_UNAVAILABLE = 12;
+  TRANSLATION_ERROR_TYPE_MODEL_LOAD_ERROR = 13;
+  TRANSLATION_ERROR_TYPE_INVALID_REQUEST = 14;
+  TRANSLATION_ERROR_TYPE_INVALID_RESPONSE = 15;
+  TRANSLATION_ERROR_TYPE_OPERATION_CANCELED = 16;
+  TRANSLATION_ERROR_TYPE_UNEXPECTED_ERROR = 17;
+  TRANSLATION_ERROR_TYPE_AUTH_ERROR = 18;
+  TRANSLATION_ERROR_TYPE_RATE_LIMIT_EXCEEDED = 19;
+  TRANSLATION_ERROR_TYPE_MODEL_ERROR = 20;
+}
+
+// ============================================================================
+// Basic Types
+// ============================================================================
+
+/// <summary>
+/// 矩形領域を表す
+/// </summary>
+message Rectangle {
+  int32 x = 1;
+  int32 y = 2;
+  int32 width = 3;
+  int32 height = 4;
+}
+
+/// <summary>
+/// 翻訳で使用する言語情報
+/// </summary>
+message Language {
+  string code = 1;           // 言語コード (例: "en", "ja", "zh-CN")
+  string display_name = 2;   // 表示名 (例: "English", "日本語")
+  string name = 3;           // 言語名（英語）
+  string native_name = 4;    // 言語名（現地語）
+  string region_code = 5;    // 地域コード (例: "US", "JP")
+  bool is_auto_detect = 6;   // 自動検出かどうか
+  bool is_right_to_left = 7; // RTL言語かどうか
+}
+
+// ============================================================================
+// Complex Types
+// ============================================================================
+
+/// <summary>
+/// 翻訳コンテキスト
+/// </summary>
+message TranslationContext {
+  string game_profile_id = 1;          // ゲームプロファイルID
+  string scene_id = 2;                 // シーン識別子
+  string dialogue_id = 3;              // 会話ID
+  Rectangle screen_region = 4;         // 画面領域
+  repeated string tags = 5;            // コンテキストタグ
+  int32 priority = 6;                  // コンテキスト優先度（0～100）
+  map<string, string> additional_context = 7; // 追加コンテキスト情報（JSON文字列化）
+  string genre = 8;                    // テキストのジャンル
+  string domain = 9;                   // テキストのドメイン
+}
+
+/// <summary>
+/// 翻訳エラー情報
+/// </summary>
+message TranslationError {
+  string error_code = 1;               // エラーコード
+  string message = 2;                  // エラーメッセージ
+  string details = 3;                  // 詳細情報
+  bool is_retryable = 4;               // 再試行可能かどうか
+  TranslationErrorType error_type = 5; // エラーの種類
+
+  // Exception情報（C# Exception型は直接シリアライズ不可）
+  string exception_type = 6;           // 例外の型名
+  string exception_message = 7;        // 例外メッセージ
+  string exception_stack_trace = 8;    // スタックトレース
+}
+
+// ============================================================================
+// Request/Response Messages - Single Translation
+// ============================================================================
+
+/// <summary>
+/// 単一翻訳リクエスト
+/// </summary>
+message TranslateRequest {
+  string source_text = 1;              // 翻訳元テキスト (最頻出、1バイトエンコード)
+  Language source_language = 2;        // 元言語
+  Language target_language = 3;        // 対象言語
+  string request_id = 4;               // リクエストID (UUID文字列)
+  TranslationContext context = 5;      // 翻訳コンテキスト（optional）
+  string preferred_engine = 6;         // 優先する翻訳エンジン名（optional）
+  map<string, string> options = 15;    // リクエストオプション（JSON文字列化）
+  google.protobuf.Timestamp timestamp = 16; // リクエストタイムスタンプ
+}
+
+/// <summary>
+/// 単一翻訳レスポンス
+/// </summary>
+message TranslateResponse {
+  string request_id = 1;               // 対応するリクエストID (UUID文字列)
+  string source_text = 2;              // 翻訳元テキスト
+  string translated_text = 3;          // 翻訳結果テキスト
+  Language source_language = 4;        // 翻訳元言語
+  Language target_language = 5;        // 翻訳先言語
+  string engine_name = 6;              // 使用された翻訳エンジン名
+  float confidence_score = 7;          // 翻訳の信頼度スコア (-1.0 = 未設定)
+  int64 processing_time_ms = 8;        // 翻訳処理時間（ミリ秒）
+  bool is_success = 9;                 // 翻訳が成功したかどうか
+  TranslationError error = 10;         // エラー情報（optional）
+  map<string, string> metadata = 11;   // メタデータ（JSON文字列化）
+  google.protobuf.Timestamp timestamp = 12; // レスポンスタイムスタンプ
+}
+
+// ============================================================================
+// Request/Response Messages - Batch Translation
+// ============================================================================
+
+/// <summary>
+/// バッチ翻訳リクエスト
+/// </summary>
+message BatchTranslateRequest {
+  repeated TranslateRequest requests = 1; // 翻訳リクエストのリスト
+  string batch_id = 2;                    // バッチID (UUID文字列)
+  google.protobuf.Timestamp timestamp = 3; // リクエストタイムスタンプ
+}
+
+/// <summary>
+/// バッチ翻訳レスポンス
+/// </summary>
+message BatchTranslateResponse {
+  repeated TranslateResponse responses = 1; // 翻訳レスポンスのリスト
+  string batch_id = 2;                      // 対応するバッチID
+  int32 success_count = 3;                  // 成功した翻訳の数
+  int32 failure_count = 4;                  // 失敗した翻訳の数
+  int64 total_processing_time_ms = 5;       // 総処理時間（ミリ秒）
+  google.protobuf.Timestamp timestamp = 6;  // レスポンスタイムスタンプ
+}
+
+// ============================================================================
+// Request/Response Messages - Health Check
+// ============================================================================
+
+/// <summary>
+/// ヘルスチェックリクエスト
+/// </summary>
+message HealthCheckRequest {
+  // Empty message - health check doesn't need parameters
+}
+
+/// <summary>
+/// ヘルスチェックレスポンス
+/// </summary>
+message HealthCheckResponse {
+  bool is_healthy = 1;                      // サーバーが正常かどうか
+  string status = 2;                        // ステータスメッセージ
+  map<string, string> details = 3;          // 詳細情報
+  google.protobuf.Timestamp timestamp = 4;  // タイムスタンプ
+}
+
+/// <summary>
+/// 準備状態確認リクエスト
+/// </summary>
+message IsReadyRequest {
+  // Empty message - ready check doesn't need parameters
+}
+
+/// <summary>
+/// 準備状態確認レスポンス
+/// </summary>
+message IsReadyResponse {
+  bool is_ready = 1;                        // サーバーが準備完了かどうか
+  string status = 2;                        // ステータスメッセージ
+  map<string, string> details = 3;          // 詳細情報（モデルロード状況など）
+  google.protobuf.Timestamp timestamp = 4;  // タイムスタンプ
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+/// <summary>
+/// Baketa翻訳サービス
+/// Phase 2: gRPC通信によるPython翻訳サーバーとの連携
+/// </summary>
+service TranslationService {
+  /// <summary>
+  /// 単一テキストを翻訳します
+  /// </summary>
+  rpc Translate(TranslateRequest) returns (TranslateResponse);
+
+  /// <summary>
+  /// 複数のテキストをバッチ翻訳します
+  /// </summary>
+  rpc TranslateBatch(BatchTranslateRequest) returns (BatchTranslateResponse);
+
+  /// <summary>
+  /// サーバーのヘルスチェックを実行します
+  /// </summary>
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  /// <summary>
+  /// サーバーが準備完了かどうかを確認します
+  /// </summary>
+  rpc IsReady(IsReadyRequest) returns (IsReadyResponse);
+
+  // ============================================================================
+  // 🔥 [FUTURE] Phase 12.2: ストリーミング翻訳サポート（予約）
+  // ============================================================================
+  // /// <summary>
+  // /// ストリーミング翻訳を実行します（双方向ストリーミング）
+  // /// </summary>
+  // rpc TranslateStream(stream TranslateRequest) returns (stream TranslateResponse);
+}

@@ -175,6 +175,15 @@ public sealed class TimedChunkAggregator : IDisposable
             existingChunks.Add(chunk);
             Interlocked.Increment(ref _totalChunksProcessed);
 
+            // 🔧 [PHASE3.4B] 最初のチャンク追加時にタイマーリセット時刻を更新（ForceFlushMs誤検知防止）
+            // 各ウィンドウの最初のチャンク追加時に_lastTimerResetを更新することで、
+            // 前回のOCRセッションからの経過時間蓄積による誤検知を防止
+            if (existingChunks.Count == 1)
+            {
+                _lastTimerReset = DateTime.UtcNow;
+                _logger.LogDebug("🔧 [PHASE3.4B] 最初のチャンク追加 - タイマーリセット時刻更新 (ウィンドウ: {WindowHandle})", windowHandle);
+            }
+
             // 全ウィンドウのチャンク数を計算
             var totalChunks = _pendingChunksByWindow.Values.Sum(list => list.Count);
 

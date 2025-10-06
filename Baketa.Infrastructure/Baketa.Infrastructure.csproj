@@ -18,7 +18,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Protobuf Include="Translation\Local\Onnx\SentencePiece\Proto\sentencepiece_model.proto" GrpcServices="None" Access="Internal" />
+		<!-- Phase 2.1: gRPC翻訳サービス定義 -->
+		<Protobuf Include="Translation\Protos\translation.proto" GrpcServices="Client" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -27,7 +28,7 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
 		
 		<!-- OpenCV Sharp パッケージ - 重要: PaddleOCRで使用 -->
@@ -51,10 +52,17 @@
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />
 		
 		<!-- Google.Protobuf for SentencePiece model parsing -->
-		<PackageReference Include="Google.Protobuf" Version="3.25.2" />
-		<PackageReference Include="Google.Protobuf.Tools" Version="3.25.2">
+		<PackageReference Include="Google.Protobuf" Version="3.32.1" />
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.32.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+		</PackageReference>
+
+		<!-- Phase 2.1: gRPC クライアント通信 -->
+		<PackageReference Include="Grpc.Net.Client" Version="2.69.0" />
+		<PackageReference Include="Grpc.Tools" Version="2.69.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		
 		<!-- PaddleOCR パッケージ - 3.0.1統一 (runtime: 3.1.0.54強制) -->

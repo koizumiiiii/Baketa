@@ -1,0 +1,28 @@
+# Baketa gRPC Translation Server Dependencies
+# Phase 2.2: Python gRPCサーバー実装
+
+# gRPC (最新版)
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+
+# NLLB-200 Translation Model (既存requirements.txtベース)
+transformers>=4.30.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+
+# Data Processing
+numpy>=1.24.0
+
+# System Monitoring
+psutil>=5.9.0
+
+# Optional: GPU support (uncomment if CUDA is available)
+# torch[cuda]>=2.0.0
+
+# Phase 2.2.1: CTranslate2 for optimized inference (80% memory reduction: 2.4GB -> 500MB)
+ctranslate2>=3.20.0
+
+# Development & Testing
+pytest>=7.0.0
+pytest-asyncio>=0.23.0
