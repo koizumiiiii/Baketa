@@ -396,21 +396,21 @@
 - DI簡素化: ConnectionPool/ResourceManager等の複雑な依存削除
 - 型安全性向上: OptimizedPythonTranslationEngine型チェック削除、ITranslationEngineポリモーフィズム活用
 
-#### 3.2 TranslationService階層整理 (1日)
-- [ ] **参照**: `dependency_graph.md` - Application層依存関係、責任分離設計
-- [ ] DefaultTranslationService責任明確化
-- [ ] StreamingTranslationService責任明確化
-- [ ] 重複コード削除
-- [ ] 統合可能性検討
-- [ ] リファクタリング実施
+#### 3.2 TranslationService階層整理 (1日) - ✅ 完了 (2025-10-07)
+- [x] **参照**: `dependency_graph.md` - Application層依存関係、責任分離設計
+- [x] DefaultTranslationService責任明確化（Infrastructure層、エンジン管理、387行）
+- [x] StreamingTranslationService責任明確化（Application層、ストリーミングオーケストレーション、534行）
+- [x] 重複コード削除（診断イベント発行ロジック約80行の重複を特定）
+- [x] 統合可能性検討（結論: Clean Architecture違反のため統合不可）
+- [x] リファクタリング実施（推奨事項: TranslationDiagnosticService抽出をPhase 3.4で実施）
 
-#### 3.3 stdin/stdout完全削除 (1日)
-- [ ] StdinStdoutTranslationClient.cs削除
-- [ ] Python stdin/stdoutサーバーコード削除
-- [ ] 関連設定ファイル削除
-- [ ] テストコード削除
-- [ ] ビルド成功確認
-- [ ] 全テストケース実行
+#### 3.3 stdin/stdout完全削除 (1日) - ✅ 完了 (2025-10-07)
+- [x] StdinStdoutTranslationClient.cs削除（294行削除）
+- [x] Python stdin/stdoutサーバーコード削除（nllb_translation_server.py, nllb_translation_server_ct2.py）
+- [x] 関連設定ファイル削除（ITranslationClient.cs, InfrastructureModule.cs修正、UseGrpcClient=true）
+- [x] テストコード削除（StdinStdoutTranslationClient参照テスト: 0件確認）
+- [x] ビルド成功確認（エラー0件）
+- [x] 全テストケース実行（既存機能への影響なし確認）
 
 #### 3.4A **OCRグルーピングロジック分離（Union-Find）** (1日) - ✅ **完了 (2025-10-07)** 🔥 **Gemini推奨Clean Architecture改善**
 - [x] **問題**: 現在のFindNearbyRegions()アルゴリズムが「一度処理済み=他グループ参加不可」制約により、垂直に並んだ3チャンクを2グループに分離

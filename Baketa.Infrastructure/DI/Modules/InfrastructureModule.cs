@@ -631,10 +631,8 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
             Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
 
-            // 🔥 [PHASE12.5] Gemini推奨: StdinStdout通信モード時はConnectionPool登録をスキップ
-            // 理由: stdin/stdout通信ではTCP接続不要、ConnectionPool初期化時のTCP接続試行を完全防止
-            // 動的ポート管理使用時（PythonServerManager登録済み）はStdinStdout通信モード
-            // 🔥 [PHASE12.5.1_FIX] 型修正: PythonServerManager → IPythonServerManager（インターフェース型で判定）
+            // 🔥 [PHASE3.3] gRPC通信モード: PythonServerManager登録時はConnectionPool不要
+            // gRPC経由の通信ではConnectionPoolの代わりにgRPCクライアントを使用
             var pythonServerManagerRegistered = services.Any(sd =>
                 sd.ServiceType == typeof(IPythonServerManager));
 
@@ -652,36 +650,47 @@ namespace Baketa.Infrastructure.DI.Modules;
             }
             else
             {
-                // ✅ ConnectionPool未登録（StdinStdout通信モード）
-                Console.WriteLine("🔧 [PHASE12.5] ConnectionPool登録スキップ - StdinStdout通信モード（TCP接続不要）");
+                // ✅ ConnectionPool未登録（gRPC通信モード）
+                Console.WriteLine("🔧 [PHASE3.3] ConnectionPool登録スキップ - gRPC通信モード（gRPCクライアント使用）");
                 System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 🔧 [PHASE12.5] ConnectionPool登録スキップ - StdinStdout通信モード\r\n");
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 🔧 [PHASE3.3] ConnectionPool登録スキップ - gRPC通信モード\r\n");
             }
             
-            // ✅ [PHASE3.1] gRPC Translation Adapter - OptimizedPythonTranslationEngine削除、シンプルなAdapter実装
+            // 🎯 [UltraThink Solution] appsettings.json固定ポート優先 + ServerManagerHostedService起動監視
+            // 問題: DIコンテナ解決タイミング vs IHostedService実行タイミングのミスマッチ
+            // 解決: appsettings.jsonのGrpcServerAddressを優先使用、ServerManagerはそのポートで起動
+
+            // GrpcPortProvider登録（動的ポート管理用、将来の拡張用）
+            services.AddSingleton<Baketa.Infrastructure.Translation.Services.GrpcPortProvider>();
+
+            // ServerManagerHostedService登録（Pythonサーバー起動・監視）
+            services.AddHostedService<Baketa.Infrastructure.Translation.Services.ServerManagerHostedService>();
+
+            // ✅ [UltraThink Fix] GrpcTranslationClient - appsettings.json固定ポート優先使用
+            // appsettings.jsonに設定がある場合は即座に使用し、DIブロックを回避
             services.AddSingleton<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>(provider =>
             {
+                Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] GrpcTranslationClientファクトリー実行開始！");
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>>();
+                Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] ILogger取得完了");
                 var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
+                Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] TranslationSettings取得完了 - GrpcServerAddress: '{translationSettings.GrpcServerAddress}'");
 
-                // 🎯 [PHASE3.1_FIX] 動的ポート検索 - translation_ports_global.jsonから利用可能ポートを検出
-                string serverAddress;
-                const string DefaultGrpcAddress = "http://localhost:50051";
+                // appsettings.jsonに設定がある場合は優先使用
+                Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] 条件チェック: IsNullOrEmpty = {string.IsNullOrEmpty(translationSettings.GrpcServerAddress)}");
+                if (!string.IsNullOrEmpty(translationSettings.GrpcServerAddress))
+                {
+                    logger.LogInformation("✅ [FIXED_PORT] appsettings.json設定使用: {Address}", translationSettings.GrpcServerAddress);
+                    return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(translationSettings.GrpcServerAddress, logger);
+                }
 
-                // デフォルト値または空の場合は動的検出を実行
-                if (string.IsNullOrEmpty(translationSettings.GrpcServerAddress) ||
-                    translationSettings.GrpcServerAddress == DefaultGrpcAddress)
-                {
-                    // translation_ports_global.jsonから動的にポート検出
-                    var dynamicPort = DetectDynamicPortFromGlobalRegistry(logger);
-                    serverAddress = $"http://localhost:{dynamicPort}";
-                    logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcServerAddress使用（動的検出）: Port {Port}", dynamicPort);
-                }
-                else
-                {
-                    serverAddress = translationSettings.GrpcServerAddress;
-                    logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcServerAddress使用（設定値）: {ServerAddress}", serverAddress);
-                }
+                // 設定がない場合はGrpcPortProviderを使用（動的ポート管理）
+                // ⚠️ この場合はブロッキング待機が発生するため、appsettings.json設定を推奨
+                logger.LogWarning("⚠️ [DYNAMIC_PORT] appsettings.json未設定、動的ポート待機（推奨されません）");
+                var portProvider = provider.GetRequiredService<Baketa.Infrastructure.Translation.Services.GrpcPortProvider>();
+                var port = portProvider.GetPortAsync().GetAwaiter().GetResult();
+                var serverAddress = $"http://localhost:{port}";
+                logger.LogInformation("✅ [DYNAMIC_PORT] GrpcServerAddress確定: {ServerAddress}", serverAddress);
 
                 return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(serverAddress, logger);
             });
@@ -1173,7 +1182,7 @@ namespace Baketa.Infrastructure.DI.Modules;
 #endif
                     services.Configure<TranslationSettings>(options =>
                     {
-                        options.UseGrpcClient = false; // デフォルトはStdinStdoutクライアント
+                        options.UseGrpcClient = true; // [PHASE3.3] gRPCクライアントがデフォルト
                         options.GrpcServerAddress = "http://localhost:50051";
                     });
                 }
@@ -1186,7 +1195,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 // フォールバック処理
                 services.Configure<TranslationSettings>(options =>
                 {
-                    options.UseGrpcClient = false;
+                    options.UseGrpcClient = true; // [PHASE3.3] gRPCクライアントがデフォルト
                     options.GrpcServerAddress = "http://localhost:50051";
                 });
             }

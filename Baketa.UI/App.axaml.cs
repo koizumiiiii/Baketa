@@ -271,20 +271,47 @@ internal sealed partial class App : Avalonia.Application
                     Console.WriteLine("✅ EventHandlerInitializationService は Program.cs で初期化済み - App.axaml.cs での重複実行をスキップ");
 
                     // 🔥 [FIX] TranslationInitializationService手動実行 - IHostedService未実行問題の回避
-                    Console.WriteLine("🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化開始");
+                    Console.WriteLine("🚨🚨🚨 [INIT_DEBUG] OnFrameworkInitializationCompleted - 翻訳エンジン手動初期化開始");
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+                        $"[{DateTime.Now:HH:mm:ss.fff}] 🚨🚨🚨 [INIT_DEBUG] OnFrameworkInitializationCompleted - 翻訳エンジン手動初期化開始\r\n"
+                    );
+
                     _ = Task.Run(async () =>
                     {
                         try
                         {
+                            Console.WriteLine("🚨 [INIT_DEBUG] Task.Run実行開始");
+                            System.IO.File.AppendAllText(
+                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+                                $"[{DateTime.Now:HH:mm:ss.fff}] 🚨 [INIT_DEBUG] Task.Run実行開始\r\n"
+                            );
+
+                            Console.WriteLine("🚨 [INIT_DEBUG] GetRequiredService<ITranslationEngine>呼び出し開始");
                             var translationEngine = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationEngine>();
                             Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] ITranslationEngine取得成功: {translationEngine.GetType().Name}");
+                            System.IO.File.AppendAllText(
+                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+                                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [TRANSLATION_INIT_FIX] ITranslationEngine取得成功: {translationEngine.GetType().Name}\r\n"
+                            );
 
+                            Console.WriteLine("🚨 [INIT_DEBUG] InitializeAsync呼び出し開始");
                             var initResult = await translationEngine.InitializeAsync().ConfigureAwait(false);
                             Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化完了: {initResult}");
+                            System.IO.File.AppendAllText(
+                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+                                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化完了: {initResult}\r\n"
+                            );
                         }
                         catch (Exception initEx)
                         {
-                            Console.WriteLine($"❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.Message}");
+                            Console.WriteLine($"❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.GetType().Name} - {initEx.Message}");
+                            System.IO.File.AppendAllText(
+                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.GetType().Name}\r\n" +
+                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ Message: {initEx.Message}\r\n" +
+                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ StackTrace: {initEx.StackTrace}\r\n"
+                            );
                         }
                     });
 

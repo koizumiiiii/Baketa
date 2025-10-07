@@ -64,4 +64,9 @@ public interface IPythonServerManager : IDisposable
     /// サーバーのヘルスチェックを実行します
     /// </summary>
     Task PerformHealthCheckAsync();
+
+    /// <summary>
+    /// ヘルスチェックタイマーを初期化します
+    /// </summary>
+    void InitializeHealthCheckTimer();
 }

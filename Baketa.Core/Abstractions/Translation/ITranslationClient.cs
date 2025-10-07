@@ -6,11 +6,11 @@ namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>
 /// Python翻訳サーバーとの通信クライアント抽象化
-/// UltraPhase 14.25: ハイブリッド通信アーキテクチャ (stdin/stdout vs TCP)
+/// Phase 3.3: gRPC通信アーキテクチャ
 ///
 /// 責務:
-/// - 低レベルな通信プロトコル管理（stdin/stdout, TCP）
-/// - OptimizedPythonTranslationEngine から利用される
+/// - 低レベルな通信プロトコル管理（gRPC）
+/// - GrpcTranslationEngineAdapter から利用される
 /// - Strategy パターンによる通信方式の切り替え
 /// </summary>
 public interface ITranslationClient
@@ -18,7 +18,7 @@ public interface ITranslationClient
     /// <summary>
     /// 通信モード名（診断・ログ用）
     /// </summary>
-    /// <example>"StdinStdout", "TCP"</example>
+    /// <example>"Grpc", "TCP"</example>
     string CommunicationMode { get; }
 
     /// <summary>
