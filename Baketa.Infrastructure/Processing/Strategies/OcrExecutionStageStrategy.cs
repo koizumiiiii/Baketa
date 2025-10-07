@@ -1,10 +1,12 @@
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
 using Baketa.Core.Abstractions.Capture; // 🎯 UltraThink: ITextRegionDetector用
 using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
 using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統合
 using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
 using Baketa.Core.Abstractions.Imaging; // 🔧 [PHASE3.2_FIX] IImage用
+using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
@@ -31,7 +33,9 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     private readonly ITextRegionDetector? _textRegionDetector; // 🎯 UltraThink: ROI検出器統合
     private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
-    
+    private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
+    private int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
+
     public ProcessingStageType StageType => ProcessingStageType.OcrExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(80);
 
@@ -40,13 +44,15 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
         IImageFactoryInterface imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
-        ITextRegionDetector? textRegionDetector = null) // 🎯 UltraThink: ROI検出器をオプション依存で追加
+        ITextRegionDetector? textRegionDetector = null, // 🎯 UltraThink: ROI検出器をオプション依存で追加
+        ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _textRegionDetector = textRegionDetector; // null許容（フォールバック対応）
+        _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken = default)
@@ -431,6 +437,61 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             catch (Exception imageEx)
             {
                 _logger.LogWarning(imageEx, "🎯 [ROI_IMAGE_SAVE] ROI画像保存でエラー");
+            }
+
+            // 🔧 [TRANSLATION_FIX] OCR結果をTextChunkに変換して翻訳パイプラインに送信
+            if (_textChunkAggregator != null && textChunks.Count > 0 && !string.IsNullOrEmpty(detectedText))
+            {
+                try
+                {
+                    // TextRegionをPositionedTextResultに変換
+                    var positionedResults = textChunks
+                        .OfType<Baketa.Core.Abstractions.OCR.TextRegion>()
+                        .Select(region => new PositionedTextResult
+                        {
+                            Text = region.Text,
+                            BoundingBox = region.Bounds,
+                            Confidence = (float)region.Confidence,
+                            ChunkId = _nextChunkId,
+                            ProcessingTime = stopwatch.Elapsed,
+                            DetectedLanguage = null // OCR結果には言語情報がない場合がある
+                        })
+                        .ToList();
+
+                    if (positionedResults.Count > 0)
+                    {
+                        // 全テキストチャンクの境界ボックスを計算
+                        var allBounds = positionedResults.Select(r => r.BoundingBox);
+                        var minX = allBounds.Min(r => r.X);
+                        var minY = allBounds.Min(r => r.Y);
+                        var maxX = allBounds.Max(r => r.X + r.Width);
+                        var maxY = allBounds.Max(r => r.Y + r.Height);
+                        var combinedBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+
+                        // TextChunk作成
+                        var textChunk = new TextChunk
+                        {
+                            ChunkId = _nextChunkId++,
+                            TextResults = positionedResults,
+                            CombinedBounds = combinedBounds,
+                            CombinedText = detectedText,
+                            SourceWindowHandle = context.Input.SourceWindowHandle,
+                            DetectedLanguage = null
+                        };
+
+                        // TimedChunkAggregatorに送信
+                        var added = await _textChunkAggregator.TryAddTextChunkAsync(textChunk, cancellationToken).ConfigureAwait(false);
+
+                        _logger.LogInformation("🔧 [TRANSLATION_FIX] OCR結果を翻訳パイプラインに送信 - ChunkId: {ChunkId}, テキスト長: {Length}, 送信成功: {Added}",
+                            textChunk.ChunkId, detectedText.Length, added);
+
+                        DebugLogUtility.WriteLog($"🔧 [TRANSLATION_FIX] 翻訳パイプライン送信 - ChunkId: {textChunk.ChunkId}, テキスト: '{detectedText.Substring(0, Math.Min(50, detectedText.Length))}...', 成功: {added}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "🔧 [TRANSLATION_FIX] 翻訳パイプライン送信でエラー - 処理は継続");
+                }
             }
 
             // ProcessingStageResult作成
