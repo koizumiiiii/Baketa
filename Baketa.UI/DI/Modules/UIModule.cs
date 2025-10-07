@@ -170,6 +170,12 @@ namespace Baketa.UI.DI.Modules;
             // オーバーレイ位置管理システム
             OverlayPositioningModule.RegisterServices(services);
 
+            // Phase 4.1: オーバーレイFactoryパターン - オーバーレイ作成と表示の専門化
+            services.AddSingleton<Baketa.UI.Factories.IInPlaceOverlayFactory, Baketa.UI.Factories.InPlaceOverlayFactory>();
+            services.AddSingleton<IOverlayCoordinateTransformer, OverlayCoordinateTransformer>();
+            services.AddSingleton<IOverlayDiagnosticService, OverlayDiagnosticService>();
+            services.AddSingleton<IOverlayCollectionManager, OverlayCollectionManager>();
+
             // 🖥️ [PHASE1_MONITOR] 高度モニター判定・DPI補正システム（Gemini推奨：Avalonia Screen API優先）
             services.AddSingleton<IAdvancedMonitorService, AdvancedMonitorService>();
 

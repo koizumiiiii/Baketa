@@ -533,10 +533,11 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         
         try
         {
+            // 🔧 [PHASE4.4_FIX] UltraThink + Gemini Review完了: TextDisappearanceEvent発行条件修正
             // 条件1: 前回画像が存在する（初回実行ではない）
-            // 条件2: 変化が検知されていない（テキスト消失の可能性）
-            // 条件3: 変化率が閾値以下（設定値使用、Gemini Review対応）
-            if (previousImage != null && !changeResult.HasChanged && changeResult.ChangePercentage <= 0.05f) // TODO: 設定外部化対応
+            // 条件2: 画像に変化がある（!changeResult.HasChanged → changeResult.HasChanged に修正）
+            // 条件3: テキスト消失パターンに該当する（IsTextDisappearance判定）
+            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult))
             {
                 // 消失領域をキャプチャ領域として設定
                 var disappearedRegions = new List<Rectangle> { captureRegion };
@@ -598,5 +599,57 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         float finalConfidence = Math.Max(0.6f, Math.Min(1.0f, baseConfidence + changeAdjustment));
         
         return finalConfidence;
+    }
+
+    /// <summary>
+    /// テキスト消失パターン判定（Phase 4.4: UltraThink + Gemini Review完了）
+    /// </summary>
+    /// <param name="changeResult">画像変化検知結果</param>
+    /// <returns>テキスト消失パターンに該当する場合true</returns>
+    /// <remarks>
+    /// Gemini推奨設計:
+    /// - ChangePercentage閾値: 15% (ゲームUIテキスト消失の典型的範囲)
+    /// - SSIM閾値: 85% (背景構造の類似性が高い)
+    /// - 偽陽性: 小さなUIアニメーションは除外される
+    /// - 偽陰性: 画面の20%以上を占める大テキストは検知されない（トレードオフ）
+    /// </remarks>
+    private bool IsTextDisappearance(ImageChangeResult changeResult)
+    {
+        // 条件1: 画像に変化あり（前提条件、呼び出し元で既にチェック済みだが安全性のため再確認）
+        if (!changeResult.HasChanged)
+        {
+            return false;
+        }
+
+        // 条件2: 変化率が小さい（テキスト消失程度の変化）
+        // ゲームUIのテキストボックス消失は通常5-15%の変化
+        const float maxChangePercentageForTextDisappearance = 0.15f; // Gemini推奨: 15%
+        if (changeResult.ChangePercentage > maxChangePercentageForTextDisappearance)
+        {
+            _logger.LogTrace("🔍 IsTextDisappearance: false - 変化率が大きすぎる ({ChangePercentage:F3}% > {Threshold:F3}%)",
+                changeResult.ChangePercentage * 100, maxChangePercentageForTextDisappearance * 100);
+            return false;
+        }
+
+        // 条件3: SSIM判定（構造的類似性 - Stage 3で利用可能）
+        // テキスト消失は背景が似ているためSSIMが高い
+        const float minSSIMForTextDisappearance = 0.85f; // Gemini推奨: 85%
+        if (changeResult.SSIMScore.HasValue)
+        {
+            if (changeResult.SSIMScore.Value < minSSIMForTextDisappearance)
+            {
+                _logger.LogTrace("🔍 IsTextDisappearance: false - SSIM類似性が低すぎる ({SSIM:F3} < {Threshold:F3})",
+                    changeResult.SSIMScore.Value, minSSIMForTextDisappearance);
+                return false;
+            }
+        }
+
+        // Gemini推奨: テキスト消失判定成功時のデバッグログ（閾値チューニング用データ収集）
+        _logger.LogDebug("✅ IsTextDisappearance: true - 変化率: {ChangePercentage:F3}%, SSIM: {SSIM:F3}, Stage: {DetectionStage}",
+            changeResult.ChangePercentage * 100,
+            changeResult.SSIMScore ?? -1.0f,
+            changeResult.DetectionStage);
+
+        return true;
     }
 }

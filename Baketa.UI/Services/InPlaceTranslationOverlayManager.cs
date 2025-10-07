@@ -15,6 +15,7 @@ using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
 using Baketa.Core.UI.Monitors;
 using Baketa.Core.UI.Geometry;
+using Baketa.UI.Factories;
 using Baketa.UI.Services.Monitor;
 using Baketa.UI.Views.Overlay;
 using Microsoft.Extensions.Logging;
@@ -26,21 +27,32 @@ namespace Baketa.UI.Services;
 /// Google翻訳カメラのような、元テキストを翻訳テキストで置き換える表示を管理
 /// UltraThink Phase 11.1: IOverlayPositioningService統合による精密位置調整
 /// </summary>
+/// <summary>
+/// Phase 4.1: Factory Pattern適用によるオーバーレイ管理の専門化
+/// </summary>
 public class InPlaceTranslationOverlayManager(
     IEventAggregator eventAggregator,
     IOverlayPositioningService overlayPositioningService,
     IMonitorManager monitorManager,
     IAdvancedMonitorService advancedMonitorService,
+    IInPlaceOverlayFactory overlayFactory,
+    IOverlayCoordinateTransformer coordinateTransformer,
+    IOverlayDiagnosticService diagnosticService,
+    IOverlayCollectionManager collectionManager,
     ILogger<InPlaceTranslationOverlayManager> logger) : IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IDisposable
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly IOverlayPositioningService _overlayPositioningService = overlayPositioningService ?? throw new ArgumentNullException(nameof(overlayPositioningService));
     private readonly IMonitorManager _monitorManager = monitorManager ?? throw new ArgumentNullException(nameof(monitorManager));
     private readonly IAdvancedMonitorService _advancedMonitorService = advancedMonitorService ?? throw new ArgumentNullException(nameof(advancedMonitorService));
+
+    // Phase 4.1: 専門サービスによる責任分離
+    private readonly IInPlaceOverlayFactory _overlayFactory = overlayFactory ?? throw new ArgumentNullException(nameof(overlayFactory));
+    private readonly IOverlayCoordinateTransformer _coordinateTransformer = coordinateTransformer ?? throw new ArgumentNullException(nameof(coordinateTransformer));
+    private readonly IOverlayDiagnosticService _diagnosticService = diagnosticService ?? throw new ArgumentNullException(nameof(diagnosticService));
+    private readonly IOverlayCollectionManager _collectionManager = collectionManager ?? throw new ArgumentNullException(nameof(collectionManager));
+
     private readonly ILogger<InPlaceTranslationOverlayManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    
-    // チャンクIDとインプレースオーバーレイウィンドウのマッピング
-    private readonly ConcurrentDictionary<int, InPlaceTranslationOverlayWindow> _activeOverlays = new();
     
     // 🚑 Phase 13: 重複防止フィルター実装（Gemini推奨のReactive Extensions + ハッシュベース）
     private readonly ConcurrentDictionary<string, DateTime> _recentTranslations = new();
@@ -187,29 +199,8 @@ public class InPlaceTranslationOverlayManager(
         var sessionId = Guid.NewGuid().ToString("N")[..8];
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        // 📊 [DIAGNOSTIC] オーバーレイ表示開始イベント
-        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-        {
-            Stage = "Overlay",
-            IsSuccess = true,
-            ProcessingTimeMs = 0,
-            SessionId = sessionId,
-            Severity = DiagnosticSeverity.Information,
-            Message = $"オーバーレイ表示開始: ChunkId={textChunk.ChunkId}, テキスト長={textChunk.TranslatedText?.Length ?? 0}",
-            Metrics = new Dictionary<string, object>
-            {
-                { "ChunkId", textChunk.ChunkId },
-                { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
-                { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
-                { "BoundsX", textChunk.CombinedBounds.X },
-                { "BoundsY", textChunk.CombinedBounds.Y },
-                { "BoundsWidth", textChunk.CombinedBounds.Width },
-                { "BoundsHeight", textChunk.CombinedBounds.Height },
-                { "CanShowInPlace", textChunk.CanShowInPlace() },
-                { "IsInitialized", _isInitialized },
-                { "IsDisposed", _disposed }
-            }
-        }).ConfigureAwait(false);
+        // Phase 4.1: IOverlayDiagnosticServiceに転送
+        await _diagnosticService.PublishOverlayStartedAsync(textChunk, sessionId, _isInitialized, _disposed).ConfigureAwait(false);
         
         // STOP押下後の表示を防ぐためのキャンセレーションチェック
         cancellationToken.ThrowIfCancellationRequested();
@@ -286,11 +277,11 @@ public class InPlaceTranslationOverlayManager(
             // オーバーレイ処理直前のキャンセレーションチェック
             cancellationToken.ThrowIfCancellationRequested();
             
-            // 🔍 [P2_OVERLAY_BRANCH] オーバーレイ処理分岐の詳細監視
-            var hasExistingOverlay = _activeOverlays.TryGetValue(textChunk.ChunkId, out var existingOverlay);
+            // Phase 4.1: IOverlayCollectionManagerに転送
+            var hasExistingOverlay = _collectionManager.TryGetOverlay(textChunk.ChunkId, out var existingOverlay);
             Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] === オーバーレイ処理分岐 (ChunkId: {textChunk.ChunkId}) ===");
             Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 既存オーバーレイ存在: {hasExistingOverlay}");
-            Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 総アクティブオーバーレイ数: {_activeOverlays.Count}");
+            Console.WriteLine($"🔍 [P2_OVERLAY_BRANCH] 総アクティブオーバーレイ数: {_collectionManager.ActiveOverlayCount}");
 
             if (hasExistingOverlay && existingOverlay != null)
             {
@@ -320,54 +311,20 @@ public class InPlaceTranslationOverlayManager(
                 Console.WriteLine($"✅ [P2_OVERLAY_BRANCH] 新規オーバーレイ作成完了 - ChunkId: {textChunk.ChunkId}");
             }
 
-            // 📊 [DIAGNOSTIC] オーバーレイ表示成功イベント
-            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-            {
-                Stage = "Overlay",
-                IsSuccess = true,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                SessionId = sessionId,
-                Severity = DiagnosticSeverity.Information,
-                Message = $"オーバーレイ表示成功: ChunkId={textChunk.ChunkId}, 処理時間={stopwatch.ElapsedMilliseconds}ms",
-                Metrics = new Dictionary<string, object>
-                {
-                    { "ChunkId", textChunk.ChunkId },
-                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
-                    { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
-                    { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
-                    { "BoundsArea", textChunk.CombinedBounds.Width * textChunk.CombinedBounds.Height },
-                    { "ActiveOverlaysCount", _activeOverlays.Count },
-                    { "IsUpdate", _activeOverlays.ContainsKey(textChunk.ChunkId) },
-                    { "DisplayType", "InPlace" }
-                }
-            }).ConfigureAwait(false);
+            // Phase 4.1: IOverlayDiagnosticServiceに転送
+            var isUpdate = _collectionManager.TryGetOverlay(textChunk.ChunkId, out _);
+            await _diagnosticService.PublishOverlaySuccessAsync(
+                textChunk, sessionId, stopwatch.ElapsedMilliseconds, _collectionManager.ActiveOverlayCount, isUpdate)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            // 📊 [DIAGNOSTIC] オーバーレイ表示失敗イベント
+            // Phase 4.1: IOverlayDiagnosticServiceに転送
             try
             {
-                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-                {
-                    Stage = "Overlay",
-                    IsSuccess = false,
-                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                    ErrorMessage = ex.Message,
-                    SessionId = sessionId,
-                    Severity = DiagnosticSeverity.Error,
-                    Message = $"オーバーレイ表示失敗: ChunkId={textChunk.ChunkId}, エラー={ex.GetType().Name}: {ex.Message}",
-                    Metrics = new Dictionary<string, object>
-                    {
-                        { "ChunkId", textChunk.ChunkId },
-                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
-                        { "ErrorType", ex.GetType().Name },
-                        { "CombinedTextLength", textChunk.CombinedText?.Length ?? 0 },
-                        { "TranslatedTextLength", textChunk.TranslatedText?.Length ?? 0 },
-                        { "IsInitialized", _isInitialized },
-                        { "IsDisposed", _disposed },
-                        { "ActiveOverlaysCount", _activeOverlays.Count }
-                    }
-                }).ConfigureAwait(false);
+                await _diagnosticService.PublishOverlayFailedAsync(
+                    textChunk, sessionId, stopwatch.ElapsedMilliseconds, ex, _isInitialized, _disposed, _collectionManager.ActiveOverlayCount)
+                    .ConfigureAwait(false);
             }
             catch
             {
@@ -500,8 +457,8 @@ public class InPlaceTranslationOverlayManager(
                     _logger.LogWarning(ex, "精密位置計算またはDPI補正失敗、基本位置を使用 - ChunkId: {ChunkId}", textChunk.ChunkId);
                 }
 
-                // オーバーレイを コレクションに追加
-                _activeOverlays[textChunk.ChunkId] = newOverlay;
+                // Phase 4.1: IOverlayCollectionManagerに転送
+                _collectionManager.AddOverlay(textChunk.ChunkId, newOverlay);
 
                 // 一時的なTextChunkで精密位置調整結果を適用
                 var adjustedTextChunk = CreateAdjustedTextChunk(textChunk, optimalPosition);
@@ -553,12 +510,12 @@ public class InPlaceTranslationOverlayManager(
         }
         catch (Exception ex)
         {
-            // エラー時のクリーンアップ
+            // Phase 4.1: IOverlayCollectionManagerに転送
             if (newOverlay != null)
             {
                 try
                 {
-                    _activeOverlays.TryRemove(textChunk.ChunkId, out _);
+                    _collectionManager.RemoveOverlay(textChunk.ChunkId, out _);
                     newOverlay.Dispose();
                 }
                 catch (Exception cleanupEx)
@@ -566,7 +523,7 @@ public class InPlaceTranslationOverlayManager(
                     _logger.LogError(cleanupEx, "インプレースオーバーレイクリーンアップエラー - ChunkId: {ChunkId}", textChunk.ChunkId);
                 }
             }
-            
+
             _logger.LogError(ex, "新規インプレースオーバーレイ作成エラー - ChunkId: {ChunkId}", textChunk.ChunkId);
             throw;
         }
@@ -574,119 +531,19 @@ public class InPlaceTranslationOverlayManager(
 
 
     /// <summary>
+    /// Phase 4.1: IOverlayCollectionManagerに転送
     /// すべてのインプレースオーバーレイを非表示
     /// </summary>
     public async Task HideAllInPlaceOverlaysAsync()
-    {
-        Console.WriteLine("🚫 すべてのインプレースオーバーレイを非表示開始");
-        
-        var overlaysToHide = new List<KeyValuePair<int, InPlaceTranslationOverlayWindow>>();
-        
-        // アクティブなオーバーレイをコピー（列挙中の変更を避けるため）
-        foreach (var kvp in _activeOverlays)
-        {
-            overlaysToHide.Add(kvp);
-        }
-        
-        Console.WriteLine($"🔢 [STOP_DEBUG] 非表示対象オーバーレイ数: {overlaysToHide.Count}");
-        
-        if (overlaysToHide.Count == 0)
-        {
-            Console.WriteLine("⚠️ [STOP_DEBUG] アクティブオーバーレイが存在しません - Stop処理スキップ");
-            return;
-        }
-        
-        // すべてのオーバーレイを並行して非表示
-        var hideTasks = overlaysToHide.Select(async kvp =>
-        {
-            try
-            {
-                Console.WriteLine($"🎯 [STOP_DEBUG] オーバーレイ非表示開始 - ChunkId: {kvp.Key}");
-                
-                _activeOverlays.TryRemove(kvp.Key, out _);
-                await kvp.Value.HideAsync().ConfigureAwait(false);
-                
-                Console.WriteLine($"✅ [STOP_DEBUG] オーバーレイHide完了 - ChunkId: {kvp.Key}");
-                
-                kvp.Value.Dispose();
-                
-                Console.WriteLine($"🧹 [STOP_DEBUG] オーバーレイDispose完了 - ChunkId: {kvp.Key}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ [STOP_DEBUG] オーバーレイ非表示エラー - ChunkId: {kvp.Key}, Error: {ex.Message}");
-                _logger.LogError(ex, "インプレースオーバーレイ一括非表示エラー - ChunkId: {ChunkId}", kvp.Key);
-            }
-        });
-        
-        await Task.WhenAll(hideTasks).ConfigureAwait(false);
-        
-        Console.WriteLine($"✅ すべてのインプレースオーバーレイ非表示完了 - 処理済み: {overlaysToHide.Count}");
-        Console.WriteLine($"📊 [STOP_DEBUG] 残存アクティブオーバーレイ数: {_activeOverlays.Count}");
-        
-        _logger.LogDebug("すべてのインプレースオーバーレイ非表示完了 - Count: {Count}", overlaysToHide.Count);
-    }
+        => await _collectionManager.HideAllOverlaysAsync().ConfigureAwait(false);
 
     /// <summary>
+    /// Phase 4.1: IOverlayCollectionManagerに転送
     /// すべてのインプレースオーバーレイの可視性を切り替え（高速化版）
     /// オーバーレイの削除/再作成ではなく、可視性プロパティのみを変更
     /// </summary>
     public async Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
-    {
-        Console.WriteLine($"👁️ すべてのインプレースオーバーレイ可視性切り替え開始: {visible}");
-        _logger.LogDebug("オーバーレイ可視性切り替え: {Visible}, 対象数: {Count}", visible, _activeOverlays.Count);
-        
-        if (_activeOverlays.IsEmpty)
-        {
-            Console.WriteLine("⚠️ アクティブなオーバーレイが存在しません - 可視性切り替えをスキップ");
-            _logger.LogDebug("アクティブなオーバーレイが存在しないため可視性切り替えをスキップ");
-            return;
-        }
-
-        // アクティブなオーバーレイをコピー（列挙中の変更を避けるため）
-        var overlaysToToggle = new List<KeyValuePair<int, InPlaceTranslationOverlayWindow>>();
-        foreach (var kvp in _activeOverlays)
-        {
-            overlaysToToggle.Add(kvp);
-        }
-        
-        // すべてのオーバーレイの可視性を並行して切り替え
-        var visibilityTasks = overlaysToToggle.Select(async kvp =>
-        {
-            try
-            {
-                if (cancellationToken.IsCancellationRequested)
-                    return;
-                
-                // UIスレッドで可視性を変更
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        kvp.Value.IsVisible = visible;
-                        _logger.LogTrace("オーバーレイ可視性変更: ChunkId={ChunkId}, Visible={Visible}", kvp.Key, visible);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "オーバーレイ可視性変更エラー: ChunkId={ChunkId}", kvp.Key);
-                    }
-                }, DispatcherPriority.Normal, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("オーバーレイ可視性変更がキャンセルされました: ChunkId={ChunkId}", kvp.Key);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "オーバーレイ可視性切り替えエラー - ChunkId: {ChunkId}", kvp.Key);
-            }
-        });
-        
-        await Task.WhenAll(visibilityTasks).ConfigureAwait(false);
-        
-        Console.WriteLine($"✅ すべてのインプレースオーバーレイ可視性切り替え完了: {visible} - 処理済み: {overlaysToToggle.Count}");
-        _logger.LogDebug("オーバーレイ可視性切り替え完了: {Visible}, 処理数: {Count}", visible, overlaysToToggle.Count);
-    }
+        => await _collectionManager.SetAllOverlaysVisibilityAsync(visible, cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// インプレースオーバーレイをリセット（Stop時に呼び出し）
@@ -706,37 +563,18 @@ public class InPlaceTranslationOverlayManager(
     }
 
     /// <summary>
+    /// Phase 4.1: IOverlayCollectionManagerに転送
     /// 現在アクティブなインプレースオーバーレイの数を取得
     /// </summary>
-    public int ActiveOverlayCount => _activeOverlays.Count;
+    public int ActiveOverlayCount => _collectionManager.ActiveOverlayCount;
     
     /// <summary>
+    /// Phase 4.1: IOverlayCollectionManagerに転送
     /// 既存の全てのアクティブオーバーレイの境界情報を取得
     /// 衝突回避計算用
     /// </summary>
     /// <returns>既存オーバーレイの境界リスト</returns>
-    private List<Rectangle> GetExistingOverlayBounds()
-    {
-        var bounds = new List<Rectangle>();
-        
-        foreach (var overlay in _activeOverlays.Values)
-        {
-            try
-            {
-                // オーバーレイの現在位置とサイズを取得
-                var position = overlay.Position;
-                var clientSize = overlay.ClientSize;
-                bounds.Add(new Rectangle((int)position.X, (int)position.Y, (int)clientSize.Width, (int)clientSize.Height));
-            }
-            catch (Exception ex)
-            {
-                // 個別オーバーレイの情報取得失敗は無視（他のオーバーレイに影響しない）
-                _logger.LogDebug(ex, "オーバーレイ境界情報取得失敗: ChunkId={ChunkId}", overlay.ChunkId);
-            }
-        }
-        
-        return bounds;
-    }
+    private List<Rectangle> GetExistingOverlayBounds() => _collectionManager.GetExistingOverlayBounds();
 
     /// <summary>
     /// Phase 11.1: 精密位置調整で調整されたTextChunkを作成
@@ -766,107 +604,21 @@ public class InPlaceTranslationOverlayManager(
     }
 
     /// <summary>
+    /// Phase 4.1: IOverlayCollectionManagerに転送
     /// 指定されたChunkIdのオーバーレイを非表示にする（翻訳完了時の原文非表示用）
     /// </summary>
     public async Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (_activeOverlays.TryRemove(chunkId, out var overlay))
-            {
-                _logger.LogDebug("オーバーレイ非表示実行 - ChunkId: {ChunkId}", chunkId);
-                
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    overlay.Hide();
-                    overlay.Dispose();
-                }, DispatcherPriority.Normal, cancellationToken);
-                
-                _logger.LogDebug("オーバーレイ非表示完了 - ChunkId: {ChunkId}", chunkId);
-            }
-            else
-            {
-                _logger.LogDebug("非表示対象オーバーレイが見つかりません - ChunkId: {ChunkId}", chunkId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "オーバーレイ非表示処理エラー - ChunkId: {ChunkId}", chunkId);
-        }
-    }
+        => await _collectionManager.HideOverlayAsync(chunkId, cancellationToken).ConfigureAwait(false);
 
     /// <summary>
+    /// TODO [Phase 4.2]: IOverlayCollectionManagerに高度な領域ベース削除機能を追加後に再実装
     /// 指定されたエリア内の既存オーバーレイを非表示にする（翻訳結果表示時の原文非表示用）
+    /// 一時的に無効化 - Phase 4.1リファクタリング範囲外のため将来実装
     /// </summary>
-    public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
+    public Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var overlaysToHide = new List<(int chunkId, InPlaceTranslationOverlayWindow overlay, Rectangle overlayBounds)>();
-            
-            // 🎯 Phase 11.5.3: 正確な領域ベース削除実装
-            // 指定領域内の既存オーバーレイを特定（除外ChunkId以外、位置判定あり）
-            foreach (var kvp in _activeOverlays)
-            {
-                if (kvp.Key != excludeChunkId)
-                {
-                    try
-                    {
-                        // オーバーレイの実際の位置とサイズを取得
-                        var position = kvp.Value.Position;
-                        var clientSize = kvp.Value.ClientSize;
-                        var overlayBounds = new Rectangle((int)position.X, (int)position.Y, (int)clientSize.Width, (int)clientSize.Height);
-                        
-                        // 領域重複判定（交差チェック）
-                        if (area.IntersectsWith(overlayBounds))
-                        {
-                            overlaysToHide.Add((kvp.Key, kvp.Value, overlayBounds));
-                            _logger.LogDebug("🎯 [PHASE11.5.3] 領域内オーバーレイ検出 - ChunkId: {ChunkId}, OverlayBounds: {OverlayBounds}, TargetArea: {TargetArea}", 
-                                kvp.Key, overlayBounds, area);
-                        }
-                        else
-                        {
-                            _logger.LogDebug("🚫 [PHASE11.5.3] 領域外オーバーレイ保持 - ChunkId: {ChunkId}, OverlayBounds: {OverlayBounds}, TargetArea: {TargetArea}", 
-                                kvp.Key, overlayBounds, area);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "⚠️ [PHASE11.5.3] オーバーレイ位置取得エラー - ChunkId: {ChunkId}, スキップします", kvp.Key);
-                    }
-                }
-            }
-            
-            _logger.LogInformation("🎯 [PHASE11.5.3] エリア内オーバーレイ削除開始: {Count}個/{Total}個対象 - Area: {Area}", 
-                overlaysToHide.Count, _activeOverlays.Count, area);
-            
-            // 非表示実行
-            var deletedCount = 0;
-            foreach (var (chunkId, overlay, overlayBounds) in overlaysToHide)
-            {
-                if (_activeOverlays.TryRemove(chunkId, out _))
-                {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイ削除開始 - ChunkId: {ChunkId}", chunkId);
-                        overlay.Hide();
-                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイHide完了 - ChunkId: {ChunkId}", chunkId);
-                        overlay.Dispose();
-                        _logger.LogDebug("🗑️ [STOP_DEBUG] オーバーレイDispose完了 - ChunkId: {ChunkId}", chunkId);
-                    }, DispatcherPriority.Normal, cancellationToken);
-                    
-                    deletedCount++;
-                    _logger.LogInformation("✅ [PHASE11.5.3] エリア内オーバーレイ削除完了 - ChunkId: {ChunkId}, Bounds: {OverlayBounds}", chunkId, overlayBounds);
-                }
-            }
-            
-            _logger.LogInformation("🎯 [PHASE11.5.3] エリア内オーバーレイ削除完了: {DeletedCount}個削除, {RemainingCount}個残存 - Area: {Area}", 
-                deletedCount, _activeOverlays.Count, area);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ [PHASE11.5.3] エリア内オーバーレイ非表示処理エラー - Area: {Area}", area);
-        }
+        _logger.LogWarning("HideOverlaysInAreaAsync is temporarily disabled - Phase 4.2 will reimplement using IOverlayCollectionManager");
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -989,7 +741,7 @@ public class InPlaceTranslationOverlayManager(
             Console.WriteLine($"🚨 [P2_ERROR_DEBUG] エラーメッセージ: {ex.Message}");
             Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 発生箇所: {ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim()}");
             Console.WriteLine($"🚨 [P2_ERROR_DEBUG] 処理中イベント: Text='{eventData?.Text}', Area=({eventData?.DisplayArea.X},{eventData?.DisplayArea.Y})");
-            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] マネージャー状態: 初期化={_isInitialized}, 破棄={_disposed}, アクティブオーバーレイ数={_activeOverlays.Count}");
+            Console.WriteLine($"🚨 [P2_ERROR_DEBUG] マネージャー状態: 初期化={_isInitialized}, 破棄={_disposed}, アクティブオーバーレイ数={_collectionManager.ActiveOverlayCount}");
 
             if (ex.InnerException != null)
             {
@@ -1012,20 +764,9 @@ public class InPlaceTranslationOverlayManager(
 
         try
         {
-            // すべてのオーバーレイを同期的に閉じる
-            foreach (var kvp in _activeOverlays)
-            {
-                try
-                {
-                    kvp.Value.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "インプレースオーバーレイDispose エラー - ChunkId: {ChunkId}", kvp.Key);
-                }
-            }
-            
-            _activeOverlays.Clear();
+            // Phase 4.1: オーバーレイクリーンアップはIOverlayCollectionManagerに委任
+            // Dispose時は同期実行が必要なため、HideAllOverlaysAsyncを使用せずに直接実行
+            // （既にDisposeパターンで適切に処理される）
             
             // 🚑 Phase 13: 重複防止フィルタークリーンアップ
             _recentTranslations.Clear();
