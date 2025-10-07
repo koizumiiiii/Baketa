@@ -269,7 +269,25 @@ internal sealed partial class App : Avalonia.Application
                     
                     // EventHandlerInitializationService は Program.cs で既に完了済み
                     Console.WriteLine("✅ EventHandlerInitializationService は Program.cs で初期化済み - App.axaml.cs での重複実行をスキップ");
-                    
+
+                    // 🔥 [FIX] TranslationInitializationService手動実行 - IHostedService未実行問題の回避
+                    Console.WriteLine("🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化開始");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var translationEngine = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationEngine>();
+                            Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] ITranslationEngine取得成功: {translationEngine.GetType().Name}");
+
+                            var initResult = await translationEngine.InitializeAsync().ConfigureAwait(false);
+                            Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化完了: {initResult}");
+                        }
+                        catch (Exception initEx)
+                        {
+                            Console.WriteLine($"❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.Message}");
+                        }
+                    });
+
                     // デバッグログ追加
                     try
                     {
@@ -278,7 +296,7 @@ internal sealed partial class App : Avalonia.Application
                         System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→✅ EventHandlerInitializationService は Program.cs で初期化済み{Environment.NewLine}");
                     }
                     catch { /* ログファイル書き込み失敗は無視 */ }
-                    
+
                     Console.WriteLine("🔍 IEventAggregator取得開始");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 IEventAggregator取得開始");
                     try
