@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.IO;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -17,6 +19,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
 {
     private readonly ILogger<NativeWindowsCaptureWrapper>? _logger;
     private readonly WindowsImageFactory _imageFactory;
+    private readonly ISafeImageFactory _safeImageFactory; // 🔧 [SAFEIMAGE_FIX] SafeImageAdapterでOCR画像をラップ
     private readonly LoggingSettings _loggingSettings;
     private bool _disposed;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0032:Use auto property", Justification = "Field needs thread-safe access and initialization state tracking")]
@@ -54,14 +57,17 @@ public class NativeWindowsCaptureWrapper : IDisposable
     /// コンストラクタ
     /// </summary>
     /// <param name="imageFactory">画像ファクトリー</param>
+    /// <param name="safeImageFactory">SafeImage ファクトリー（OCR画像のメモリ安全性確保）</param>
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="loggingSettings">ログ設定（オプション）</param>
     public NativeWindowsCaptureWrapper(
         WindowsImageFactory imageFactory,
+        ISafeImageFactory safeImageFactory,
         ILogger<NativeWindowsCaptureWrapper>? logger = null,
         LoggingSettings? loggingSettings = null)
     {
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
+        _safeImageFactory = safeImageFactory ?? throw new ArgumentNullException(nameof(safeImageFactory));
         _logger = logger;
         _loggingSettings = loggingSettings ?? new LoggingSettings();
     }
@@ -436,14 +442,17 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 {
                     // BGRAデータからBitmapを作成
                     var bitmap = CreateBitmapFromBGRA(frame);
-                    
-                    // WindowsImageを作成
-                    var windowsImage = _imageFactory.CreateFromBitmap(bitmap);
-                    
-                    _logger?.LogDebug("フレームキャプチャ成功: {Width}x{Height}, Timestamp={Timestamp}", 
+
+                    // 🔧 [SAFEIMAGE_FIX] SafeImageを作成してメモリ安全性を確保
+                    var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, frame.width, frame.height);
+
+                    // 🔧 [SAFEIMAGE_FIX] SafeImageAdapterでラップしてIWindowsImageとして返す
+                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
+
+                    _logger?.LogDebug("✅ [SAFEIMAGE_FIX] フレームキャプチャ成功（SafeImage統合）: {Width}x{Height}, Timestamp={Timestamp}",
                         frame.width, frame.height, frame.timestamp);
-                    
-                    return windowsImage;
+
+                    return safeImageAdapter;
                 }
                 catch (Exception ex)
                 {
@@ -505,12 +514,12 @@ public class NativeWindowsCaptureWrapper : IDisposable
             width: frame.width,
             height: frame.height,
             stride: frame.stride,
-            format: PixelFormat.Format32bppArgb,
+            format: System.Drawing.Imaging.PixelFormat.Format32bppArgb,
             scan0: frame.bgraData);
 
         // 🛡️ メモリ安全性: Clone()で管理メモリにコピーしてAccessViolationException防止
         var bitmap = tempBitmap.Clone(
-            new Rectangle(0, 0, tempBitmap.Width, tempBitmap.Height),
+            new System.Drawing.Rectangle(0, 0, tempBitmap.Width, tempBitmap.Height),
             tempBitmap.PixelFormat);
 
         _logger?.LogDebug("安全化Bitmap作成成功: {Width}x{Height}, Stride={Stride}",
@@ -520,7 +529,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
         try
         {
             var bitmapData = bitmap.LockBits(
-                new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
                 ImageLockMode.ReadOnly,
                 bitmap.PixelFormat);
 
