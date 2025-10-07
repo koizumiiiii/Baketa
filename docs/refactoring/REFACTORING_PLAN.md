@@ -550,14 +550,111 @@ if (existingChunks.Count == 1)  // 最初のチャンク追加時
 
 #### 4.1 InPlaceTranslationOverlayManager分割 (3-4日)
 - [x] **参照**: `dependency_graph.md` - UI層依存関係（Application, Infrastructure.Platform）確認 ✅ (2025-10-07調査完了)
-- [ ] IInPlaceOverlayFactory.cs設計
-- [ ] InPlaceOverlayFactory.cs実装
-- [ ] CreateOverlay実装
-- [ ] ConfigureOverlay実装（WIDTH_FIX含む）
-- [ ] IOverlayPositioningService統合
-- [ ] InPlaceTranslationOverlayManager.cs簡素化（1,067行 → 300行）
-- [ ] ビルド成功確認
-- [ ] オーバーレイ表示動作確認
+- [x] **InPlaceTranslationOverlayManager.cs詳細分析完了** ✅ (2025-10-07)
+  - **現状**: 1,046行
+  - **目標**: 300行（**746行削減、72%削減**）
+  - **主要責任**: 初期化、重複防止、オーバーレイ表示、座標変換、診断、コレクション管理、イベント処理
+  - **冗長性**: 大量の診断ログ（各メソッド10-30行）、重複した例外処理、重複した座標変換ロジック
+
+**📊 Factory Pattern抽出戦略（UltraThink Phase 1分析結果）**:
+
+##### A. **IInPlaceOverlayFactory** (新規作成) - オーバーレイ作成の専門化
+**責任**: InPlaceTranslationOverlayWindowの作成とライフサイクル管理
+**抽出対象**:
+- `CreateAndShowNewInPlaceOverlayAsync` (Lines 385-573, 189行)
+  - オーバーレイウィンドウ作成ロジック (Lines 398-413)
+  - 座標変換呼び出し (Lines 449-450)
+  - DPI補正呼び出し (Lines 475-493)
+  - オーバーレイ表示ロジック (Lines 516-547)
+**削減見込み**: 189行 → 10行のFactory呼び出し（**179行削減**）
+
+##### B. **IOverlayCoordinateTransformer** (新規作成) - 座標変換の専門化
+**責任**: 座標変換、DPI補正、座標妥当性検証の統一化
+**抽出対象**:
+- 座標変換ロジック (Lines 420-501, 82行)
+  - IOverlayPositioningService.CalculateOptimalPosition呼び出し (Lines 449-450)
+  - DPI補正ロジック (Lines 475-493)
+  - 座標妥当性検証 (Lines 460-470)
+**削減見込み**: 82行 → 5行のTransformer呼び出し（**77行削減**）
+
+##### C. **IOverlayDiagnosticService** (新規作成) - 診断の専門化
+**責任**: 診断イベント発行、診断ログ出力の統一化
+**抽出対象**:
+- PipelineDiagnosticEvent発行ロジック (Lines 191-212, 324-343, 350-370, 約150行)
+- Console.WriteLine診断ログ（各メソッドに散在、約100行）
+**削減見込み**: 250行 → 20行のDiagnostic呼び出し（**230行削減**）
+
+##### D. **IOverlayCollectionManager** (新規作成) - コレクション管理の専門化
+**責任**: アクティブオーバーレイコレクションの管理、一括操作
+**抽出対象**:
+- `GetExistingOverlayBounds` (Lines 718-739, 22行)
+- `HideAllInPlaceOverlaysAsync` (Lines 579-628, 50行)
+- `HideOverlaysInAreaAsync` (Lines 801-870, 70行)
+- `SetAllOverlaysVisibilityAsync` (Lines 634-689, 56行)
+- `HideInPlaceOverlayAsync` (Lines 771-796, 26行)
+**削減見込み**: 224行 → 30行のCollection管理呼び出し（**194行削減**）
+
+**📋 削減見込み詳細**:
+
+| 領域 | 現在 | 削減後 | 削減量 |
+|------|------|--------|--------|
+| オーバーレイ作成（Factory） | 189行 | 10行 | **179行** |
+| 座標変換・DPI補正（Transformer） | 82行 | 5行 | **77行** |
+| 診断ログ・イベント（Diagnostic） | 250行 | 20行 | **230行** |
+| コレクション管理（Collection） | 224行 | 30行 | **194行** |
+| その他（重複削除） | 301行 | 235行 | **66行** |
+| **合計** | **1,046行** | **300行** | **746行（72%削減）** |
+
+**🛠️ 実装手順（6ステップ）**:
+
+- [ ] **Step 1**: IInPlaceOverlayFactory設計・実装 (0.5日)
+  - `Baketa.UI/Factories/IInPlaceOverlayFactory.cs` インターフェース定義
+  - `Baketa.UI/Factories/InPlaceOverlayFactory.cs` 実装
+  - `CreateOverlayAsync(TextChunk, CancellationToken)` メソッド
+  - `ShowOverlayAsync(InPlaceTranslationOverlayWindow, TextChunk, Point, CancellationToken)` メソッド
+  - DI登録（UIModule.cs）
+
+- [ ] **Step 2**: IOverlayCoordinateTransformer設計・実装 (0.5日)
+  - `Baketa.UI/Services/IOverlayCoordinateTransformer.cs` インターフェース定義
+  - `Baketa.UI/Services/OverlayCoordinateTransformer.cs` 実装
+  - `TransformCoordinatesAsync(TextChunk, MonitorInfo, List<Rectangle>, OverlayPositioningOptions, CancellationToken)` メソッド
+  - `ValidateCoordinates(Point, MonitorInfo)` メソッド
+  - DI登録（UIModule.cs）
+
+- [ ] **Step 3**: IOverlayDiagnosticService設計・実装 (0.5日)
+  - `Baketa.UI/Services/IOverlayDiagnosticService.cs` インターフェース定義
+  - `Baketa.UI/Services/OverlayDiagnosticService.cs` 実装
+  - `PublishOverlayDiagnosticAsync(string stage, bool isSuccess, long processingTimeMs, TextChunk, string sessionId, Exception? error)` メソッド
+  - `LogOverlayState(string operation, TextChunk, InPlaceTranslationOverlayWindow?)` メソッド
+  - DI登録（UIModule.cs）
+
+- [ ] **Step 4**: IOverlayCollectionManager設計・実装 (0.5日)
+  - `Baketa.UI/Services/IOverlayCollectionManager.cs` インターフェース定義
+  - `Baketa.UI/Services/OverlayCollectionManager.cs` 実装
+  - `GetExistingOverlayBounds()` メソッド
+  - `HideAllOverlaysAsync(CancellationToken)` メソッド
+  - `HideOverlaysInAreaAsync(Rectangle, int excludeChunkId, CancellationToken)` メソッド
+  - `SetAllVisibilityAsync(bool visible, CancellationToken)` メソッド
+  - `HideOverlayAsync(int chunkId, CancellationToken)` メソッド
+  - DI登録（UIModule.cs）
+
+- [ ] **Step 5**: InPlaceTranslationOverlayManager簡素化 (1日)
+  - Factory/Transformer/Diagnostic/Collection依存注入（コンストラクタ修正）
+  - `ShowInPlaceOverlayAsync` メソッド簡素化（Factory/Transformer呼び出しに置き換え）
+  - `CreateAndShowNewInPlaceOverlayAsync` メソッド削除（Factoryに移譲）
+  - 診断ログ削減（Diagnosticに移譲）
+  - 座標変換ロジック削減（Transformerに移譲）
+  - コレクション管理メソッド削減（Collectionに移譲）
+  - 重複コード削除（例外処理、境界取得など）
+  - ConfigureAwait(false)準拠確認
+
+- [ ] **Step 6**: ビルド確認とテスト (0.5日)
+  - ビルド成功確認（エラー0件）
+  - 既存テスト実行（Baketa.UI.Tests）
+  - オーバーレイ表示動作確認（新規作成・更新・削除）
+  - WIDTH_FIX動作確認（Factory実装で解決）
+  - 座標変換精度確認（Transformer実装で統一）
+  - マルチモニター対応確認
 
 #### 4.2 WIDTH_FIX問題の完全解決 (1日)
 - [ ] METHOD_ENTRYログが出ない原因完全解明
