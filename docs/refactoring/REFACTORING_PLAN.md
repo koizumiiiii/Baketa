@@ -527,11 +527,29 @@ if (existingChunks.Count == 1)  // 最初のチャンク追加時
 ### Phase 4: UI層リファクタリング (5-7日) - 🔴 未着手
 
 **📋 前提条件（Phase 2完了後、Phase 0.3成果物活用）**:
-- [ ] **参照**: `package_analysis.md` - Avalonia 11.2.7 → 11.3.7更新検討
-- [ ] **参照**: `package_analysis.md` - ReactiveUI 20.1.63 → 22.0.1更新検討（破壊的変更確認）
+- [x] **参照**: `package_analysis.md` - Avalonia 11.2.7 → 11.3.7更新検討 ✅ (2025-10-07調査完了)
+- [x] **参照**: `package_analysis.md` - ReactiveUI 20.1.63 → 22.0.1更新検討（破壊的変更確認） ✅ (2025-10-07調査完了)
+
+**📊 Phase 4前提条件調査結果（2025-10-07完了）**:
+
+1. **パッケージバージョン確認** (`package_analysis.md`参照):
+   - ✅ Avalonia: 11.2.7 → 11.3.7（⭐⭐⭐、マイナーアップデート、バグ修正・小機能追加）
+   - ⚠️ ReactiveUI: 20.1.63 → 22.0.1（⭐⭐⭐⭐、メジャーアップデート、**破壊的変更リスク高**）
+   - **推奨**: Phase 4.1完了後にReactiveUI更新を検討（リスク分離のため先送り）
+   - **理由**: UI層リファクタリング中のReactiveUIメジャーアップデートは変更点の切り分けが困難
+
+2. **UI層依存関係確認** (`dependency_graph.md`参照):
+   - ✅ Baketa.UI依存: Application, Core, Infrastructure.Platform
+   - ✅ 循環依存なし、Clean Architecture準拠確認
+   - ✅ テストプロジェクト: Baketa.UI.Tests (5依存), Baketa.UI.IntegrationTests (5依存)
+
+3. **InPlaceTranslationOverlayManager.cs現状**:
+   - ✅ 場所: `Baketa.UI/Services/InPlaceTranslationOverlayManager.cs`
+   - ✅ サイズ: 1,067行
+   - 🎯 目標: Factory Pattern適用により**300行に削減**（767行削減、約72%削減）
 
 #### 4.1 InPlaceTranslationOverlayManager分割 (3-4日)
-- [ ] **参照**: `dependency_graph.md` - UI層依存関係（Application, Infrastructure.Platform）確認
+- [x] **参照**: `dependency_graph.md` - UI層依存関係（Application, Infrastructure.Platform）確認 ✅ (2025-10-07調査完了)
 - [ ] IInPlaceOverlayFactory.cs設計
 - [ ] InPlaceOverlayFactory.cs実装
 - [ ] CreateOverlay実装
