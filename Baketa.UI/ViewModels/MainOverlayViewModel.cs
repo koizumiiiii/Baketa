@@ -575,13 +575,15 @@ public class MainOverlayViewModel : ViewModelBase
                 var isInitialized = (bool)(prop.GetValue(ocrService) ?? false);
                 return isInitialized;
             }
-            
-            // フォールバック: InitializeAsyncを呼んでみて、すでに初期化済みの場合は即座に完了する
-            await ocrService.InitializeAsync().ConfigureAwait(false);
-            return true;
+
+            // フォールバック: InitializeAsyncを呼んでみて、初期化結果を返す
+            var result = await ocrService.InitializeAsync().ConfigureAwait(false);
+            DebugLogUtility.WriteLog($"🔍 OCR InitializeAsync結果: {result}");
+            return result;
         }
-        catch
+        catch (Exception ex)
         {
+            DebugLogUtility.WriteLog($"❌ OCR初期化チェックエラー: {ex.Message}");
             return false;
         }
     }

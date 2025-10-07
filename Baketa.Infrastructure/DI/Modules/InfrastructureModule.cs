@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Baketa.Core.Abstractions.DI;
@@ -663,8 +664,24 @@ namespace Baketa.Infrastructure.DI.Modules;
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>>();
                 var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
 
-                var serverAddress = translationSettings.GrpcServerAddress ?? "http://localhost:50051";
-                logger.LogInformation("🔄 [PHASE3.1] GrpcTranslationClient初期化: {ServerAddress}", serverAddress);
+                // 🎯 [PHASE3.1_FIX] 動的ポート検索 - translation_ports_global.jsonから利用可能ポートを検出
+                string serverAddress;
+                const string DefaultGrpcAddress = "http://localhost:50051";
+
+                // デフォルト値または空の場合は動的検出を実行
+                if (string.IsNullOrEmpty(translationSettings.GrpcServerAddress) ||
+                    translationSettings.GrpcServerAddress == DefaultGrpcAddress)
+                {
+                    // translation_ports_global.jsonから動的にポート検出
+                    var dynamicPort = DetectDynamicPortFromGlobalRegistry(logger);
+                    serverAddress = $"http://localhost:{dynamicPort}";
+                    logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcServerAddress使用（動的検出）: Port {Port}", dynamicPort);
+                }
+                else
+                {
+                    serverAddress = translationSettings.GrpcServerAddress;
+                    logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcServerAddress使用（設定値）: {ServerAddress}", serverAddress);
+                }
 
                 return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(serverAddress, logger);
             });
@@ -679,9 +696,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             {
                 var client = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationClient>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter>>();
+                var serverManager = provider.GetRequiredService<IPythonServerManager>();
 
-                logger.LogInformation("🔥 [PHASE3.1] GrpcTranslationEngineAdapterをITranslationEngineとして登録");
-                return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger);
+                logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcTranslationEngineAdapterをITranslationEngineとして登録（ServerManager統合）");
+                return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger, serverManager);
             });
 
             Console.WriteLine("🚀 [PHASE3.1] GrpcTranslationEngineAdapter登録完了 - OptimizedPythonTranslationEngine削除済み");
@@ -1226,6 +1244,50 @@ namespace Baketa.Infrastructure.DI.Modules;
                     options.TimeoutMs = 120000; // 120秒 - NLLB-200初回ロード対応
                     options.RecoveryTimeoutMs = 60000;
                 });
+            }
+        }
+
+        /// <summary>
+        /// translation_ports_global.jsonから動的に利用可能なポート番号を検出します
+        /// </summary>
+        /// <param name="logger">ロガー</param>
+        /// <returns>検出されたポート番号（見つからない場合は50051）</returns>
+        private static int DetectDynamicPortFromGlobalRegistry(ILogger logger)
+        {
+            const int DefaultPort = 50051;
+            var globalRegistryPath = Path.Combine(Environment.CurrentDirectory, "translation_ports_global.json");
+
+            try
+            {
+                if (!File.Exists(globalRegistryPath))
+                {
+                    logger.LogWarning("🔍 [PHASE3.1_FIX] translation_ports_global.json が見つかりません: {Path}", globalRegistryPath);
+                    return DefaultPort;
+                }
+
+                var json = File.ReadAllText(globalRegistryPath);
+                using var document = System.Text.Json.JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("ports", out var portsElement))
+                {
+                    foreach (var portProperty in portsElement.EnumerateObject())
+                    {
+                        if (int.TryParse(portProperty.Name, out var availablePort))
+                        {
+                            logger.LogInformation("🎯 [PHASE3.1_FIX] 動的ポート検出成功: {Port}", availablePort);
+                            return availablePort;
+                        }
+                    }
+                }
+
+                logger.LogWarning("🔍 [PHASE3.1_FIX] translation_ports_global.json に有効なポートが見つかりませんでした");
+                return DefaultPort;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "💥 [PHASE3.1_FIX] translation_ports_global.json 読み込みエラー");
+                return DefaultPort;
             }
         }
     }

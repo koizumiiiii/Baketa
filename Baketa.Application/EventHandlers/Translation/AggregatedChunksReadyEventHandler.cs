@@ -11,6 +11,8 @@ using Baketa.Core.Events.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
+using Baketa.Core.Models.Translation;
+using Language = Baketa.Core.Translation.Models.Language;
 
 namespace Baketa.Application.EventHandlers.Translation;
 
@@ -26,11 +28,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    private readonly ILanguageConfigurationService _languageConfig;
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
 
     public AggregatedChunksReadyEventHandler(
         ITranslationService translationService,
         IInPlaceTranslationOverlayManager overlayManager,
+        ILanguageConfigurationService languageConfig,
         ILogger<AggregatedChunksReadyEventHandler> logger,
         IStreamingTranslationService? streamingTranslationService = null)
     {
@@ -39,6 +43,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _streamingTranslationService = streamingTranslationService;
 
@@ -163,6 +168,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 // CoordinateBasedTranslationServiceと同じシグネチャ
                 DebugLogUtility.WriteLog($"📞 [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync呼び出し直前");
 
+                // 🔥 [PHASE3.1_FIX] 設定から言語ペア取得（ハードコード削除）
+                var languagePair = _languageConfig.GetCurrentLanguagePair();
+                var sourceLanguage = Language.FromCode(languagePair.SourceCode);
+                var targetLanguage = Language.FromCode(languagePair.TargetCode);
+
+                DebugLogUtility.WriteLog($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+                Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し直前を確実に記録
                 var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
                 var threadId1 = Environment.CurrentManagedThreadId;
@@ -171,8 +184,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 var results = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
                     batchTexts,
-                    Language.FromCode("ja"), // TODO: 設定から取得
-                    Language.FromCode("en"), // TODO: 設定から取得
+                    sourceLanguage,
+                    targetLanguage,
                     null!, // OnChunkCompletedコールバックは不要（バッチ完了後にオーバーレイ表示）
                     cancellationToken).ConfigureAwait(false);
 
@@ -192,6 +205,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 Console.WriteLine($"🔥🔥🔥 [PHASE12.2_BATCH] DefaultTranslationService使用（_streamingTranslationService is null）");
                 _logger.LogDebug("🔥 [PHASE12.2] DefaultTranslationService使用");
 
+                // 🔥 [PHASE3.1_FIX] 設定から言語ペア取得（ハードコード削除）
+                var languagePair = _languageConfig.GetCurrentLanguagePair();
+                var sourceLanguage = Language.FromCode(languagePair.SourceCode);
+                var targetLanguage = Language.FromCode(languagePair.TargetCode);
+
+                DebugLogUtility.WriteLog($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+                Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+
                 var results = new List<string>();
                 for (int i = 0; i < batchTexts.Count; i++)
                 {
@@ -207,8 +228,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                     var response = await _translationService.TranslateAsync(
                         text,
-                        Language.FromCode("ja"), // TODO: 設定から取得
-                        Language.FromCode("en"), // TODO: 設定から取得
+                        sourceLanguage,
+                        targetLanguage,
                         null,
                         cancellationToken).ConfigureAwait(false);
 

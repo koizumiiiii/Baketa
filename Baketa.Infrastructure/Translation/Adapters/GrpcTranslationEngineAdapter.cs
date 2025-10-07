@@ -23,7 +23,10 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     private readonly ITranslationClient _client;
     private readonly ILogger<GrpcTranslationEngineAdapter> _logger;
     private readonly IReadOnlyList<LanguagePair> _supportedLanguagePairs;
+    private readonly IPythonServerManager? _serverManager;
     private bool _disposed;
+    private bool _serverEnsured; // サーバー起動確認済みフラグ
+    private readonly SemaphoreSlim _serverLock = new(1, 1); // サーバー起動の排他制御
 
     /// <summary>
     /// NLLB-200がサポートする主要言語ペア（日英翻訳特化）
@@ -47,21 +50,27 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     /// </summary>
     /// <param name="client">gRPC翻訳クライアント</param>
     /// <param name="logger">ロガー</param>
+    /// <param name="serverManager">Pythonサーバーマネージャー（nullの場合はサーバー起動なし）</param>
     /// <param name="supportedLanguagePairs">サポート言語ペア（nullの場合はデフォルト）</param>
     public GrpcTranslationEngineAdapter(
         ITranslationClient client,
         ILogger<GrpcTranslationEngineAdapter> logger,
+        IPythonServerManager? serverManager = null,
         IReadOnlyList<LanguagePair>? supportedLanguagePairs = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _serverManager = serverManager;
         _supportedLanguagePairs = supportedLanguagePairs ?? DefaultSupportedLanguagePairs;
 
+        Console.WriteLine($"🔥 [GrpcAdapter] コンストラクタ開始 - ServerManager: {_serverManager != null}");
         _logger.LogInformation(
-            "GrpcTranslationEngineAdapter initialized: Mode={CommunicationMode}, SupportedPairs={Count}",
+            "GrpcTranslationEngineAdapter initialized: Mode={CommunicationMode}, ServerManager={HasServerManager}, SupportedPairs={Count}",
             _client.CommunicationMode,
+            _serverManager != null,
             _supportedLanguagePairs.Count
         );
+        Console.WriteLine($"🔥 [GrpcAdapter] コンストラクタ完了 - ServerManager is null: {_serverManager == null}");
     }
 
     /// <inheritdoc/>
@@ -96,6 +105,56 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
         return Task.FromResult(isSupported);
     }
 
+    /// <summary>
+    /// Pythonサーバーが起動していることを確認します（初回のみ実行）
+    /// </summary>
+    private async Task EnsureServerStartedAsync()
+    {
+        if (_serverEnsured || _serverManager == null)
+        {
+            return;
+        }
+
+        await _serverLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_serverEnsured) // Double-check
+            {
+                return;
+            }
+
+            _logger.LogInformation("[GrpcAdapter] 🔥 Ensuring Python gRPC server is started");
+
+            const string GrpcServerLanguagePair = "grpc-all";
+            var serverInfo = await _serverManager.GetServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
+
+            if (serverInfo == null || !serverInfo.IsHealthy)
+            {
+                _logger.LogInformation("[GrpcAdapter] 🚀 Starting Python gRPC server");
+                serverInfo = await _serverManager.StartServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
+
+                if (serverInfo != null)
+                {
+                    _logger.LogInformation("[GrpcAdapter] ✅ Python gRPC server started on port {Port}", serverInfo.Port);
+                }
+                else
+                {
+                    _logger.LogWarning("[GrpcAdapter] ⚠️ Failed to start Python gRPC server");
+                }
+            }
+            else
+            {
+                _logger.LogInformation("[GrpcAdapter] ✅ Python gRPC server already running on port {Port}", serverInfo.Port);
+            }
+
+            _serverEnsured = true;
+        }
+        finally
+        {
+            _serverLock.Release();
+        }
+    }
+
     /// <inheritdoc/>
     public async Task<TranslationResponse> TranslateAsync(
         TranslationRequest request,
@@ -103,6 +162,9 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(request);
+
+        // 🔥 [PHASE3.1_FIX] 翻訳実行前にサーバー起動を確認
+        await EnsureServerStartedAsync().ConfigureAwait(false);
 
         try
         {
@@ -142,6 +204,20 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
             return Array.Empty<TranslationResponse>();
         }
 
+        // 🔥 [PHASE3.1_FIX] 翻訳実行前にサーバー起動を確認
+        await EnsureServerStartedAsync().ConfigureAwait(false);
+
+        // 🔥 [PHASE3.1_DEBUG] 必ず出力される詳細ログ
+        Console.WriteLine($"🔥 [GrpcAdapter] TranslateBatchAsync開始 - リクエスト数: {requests.Count}");
+        for (int i = 0; i < requests.Count; i++)
+        {
+            Console.WriteLine($"🔥 [GrpcAdapter] Request[{i}]: {requests[i].SourceLanguage.Code} → {requests[i].TargetLanguage.Code}, Text: '{requests[i].SourceText}'");
+        }
+        System.IO.File.AppendAllText(
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+            $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [GrpcAdapter] TranslateBatchAsync - Count: {requests.Count}\r\n"
+        );
+
         _logger.LogDebug("[GrpcAdapter] Batch translation: {Count} requests", requests.Count);
 
         try
@@ -150,6 +226,13 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
             // Note: GrpcTranslationClientにTranslateBatchAsyncメソッドが実装されたら切り替え
             var tasks = requests.Select(request => TranslateAsync(request, cancellationToken));
             var responses = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            // 🔥 [PHASE3.1_DEBUG] 翻訳結果ログ
+            Console.WriteLine($"🔥 [GrpcAdapter] TranslateBatchAsync完了 - 成功: {responses.Count(r => r.IsSuccess)}/{responses.Length}");
+            for (int i = 0; i < responses.Length; i++)
+            {
+                Console.WriteLine($"🔥 [GrpcAdapter] Response[{i}]: IsSuccess={responses[i].IsSuccess}, TranslatedText='{responses[i].TranslatedText}'");
+            }
 
             _logger.LogDebug(
                 "[GrpcAdapter] Batch translation completed: {SuccessCount}/{TotalCount} successful",
@@ -201,6 +284,34 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
         {
             _logger.LogInformation("[GrpcAdapter] Initializing gRPC translation engine");
 
+            // 🔥 [PHASE3.1_FIX] Pythonサーバーを自動起動
+            if (_serverManager != null)
+            {
+                _logger.LogInformation("[GrpcAdapter] Starting Python gRPC server via ServerManager");
+
+                // gRPCサーバーは単一サーバーがすべての言語ペアを処理するため、固定の識別子を使用
+                const string GrpcServerLanguagePair = "grpc-all";
+                var serverInfo = await _serverManager.GetServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
+
+                if (serverInfo == null)
+                {
+                    _logger.LogInformation("[GrpcAdapter] gRPC server not found, starting new instance");
+                    serverInfo = await _serverManager.StartServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
+                }
+
+                if (serverInfo == null || !serverInfo.IsHealthy)
+                {
+                    _logger.LogWarning("[GrpcAdapter] Python gRPC server failed to start or is unhealthy");
+                    return false;
+                }
+
+                _logger.LogInformation("[GrpcAdapter] Python gRPC server started successfully on port {Port}", serverInfo.Port);
+            }
+            else
+            {
+                _logger.LogInformation("[GrpcAdapter] No ServerManager provided - expecting externally managed server");
+            }
+
             // ヘルスチェックで初期化確認
             var isHealthy = await _client.HealthCheckAsync(CancellationToken.None).ConfigureAwait(false);
 
@@ -236,10 +347,12 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
             {
                 disposableClient.Dispose();
             }
+
+            _serverLock?.Dispose();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[GrpcAdapter] Error disposing client");
+            _logger.LogError(ex, "[GrpcAdapter] Error disposing resources");
         }
 
         _disposed = true;
