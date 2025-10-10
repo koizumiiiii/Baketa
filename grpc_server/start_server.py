@@ -28,6 +28,12 @@ from translation_server import TranslationServicer
 from engines.nllb_engine import NllbEngine
 from engines.ctranslate2_engine import CTranslate2Engine
 
+# 🔧 [UNICODE_FIX] Windows環境でのUnicodeEncodeError対策
+# sys.stdout/stderrをUTF-8に再設定（cp932 → utf-8）
+# これにより、ログ出力時のUnicodeエンコーディングエラーを防止
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 # ロギング設定
 logging.basicConfig(
     level=logging.INFO,
@@ -117,6 +123,12 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     logger.info(f"   Engine: {engine.__class__.__name__}")
     logger.info(f"   Model: {engine.model_name}")
     logger.info(f"   Device: {engine.device}")
+
+    # 🔥 [PHASE8_FIX] PythonServerManager.WaitForServerReadyAsync()互換性のため[SERVER_START]出力
+    # C#側がStdErrを監視しているため、sys.stderrに直接出力
+    sys.stderr.write("[SERVER_START]\n")
+    sys.stderr.flush()  # 即座に出力
+    logger.info("[SERVER_START] signal sent to stderr for C# detection")
     logger.info(f"   Supported languages: {', '.join(engine.get_supported_languages())}")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
