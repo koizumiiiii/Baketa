@@ -270,59 +270,10 @@ internal sealed partial class App : Avalonia.Application
                     // EventHandlerInitializationService は Program.cs で既に完了済み
                     Console.WriteLine("✅ EventHandlerInitializationService は Program.cs で初期化済み - App.axaml.cs での重複実行をスキップ");
 
-                    // 🔥 [FIX] TranslationInitializationService手動実行 - IHostedService未実行問題の回避
-                    Console.WriteLine("🚨🚨🚨 [INIT_DEBUG] OnFrameworkInitializationCompleted - 翻訳エンジン手動初期化開始");
-                    System.IO.File.AppendAllText(
-                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                        $"[{DateTime.Now:HH:mm:ss.fff}] 🚨🚨🚨 [INIT_DEBUG] OnFrameworkInitializationCompleted - 翻訳エンジン手動初期化開始\r\n"
-                    );
-
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            Console.WriteLine("🚨 [INIT_DEBUG] Task.Run実行開始");
-                            System.IO.File.AppendAllText(
-                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                                $"[{DateTime.Now:HH:mm:ss.fff}] 🚨 [INIT_DEBUG] Task.Run実行開始\r\n"
-                            );
-
-                            Console.WriteLine("🚨 [INIT_DEBUG] GetRequiredService<ITranslationEngine>呼び出し開始");
-                            var translationEngine = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationEngine>();
-                            Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] ITranslationEngine取得成功: {translationEngine.GetType().Name}");
-                            System.IO.File.AppendAllText(
-                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [TRANSLATION_INIT_FIX] ITranslationEngine取得成功: {translationEngine.GetType().Name}\r\n"
-                            );
-
-                            Console.WriteLine("🚨 [INIT_DEBUG] InitializeAsync呼び出し開始");
-                            var initResult = await translationEngine.InitializeAsync().ConfigureAwait(false);
-                            Console.WriteLine($"🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化完了: {initResult}");
-                            System.IO.File.AppendAllText(
-                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [TRANSLATION_INIT_FIX] 翻訳エンジン初期化完了: {initResult}\r\n"
-                            );
-                        }
-                        catch (Exception initEx)
-                        {
-                            Console.WriteLine($"❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.GetType().Name} - {initEx.Message}");
-                            System.IO.File.AppendAllText(
-                                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [TRANSLATION_INIT_FIX] 翻訳エンジン初期化エラー: {initEx.GetType().Name}\r\n" +
-                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ Message: {initEx.Message}\r\n" +
-                                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ StackTrace: {initEx.StackTrace}\r\n"
-                            );
-                        }
-                    });
-
-                    // デバッグログ追加
-                    try
-                    {
-                        var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
-                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                        System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→✅ EventHandlerInitializationService は Program.cs で初期化済み{Environment.NewLine}");
-                    }
-                    catch { /* ログファイル書き込み失敗は無視 */ }
+                    // 🔥 [PHASE0_FIX] IHostedService重複起動削除 - Program.cs:677-722で既に起動済み
+                    // Event Storm問題（PythonServerStatusChangedEvent多重発行）の根本原因を解決
+                    // ServerManagerHostedServiceを含むすべてのIHostedServiceはProgram.csで起動完了
+                    Console.WriteLine("🔥 [PHASE0_FIX] IHostedService起動はProgram.csで完了済み - 重複実行を回避");
 
                     Console.WriteLine("🔍 IEventAggregator取得開始");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 IEventAggregator取得開始");
