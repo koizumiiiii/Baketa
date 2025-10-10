@@ -63,6 +63,9 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             Console.WriteLine("🔍🔍🔍 [DIAGNOSTIC] InfrastructureModule.RegisterServices(1-parameter) 開始");
 
+            // 🚀 IHostedService: Pythonサーバー事前起動
+            services.AddHostedService<PythonServerHostedService>();
+
             // 🎯 Phase 3.1: NOTE: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで登録済み
             // Clean Architecture原則により、InfrastructureがApplicationを参照することはできない
             // SafeImageFactoryはSafeImageの内部コンストラクタアクセスのためApplication層必須
@@ -135,13 +138,15 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="configuration">設定オブジェクト</param>
         public void RegisterServices(IServiceCollection services, IConfiguration configuration)
         {
+            // 🚀 IHostedService: Pythonサーバー事前起動
+            services.AddHostedService<PythonServerHostedService>();
 
             // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
-            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>() 
+            //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>()
             //    ?? Core.DI.BaketaEnvironment.Production;
             var environment = Core.DI.BaketaEnvironment.Production;
-                
+
             // 設定ファイル統一: OCR設定をappsettings.jsonから読み込み
             // 注意: これはServiceModuleの外で設定される想定（Startup.cs等）
             
