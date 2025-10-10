@@ -63,9 +63,6 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             Console.WriteLine("🔍🔍🔍 [DIAGNOSTIC] InfrastructureModule.RegisterServices(1-parameter) 開始");
 
-            // 🚀 IHostedService: Pythonサーバー事前起動
-            services.AddHostedService<PythonServerHostedService>();
-
             // 🎯 Phase 3.1: NOTE: ISafeImageFactory/IImageLifecycleManagerはApplicationModuleで登録済み
             // Clean Architecture原則により、InfrastructureがApplicationを参照することはできない
             // SafeImageFactoryはSafeImageの内部コンストラクタアクセスのためApplication層必須
@@ -138,9 +135,6 @@ namespace Baketa.Infrastructure.DI.Modules;
         /// <param name="configuration">設定オブジェクト</param>
         public void RegisterServices(IServiceCollection services, IConfiguration configuration)
         {
-            // 🚀 IHostedService: Pythonサーバー事前起動
-            services.AddHostedService<PythonServerHostedService>();
-
             // 環境確認は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
             //var environment = services.BuildServiceProvider().GetService<Core.DI.BaketaEnvironment>()
@@ -335,12 +329,8 @@ namespace Baketa.Infrastructure.DI.Modules;
         {
             // Phase 1: 30秒再起動ループの根本解決
             services.AddSingleton<ModelCacheManager>();
-            services.AddSingleton<ModelPrewarmingService>();
             services.AddSingleton<DynamicHealthCheckManager>();
-            
-            // Phase 1: ModelPrewarmingServiceをIHostedServiceとして登録
-            services.AddHostedService<ModelPrewarmingService>();
-            
+
             // Phase 1: DynamicHealthCheckManagerをイベントプロセッサーとして登録
             services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(provider =>
                 provider.GetRequiredService<DynamicHealthCheckManager>());

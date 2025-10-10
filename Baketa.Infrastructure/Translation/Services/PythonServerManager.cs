@@ -17,16 +17,18 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// Issue #147 Phase 5: ヘルスチェック機能付きプロセス管理
 /// Gemini改善提案反映: 自動監視・復旧機能
 /// Step 1統合: PythonEnvironmentResolver活用
+/// 🔧 [GEMINI_FIX] IAsyncDisposable実装追加 - アプリケーション終了時の確実なクリーンアップ
 /// </summary>
 public class PythonServerManager(
     IPortManagementService portManager,
     PythonEnvironmentResolver pythonResolver,
     IEventAggregator eventAggregator,
-    ILogger<PythonServerManager> logger) : IPythonServerManager
+    ILogger<PythonServerManager> logger) : IPythonServerManager, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, PythonServerInstance> _activeServers = [];
     private readonly ConcurrentDictionary<int, bool> _serverStartDetectionFlags = []; // 🔥 UltraPhase 14.17: [SERVER_START]検出フラグ
     private readonly ConcurrentDictionary<int, bool> _commandCommunicationActiveFlags = []; // 🔥 UltraPhase 14.21: stdout競合回避フラグ
+    private readonly SemaphoreSlim _startServerSemaphore = new(1, 1); // 🔥 [PORT_CONFLICT_FIX] 並行起動防止
     private System.Threading.Timer? _healthCheckTimer;
     private readonly object _healthCheckLock = new();
     private bool _disposed;
@@ -53,17 +55,16 @@ public class PythonServerManager(
     /// <inheritdoc />
     public async Task<IPythonServerInfo> StartServerAsync(string languagePair)
     {
-        // 🔥 ULTRA_DEBUG: サーバー登録時の言語ペアキーを確実に記録
-        Console.WriteLine($"🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{languagePair}'");
-        logger.LogInformation("🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{LanguagePair}'", languagePair);
+        // 🔥 [PORT_CONFLICT_FIX] 並行起動防止 - SemaphoreSlimで排他制御
+        await _startServerSemaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // 🔥 ULTRA_DEBUG: サーバー登録時の言語ペアキーを確実に記録
+            Console.WriteLine($"🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{languagePair}'");
+            logger.LogInformation("🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{LanguagePair}'", languagePair);
 
-        Console.WriteLine($"🚀 [UltraPhase 14.12] PythonServerManager.StartServerAsync() 開始: {languagePair}");
-        logger.LogInformation("🚀 Python翻訳サーバー起動開始: {LanguagePair}", languagePair);
-
-        // Phase 0: サーバー初期化開始イベント発行
-        Console.WriteLine("🔍 [UltraPhase 14.12] PublishServerStatusAsync() 呼び出し");
-        await PublishServerStatusAsync(false, 0, "翻訳サーバー初期化中...",
-            $"言語ペア: {languagePair}").ConfigureAwait(false);
+            Console.WriteLine($"🚀 [UltraPhase 14.12] PythonServerManager.StartServerAsync() 開始: {languagePair}");
+            logger.LogInformation("🚀 Python翻訳サーバー起動開始: {LanguagePair}", languagePair);
 
         // 既存サーバーチェック（内部管理）
         Console.WriteLine("🔍 [UltraPhase 14.12] 既存サーバーチェック開始");
@@ -72,12 +73,17 @@ public class PythonServerManager(
             Console.WriteLine($"♻️ [UltraPhase 14.12] 既存サーバー再利用: Port {existing.Port}");
             logger.LogInformation("♻️ 既存サーバーを再利用: {LanguagePair} → Port {Port}", languagePair, existing.Port);
 
-            // Phase 0: 既存サーバー準備完了イベント発行
-            await PublishServerStatusAsync(true, existing.Port, "翻訳サーバー準備完了",
-                $"既存サーバー再利用: {languagePair}").ConfigureAwait(false);
+            // 🔧 [EVENT_FIX] Gemini推奨: 既存サーバー流用時はイベント発行をスキップ
+            // 理由: サーバー状態は「準備完了」のまま変化していないため、状態変化イベントは不要
+            logger.LogDebug("[PHASE0_FIX] 既存サーバー流用 - イベント発行スキップ: {LanguagePair} → Port {Port}", languagePair, existing.Port);
 
             return existing;
         }
+
+        // Phase 0: サーバー初期化開始イベント発行を削除
+        // 理由: 既存サーバーチェックやServerManagerHostedServiceが呼び出すたびに
+        // IsReady=Falseイベントが発行され、Startボタンが無効化されてしまう
+        Console.WriteLine("🔍 [FIX] StartServerAsync開始 - 初期化イベント発行をスキップ");
 
         // 🔥 UltraPhase 14.12 決定的修正: 外部サーバー検出を無効化
         // DetectExternalServerAsync()がTranslationInitializationService初期化中に
@@ -89,16 +95,20 @@ public class PythonServerManager(
         Console.WriteLine($"🔍 [UltraPhase 14.12] DetectExternalServerAsync() 完了: {(externalServerPort.HasValue ? $"Port {externalServerPort.Value}" : "未検出")}");
         if (externalServerPort.HasValue)
         {
+            var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [PHASE0_FIX] 既存サーバーチェック: 外部サーバー検出 Port {externalServerPort.Value}{Environment.NewLine}"); } catch { }
             logger.LogInformation("🔍 外部翻訳サーバー検出・登録: Port {Port}", externalServerPort.Value);
-            
+
             // 外部サーバーをPythonServerManagerに登録
             var externalInstance = new PythonServerInstance(externalServerPort.Value, languagePair, null);
             externalInstance.UpdateStatus(ServerStatus.Running);
             _activeServers[languagePair] = externalInstance;
-            
-            await PublishServerStatusAsync(true, externalServerPort.Value, "翻訳サーバー準備完了", 
+
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] 🔥🔥🔥 [EVENT_FIX] 既存サーバーチェック: PublishServerStatusAsync呼び出し直前 (Port {externalServerPort.Value}){Environment.NewLine}"); } catch { }
+            await PublishServerStatusAsync(true, externalServerPort.Value, "翻訳サーバー準備完了",
                 $"外部サーバー統合: {languagePair}").ConfigureAwait(false);
-            
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ✅ [EVENT_FIX] 既存サーバーチェック: PublishServerStatusAsync完了{Environment.NewLine}"); } catch { }
+
             return externalInstance;
         }
         
@@ -108,12 +118,38 @@ public class PythonServerManager(
             logger.LogWarning("🔄 不健全なサーバーを停止して再起動: {LanguagePair}", languagePair);
             await StopServerInternalAsync(languagePair).ConfigureAwait(false);
         }
-        
-        var port = await portManager.AcquireAvailablePortAsync().ConfigureAwait(false);
-        
-        try
+
+        // 🔥 [FIX] 固定ポート50051使用 - appsettings.json GrpcServerAddress設定と一致させる
+        const int port = 50051;
+
+        // 🔥 [ORPHAN_PROCESS_FIX] 孤立プロセス検出&強制終了 - アプリ異常終了時の残留プロセス対策
+        await KillOrphanedProcessOnPortAsync(port).ConfigureAwait(false);
+
+        logger.LogInformation("🔧 [FIXED_PORT] 固定ポート50051でPythonサーバー起動");
+        Console.WriteLine("🔧 [FIXED_PORT] 固定ポート50051でPythonサーバー起動");
+
+        // 🔥 [PORT_CONFLICT_FIX] 固定ポート50051では全言語ペアが同じポートを共有
+        // 既に起動済みのサーバーがあれば、言語ペアに関係なく再利用
+        var existingServerOnPort = _activeServers.Values.FirstOrDefault(s => s.Port == port && s.IsHealthy);
+        if (existingServerOnPort != null)
         {
-            var process = await StartPythonProcessAsync(port, languagePair).ConfigureAwait(false);
+            logger.LogInformation("♻️ [PORT_CONFLICT_FIX] 固定ポート50051のサーバーを再利用: {LanguagePair} (全言語ペア対応)", languagePair);
+            Console.WriteLine($"♻️ [PORT_CONFLICT_FIX] 固定ポート50051のサーバーを再利用: {languagePair}");
+
+            // 現在の言語ペアキーでも登録（複数キーで同じサーバーを参照）
+            _activeServers[languagePair] = existingServerOnPort;
+
+            // 🔧 [EVENT_FIX] Gemini推奨: 既存サーバー流用時はイベント発行をスキップ
+            // 理由: サーバー状態は「準備完了」のまま変化していないため、状態変化イベントは不要
+            // 新規サーバー起動時のみイベント発行することで、UI状態の不要な更新を回避
+            logger.LogDebug("[PORT_CONFLICT_FIX] 既存サーバー流用 - イベント発行スキップ: {LanguagePair} → Port {Port}", languagePair, port);
+
+            return existingServerOnPort;
+        }
+
+            try
+            {
+                var process = await StartPythonProcessAsync(port, languagePair).ConfigureAwait(false);
 
             // サーバー準備完了まで待機（UltraPhase 14.5: プロセス参照も渡して確実な準備確認）
             await WaitForServerReadyAsync(port, process).ConfigureAwait(false);
@@ -144,26 +180,35 @@ public class PythonServerManager(
             // ポートレジストリにサーバー情報登録
             await RegisterServerInPortRegistryAsync(instance).ConfigureAwait(false);
             
-            logger.LogInformation("✅ Python翻訳サーバー起動完了: {LanguagePair} → Port {Port}, PID {PID}", 
+            logger.LogInformation("✅ Python翻訳サーバー起動完了: {LanguagePair} → Port {Port}, PID {PID}",
                 languagePair, port, process.Id);
-            
+
             // Phase 0: サーバー起動完了イベント発行
-            await PublishServerStatusAsync(true, port, "翻訳サーバー準備完了", 
+            var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] 🔥🔥🔥 [EVENT_FIX] 新規サーバー起動: PublishServerStatusAsync呼び出し直前 (Port {port}, PID {process.Id}){Environment.NewLine}"); } catch { }
+            await PublishServerStatusAsync(true, port, "翻訳サーバー準備完了",
                 $"起動完了: {languagePair}, PID {process.Id}").ConfigureAwait(false);
-            
-            return instance;
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ✅ [EVENT_FIX] 新規サーバー起動: PublishServerStatusAsync完了{Environment.NewLine}"); } catch { };
+
+                return instance;
+            }
+            catch (Exception ex)
+            {
+                // ポート解放
+                await portManager.ReleasePortAsync(port).ConfigureAwait(false);
+                logger.LogError(ex, "❌ Python翻訳サーバー起動失敗: {LanguagePair}, Port {Port}", languagePair, port);
+
+                // Phase 0: サーバー起動失敗イベント発行
+                await PublishServerStatusAsync(false, port, "翻訳サーバーエラー",
+                    $"起動失敗: {languagePair}, エラー: {ex.Message}").ConfigureAwait(false);
+
+                throw;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            // ポート解放
-            await portManager.ReleasePortAsync(port).ConfigureAwait(false);
-            logger.LogError(ex, "❌ Python翻訳サーバー起動失敗: {LanguagePair}, Port {Port}", languagePair, port);
-            
-            // Phase 0: サーバー起動失敗イベント発行
-            await PublishServerStatusAsync(false, port, "翻訳サーバーエラー", 
-                $"起動失敗: {languagePair}, エラー: {ex.Message}").ConfigureAwait(false);
-            
-            throw;
+            // 🔥 [PORT_CONFLICT_FIX] SemaphoreSlim解放
+            _startServerSemaphore.Release();
         }
     }
 
@@ -226,20 +271,24 @@ public class PythonServerManager(
     /// </summary>
     private async Task<Process> StartPythonProcessAsync(int port, string languagePair)
     {
-        // CTranslate2版サーバーを優先使用
+        // プロジェクトルート取得（Environment.CurrentDirectoryが既にBaketaルート）
         var currentDir = Environment.CurrentDirectory;
-        var scriptPath = Path.Combine(currentDir, "scripts", "nllb_translation_server_ct2.py");
+        var projectRoot = currentDir; // 🔧 [PATH_FIX] CurrentDirectoryが既にプロジェクトルート
+
+        // CTranslate2版サーバーを優先使用（プロジェクトルートからの相対パス）
+        var scriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
 
         // 🔧 デバッグ: パス構築情報を詳細ログ出力
-        logger.LogInformation("🔧 [PATH_DEBUG] CurrentDirectory: '{CurrentDir}'", currentDir);
-        logger.LogInformation("🔧 [PATH_DEBUG] Constructed scriptPath: '{ScriptPath}'", scriptPath);
-        logger.LogInformation("🔧 [PATH_DEBUG] Script file exists: {Exists}", File.Exists(scriptPath));
+        logger.LogInformation("🔧 [PATH_FIX] CurrentDirectory: '{CurrentDir}'", currentDir);
+        logger.LogInformation("🔧 [PATH_FIX] ProjectRoot: '{ProjectRoot}'", projectRoot);
+        logger.LogInformation("🔧 [PATH_FIX] Constructed scriptPath: '{ScriptPath}'", scriptPath);
+        logger.LogInformation("🔧 [PATH_FIX] Script file exists: {Exists}", File.Exists(scriptPath));
 
         // スクリプトファイル存在確認
         if (!File.Exists(scriptPath))
         {
-            // フォールバック: 旧版サーバーを使用（互換性維持）
-            scriptPath = Path.Combine(Environment.CurrentDirectory, "scripts", "nllb_translation_server.py");
+            // フォールバック: gRPCサーバーを使用（Phase 2.2統合版、プロジェクトルートから）
+            scriptPath = Path.Combine(projectRoot, "grpc_server", "start_server.py");
 
             if (!File.Exists(scriptPath))
             {
@@ -280,9 +329,17 @@ public class PythonServerManager(
         var process = Process.Start(startInfo) ?? 
             throw new InvalidOperationException($"Python翻訳サーバープロセス起動失敗: {languagePair}");
         
-        logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Python: {Python}, Args: {Args}", 
+        logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Python: {Python}, Args: {Args}",
             process.Id, pythonExecutable, startInfo.Arguments);
-        
+
+        // 🔥 [PHASE7] StdErrファイル完全記録（ExitCode -1診断用）
+        var stderrLogPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"python_stderr_port{port}.log");
+        System.IO.File.WriteAllText(stderrLogPath, $"=== Python Process Started: PID {process.Id}, Port {port}, Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===\r\n");
+        System.IO.File.AppendAllText(stderrLogPath, $"Python: {pythonExecutable}\r\n");
+        System.IO.File.AppendAllText(stderrLogPath, $"Script: {scriptPath}\r\n");
+        System.IO.File.AppendAllText(stderrLogPath, $"Args: {startInfo.Arguments}\r\n");
+        System.IO.File.AppendAllText(stderrLogPath, $"=== StdErr Output ===\r\n");
+
         // 🚨 Phase 1.3: 標準出力監視 - UltraPhase 14.23: stdout完全無効化
         // 🔥 UltraPhase 14.23: stdin/stdout通信サーバーでは標準出力監視を完全停止
         //   理由: バックグラウンド監視タスクがJSONレスポンスを横取りし、
@@ -301,6 +358,13 @@ public class PythonServerManager(
                     var line = await process.StandardError.ReadLineAsync().ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(line))
                     {
+                        // 🔥 [PHASE7] すべてのStdErr出力をファイルに記録
+                        try
+                        {
+                            System.IO.File.AppendAllText(stderrLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {line}\r\n");
+                        }
+                        catch { /* ファイル書き込み失敗は無視 */ }
+
                         // Pythonエラーの重要度分類
                         if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
                         {
@@ -400,6 +464,10 @@ public class PythonServerManager(
 
             Console.WriteLine($"✅ [UltraPhase 14.13] SERVER_START信号検出完了: Port {port}, PID {process.Id}");
             logger.LogInformation("✅ サーバー準備完了確認: Port {Port}, PID {PID} (stdin/stdout通信)", port, process.Id);
+
+            // 🔧 [ULTRA_FIX] イベント発行はLine 183 (StartServerAsync内部)で実施
+            // WaitForServerReadyAsyncは準備確認のみに専念し、イベント発行責務を持たない
+            // 理由: 重複イベント発行によるIsTranslationEngineInitializingトグル問題を防止
         }
         catch (Exception ex)
         {
@@ -701,12 +769,104 @@ public class PythonServerManager(
     }
 
     /// <summary>
+    /// 🔥 [ORPHAN_PROCESS_FIX] 孤立Pythonプロセス検出&強制終了
+    /// アプリケーション異常終了時に残留したPythonサーバープロセスを検出して終了する
+    /// </summary>
+    private async Task KillOrphanedProcessOnPortAsync(int port)
+    {
+        try
+        {
+            logger.LogDebug("🔍 [ORPHAN_PROCESS_FIX] ポート{Port}の孤立プロセスチェック開始", port);
+
+            // netstatでポート占有プロセスを検出
+            var netstatProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "netstat",
+                    Arguments = "-ano",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            netstatProcess.Start();
+            var output = await netstatProcess.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+            await netstatProcess.WaitForExitAsync().ConfigureAwait(false);
+
+            // ポート50051を使用しているプロセスIDを抽出
+            var lines = output.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.Contains($":{port}") && line.Contains("LISTENING"))
+                {
+                    var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
+                    {
+                        logger.LogWarning("⚠️ [ORPHAN_PROCESS_FIX] ポート{Port}を占有する孤立プロセス検出: PID {Pid}", port, pid);
+                        Console.WriteLine($"⚠️ [ORPHAN_PROCESS_FIX] ポート{port}を占有する孤立プロセス検出: PID {pid}");
+
+                        // プロセスを強制終了（Gemini推奨: プロセス名検証追加）
+                        try
+                        {
+                            var orphanProcess = Process.GetProcessById(pid);
+
+                            // 🔥 [GEMINI_SECURITY] プロセス名が "python" または "pythonw" であることを確認
+                            // 予期しないプロセスを誤って終了するリスクを回避
+                            if (orphanProcess.ProcessName.Equals("python", StringComparison.OrdinalIgnoreCase) ||
+                                orphanProcess.ProcessName.Equals("pythonw", StringComparison.OrdinalIgnoreCase))
+                            {
+                                logger.LogInformation("🔥 [ORPHAN_PROCESS_FIX] 孤立したPythonプロセスを強制終了: PID {Pid}, Name {Name}", pid, orphanProcess.ProcessName);
+                                Console.WriteLine($"🔥 [ORPHAN_PROCESS_FIX] 孤立したPythonプロセスを強制終了: PID {pid}, Name {orphanProcess.ProcessName}");
+
+                                orphanProcess.Kill(entireProcessTree: true);
+                                await orphanProcess.WaitForExitAsync().ConfigureAwait(false);
+
+                                logger.LogInformation("✅ [ORPHAN_PROCESS_FIX] 孤立プロセス強制終了完了: PID {Pid}", pid);
+                                Console.WriteLine($"✅ [ORPHAN_PROCESS_FIX] 孤立プロセス強制終了完了: PID {pid}");
+                            }
+                            else
+                            {
+                                // 予期しないプロセスだった場合は警告ログのみ出力し、終了させない
+                                logger.LogWarning("⚠️ [ORPHAN_PROCESS_FIX] ポート{Port}を占有しているのは予期しないプロセスです。終了をスキップします: PID {Pid}, Name {Name}", port, pid, orphanProcess.ProcessName);
+                                Console.WriteLine($"⚠️ [ORPHAN_PROCESS_FIX] 予期しないプロセス（{orphanProcess.ProcessName}）のためスキップ: PID {pid}");
+                            }
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Process.GetProcessById でプロセスが見つからなかった場合（netstat実行後、Killまでの間に終了したなど）
+                            logger.LogInformation("ℹ️ [ORPHAN_PROCESS_FIX] PID {Pid} のプロセスは既に存在しないため、スキップします。", pid);
+                        }
+                        catch (Exception killEx)
+                        {
+                            logger.LogWarning(killEx, "⚠️ [ORPHAN_PROCESS_FIX] プロセス強制終了失敗: PID {Pid}", pid);
+                        }
+
+                        break; // 1つ見つかれば十分
+                    }
+                }
+            }
+
+            logger.LogDebug("✅ [ORPHAN_PROCESS_FIX] ポート{Port}の孤立プロセスチェック完了", port);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "⚠️ [ORPHAN_PROCESS_FIX] 孤立プロセスチェックでエラー発生 - 続行");
+        }
+    }
+
+    /// <summary>
     /// Pythonサーバー状態変更イベントを発行するヘルパーメソッド (Phase 0: StartButton制御機能)
     /// </summary>
     private async Task PublishServerStatusAsync(bool isReady, int port, string message, string details)
     {
+        var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
         try
         {
+            // 🔥 [EVENT_FIX] PublishServerStatusAsync実行ログ
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] 🔥🔥🔥 [EVENT_FIX] PublishServerStatusAsync実行: IsReady={isReady}, Port={port}, Message={message}{Environment.NewLine}"); } catch { }
+
             var statusEvent = new PythonServerStatusChangedEvent
             {
                 IsServerReady = isReady,
@@ -715,13 +875,16 @@ public class PythonServerManager(
                 Details = details
             };
 
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [EVENT_FIX] EventAggregator.PublishAsync呼び出し直前{Environment.NewLine}"); } catch { }
             await eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
-            
-            logger.LogDebug("📡 サーバー状態イベント発行: Ready={IsReady}, Port={Port}, Message={Message}", 
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ✅ [EVENT_FIX] EventAggregator.PublishAsync完了{Environment.NewLine}"); } catch { }
+
+            logger.LogDebug("📡 サーバー状態イベント発行: Ready={IsReady}, Port={Port}, Message={Message}",
                 isReady, port, message);
         }
         catch (Exception ex)
         {
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [EVENT_FIX] PublishServerStatusAsync例外: {ex.Message}{Environment.NewLine}"); } catch { }
             logger.LogWarning(ex, "⚠️ サーバー状態イベント発行エラー: Ready={IsReady}, Port={Port}", isReady, port);
         }
     }
@@ -729,11 +892,11 @@ public class PythonServerManager(
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         logger.LogInformation("🛑 PythonServerManager破棄開始");
-        
+
         _disposed = true;
-        
+
         try
         {
             _healthCheckTimer?.Dispose();
@@ -742,10 +905,10 @@ public class PythonServerManager(
         {
             logger.LogWarning("⚠️ ヘルスチェックタイマー破棄エラー: {Error}", ex.Message);
         }
-        
+
         // 全サーバー停止
         var stopTasks = _activeServers.Keys.ToList().Select(StopServerInternalAsync);
-        
+
         try
         {
             Task.WaitAll([..stopTasks], TimeSpan.FromSeconds(10));
@@ -754,7 +917,70 @@ public class PythonServerManager(
         {
             logger.LogWarning("⚠️ サーバー一括停止エラー: {Error}", ex.Message);
         }
-        
+
+        // 🔧 [GEMINI_FIX] SemaphoreSlim破棄追加 - リソースリーク防止
+        try
+        {
+            _startServerSemaphore?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("⚠️ SemaphoreSlim破棄エラー: {Error}", ex.Message);
+        }
+
         logger.LogInformation("✅ PythonServerManager破棄完了");
+    }
+
+    /// <summary>
+    /// 非同期破棄処理 - IAsyncDisposable実装
+    /// 🔧 [GEMINI_FIX] アプリケーション終了時の確実なプロセスクリーンアップ
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+
+        logger.LogInformation("🛑 [ASYNC_DISPOSE] PythonServerManager非同期破棄開始");
+
+        _disposed = true;
+
+        // ヘルスチェックタイマー停止
+        try
+        {
+            _healthCheckTimer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+            _healthCheckTimer?.Dispose();
+            logger.LogDebug("✅ [ASYNC_DISPOSE] ヘルスチェックタイマー破棄完了");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "⚠️ [ASYNC_DISPOSE] ヘルスチェックタイマー破棄エラー");
+        }
+
+        // 全サーバー非同期停止
+        var stopTasks = _activeServers.Keys.ToList().Select(StopServerInternalAsync);
+
+        try
+        {
+            await Task.WhenAll(stopTasks).ConfigureAwait(false);
+            logger.LogInformation("✅ [ASYNC_DISPOSE] 全サーバー停止完了: {ServerCount}台", stopTasks.Count());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ [ASYNC_DISPOSE] サーバー一括停止エラー");
+        }
+
+        // SemaphoreSlim破棄
+        try
+        {
+            _startServerSemaphore?.Dispose();
+            logger.LogDebug("✅ [ASYNC_DISPOSE] SemaphoreSlim破棄完了");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "⚠️ [ASYNC_DISPOSE] SemaphoreSlim破棄エラー");
+        }
+
+        logger.LogInformation("✅ [ASYNC_DISPOSE] PythonServerManager非同期破棄完了");
+
+        GC.SuppressFinalize(this);
     }
 }

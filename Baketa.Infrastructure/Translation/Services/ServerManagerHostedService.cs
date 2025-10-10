@@ -40,9 +40,9 @@ public sealed class ServerManagerHostedService : IHostedService
             {
                 _logger.LogInformation("🔄 [HOSTED_SERVICE] Python翻訳サーバー起動開始");
 
-                // デフォルト言語ペア（en-ja）のサーバーを起動
-                // ServerManagerが動的にポートを割り当て
-                const string defaultLanguagePair = "en-ja";
+                // gRPCサーバーは単一サーバーがすべての言語ペアを処理するため、固定の識別子を使用
+                // GrpcTranslationEngineAdapterと同じキーを使用して、Dictionary での重複登録を防ぐ
+                const string defaultLanguagePair = "grpc-all";
 
                 var serverInfo = await _serverManager.StartServerAsync(defaultLanguagePair).ConfigureAwait(false);
 
