@@ -203,10 +203,16 @@ class NllbEngine(TranslationEngine):
             # 翻訳実行（asyncio.to_threadで非同期化）
             def _generate():
                 self.tokenizer.src_lang = src_code
+                # 🔥 [FIX] NllbTokenizerFastでは convert_tokens_to_ids() を使用
+                tgt_lang_id = self.tokenizer.convert_tokens_to_ids(tgt_code)
+
+                # 🔍 [DEBUG] tgt_lang_idの値確認（デバッグ用）
+                self.logger.debug(f"tgt_code: {tgt_code}, tgt_lang_id: {tgt_lang_id}")
+
                 with torch.no_grad():
                     generated_tokens = self.model.generate(
                         **inputs,
-                        forced_bos_token_id=self.tokenizer.lang_code_to_id[tgt_code],
+                        forced_bos_token_id=tgt_lang_id,
                         max_new_tokens=self.MAX_TEXT_LENGTH,
                         num_beams=5,
                         early_stopping=True
@@ -274,10 +280,16 @@ class NllbEngine(TranslationEngine):
             # バッチ翻訳実行（asyncio.to_threadで非同期化）
             def _generate_batch():
                 self.tokenizer.src_lang = src_code
+                # 🔥 [FIX] NllbTokenizerFastでは convert_tokens_to_ids() を使用
+                tgt_lang_id = self.tokenizer.convert_tokens_to_ids(tgt_code)
+
+                # 🔍 [DEBUG] tgt_lang_idの値確認（デバッグ用）
+                self.logger.debug(f"[BATCH] tgt_code: {tgt_code}, tgt_lang_id: {tgt_lang_id}")
+
                 with torch.no_grad():
                     generated_tokens = self.model.generate(
                         **inputs,
-                        forced_bos_token_id=self.tokenizer.lang_code_to_id[tgt_code],
+                        forced_bos_token_id=tgt_lang_id,
                         max_new_tokens=self.MAX_TEXT_LENGTH,
                         num_beams=5,
                         early_stopping=True
