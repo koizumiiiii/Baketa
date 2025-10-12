@@ -541,9 +541,9 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
                 if (!File.Exists(serverScriptPath))
                 {
-                    // フォールバック: 旧版サーバー（互換性維持）
-                    serverScriptPath = @"scripts\nllb_translation_server.py";
-                    _logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Path}", serverScriptPath);
+                    // フォールバック: gRPCサーバー（Phase 2.2統合版）
+                    serverScriptPath = @"grpc_server\start_server.py";
+                    _logger.LogWarning("⚠️ CTranslate2版が見つからず、gRPCサーバーを使用: {Path}", serverScriptPath);
                 }
 
                 // NLLB-200用のポート設定（動的ポート範囲に統一）

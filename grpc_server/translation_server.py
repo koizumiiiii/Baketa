@@ -84,6 +84,10 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
         start_time = time.time()
         self.logger.info(f"Translate RPC called - request_id: {request.request_id}")
 
+        # 🔧 [TRANSLATION_DEBUG] 入力情報ログ
+        self.logger.info(f"[TRANSLATE_INPUT] SourceLang: {request.source_language.code}, TargetLang: {request.target_language.code}")
+        self.logger.info(f"[TRANSLATE_INPUT] Length: {len(request.source_text)}, Text: {request.source_text[:200]}...")
+
         try:
             # 翻訳実行
             translated_text, confidence_score = await self.engine.translate(
@@ -93,6 +97,9 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
             )
 
             processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # 🔧 [TRANSLATION_DEBUG] 翻訳結果ログ
+            self.logger.info(f"[TRANSLATE_OUTPUT] Length: {len(translated_text)}, Confidence: {confidence_score:.3f}, Text: {translated_text[:200]}...")
 
             # TranslateResponse作成（translation_pb2.TranslateResponse()）
             response = translation_pb2.TranslateResponse(
@@ -177,6 +184,10 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
             # 翻訳元テキスト抽出
             texts = [req.source_text for req in request.requests]
 
+            # 🔧 [REPETITION_DEBUG] 入力テキストをログ出力
+            for i, text in enumerate(texts):
+                self.logger.info(f"[BATCH_INPUT_{i}] Length: {len(text)}, Text: {text[:200]}...")
+
             # 言語コード（最初のリクエストから取得）
             if batch_size == 0:
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -193,6 +204,10 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
                 source_lang=source_lang,
                 target_lang=target_lang
             )
+
+            # 🔧 [REPETITION_DEBUG] 翻訳結果をログ出力
+            for i, (translated_text, confidence) in enumerate(results):
+                self.logger.info(f"[BATCH_OUTPUT_{i}] Length: {len(translated_text)}, Confidence: {confidence:.3f}, Text: {translated_text[:200]}...")
 
             processing_time_ms = int((time.time() - start_time) * 1000)
 

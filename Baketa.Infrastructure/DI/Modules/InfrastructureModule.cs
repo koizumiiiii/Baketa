@@ -366,13 +366,15 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 🚨 翻訳サーバー安定化: Python サーバーヘルスモニター（バックグラウンドサービス）
             Console.WriteLine("🔍 [DI_DEBUG] PythonServerHealthMonitor登録開始");
-            
-            // シングルトンとしても登録（直接取得のため）
-            services.AddSingleton<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
-            
-            // HostedServiceとしても登録
+
+            // 🔥 [PHASE5.2J_FIX] Gemini推奨修正: AddSingleton削除（二重登録問題解決）
+            // AddHostedService<T>()は内部的にシングルトン登録も行うため、明示的なAddSingletonは不要
+            // 二重登録によりGetServices<IHostedService>()でInvalidOperationExceptionが発生していた
+            // services.AddSingleton<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>(); // ← 削除
+
+            // HostedServiceとしてのみ登録（これでシングルトン + IHostedService両方が登録される）
             services.AddHostedService<PythonServerHealthMonitor>();
-            
+
             Console.WriteLine("✅ [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能");
             
             // 🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム統合

@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Memory;
@@ -59,6 +60,18 @@ public sealed class SafeImageAdapter : IWindowsImage
     {
         ThrowIfDisposed();
         return CreateBitmapFromSafeImage();
+    }
+
+    /// <summary>
+    /// Bitmapとして取得（async版）
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>System.Drawing.Bitmap インスタンス</returns>
+    /// <remarks>🔥 [PHASE5.2] スレッドブロッキング防止のため追加</remarks>
+    public Task<Bitmap> GetBitmapAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        return Task.FromResult(CreateBitmapFromSafeImage());
     }
 
     /// <summary>
@@ -171,12 +184,26 @@ public sealed class SafeImageAdapter : IWindowsImage
     }
 
     /// <summary>
+    /// ネイティブImageオブジェクトを取得（async版）
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>System.Drawing.Image インスタンス</returns>
+    /// <remarks>🔥 [PHASE5.2] スレッドブロッキング防止のため追加</remarks>
+    public Task<Image> GetNativeImageAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        return Task.FromResult<Image>(CreateBitmapFromSafeImage());
+    }
+
+    /// <summary>
     /// 指定したパスに画像を保存
     /// </summary>
     /// <param name="path">保存先パス</param>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>非同期タスク</returns>
-    public async Task SaveAsync(string path, GdiImageFormat? format = null)
+    /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+    public async Task SaveAsync(string path, GdiImageFormat? format = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -217,8 +244,10 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// 画像の一部を切り取る
     /// </summary>
     /// <param name="rectangle">切り取る領域</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>切り取られた新しい画像インスタンス</returns>
-    public async Task<IWindowsImage> CropAsync(GdiRectangle rectangle)
+    /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+    public async Task<IWindowsImage> CropAsync(GdiRectangle rectangle, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -239,8 +268,10 @@ public sealed class SafeImageAdapter : IWindowsImage
     /// 画像をバイト配列に変換
     /// </summary>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>画像データのバイト配列</returns>
-    public async Task<byte[]> ToByteArrayAsync(GdiImageFormat? format = null)
+    /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+    public async Task<byte[]> ToByteArrayAsync(GdiImageFormat? format = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 

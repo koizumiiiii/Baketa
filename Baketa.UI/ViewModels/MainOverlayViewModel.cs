@@ -37,9 +37,13 @@ public class MainOverlayViewModel : ViewModelBase
     private bool _isTranslationResultVisible; // 初期状態は非表示
     private bool _isWindowSelected;
     private bool _isOcrInitialized;
-    
+
     // 🚀 EventHandler初期化完了状態（UI安全性向上）
     private bool _isEventHandlerInitialized;
+
+    // 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態（StartButton制御）
+    private bool _isTranslationEngineInitializing;
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -61,10 +65,14 @@ public class MainOverlayViewModel : ViewModelBase
         _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
         _translationControlService = translationControlService ?? throw new ArgumentNullException(nameof(translationControlService));
         _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
-        
+
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
         _currentStatus = TranslationStatus.Idle; // アイドル状態から開始
+
+        // 🔥 [FIX] 翻訳エンジンは既に起動済み（ServerManagerHostedServiceで起動）
+        // MainOverlayViewModel初期化時点でサーバーは準備完了しているため、falseで開始
+        _isTranslationEngineInitializing = false;
         
         DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
@@ -259,8 +267,37 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                     });
                 }
-                
+
                 DebugLogUtility.WriteLog($"🚀 EventHandler初期化状態変更: IsEventHandlerInitialized={value}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態 - Start button制御
+    /// TranslationInitializationServiceがPythonサーバー起動完了後にfalseに設定
+    /// </summary>
+    public bool IsTranslationEngineInitializing
+    {
+        get => _isTranslationEngineInitializing;
+        set
+        {
+            var changed = SetPropertySafe(ref _isTranslationEngineInitializing, value);
+            if (changed)
+            {
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                    });
+                }
+
+                DebugLogUtility.WriteLog($"🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態変更: IsTranslationEngineInitializing={value}");
             }
         }
     }
@@ -276,22 +313,23 @@ public class MainOverlayViewModel : ViewModelBase
     public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
     public bool SettingsEnabled => !IsLoading && !IsTranslationActive; // ローディング中または翻訳実行中は無効
     public bool IsSelectWindowEnabled => IsOcrInitialized && !IsLoading; // OCR初期化完了かつローディング中以外
-    public bool IsStartStopEnabled 
-    { 
-        get 
+    public bool IsStartStopEnabled
+    {
+        get
         {
+            // 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化完了チェックを追加（StartButton制御）
             // 🚀 EventHandler初期化完了チェックを追加（UI安全性向上）
-            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized; 
-            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, 結果={enabled}");
-            
+            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing;
+            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
+
             // デバッグ用に実際の状態をファイルログにも出力
             try
             {
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", 
-                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}");
             }
             catch { }
-            
+
             return enabled;
         }
     }
@@ -436,6 +474,9 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 翻訳結果表示状態変更イベントの購読
         SubscribeToEvent<TranslationDisplayVisibilityChangedEvent>(OnTranslationDisplayVisibilityChanged);
+
+        // 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントの購読（翻訳エンジン初期化完了検知）
+        SubscribeToEvent<Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent>(OnPythonServerStatusChanged);
     }
 
     private void InitializePropertyChangeHandlers()
@@ -1184,8 +1225,57 @@ public class MainOverlayViewModel : ViewModelBase
         {
             IsTranslationResultVisible = visibilityEvent.IsVisible;
         });
-        
+
         Logger?.LogDebug("Translation display visibility changed: {IsVisible}", visibilityEvent.IsVisible);
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントハンドラー
+    /// TranslationInitializationServiceがサーバー起動完了時にこのイベントを発行
+    /// StartButton制御の核心部分
+    /// </summary>
+    private async Task OnPythonServerStatusChanged(Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent eventData)
+    {
+        try
+        {
+            Logger?.LogInformation("🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更: Ready={IsReady}, Port={Port}, Message={Message}",
+                eventData.IsServerReady, eventData.ServerPort, eventData.StatusMessage);
+
+            // UI更新をメインスレッドで実行
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // StartCaptureCommandの有効/無効を制御
+                IsTranslationEngineInitializing = !eventData.IsServerReady;
+
+                // サーバー準備完了時の追加処理
+                if (eventData.IsServerReady)
+                {
+                    Logger?.LogInformation("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
+                    DebugLogUtility.WriteLog("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
+                }
+                else
+                {
+                    // 初期化中または失敗時
+                    if (eventData.StatusMessage.Contains("エラー"))
+                    {
+                        Logger?.LogWarning("❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー - StartButton無効化");
+                        DebugLogUtility.WriteLog($"❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー: {eventData.StatusMessage}");
+                    }
+                    else
+                    {
+                        Logger?.LogInformation("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
+                        DebugLogUtility.WriteLog("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
+                    }
+                }
+            });
+
+            await Task.CompletedTask.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "❌ [PHASE2_PROBLEM2] Pythonサーバー状態変更イベント処理エラー");
+            DebugLogUtility.WriteLog($"❌ [PHASE2_PROBLEM2] イベント処理エラー: {ex.Message}");
+        }
     }
 
     #endregion

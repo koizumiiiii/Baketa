@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 
 namespace Baketa.Infrastructure.Processing.Strategies;
@@ -51,12 +52,20 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
+        // 🎯 [PHASE4.4_DIAGNOSIS] ExecuteAsync開始ログ（ファイル直接書き込み）
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🎯 [PHASE4.4_DIAGNOSIS] ImageChangeDetectionStageStrategy.ExecuteAsync開始{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         try
         {
             var input = context.Input;
             var currentImage = input.CapturedImage;
-            
+
             if (currentImage == null)
             {
                 _logger.LogWarning("キャプチャ画像が null - 変化ありとして処理継続");
@@ -132,56 +141,21 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     public bool ShouldExecute(ProcessingContext context)
 {
-    // 🔍 Phase 3 Fix: 画像変化検知結果に基づく実行判定（重複翻訳解決）
     var currentImage = context.Input?.CapturedImage;
-    
+
     // 画像なし: 実行不要
     if (currentImage == null)
     {
         _logger.LogDebug("🚫 ShouldExecute: false (画像なし)");
         return false;
     }
-    
-    // 初回キャプチャ: 必ず実行
-    IImage? previousImageToUse;
-    lock (_imageLock)
-    {
-        previousImageToUse = _previousImage;
-        if (previousImageToUse == null)
-        {
-            _logger.LogDebug("✅ ShouldExecute: true (初回キャプチャ)");
-            return true;
-        }
-    }
-    
-    try
-    {
-        // 🚀 基本変化検知: サイズベース + 時間間隔チェック
-        var hasBasicChange = PerformBasicChangeCheck(previousImageToUse, currentImage);
-        
-        // 🔥 UltraThink Phase 8 修正: 詳細ログ追加で根本原因特定
-        _logger.LogDebug("🔍 ShouldExecute詳細分析 - 前回画像: {PrevW}x{PrevH}, 現在画像: {CurrW}x{CurrH}, 基本変化検知: {HasChange}",
-            previousImageToUse.Width, previousImageToUse.Height,
-            currentImage.Width, currentImage.Height,
-            hasBasicChange);
-        
-        if (hasBasicChange)
-        {
-            _logger.LogTrace("✅ ShouldExecute: true (基本変化検知: 変化あり)");
-        }
-        else
-        {
-            _logger.LogTrace("🚫 ShouldExecute: false (基本変化検知: 変化なし - 処理スキップで重複翻訳解決)");
-        }
-        
-        return hasBasicChange;
-    }
-    catch (Exception ex)
-    {
-        // エラー時は安全側で実行継続
-        _logger.LogWarning(ex, "⚠️ ShouldExecute: true (基本変化検知エラー、安全側で実行継続)");
-        return true;
-    }
+
+    // 🎯 [PHASE4.4_FIX] EnhancedImageChangeDetectionServiceの3段階検知に完全委任
+    // サイズベースチェックサム（CalculateImageChecksum）は不適切なため廃止
+    // 理由: ゲームウィンドウはプレイ中にサイズ変更しないため、常に同じチェックサム値となり変化検知不能
+    // EnhancedImageChangeDetectionServiceのStage 1パーセプチュアルハッシュが背景変化も検出
+    _logger.LogDebug("✅ ShouldExecute: true (EnhancedImageChangeDetectionServiceに委任)");
+    return true;
 }
     
     /// <summary>
@@ -525,12 +499,33 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         Rectangle captureRegion,
         CancellationToken cancellationToken)
     {
+        // 🎯 [PHASE4.4_DIAGNOSIS] メソッド開始
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🎯 [PHASE4.4_DIAGNOSIS] TryPublishTextDisappearanceEventAsync開始{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         // EventAggregatorが統合されていない場合はスキップ
         if (_eventAggregator == null)
         {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→⚠️ [PHASE4.4_DIAGNOSIS] EventAggregator is null - スキップ{Environment.NewLine}");
+            }
+            catch { /* ログ失敗は無視 */ }
             return;
         }
-        
+
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔍 [PHASE4.4_DIAGNOSIS] 条件チェック - previousImage: {previousImage != null}, HasChanged: {changeResult.HasChanged}, ChangePercentage: {changeResult.ChangePercentage:F3}{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         try
         {
             // 🔧 [PHASE4.4_FIX] UltraThink + Gemini Review完了: TextDisappearanceEvent発行条件修正
@@ -615,9 +610,22 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     /// </remarks>
     private bool IsTextDisappearance(ImageChangeResult changeResult)
     {
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔍 [PHASE4.4_DIAGNOSIS] IsTextDisappearance開始 - HasChanged: {changeResult.HasChanged}{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         // 条件1: 画像に変化あり（前提条件、呼び出し元で既にチェック済みだが安全性のため再確認）
         if (!changeResult.HasChanged)
         {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→❌ [PHASE4.4_DIAGNOSIS] IsTextDisappearance: false - HasChanged is false{Environment.NewLine}");
+            }
+            catch { /* ログ失敗は無視 */ }
             return false;
         }
 
@@ -626,6 +634,12 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         const float maxChangePercentageForTextDisappearance = 0.15f; // Gemini推奨: 15%
         if (changeResult.ChangePercentage > maxChangePercentageForTextDisappearance)
         {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→❌ [PHASE4.4_DIAGNOSIS] IsTextDisappearance: false - 変化率超過 ({changeResult.ChangePercentage * 100:F3}% > 15%){Environment.NewLine}");
+            }
+            catch { /* ログ失敗は無視 */ }
             _logger.LogTrace("🔍 IsTextDisappearance: false - 変化率が大きすぎる ({ChangePercentage:F3}% > {Threshold:F3}%)",
                 changeResult.ChangePercentage * 100, maxChangePercentageForTextDisappearance * 100);
             return false;
@@ -638,6 +652,12 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         {
             if (changeResult.SSIMScore.Value < minSSIMForTextDisappearance)
             {
+                try
+                {
+                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                    System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→❌ [PHASE4.4_DIAGNOSIS] IsTextDisappearance: false - SSIM不足 ({changeResult.SSIMScore.Value:F3} < 0.85){Environment.NewLine}");
+                }
+                catch { /* ログ失敗は無視 */ }
                 _logger.LogTrace("🔍 IsTextDisappearance: false - SSIM類似性が低すぎる ({SSIM:F3} < {Threshold:F3})",
                     changeResult.SSIMScore.Value, minSSIMForTextDisappearance);
                 return false;
@@ -645,6 +665,12 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         }
 
         // Gemini推奨: テキスト消失判定成功時のデバッグログ（閾値チューニング用データ収集）
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→✅ [PHASE4.4_DIAGNOSIS] IsTextDisappearance: true - 変化率: {changeResult.ChangePercentage * 100:F3}%, SSIM: {changeResult.SSIMScore ?? -1.0f:F3}{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
         _logger.LogDebug("✅ IsTextDisappearance: true - 変化率: {ChangePercentage:F3}%, SSIM: {SSIM:F3}, Stage: {DetectionStage}",
             changeResult.ChangePercentage * 100,
             changeResult.SSIMScore ?? -1.0f,

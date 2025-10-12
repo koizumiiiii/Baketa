@@ -27,7 +27,8 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     // 削除: 使用しないFieldを削除してテストを簡素化
     private readonly LoginViewModel _loginViewModel;
     private readonly SignupViewModel _signupViewModel;
-    private readonly MainWindowViewModel _mainWindowViewModel;
+    // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
+    // private readonly MainWindowViewModel _mainWindowViewModel;
     private AvaloniaNavigationService? _navigationService;
 
     public AvaloniaNavigationServiceTests()
@@ -43,20 +44,21 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // sealed ViewModelsのため、実際のインスタンスを使用（正しいコンストラクタ引数で）
         var mockEventAggregator = Mock.Of<Core.Abstractions.Events.IEventAggregator>();
         
+        // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
         // シンプルなMockで必要最小限のViewModel構成に変更してインスタンス化エラーを回避
-        _mainWindowViewModel = new MainWindowViewModel(
-            mockEventAggregator,
-            new HomeViewModel(mockEventAggregator),
-            new CaptureViewModel(mockEventAggregator, Mock.Of<Baketa.Core.Abstractions.Translation.ISimpleTranslationService>()),
-            new TranslationViewModel(mockEventAggregator),
-            new OverlayViewModel(mockEventAggregator),
-            new HistoryViewModel(mockEventAggregator),
-            CreateStubSimpleSettingsViewModel(mockEventAggregator), // テスト簡素化のためStubSimpleSettingsViewModel作成
-            new AccessibilitySettingsViewModel(mockEventAggregator, Mock.Of<Core.Services.ISettingsService>()),
-            Mock.Of<INavigationService>(), // 追加されたINavigationServiceパラメータ
-            null, // TranslationOrchestrationServiceパラメータ（オプション）
-            Mock.Of<ILogger>());
-        
+        // _mainWindowViewModel = new MainWindowViewModel(
+        //     mockEventAggregator,
+        //     new HomeViewModel(mockEventAggregator),
+        //     new CaptureViewModel(mockEventAggregator, Mock.Of<Baketa.Core.Abstractions.Translation.ISimpleTranslationService>()),
+        //     new TranslationViewModel(mockEventAggregator),
+        //     new OverlayViewModel(mockEventAggregator),
+        //     new HistoryViewModel(mockEventAggregator),
+        //     CreateStubSimpleSettingsViewModel(mockEventAggregator), // テスト簡素化のためStubSimpleSettingsViewModel作成
+        //     new AccessibilitySettingsViewModel(mockEventAggregator, Mock.Of<Core.Services.ISettingsService>()),
+        //     Mock.Of<INavigationService>(), // 追加されたINavigationServiceパラメータ
+        //     null, // TranslationOrchestrationServiceパラメータ（オプション）
+        //     Mock.Of<ILogger>());
+
         SetupMocks();
     }
 
@@ -101,8 +103,9 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             .Returns(_loginViewModel);
         _mockServiceProvider.Setup(x => x.GetService(typeof(SignupViewModel)))
             .Returns(_signupViewModel);
-        _mockServiceProvider.Setup(x => x.GetService(typeof(MainWindowViewModel)))
-            .Returns(_mainWindowViewModel);
+        // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
+        // _mockServiceProvider.Setup(x => x.GetService(typeof(MainWindowViewModel)))
+        //     .Returns(_mainWindowViewModel);
         _mockServiceProvider.Setup(x => x.GetService(typeof(IAuthService)))
             .Returns(_mockAuthService.Object);
 
@@ -296,13 +299,16 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // LoggerMessage使用時は検証スキップ
     }
 
+    // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
+    // テストメソッドコメントアウト（MainWindowViewModel参照削除）
+    /*
     [Fact]
     public async Task ShowMainWindowAsync_WhenServiceProviderThrows_LogsError()
     {
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(MainWindowViewModel)))
             .Returns((object?)null); // GetServiceがnullを返すとGetRequiredServiceはInvalidOperationExceptionを投げる
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -311,6 +317,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Assert
         // LoggerMessage使用時は検証スキップ
     }
+    */
 
     #endregion
 

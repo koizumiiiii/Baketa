@@ -130,14 +130,10 @@ namespace Baketa.UI.DI.Modules;
             // 認証ビューモデル
             services.AddTransient<LoginViewModel>();
             services.AddTransient<SignupViewModel>();
-            
-            // メインウィンドウビューモデル
-            services.AddSingleton<MainWindowViewModel>();
-            
-            // Phase 0: MainWindowViewModelをイベントプロセッサーとしても登録
-            services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(
-                provider => provider.GetRequiredService<MainWindowViewModel>());
-            
+
+            // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
+            // MainOverlayViewModelがPythonServerStatusChangedEventを処理し、IsTranslationEngineInitializingを制御
+
             // 翻訳仕様を同期するサービス
             // 例: services.AddSingleton<IViewModelSynchronizationService, ViewModelSynchronizationService>();
             

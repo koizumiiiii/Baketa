@@ -108,14 +108,22 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
 
     /// <inheritdoc />
     public async Task<ImageChangeResult> DetectChangeAsync(
-        IImage? previousImage, 
-        IImage currentImage, 
+        IImage? previousImage,
+        IImage currentImage,
         string contextId = "default",
         CancellationToken cancellationToken = default)
     {
+        // 🔥🔥🔥 [ULTRA_DEBUG] メソッド呼び出し確認用直接ファイル書き込み
+        try
+        {
+            var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [ENHANCED_SERVICE] DetectChangeAsync呼び出し確認 - ContextId: {contextId}, previousImage is null: {previousImage == null}{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         ArgumentNullException.ThrowIfNull(currentImage);
         Interlocked.Increment(ref _totalProcessed);
-        
+
         // 🎯 P0システム動作確認用 - 変化検知開始ログ
         _logger.LogDebug("🎯 [P0_CHANGE_DETECT] EnhancedImageChangeDetectionService.DetectChangeAsync開始 - ContextId: {ContextId}", contextId);
         
@@ -371,12 +379,22 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             }
             
             // ハッシュ比較
-            var previousHash = quickAlgorithm == HashAlgorithmType.AverageHash 
-                ? cachedHashes.AverageHash 
+            var previousHash = quickAlgorithm == HashAlgorithmType.AverageHash
+                ? cachedHashes.AverageHash
                 : cachedHashes.DifferenceHash;
-                
+
             var similarity = _perceptualHashService.CompareHashes(previousHash, currentHash, quickAlgorithm);
             var hasPotentialChange = similarity < _settings.Stage1SimilarityThreshold; // Stage1類似度閾値（設定外部化）
+
+            // 🔥🔥🔥 [STAGE1_DEBUG] 直接ファイル書き込みでハッシュ比較結果を確認
+            try
+            {
+                var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+                var prevHashShort = string.IsNullOrEmpty(previousHash) ? "NULL" : previousHash.Substring(0, Math.Min(8, previousHash.Length));
+                var currHashShort = string.IsNullOrEmpty(currentHash) ? "NULL" : currentHash.Substring(0, Math.Min(8, currentHash.Length));
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥 [STAGE1_HASH] Algo: {quickAlgorithm}, Prev: {prevHashShort}, Curr: {currHashShort}, Similarity: {similarity:F4}, Threshold: {_settings.Stage1SimilarityThreshold:F4}, HasChange: {hasPotentialChange}{Environment.NewLine}");
+            }
+            catch { /* ログ失敗は無視 */ }
             
             // 🔍 P0システム動作確認用 - ハッシュ値デバッグログ
             if (_logger.IsEnabled(LogLevel.Debug))

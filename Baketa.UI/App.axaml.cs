@@ -500,7 +500,12 @@ internal sealed partial class App : Avalonia.Application
 
                     // 旧TranslationResultOverlayManagerは削除済み - インプレースシステムが自動で管理
                     Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理");
-                    
+
+                    // 🔥 [FIX] Pythonサーバー起動はPythonServerHostedServiceで自動実行される
+                    // IHostedServiceパターン（コミット 1b5a5d9）により、アプリ起動時に自動的にサーバーが起動される
+                    // 手動起動コードは重複のため削除（重複イベント発行によるStartボタン有効化問題を解決）
+                    Console.WriteLine("✅ Pythonサーバーは PythonServerHostedService により自動起動されます");
+
                     // TranslationFlowModuleを使用してイベント購読を設定
                     Console.WriteLine("🔧 TranslationFlowModuleのイベント購読を初期化中");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 TranslationFlowModuleのイベント購読を初期化中");

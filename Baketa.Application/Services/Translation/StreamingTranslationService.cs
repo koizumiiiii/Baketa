@@ -346,7 +346,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                     // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 翻訳実行結果
                     var translationEnd = DateTime.UtcNow;
                     var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
-                    var successCount = batchTranslationResults.Count(r => r.IsSuccess);
+                    var successCount = batchTranslationResults.Count(r => r != null && r.IsSuccess); // 🔧 [ULTRAPHASE4_L1] null安全化
                     var sameLanguageCount = 0;
                     
                     // 🔍 翻訳品質チェック: 高精度言語比較による翻訳失敗検出
@@ -483,9 +483,13 @@ public class StreamingTranslationService : IStreamingTranslationService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳エラー - チャンク: {Start}-{End}", 
+                    // 🚨🚨🚨 [ULTRA_CRITICAL_CATCH] 絶対に実行される診断ログ
+                    Console.WriteLine($"🚨🚨🚨 [STREAMING_CATCH] チャンクバッチ翻訳エラー - ExceptionType: {ex.GetType().Name}, Message: {ex.Message}");
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🚨🚨🚨 [STREAMING_CATCH] ExceptionType: {ex.GetType().Name}, Message: {ex.Message}, _logger is null: {_logger == null}\r\n");
+
+                    _logger.LogWarning(ex, "🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳エラー - チャンク: {Start}-{End}",
                         chunk.StartIndex, chunk.EndIndex);
-                        
+
                     // エラー時はプレースホルダーを設定
                     for (int j = 0; j < chunk.Texts.Count; j++)
                     {

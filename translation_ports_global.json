@@ -1,25 +1,4 @@
 {
-  "ports": {
-    "5558": {
-      "pid": 26424,
-      "last_heartbeat": "2025-10-07T07:27:17.0477231Z",
-      "metadata": null
-    },
-    "5559": {
-      "pid": 26424,
-      "last_heartbeat": "2025-10-07T07:27:17.0477232Z",
-      "metadata": null
-    },
-    "5560": {
-      "pid": 30988,
-      "last_heartbeat": "2025-10-07T07:30:41.1592144Z",
-      "metadata": null
-    },
-    "5561": {
-      "pid": 30988,
-      "last_heartbeat": "2025-10-07T07:30:41.1592145Z",
-      "metadata": null
-    }
-  },
-  "last_updated": "2025-10-07T07:26:47.0415261Z"
+  "ports": {},
+  "last_updated": "2025-10-09T16:41:28.7455275Z"
 }

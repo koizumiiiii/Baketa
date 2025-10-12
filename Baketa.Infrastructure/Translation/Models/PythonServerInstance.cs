@@ -79,28 +79,45 @@ public record PythonServerInstance(
     
     /// <summary>
     /// サーバーインスタンスの非同期破棄
+    /// 🔧 [GEMINI_FIX] 段階的プロセス終了実装 - データ損失・リソースリーク防止
     /// </summary>
     public async ValueTask DisposeAsync()
     {
         UpdateStatus(ServerStatus.Stopping);
-        
+
         try
         {
             if (!Process.HasExited)
             {
-                // 正常終了を試行
+                Console.WriteLine($"🛑 [GRACEFUL_SHUTDOWN] プロセス終了開始: PID={Process.Id}, Port={Port}");
+
+                // 🔧 [GEMINI_RECOMMENDED] Phase 1: 自主終了を待機（グレースフルシャットダウン）
+                // Pythonプロセスは通常ウィンドウを持たないため、まず自主終了の機会を与える
+                Console.WriteLine($"⏳ [GRACEFUL_SHUTDOWN] Phase 1: 自主終了待機開始（5秒）");
                 try
                 {
-                    Process.Kill();
-                    await Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-                }
-                catch (InvalidOperationException)
-                {
-                    // プロセスが既に終了している場合
+                    using var cts1 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await Process.WaitForExitAsync(cts1.Token).ConfigureAwait(false);
+
+                    Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] プロセス自主終了成功: Port={Port}");
+                    return; // 自主終了成功
                 }
                 catch (OperationCanceledException)
                 {
-                    // タイムアウト時は強制終了
+                    // 5秒経過してもプロセスが終了しない → Phase 2へ
+                    Console.WriteLine($"⚠️ [GRACEFUL_SHUTDOWN] Phase 1タイムアウト（5秒経過） - Phase 2へ");
+                }
+                catch (InvalidOperationException)
+                {
+                    // プロセスが既に終了
+                    Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] プロセス既に終了: Port={Port}");
+                    return;
+                }
+
+                // 🔧 [GEMINI_RECOMMENDED] Phase 2: Process.Kill()で終了シグナル送信
+                if (!Process.HasExited)
+                {
+                    Console.WriteLine($"🔥 [GRACEFUL_SHUTDOWN] Phase 2: Process.Kill()実行");
                     try
                     {
                         Process.Kill();
@@ -108,18 +125,53 @@ public record PythonServerInstance(
                     catch (InvalidOperationException)
                     {
                         // プロセスが既に終了している場合
+                        Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] プロセス既に終了（Kill前）: Port={Port}");
+                        return;
+                    }
+
+                    // Kill()後、プロセスが完全に終了するまで待機（3秒）
+                    Console.WriteLine($"⏳ [GRACEFUL_SHUTDOWN] Phase 2: Kill()後の終了待機（3秒）");
+                    try
+                    {
+                        using var cts2 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        await Process.WaitForExitAsync(cts2.Token).ConfigureAwait(false);
+
+                        Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] Kill()後にプロセス終了成功: Port={Port}");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Console.WriteLine($"❌ [GRACEFUL_SHUTDOWN] Kill()後も3秒経過してプロセス未終了: PID={Process.Id}");
+                        // ここでもう一度Kill()は実行しない（既にKill済み）
+                        // OSがプロセスを終了させるのを待つしかない
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] プロセス終了完了: Port={Port}");
                     }
                 }
+            }
+            else
+            {
+                Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] プロセス既に終了状態: Port={Port}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"プロセス終了エラー Port={Port}, LanguagePair={LanguagePair}: {ex.Message}");
+            Console.WriteLine($"❌ [GRACEFUL_SHUTDOWN] プロセス終了エラー Port={Port}, LanguagePair={LanguagePair}: {ex.GetType().Name} - {ex.Message}");
         }
         finally
         {
             UpdateStatus(ServerStatus.Stopped);
-            Process.Dispose();
+
+            try
+            {
+                Process.Dispose();
+                Console.WriteLine($"✅ [GRACEFUL_SHUTDOWN] Processリソース破棄完了: Port={Port}");
+            }
+            catch (Exception disposeEx)
+            {
+                Console.WriteLine($"⚠️ [GRACEFUL_SHUTDOWN] Process.Dispose()エラー: {disposeEx.Message}");
+            }
         }
     }
     

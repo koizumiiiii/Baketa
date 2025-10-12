@@ -103,7 +103,12 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         _settingsLock.Wait();
         try
         {
-            _cachedAppSettings ??= new UnifiedAppSettings(GetTranslationSettings(), GetOcrSettings(), _appSettingsOptions.Value);
+            // 🔥 [DEADLOCK_FIX] GetTranslationSettings()/GetOcrSettings()呼び出しはデッドロックの原因
+            // _settingsLock再入不可のため、直接LoadXxxSettings()を呼ぶ
+            _cachedTranslationSettings ??= LoadTranslationSettings();
+            _cachedOcrSettings ??= LoadOcrSettings();
+
+            _cachedAppSettings ??= new UnifiedAppSettings(_cachedTranslationSettings, _cachedOcrSettings, _appSettingsOptions.Value);
             return _cachedAppSettings;
         }
         finally

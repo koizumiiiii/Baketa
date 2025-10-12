@@ -25,8 +25,9 @@ public interface IPythonServerInfo
 /// <summary>
 /// Python翻訳サーバー管理インターフェース
 /// Issue #147 Phase 5: ポート競合防止機構
+/// 🔧 [GEMINI_FIX] IAsyncDisposable追加 - 非同期破棄処理をサポート
 /// </summary>
-public interface IPythonServerManager : IDisposable
+public interface IPythonServerManager : IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// 指定された言語ペアのサーバーを起動します

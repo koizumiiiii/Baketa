@@ -668,59 +668,103 @@ namespace Baketa.UI;
             ServiceProvider = services.BuildServiceProvider();
             Console.WriteLine("✅ ServiceProvider構築完了");
             System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
-            
-            // 🚀 CRITICAL: EventHandlerInitializationServiceをDI完了直後に実行（競合状態根本解決）
-            Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行開始！ 🚀🚀🚀");
-            InitializeEventHandlersImmediately();
-            Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行完了！ 🚀🚀🚀");
-            
-            // 🚀 CRITICAL: IHostedService手動起動（ModelPrewarmingService等を確実に起動）
-            Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動開始！ 🚀🚀🚀");
+
+            // 🚨🚨🚨 [PHASE5.2G_VERIFY] 診断ログ - ビルド反映確認用
+            var verifyMessage = "🚨🚨🚨 [PHASE5.2G_VERIFY] このログが出ればビルド反映成功！";
+            Console.WriteLine(verifyMessage);
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(verifyMessage);
+
+            // 🔥 [PHASE5.2G] IHostedService非同期起動 - UIブロック防止（InitializeEventHandlersImmediatelyの前に移動）
+            Console.WriteLine("🔥 [PHASE5.2G] IHostedService非同期起動開始 - Pythonサーバーをバックグラウンドで起動");
+            Baketa.Core.Logging.BaketaLogManager.LogSystemDebug("🔥 [PHASE5.2G] IHostedService非同期起動開始 - Pythonサーバーをバックグラウンドで起動");
             try
             {
-                var hostedServiceTask = Task.Run(async () =>
+                _ = Task.Run(async () =>
                 {
                     try
                     {
-                        Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動開始！");
+                        // 🔥🔥🔥 [BUILD_TIMESTAMP] このログが表示されれば、最新ビルドが実行されていることの証明
+                        const string LAMBDA_BUILD_TIMESTAMP = "2025-10-12T10:15:00+09:00";
+                        Console.WriteLine($"🔥🔥🔥 [BUILD_TIMESTAMP] Task.Run Lambda - Build: {LAMBDA_BUILD_TIMESTAMP}");
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト（プロセス停止の原因）
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"🔥🔥🔥 [BUILD_TIMESTAMP] Task.Run Lambda - Build: {LAMBDA_BUILD_TIMESTAMP}");
+
+                        var startMsg = "🚀 [HOSTED_SERVICE] IHostedService手動起動開始（非同期）";
+                        Console.WriteLine(startMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(startMsg);
+
+                        // 🔽 [PHASE5.2J_DEBUG] Gemini推奨デバッグログ追加
+                        var spIsNull = ServiceProvider == null;
+                        var spDebugMsg = $"[DEBUG] Before await: ServiceProvider is {(spIsNull ? "null" : "not null")}.";
+                        Console.WriteLine(spDebugMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(spDebugMsg);
+
+                        var callMsg = "[DEBUG] Calling StartHostedServicesAsync()...";
+                        Console.WriteLine(callMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(callMsg);
+
                         await StartHostedServicesAsync().ConfigureAwait(false);
-                        Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動完了！");
+
+                        var completeCallMsg = "[DEBUG] Call to StartHostedServicesAsync completed.";
+                        Console.WriteLine(completeCallMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completeCallMsg);
+                        // 🔼 [PHASE5.2J_DEBUG] Gemini推奨デバッグログ追加
+
+                        var completeMsg = "✅ [HOSTED_SERVICE] IHostedService手動起動完了";
+                        Console.WriteLine(completeMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(completeMsg);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー: {ex.GetType().Name}");
-                        Console.WriteLine($"💥 [CRITICAL] Message: {ex.Message}");
-                        Console.WriteLine($"💥 [CRITICAL] StackTrace: {ex.StackTrace}");
+                        var errorMsg = $"❌ [HOSTED_SERVICE] 起動エラー: {ex.GetType().Name} - {ex.Message}";
+                        Console.WriteLine(errorMsg);
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(errorMsg);
+
+                        Console.WriteLine($"❌ [HOSTED_SERVICE] StackTrace: {ex.StackTrace}");
+                        // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                        // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"❌ [HOSTED_SERVICE] StackTrace: {ex.StackTrace}");
+
                         if (ex.InnerException != null)
                         {
-                            Console.WriteLine($"💥 [CRITICAL] InnerException: {ex.InnerException.GetType().Name}");
-                            Console.WriteLine($"💥 [CRITICAL] InnerMessage: {ex.InnerException.Message}");
+                            var innerMsg = $"❌ [HOSTED_SERVICE] InnerException: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}";
+                            Console.WriteLine(innerMsg);
+                            // 🚨 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugをコメントアウト
+                            // Baketa.Core.Logging.BaketaLogManager.LogSystemDebug(innerMsg);
                         }
-                        throw; // Re-throw to explicitly fail
+                        // 🔥 [PHASE5.2G] エラーログのみ記録し、アプリケーション起動は継続
+                        // throw; を削除 - サーバー起動失敗してもアプリは使用可能
                     }
                 });
 
-                // 同期的に待機してエラーを可視化
-                hostedServiceTask.Wait();
-                Console.WriteLine("🚀🚀🚀 [CRITICAL] IHostedService手動起動同期待機完了！ 🚀🚀🚀");
+                Console.WriteLine("✅ [PHASE5.2G] IHostedService非同期起動開始完了 - UIブロックなし");
             }
-            catch (AggregateException aggEx)
+            catch (Exception ex)
             {
-                Console.WriteLine($"💥💥💥 [CRITICAL] AggregateException発生: {aggEx.GetType().Name}");
-                foreach (var innerEx in aggEx.InnerExceptions)
-                {
-                    Console.WriteLine($"💥 [CRITICAL] InnerException: {innerEx.GetType().Name}");
-                    Console.WriteLine($"💥 [CRITICAL] InnerMessage: {innerEx.Message}");
-                    Console.WriteLine($"💥 [CRITICAL] InnerStackTrace: {innerEx.StackTrace}");
-                }
-                throw; // Re-throw to explicitly fail
+                // Task.Run()自体の失敗のみキャッチ（通常発生しない）
+                Console.WriteLine($"❌ [PHASE5.2G] Task.Run失敗: {ex.Message}");
+                // アプリケーション起動は継続
             }
-            catch (Exception directEx)
+
+            // 🚀 CRITICAL: EventHandlerInitializationServiceをDI完了直後に実行（競合状態根本解決）
+            Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行開始！ 🚀🚀🚀");
+            try
             {
-                Console.WriteLine($"💥💥💥 [CRITICAL] 直接Exception発生: {directEx.GetType().Name}");
-                Console.WriteLine($"💥 [CRITICAL] Message: {directEx.Message}");
-                Console.WriteLine($"💥 [CRITICAL] StackTrace: {directEx.StackTrace}");
-                throw; // Re-throw to explicitly fail
+                InitializeEventHandlersImmediately();
+                Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行完了！ 🚀🚀🚀");
+            }
+            catch (Exception ex)
+            {
+                // InitializeEventHandlersImmediately()で例外が発生した場合
+                Console.WriteLine($"❌ [CRITICAL] EventHandlerInitializationService失敗: {ex.GetType().Name}");
+                Console.WriteLine($"❌ [CRITICAL] Message: {ex.Message}");
+                Console.WriteLine($"❌ [CRITICAL] StackTrace: {ex.StackTrace}");
+                // アプリケーション起動は継続（EventHandler初期化失敗しても機能する部分はある）
             }
 
             // 🔥 UltraThink翻訳モデル事前ロード戦略 - Program.cs統合実装
@@ -744,21 +788,71 @@ namespace Baketa.UI;
         /// </summary>
         private static async Task StartHostedServicesAsync()
         {
+            // 🔥🔥🔥 [BUILD_TIMESTAMP] このログが表示されれば、最新ビルドが実行されていることの証明
+            const string BUILD_TIMESTAMP = "2025-10-12T10:20:00+09:00"; // ビルド実行時刻（強制再コンパイル用）
+            Console.WriteLine($"🔥🔥🔥 [BUILD_TIMESTAMP] StartHostedServicesAsync - Build: {BUILD_TIMESTAMP}");
+
+            // 🔥🔥🔥 [CRITICAL_FIX] BaketaLogManager.LogSystemDebugがプロセスを停止させる可能性があるため完全にコメントアウト
+            // try
+            // {
+            //     Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"🔥🔥🔥 [BUILD_TIMESTAMP] StartHostedServicesAsync - Build: {BUILD_TIMESTAMP}");
+            // }
+            // catch (Exception baketaLogEx)
+            // {
+            //     Console.WriteLine($"⚠️ BaketaLogManager.LogSystemDebugエラー: {baketaLogEx.Message}");
+            // }
+
+            // 🔥 [PHASE5.2J_DEBUG] Console.WriteLineを先に実行（logger取得でクラッシュする可能性回避）
+            Console.WriteLine("🔍 [PHASE5.2J_DEBUG] StartHostedServicesAsync呼び出し開始");
+
+            ILogger<Program>? logger = null;
+            try
+            {
+                logger = ServiceProvider?.GetService<ILogger<Program>>();
+                logger?.LogInformation("🔍 [PHASE5.2J_DEBUG] StartHostedServicesAsync呼び出し開始");
+            }
+            catch (Exception loggerEx)
+            {
+                Console.WriteLine($"⚠️ Logger取得エラー（処理は継続）: {loggerEx.Message}");
+            }
+
             if (ServiceProvider == null)
             {
                 Console.WriteLine("⚠️ ServiceProviderがnull - IHostedService起動をスキップ");
                 return;
             }
 
+            Console.WriteLine("🔍 [PHASE5.2J_DEBUG] ServiceProvider != null 確認完了");
+            logger?.LogInformation("🔍 [PHASE5.2J_DEBUG] ServiceProvider != null 確認完了");
+
             try
             {
                 Console.WriteLine("🚀 IHostedService手動起動開始");
-                
+                logger?.LogInformation("🚀 IHostedService手動起動開始");
+
                 // すべてのIHostedServiceを取得
+                Console.WriteLine("🔍 [PHASE5.2J_DEBUG] GetServices<IHostedService>()呼び出し直前");
+                logger?.LogInformation("🔍 [PHASE5.2J_DEBUG] GetServices<IHostedService>()呼び出し直前");
+
                 var hostedServices = ServiceProvider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+
+                Console.WriteLine("🔍 [PHASE5.2J_DEBUG] GetServices<IHostedService>()呼び出し完了");
+                logger?.LogInformation("🔍 [PHASE5.2J_DEBUG] GetServices<IHostedService>()呼び出し完了");
+
                 var serviceList = hostedServices.ToList();
-                
+
                 Console.WriteLine($"🔍 検出されたIHostedService数: {serviceList.Count}");
+
+                try
+                {
+                    Baketa.Core.Logging.BaketaLogManager.LogSystemDebug($"🔍 検出されたIHostedService数: {serviceList.Count}");
+                }
+                catch (Exception bakLogEx2)
+                {
+                    Console.WriteLine($"⚠️ BaketaLogManager.LogSystemDebugエラー(2): {bakLogEx2.Message}");
+                }
+
+                logger?.LogInformation("🔍 検出されたIHostedService数: {Count}", serviceList.Count);
                 
                 var cancellationToken = CancellationToken.None;
                 var startTasks = new List<Task>();
@@ -794,8 +888,10 @@ namespace Baketa.UI;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"💥 IHostedService手動起動エラー: {ex.Message}");
-                Console.WriteLine($"💥 StackTrace: {ex.StackTrace}");
+                // 🔥 [PHASE5.2J_FIX] Gemini推奨修正: ex.ToString()で完全な例外情報を出力
+                // Message + StackTrace + InnerExceptionを含む詳細なデバッグ情報
+                Console.WriteLine($"💥 [CRITICAL] IHostedService手動起動エラー:");
+                Console.WriteLine(ex.ToString()); // 完全な例外情報（型、メッセージ、スタックトレース、InnerException）
             }
         }
         
@@ -930,8 +1026,8 @@ namespace Baketa.UI;
             var viewModelTypes = new[]
             {
                 typeof(Baketa.UI.ViewModels.AccessibilitySettingsViewModel),
-                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel),
-                typeof(Baketa.UI.ViewModels.MainWindowViewModel) // MainWindow有効化 - 翻訳オーバーレイ表示のため必須
+                typeof(Baketa.UI.ViewModels.LanguagePairsViewModel)
+                // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
             };
             
             foreach (var vmType in viewModelTypes)

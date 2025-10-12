@@ -117,6 +117,18 @@ namespace Baketa.Infrastructure.Platform.Windows;
         }
 
         /// <summary>
+        /// Bitmapとして取得（async版）
+        /// </summary>
+        /// <param name="cancellationToken">キャンセルトークン</param>
+        /// <returns>System.Drawing.Bitmap インスタンス</returns>
+        /// <remarks>🔥 [PHASE5.2] スレッドブロッキング防止のため追加</remarks>
+        public Task<Bitmap> GetBitmapAsync(CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            return Task.FromResult(_bitmap);
+        }
+
+        /// <summary>
         /// Bitmapとして取得
         /// </summary>
         /// <returns>System.Drawing.Bitmap インスタンス</returns>
@@ -124,6 +136,17 @@ namespace Baketa.Infrastructure.Platform.Windows;
         {
             ThrowIfDisposed();
             return _bitmap;
+        }
+
+        /// <summary>
+        /// ネイティブImageオブジェクトを取得（async版）
+        /// </summary>
+        /// <param name="cancellationToken">キャンセルトークン</param>
+        /// <returns>System.Drawing.Image インスタンス</returns>
+        /// <remarks>🔥 [PHASE5.2] スレッドブロッキング防止のため追加</remarks>
+        public Task<Image> GetNativeImageAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<Image>(GetBitmap());
         }
 
         /// <summary>
@@ -178,8 +201,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
         /// </summary>
         /// <param name="path">保存先パス</param>
         /// <param name="format">画像フォーマット（省略時はPNG）</param>
+        /// <param name="cancellationToken">キャンセルトークン</param>
         /// <returns>非同期タスク</returns>
-        public async Task SaveAsync(string path, ImageFormat? format = null)
+        /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+        public async Task SaveAsync(string path, ImageFormat? format = null, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
 
@@ -223,8 +248,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
         /// 画像の一部を切り取る
         /// </summary>
         /// <param name="rectangle">切り取る領域</param>
+        /// <param name="cancellationToken">キャンセルトークン</param>
         /// <returns>切り取られた新しい画像インスタンス</returns>
-        public async Task<IWindowsImage> CropAsync(Rectangle rectangle)
+        /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+        public async Task<IWindowsImage> CropAsync(Rectangle rectangle, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             
@@ -254,8 +281,10 @@ namespace Baketa.Infrastructure.Platform.Windows;
     /// 画像をバイト配列に変換
     /// </summary>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>画像データのバイト配列</returns>
-    public async Task<byte[]> ToByteArrayAsync(ImageFormat? format = null)
+    /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
+    public async Task<byte[]> ToByteArrayAsync(ImageFormat? format = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 

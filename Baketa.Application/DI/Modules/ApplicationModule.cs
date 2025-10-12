@@ -328,12 +328,6 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
             services.AddHostedService(provider => provider.GetRequiredService<Services.UI.AutoOverlayCleanupService>());
 
-            // 🚀 UltraPhase 13.2: 翻訳サービス初期化HostedService
-            // STEP4無限待機問題の根本解決 - DI循環依存回避しつつPython翻訳サーバー確実初期化
-            // Gemini AI推奨: BackgroundServiceパターンによるClean Architecture準拠実装
-            // ✅ [FIXED] UltraPhase 14.6: HostedService登録復旧 - stdin通信実装完了後に有効化
-            services.AddHostedService<Services.Translation.TranslationInitializationService>();
-
             // 🎯 オーバーレイ位置調整サービス（UltraThink Phase 10.3: クリーンアーキテクチャ準拠）
             // TextChunkから位置調整ロジックを分離し、責務の明確化を実現
             services.AddSingleton<IOverlayPositioningService, Services.UI.OverlayPositioningService>();

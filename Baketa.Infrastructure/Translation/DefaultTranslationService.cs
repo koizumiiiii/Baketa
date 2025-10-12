@@ -326,14 +326,14 @@ namespace Baketa.Infrastructure.Translation;
             {
                 var translationEnd = DateTime.UtcNow;
                 var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
-                var successCount = result.Count(r => r.IsSuccess);
+                var successCount = result.Count(r => r != null && r.IsSuccess); // 🔧 [ULTRAPHASE4_L2] null安全化
                 var sameLanguageCount = 0;
                 var sameLanguageFailures = new List<string>();
 
                 // 翻訳品質チェック: 改良された診断ロジック
                 for (int i = 0; i < Math.Min(texts.Count, result.Count); i++)
                 {
-                    if (i < result.Count && result[i].IsSuccess && !string.IsNullOrEmpty(result[i].TranslatedText))
+                    if (i < result.Count && result[i] != null && result[i].IsSuccess && !string.IsNullOrEmpty(result[i].TranslatedText)) // 🔧 [ULTRAPHASE4_L2] null安全化
                     {
                         var originalText = texts[i];
                         var translatedText = result[i].TranslatedText;

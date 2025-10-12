@@ -643,7 +643,8 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         _logger.LogDebug("🔄 [PHASE77.6] InlineImageToWindowsImageAdapter 作成 - Size: {Width}x{Height}", Width, Height);
     }
 
-    public Bitmap GetBitmap()
+    // 🔥 [PHASE5.2] async化によりスレッド爆発を防止（.Result削除）
+    public async Task<Bitmap> GetBitmapAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -654,36 +655,53 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
 
         try
         {
-            _logger.LogDebug("🔄 [PHASE77.6] IImage → Bitmap 変換開始");
+            _logger.LogDebug("🔄 [PHASE5.2] IImage → Bitmap async変換開始");
 
-            var imageBytes = _underlyingImage.ToByteArrayAsync().Result;
+            // 🔥 [PHASE5.2] .Result削除 - スレッドブロッキング解消
+            var imageBytes = await _underlyingImage.ToByteArrayAsync().ConfigureAwait(false);
             using var memoryStream = new MemoryStream(imageBytes);
             _cachedBitmap = new Bitmap(memoryStream);
 
-            _logger.LogDebug("✅ [PHASE77.6] Bitmap 変換成功 - Size: {Width}x{Height}",
+            _logger.LogDebug("✅ [PHASE5.2] Bitmap async変換成功 - Size: {Width}x{Height}",
                 _cachedBitmap.Width, _cachedBitmap.Height);
 
             return _cachedBitmap;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [PHASE77.6] IImage → Bitmap 変換失敗: {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "❌ [PHASE5.2] IImage → Bitmap async変換失敗: {ErrorMessage}", ex.Message);
             throw new InvalidOperationException($"Failed to convert IImage to Bitmap: {ex.Message}", ex);
         }
     }
 
-    public Image GetNativeImage()
+    // 🔥 [PHASE5.2] 同期版GetBitmap()は後方互換性のために残すが、内部でGetBitmapAsync()を呼び出す
+    // TODO: Phase 5.2C-Step4で全呼び出し側をasync化した後、この同期版を削除する
+    [Obsolete("Use GetBitmapAsync instead. This synchronous method will be removed in Phase 5.2C-Step4.")]
+    public Bitmap GetBitmap()
+    {
+        return GetBitmapAsync().GetAwaiter().GetResult();
+    }
+
+    // 🔥 [PHASE5.2] async化対応
+    public async Task<Image> GetNativeImageAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        return await GetBitmapAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // 後方互換性のために同期版を残す（Obsolete）
+    [Obsolete("Use GetNativeImageAsync instead.")]
+    public Image GetNativeImage()
+    {
         return GetBitmap();
     }
 
-    public async Task SaveAsync(string path, System.Drawing.Imaging.ImageFormat? format = null)
+    // 🔥 [PHASE5.2] async化完全対応（既存asyncメソッドを修正）
+    public async Task SaveAsync(string path, System.Drawing.Imaging.ImageFormat? format = null, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var bitmap = GetBitmap();
+        var bitmap = await GetBitmapAsync(cancellationToken).ConfigureAwait(false);
         bitmap.Save(path, format ?? System.Drawing.Imaging.ImageFormat.Png);
-        await Task.CompletedTask;
     }
 
     public async Task<IWindowsImage> ResizeAsync(int width, int height)
@@ -693,11 +711,12 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         return new InlineImageToWindowsImageAdapter(resizedImage, _logger);
     }
 
-    public async Task<IWindowsImage> CropAsync(Rectangle rectangle)
+    // 🔥 [PHASE5.2] async化完全対応
+    public async Task<IWindowsImage> CropAsync(Rectangle rectangle, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var bitmap = GetBitmap();
+        var bitmap = await GetBitmapAsync(cancellationToken).ConfigureAwait(false);
         var croppedBitmap = new Bitmap(rectangle.Width, rectangle.Height);
 
         using (var graphics = Graphics.FromImage(croppedBitmap))
@@ -713,11 +732,12 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         throw new NotImplementedException("CropAsync requires IImageFactory which would create circular reference");
     }
 
-    public async Task<byte[]> ToByteArrayAsync(System.Drawing.Imaging.ImageFormat? format = null)
+    // 🔥 [PHASE5.2] async化完全対応（既存asyncメソッドを修正）
+    public async Task<byte[]> ToByteArrayAsync(System.Drawing.Imaging.ImageFormat? format = null, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var bitmap = GetBitmap();
+        var bitmap = await GetBitmapAsync(cancellationToken).ConfigureAwait(false);
         using var memoryStream = new MemoryStream();
         bitmap.Save(memoryStream, format ?? System.Drawing.Imaging.ImageFormat.Png);
         return memoryStream.ToArray();

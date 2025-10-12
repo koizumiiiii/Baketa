@@ -17,6 +17,7 @@ using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;
 using Sdcb.PaddleOCR.Models.Shared;
 using static Sdcb.PaddleOCR.Models.ModelVersion;
+using System.Buffers;
 using System.IO;
 using OpenCvSharp;
 using System.Drawing;
@@ -933,10 +934,11 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     // ✅ [PHASE2.11.8] GetRecognitionModelName削除 - IPaddleOcrModelManagerに完全委譲済み
 
     /// <summary>
-    /// IImageからOpenCV Matに変換
+    /// IImageからOpenCV Matに変換（Phase 5.2: ArrayPool<byte>対応）
     /// </summary>
-    private async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? regionOfInterest, CancellationToken _)
+    private async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
     {
+        byte[]? pooledArray = null;
         try
         {
             // テスト環境ではOpenCvSharpの使用を回避
@@ -946,20 +948,24 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 return CreateDummyMat();
             }
 
-            // IImageからバイト配列を取得
-            var imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
-            
-            // OpenCV Matに変換
-            var mat = Mat.FromImageData(imageData, ImreadModes.Color);
-            
+            // 🔥 [PHASE5.2] ArrayPool<byte>を使用した効率的なバイト配列取得
+            int actualLength;
+            (pooledArray, actualLength) = await image.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
+            // Gemini推奨: Buffer.BlockCopy()による高速コピーで、ArrayPoolとMatのライフサイクルを分離
+            var imageBytes = new byte[actualLength];
+            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
+            var mat = Mat.FromImageData(imageBytes, ImreadModes.Color);
+
             // ROI指定がある場合は切り出し
             if (regionOfInterest.HasValue)
             {
                 var roi = regionOfInterest.Value;
                 var rect = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
-                
+
                 // 🛡️ [MEMORY_PROTECTION] 画像境界チェック - Mat.Width/Heightの安全なアクセス
-                try 
+                try
                 {
                     if (mat.Empty())
                     {
@@ -968,7 +974,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     }
 
                     int matWidth, matHeight;
-                    try 
+                    try
                     {
                         matWidth = mat.Width;
                         matHeight = mat.Height;
@@ -980,7 +986,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     }
 
                     rect = rect.Intersect(new Rect(0, 0, matWidth, matHeight));
-                    
+
                     if (rect.Width > 0 && rect.Height > 0)
                     {
                         try
@@ -1003,7 +1009,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     return mat; // 例外発生時は元のMatを返す
                 }
             }
-            
+
             return mat;
         }
         catch (ArgumentException ex)
@@ -1025,6 +1031,14 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         {
             __logger?.LogError(ex, "サポートされていない画像形式: {ExceptionType}", ex.GetType().Name);
             throw new OcrException($"サポートされていない画像形式: {ex.Message}", ex);
+        }
+        finally
+        {
+            // 🔥 [PHASE5.2] ArrayPool<byte>から借りた配列を必ず返却（メモリリーク防止）
+            if (pooledArray != null)
+            {
+                ArrayPool<byte>.Shared.Return(pooledArray);
+            }
         }
     }
 
@@ -1116,14 +1130,14 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     }
     
     /// <summary>
-    /// Lanczosリサンプリングによる高品質画像スケーリング
+    /// Lanczosリサンプリングによる高品質画像スケーリング（Phase 5.2: ArrayPool<byte>対応 + PNG圧縮スキップ）
     /// </summary>
     /// <param name="originalImage">元画像</param>
     /// <param name="targetWidth">目標幅</param>
     /// <param name="targetHeight">目標高さ</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>スケーリングされた画像</returns>
-    private async Task<IImage> ScaleImageWithLanczos(IImage originalImage, int targetWidth, int targetHeight, 
+    private async Task<IImage> ScaleImageWithLanczos(IImage originalImage, int targetWidth, int targetHeight,
         CancellationToken cancellationToken)
     {
         // テスト環境ではダミー画像を返す
@@ -1132,26 +1146,44 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             __logger?.LogDebug("テスト環境: ダミースケーリング結果を返却");
             return originalImage; // テスト環境では元画像をそのまま返す
         }
-        
+
+        byte[]? pooledArray = null;
         try
         {
-            // 元画像をMatに変換
-            var imageData = await originalImage.ToByteArrayAsync().ConfigureAwait(false);
-            using var originalMat = Mat.FromImageData(imageData, ImreadModes.Color);
-            
+            // 🔥 [PHASE5.2] ArrayPool<byte>を使用した効率的なバイト配列取得
+            int actualLength;
+            (pooledArray, actualLength) = await originalImage.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
+            // Gemini推奨: Buffer.BlockCopy()による高速コピーで、ArrayPoolとMatのライフサイクルを分離
+            var imageBytes = new byte[actualLength];
+            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
+            using var originalMat = Mat.FromImageData(imageBytes, ImreadModes.Color);
+
             // Lanczosリサンプリングでリサイズ
             using var resizedMat = new Mat();
-            Cv2.Resize(originalMat, resizedMat, new OpenCvSharp.Size(targetWidth, targetHeight), 
+            Cv2.Resize(originalMat, resizedMat, new OpenCvSharp.Size(targetWidth, targetHeight),
                 interpolation: InterpolationFlags.Lanczos4);
-            
-            // MatをIImageに変換して返す
-            var resizedImageData = resizedMat.ToBytes(".png");
+
+            // 🔥 [PHASE5.2_GEMINI] PNG圧縮をスキップ - Mat → IImage 直接変換で8MB削減
+            // 従来: resizedMat.ToBytes(".png") → 8MB PNG圧縮 → CreateFromBytesAsync
+            // 最適化: resizedMat → BMP形式（無圧縮） → CreateFromBytesAsync
+            // BMPはOpenCVのデフォルト形式で、圧縮オーバーヘッドなし
+            var resizedImageData = resizedMat.ToBytes(".bmp");
             return await __imageFactory.CreateFromBytesAsync(resizedImageData).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             __logger?.LogError(ex, "Lanczosスケーリング失敗: {TargetSize}", $"{targetWidth}x{targetHeight}");
             throw new OcrException($"画像スケーリングに失敗しました: {ex.Message}", ex);
+        }
+        finally
+        {
+            // 🔥 [PHASE5.2] ArrayPool<byte>から借りた配列を必ず返却（メモリリーク防止）
+            if (pooledArray != null)
+            {
+                ArrayPool<byte>.Shared.Return(pooledArray);
+            }
         }
     }
 

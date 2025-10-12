@@ -175,26 +175,27 @@ public sealed class TextRegionDetectorAdapter : Baketa.Core.Abstractions.Capture
     /// </summary>
     /// <param name="windowsImage">変換元のWindowsImage</param>
     /// <returns>変換されたAdvancedImage</returns>
-    private async Task<IAdvancedImage> ConvertToAdvancedImageAsync(IWindowsImage windowsImage)
+    // 🔥 [PHASE5.2] GetBitmapAsync使用によりスレッドブロッキング解消
+    private async Task<IAdvancedImage> ConvertToAdvancedImageAsync(IWindowsImage windowsImage, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("🔧 IWindowsImage → IAdvancedImage 変換開始");
+        _logger.LogDebug("🔧 [PHASE5.2] IWindowsImage → IAdvancedImage async変換開始");
 
         try
         {
-            // WindowsImage から Bitmap を取得
-            using var bitmap = windowsImage.GetBitmap();
+            // 🔥 [PHASE5.2] WindowsImage から Bitmap を非同期取得（.Result削除）
+            using var bitmap = await windowsImage.GetBitmapAsync(cancellationToken).ConfigureAwait(false);
 
             // TODO: 実際のAdvancedImageFactory実装を見つけて適切に置き換える
             // 現時点では簡易実装として、必要最小限のメソッドを持つスタブを作成
             var simpleAdvancedImage = new SimpleAdvancedImageAdapter(bitmap, _logger);
 
-            _logger.LogDebug("✅ IWindowsImage → IAdvancedImage 変換完了");
+            _logger.LogDebug("✅ [PHASE5.2] IWindowsImage → IAdvancedImage async変換完了");
 
             return simpleAdvancedImage;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ IWindowsImage → IAdvancedImage 変換失敗: {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "❌ [PHASE5.2] IWindowsImage → IAdvancedImage async変換失敗: {ErrorMessage}", ex.Message);
             throw;
         }
     }

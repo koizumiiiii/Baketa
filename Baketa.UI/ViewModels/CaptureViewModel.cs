@@ -130,7 +130,7 @@ namespace Baketa.UI.ViewModels;
         // キャプチャ開始コマンド実行
         private async Task ExecuteStartCaptureAsync()
         {
-            Console.WriteLine("🚀 キャプチャ開始コマンドが実行されました");
+            Console.WriteLine("🚀 [START_CAPTURE] キャプチャ開始コマンド実行開始");
 
             // Phase 3: Simple Translation Service統合
             try
@@ -139,12 +139,17 @@ namespace Baketa.UI.ViewModels;
                 // 注意: ISimpleTranslationServiceにはStartAsyncメソッドが存在しないため、StatusChanges購読のみ実装
                 await PublishEventAsync(new UIEvents.StartCaptureRequestedEvent()).ConfigureAwait(false);
                 IsCapturing = true;
+                Console.WriteLine("✅ [START_CAPTURE] IsCapturing = true 設定完了 - Stopボタン有効化");
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, "翻訳サービスの開始またはキャプチャ開始でエラーが発生しました");
-                // エラー状態でもUIは更新する
-                IsCapturing = false;
+                Logger?.LogError(ex, "キャプチャ開始イベント発行中にエラーが発生しました");
+                Console.WriteLine($"❌ [START_CAPTURE] イベント発行エラー: {ex.GetType().Name} - {ex.Message}");
+
+                // 🔥 [PHASE5.2I] Stopボタン制御問題修正
+                // IsCapturing = false を削除 - ユーザーが明示的にStopボタンで停止できるようにする
+                // イベント発行失敗でも、Stopボタンは有効なまま維持
+                // ⚠️ この状態では実際の翻訳処理は動作していないが、ユーザーは停止操作を実行可能
             }
         }
         

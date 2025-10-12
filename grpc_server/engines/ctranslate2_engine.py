@@ -11,6 +11,7 @@ Phase 2.2.1: CTranslate2最適化エンジン実装
 import asyncio
 import time
 import logging
+import gc  # 🔥 [PHASE1.2] 明示的GC実行用
 from pathlib import Path
 from typing import List, Tuple, Optional
 from threading import Lock
@@ -86,6 +87,10 @@ class CTranslate2Engine(TranslationEngine):
         # トークナイザー並列アクセス制御（Race Condition対策）
         self.tokenizer_lock = Lock()
 
+        # 🔥 [PHASE1.2] メモリ管理最適化（Gemini推奨）
+        self.translation_count = 0  # 翻訳回数カウンター
+        self.max_translations_before_gc = 1000  # 1000回ごとにGC実行
+
         self.logger.info(f"CTranslate2 Engine initialized")
         self.logger.info(f"  Model Path: {self.model_path}")
         self.logger.info(f"  Device: {self.device}")
@@ -110,7 +115,9 @@ class CTranslate2Engine(TranslationEngine):
                 str(self.model_path),
                 device=self.device,
                 compute_type=self.compute_type,
-                inter_threads=self.max_workers
+                inter_threads=self.max_workers,
+                intra_threads=1,  # 🔥 [PHASE1.2] スレッドプール制限
+                max_queued_batches=2  # 🔥 [PHASE1.2] バッチキュー制限（VRAM爆発防止）
             )
             self.logger.info("Translatorロード完了")
             self.logger.info(f"  Device: {self.translator.device}")
@@ -285,9 +292,16 @@ class CTranslate2Engine(TranslationEngine):
         src_code = self._get_nllb_lang_code(source_lang)
         tgt_code = self._get_nllb_lang_code(target_lang)
 
+        # 🔧 [ENGINE_DEBUG] 入力情報ログ
+        self.logger.info(f"[ENGINE_TRANSLATE_INPUT] src_code: {src_code}, tgt_code: {tgt_code}")
+        self.logger.info(f"[ENGINE_TRANSLATE_INPUT] Text length: {len(text)}, Text: {text[:100]}...")
+
         try:
             # トークナイズ（source_langを渡す）
             source_tokens = self._encode_text(text, source_lang)
+
+            # 🔧 [ENGINE_DEBUG] トークナイズ結果ログ
+            self.logger.info(f"[ENGINE_TOKENIZE] Token count: {len(source_tokens)}, Tokens: {source_tokens[:20]}...")
 
             # テキスト長チェック
             if len(source_tokens) > self.MAX_TEXT_LENGTH:
@@ -301,12 +315,11 @@ class CTranslate2Engine(TranslationEngine):
                 return self.translator.translate_batch(
                     source=[source_tokens],
                     target_prefix=[[tgt_code]],
-                    beam_size=1,             # ビーム数を1に削減
-                    max_decoding_length=64,  # 短い長さ
-                    repetition_penalty=1.5,  # 繰り返し防止
-                    no_repeat_ngram_size=2,  # 2-gram繰り返し防止
-                    length_penalty=0.8,      # 短い翻訳を優先
-                    disable_unk=True         # 未知トークン無効化
+                    beam_size=1,
+                    max_decoding_length=256,  # 長めに設定
+                    repetition_penalty=1.2,
+                    no_repeat_ngram_size=3,
+                    return_scores=True
                 )
 
             results = await asyncio.get_event_loop().run_in_executor(
@@ -316,10 +329,23 @@ class CTranslate2Engine(TranslationEngine):
 
             # デトークナイズ
             output_tokens = results[0].hypotheses[0]
+
+            # 🔧 [ENGINE_DEBUG] デトークナイズ前のトークンログ
+            self.logger.info(f"[ENGINE_DETOKENIZE] Output token count: {len(output_tokens)}, Tokens: {output_tokens[:20]}...")
+
             translated_text = self._decode_tokens(output_tokens)
+
+            # 🔧 [ENGINE_DEBUG] 翻訳結果ログ
+            self.logger.info(f"[ENGINE_TRANSLATE_OUTPUT] Translated text length: {len(translated_text)}, Text: {translated_text[:100]}...")
 
             # 信頼度スコア（CTranslate2はスコア提供）
             confidence = results[0].scores[0] if results[0].scores else -1.0
+
+            # 🔥 [PHASE1.2] 定期的な明示的メモリ解放（1000回ごと）
+            self.translation_count += 1
+            if self.translation_count % self.max_translations_before_gc == 0:
+                self.logger.info(f"[GC_TRIGGER] {self.translation_count} translations, forcing GC")
+                gc.collect()
 
             return (translated_text, confidence)
 
@@ -328,6 +354,9 @@ class CTranslate2Engine(TranslationEngine):
         except TextTooLongError:
             raise
         except Exception as e:
+            # 🔥 [PHASE1.2] エラー時もGCを実行してメモリ解放
+            self.logger.warning(f"[GC_ON_ERROR] Translation error, forcing GC: {e}")
+            gc.collect()
             raise ModelInferenceError(f"Translation failed: {e}")
 
     async def translate_batch(
@@ -401,9 +430,18 @@ class CTranslate2Engine(TranslationEngine):
                 else:
                     result_list.append(("", 0.0))
 
+            # 🔥 [PHASE1.2] バッチ処理後もGCトリガー（バッチサイズ分カウント）
+            self.translation_count += len(valid_texts)
+            if self.translation_count % self.max_translations_before_gc == 0:
+                self.logger.info(f"[GC_TRIGGER] {self.translation_count} translations (batch), forcing GC")
+                gc.collect()
+
             return result_list
 
         except Exception as e:
+            # 🔥 [PHASE1.2] エラー時もGCを実行してメモリ解放
+            self.logger.warning(f"[GC_ON_ERROR] Batch translation error, forcing GC: {e}")
+            gc.collect()
             raise ModelInferenceError(f"Batch translation failed: {e}")
 
     async def is_ready(self) -> bool:

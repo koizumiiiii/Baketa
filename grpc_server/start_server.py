@@ -16,6 +16,8 @@ import argparse
 import logging
 import signal
 import sys
+import faulthandler  # 🔥 [PHASE1.3] Windows固有クラッシュ検出用
+import traceback  # 🔥 [PHASE1.3] 例外スタックトレース出力用
 
 import grpc
 from grpc import aio
@@ -27,6 +29,7 @@ from protos import translation_pb2_grpc
 from translation_server import TranslationServicer
 from engines.nllb_engine import NllbEngine
 from engines.ctranslate2_engine import CTranslate2Engine
+from resource_monitor import ResourceMonitor  # Phase 1.1: GPU/VRAM監視
 
 # 🔧 [UNICODE_FIX] Windows環境でのUnicodeEncodeError対策
 # sys.stdout/stderrをUTF-8に再設定（cp932 → utf-8）
@@ -133,6 +136,11 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 
+    # 🔥 [PHASE1.1] GPU/VRAMメモリ監視開始（Gemini最重要推奨）
+    resource_monitor = ResourceMonitor(enable_gpu_monitoring=True)
+    await resource_monitor.start_monitoring(interval_seconds=300)  # 5分ごと
+    logger.info("[PHASE1.1] Resource monitoring started (CPU RAM + GPU VRAM + Handles)")
+
     # グレースフルシャットダウン待機
     with GracefulShutdown() as shutdown_handler:
         try:
@@ -145,9 +153,39 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     await server.stop(grace=5.0)  # 5秒のグレースピリオド
     logger.info("gRPC server stopped")
 
+    # 🔥 [PHASE1.1] リソース監視クリーンアップ
+    await resource_monitor.stop_monitoring()
+    resource_monitor.cleanup()
+    logger.info("[PHASE1.1] Resource monitoring cleanup completed")
+
+
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    """🔥 [PHASE1.3] グローバル例外ハンドラー - すべての未処理例外をログ出力"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        # KeyboardInterruptは通常処理
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.critical("=" * 80)
+    logger.critical("🚨 [PHASE1.3] UNCAUGHT EXCEPTION - CRITICAL ERROR")
+    logger.critical("=" * 80)
+    logger.critical(f"Exception Type: {exc_type.__name__}")
+    logger.critical(f"Exception Value: {exc_value}")
+    logger.critical("Traceback:")
+    logger.critical("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+    logger.critical("=" * 80)
+
 
 def main():
     """コマンドライン引数パース & サーバー起動"""
+    # 🔥 [PHASE1.3] faulthandler有効化 - SIGSEGV等のOS-levelクラッシュを検出
+    faulthandler.enable(file=sys.stderr, all_threads=True)
+    logger.info("[PHASE1.3] faulthandler enabled - OS-level crash detection active")
+
+    # 🔥 [PHASE1.3] グローバル例外ハンドラー設置
+    sys.excepthook = global_exception_handler
+    logger.info("[PHASE1.3] Global exception handler installed")
+
     parser = argparse.ArgumentParser(
         description="Baketa gRPC Translation Server"
     )

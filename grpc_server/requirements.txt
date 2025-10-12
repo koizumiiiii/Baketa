@@ -17,6 +17,9 @@ numpy>=1.24.0
 # System Monitoring
 psutil>=5.9.0
 
+# 🔥 [PHASE1.1] GPU/VRAM監視用（NVIDIA GPU環境）
+pynvml>=11.5.0
+
 # Optional: GPU support (uncomment if CUDA is available)
 # torch[cuda]>=2.0.0
 
