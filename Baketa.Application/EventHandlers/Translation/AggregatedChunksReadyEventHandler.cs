@@ -25,6 +25,10 @@ namespace Baketa.Application.EventHandlers.Translation;
 /// </summary>
 public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<AggregatedChunksReadyEvent>
 {
+    // 🔥 [PHASE1_SEMAPHORE] 翻訳実行制御用セマフォ（1並列のみ許可）
+    // Gemini推奨の多層防御アーキテクチャ - 第2層: 物理的排他制御
+    private static readonly SemaphoreSlim _translationExecutionSemaphore = new(1, 1);
+
     private readonly ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
@@ -62,6 +66,21 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     public async Task HandleAsync(AggregatedChunksReadyEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // 🔥 [PHASE1_SEMAPHORE] セマフォ取得（並行実行防止）
+        // WaitAsync(0) = 即座に判定、ブロッキングなし
+        if (!await _translationExecutionSemaphore.WaitAsync(0).ConfigureAwait(false))
+        {
+            // 既に翻訳実行中の場合はスキップ
+            _logger.LogWarning("⚠️ [PHASE1] 翻訳実行中のため、SessionId: {SessionId} をスキップ（並行実行防止）",
+                eventData.SessionId);
+
+            // 🔥 [GEMINI_FEEDBACK] UI/UXフィードバック強化
+            DebugLogUtility.WriteLog($"⏳ [PHASE1] 翻訳スキップ - 別の翻訳実行中（SessionId: {eventData.SessionId}）");
+            Console.WriteLine($"⏳ [PHASE1] 翻訳スキップ - 別の翻訳実行中（SessionId: {eventData.SessionId}）");
+
+            return; // 早期リターン - イベント破棄
+        }
 
         // 🔥 [PHASE12.2_NEW_ARCH] Gemini推奨の見える化ログ
         Console.WriteLine($"✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
@@ -135,6 +154,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _logger.LogError(ex, "❌ [PHASE12.2] 集約チャンクイベント処理エラー - SessionId: {SessionId}",
                 eventData.SessionId);
             throw;
+        }
+        finally
+        {
+            // 🔥 [PHASE1_SEMAPHORE] セマフォ解放（必ず実行）
+            _translationExecutionSemaphore.Release();
+            DebugLogUtility.WriteLog($"🔓 [PHASE1] セマフォ解放完了 - SessionId: {eventData.SessionId}");
         }
     }
 
