@@ -93,8 +93,9 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     # エンジン選択
     if use_ctranslate2:
         logger.info("Initializing CTranslate2 translation engine...")
+        # 🔥 [PATH_FIX] WorkingDirectory=E:\dev\Baketa からの相対パス
         engine = CTranslate2Engine(
-            model_path="../models/nllb-200-ct2",  # grpc_serverディレクトリからの相対パス
+            model_path="models/nllb-200-ct2",  # プロジェクトルートからの相対パス
             device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="int8"
         )

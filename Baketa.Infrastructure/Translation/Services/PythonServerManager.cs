@@ -314,7 +314,8 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = pythonExecutable, // Step 1: py.exe優先戦略適用
-            Arguments = $"\"{scriptPath}\" --port {port}",
+            // 🔥 [CTRANSLATE2_FIX] CTranslate2エンジン使用（int8量子化、80%メモリ削減、GPU access violation解消）
+            Arguments = $"\"{scriptPath}\" --port {port} --use-ctranslate2",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,

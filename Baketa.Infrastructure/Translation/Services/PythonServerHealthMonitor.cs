@@ -568,7 +568,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             var processInfo = new ProcessStartInfo
             {
                 FileName = pythonPath,
-                Arguments = $"\"{serverScriptPath}\" --port {_currentServerPort}",
+                // 🔥 [CTRANSLATE2_FIX] CTranslate2エンジン使用（int8量子化、メモリ80%削減）
+                Arguments = $"\"{serverScriptPath}\" --port {_currentServerPort} --use-ctranslate2",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
