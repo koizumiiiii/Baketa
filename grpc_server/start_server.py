@@ -18,6 +18,7 @@ import signal
 import sys
 import faulthandler  # 🔥 [PHASE1.3] Windows固有クラッシュ検出用
 import traceback  # 🔥 [PHASE1.3] 例外スタックトレース出力用
+from pathlib import Path
 
 import grpc
 from grpc import aio
@@ -93,9 +94,14 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     # エンジン選択
     if use_ctranslate2:
         logger.info("Initializing CTranslate2 translation engine...")
-        # 🔥 [PATH_FIX] WorkingDirectory=E:\dev\Baketa からの相対パス
+        # 🔥 [PATH_FIX] スクリプトの場所から絶対パスを構築
+        script_dir = Path(__file__).parent  # E:\dev\Baketa\grpc_server
+        project_root = script_dir.parent  # E:\dev\Baketa
+        model_path = project_root / "Models" / "nllb-200-ct2"
+        logger.info(f"Model path resolved: {model_path}")
+
         engine = CTranslate2Engine(
-            model_path="models/nllb-200-ct2",  # プロジェクトルートからの相対パス
+            model_path=str(model_path),  # 絶対パス
             device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="int8"
         )

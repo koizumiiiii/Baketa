@@ -98,7 +98,11 @@ class CTranslate2Engine(TranslationEngine):
 
     async def load_model(self) -> None:
         """CTranslate2モデルを事前ロード"""
+        import os
         self.logger.info(f"CTranslate2モデルロード開始: {self.model_path}")
+        self.logger.info(f"  Current Working Directory: {os.getcwd()}")
+        self.logger.info(f"  Model Path (absolute): {self.model_path.absolute()}")
+        self.logger.info(f"  Model Path exists: {self.model_path.exists()}")
         start_time = time.time()
 
         try:
@@ -106,6 +110,8 @@ class CTranslate2Engine(TranslationEngine):
             if not self.model_path.exists():
                 raise ModelNotLoadedError(
                     f"モデルが見つかりません: {self.model_path}\n"
+                    f"WorkingDirectory: {os.getcwd()}\n"
+                    f"Absolute path: {self.model_path.absolute()}\n"
                     f"convert_nllb_to_ctranslate2.pyで変換してください"
                 )
 
