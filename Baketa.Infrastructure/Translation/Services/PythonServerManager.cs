@@ -311,6 +311,9 @@ public class PythonServerManager(
             throw new InvalidOperationException($"Python実行環境が見つかりません。Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
         }
         
+        // 🔥 [TOKENIZER_HANG_FIX] HuggingFace Tokenizerロード時のstderrハング問題修正
+        // 問題: Transformers警告の長いメッセージでstderrバッファが満杯になり、Python側がブロック
+        // 解決策: stderr監視を非同期タスクで実行し、バッファを即座に消費
         var startInfo = new ProcessStartInfo
         {
             FileName = pythonExecutable, // Step 1: py.exe優先戦略適用
@@ -326,10 +329,18 @@ public class PythonServerManager(
             StandardErrorEncoding = new System.Text.UTF8Encoding(false),  // UltraThink Phase 3.1: BOM無しUTF-8
             WorkingDirectory = Environment.CurrentDirectory
         };
+
+        // 🔥 [ULTRATHINK_FIX] Phase 2: 環境変数追加でTokenizerハング完全解消
+        // 問題1: PYTHONUNBUFFERED未設定 → stderrがフルバッファリング → warnings.warn()でバッファ滞留
+        // 問題2: TOKENIZERS_PARALLELISM未設定 → HuggingFace並列化 → プロセス制御下でデッドロック
+        // 解決策: 両方の環境変数を明示設定
+        startInfo.EnvironmentVariables["PYTHONUNBUFFERED"] = "1"; // バッファリング完全無効化
+        startInfo.EnvironmentVariables["TOKENIZERS_PARALLELISM"] = "false"; // Tokenizer並列化無効化
+        logger.LogInformation("🔥 [ULTRATHINK_FIX] 環境変数設定: PYTHONUNBUFFERED=1, TOKENIZERS_PARALLELISM=false");
         
-        var process = Process.Start(startInfo) ?? 
+        var process = Process.Start(startInfo) ??
             throw new InvalidOperationException($"Python翻訳サーバープロセス起動失敗: {languagePair}");
-        
+
         logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Python: {Python}, Args: {Args}",
             process.Id, pythonExecutable, startInfo.Arguments);
 
@@ -341,59 +352,77 @@ public class PythonServerManager(
         System.IO.File.AppendAllText(stderrLogPath, $"Args: {startInfo.Arguments}\r\n");
         System.IO.File.AppendAllText(stderrLogPath, $"=== StdErr Output ===\r\n");
 
-        // 🚨 Phase 1.3: 標準出力監視 - UltraPhase 14.23: stdout完全無効化
-        // 🔥 UltraPhase 14.23: stdin/stdout通信サーバーでは標準出力監視を完全停止
-        //   理由: バックグラウンド監視タスクがJSONレスポンスを横取りし、
-        //         コマンド通信でnull受信 → Python EOF検出 → プロセス終了を引き起こす
-        // 代替: stderr監視のみでPythonログを取得
-        logger.LogInformation("🔇 [UltraPhase 14.23] stdout監視無効化 - stdin/stdout通信モード");
-        logger.LogInformation("📋 [UltraPhase 14.23] 理由: バックグラウンドタスクによるレスポンス横取り防止");
+        // 🚨 [GEMINI_FIX] stdout監視追加 - デッドロック完全解消
+        // 問題: stdout未監視 → バッファ満杯 → torch/transformersがハング
+        // 解決策: BeginOutputReadLine()でstdoutも非同期監視
+        var stdoutLogPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"python_stdout_port{port}.log");
+        System.IO.File.WriteAllText(stdoutLogPath, $"=== Python Process Started: PID {process.Id}, Port {port}, Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===\r\n");
+        System.IO.File.AppendAllText(stdoutLogPath, $"=== StdOut Output ===\r\n");
 
-        // 🚨 Phase 1.3: 詳細エラーログ取得機能 - 標準エラー監視
-        _ = Task.Run(async () =>
+        process.OutputDataReceived += (sender, e) =>
         {
-            try
+            if (!string.IsNullOrEmpty(e.Data))
             {
-                while (!process.StandardError.EndOfStream)
+                var line = e.Data;
+
+                // stdout出力をファイルに記録
+                try
                 {
-                    var line = await process.StandardError.ReadLineAsync().ConfigureAwait(false);
-                    if (!string.IsNullOrEmpty(line))
+                    System.IO.File.AppendAllText(stdoutLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {line}\r\n");
+                }
+                catch { /* ファイル書き込み失敗は無視 */ }
+
+                logger.LogDebug("🐍 [Python-Output-{LanguagePair}-{Port}] {Output}", languagePair, port, line);
+            }
+        };
+
+        process.BeginOutputReadLine(); // 🔥 [GEMINI_FIX] stdout監視開始
+        logger.LogInformation("✅ [GEMINI_FIX] stdout監視有効化 - デッドロック完全回避");
+
+        // 🔥 [TOKENIZER_HANG_FIX] BeginErrorReadLine()で非同期イベントベースstderr読み取り
+        // 問題: ReadLineAsync()がHuggingFace Tokenizerの長い警告メッセージでブロック
+        // 解決策: BeginErrorReadLine()を使用して専用スレッドでstderrを非同期読み取り
+        //         → バッファデッドロックを完全回避
+        logger.LogInformation("🔥 [TOKENIZER_HANG_FIX] BeginErrorReadLine()使用 - バッファデッドロック完全回避");
+
+        process.ErrorDataReceived += (sender, e) =>
+        {
+            if (!string.IsNullOrEmpty(e.Data))
+            {
+                var line = e.Data;
+
+                // 🔥 [PHASE7] すべてのStdErr出力をファイルに記録
+                try
+                {
+                    System.IO.File.AppendAllText(stderrLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {line}\r\n");
+                }
+                catch { /* ファイル書き込み失敗は無視 */ }
+
+                // Pythonエラーの重要度分類
+                if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
+                {
+                    logger.LogError("🚨 [PYTHON_ERROR] {LanguagePair}:{Port} クリティカルエラー: {Error}", languagePair, port, line);
+                }
+                else if (line.Contains("Warning") || line.Contains("WARN"))
+                {
+                    logger.LogWarning("⚠️ [PYTHON_WARN] {LanguagePair}:{Port} 警告: {Warning}", languagePair, port, line);
+                }
+                else
+                {
+                    logger.LogDebug("🐍 [Python-Error-{LanguagePair}-{Port}] {Output}", languagePair, port, line);
+
+                    // 🔥 UltraPhase 14.17: [SERVER_START]検出時にフラグを立てる
+                    if (line.Contains("[SERVER_START]"))
                     {
-                        // 🔥 [PHASE7] すべてのStdErr出力をファイルに記録
-                        try
-                        {
-                            System.IO.File.AppendAllText(stderrLogPath, $"[{DateTime.Now:HH:mm:ss.fff}] {line}\r\n");
-                        }
-                        catch { /* ファイル書き込み失敗は無視 */ }
-
-                        // Pythonエラーの重要度分類
-                        if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
-                        {
-                            logger.LogError("🚨 [PYTHON_ERROR] {LanguagePair}:{Port} クリティカルエラー: {Error}", languagePair, port, line);
-                        }
-                        else if (line.Contains("Warning") || line.Contains("WARN"))
-                        {
-                            logger.LogWarning("⚠️ [PYTHON_WARN] {LanguagePair}:{Port} 警告: {Warning}", languagePair, port, line);
-                        }
-                        else
-                        {
-                            logger.LogDebug("🐍 [Python-Error-{LanguagePair}-{Port}] {Output}", languagePair, port, line);
-
-                            // 🔥 UltraPhase 14.17: [SERVER_START]検出時にフラグを立てる
-                            if (line.Contains("[SERVER_START]"))
-                            {
-                                _serverStartDetectionFlags[port] = true;
-                                logger.LogInformation("✅ [UltraPhase 14.17] [SERVER_START]検出: Port {Port}", port);
-                            }
-                        }
+                        _serverStartDetectionFlags[port] = true;
+                        logger.LogInformation("✅ [UltraPhase 14.17] [SERVER_START]検出: Port {Port}", port);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Python標準エラー監視エラー - 継続して監視します");
-            }
-        });
+        };
+
+        // 🔥 [CRITICAL] BeginErrorReadLine()を即座に開始してstderrバッファを非同期消費
+        process.BeginErrorReadLine();
         
         return process;
     }

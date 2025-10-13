@@ -1,3 +1,15 @@
+# 🔥 [ULTRATHINK_FIX] Phase 6: 全warnings完全抑制（import文より前に実行）
+# 問題: torch.cuda/transformersの警告がstderrでハング → C#プロセス起動失敗
+# 解決策: import前にwarnings抑制 + 環境変数PYTHONWARNINGS設定
+import warnings
+warnings.filterwarnings('ignore')
+
+# 🔥 [ULTRATHINK_FIX] Phase 6: Python組み込みwarnings環境変数設定
+import os
+os.environ["PYTHONWARNINGS"] = "ignore"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # TensorFlow警告抑制
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # HuggingFace並列化無効
+
 """
 gRPC Translation Server Startup Script
 Phase 2.2: サーバー起動エントリーポイント
