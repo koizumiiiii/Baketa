@@ -948,14 +948,10 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 return CreateDummyMat();
             }
 
-            // 🔥 [PHASE5.2] ArrayPool<byte>を使用した効率的なバイト配列取得
-            int actualLength;
-            (pooledArray, actualLength) = await image.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
-
-            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
-            // Gemini推奨: Buffer.BlockCopy()による高速コピーで、ArrayPoolとMatのライフサイクルを分離
-            var imageBytes = new byte[actualLength];
-            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
+            // 🔥 [PHASE5.2_ROLLBACK] ArrayPool一時無効化 - Segmentation Fault対策（Gemini推奨）
+            // 問題: ArrayPool + Buffer.BlockCopy + Mat.FromImageData が30MB画像でネイティブメモリ破損
+            // 暫定対策: ToByteArrayAsync()直接使用で安定性確保、Phase 5.2D検証を優先
+            var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
             var mat = Mat.FromImageData(imageBytes, ImreadModes.Color);
 
             // ROI指定がある場合は切り出し
@@ -1150,14 +1146,11 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         byte[]? pooledArray = null;
         try
         {
-            // 🔥 [PHASE5.2] ArrayPool<byte>を使用した効率的なバイト配列取得
-            int actualLength;
-            (pooledArray, actualLength) = await originalImage.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
-
-            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
-            // Gemini推奨: Buffer.BlockCopy()による高速コピーで、ArrayPoolとMatのライフサイクルを分離
-            var imageBytes = new byte[actualLength];
-            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
+            // 🔥 [PHASE5.2_ROLLBACK] ArrayPool一時無効化 - Segmentation Fault対策（Gemini推奨）
+            // 問題: ArrayPool + Buffer.BlockCopy + Mat.FromImageData が30MB画像でネイティブメモリ破損
+            // 暫定対策: ToByteArrayAsync()直接使用で安定性確保、Phase 5.2D検証を優先
+            // 恒久対策: Phase 5.2Gでfixedピン留め + ゼロコピー実装予定
+            var imageBytes = await originalImage.ToByteArrayAsync().ConfigureAwait(false);
             using var originalMat = Mat.FromImageData(imageBytes, ImreadModes.Color);
 
             // Lanczosリサンプリングでリサイズ

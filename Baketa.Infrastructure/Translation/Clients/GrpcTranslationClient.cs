@@ -101,8 +101,14 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
             );
 
             // gRPC Translate RPC呼び出し
-            Console.WriteLine($"🔥 [gRPC_CLIENT] gRPC Translate RPC呼び出し開始...");
-            var grpcResponse = await _client.TranslateAsync(grpcRequest, cancellationToken: cancellationToken)
+            // 🔥 [PHASE5.2D_FIX] WaitForReady=true で TCP接続初期化待機
+            // 問題: gRPC Channelは lazy initialization のため、最初のRPC呼び出し時にTCP接続を確立
+            // 解決策: WaitForReady()で接続確立を待機し、初期化中のUNAVAILABLEエラーを防止
+            var callOptions = new CallOptions(cancellationToken: cancellationToken)
+                .WithWaitForReady(true); // 接続確立まで待機
+
+            Console.WriteLine($"🔥 [gRPC_CLIENT] gRPC Translate RPC呼び出し開始（WaitForReady=true）...");
+            var grpcResponse = await _client.TranslateAsync(grpcRequest, callOptions)
                 .ConfigureAwait(false);
 
             sw.Stop();
@@ -221,7 +227,11 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         try
         {
             var request = new IsReadyRequest();
-            var response = await _client.IsReadyAsync(request, cancellationToken: cancellationToken)
+            // 🔥 [PHASE5.2D_FIX] WaitForReady=true で TCP接続初期化待機
+            var callOptions = new CallOptions(cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            var response = await _client.IsReadyAsync(request, callOptions)
                 .ConfigureAwait(false);
 
             _logger.LogDebug("[gRPC] IsReady: {Ready}, Status: {Status}", response.IsReady, response.Status);
@@ -248,7 +258,11 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         try
         {
             var request = new HealthCheckRequest();
-            var response = await _client.HealthCheckAsync(request, cancellationToken: cancellationToken)
+            // 🔥 [PHASE5.2D_FIX] WaitForReady=true で TCP接続初期化待機
+            var callOptions = new CallOptions(cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            var response = await _client.HealthCheckAsync(request, callOptions)
                 .ConfigureAwait(false);
 
             _logger.LogDebug("[gRPC] HealthCheck: {Healthy}, Status: {Status}", response.IsHealthy, response.Status);
