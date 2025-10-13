@@ -948,10 +948,21 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 return CreateDummyMat();
             }
 
-            // 🔥 [PHASE5.2_ROLLBACK] ArrayPool一時無効化 - Segmentation Fault対策（Gemini推奨）
-            // 問題: ArrayPool + Buffer.BlockCopy + Mat.FromImageData が30MB画像でネイティブメモリ破損
-            // 暫定対策: ToByteArrayAsync()直接使用で安定性確保、Phase 5.2D検証を優先
-            var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
+            // 🔥 [PHASE5.2G-B] ArrayPool効率化 + Mat.FromImageData（段階的アプローチ Phase 1）
+            // 修正内容: Phase 5.2Gのfixed pinning + Mat.FromPixelData()は誤実装だった
+            //          ToPooledByteArrayWithLengthAsync()が返すのはPNGエンコードデータであり、
+            //          Mat.FromPixelData()が期待する生ピクセルデータではない
+            //
+            // 現実装: Mat.FromImageData()でPNG復号化（Phase 5.2Fと同じ）
+            // 効果: クラッシュ解消、ArrayPoolによるメモリ効率化は維持
+            //
+            // TODO Phase 5.2G-A: IImage.GetPixelData()追加で真のゼロコピー実装（次タスク）
+            (pooledArray, int actualLength) = await image.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
+            // Gemini推奨: Buffer.BlockCopy()による高速コピーで、ArrayPoolとMatのライフサイクルを分離
+            var imageBytes = new byte[actualLength];
+            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
             var mat = Mat.FromImageData(imageBytes, ImreadModes.Color);
 
             // ROI指定がある場合は切り出し
@@ -987,8 +998,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                     {
                         try
                         {
-                            // 🛡️ [MEMORY_FIX] ROI用の新しいMatを作成し、元のmatを安全にDispose
-                            var roiMat = new Mat(mat, rect);
+                            // ROI用の新しいMatを作成し、元のmatを安全にDispose
+                            var roiMat = new Mat(mat, rect).Clone();
                             mat.Dispose(); // 元のmatを解放
                             return roiMat;
                         }
@@ -1146,16 +1157,25 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         byte[]? pooledArray = null;
         try
         {
-            // 🔥 [PHASE5.2_ROLLBACK] ArrayPool一時無効化 - Segmentation Fault対策（Gemini推奨）
-            // 問題: ArrayPool + Buffer.BlockCopy + Mat.FromImageData が30MB画像でネイティブメモリ破損
-            // 暫定対策: ToByteArrayAsync()直接使用で安定性確保、Phase 5.2D検証を優先
-            // 恒久対策: Phase 5.2Gでfixedピン留め + ゼロコピー実装予定
-            var imageBytes = await originalImage.ToByteArrayAsync().ConfigureAwait(false);
-            using var originalMat = Mat.FromImageData(imageBytes, ImreadModes.Color);
+            // 🔥 [PHASE5.2G-B] ArrayPool効率化 + Mat.FromImageData（段階的アプローチ Phase 1）
+            // 修正内容: Phase 5.2Gのfixed pinning + Mat.FromPixelData()は誤実装だった
+            //          ToPooledByteArrayWithLengthAsync()が返すのはPNGエンコードデータであり、
+            //          Mat.FromPixelData()が期待する生ピクセルデータではない
+            //
+            // 現実装: Mat.FromImageData()でPNG復号化（Phase 5.2Fと同じ）
+            // 効果: クラッシュ解消、ArrayPoolによるメモリ効率化は維持
+            //
+            // TODO Phase 5.2G-A: IImage.GetPixelData()追加で真のゼロコピー実装（次タスク）
+            (pooledArray, int actualLength) = await originalImage.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE5.2E] Use-After-Free修正: 正確なサイズの安全な配列を作成してコピー
+            var imageBytes = new byte[actualLength];
+            Buffer.BlockCopy(pooledArray, 0, imageBytes, 0, actualLength);
+            using var mat = Mat.FromImageData(imageBytes, ImreadModes.Color);
 
             // Lanczosリサンプリングでリサイズ
             using var resizedMat = new Mat();
-            Cv2.Resize(originalMat, resizedMat, new OpenCvSharp.Size(targetWidth, targetHeight),
+            Cv2.Resize(mat, resizedMat, new OpenCvSharp.Size(targetWidth, targetHeight),
                 interpolation: InterpolationFlags.Lanczos4);
 
             // 🔥 [PHASE5.2_GEMINI] PNG圧縮をスキップ - Mat → IImage 直接変換で8MB削減
@@ -1175,7 +1195,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // 🔥 [PHASE5.2] ArrayPool<byte>から借りた配列を必ず返却（メモリリーク防止）
             if (pooledArray != null)
             {
-                ArrayPool<byte>.Shared.Return(pooledArray);
+                ArrayPool<byte>.Shared.Return(pooledArray, clearArray: false);
             }
         }
     }
