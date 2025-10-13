@@ -7,10 +7,12 @@ using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統
 using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
 using Baketa.Core.Abstractions.Imaging; // 🔧 [PHASE3.2_FIX] IImage用
 using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
+using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
 using Microsoft.Extensions.Logging;
+using System.Buffers; // 🔥 [PHASE5.2C] ArrayPool<byte>用
 using System.Diagnostics;
 using System.Drawing; // 🎯 UltraThink Phase 77.6: Bitmap用 + ROI_IMAGE_SAVE Graphics, Pen, Color等用
 using System.Drawing.Imaging; // 🎯 [ROI_IMAGE_SAVE] ImageFormat用
@@ -643,7 +645,7 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         _logger.LogDebug("🔄 [PHASE77.6] InlineImageToWindowsImageAdapter 作成 - Size: {Width}x{Height}", Width, Height);
     }
 
-    // 🔥 [PHASE5.2] async化によりスレッド爆発を防止（.Result削除）
+    // 🔥 [PHASE5.2C] async化 + ArrayPool対応によりスレッド爆発とメモリリークを防止
     public async Task<Bitmap> GetBitmapAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -653,24 +655,36 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
             return _cachedBitmap;
         }
 
+        byte[]? pooledArray = null;
         try
         {
-            _logger.LogDebug("🔄 [PHASE5.2] IImage → Bitmap async変換開始");
+            _logger.LogDebug("🔄 [PHASE5.2C] IImage → Bitmap async変換開始（ArrayPool使用）");
 
-            // 🔥 [PHASE5.2] .Result削除 - スレッドブロッキング解消
-            var imageBytes = await _underlyingImage.ToByteArrayAsync().ConfigureAwait(false);
-            using var memoryStream = new MemoryStream(imageBytes);
+            // 🔥 [PHASE5.2C] ArrayPool<byte>使用でメモリリーク防止
+            int actualLength;
+            (pooledArray, actualLength) = await _underlyingImage.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
+
+            // 🔥 [PHASE5.2C] actualLengthで正確なサイズのMemoryStreamを作成
+            using var memoryStream = new MemoryStream(pooledArray, 0, actualLength, writable: false);
             _cachedBitmap = new Bitmap(memoryStream);
 
-            _logger.LogDebug("✅ [PHASE5.2] Bitmap async変換成功 - Size: {Width}x{Height}",
+            _logger.LogDebug("✅ [PHASE5.2C] Bitmap async変換成功 - Size: {Width}x{Height}",
                 _cachedBitmap.Width, _cachedBitmap.Height);
 
             return _cachedBitmap;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [PHASE5.2] IImage → Bitmap async変換失敗: {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "❌ [PHASE5.2C] IImage → Bitmap async変換失敗: {ErrorMessage}", ex.Message);
             throw new InvalidOperationException($"Failed to convert IImage to Bitmap: {ex.Message}", ex);
+        }
+        finally
+        {
+            // 🔥 [PHASE5.2C] ArrayPool<byte>から借りた配列を必ず返却（メモリリーク防止）
+            if (pooledArray != null)
+            {
+                ArrayPool<byte>.Shared.Return(pooledArray);
+            }
         }
     }
 
