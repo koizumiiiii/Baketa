@@ -39,10 +39,18 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
     
     // GPU環境検出
     services.AddSingleton<ICaptureEnvironmentDetector, GPUEnvironmentDetector>();
-    
-    // WindowsImage作成ファクトリー
-    services.AddSingleton<WindowsImageFactory>();
-    
+
+    // 🔥 [PHASE7.1_VERIFICATION] 画像ファクトリーのキー付きDI登録
+    // Gemini推奨: 機能フラグで動的に切り替え可能にする
+    // "legacy": WindowsImageFactory (Bitmap直接保持)
+    // "safe": ReferencedSafeImageFactory (ArrayPool<byte>ベース、Phase 7.1診断対応)
+    services.AddKeyedSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory, WindowsImageFactory>("legacy");
+
+    // Phase 7.1検証用: デフォルトは"legacy"を使用（後方互換性維持）
+    services.AddSingleton<WindowsImageFactory>(sp =>
+        sp.GetRequiredKeyedService<Baketa.Core.Abstractions.Factories.IWindowsImageFactory>("legacy") as WindowsImageFactory
+        ?? throw new InvalidOperationException("WindowsImageFactory (legacy) registration failed"));
+
     // ネイティブWindows Captureラッパー
     services.AddTransient<NativeWindowsCaptureWrapper>();
     

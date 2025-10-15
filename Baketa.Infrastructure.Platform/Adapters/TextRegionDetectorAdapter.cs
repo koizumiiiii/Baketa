@@ -258,6 +258,11 @@ internal sealed class SimpleAdvancedImageAdapter : IAdvancedImage, IDisposable
 
     public ReadOnlyMemory<byte> GetImageMemory() => ToByteArrayAsync().Result;
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (SimpleAdvancedImageAdapter is adapter-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("SimpleAdvancedImageAdapter does not support LockPixelData");
+
     public IImage Clone() => new SimpleAdvancedImageAdapter(_bitmap, _logger);
     public Task<IImage> ResizeAsync(int width, int height) => throw new NotImplementedException("SimpleAdvancedImageAdapter: 簡易実装では未対応");
 

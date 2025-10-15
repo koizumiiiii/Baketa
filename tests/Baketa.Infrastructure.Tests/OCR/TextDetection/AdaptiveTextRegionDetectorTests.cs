@@ -257,6 +257,11 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
         return new ReadOnlyMemory<byte>(imageData);
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (TestImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("TestImage does not support LockPixelData");
+
     // IImage methods
     IImage IImage.Clone() => new TestImage(Width, Height);
     public async Task<IImage> ResizeAsync(int newWidth, int newHeight) => await Task.FromResult(new TestImage(newWidth, newHeight)).ConfigureAwait(false);

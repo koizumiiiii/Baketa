@@ -386,7 +386,12 @@ public class BitmapImage(byte[] imageBytes) : IImage
     {
         return new ReadOnlyMemory<byte>(_imageBytes);
     }
-    
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (BitmapImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("BitmapImage does not support LockPixelData");
+
     public Task<byte[]> ToByteArrayAsync()
     {
         return Task.FromResult(_imageBytes);
@@ -436,7 +441,12 @@ public class PlaceholderImageWithSize(byte[] imageBytes, int width, int height) 
     {
         return new ReadOnlyMemory<byte>(_imageBytes);
     }
-    
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (PlaceholderImageWithSize is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("PlaceholderImageWithSize does not support LockPixelData");
+
     public Task<byte[]> ToByteArrayAsync()
     {
         return Task.FromResult(_imageBytes);

@@ -610,7 +610,12 @@ public static class Phase4TestApp
         {
             return new ReadOnlyMemory<byte>(new byte[Width * Height * 3]); // RGB24フォーマット
         }
-        
+
+        /// <summary>
+        /// 🔥 [PHASE5.2G-A] LockPixelData (MockImage is test-only, not supported)
+        /// </summary>
+        public Baketa.Core.Abstractions.Imaging.PixelDataLock LockPixelData() => throw new NotSupportedException("MockImage does not support LockPixelData");
+
         public async Task<byte[]> ToByteArrayAsync()
         {
             await Task.Delay(1).ConfigureAwait(false); // 非同期処理のシミュレーション

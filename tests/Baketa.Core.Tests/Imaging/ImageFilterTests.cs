@@ -176,6 +176,11 @@ namespace Baketa.Core.Tests.Imaging;
             public ReadOnlyMemory<byte> GetImageMemory() => new ReadOnlyMemory<byte>(_data);
             public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
 
+            /// <summary>
+            /// 🔥 [PHASE5.2G-A] LockPixelData (MockAdvancedImage is test-only, not supported)
+            /// </summary>
+            public PixelDataLock LockPixelData() => throw new NotSupportedException("MockAdvancedImage does not support LockPixelData");
+
             public void Dispose() { }
         }
 

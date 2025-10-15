@@ -206,6 +206,11 @@ internal sealed class DummyImage(string path) : Baketa.Core.Abstractions.Imaging
         return new ReadOnlyMemory<byte>(Array.Empty<byte>());
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (DummyImage is test-only, not supported)
+    /// </summary>
+    public Baketa.Core.Abstractions.Imaging.PixelDataLock LockPixelData() => throw new NotSupportedException("DummyImage does not support LockPixelData");
+
     public void Dispose() { }
     public byte[] ToByteArray() => [];
     public Task<byte[]> ToByteArrayAsync() => Task.FromResult(Array.Empty<byte>());

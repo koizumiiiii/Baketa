@@ -313,6 +313,11 @@ public sealed class PlaceholderImage(string text) : IImage
         return new ReadOnlyMemory<byte>(Array.Empty<byte>());
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (PlaceholderImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("PlaceholderImage does not support LockPixelData");
+
     public void Dispose() { }
 
     public Task<byte[]> ToByteArrayAsync()

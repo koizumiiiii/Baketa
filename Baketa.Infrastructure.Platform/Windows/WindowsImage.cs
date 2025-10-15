@@ -278,6 +278,52 @@ namespace Baketa.Infrastructure.Platform.Windows;
         }
 
     /// <summary>
+    /// 🔥 [PHASE5.2G-A] ピクセルデータへの直接アクセスを提供（ゼロコピー）
+    /// Bitmap.LockBitsを使用してメモリを直接ロックし、ReadOnlySpan経由でアクセス
+    /// </summary>
+    /// <returns>PixelDataLock（IDisposable、using推奨）</returns>
+    /// <remarks>
+    /// Phase 5.2G-A Phase 3実装: 真のゼロコピー画像アクセス
+    /// - Bitmap.LockBitsでメモリロック
+    /// - ReadOnlySpan&lt;byte&gt;で直接ピクセルアクセス
+    /// - usingパターンで自動的にUnlockBits実行
+    /// - PaddleOcrEngineでの使用を想定
+    /// </remarks>
+    public Baketa.Core.Abstractions.Imaging.PixelDataLock LockPixelData()
+    {
+        ThrowIfDisposed();
+
+        // Bitmap.LockBitsでピクセルデータをロック（Format24bppRgb = 3バイト/ピクセル）
+        var rect = new Rectangle(0, 0, _bitmap.Width, _bitmap.Height);
+        var bitmapData = _bitmap.LockBits(rect, ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+        try
+        {
+            // ピクセルデータへの直接ポインタ取得
+            unsafe
+            {
+                var ptr = (byte*)bitmapData.Scan0.ToPointer();
+                var length = Math.Abs(bitmapData.Stride) * bitmapData.Height;
+                var span = new ReadOnlySpan<byte>(ptr, length);
+
+                // PixelDataLockを作成（位置引数でコンストラクタ呼び出し）
+                // Dispose時にUnlockBitsが自動実行される
+                return new Baketa.Core.Abstractions.Imaging.PixelDataLock(
+                    span,                                      // data: ReadOnlySpan<byte>
+                    bitmapData.Stride,                         // stride: int
+                    () => _bitmap.UnlockBits(bitmapData)       // unlockAction: Action
+                );
+            }
+        }
+        catch
+        {
+            // エラー時は即座にUnlockBits実行
+            _bitmap.UnlockBits(bitmapData);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// 画像をバイト配列に変換
     /// </summary>
     /// <param name="format">画像フォーマット（省略時はPNG）</param>

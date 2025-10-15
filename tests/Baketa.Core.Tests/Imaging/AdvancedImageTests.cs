@@ -175,6 +175,11 @@ namespace Baketa.Core.Tests.Imaging;
         }
 
         public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+        /// <summary>
+        /// 🔥 [PHASE5.2G-A] LockPixelData (MockAdvancedImage is test-only, not supported)
+        /// </summary>
+        public PixelDataLock LockPixelData() => throw new NotSupportedException("MockAdvancedImage does not support LockPixelData");
     }
 
     /// <summary>

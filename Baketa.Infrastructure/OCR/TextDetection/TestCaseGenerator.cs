@@ -666,6 +666,11 @@ internal sealed class TestAdvancedImage(Bitmap bitmap) : IAdvancedImage
         return new ReadOnlyMemory<byte>(stream.ToArray());
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (TestAdvancedImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("TestAdvancedImage does not support LockPixelData");
+
     public IImage Clone() => new TestAdvancedImage(new Bitmap(_bitmap));
     
     public Color GetPixel(int x, int y) => _bitmap.GetPixel(x, y);

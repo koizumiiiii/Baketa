@@ -757,6 +757,60 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         return memoryStream.ToArray();
     }
 
+    /// <summary>
+    /// 🔥 [PHASE7.2] LockPixelData実装 - IWindowsImageインターフェース完全対応
+    /// Bitmap.LockBits()を使用してゼロコピーピクセルアクセスを提供
+    ///
+    /// 実装詳細:
+    /// - GetBitmap()で_cachedBitmapを取得（既にキャッシュ済みの場合は再利用）
+    /// - Bitmap.LockBits()でBGRA32形式のピクセルデータをロック
+    /// - PixelDataLockを返してusingパターンで自動UnlockBits()実行
+    ///
+    /// Phase 3実装保留を解消: OCRパイプラインでの使用が可能に
+    /// WindowsImage.LockPixelData()と同じ実装パターンを採用
+    /// </summary>
+    public PixelDataLock LockPixelData()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // 🔥 同期版GetBitmap()を使用（LockPixelDataは同期メソッドのため）
+        // _cachedBitmapが既にある場合は再利用、ない場合はGetBitmapAsync()を同期実行
+#pragma warning disable CS0618 // 型またはメンバーが旧型式です
+        var bitmap = GetBitmap();
+#pragma warning restore CS0618
+
+        // Bitmap.LockBits()でBGRA32形式のピクセルデータをロック（WindowsImageと同じFormat32bppArgb）
+        var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var bitmapData = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+        try
+        {
+            // ピクセルデータへの直接ポインタ取得（WindowsImageと同じパターン）
+            unsafe
+            {
+                var ptr = (byte*)bitmapData.Scan0.ToPointer();
+                var length = Math.Abs(bitmapData.Stride) * bitmapData.Height;
+                var span = new ReadOnlySpan<byte>(ptr, length);
+
+                _logger.LogDebug("🔥 [PHASE7.2] PixelDataLock作成成功 - Size: {Width}x{Height}, Stride: {Stride}",
+                    bitmap.Width, bitmap.Height, bitmapData.Stride);
+
+                // PixelDataLockを作成（Dispose時にUnlockBitsが自動実行される）
+                return new PixelDataLock(
+                    span,                                   // data: ReadOnlySpan<byte>
+                    bitmapData.Stride,                      // stride: int
+                    () => bitmap.UnlockBits(bitmapData)     // unlockAction: Action
+                );
+            }
+        }
+        catch
+        {
+            // エラー時は即座にUnlockBits実行
+            bitmap.UnlockBits(bitmapData);
+            throw;
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

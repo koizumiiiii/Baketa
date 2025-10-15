@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Core.Abstractions.Platform.Windows;
 
@@ -83,4 +84,36 @@ namespace Baketa.Core.Abstractions.Platform.Windows;
         /// <returns>画像データのバイト配列</returns>
         /// <remarks>🔥 [PHASE5.2] CancellationToken追加</remarks>
         Task<byte[]> ToByteArrayAsync(System.Drawing.Imaging.ImageFormat? format = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 🔥 [PHASE7.2] 生ピクセルデータへの直接アクセスを取得（ゼロコピー最適化）
+        ///
+        /// Phase 5.2G-AでWindowsImageに実装済み、Phase 7.2でIWindowsImageインターフェースに追加
+        ///
+        /// 用途:
+        /// - OpenCV Mat.FromPixelData() でのゼロコピー処理
+        /// - PNG デコード不要の高速画像処理
+        ///
+        /// 使用例:
+        /// <code>
+        /// using (var pixelLock = windowsImage.LockPixelData())
+        /// {
+        ///     unsafe
+        ///     {
+        ///         fixed (byte* dataPtr = pixelLock.Data)
+        ///         {
+        ///             var mat = Mat.FromPixelData(windowsImage.Height, windowsImage.Width,
+        ///                 MatType.CV_8UC4, (IntPtr)dataPtr, pixelLock.Stride);
+        ///             // ... Mat処理
+        ///         }
+        ///     }
+        /// } // UnlockBits() 自動呼び出し
+        /// </code>
+        ///
+        /// ⚠️ 重要:
+        /// - 必ず using 文で使用すること（UnlockBits() 自動実行のため）
+        /// - Dispose() 後の Data アクセスは禁止（AccessViolationException）
+        /// </summary>
+        /// <returns>生ピクセルデータロック（BGRA32形式、IDisposable）</returns>
+        PixelDataLock LockPixelData();
     }

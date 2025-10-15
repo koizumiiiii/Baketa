@@ -169,6 +169,12 @@ public sealed class ReferencedSafeImage : IImage, IDisposable
     }
 
     /// <summary>
+    /// 🔥 [PHASE5.2G-A] 生ピクセルデータへの直接アクセス（ReferencedSafeImageは非サポート）
+    /// Phase 3でSafeImageの実装完了後、必要に応じて委譲実装に変更予定
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("ReferencedSafeImageは現在、生ピクセルデータアクセスをサポートしません（Phase 3で実装予定）");
+
+    /// <summary>
     /// 内部のSafeImageインスタンスへの安全なアクセス
     /// 参照カウント管理により破棄されることはない
     /// </summary>

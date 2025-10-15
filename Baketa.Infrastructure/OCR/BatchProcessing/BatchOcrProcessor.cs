@@ -2604,6 +2604,11 @@ internal sealed class SimpleImageWrapper(int width, int height) : IImage
         return new ReadOnlyMemory<byte>(new byte[Width * Height * 4]); // BGRA32形式
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (SimpleImageWrapper is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("SimpleImageWrapper does not support LockPixelData");
+
     public IImage Clone()
     {
         return new SimpleImageWrapper(Width, Height);

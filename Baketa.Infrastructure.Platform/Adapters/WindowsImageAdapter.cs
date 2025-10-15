@@ -131,7 +131,14 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                 return ReadOnlyMemory<byte>.Empty;
             }
         }
-        
+
+        /// <summary>
+        /// 🔥 [PHASE7.2] LockPixelData実装完了 - IWindowsImageに委譲
+        /// Phase 3実装保留を解消: WindowsImage.LockPixelData()への委譲により、
+        /// Bitmap.LockBits()ベースのゼロコピーアクセスが可能に
+        /// </summary>
+        public PixelDataLock LockPixelData() => _windowsImage.LockPixelData();
+
         /// <summary>
         /// 画像がグレースケールかどうかを返します
         /// </summary>

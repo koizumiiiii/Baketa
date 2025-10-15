@@ -304,6 +304,37 @@ public sealed class SafeImageAdapter : IWindowsImage
     }
 
     /// <summary>
+    /// 🔥 [PHASE7.2] LockPixelData実装 - IWindowsImageインターフェース完全対応
+    /// SafeImageが保持する画像データへの直接アクセスを提供
+    ///
+    /// 実装詳細:
+    /// - SafeImage.GetImageData()で既にメモリ内にあるピクセルデータを取得
+    /// - ReadOnlySpanを返してゼロコピーアクセスを実現
+    /// - unlockActionは不要（SafeImageはメモリ管理済み）
+    ///
+    /// Phase 3実装保留を解消: OCRパイプラインでの使用が可能に
+    /// </summary>
+    public Baketa.Core.Abstractions.Imaging.PixelDataLock LockPixelData()
+    {
+        ThrowIfDisposed();
+
+        // SafeImageから直接画像データを取得（既にメモリ内に保持されている）
+        var imageData = _safeImage.GetImageData();
+
+        // Strideを計算（Width * BytesPerPixel）
+        var bytesPerPixel = GetBytesPerPixel(_safeImage.PixelFormat);
+        var stride = _safeImage.Width * bytesPerPixel;
+
+        // PixelDataLockを作成（unlockActionは不要：SafeImageが既にメモリ管理している）
+        // SafeImageはメモリ内データを保持しているため、UnlockBitsのような処理は不要
+        return new Baketa.Core.Abstractions.Imaging.PixelDataLock(
+            imageData,                      // data: ReadOnlySpan<byte>
+            stride,                         // stride: int
+            () => { }                       // unlockAction: 何もしない（SafeImageが管理）
+        );
+    }
+
+    /// <summary>
     /// SafeImageからBitmapを生成するヘルパーメソッド
     /// </summary>
     /// <returns>生成されたBitmap（呼び出し側でDispose必要）</returns>

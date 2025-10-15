@@ -66,7 +66,13 @@ public class CoreImage(byte[] pixelData, int width, int height, ImageFormat form
         ThrowIfDisposed();
         return new ReadOnlyMemory<byte>(_pixelData);
     }
-        
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] 生ピクセルデータへの直接アクセス（CoreImageは非サポート）
+    /// CoreImageはPNGエンコードデータ保持のため、生ピクセルアクセス不可
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("CoreImageは生ピクセルデータアクセスをサポートしません（WindowsImageを使用してください）");
+
         /// <summary>
         /// 画像データのバイト配列を取得します
         /// </summary>

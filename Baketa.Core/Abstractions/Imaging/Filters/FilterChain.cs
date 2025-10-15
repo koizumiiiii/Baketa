@@ -270,6 +270,11 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
             /// <returns>画像データの読み取り専用メモリ</returns>
             public ReadOnlyMemory<byte> GetImageMemory() => throw new NotImplementedException();
 
+            /// <summary>
+            /// 🔥 [PHASE5.2G-A] 生ピクセルデータへの直接アクセス（VirtualImageは非サポート）
+            /// </summary>
+            public PixelDataLock LockPixelData() => throw new NotSupportedException("VirtualImageは生ピクセルデータアクセスをサポートしません");
+
             // 以下は仮想的な実装（実際にはGetOutputImageInfoでのみ使用）
             public Task<byte[]> ToByteArrayAsync() => throw new NotImplementedException();
             public IImage Clone() => throw new NotImplementedException();

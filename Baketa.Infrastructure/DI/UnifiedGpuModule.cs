@@ -248,7 +248,12 @@ internal sealed class MockImage : IImage
     {
         return new ReadOnlyMemory<byte>(new byte[Width * Height * 3]);
     }
-    
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (MockImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("MockImage does not support LockPixelData");
+
     public async Task<byte[]> ToByteArrayAsync() => await Task.FromResult(new byte[Width * Height * 3]);
     public IImage Clone() => new MockImage();
     public async Task<IImage> ResizeAsync(int width, int height) => await Task.FromResult(new MockImage());

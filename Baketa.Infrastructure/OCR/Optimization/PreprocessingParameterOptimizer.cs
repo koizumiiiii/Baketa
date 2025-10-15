@@ -456,6 +456,11 @@ internal sealed class TempImageWrapper(string filePath, int width, int height) :
         return new ReadOnlyMemory<byte>(bytes);
     }
 
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (TempImageWrapper is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("TempImageWrapper does not support LockPixelData");
+
     public IImage Clone()
     {
         return new TempImageWrapper(FilePath, Width, Height);
