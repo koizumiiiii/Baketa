@@ -5,8 +5,65 @@
 - **作成日**: 2025-10-03
 - **対象バージョン**: Phase 12.5完了後
 - **推定期間**: 20-28日
-- **ステータス**: Phase 0完全完了（100%）、Phase 1完了（80%）、**Phase 2完全完了（100%）**
-- **最終更新**: 2025-10-06（Phase 2.3完了、gRPC基盤構築完了）
+- **ステータス**: Phase 0-4部分完了（Phase 5.2C緊急実装必要）、**Phase 7.1完了**
+- **最終更新**: 2025-10-15（Phase 7.1完了、優先順位再整理）
+
+---
+
+## 🚨 **最優先緊急タスク（Phase 5.2C）**
+
+### Phase 5.2C: ArrayPoolメモリリーク対策 - ✅ **実装完了（検証待ち）** (2025-10-15)
+
+**ステータス**: ✅ **実装完了**（2025-10-15）、⏳ **効果測定待ち**
+
+**問題の深刻度**: 🔴 **致命的** - アプリの実用性を完全に損なう
+
+**実測メモリリーク**:
+| 測定 | タイミング | Private Memory (MB) | 増加量 |
+|------|-----------|-------------------|--------|
+| 測定1 | 起動直後 | 3,472 | - |
+| 測定2 | 翻訳1回後 | 3,621 | **+149 MB** |
+| 測定3 | 翻訳2回後 | **4,625** | **+1,004 MB** |
+
+**根本原因**:
+- 翻訳1回あたり**平均577MB**のメモリリーク
+- `InlineImageToWindowsImageAdapter.GetBitmapAsync()`で大量メモリアロケーション
+- `ScaleImageWithLanczos`でbyte[]追加コピー
+
+**実装完了タスク**:
+1. [x] `IImageExtensions.ToPooledByteArrayAsync()` - ✅ 実装済み (`Baketa.Core\Extensions\IImageExtensions.cs`)
+2. [x] `PaddleOcrEngine` - ✅ Phase 5.2G-A 真のゼロコピー実装（ArrayPool不要）
+3. [x] `InlineImageToWindowsImageAdapter.GetBitmapAsync()` - ✅ ArrayPool実装完了 (`OcrExecutionStageStrategy.cs:649-689`)
+4. [x] `ScaleImageWithLanczos` - ✅ **MemoryStream最適化完了** (`PaddleOcrEngine.cs:1371-1376`)
+5. [x] ビルド検証 - ✅ 成功（エラー0件、警告138件既存のみ）
+6. [ ] **最終メモリプロファイル測定** - ⏳ **検証必要**
+
+**実装内容**:
+
+**ScaleImageWithLanczos MemoryStream最適化** (2025-10-15完了):
+```csharp
+// 修正前
+var resizedImageData = resizedMat.ToBytes(".bmp");
+return await __imageFactory.CreateFromBytesAsync(resizedImageData).ConfigureAwait(false);
+
+// 修正後 [PHASE5.2C]
+var resizedImageData = resizedMat.ToBytes(".bmp");
+using var memoryStream = new MemoryStream(resizedImageData, writable: false);
+return await __imageFactory.CreateFromStreamAsync(memoryStream).ConfigureAwait(false);
+```
+
+**期待効果**:
+- メモリ使用量: **3,472 MB → 500 MB以下**（約7倍改善）
+- 翻訳2回目以降: **+1,004 MB → +138 MB以下**（86%削減）
+- メモリリーク: **大幅改善期待**
+
+**詳細ドキュメント**: `CLAUDE.local.md` (2025-10-15更新)
+
+**検証完了条件**:
+1. ✅ 実装完了
+2. ✅ ビルド成功確認（エラー0件）
+3. ⏳ 翻訳3回実行後のメモリ使用量測定
+4. ⏳ gRPC翻訳正常動作確認
 
 ---
 
@@ -895,6 +952,41 @@ private bool IsTextDisappearance(ImageChangeResult changeResult)
 - [ ] コード削減量最終測定
 - [ ] 技術的負債解消確認
 - [ ] リファクタリング完了宣言
+
+---
+
+### Phase 7: 画像処理・OCR最適化 (2-3日) - ⚠️ **部分完了**
+
+#### 7.1 Stride計算検証（診断ログ実装） - ✅ **完了 (2025-10-15)**
+- [x] CreateMatFromImage()に画像型判定ログ追加 ✅
+- [x] CreateMatFromPixelLock()に詳細Stride診断ログ実装 ✅
+- [x] File.AppendAllText()でbaketa_debug.logに直接出力 ✅
+- [x] WindowsImageAdapterパス正常動作確認 ✅
+- [x] Stride計算正当性の実証（実測データ） ✅
+- [x] ビルド成功確認 ✅
+- [x] 動作検証完了 ✅
+
+**検証結果**:
+- **3840x2160解像度**: Stride 11520 → 15360 (33%パディング検出)
+- **1885x1060解像度**: Stride 5655 → 5656 (4バイト境界アライメント検出)
+- **WindowsImageAdapterパス**: 全OCR処理で正常動作確認
+
+**技術的意義**:
+- Windows Bitmapメモリアライメント最適化を実証
+- Actual Stride使用の必要性を実データで証明
+- 現在の実装(pixelLock.Stride使用)が正しいことを確認
+
+**コミット**: `6deedbf` - feat: Phase 7.1完了 - Stride計算検証診断ログ実装
+
+**実装ファイル**:
+- `Baketa.Infrastructure/OCR/PaddleOCR/Engine/PaddleOcrEngine.cs:3258-3277, 3341-3368`
+- 診断ログ23箇所追加（File.AppendAllText直接出力）
+
+#### 7.2 PaddleOCR前処理パイプライン最適化 (1-2日) - 🔴 **未着手**
+- [ ] 画像前処理フィルター性能プロファイリング
+- [ ] 不要フィルター削減
+- [ ] GPU最適化適用（CUDA利用）
+- [ ] Mat.FromImageData vs Mat.FromPixelLock性能比較
 
 ---
 

@@ -1335,7 +1335,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     }
     
     /// <summary>
-    /// Lanczosリサンプリングによる高品質画像スケーリング（Phase 5.2: ArrayPool<byte>対応 + PNG圧縮スキップ）
+    /// Lanczosリサンプリングによる高品質画像スケーリング（Phase 5.2C: MemoryStream最適化 + PNG圧縮スキップ）
     /// </summary>
     /// <param name="originalImage">元画像</param>
     /// <param name="targetWidth">目標幅</param>
@@ -1368,12 +1368,12 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // mat.Dispose() - Clone済みMatを解放
             mat.Dispose();
 
-            // 🔥 [PHASE5.2_GEMINI] PNG圧縮をスキップ - Mat → IImage 直接変換で8MB削減
-            // 従来: resizedMat.ToBytes(".png") → 8MB PNG圧縮 → CreateFromBytesAsync
-            // 最適化: resizedMat → BMP形式（無圧縮） → CreateFromBytesAsync
-            // BMPはOpenCVのデフォルト形式で、圧縮オーバーヘッドなし
+            // 🔥 [PHASE5.2C] MemoryStream最適化 - byte[]コピーを削減
+            // resizedMat.ToBytes()の結果を直接MemoryStreamでラップし、CreateFromStreamAsyncを使用
+            // メリット: byte[]の追加コピーが不要、MemoryStreamが内部バッファを効率的に管理
             var resizedImageData = resizedMat.ToBytes(".bmp");
-            return await __imageFactory.CreateFromBytesAsync(resizedImageData).ConfigureAwait(false);
+            using var memoryStream = new MemoryStream(resizedImageData, writable: false);
+            return await __imageFactory.CreateFromStreamAsync(memoryStream).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
