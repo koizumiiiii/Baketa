@@ -199,6 +199,13 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         {
             _logger.LogInformation("翻訳停止処理開始");
 
+            // 🔥 [STOP_CLEANUP] セマフォ強制リセット - タイムアウト中でも即座にクリーンアップ
+            // 問題: gRPCタイムアウト中（0-10秒）にStopしても、セマフォが保持されたまま
+            // 解決策: AggregatedChunksReadyEventHandlerのセマフォを強制解放
+            Console.WriteLine("🚀 [STOP_CLEANUP_DEBUG] ResetSemaphoreForStop()呼び出し直前");
+            Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler.ResetSemaphoreForStop();
+            Console.WriteLine("✅ [STOP_CLEANUP_DEBUG] ResetSemaphoreForStop()呼び出し完了");
+
             // オーバーレイを非表示にしてリセット
             await _overlayManager.HideAllInPlaceOverlaysAsync();
             await _overlayManager.ResetAsync();
@@ -207,7 +214,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
             await UpdateTranslationStateAsync(TranslationStatus.Idle, false, false, false, "StopTranslationAsync");
 
             _logger.LogInformation("翻訳停止処理完了");
-            
+
             executionTimer.Stop();
             return new TranslationControlResult(true, null, TranslationStatus.Idle, executionTimer.Elapsed);
         }

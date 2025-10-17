@@ -314,37 +314,66 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         {
             __logger?.LogInformation("🔥 PaddleOCRウォームアップ開始");
             var stopwatch = Stopwatch.StartNew();
-            
-            // 小さなダミー画像を作成（512x512の白い画像）
-            var dummyImageData = new byte[512 * 512 * 3];
-            for (int i = 0; i < dummyImageData.Length; i++)
+
+            // 🔥 [PHASE13.2.24_FIX] PooledOcrService.IsInitialized=true問題対策
+            // RecognizeAsync内の初期化ガード（Line 416）がスキップされるため、
+            // WarmupAsync内で明示的にInitializeAsync()を呼び出す
+            Console.WriteLine($"🔥🔥🔥 [PHASE13.2.24_CONSOLE] WarmupAsync - IsInitialized={IsInitialized}");
+            if (!IsInitialized)
             {
-                dummyImageData[i] = 255; // 白で埋める
+                Console.WriteLine("🚨🚨🚨 [PHASE13.2.24_CONSOLE] PaddleOCRエンジン未初期化 - 明示的初期化を実行");
+                __logger?.LogWarning("🚨 [PHASE13.2.24] PaddleOCRエンジン未初期化 - 明示的初期化を実行");
+                var initResult = await InitializeAsync(_settings, cancellationToken).ConfigureAwait(false);
+                if (!initResult)
+                {
+                    Console.WriteLine("❌❌❌ [PHASE13.2.24_CONSOLE] PaddleOCRエンジン初期化失敗");
+                    __logger?.LogError("❌ [PHASE13.2.24] PaddleOCRエンジン初期化失敗");
+                    return false;
+                }
+                Console.WriteLine("✅✅✅ [PHASE13.2.24_CONSOLE] PaddleOCRエンジン初期化成功");
+                __logger?.LogInformation("✅ [PHASE13.2.24] PaddleOCRエンジン初期化成功");
             }
-            
-            // ダミー画像オブジェクトを作成
-            var dummyImage = new Core.Services.Imaging.AdvancedImage(
-                dummyImageData, 
-                512, 
-                512, 
-                Core.Abstractions.Imaging.ImageFormat.Rgb24);
-            
+            else
+            {
+                Console.WriteLine("🔍🔍🔍 [PHASE13.2.24_CONSOLE] PaddleOCRエンジン既に初期化済み（IsInitialized=true）");
+                __logger?.LogDebug("🔍 [PHASE13.2.24] PaddleOCRエンジン既に初期化済み（IsInitialized=true）");
+            }
+
+            // 🔥 [PHASE13.2.27] ダミー画像をBitmap → MemoryStream → IImageで作成 - CoreImage非対応問題の修正
+            // 小さなダミー画像を作成（512x512の白い画像）
+            using var dummyBitmap = new Bitmap(512, 512);
+            using (var g = Graphics.FromImage(dummyBitmap))
+            {
+                g.Clear(System.Drawing.Color.White); // 白で埋める
+            }
+
+            // BitmapをMemoryStreamに変換
+            using var memoryStream = new MemoryStream();
+            dummyBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+            memoryStream.Position = 0; // ストリームの読み取り位置をリセット
+
+            // ダミー画像オブジェクトをWindowsImage形式で作成
+            var dummyImage = await __imageFactory.CreateFromStreamAsync(memoryStream).ConfigureAwait(false);
+
             // PaddleOCR実行（モデルをメモリにロード）
             __logger?.LogInformation("📝 ダミー画像でOCR実行中...");
-            
+
             // 実際のOCR処理を小さい画像で実行してモデルをロード
             var result = await RecognizeAsync(dummyImage, progressCallback: null, cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
             __logger?.LogInformation("✅ PaddleOCRウォームアップ完了: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
-            
+
             // 結果を簡単にログ出力
             __logger?.LogInformation("🔍 ウォームアップOCR結果: 検出領域数={Count}", result.TextRegions.Count);
-            
+
             return true;
         }
         catch (Exception ex)
         {
+            // 🔥 [PHASE13.2.26] DebugLogUtility追加 - __loggerがnullでも例外を確実にログ出力
+            Baketa.Core.Utilities.DebugLogUtility.WriteLog($"❌❌❌ [PHASE13.2.26] WarmupAsync例外: {ex.GetType().Name} - {ex.Message}");
+            Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔍 [PHASE13.2.26] StackTrace: {ex.StackTrace}");
             __logger?.LogError(ex, "❌ PaddleOCRウォームアップ中にエラーが発生");
             return false;
         }
@@ -944,25 +973,73 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// </summary>
     private static Mat CreateMatFromPixelLock(PixelDataLock pixelLock, int width, int height)
     {
-        // 🔥 [PHASE7.1_OPTIONA] stride計算の検証（WindowsImage/SafeImageAdapterパス）
-        const int channels = 3; // CV_8UC3固定
-        var calculatedStride = width * channels;
+        // 🔥 [PHASE13.2.31K-23] actualStrideから実際のチャンネル数を自動判定
         var actualStride = pixelLock.Stride;
         var dataLength = pixelLock.Data.Length;
 
-        // 🔥 [PHASE7.1_OPTIONA] ファイル直接書き込みでログ出力（staticメソッドのためILogger不可）
+        // actualStrideからチャンネル数を推定（パディング考慮）
+        var estimatedChannels = actualStride / width;
+        var remainder = actualStride % width;
+
+        // チャンネル数とMatTypeを決定
+        int channels;
+        MatType matType;
+        if (actualStride == width * 4 || estimatedChannels == 4)
+        {
+            // 4チャンネル（RGBA/BGRA）
+            channels = 4;
+            matType = MatType.CV_8UC4;
+        }
+        else if (actualStride == width * 3 || estimatedChannels == 3)
+        {
+            // 3チャンネル（RGB/BGR）
+            channels = 3;
+            matType = MatType.CV_8UC3;
+        }
+        else if (actualStride == width || estimatedChannels == 1)
+        {
+            // 1チャンネル（Grayscale）
+            channels = 1;
+            matType = MatType.CV_8UC1;
+        }
+        else
+        {
+            // パディングありの場合、最も近いチャンネル数を選択
+            if (estimatedChannels >= 4 || remainder > 0 && estimatedChannels == 3)
+            {
+                channels = 4;
+                matType = MatType.CV_8UC4;
+            }
+            else if (estimatedChannels >= 3)
+            {
+                channels = 3;
+                matType = MatType.CV_8UC3;
+            }
+            else
+            {
+                channels = 1;
+                matType = MatType.CV_8UC1;
+            }
+        }
+
+        var calculatedStride = width * channels;
+
+        // 🔥 [PHASE13.2.31K-23] 診断ログ出力（チャンネル数自動判定結果を含む）
         var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
         try
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            var logMessage = $"[{timestamp}] 🔍 [PHASE7.1_OPTIONA] CreateMatFromPixelLock診断:\n" +
+            var logMessage = $"[{timestamp}] 🔍 [K-23] CreateMatFromPixelLock診断:\n" +
                            $"[{timestamp}]   Image Type: WindowsImage/SafeImageAdapter (LockPixelData path)\n" +
                            $"[{timestamp}]   Width: {width}, Height: {height}\n" +
-                           $"[{timestamp}]   Channels: {channels} (MatType.CV_8UC3)\n" +
                            $"[{timestamp}]   pixelLock.Data.Length: {dataLength} bytes\n" +
-                           $"[{timestamp}]   Calculated stride (W*C): {calculatedStride}\n" +
                            $"[{timestamp}]   Actual stride (PixelLock): {actualStride}\n" +
-                           $"[{timestamp}]   Stride mismatch: {calculatedStride != actualStride}\n";
+                           $"[{timestamp}]   Estimated channels (Stride/Width): {estimatedChannels}\n" +
+                           $"[{timestamp}]   Remainder (Stride%Width): {remainder}\n" +
+                           $"[{timestamp}]   🔥 [K-23] Detected channels: {channels}\n" +
+                           $"[{timestamp}]   🔥 [K-23] MatType: {matType}\n" +
+                           $"[{timestamp}]   Calculated stride (W*C): {calculatedStride}\n" +
+                           $"[{timestamp}]   Stride match: {calculatedStride == actualStride}\n";
             System.IO.File.AppendAllText(logPath, logMessage);
         }
         catch { /* ログ書き込み失敗は無視 */ }
@@ -975,15 +1052,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 {
                     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                     System.IO.File.AppendAllText(logPath,
-                        $"[{timestamp}] 🚀 [PHASE7.1_OPTIONA] Mat.FromPixelData呼び出し - Height={height}, Width={width}, MatType=CV_8UC3, Stride={actualStride}\n");
+                        $"[{timestamp}] 🚀 [K-23] Mat.FromPixelData呼び出し - Height={height}, Width={width}, MatType={matType}, Stride={actualStride}\n");
                 }
                 catch { /* ログ書き込み失敗は無視 */ }
 
-                // 生ピクセルデータから直接Matを作成（stride考慮）
+                // 🔥 [PHASE13.2.31K-23] 自動判定されたMatTypeを使用
                 var mat = Mat.FromPixelData(
                     height,
                     width,
-                    MatType.CV_8UC3,  // 3 channels for RGB24
+                    matType,  // 自動判定されたチャンネル数
                     (IntPtr)ptr,
                     actualStride
                 );
@@ -992,7 +1069,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 {
                     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                     System.IO.File.AppendAllText(logPath,
-                        $"[{timestamp}] ✅ [PHASE7.1_OPTIONA] Mat.FromPixelData成功 - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}\n");
+                        $"[{timestamp}] ✅ [K-23] Mat.FromPixelData成功 - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}, Channels={mat.Channels()}\n");
                 }
                 catch { /* ログ書き込み失敗は無視 */ }
 
@@ -1009,18 +1086,135 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// </summary>
     private static Mat CreateMatFromSafeImage(SafeImage safeImage)
     {
+        // 🔥 [PHASE13.2.31K-15] ファイルログに出力
+        var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
+        try
+        {
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] !!! [K-15] CreateMatFromSafeImage ENTRY - Method called\n");
+        }
+        catch { /* ログ書き込み失敗は無視 */ }
+
+        // 🔥 [PHASE13.2.31K-6] CreateMatFromSafeImage開始診断
+        Console.WriteLine($"🚀🚀🚀 [PHASE13.2.31K-6] CreateMatFromSafeImage開始");
+
+        Console.WriteLine($"  [K-6] Step 1: GetImageData呼び出し前");
+
         // Step 1: SafeImageから生ピクセルデータ取得（ArrayPool<byte>からの参照）
-        var imageData = safeImage.GetImageData();
+        ReadOnlySpan<byte> imageData;
+        try
+        {
+            imageData = safeImage.GetImageData();
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-15] Step 1 SUCCESS: imageData.Length={imageData.Length}\n");
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-15] Step 1 FAILED: GetImageData threw {ex.GetType().Name} - {ex.Message}\n");
+            throw;
+        }
+        Console.WriteLine($"  [K-6] Step 1完了: imageData.Length={imageData.Length}");
 
+        Console.WriteLine($"  [K-6] Step 2: PixelFormat取得前");
         // Step 2: PixelFormat → MatType 変換
-        var matType = ConvertPixelFormatToMatType(safeImage.PixelFormat);
+        var pixelFormat = safeImage.PixelFormat;
+        var matType = ConvertPixelFormatToMatType(pixelFormat);
 
-        // Step 3: 画像データのストライド計算（実際のメモリレイアウトに基づく）
+        // 🔥 [K-18] PixelFormat診断
         var channels = GetChannelCountFromMatType(matType);
+        var expectedSize = safeImage.Width * safeImage.Height * channels;
+        var isCompressedData = imageData.Length < expectedSize * 0.8; // 80%未満なら圧縮データと判断
 
+        try
+        {
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-18] PixelFormat={pixelFormat}, MatType={matType}\n");
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-18] Width={safeImage.Width}, Height={safeImage.Height}\n");
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-18] Expected size (W*H*C): {expectedSize} bytes\n");
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-18] Actual size: {imageData.Length} bytes ({(double)imageData.Length / expectedSize * 100:F1}%)\n");
+            System.IO.File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-21] Compressed data detected: {isCompressedData}\n");
+        }
+        catch { /* ログ書き込み失敗は無視 */ }
+
+        // 🔥 [PHASE13.2.31K-21] 圧縮データの場合はデコード処理を実行
+        if (isCompressedData)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-21] DECODE START - Compressed image data detected, decoding to raw pixels\n");
+
+                // 圧縮データ（PNG/JPEG等）をBitmapでデコード
+                using var ms = new System.IO.MemoryStream(imageData.ToArray());
+                using var bitmap = new System.Drawing.Bitmap(ms);
+
+                // Bitmapから Raw Pixel Data を抽出
+                var bitmapData = bitmap.LockBits(
+                    new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb); // Rgba32に対応
+
+                try
+                {
+                    var rawStride = bitmapData.Stride;
+                    var rawDataSize = rawStride * bitmap.Height;
+
+                    System.IO.File.AppendAllText(logPath,
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-21] DECODE SUCCESS - BitmapData: W={bitmap.Width}, H={bitmap.Height}, Stride={rawStride}, Size={rawDataSize}\n");
+
+                    unsafe
+                    {
+                        var ptr = (byte*)bitmapData.Scan0;
+
+                        // BitmapデータからMat作成（解凍済みRaw Pixel Data）
+                        var mat = Mat.FromPixelData(
+                            bitmap.Height,
+                            bitmap.Width,
+                            matType,
+                            (IntPtr)ptr,
+                            rawStride
+                        );
+
+                        System.IO.File.AppendAllText(logPath,
+                            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-21] Mat.FromPixelData SUCCESS after decode - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}\n");
+
+                        // Clone()で独立したMatを作成（bitmapData.Scan0から独立）
+                        return mat.Clone();
+                    }
+                }
+                finally
+                {
+                    bitmap.UnlockBits(bitmapData);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.IO.File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-21] DECODE FAILED: {ex.GetType().Name} - {ex.Message}\n");
+                throw new InvalidOperationException($"Failed to decode compressed image data: {ex.Message}", ex);
+            }
+        }
+
+        Console.WriteLine($"  [K-6] Step 2完了: matType={matType}");
+
+        Console.WriteLine($"  [K-6] Step 3: channels計算前");
+        // Step 3: 画像データのストライド計算（実際のメモリレイアウトに基づく）
+        // 🔥 [K-21] channels変数はLine 1077で既に定義済み（重複定義削除）
+        Console.WriteLine($"  [K-6] Step 3完了: channels={channels}");
+
+        Console.WriteLine($"  [K-6] Step 4: Width取得前");
         // 🔥 [PHASE7.1_DIAGNOSIS] stride計算の検証
         var calculatedStride = safeImage.Width * channels;
+        Console.WriteLine($"  [K-6] Step 4完了: Width={safeImage.Width}, calculatedStride={calculatedStride}");
+
+        Console.WriteLine($"  [K-6] Step 5: Height取得とstride計算前");
         var actualStride = imageData.Length / safeImage.Height;
+        Console.WriteLine($"  [K-6] Step 5完了: Height={safeImage.Height}, actualStride={actualStride}");
 
         Console.WriteLine($"🔍 [PHASE7.1_DIAGNOSIS] CreateMatFromSafeImage診断:");
         Console.WriteLine($"  PixelFormat: {safeImage.PixelFormat}");
@@ -1041,14 +1235,34 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             {
                 Console.WriteLine($"🚀 [PHASE7.1] Mat.FromPixelData呼び出し - Height={safeImage.Height}, Width={safeImage.Width}, MatType={matType}, Stride={stride}");
 
+                try
+                {
+                    System.IO.File.AppendAllText(logPath,
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-15] BEFORE Mat.FromPixelData - H={safeImage.Height}, W={safeImage.Width}, Stride={stride}\n");
+                }
+                catch { /* ログ書き込み失敗は無視 */ }
+
                 // 生ピクセルデータから直接Matを作成
-                var mat = Mat.FromPixelData(
-                    safeImage.Height,
-                    safeImage.Width,
-                    matType,
-                    (IntPtr)ptr,
-                    stride
-                );
+                Mat mat;
+                try
+                {
+                    mat = Mat.FromPixelData(
+                        safeImage.Height,
+                        safeImage.Width,
+                        matType,
+                        (IntPtr)ptr,
+                        stride
+                    );
+
+                    System.IO.File.AppendAllText(logPath,
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-15] SUCCESS Mat.FromPixelData - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}\n");
+                }
+                catch (Exception ex)
+                {
+                    System.IO.File.AppendAllText(logPath,
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-15] CRITICAL Mat.FromPixelData FAILED: {ex.GetType().Name} - {ex.Message}\n");
+                    throw;
+                }
 
                 Console.WriteLine($"✅ [PHASE7.1] Mat.FromPixelData成功 - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}");
 
@@ -1120,7 +1334,48 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             }
             catch { /* ログ書き込み失敗は無視 */ }
 
-            var safeImage = refImage.GetUnderlyingSafeImage();
+            // 🔥 [PHASE13.2.31K-9] GetUnderlyingSafeImage呼び出し診断
+            try
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText(logPath,
+                    $"[{timestamp}] !!! [K-9] BEFORE GetUnderlyingSafeImage call - ReferencedSafeImage.IsDisposed check required\n");
+            }
+            catch (Exception logEx)
+            {
+                // 🔥 [K-11] ログ書き込み失敗を明示的にキャッチして調査
+                try
+                {
+                    System.IO.File.AppendAllText(logPath,
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [K-11-ERROR] K-9 log write FAILED: {logEx.GetType().Name} - {logEx.Message}\n");
+                }
+                catch { /* 二重失敗は無視 */ }
+            }
+
+            SafeImage safeImage;
+            try
+            {
+                safeImage = refImage.GetUnderlyingSafeImage();
+
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText(logPath,
+                    $"[{timestamp}] [K-9] SUCCESS GetUnderlyingSafeImage - SafeImage retrieved\n");
+            }
+            catch (ObjectDisposedException ex)
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText(logPath,
+                    $"[{timestamp}] [K-9] CRITICAL ObjectDisposedException - ReferencedSafeImage already Disposed - Message: {ex.Message}\n");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText(logPath,
+                    $"[{timestamp}] [K-9] ERROR Unexpected exception in GetUnderlyingSafeImage: {ex.GetType().Name} - {ex.Message}\n");
+                throw;
+            }
+
             return CreateMatFromSafeImage(safeImage);
         }
 

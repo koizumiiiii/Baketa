@@ -60,7 +60,46 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     public int Priority => 0;
 
     /// <inheritdoc />
-    public bool SynchronousExecution => true; // 🔥 [PHASE12.2_FIX] Task.Runのfire-and-forget問題を回避
+    public bool SynchronousExecution => false; // 🔧 [FIX] 並列処理を許可して120秒ブロック時のデッドロック回避
+
+    /// <summary>
+    /// 🔥 [STOP_CLEANUP] Stop時のセマフォ強制リセット
+    /// 問題: タイムアウト中（0-10秒）にStopしても、セマフォが保持されたまま残る
+    /// 解決策: Stop時にセマフォの状態を強制的にリセットし、次のStartで即座に翻訳可能にする
+    /// </summary>
+    public static void ResetSemaphoreForStop()
+    {
+        try
+        {
+            Console.WriteLine($"🔍 [STOP_CLEANUP_DEBUG] メソッド開始 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
+            DebugLogUtility.WriteLog($"🔍 [STOP_CLEANUP_DEBUG] メソッド開始 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"💥 [STOP_CLEANUP_DEBUG] Console.WriteLine失敗: {ex.GetType().Name} - {ex.Message}");
+            DebugLogUtility.WriteLog($"💥 [STOP_CLEANUP_DEBUG] Console.WriteLine失敗: {ex.GetType().Name} - {ex.Message}");
+        }
+
+        // セマフォが既に取得されている場合（CurrentCount == 0）のみリセット
+        if (_translationExecutionSemaphore.CurrentCount == 0)
+        {
+            try
+            {
+                _translationExecutionSemaphore.Release();
+                Console.WriteLine("🔓 [STOP_CLEANUP] セマフォ強制解放完了 - Stop時クリーンアップ");
+                DebugLogUtility.WriteLog("🔓 [STOP_CLEANUP] セマフォ強制解放完了 - Stop時クリーンアップ");
+            }
+            catch (SemaphoreFullException)
+            {
+                // 既に解放済み（CurrentCount == 1）の場合は無視
+                Console.WriteLine("ℹ️ [STOP_CLEANUP] セマフォは既に解放済み");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"ℹ️ [STOP_CLEANUP] セマフォは既に利用可能 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
+        }
+    }
 
     /// <inheritdoc />
     public async Task HandleAsync(AggregatedChunksReadyEvent eventData)

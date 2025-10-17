@@ -48,11 +48,16 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         _channel = GrpcChannel.ForAddress(_serverAddress, new GrpcChannelOptions
         {
             // HTTP/2 Keep-Alive設定（接続維持）
+            // 🔧 [GEMINI_DEEP_FIX] TCP層KeepAlive強化による接続維持
+            // 根本原因: 中間機器（ファイアウォール、NAT等）が112秒アイドルでTCP切断
+            // 制約: Grpc.Net.ClientはgRPCレベル(L7)KeepAliveをサポートしていない
+            //       (HttpClient and Kestrel limitation - grpc-dotnet公式ドキュメント)
+            // 解決策: TCP層(L4)KeepAlivePingDelayを60秒→30秒に短縮し、中間機器タイムアウトを回避
             HttpHandler = new System.Net.Http.SocketsHttpHandler
             {
-                PooledConnectionIdleTimeout = Timeout.InfiniteTimeSpan,
-                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
-                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+                PooledConnectionIdleTimeout = Timeout.InfiniteTimeSpan, // クライアント側のアイドルタイムアウト無効化
+                KeepAlivePingDelay = TimeSpan.FromSeconds(10), // 🔧 [PHASE5.2E_FIX] 接続維持強化 - 30秒→10秒（2分アイドル後の再接続問題対策）
+                KeepAlivePingTimeout = TimeSpan.FromSeconds(10), // PING応答待ち時間
                 EnableMultipleHttp2Connections = true
             }
         });

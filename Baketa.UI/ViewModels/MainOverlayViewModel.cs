@@ -610,16 +610,35 @@ public class MainOverlayViewModel : ViewModelBase
     {
         try
         {
-            // OCRサービスに初期化済みかどうかの確認メソッドがあるかチェック
+            // 🔥 [PHASE13.2.21] 型情報診断ログ追加
+            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.21] IOcrEngine実際の型: {ocrService.GetType().FullName}");
+            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.21] IOcrEngine.GetType().Name: {ocrService.GetType().Name}");
+
+            // 🔥 [PHASE13.2.30] WarmupAsync重複実行防止: PooledOcrServiceが自動的にWarmupAsyncを実行
+            // 根本原因: MainOverlayViewModelとPooledOcrService両方がWarmupAsyncを呼び出し、
+            //           2回目のWarmupAsyncでPaddlePredictor(Detector) run failedエラーが発生
+            // 修正内容: MainOverlayViewModelでのWarmupAsync強制実行を削除し、
+            //           PooledOcrServiceの自動WarmupAsyncに任せる
             if (ocrService.GetType().GetProperty("IsInitialized") is var prop && prop != null)
             {
                 var isInitialized = (bool)(prop.GetValue(ocrService) ?? false);
-                return isInitialized;
+                DebugLogUtility.WriteLog($"🔍 [PHASE13.2.30] OCR IsInitialized: {isInitialized}");
+
+                if (isInitialized)
+                {
+                    // ✅ [PHASE13.2.30] PooledOcrServiceが既にWarmupAsync実行済み - そのまま成功を返す
+                    DebugLogUtility.WriteLog("✅ [PHASE13.2.30] PooledOcrService初期化済み - WarmupAsync不要");
+                    return true;
+                }
+
+                // 未初期化の場合はInitializeAsync()を呼び出す（後続のフォールバック処理へ）
+                DebugLogUtility.WriteLog("🔍 [PHASE13.2.30] IsInitialized=false - InitializeAsync実行へ");
             }
 
             // フォールバック: InitializeAsyncを呼んでみて、初期化結果を返す
+            DebugLogUtility.WriteLog("🔥 [PHASE13.2.20] OCR InitializeAsync呼び出し開始");
             var result = await ocrService.InitializeAsync().ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"🔍 OCR InitializeAsync結果: {result}");
+            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.20] OCR InitializeAsync結果: {result}");
             return result;
         }
         catch (Exception ex)
@@ -927,6 +946,15 @@ public class MainOverlayViewModel : ViewModelBase
         {
             DebugLogUtility.WriteLog("🔴 翻訳停止処理開始");
             Logger?.LogInformation("Stopping translation");
+
+            // 🔥 [STOP_CLEANUP] セマフォ強制リセット - タイムアウト中でも即座にクリーンアップ
+            // 問題: gRPCタイムアウト中（0-10秒）にStopしても、セマフォが保持されたまま
+            // 解決策: AggregatedChunksReadyEventHandlerのセマフォを強制解放
+            Console.WriteLine("🚀 [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し直前");
+            DebugLogUtility.WriteLog("🚀 [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し直前");
+            Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler.ResetSemaphoreForStop();
+            Console.WriteLine("✅ [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し完了");
+            DebugLogUtility.WriteLog("✅ [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し完了");
 
             // 翻訳停止（ウィンドウ選択状態は維持）
             DebugLogUtility.WriteLog("🔴 翻訳状態をアイドルに設定");

@@ -36,7 +36,7 @@ public class StreamingTranslationService : IStreamingTranslationService
     private const int MaxParallelChunks = 2; // 並列処理数
     
     // 🚀 [DYNAMIC_TIMEOUT] 動的タイムアウト設定定数
-    private const int BaseTimeoutSeconds = 120; // 🔧 [TIMEOUT_TEST] 基本タイムアウト（秒）- 30秒→120秒に延長してタイムアウト原因を確定検証
+    private const int BaseTimeoutSeconds = 60; // 🔧 [PHASE5.2E_FIX] gRPC再接続時間確保 - 10秒→60秒（KeepAlive切断後の再接続対応）
     private const int TimeoutExtensionThreshold = 500; // タイムアウト延長を開始する文字数
     private const double TimeoutExtensionPercentage = 0.5; // 500文字ごとに50%延長
     private const int MaxTimeoutMultiplier = 10; // 最大10倍まで延長

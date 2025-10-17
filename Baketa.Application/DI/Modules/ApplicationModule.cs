@@ -157,53 +157,61 @@ namespace Baketa.Application.DI.Modules;
                 Baketa.Application.Services.Configuration.ConfigurationFacade>();
             
             // 🔥 [STREAMING] ストリーミング翻訳サービス: 段階的結果表示による12.7秒→数秒体感速度向上
-            Console.WriteLine("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
+            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
             services.AddSingleton<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
-            Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
+            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [DI_DEBUG] StreamingTranslationService登録完了");
             
-            // 🚀 [NLLB_TEST] CoordinateBasedTranslationService一時無効化 - NLLB-200 TPL Dataflowテスト用
-            /*
+            // 🎯 [OPTION_A] CoordinateBasedTranslationService正式登録 - SmartProcessingPipelineService統合
             services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
             {
-                Console.WriteLine("🔍 [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (Phase 2.1更新版)");
-                
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService Factory開始");
+
                 try
                 {
-                    Console.WriteLine("🔍 [DI_DEBUG] ITranslationProcessingFacade取得中...");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ITranslationProcessingFacade取得中...");
                     var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
-                    Console.WriteLine($"✅ [DI_DEBUG] ITranslationProcessingFacade取得成功: {processingFacade.GetType().Name}");
-                    
-                    Console.WriteLine("🔍 [DI_DEBUG] IConfigurationFacade取得中...");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ITranslationProcessingFacade取得成功: {processingFacade.GetType().Name}");
+
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] IConfigurationFacade取得中...");
                     var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
-                    
-                    Console.WriteLine("🔍 [DI_DEBUG] IStreamingTranslationService取得中...");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
+
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] IStreamingTranslationService取得中...");
                     var streamingService = provider.GetService<TranslationAbstractions.IStreamingTranslationService>();
-                    Console.WriteLine($"✅ [DI_DEBUG] IStreamingTranslationService取得成功: {streamingService?.GetType().Name ?? "null"}");
-                    
-                    Console.WriteLine("🔧 [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始 (Service Locator除去済み)");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] IStreamingTranslationService取得成功: {streamingService?.GetType().Name ?? "null"}");
+
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ITextChunkAggregatorService取得中...");
+                    var textChunkAggregatorService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>();
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ITextChunkAggregatorService取得成功: {textChunkAggregatorService.GetType().Name}");
+
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ISmartProcessingPipelineService取得中...");
+                    var pipelineService = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ISmartProcessingPipelineService>();
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ISmartProcessingPipelineService取得成功: {pipelineService.GetType().Name}");
+
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（6パラメータ）");
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                         processingFacade,
                         configurationFacade,
                         streamingService,
+                        textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
+                        pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
                         logger);
-                    Console.WriteLine("✅ [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了 (Phase 2.1)");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知統合済み");
                     return instance;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"💥 [DI_DEBUG] CoordinateBasedTranslationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"💥 [OPTION_A] CoordinateBasedTranslationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
                     throw;
                 }
             });
-            */
             
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>(provider =>
             {
-                Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService Factory開始");
-                
+                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] TranslationOrchestrationService Factory開始");
+
                 try
                 {
                     var captureService = provider.GetRequiredService<ICaptureService>();
@@ -214,28 +222,13 @@ namespace Baketa.Application.DI.Modules;
                     var translationService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationService>();
                     var translationDictionaryService = (Baketa.Core.Abstractions.Services.ITranslationDictionaryService?)null; // REMOVED: 辞書翻訳削除済み
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
-                    
-                    // 🎯 [PHASE17] CoordinateBasedTranslationService有効化 - TimedChunkAggregator統合
-                    Console.WriteLine("🚀 [PHASE17] CoordinateBasedTranslationService取得開始 - TimedChunkAggregator統合用");
-                    var coordinateBasedTranslation = provider.GetService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
-                    if (coordinateBasedTranslation == null)
-                    {
-                        Console.WriteLine("⚠️ [PHASE17] CoordinateBasedTranslationService未登録 - 新規作成");
-                        var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
-                        var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
-                        var streamingTranslationService = provider.GetService<Baketa.Core.Abstractions.Translation.IStreamingTranslationService>();
-                        var textChunkAggregatorService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>();
-                        var loggerForCoordinate = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
-                        coordinateBasedTranslation = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
-                            processingFacade,
-                            configurationFacade,
-                            streamingTranslationService,
-                            textChunkAggregatorService,
-                            loggerForCoordinate);
-                    }
-                    Console.WriteLine($"✅ [PHASE17] CoordinateBasedTranslationService準備完了 - TimedChunkAggregator統合有効");
-                    Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
-                    Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
+
+                    // 🎯 [OPTION_A] CoordinateBasedTranslationService取得 - AddSingletonで既に登録済み
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService取得開始");
+                    var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] CoordinateBasedTranslationService取得成功 - SmartProcessingPipelineService統合済み");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
                     
                     var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
@@ -252,7 +245,7 @@ namespace Baketa.Application.DI.Modules;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"💥 [DI_DEBUG] TranslationOrchestrationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"💥 [DI_DEBUG] TranslationOrchestrationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
                     throw;
                 }
             });

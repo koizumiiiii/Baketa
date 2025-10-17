@@ -42,8 +42,11 @@ namespace Baketa.Infrastructure.DI;
             services.AddSingleton<AdaptiveTextRegionDetector>(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<AdaptiveTextRegionDetector>>();
-                var ocrEngine = sp.GetService<IOcrEngine>(); // オプショナル
-                var imageFactory = sp.GetService<IImageFactory>(); // オプショナル
+                // 🔥 [PHASE13.2.31_FIX] GetService → GetRequiredService に変更
+                // 問題: IOcrEngine/IImageFactoryが null → 全画面フォールバック → 4K画像(3840x2160)でOpenCVエラー
+                // 修正: 必須依存として明示的に解決し、PaddleOCRベースROI検出を確実に実行
+                var ocrEngine = sp.GetRequiredService<IOcrEngine>();
+                var imageFactory = sp.GetRequiredService<IImageFactory>();
 
                 return new AdaptiveTextRegionDetector(logger, ocrEngine, imageFactory);
             });

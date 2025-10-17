@@ -129,20 +129,26 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                         };
                     }
 
-                    // 🎯 【重要】パラメーター最適化を一時的に無効化してテスト
-                    /*
+                    // 🔥 [PHASE13.2.2_FIX] OCR認識精度向上 - 最適化パラメーター有効化
+                    // UltraThink Phase 1で特定: このコメントアウトがOCR文字化けの根本原因
+                    // 効果: det_db_thresh 0.3→0.1, det_db_box_thresh 0.6→0.3, 解像度960→1440
+
+                    // 🔥 [PHASE13.2.5_DIAGNOSTIC] Console.WriteLine診断ログ追加（Logger null対策）
+                    Console.WriteLine($"🚨🚨🚨 [PHASE13.2.5] InitializeAsync実行中 - _logger is null: {_logger == null}");
+                    Console.WriteLine($"🚨🚨🚨 [PHASE13.2.5] ApplyDetectionOptimization呼び出し直前");
+
                     try
                     {
                         // 検出感度向上パラメーター適用（低コントラスト・小文字対応）
                         ApplyDetectionOptimization(_ocrEngine);
-                        _logger?.LogInformation("✅ PaddleOCR検出精度最適化パラメーター適用完了");
+                        Console.WriteLine("✅✅✅ [PHASE13.2.5] ApplyDetectionOptimization呼び出し成功");
+                        _logger?.LogInformation("✅ [PHASE13.2.2] PaddleOCR検出精度最適化パラメーター適用完了");
                     }
                     catch (Exception optEx)
                     {
+                        Console.WriteLine($"❌❌❌ [PHASE13.2.5] ApplyDetectionOptimization失敗: {optEx.Message}");
                         _logger?.LogWarning(optEx, "⚠️ PaddleOCR最適化パラメーター適用で警告発生（処理継続）");
                     }
-                    */
-                    _logger?.LogWarning("🚧 【テスト中】PaddleOCR最適化パラメーターを一時的に無効化 - デフォルト設定で実行");
 
                     _logger?.LogDebug("✅ PaddleOcrAll作成完了 - エンジン型: {EngineType}", _ocrEngine?.GetType()?.Name);
 
@@ -301,9 +307,13 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
     /// </summary>
     private void ApplyDetectionOptimization(PaddleOcrAll ocrEngine)
     {
+        // 🔥 [PHASE13.2.5_DIAGNOSTIC] メソッド開始ログ
+        Console.WriteLine("🔥🔥🔥 [PHASE13.2.5] ApplyDetectionOptimization メソッド開始");
+
         try
         {
             var engineType = ocrEngine.GetType();
+            Console.WriteLine($"🔥 [PHASE13.2.5] EngineType取得成功: {engineType?.Name}");
 
             // 🎯 検出感度最適化パラメーター（言語非依存）
             var detectionParams = new Dictionary<string, object>
@@ -317,8 +327,10 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                 // アンクリップ比率を上げて小さい文字を拡張
                 { "det_db_unclip_ratio", 2.2f },
 
-                // 検出時の最大辺長を拡大（解像度向上）
-                { "det_limit_side_len", 1440 },
+                // 🔥 [PHASE13.2.12_FIX] Gemini推奨: det_limit_side_len を 1440 → 960 にロールバック
+                // 根本原因: 4K画像(3840x2160)を1440に縮小する際、OpenCV内部で "_step >= minstep" エラー発生
+                // 修正内容: PaddleOCR公式デフォルト値960に戻すことで、安定した動作を確保
+                { "det_limit_side_len", 960 },
 
                 // スコアモードを精度重視に設定
                 { "det_db_score_mode", "slow" },
@@ -326,6 +338,8 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                 // 検出制限タイプ
                 { "det_limit_type", "max" }
             };
+
+            Console.WriteLine($"🔥 [PHASE13.2.5] 最適化パラメータ数: {detectionParams.Count}");
 
             // リフレクションでパラメーター適用
             int appliedCount = 0;
@@ -362,6 +376,8 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                 }
             }
 
+            // 🔥 [PHASE13.2.5_DIAGNOSTIC] パラメータ適用結果ログ
+            Console.WriteLine($"✅✅✅ [PHASE13.2.5] 検出精度最適化完了: {appliedCount}/{detectionParams.Count}個のパラメーター適用");
             _logger?.LogDebug("🎯 検出精度最適化完了: {AppliedCount}/{TotalCount}個のパラメーター適用",
                 appliedCount, detectionParams.Count);
         }

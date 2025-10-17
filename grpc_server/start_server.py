@@ -127,7 +127,18 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
 
     # gRPCサーバー作成
     logger.info("Creating gRPC server...")
-    server = aio.server()
+    # 🔧 [GEMINI_DEEP_FIX] 完全なKeepAlive設定 - 中間機器による切断を防止
+    # 根本原因: 中間機器（ファイアウォール、NAT等）が112秒アイドルでTCP切断
+    # 解決策: サーバー側から30秒間隔でPINGを送信し、クライアントからのPINGも許可
+    server = aio.server(options=[
+        # ★★★ サーバー側のKeepAlive設定 ★★★
+        ('grpc.keepalive_time_ms', 30000),  # 30秒ごとにクライアントの生存確認PINGを送信
+        ('grpc.keepalive_timeout_ms', 10000),  # PINGの応答待ち時間
+        ('grpc.keepalive_permit_without_calls', True),  # RPCがなくてもPINGを許可（アイドル中も接続維持）
+        ('grpc.http2.min_time_between_pings_ms', 10000),  # PINGの最低間隔
+        ('grpc.http2.max_pings_without_data', 0),  # データなしでのPING回数制限を無効化
+        ('grpc.http2.min_ping_interval_without_data_ms', 10000),  # クライアントからのPING最低間隔
+    ])
 
     # TranslationServiceを登録
     servicer = TranslationServicer(engine)

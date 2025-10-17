@@ -32,7 +32,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 {
     private readonly ILogger<OcrExecutionStageStrategy> _logger;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
-    private readonly ITextRegionDetector? _textRegionDetector; // 🎯 UltraThink: ROI検出器統合
+    private readonly ITextRegionDetector _textRegionDetector; // 🔥 [PHASE13.2.31I_FIX] nullable削除 - 必須依存として明示（フィールド宣言とコンストラクタの一致）
     private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
@@ -46,15 +46,23 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
         IImageFactoryInterface imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
-        ITextRegionDetector? textRegionDetector = null, // 🎯 UltraThink: ROI検出器をオプション依存で追加
+        ITextRegionDetector textRegionDetector, // 🔥 [PHASE13.2.31H_FIX] 必須依存に変更（デフォルト値削除） - Gemini推奨⭐5/5
         ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        // 🔥 [PHASE13.2.31I_DIAG] コンストラクタ診断ログ（Logger使用 - Console.WriteLineはGUIアプリで記録されない）
+        _logger.LogInformation("🔥🔥🔥 [PHASE13.2.31I] OcrExecutionStageStrategy コンストラクタ呼び出し - textRegionDetector: {TextRegionDetectorStatus}",
+            textRegionDetector != null ? "NOT NULL" : "NULL");
+
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
-        _textRegionDetector = textRegionDetector; // null許容（フォールバック対応）
+        _textRegionDetector = textRegionDetector ?? throw new ArgumentNullException(nameof(textRegionDetector)); // 🔥 [PHASE13.2.31H_FIX] 必須依存として明示
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
+
+        _logger.LogInformation("✅ [PHASE13.2.31I] OcrExecutionStageStrategy 初期化完了 - _textRegionDetector: {FieldStatus}",
+            _textRegionDetector != null ? "NOT NULL" : "NULL");
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken = default)

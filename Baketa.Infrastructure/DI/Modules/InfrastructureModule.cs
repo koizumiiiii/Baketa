@@ -940,10 +940,15 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 段階別戦略実装（IProcessingStageStrategyインターフェースとして登録 - Geminiフィードバック反映）
             // 🔧 UltraThink修正: AddSingletonで状態保持（_previousImage）を正常化
             services.AddSingleton<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.ImageChangeDetectionStageStrategy>();
+
+            // 🔥 [PHASE13.2.31H_FIX] OcrExecutionStageStrategy標準DI登録（ファクトリーラムダ削除） - Gemini推奨⭐5/5
+            // 根本修正: コンストラクタのデフォルト値を削除し、DIコンテナが自動的に依存関係を解決
+            // 利点: Clean Architecture準拠、他のStrategyクラスとDI登録方法を統一、再発防止
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.OcrExecutionStageStrategy>();
+
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TextChangeDetectionStageStrategy>();
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TranslationExecutionStageStrategy>();
-            Console.WriteLine("✅ 段階別戦略登録完了 - 4段階処理戦略");
+            Console.WriteLine("✅ 段階別戦略登録完了 - 4段階処理戦略（ROI検出有効化）");
             
             // 段階的処理設定（appsettings.json対応 - ハードコード削除済み）
             if (configuration != null)

@@ -26,10 +26,11 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     private readonly IImageChangeDetectionService _changeDetectionService;
     private readonly ILogger<ImageChangeDetectionStageStrategy> _logger;
     private readonly IEventAggregator? _eventAggregator; // UltraThink Phase 1: オーバーレイ自動削除統合（オプショナル）
-    
-    // 🔥 Critical Fix: 前回画像管理のためのフィールド追加
-    private readonly object _imageLock = new object();
-    private IImage? _previousImage;
+
+    // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を管理（Singleton問題解決）
+    // 問題: Singletonの_previousImageが複数の処理経路で共有され、初回実行でもpreviousImage != nullになる
+    // 解決策: ConcurrentDictionary<contextId, IImage>でコンテキストごとに前回画像を管理
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IImage?> _previousImages = new();
     
     public ProcessingStageType StageType => ProcessingStageType.ImageChangeDetection;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(2); // 3段階フィルタリングによる高速化
@@ -74,33 +75,30 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     stopwatch.Elapsed);
             }
 
-            // コンテキストIDを生成（デフォルト）
-            var contextId = "default";
-            
-            // 🔥 Critical Fix: 前回画像を適切に管理
-            IImage? previousImageToUse;
-            lock (_imageLock)
-            {
-                previousImageToUse = _previousImage;
-            }
+            // 🔥 [PHASE11_FIX] コンテキストIDを生成（ウィンドウハンドル + 領域ベース）
+            // 各翻訳セッションごとに独立した画像履歴を保持
+            var contextId = $"window_{input.SourceWindowHandle}_region_{input.CaptureRegion.X}_{input.CaptureRegion.Y}_{input.CaptureRegion.Width}_{input.CaptureRegion.Height}";
+
+            // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を取得
+            _previousImages.TryGetValue(contextId, out var previousImageToUse);
 
             // 3段階フィルタリング画像変化検知を実行
             var changeResult = await _changeDetectionService.DetectChangeAsync(
-                previousImageToUse, 
-                currentImage, 
-                contextId, 
+                previousImageToUse,
+                currentImage,
+                contextId,
                 cancellationToken).ConfigureAwait(false);
 
-            // 🔥 Critical Fix: 前回画像を更新（リソース管理付き）
-            lock (_imageLock)
+            // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を更新（リソース管理付き）
+            // 古い画像を破棄してから新しい画像を保存
+            if (_previousImages.TryRemove(contextId, out var oldImage))
             {
-                // 古い画像を破棄
-                if (_previousImage is IDisposable disposable)
+                if (oldImage is IDisposable disposable)
                 {
                     disposable.Dispose();
                 }
-                _previousImage = currentImage;
             }
+            _previousImages[contextId] = currentImage;
 
             var processingResult = CreateLegacyResult(changeResult);
             
