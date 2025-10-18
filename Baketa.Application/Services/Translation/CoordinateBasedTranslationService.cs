@@ -31,7 +31,7 @@ namespace Baketa.Application.Services.Translation;
 /// 座標ベース翻訳表示サービス
 /// バッチOCR処理と複数ウィンドウオーバーレイ表示を統合した座標ベース翻訳システム
 /// </summary>
-public sealed class CoordinateBasedTranslationService : IDisposable
+public sealed class CoordinateBasedTranslationService : IDisposable, IEventProcessor<Baketa.Core.Events.Translation.AggregatedChunksFailedEvent>
 {
     private readonly ITranslationProcessingFacade _processingFacade;
     private readonly IConfigurationFacade _configurationFacade;
@@ -72,7 +72,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合完了
         Console.WriteLine("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合完了 - 時間軸集約システム有効化");
         _logger?.LogInformation("🎯 TimedChunkAggregator統合完了 - 翻訳品質40-60%向上機能有効化");
-        
+
+        // 🔥 [FALLBACK] AggregatedChunksFailedEventハンドラー登録
+        if (_eventAggregator != null)
+        {
+            _eventAggregator.Subscribe<Baketa.Core.Events.Translation.AggregatedChunksFailedEvent>(this);
+            _logger?.LogInformation("✅ [FALLBACK] AggregatedChunksFailedEventハンドラー登録完了");
+        }
+
         // 統一ログを使用（重複したConsole.WriteLineを統合）
         _configurationFacade.Logger?.LogDebug("CoordinateBasedTranslationService", "サービス初期化完了", new
         {
@@ -1393,6 +1400,102 @@ public sealed class CoordinateBasedTranslationService : IDisposable
         }
     }
 
+    /// <summary>
+    /// IEventProcessorインターフェース実装: イベント処理優先度
+    /// </summary>
+    public int Priority => 100;
+
+    /// <summary>
+    /// IEventProcessorインターフェース実装: 同期実行フラグ
+    /// </summary>
+    public bool SynchronousExecution => false;
+
+    /// <summary>
+    /// 🔥 [FALLBACK] 個別翻訳失敗時のフォールバックハンドラー
+    /// AggregatedChunksFailedEventを受信し、全画面一括翻訳を実行
+    /// </summary>
+    public async Task HandleAsync(Baketa.Core.Events.Translation.AggregatedChunksFailedEvent eventData)
+    {
+        _logger?.LogWarning("🔄 [FALLBACK] 個別翻訳失敗 - 全画面一括翻訳にフォールバック - SessionId: {SessionId}, エラー: {Error}",
+            eventData.SessionId, eventData.ErrorMessage);
+
+        try
+        {
+            if (_streamingTranslationService == null)
+            {
+                _logger?.LogError("❌ [FALLBACK] StreamingTranslationServiceが利用不可 - フォールバック翻訳を実行できません");
+                return;
+            }
+
+            // 失敗したチャンクを全て結合
+            var combinedText = string.Join(" ", eventData.FailedChunks.Select(c => c.CombinedText));
+
+            _logger?.LogInformation("🔄 [FALLBACK] 全画面一括翻訳実行 - テキスト長: {Length}, チャンク数: {Count}",
+                combinedText.Length, eventData.FailedChunks.Count);
+
+            // 全画面一括翻訳実行
+            var translationResult = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
+                [combinedText],
+                Language.FromCode(eventData.SourceLanguage),
+                Language.FromCode(eventData.TargetLanguage),
+                null,
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (translationResult != null && translationResult.Count > 0)
+            {
+                var translatedText = translationResult[0];
+
+                // 全画面翻訳結果の座標を計算（全チャンクを包含する矩形）
+                var bounds = CalculateCombinedBounds(eventData.FailedChunks);
+
+                _logger?.LogInformation("✅ [FALLBACK] 全画面一括翻訳成功 - Text: '{Text}', Bounds: {Bounds}",
+                    translatedText.Substring(0, Math.Min(50, translatedText.Length)), bounds);
+
+                // TranslationWithBoundsCompletedEventを発行（IsFallbackTranslation = true）
+                if (_eventAggregator != null)
+                {
+                    var translationEvent = new TranslationWithBoundsCompletedEvent(
+                        sourceText: combinedText,
+                        translatedText: translatedText,
+                        sourceLanguage: eventData.SourceLanguage,
+                        targetLanguage: eventData.TargetLanguage,
+                        bounds: bounds,
+                        confidence: 1.0f,
+                        engineName: "Fallback",
+                        isFallbackTranslation: true); // 🔥 [FALLBACK] フォールバックフラグを設定
+
+                    await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
+                    _logger?.LogInformation("✅ [FALLBACK] TranslationWithBoundsCompletedEvent発行完了（IsFallbackTranslation=true）");
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("⚠️ [FALLBACK] 全画面一括翻訳結果が空 - フォールバック失敗");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ [FALLBACK] 全画面一括翻訳失敗 - 翻訳を表示できません - SessionId: {SessionId}",
+                eventData.SessionId);
+        }
+    }
+
+    /// <summary>
+    /// 複数チャンクを包含する矩形を計算
+    /// </summary>
+    private System.Drawing.Rectangle CalculateCombinedBounds(System.Collections.Generic.List<Baketa.Core.Abstractions.Translation.TextChunk> chunks)
+    {
+        if (chunks.Count == 0)
+            return System.Drawing.Rectangle.Empty;
+
+        var minX = chunks.Min(c => c.CombinedBounds.X);
+        var minY = chunks.Min(c => c.CombinedBounds.Y);
+        var maxX = chunks.Max(c => c.CombinedBounds.Right);
+        var maxY = chunks.Max(c => c.CombinedBounds.Bottom);
+
+        return new System.Drawing.Rectangle(minX, minY, maxX - minX, maxY - minY);
+    }
+
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -1404,6 +1507,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable
 
         try
         {
+            // 🔥 [GEMINI_FIX] メモリリーク防止のためイベントの購読を解除
+            if (_eventAggregator != null)
+            {
+                _eventAggregator.Unsubscribe<Baketa.Core.Events.Translation.AggregatedChunksFailedEvent>(this);
+                _logger?.LogDebug("✅ [DISPOSE] AggregatedChunksFailedEventハンドラー登録解除完了");
+            }
+
             // MultiWindowOverlayManagerのクリーンアップ
             if (_processingFacade.OverlayManager is IDisposable disposableOverlayManager)
             {

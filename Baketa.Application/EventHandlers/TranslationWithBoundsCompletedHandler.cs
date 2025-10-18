@@ -87,9 +87,27 @@ public class TranslationWithBoundsCompletedHandler(
             // 🏗️ PHASE18: 統一オーバーレイシステムを使用（利用可能な場合）
             if (_overlayManager != null && isTranslationSuccessful)
             {
-                _logger.LogDebug("🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用開始 - ID: {Id}", eventData.Id);
-                Console.WriteLine($"🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用 - EventId: {eventData.Id}");
-                
+                // 🔥 [FALLBACK_FIX] フォールバック翻訳の場合、オーバーレイ表示前に既存の個別翻訳オーバーレイを削除
+                if (eventData.IsFallbackTranslation)
+                {
+                    _logger.LogInformation("🧹 [FALLBACK] フォールバック翻訳実行 - 個別翻訳オーバーレイを削除");
+                    Console.WriteLine("🧹 [FALLBACK] 個別翻訳オーバーレイを削除 - 全画面翻訳のみ表示");
+
+                    try
+                    {
+                        await _overlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                        _logger.LogInformation("✅ [FALLBACK] オーバーレイクリア完了");
+                    }
+                    catch (Exception clearEx)
+                    {
+                        _logger.LogError(clearEx, "❌ [FALLBACK] オーバーレイクリア失敗");
+                    }
+                }
+
+                _logger.LogDebug("🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用開始 - ID: {Id}, IsFallback: {IsFallback}",
+                    eventData.Id, eventData.IsFallbackTranslation);
+                Console.WriteLine($"🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用 - EventId: {eventData.Id}, IsFallback: {eventData.IsFallbackTranslation}");
+
                 try
                 {
                     // TextChunkを作成（eventDataから）

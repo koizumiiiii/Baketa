@@ -17,6 +17,7 @@ namespace Baketa.Core.Events.EventTypes;
 /// <param name="bounds">テキストの座標範囲</param>
 /// <param name="confidence">翻訳の信頼度（0.0-1.0）</param>
 /// <param name="engineName">使用された翻訳エンジン名</param>
+/// <param name="isFallbackTranslation">フォールバック翻訳かどうか（true: 全画面一括翻訳、false: 通常の個別翻訳）</param>
 /// <exception cref="ArgumentNullException">sourceTextまたはtranslatedTextがnullの場合</exception>
 public class TranslationWithBoundsCompletedEvent(
     string sourceText,
@@ -25,7 +26,8 @@ public class TranslationWithBoundsCompletedEvent(
     string targetLanguage,
     Rectangle bounds,
     float confidence = 1.0f,
-    string engineName = "Default") : EventBase
+    string engineName = "Default",
+    bool isFallbackTranslation = false) : EventBase
 {
     /// <summary>
     /// 元のテキスト
@@ -62,9 +64,18 @@ public class TranslationWithBoundsCompletedEvent(
     /// </summary>
     public string EngineName { get; } = engineName ?? "Default";
 
+    /// <summary>
+    /// フォールバック翻訳かどうかを示すフラグ
+    /// </summary>
+    /// <remarks>
+    /// true: 全画面一括翻訳（個別翻訳失敗時のフォールバック）
+    /// false: 通常の個別翻訳
+    /// </remarks>
+    public bool IsFallbackTranslation { get; } = isFallbackTranslation;
+
     /// <inheritdoc />
     public override string Name => "TranslationWithBoundsCompleted";
-        
+
     /// <inheritdoc />
     public override string Category => "Translation";
 }

@@ -33,12 +33,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly IStreamingTranslationService? _streamingTranslationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ILanguageConfigurationService _languageConfig;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
 
     public AggregatedChunksReadyEventHandler(
         ITranslationService translationService,
         IInPlaceTranslationOverlayManager overlayManager,
         ILanguageConfigurationService languageConfig,
+        IEventAggregator eventAggregator,
         ILogger<AggregatedChunksReadyEventHandler> logger,
         IStreamingTranslationService? streamingTranslationService = null)
     {
@@ -48,6 +50,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _streamingTranslationService = streamingTranslationService;
 
@@ -173,26 +176,50 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 DebugLogUtility.WriteLog($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
-            // オーバーレイ表示
-            DebugLogUtility.WriteLog($"🎯🎯🎯 [PHASE12.2_HANDLER] DisplayTranslationOverlayAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
-            Console.WriteLine($"🎯🎯🎯 [PHASE12.2_HANDLER] DisplayTranslationOverlayAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
-
-            await DisplayTranslationOverlayAsync(
-                nonEmptyChunks,
-                eventData.SourceWindowHandle,
-                CancellationToken.None).ConfigureAwait(false);
-
-            DebugLogUtility.WriteLog($"✅✅✅ [PHASE12.2_HANDLER] DisplayTranslationOverlayAsync完了 - SessionId: {eventData.SessionId}");
-            Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] DisplayTranslationOverlayAsync完了 - SessionId: {eventData.SessionId}");
+            // 🔥 [DUAL_TRANSLATION_FIX] オーバーレイ表示を削除
+            // 理由: TranslationWithBoundsCompletedEventHandler経由で既に表示されているため、
+            //       ここで再度表示すると2重表示になる
+            // 解決策: オーバーレイ表示はTranslationWithBoundsCompletedHandlerの責務とし、
+            //         ここでは翻訳結果の設定のみ行う
+            DebugLogUtility.WriteLog($"✅✅✅ [DUAL_TRANSLATION_FIX] オーバーレイ表示をスキップ - TranslationWithBoundsCompletedHandler経由で表示済み");
+            Console.WriteLine($"✅✅✅ [DUAL_TRANSLATION_FIX] オーバーレイ表示をスキップ - TranslationWithBoundsCompletedHandler経由で表示済み");
 
             _logger.LogInformation("✅ [PHASE12.2] バッチ翻訳・オーバーレイ表示完了 - SessionId: {SessionId}, 翻訳数: {Count}",
                 eventData.SessionId, translationResults.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [PHASE12.2] 集約チャンクイベント処理エラー - SessionId: {SessionId}",
+            _logger.LogError(ex, "❌ [PHASE12.2] 集約チャンクイベント処理エラー - フォールバックイベント発行 - SessionId: {SessionId}",
                 eventData.SessionId);
-            throw;
+
+            // 🔥 [FALLBACK] 個別翻訳失敗時にフォールバックイベントを発行
+            // AggregatedChunksFailedEventを発行し、CoordinateBasedTranslationServiceが全画面一括翻訳を実行
+            try
+            {
+                var sourceLanguage = _languageConfig.GetSourceLanguageCode();
+                var targetLanguage = _languageConfig.GetTargetLanguageCode();
+
+                var failedEvent = new AggregatedChunksFailedEvent
+                {
+                    SessionId = eventData.SessionId,
+                    FailedChunks = eventData.AggregatedChunks.ToList(),
+                    SourceLanguage = sourceLanguage,
+                    TargetLanguage = targetLanguage,
+                    ErrorMessage = ex.Message,
+                    ErrorException = ex
+                };
+
+                await _eventAggregator.PublishAsync(failedEvent).ConfigureAwait(false);
+                _logger.LogInformation("✅ [FALLBACK] AggregatedChunksFailedEvent発行完了 - SessionId: {SessionId}",
+                    eventData.SessionId);
+            }
+            catch (Exception publishEx)
+            {
+                _logger.LogError(publishEx, "❌ [FALLBACK] AggregatedChunksFailedEvent発行失敗 - SessionId: {SessionId}",
+                    eventData.SessionId);
+            }
+
+            // 例外を再スローせず正常終了（フォールバック処理に委ねる）
         }
         finally
         {
