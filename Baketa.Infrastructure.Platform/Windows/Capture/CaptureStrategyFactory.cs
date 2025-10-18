@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: CaptureStrategyUsedのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 

@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Exceptions.Capture;
 using Baketa.Core.Settings;
 using System.Runtime.InteropServices;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: GpuEnvironmentInfoのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.Platform.Windows.GPU;
 

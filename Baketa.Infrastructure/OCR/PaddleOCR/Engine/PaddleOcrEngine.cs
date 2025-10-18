@@ -1044,6 +1044,68 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         }
         catch { /* ログ書き込み失敗は無視 */ }
 
+        // 🔥 [PHASE13.2.31K-24] Stride不一致（パディングあり）の場合、パディング除去処理
+        if (calculatedStride != actualStride)
+        {
+            try
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                System.IO.File.AppendAllText(logPath,
+                    $"[{timestamp}] 🔧 [K-24] Stride mismatch detected - パディング除去処理開始\n" +
+                    $"[{timestamp}]   Expected stride: {calculatedStride}, Actual stride: {actualStride}, Padding: {actualStride - calculatedStride} bytes\n");
+            }
+            catch { /* ログ書き込み失敗は無視 */ }
+
+            // パディングを除去した連続メモリ領域を作成
+            var unpaddedData = new byte[calculatedStride * height];
+            var sourceData = pixelLock.Data.ToArray(); // ReadOnlySpan<byte> → byte[]変換
+            for (int y = 0; y < height; y++)
+            {
+                // 各行のパディングなしデータをコピー
+                Buffer.BlockCopy(
+                    sourceData,
+                    y * actualStride,        // ソース（パディングあり）
+                    unpaddedData,
+                    y * calculatedStride,    // デスティネーション（パディングなし）
+                    calculatedStride         // 1行のバイト数（パディングなし）
+                );
+            }
+
+            unsafe
+            {
+                fixed (byte* ptr = unpaddedData)
+                {
+                    try
+                    {
+                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                        System.IO.File.AppendAllText(logPath,
+                            $"[{timestamp}] 🚀 [K-24] Mat.FromPixelData呼び出し（パディング除去後） - Height={height}, Width={width}, MatType={matType}, Stride={calculatedStride}\n");
+                    }
+                    catch { /* ログ書き込み失敗は無視 */ }
+
+                    var mat = Mat.FromPixelData(
+                        height,
+                        width,
+                        matType,
+                        (IntPtr)ptr,
+                        calculatedStride  // パディングなしのStride
+                    );
+
+                    try
+                    {
+                        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                        System.IO.File.AppendAllText(logPath,
+                            $"[{timestamp}] ✅ [K-24] Mat.FromPixelData成功（パディング除去後） - Mat.Cols={mat.Cols}, Mat.Rows={mat.Rows}, Channels={mat.Channels()}\n");
+                    }
+                    catch { /* ログ書き込み失敗は無視 */ }
+
+                    // Clone()で独立したMatを作成（unpaddedDataがスコープ外に出るため必須）
+                    return mat.Clone();
+                }
+            }
+        }
+
+        // 🔥 [PHASE13.2.31K-23] Stride一致の場合、通常処理
         unsafe
         {
             fixed (byte* ptr = pixelLock.Data)

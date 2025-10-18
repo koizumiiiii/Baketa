@@ -694,7 +694,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Quality = 85, // 品質を少し下げてパフォーマンスを向上
             IncludeCursor = false,
             CaptureInterval = intervalMs,
-            OptimizationLevel = 2
+            OptimizationLevel = 2,
+            // 🔥 [PHASE_K-29-F] ROIScaleFactor明示的設定（Gemini推奨値: 0.5）
+            // 問題: デフォルト値0.25が使用され、CaptureModels.csの変更が反映されない
+            // 解決策: 明示的に0.5を設定し、1920x1080でのテキスト検出精度向上
+            ROIScaleFactor = 0.5f // デフォルト0.25 → 0.5（960x540 → 1920x1080）
         };
 
         _captureService.SetCaptureOptions(captureOptions);

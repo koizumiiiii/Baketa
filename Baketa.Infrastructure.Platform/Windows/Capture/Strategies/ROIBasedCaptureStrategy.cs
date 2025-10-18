@@ -9,6 +9,8 @@ using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Diagnostics;
 using System.Drawing;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
+using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
@@ -33,11 +35,36 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
         Baketa.Core.Abstractions.Factories.IWindowsImageFactory imageFactory,
         IEventAggregator eventAggregator)
     {
+        // 🔥 [PHASE1-A] 確実なログ出力（ログレベル設定に依存しない）
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        Console.WriteLine($"🔥🔥🔥 [{timestamp}] [K-29-A_CTOR] ROIBasedCaptureStrategy コンストラクタ実行開始");
+
+        try
+        {
+            var logPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log";
+            System.IO.File.AppendAllText(logPath, $"[{timestamp}] CTOR開始\n");
+        }
+        catch { /* ファイル書き込み失敗は無視 */ }
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _textDetector = textDetector ?? throw new ArgumentNullException(nameof(textDetector));
         _nativeWrapper = nativeWrapper ?? throw new ArgumentNullException(nameof(nativeWrapper));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+
+        // 🔥 [PHASE13.2.31K-29-A] ITextRegionDetectorの実装型をログ出力
+        _logger.LogInformation("🔍 [K-29-A] ROIBasedCaptureStrategy初期化 - ITextRegionDetector実装型: {TextDetectorType}",
+            _textDetector.GetType().FullName);
+
+        // 🔥 [PHASE1-A] コンストラクタ完了ログ
+        Console.WriteLine($"🔥🔥🔥 [{DateTime.Now:HH:mm:ss.fff}] [K-29-A_CTOR] ROIBasedCaptureStrategy コンストラクタ完了 - TextDetector: {_textDetector.GetType().Name}");
+
+        try
+        {
+            var logPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log";
+            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] CTOR完了 - TextDetector: {_textDetector.GetType().Name}\n");
+        }
+        catch { /* ファイル書き込み失敗は無視 */ }
     }
 
     public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
@@ -85,6 +112,17 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
     public async Task<CaptureStrategyResult> ExecuteCaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
+        // 🔥 [PHASE1-A] ExecuteCaptureAsync開始の確実なログ
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        Console.WriteLine($"🔥🔥🔥 [{timestamp}] [K-29-A_EXEC] ExecuteCaptureAsync開始 - HWND=0x{hwnd.ToInt64():X}");
+
+        try
+        {
+            var logPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log";
+            System.IO.File.AppendAllText(logPath, $"[{timestamp}] ExecuteCaptureAsync開始 - HWND=0x{hwnd.ToInt64():X}\n");
+        }
+        catch { /* ファイル書き込み失敗は無視 */ }
+
         var sessionId = Guid.NewGuid().ToString("N");
         var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = new CaptureStrategyResult
@@ -98,9 +136,17 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             _logger.LogInformation("ROIBasedキャプチャ開始: ウィンドウ=0x{Hwnd:X}, セッション={SessionId}", hwnd.ToInt64(), sessionId);
 
             // Phase 1: 低解像度スキャン
+            Console.WriteLine($"🔥🔥🔥 [{DateTime.Now:HH:mm:ss.fff}] [K-29-A_PHASE1] Phase 1開始: 低解像度スキャン");
+            try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase1開始\n"); } catch { }
+
             var phase1Stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var lowResImage = await CaptureLowResolutionAsync(hwnd, options.ROIScaleFactor).ConfigureAwait(false);
             phase1Stopwatch.Stop();
+
+            // 🔥 [PHASE_K-29-E-1] Phase 1画像サイズログ追加 - 座標ズレ仮説検証
+            var lowResImageSize = lowResImage != null ? $"{lowResImage.Width}x{lowResImage.Height}" : "null";
+            Console.WriteLine($"🔥🔥🔥 [{DateTime.Now:HH:mm:ss.fff}] [K-29-A_PHASE1] Phase 1完了: {phase1Stopwatch.ElapsedMilliseconds}ms, 画像={lowResImage != null}, サイズ={lowResImageSize}");
+            try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase1完了: {phase1Stopwatch.ElapsedMilliseconds}ms, 画像={lowResImage != null}, サイズ={lowResImageSize}\n"); } catch { }
 
             await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
             {
@@ -127,9 +173,60 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             }
 
             // Phase 2: テキスト領域検出
+            // 🔥 [PHASE_K-29-E-1] Phase 2画像サイズログ追加 - 座標ズレ仮説検証
+            Console.WriteLine($"🔥🔥🔥 [{DateTime.Now:HH:mm:ss.fff}] [K-29-A_PHASE2] Phase 2開始: テキスト領域検出 - Detector={_textDetector.GetType().Name}, 入力画像サイズ={lowResImageSize}");
+            try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase2開始 - Detector={_textDetector.GetType().Name}, 入力サイズ={lowResImageSize}\n"); } catch { }
+
             var phase2Stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var textRegions = await _textDetector.DetectTextRegionsAsync(lowResImage).ConfigureAwait(false);
+
+            // 🔥 [PHASE13.2.31K-29-A] Phase 2開始ログ - 3秒遅延の原因特定
+            _logger.LogInformation("🔍 [K-29-A_PHASE2_START] テキスト領域検出開始 - 画像サイズ: {Width}x{Height}, Detector: {DetectorType}",
+                lowResImage.Width, lowResImage.Height, _textDetector.GetType().Name);
+
+            // 🔥 [PHASE_K-29-B-1] Phase 2に3秒タイムアウト設定
+            // ユーザー要求: メモリ/GPU負荷軽減のため、ROIBasedで高速に完了できる場合のみ使用
+            // 3秒以内に完了しない場合はPrintWindowFallbackに切り替え
+            IList<System.Drawing.Rectangle> textRegions;
+            using var phase2Cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            try
+            {
+                var detectionTask = _textDetector.DetectTextRegionsAsync(lowResImage);
+                textRegions = await detectionTask.WaitAsync(phase2Cts.Token).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                phase2Stopwatch.Stop();
+                _logger.LogWarning("⏱️ [K-29-B-1] Phase 2タイムアウト（3秒超過） - PrintWindowFallbackに切り替えます, 経過時間: {ElapsedMs}ms",
+                    phase2Stopwatch.ElapsedMilliseconds);
+
+                Console.WriteLine($"⏱️ [{DateTime.Now:HH:mm:ss.fff}] [K-29-B-1] Phase 2タイムアウト（3秒超過） - {phase2Stopwatch.ElapsedMilliseconds}ms");
+                try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase2タイムアウト（3秒超過） - {phase2Stopwatch.ElapsedMilliseconds}ms\n"); } catch { }
+
+                result.Success = false;
+                result.ErrorMessage = "Phase 2 (テキスト領域検出) がタイムアウトしました";
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                phase2Stopwatch.Stop();
+                _logger.LogWarning("🚫 [K-29-B-1] Phase 2キャンセル - 経過時間: {ElapsedMs}ms", phase2Stopwatch.ElapsedMilliseconds);
+
+                Console.WriteLine($"🚫 [{DateTime.Now:HH:mm:ss.fff}] [K-29-B-1] Phase 2キャンセル - {phase2Stopwatch.ElapsedMilliseconds}ms");
+                try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase2キャンセル - {phase2Stopwatch.ElapsedMilliseconds}ms\n"); } catch { }
+
+                result.Success = false;
+                result.ErrorMessage = "Phase 2 (テキスト領域検出) がキャンセルされました";
+                return result;
+            }
+
             phase2Stopwatch.Stop();
+
+            Console.WriteLine($"🔥🔥🔥 [{DateTime.Now:HH:mm:ss.fff}] [K-29-A_PHASE2] Phase 2完了: {phase2Stopwatch.ElapsedMilliseconds}ms, 検出数={textRegions.Count}");
+            try { System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\k29a_debug.log", $"[{DateTime.Now:HH:mm:ss.fff}] Phase2完了: {phase2Stopwatch.ElapsedMilliseconds}ms, 検出数={textRegions.Count}\n"); } catch { }
+
+            // 🔥 [PHASE13.2.31K-29-A] Phase 2完了ログ
+            _logger.LogInformation("✅ [K-29-A_PHASE2_END] テキスト領域検出完了 - 検出数: {RegionCount}, 処理時間: {ElapsedMs}ms",
+                textRegions.Count, phase2Stopwatch.ElapsedMilliseconds);
 
             // テキスト領域検出の品質評価
             var regionSizes = textRegions.Select(r => r.Width * r.Height).ToList();
@@ -160,9 +257,19 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
 
             // Phase 3: 高解像度部分キャプチャ
             var phase3Stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            // 🔥 [PHASE13.2.31K-29-A] Phase 3開始ログ
+            _logger.LogInformation("🔍 [K-29-A_PHASE3_START] 高解像度部分キャプチャ開始 - 対象領域数: {RegionCount}",
+                textRegions.Count);
+
             // 🎯 [COORDINATE_FIX] ROIスケールファクターを渡して座標変換を実施
             var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions, options.ROIScaleFactor).ConfigureAwait(false);
+
             phase3Stopwatch.Stop();
+
+            // 🔥 [PHASE13.2.31K-29-A] Phase 3完了ログ
+            _logger.LogInformation("✅ [K-29-A_PHASE3_END] 高解像度部分キャプチャ完了 - 成功数: {SuccessCount}/{TotalCount}, 処理時間: {ElapsedMs}ms",
+                highResImages.Count, textRegions.Count, phase3Stopwatch.ElapsedMilliseconds);
 
             // キャプチャ結果の品質評価
             var validRegionCount = highResImages.Count;

@@ -15,19 +15,10 @@ public enum CaptureStrategyUsed
     GDIFallback            // 最終手段：古いシステム対応
 }
 
-/// <summary>
-/// キャプチャオプション
-/// </summary>
-public class CaptureOptions
-{
-    public bool AllowDirectFullScreen { get; set; } = true;
-    public bool AllowROIProcessing { get; set; } = true; 
-    public bool AllowSoftwareFallback { get; set; } = true;
-    public float ROIScaleFactor { get; set; } = 0.25f;
-    public int MaxRetryAttempts { get; set; } = 3;
-    public bool EnableHDRProcessing { get; set; } = true;
-    public int TDRTimeoutMs { get; set; } = 2000;
-}
+// 🔥 [PHASE_K-29-G] CaptureOptionsクラスを削除
+// 理由: Baketa.Core.Abstractions.Services.ICaptureService.CaptureOptionsに統合済み
+// 影響範囲: 20ファイルのusing文を更新する必要あり
+// 移行先: using Baketa.Core.Abstractions.Services;
 
 /// <summary>
 /// キャプチャメトリクス

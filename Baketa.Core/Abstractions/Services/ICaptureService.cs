@@ -68,24 +68,62 @@ namespace Baketa.Core.Abstractions.Services;
         /// キャプチャの品質（1-100）
         /// </summary>
         public int Quality { get; set; } = 100;
-        
+
         /// <summary>
         /// カーソルを含むかどうか
         /// </summary>
         public bool IncludeCursor { get; set; }
-        
+
         /// <summary>
         /// キャプチャの間隔（ミリ秒）
         /// </summary>
         public int CaptureInterval { get; set; } = 100;
-        
+
         /// <summary>
         /// キャプチャのフレームレート（秒間フレーム数）
         /// </summary>
         public int FrameRate => 1000 / Math.Max(1, CaptureInterval);
-        
+
         /// <summary>
         /// 最適化レベル（0: なし、1: 低、2: 中、3: 高）
         /// </summary>
         public int OptimizationLevel { get; set; } = 1;
+
+        // 🔥 [PHASE_K-29-G] CaptureModels.CaptureOptionsから統合されたプロパティ
+
+        /// <summary>
+        /// ROI検出用の低解像度画像スケール係数（0.0-1.0）
+        /// デフォルト: 0.5（1920x1080） - Gemini推奨値
+        /// </summary>
+        public float ROIScaleFactor { get; set; } = 0.5f;
+
+        /// <summary>
+        /// DirectFullScreen戦略を許可するか
+        /// </summary>
+        public bool AllowDirectFullScreen { get; set; } = true;
+
+        /// <summary>
+        /// ROIBased戦略を許可するか
+        /// </summary>
+        public bool AllowROIProcessing { get; set; } = true;
+
+        /// <summary>
+        /// ソフトウェアフォールバック戦略を許可するか
+        /// </summary>
+        public bool AllowSoftwareFallback { get; set; } = true;
+
+        /// <summary>
+        /// キャプチャの最大リトライ回数
+        /// </summary>
+        public int MaxRetryAttempts { get; set; } = 3;
+
+        /// <summary>
+        /// HDR処理を有効化するか
+        /// </summary>
+        public bool EnableHDRProcessing { get; set; } = true;
+
+        /// <summary>
+        /// TDR（Timeout Detection and Recovery）タイムアウト（ミリ秒）
+        /// </summary>
+        public int TDRTimeoutMs { get; set; } = 2000;
     }

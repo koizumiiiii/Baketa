@@ -177,10 +177,16 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
 
         try
         {
-            _logger.LogDebug("🔍 PaddleOCRベーステキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
+            _logger.LogDebug("🔍 [K-28_STEP1] PaddleOCRベーステキスト領域検出開始: サイズ={Width}x{Height}", image.Width, image.Height);
+
+            // 🔥 [PHASE13.2.31K-28] 詳細ログ追加: どこで例外が発生するか100%特定
+            _logger.LogDebug("🔍 [K-28_STEP2] IAdvancedImage → IImage変換開始");
 
             // IAdvancedImage → IImage変換
             var convertedImage = await ConvertAdvancedImageToImageAsync(image).ConfigureAwait(false);
+
+            _logger.LogDebug("✅ [K-28_STEP2] IAdvancedImage → IImage変換成功: {Width}x{Height}",
+                convertedImage.Width, convertedImage.Height);
 
             try
             {
@@ -198,8 +204,14 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 _logger.LogDebug("🎯 [COORDINATE_FIX] 座標復元情報: 元画像={OriginalWidth}x{OriginalHeight}, 変換後={ConvertedWidth}x{ConvertedHeight}, スケール={ScaleFactor:F3}",
                     originalWidth, originalHeight, convertedWidth, convertedHeight, scaleFactor);
 
+                // 🔥 [K-28_STEP3] PaddleOCR検出前のログ
+                _logger.LogDebug("🔍 [K-28_STEP3] PaddleOCR DetectTextRegionsAsync開始");
+
                 // PaddleOCRの検出専用機能を使用（認識処理をスキップして高速化）
                 var ocrResults = await _ocrEngine.DetectTextRegionsAsync(convertedImage, cancellationToken).ConfigureAwait(false);
+
+                _logger.LogDebug("✅ [K-28_STEP3] PaddleOCR DetectTextRegionsAsync完了: {ResultCount}個",
+                    ocrResults?.TextRegions?.Count ?? 0);
 
                 if (ocrResults?.TextRegions == null || ocrResults.TextRegions.Count == 0)
                 {
@@ -207,14 +219,20 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
                 }
 
+                // 🔥 [K-28_STEP4] 座標復元前のログ
+                _logger.LogDebug("🔍 [K-28_STEP4] 座標復元処理開始: {RegionCount}個の領域", ocrResults.TextRegions.Count);
+
                 // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
                 var restoredRegions = ocrResults.TextRegions
                     .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor))
                     .Where(region => IsRegionValid(region.Bounds))
                     .ToList();
 
-                _logger.LogDebug("🎯 [COORDINATE_FIX] 座標復元完了: 検出={DetectionCount}個, 復元後有効={RestoredCount}個",
+                _logger.LogDebug("✅ [K-28_STEP4] 座標復元完了: 検出={DetectionCount}個, 復元後有効={RestoredCount}個",
                     ocrResults.TextRegions.Count, restoredRegions.Count);
+
+                // 🔥 [K-28_STEP5] 領域統合前のログ
+                _logger.LogDebug("🔍 [K-28_STEP5] 領域統合処理開始: {RegionCount}個", restoredRegions.Count);
 
                 // 近接領域の統合（既存ロジックを活用）
                 // OcrTextRegion → OCRTextRegion (TextDetection.TextRegion) 変換
@@ -227,6 +245,8 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 }).ToList();
 
                 var mergedRegions = MergeOverlappingRegions(convertedRegions);
+
+                _logger.LogDebug("✅ [K-28_STEP5] 領域統合完了: {MergedCount}個", mergedRegions.Count);
 
                 // 適応的パラメータによる制限
                 var maxRegions = GetParameter<int>("MaxRegionsPerImage");
@@ -248,11 +268,14 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ PaddleOCR検出処理中にエラー: {ErrorMessage}", ex.Message);
+            // 🔥 [PHASE13.2.31K-27] Gemini推奨修正: フルスクリーンフォールバックの廃止
+            // 問題: CreateFullScreenFallbackAsync()がフルスクリーン領域を返し、PaddlePredictor(Detector)が失敗
+            // 解決策: K-26と同様に空リストを返してOCR処理をスキップ、システム安定化を優先
+            _logger.LogError(ex, "❌ [K-27] PaddleOCR検出処理中にエラー: {ErrorMessage} - スタックトレース含む詳細ログ", ex.Message);
 
-            // エラー時は全画面フォールバックを使用
-            _logger.LogWarning("🔄 フォールバック: 全画面を単一領域として処理");
-            return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
+            // エラー時のフォールバック: 空のリストを返す（翻訳スキップ、システム安定化）
+            _logger.LogWarning("🔄 [K-27] フォールバック: 空のリストを返します（PaddlePredictor過負荷回避、K-26統合）");
+            return [];
         }
     }
 

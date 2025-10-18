@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Infrastructure.OCR.Scaling;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: TextDetectionConfigのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
 

@@ -39,7 +39,10 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor
 
     // タイムアウト設定（将来的にはIOptions<OcrSettings>から注入）
     private const int DefaultOcrTimeoutSeconds = 30;
-    private const int DetectionOnlyTimeoutSeconds = 15;
+    // 🔥 [PHASE_K-29-E-3] ROIBased Phase 2と整合性を取るため15秒 → 3秒に短縮
+    // 問題: ROIBasedCaptureStrategy.ExecuteAsync()の3秒WaitAsyncより長いため、15秒待機していた
+    // 解決策: DetectionOnlyTimeoutSecondsを3秒に設定し、ROI検出失敗時の高速フォールバックを実現
+    private const int DetectionOnlyTimeoutSeconds = 3; // ROIBased Phase 2タイムアウトと整合性（旧: 15秒）
     private const int MaxRetryAttempts = 3;
     private const int RetryDelayMilliseconds = 500;
 

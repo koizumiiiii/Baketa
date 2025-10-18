@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Memory;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: TextDetectionConfig取得用
 using Baketa.Core.Models.Capture;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Rectangle = System.Drawing.Rectangle;
@@ -55,10 +56,16 @@ public sealed class TextRegionDetectorAdapter : Baketa.Core.Abstractions.Capture
 
         try
         {
-            _logger.LogDebug("🔗 TextRegionDetectorAdapter: IWindowsImage → IAdvancedImage 変換開始");
+            // 🔥 [PHASE_K-29-E-1] 入力画像サイズログ追加 - 座標ズレ仮説検証
+            _logger.LogDebug("🔗 [K-29-E-1] TextRegionDetectorAdapter: IWindowsImage → IAdvancedImage 変換開始 - 入力サイズ: {Width}x{Height}",
+                image.Width, image.Height);
 
             // 1. IWindowsImage → IAdvancedImage 変換
             var advancedImage = await ConvertToAdvancedImageAsync(image).ConfigureAwait(false);
+
+            // 🔥 [PHASE_K-29-E-1] 変換後画像サイズログ追加
+            _logger.LogDebug("✅ [K-29-E-1] TextRegionDetectorAdapter: IAdvancedImage変換完了 - 変換後サイズ: {Width}x{Height}",
+                advancedImage.Width, advancedImage.Height);
 
             try
             {
@@ -87,11 +94,14 @@ public sealed class TextRegionDetectorAdapter : Baketa.Core.Abstractions.Capture
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ TextRegionDetectorAdapter: テキスト領域検出中にエラーが発生: {ErrorMessage}", ex.Message);
+            // 🔥 [PHASE13.2.31K-26] Gemini推奨修正: フルスクリーンフォールバックの廃止
+            // 問題: フルスクリーン領域(3840x2160)を返すとPaddlePredictor(Detector)が失敗
+            // 解決策: 空のリストを返してOCR処理をスキップ、システム安定化を優先
+            _logger.LogError(ex, "❌ [K-26] TextRegionDetectorAdapter: テキスト領域検出失敗 - 詳細エラー情報とスタックトレース");
 
-            // エラー時のフォールバック: 全画面を単一領域として返す
-            _logger.LogWarning("🔄 TextRegionDetectorAdapter: フォールバック - 全画面を単一領域として返します");
-            return [new Rectangle(0, 0, image.Width, image.Height)];
+            // エラー時のフォールバック: 空のリストを返す（翻訳スキップ、システム安定化）
+            _logger.LogWarning("🔄 [K-26] TextRegionDetectorAdapter: フォールバック - 空のリストを返します（翻訳スキップ、PaddlePredictor過負荷回避）");
+            return [];
         }
     }
 

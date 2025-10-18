@@ -3,7 +3,7 @@ using System.IO;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Models.Capture削除
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Adapters;
 using Baketa.Infrastructure.Platform.Windows.Services;
@@ -240,9 +240,10 @@ public partial class AdaptiveCaptureServiceAdapter(
         return _currentOptions;
     }
 
-    private Baketa.Core.Models.Capture.CaptureOptions CreateAdaptiveCaptureOptions()
+    // 🔥 [PHASE_K-29-G] CaptureOptions統合: ServicesCaptureOptionsを使用
+    private ServicesCaptureOptions CreateAdaptiveCaptureOptions()
     {
-        return new Baketa.Core.Models.Capture.CaptureOptions
+        return new ServicesCaptureOptions
         {
             AllowDirectFullScreen = true,
             AllowROIProcessing = true,

@@ -16,7 +16,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using System.Drawing;
 using Baketa.Core.Settings;
-using CaptureOptions = Baketa.Core.Models.Capture.CaptureOptions;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Services.CaptureOptionsを使用
 
 namespace Baketa.Application.Services.Capture;
 

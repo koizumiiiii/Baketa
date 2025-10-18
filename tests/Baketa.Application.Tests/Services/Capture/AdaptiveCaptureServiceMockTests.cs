@@ -14,6 +14,8 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Application.Services.Capture;
 // GPU Environment Mock Helper moved here to avoid cross-project test dependencies
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
+using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
 namespace Baketa.Application.Tests.Services.Capture;
 

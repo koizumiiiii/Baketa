@@ -10,6 +10,7 @@ using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models.Local;
 using Sdcb.PaddleInference;
 using System.Diagnostics;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: TextDetectionConfigのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 
