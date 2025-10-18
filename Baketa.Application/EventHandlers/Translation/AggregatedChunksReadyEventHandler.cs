@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.Translation;
+using Baketa.Core.Events.EventTypes; // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] TranslationWithBoundsCompletedEvent用
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
@@ -176,15 +177,39 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 DebugLogUtility.WriteLog($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
-            // 🔥 [DUAL_TRANSLATION_FIX] オーバーレイ表示を削除
-            // 理由: TranslationWithBoundsCompletedEventHandler経由で既に表示されているため、
-            //       ここで再度表示すると2重表示になる
-            // 解決策: オーバーレイ表示はTranslationWithBoundsCompletedHandlerの責務とし、
-            //         ここでは翻訳結果の設定のみ行う
-            DebugLogUtility.WriteLog($"✅✅✅ [DUAL_TRANSLATION_FIX] オーバーレイ表示をスキップ - TranslationWithBoundsCompletedHandler経由で表示済み");
-            Console.WriteLine($"✅✅✅ [DUAL_TRANSLATION_FIX] オーバーレイ表示をスキップ - TranslationWithBoundsCompletedHandler経由で表示済み");
+            // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] 各翻訳済みチャンクに対してTranslationWithBoundsCompletedEventを発行
+            // 理由: 個別翻訳オーバーレイを表示するには、各チャンクごとにイベントを発行する必要がある
+            // 解決策: TranslationWithBoundsCompletedHandlerが各チャンクのオーバーレイを個別に表示
+            DebugLogUtility.WriteLog($"🔥 [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行開始 - チャンク数: {nonEmptyChunks.Count}");
+            Console.WriteLine($"🔥 [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行開始 - チャンク数: {nonEmptyChunks.Count}");
 
-            _logger.LogInformation("✅ [PHASE12.2] バッチ翻訳・オーバーレイ表示完了 - SessionId: {SessionId}, 翻訳数: {Count}",
+            var sourceLanguageCode = _languageConfig.GetSourceLanguageCode();
+            var targetLanguageCode = _languageConfig.GetTargetLanguageCode();
+
+            for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
+            {
+                var chunk = nonEmptyChunks[i];
+                var translatedText = translationResults[i];
+
+                // 各チャンクに対してTranslationWithBoundsCompletedEventを発行
+                var translationEvent = new TranslationWithBoundsCompletedEvent(
+                    sourceText: chunk.CombinedText,
+                    translatedText: translatedText,
+                    sourceLanguage: sourceLanguageCode,
+                    targetLanguage: targetLanguageCode,
+                    bounds: chunk.CombinedBounds,
+                    confidence: 1.0f,
+                    engineName: "StreamingTranslation",
+                    isFallbackTranslation: false // 個別翻訳成功
+                );
+
+                await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
+                DebugLogUtility.WriteLog($"✅ [INDIVIDUAL_TRANSLATION_EVENT] チャンク{i}イベント発行完了 - ID: {translationEvent.Id}, Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
+            }
+
+            Console.WriteLine($"✅✅✅ [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行完了 - {nonEmptyChunks.Count}個のオーバーレイ表示");
+
+            _logger.LogInformation("✅ [PHASE12.2] バッチ翻訳・個別イベント発行完了 - SessionId: {SessionId}, 翻訳数: {Count}",
                 eventData.SessionId, translationResults.Count);
         }
         catch (Exception ex)

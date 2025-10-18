@@ -947,8 +947,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.OcrExecutionStageStrategy>();
 
             services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TextChangeDetectionStageStrategy>();
-            services.AddTransient<IProcessingStageStrategy, Baketa.Infrastructure.Processing.Strategies.TranslationExecutionStageStrategy>();
-            Console.WriteLine("✅ 段階別戦略登録完了 - 4段階処理戦略（ROI検出有効化）");
+            // 🔥 [OLD_FLOW_REMOVAL] TranslationExecutionStageStrategy削除 - Phase 12.2新アーキテクチャ移行完了
+            // 理由: CoordinateBasedTranslationService + AggregatedChunksReadyEventHandlerに統一
+            Console.WriteLine("✅ 段階別戦略登録完了 - 3段階処理戦略（TranslationExecutionStageStrategy削除済み）");
             
             // 段階的処理設定（appsettings.json対応 - ハードコード削除済み）
             if (configuration != null)

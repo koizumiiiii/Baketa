@@ -28,7 +28,8 @@ public static class ProcessingServiceExtensions
 
         // 3. 処理戦略をすべて登録（IEnumerable<IProcessingStageStrategy>として注入される）
         services.AddTransient<IProcessingStageStrategy, OcrExecutionStageStrategy>();
-        services.AddTransient<IProcessingStageStrategy, TranslationExecutionStageStrategy>();
+        // 🔥 [OLD_FLOW_REMOVAL] TranslationExecutionStageStrategy削除 - Phase 12.2新アーキテクチャ移行完了
+        // 理由: CoordinateBasedTranslationService + AggregatedChunksReadyEventHandlerに統一
         services.AddTransient<IProcessingStageStrategy, ImageChangeDetectionStageStrategy>();
         services.AddTransient<IProcessingStageStrategy, TextChangeDetectionStageStrategy>();
 
