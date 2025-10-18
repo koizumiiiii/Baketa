@@ -132,8 +132,8 @@ namespace Baketa.Infrastructure.Translation;
                 return partialMatch;
             }
             
-            // 3. エンジンタイプ名による検索（OptimizedPythonTranslationEngine等）
-            var typeMatch = _availableEngines.FirstOrDefault(e => 
+            // 3. エンジンタイプ名による検索
+            var typeMatch = _availableEngines.FirstOrDefault(e =>
                 e.GetType().Name.Contains(engineName, StringComparison.OrdinalIgnoreCase));
             if (typeMatch != null) 
             {
@@ -274,7 +274,6 @@ namespace Baketa.Infrastructure.Translation;
             if (_eventAggregator != null)
             {
                 var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DEFAULT_TRANSLATE] EventAggregator.PublishAsync呼び出し直前 - PipelineDiagnosticEvent\r\n");
 
                 await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                 {
@@ -294,7 +293,6 @@ namespace Baketa.Infrastructure.Translation;
                     }
                 }).ConfigureAwait(false);
 
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DEFAULT_TRANSLATE] EventAggregator.PublishAsync呼び出し完了 - PipelineDiagnosticEvent\r\n");
             }
 
             // リクエスト作成
@@ -312,12 +310,10 @@ namespace Baketa.Infrastructure.Translation;
 
             // 翻訳実行
             var logPath2 = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-            System.IO.File.AppendAllText(logPath2, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DEFAULT_TRANSLATE] ActiveEngine.TranslateBatchAsync呼び出し直前 - Engine: {ActiveEngine.Name}\r\n");
 
             var result = await ActiveEngine.TranslateBatchAsync(transRequests, cancellationToken)
                 .ConfigureAwait(false);
 
-            System.IO.File.AppendAllText(logPath2, $"[{DateTime.Now:HH:mm:ss.fff}][T{System.Environment.CurrentManagedThreadId:D2}] 🔥 [DEFAULT_TRANSLATE] ActiveEngine.TranslateBatchAsync呼び出し完了 - 結果数: {result?.Count ?? 0}\r\n");
 
             _logger.LogInformation("バッチ翻訳完了 - 結果数: {Count}", result?.Count ?? 0);
 

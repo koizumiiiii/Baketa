@@ -87,7 +87,7 @@ public class PythonServerManager(
 
         // 🔥 UltraPhase 14.12 決定的修正: 外部サーバー検出を無効化
         // DetectExternalServerAsync()がTranslationInitializationService初期化中に
-        // OptimizedPythonTranslationEngineを検出しようとして循環待機デッドロック発生
+        // 翻訳エンジンを検出しようとして循環待機デッドロック発生
         // → 完全無効化して新規サーバー起動を優先
         Console.WriteLine("🔍 [UltraPhase 14.12] DetectExternalServerAsync() スキップ - 循環デッドロック回避");
         int? externalServerPort = null; // 常にnullを返す（外部サーバー検出しない）
@@ -617,7 +617,7 @@ public class PythonServerManager(
     }
 
     /// <summary>
-    /// 外部翻訳サーバー検出（OptimizedPythonTranslationEngine等との統合）
+    /// 外部翻訳サーバー検出（翻訳エンジンとの統合）
     /// </summary>
     private async Task<int?> DetectExternalServerAsync()
     {

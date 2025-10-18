@@ -626,7 +626,6 @@ namespace Baketa.Infrastructure.DI.Modules;
 
             // 🎭 Issue #147 Phase 3.2: Mock翻訳エンジン登録（ハイブリッド戦略テスト用）
             // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
-            Console.WriteLine("🚀 OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効");
 
             // 🔥 [PHASE3.3] gRPC通信モード: PythonServerManager登録時はConnectionPool不要
             // gRPC経由の通信ではConnectionPoolの代わりにgRPCクライアントを使用
@@ -708,7 +707,7 @@ namespace Baketa.Infrastructure.DI.Modules;
                 return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger, serverManager);
             });
 
-            Console.WriteLine("🚀 [PHASE3.1] GrpcTranslationEngineAdapter登録完了 - OptimizedPythonTranslationEngine削除済み");
+            Console.WriteLine("🚀 [PHASE3.1] GrpcTranslationEngineAdapter登録完了");
             Console.WriteLine($"🚀 [PHASE3.1] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
         }
         

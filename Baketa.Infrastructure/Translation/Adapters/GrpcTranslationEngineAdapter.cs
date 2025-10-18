@@ -11,7 +11,7 @@ namespace Baketa.Infrastructure.Translation.Adapters;
 
 /// <summary>
 /// gRPC翻訳クライアントをITranslationEngineインターフェースに適合させるAdapter
-/// Phase 3.1: OptimizedPythonTranslationEngine削除 - シンプルなAdapter実装
+/// Phase 3.1: シンプルなAdapter実装
 ///
 /// 責務:
 /// - ITranslationClientをITranslationEngineインターフェースでラップ
@@ -111,38 +111,29 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     private async Task EnsureServerStartedAsync()
     {
         var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_ENSURE_START] EnsureServerStartedAsync メソッド開始\r\n");
 
         if (_serverEnsured || _serverManager == null)
         {
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_ENSURE_EARLY_RETURN] _serverEnsured={_serverEnsured}, _serverManager==null={_serverManager == null}\r\n");
             return;
         }
 
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_LOCK_BEFORE] _serverLock.WaitAsync呼び出し直前\r\n");
         await _serverLock.WaitAsync().ConfigureAwait(false);
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_LOCK_AFTER] _serverLock.WaitAsync完了 - ロック取得成功\r\n");
         try
         {
             if (_serverEnsured) // Double-check
             {
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_DOUBLE_CHECK] _serverEnsured=true - 早期リターン\r\n");
                 return;
             }
 
             _logger.LogInformation("[GrpcAdapter] 🔥 Ensuring Python gRPC server is started");
 
             const string GrpcServerLanguagePair = "grpc-all";
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_GET_SERVER_BEFORE] GetServerAsync呼び出し直前\r\n");
             var serverInfo = await _serverManager.GetServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_GET_SERVER_AFTER] GetServerAsync完了 - serverInfo==null: {serverInfo == null}, IsHealthy: {serverInfo?.IsHealthy ?? false}\r\n");
 
             if (serverInfo == null || !serverInfo.IsHealthy)
             {
                 _logger.LogInformation("[GrpcAdapter] 🚀 Starting Python gRPC server");
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_START_SERVER_BEFORE] StartServerAsync呼び出し直前\r\n");
                 serverInfo = await _serverManager.StartServerAsync(GrpcServerLanguagePair).ConfigureAwait(false);
-                System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_START_SERVER_AFTER] StartServerAsync完了 - serverInfo==null: {serverInfo == null}\r\n");
 
                 if (serverInfo != null)
                 {
@@ -158,7 +149,6 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
                 _logger.LogInformation("[GrpcAdapter] ✅ Python gRPC server already running on port {Port}", serverInfo.Port);
             }
 
-            System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_SET_ENSURED] _serverEnsured = true 設定直前\r\n");
             _serverEnsured = true;
         }
         finally
@@ -210,25 +200,19 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     {
         // 🚨🚨🚨 [ULTRA_ULTRA_CRITICAL] 絶対に実行される診断ログ（最優先）
         var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🚨🚨🚨 [GRPC_ADAPTER_ENTRY] TranslateBatchAsync ENTRY - Count: {requests?.Count ?? -1}\r\n");
         Console.WriteLine($"🚨🚨🚨 [GRPC_ADAPTER_ENTRY] TranslateBatchAsync ENTRY - Count: {requests?.Count ?? -1}");
 
         // 🔧 [ULTRAPHASE5] Line 204到達確認
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L204] Line 204到達\r\n");
 
         // 🔧 [ULTRAPHASE4_L3] Entry診断 (Gemini推奨: ILogger使用)
         _logger.LogDebug("[L3_ENTRY] GrpcAdapter.TranslateBatchAsync ENTRY. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
 
         // 🔧 [ULTRAPHASE5] Line 207到達確認
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L207] ObjectDisposedException.ThrowIf呼び出し直前\r\n");
         ObjectDisposedException.ThrowIf(_disposed, this);
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L208] Disposed check passed\r\n");
         _logger.LogDebug("[L3_CHECK] Disposed check passed. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
 
         // 🔧 [ULTRAPHASE5] Line 210到達確認
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L210] ArgumentNullException.ThrowIfNull呼び出し直前\r\n");
         ArgumentNullException.ThrowIfNull(requests);
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L211] Null check passed - Count: {requests?.Count ?? 0}\r\n");
         _logger.LogDebug("[L3_CHECK] Null check passed - Count: {Count}. ThreadId: {ThreadId}", requests?.Count ?? 0, Environment.CurrentManagedThreadId);
 
         if (requests.Count == 0)
@@ -238,10 +222,8 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
         }
 
         // 🔥 [PHASE3.1_FIX] 翻訳実行前にサーバー起動を確認
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L220] EnsureServerStartedAsync呼び出し直前\r\n");
         _logger.LogDebug("[L3_STEP] EnsureServerStartedAsync呼び出し直前. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
         await EnsureServerStartedAsync().ConfigureAwait(false);
-        System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}][T{Environment.CurrentManagedThreadId:D2}] 🔥 [PHASE5_L222] EnsureServerStartedAsync完了\r\n");
         _logger.LogDebug("[L3_STEP] EnsureServerStartedAsync完了. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
 
         // 🔥 [PHASE3.1_DEBUG] 必ず出力される詳細ログ
@@ -250,10 +232,6 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
         {
             Console.WriteLine($"🔥 [GrpcAdapter] Request[{i}]: {requests[i].SourceLanguage.Code} → {requests[i].TargetLanguage.Code}, Text: '{requests[i].SourceText}'");
         }
-        System.IO.File.AppendAllText(
-            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-            $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [GrpcAdapter] TranslateBatchAsync - Count: {requests.Count}\r\n"
-        );
 
         _logger.LogDebug("[GrpcAdapter] Batch translation: {Count} requests", requests.Count);
 

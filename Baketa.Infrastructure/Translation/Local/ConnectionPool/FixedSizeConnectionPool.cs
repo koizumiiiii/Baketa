@@ -14,7 +14,7 @@ namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 
 /// <summary>
 /// 固定サイズ接続プール実装（Issue #147: Phase 1）
-/// Channel&lt;T&gt;ベースの高性能接続管理によりOptimizedPythonTranslationEngineの接続ロック競合を解決
+/// Channel&lt;T&gt;ベースの高性能接続管理により翻訳エンジンの接続ロック競合を解決
 /// </summary>
 public sealed class FixedSizeConnectionPool : IConnectionPool
 {

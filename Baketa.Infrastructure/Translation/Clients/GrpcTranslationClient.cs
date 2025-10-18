@@ -93,10 +93,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
             // 🔥 [PHASE3.1_DEBUG] 必ず出力される詳細ログ
             Console.WriteLine($"🔥 [gRPC_CLIENT] TranslateAsync開始 - SourceLang: {request.SourceLanguage.Code}, TargetLang: {request.TargetLanguage.Code}");
             Console.WriteLine($"🔥 [gRPC_CLIENT] SourceText: '{request.SourceText}'");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [gRPC_CLIENT] TranslateAsync - {request.SourceLanguage.Code} → {request.TargetLanguage.Code}, Text: '{request.SourceText}'\r\n"
-            );
 
             _logger.LogDebug(
                 "[gRPC] Translate: {SourceLang} -> {TargetLang}, Text: {Text}",
@@ -119,10 +115,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
             sw.Stop();
 
             Console.WriteLine($"🔥 [gRPC_CLIENT] gRPC応答受信 - IsSuccess: {grpcResponse.IsSuccess}, TranslatedText: '{grpcResponse.TranslatedText}'");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] 🔥 [gRPC_CLIENT] Response - IsSuccess: {grpcResponse.IsSuccess}, Text: '{grpcResponse.TranslatedText}'\r\n"
-            );
 
             // gRPC TranslateResponse → TranslationResponse 変換
             if (grpcResponse.IsSuccess)
@@ -150,10 +142,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         {
             sw.Stop();
             Console.WriteLine($"❌ [gRPC_CLIENT] TIMEOUT: {ex.Message}");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [gRPC_CLIENT] TIMEOUT: {ex.Message}\r\n"
-            );
             _logger.LogWarning("[gRPC] Translation timeout: {Message}", ex.Message);
 
             return TranslationResponse.CreateErrorFromException(
@@ -169,10 +157,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         {
             sw.Stop();
             Console.WriteLine($"❌ [gRPC_CLIENT] UNAVAILABLE: {ex.Message}");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [gRPC_CLIENT] UNAVAILABLE - Server: {_serverAddress}, Error: {ex.Message}\r\n"
-            );
             _logger.LogError("[gRPC] Server unavailable: {Message}", ex.Message);
 
             return TranslationResponse.CreateErrorFromException(
@@ -188,10 +172,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         {
             sw.Stop();
             Console.WriteLine($"❌ [gRPC_CLIENT] RPC ERROR: StatusCode={ex.StatusCode}, Message={ex.Message}");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [gRPC_CLIENT] RPC ERROR: StatusCode={ex.StatusCode}, Message={ex.Message}\r\n"
-            );
             _logger.LogError("[gRPC] RPC error (Status: {StatusCode}): {Message}", ex.StatusCode, ex.Message);
 
             return TranslationResponse.CreateErrorFromException(
@@ -207,10 +187,6 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
         {
             sw.Stop();
             Console.WriteLine($"❌ [gRPC_CLIENT] UNEXPECTED ERROR: {ex.GetType().Name} - {ex.Message}");
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [gRPC_CLIENT] UNEXPECTED: {ex.GetType().Name} - {ex.Message}\r\n{ex.StackTrace}\r\n"
-            );
             _logger.LogError(ex, "[gRPC] Unexpected error during translation");
 
             return TranslationResponse.CreateErrorFromException(

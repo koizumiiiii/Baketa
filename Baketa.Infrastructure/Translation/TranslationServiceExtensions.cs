@@ -34,7 +34,7 @@ namespace Baketa.Infrastructure.Translation;
             // ✨ 実際のAI翻訳エンジンを登録（優先順位順）
 
             // 1. NLLB-200エンジン（ローカル、最優先）
-            // NOTE: OptimizedPythonTranslationEngineはInfrastructureModuleで具象クラス登録済み
+            // NOTE: GrpcTranslationEngineAdapterはInfrastructureModuleで具象クラス登録済み
 
             // 2. Geminiエンジン（クラウド、第2優先）
             services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, GeminiTranslationEngine>();

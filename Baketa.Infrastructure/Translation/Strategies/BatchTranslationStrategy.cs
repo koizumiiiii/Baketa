@@ -66,7 +66,7 @@ public sealed class BatchTranslationStrategy(
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
 
-            // Phase 2で実装済みのOptimizedPythonTranslationEngineのバッチ機能を使用
+            // IBatchTranslationEngineインターフェースを実装している翻訳エンジンのバッチ機能を使用
             if (_translationEngine is IBatchTranslationEngine batchEngine)
             {
                 _logger.LogDebug("🚀 IBatchTranslationEngineインターフェースを使用してバッチ処理実行");

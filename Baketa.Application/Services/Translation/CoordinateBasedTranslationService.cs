@@ -897,7 +897,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _processingFacade.TranslationService?.GetType().Name);
         
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
-        // 🚀 汎用的なITranslationServiceベースのアプローチに変更（OptimizedPythonTranslationEngine対応）
+        // 🚀 汎用的なITranslationServiceベースのアプローチに変更
         var translationService = _processingFacade.TranslationService;
         if (translationService != null)
         {
