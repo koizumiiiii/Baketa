@@ -17,6 +17,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.DependencyInjection;
+using Baketa.Infrastructure.Processing.Strategies; // 🔥 [STOP_FIX] ImageChangeDetectionStageStrategy参照
 
 namespace Baketa.UI.Services;
 
@@ -42,6 +43,7 @@ public class TranslationFlowEventProcessor :
     private readonly IOcrEngine _ocrEngine;
     private readonly IWindowManagerAdapter _windowManager;
     private readonly IOcrFailureManager _ocrFailureManager;
+    private readonly IEnumerable<Baketa.Core.Abstractions.Processing.IProcessingStageStrategy> _processingStrategies; // 🔥 [STOP_FIX] ImageChangeDetectionStrategy取得用
     
     // 重複処理防止用
     private readonly HashSet<string> _processedEventIds = [];
@@ -64,7 +66,8 @@ public class TranslationFlowEventProcessor :
         ISettingsService settingsService,
         IOcrEngine ocrEngine,
         IWindowManagerAdapter windowManager,
-        IOcrFailureManager ocrFailureManager)
+        IOcrFailureManager ocrFailureManager,
+        IEnumerable<Baketa.Core.Abstractions.Processing.IProcessingStageStrategy> processingStrategies) // 🔥 [STOP_FIX] Strategy集合から取得
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -75,6 +78,7 @@ public class TranslationFlowEventProcessor :
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         _ocrFailureManager = ocrFailureManager ?? throw new ArgumentNullException(nameof(ocrFailureManager));
+        _processingStrategies = processingStrategies ?? throw new ArgumentNullException(nameof(processingStrategies)); // 🔥 [STOP_FIX] 必須依存
 
         _logger.LogDebug("TranslationFlowEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
@@ -363,6 +367,34 @@ public class TranslationFlowEventProcessor :
             {
                 Console.WriteLine($"⚠️ [Stop機能] OCR状態リセット中にエラー: {ocrResetEx.Message}");
                 _logger.LogWarning(ocrResetEx, "🔄 Stop機能: OCR状態リセット中にエラーが発生しましたが、処理を継続します");
+            }
+
+            // 🧹 [STOP_FIX] 画像変化検知履歴をクリア（Stop→Start後の初回翻訳を確実に実行）
+            Console.WriteLine("🧹 [STOP_FIX] 画像変化検知履歴をクリア中...");
+            _logger.LogInformation("🧹 [STOP_FIX] 画像変化検知履歴クリア開始 - Stop→Start後の翻訳スキップ問題対策");
+            try
+            {
+                // IProcessingStageStrategy集合からImageChangeDetectionStageStrategyを取得
+                var imageChangeStrategy = _processingStrategies
+                    .OfType<ImageChangeDetectionStageStrategy>()
+                    .FirstOrDefault();
+
+                if (imageChangeStrategy != null)
+                {
+                    imageChangeStrategy.ClearPreviousImages();
+                    Console.WriteLine("✅ [STOP_FIX] 画像変化検知履歴クリア成功");
+                    _logger.LogInformation("🚀 [STOP_FIX] 画像変化検知履歴クリア完了 - Stop→Start後の初回翻訳が確実に実行されます");
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ [STOP_FIX] ImageChangeDetectionStrategyが見つかりません - 履歴クリアをスキップ");
+                    _logger.LogWarning("🧹 [STOP_FIX] ImageChangeDetectionStrategyが見つかりません - 登録確認が必要です");
+                }
+            }
+            catch (Exception clearEx)
+            {
+                Console.WriteLine($"⚠️ [STOP_FIX] 画像変化検知履歴クリア中にエラー: {clearEx.Message}");
+                _logger.LogWarning(clearEx, "🧹 [STOP_FIX] 画像変化検知履歴クリア中にエラーが発生しましたが、処理を継続します");
             }
 
             // 4. 🚀 Stop機能: CancellationTokenキャンセル → 遅延翻訳結果表示を確実に防止

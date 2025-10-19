@@ -80,6 +80,7 @@ internal static class UIServiceCollectionExtensions
             var ocrEngine = provider.GetRequiredService<IOcrEngine>();
             var windowManager = provider.GetRequiredService<IWindowManagerAdapter>();
             var ocrFailureManager = provider.GetRequiredService<IOcrFailureManager>(); // クリーンアーキテクチャ準拠
+            var processingStrategies = provider.GetRequiredService<IEnumerable<Baketa.Core.Abstractions.Processing.IProcessingStageStrategy>>(); // 🔥 [STOP_FIX]
 
             return new TranslationFlowEventProcessor(
                 logger,
@@ -90,7 +91,8 @@ internal static class UIServiceCollectionExtensions
                 settingsService,
                 ocrEngine,
                 windowManager,
-                ocrFailureManager); // IServiceProviderの代わりに抽象化を注入
+                ocrFailureManager,
+                processingStrategies); // 🔥 [STOP_FIX] Strategy集合を渡す
         });
         
         // メインオーバーレイViewModel

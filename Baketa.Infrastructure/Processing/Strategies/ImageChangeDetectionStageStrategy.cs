@@ -155,6 +155,19 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     _logger.LogDebug("✅ ShouldExecute: true (EnhancedImageChangeDetectionServiceに委任)");
     return true;
 }
+
+    /// <summary>
+    /// 画像変化検知の履歴をクリア（Stop→Start時の初期化用）
+    /// </summary>
+    /// <remarks>
+    /// Stop→Start時に以前の画像履歴が残っていると、変化なしと誤判定される問題を防止
+    /// TranslationFlowEventProcessor.HandleAsync(StopTranslationRequestEvent)から呼び出される
+    /// </remarks>
+    public void ClearPreviousImages()
+    {
+        _previousImages.Clear();
+        _logger.LogInformation("🧹 [STOP_FIX] 画像変化検知履歴をクリア - Stop→Start後の初回翻訳を確実に実行");
+    }
     
     /// <summary>
     /// 基本的な変化検知（サイズベース + 基本プロパティ比較）
