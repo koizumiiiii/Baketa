@@ -97,14 +97,27 @@ public class TranslationFlowModule : ServiceModuleBase
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ StopCaptureRequestedEvent購読完了");
                 logger.LogDebug("✅ StopCaptureRequestedEvent購読完了");
 
-                // OverlayUpdateEventの購読を追加
+                // 🔥 [PHASE3_REFACTORING] OverlayUpdateEvent購読削除
+                // SimpleInPlaceOverlayManagerはIEventProcessor<OverlayUpdateEvent>を実装していない
+                // オーバーレイ表示は IInPlaceTranslationOverlayManager.ShowInPlaceOverlayAsync()経由で行う
+
+                // OverlayUpdateEventの購読を追加（削除済み）
+                /*
                 try
                 {
-                    var overlayManager = serviceProvider.GetRequiredService<InPlaceTranslationOverlayManager>();
+                    var overlayManager = serviceProvider.GetRequiredService<SimpleInPlaceOverlayManager>();
                     eventAggregator.Subscribe<OverlayUpdateEvent>(overlayManager);
                     Console.WriteLine("✅ OverlayUpdateEvent購読完了");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ OverlayUpdateEvent購読完了");
                     logger.LogDebug("✅ OverlayUpdateEvent購読完了");
+                }
+                catch (Exception overlayEx)
+                */
+                try
+                {
+                    // 🔥 [PHASE3_REFACTORING] OverlayUpdateEvent購読はコメントアウト
+                    Console.WriteLine("ℹ️ OverlayUpdateEvent購読スキップ（Phase 3 Refactoring）");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "ℹ️ OverlayUpdateEvent購読スキップ（Phase 3 Refactoring）");
                 }
                 catch (Exception overlayEx)
                 {

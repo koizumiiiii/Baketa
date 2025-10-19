@@ -24,7 +24,7 @@ namespace Baketa.UI.Services.Overlay;
 /// </summary>
 public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IAsyncDisposable, IDisposable
 {
-    private readonly InPlaceTranslationOverlayManager _overlayManager;
+    private readonly SimpleInPlaceOverlayManager _overlayManager;
     private readonly ILogger<AvaloniaOverlayRenderer> _logger;
 
     /// <summary>
@@ -231,7 +231,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// コンストラクタ
     /// </summary>
     public AvaloniaOverlayRenderer(
-        InPlaceTranslationOverlayManager overlayManager,
+        SimpleInPlaceOverlayManager overlayManager,
         ILogger<AvaloniaOverlayRenderer> logger)
     {
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));

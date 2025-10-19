@@ -27,12 +27,28 @@ public class TranslationWithBoundsCompletedHandler(
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     private readonly IInPlaceTranslationOverlayManager? _overlayManager = overlayManager;
     private readonly ILogger<TranslationWithBoundsCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    // 🔥🔥🔥 [ULTRATHINK] コンストラクタで型情報をログ出力
+    static TranslationWithBoundsCompletedHandler()
+    {
+        var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var log = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler static constructor{Environment.NewLine}";
+        try
+        {
+            File.AppendAllText(logFilePath, log);
+        }
+        catch { /* ignore */ }
+    }
+
+    // インスタンス初期化時のログ
+    private readonly string _instanceId = LogConstructorInfo(overlayManager);
         
     /// <inheritdoc />
     public int Priority => 200;
         
     /// <inheritdoc />
-    public bool SynchronousExecution => false;
+    public bool SynchronousExecution => true; // 🔥 [PHASE4.5_FIX] Task.Runのfire-and-forget問題を回避
 
     /// <inheritdoc />
     public async Task HandleAsync(TranslationWithBoundsCompletedEvent eventData)
@@ -71,22 +87,54 @@ public class TranslationWithBoundsCompletedHandler(
         var coordinateLogMessage = $"🎯 [GROUP_TRANSLATION_RESULT] 座標: Rect: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height}), 文字数: {eventData.SourceText.Length} → {eventData.TranslatedText.Length}";
         await WriteToLogFileAsync(coordinateLogMessage);
 
+        // 🔧 [PHASE4.5_DEBUG] tryブロック直前の診断ログ
+        await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] tryブロック開始直前 - ID: {eventData.Id}");
+
         try
         {
-            _logger.LogInformation("座標情報付き翻訳完了: '{Original}' → '{Translated}' (Bounds: {Bounds})", 
+            // 🔧 [PHASE4.5_DEBUG] tryブロック内最初のログ
+            await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] tryブロック内開始 - ID: {eventData.Id}");
+
+            _logger.LogInformation("座標情報付き翻訳完了: '{Original}' → '{Translated}' (Bounds: {Bounds})",
                 eventData.SourceText, eventData.TranslatedText, eventData.Bounds);
+
+            // 🔧 [PHASE4.5_DEBUG] LogInformation完了後
+            await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] LogInformation完了 - ID: {eventData.Id}");
 
             // 🔍 翻訳成功判定：空文字や空白文字の場合は翻訳失敗とみなす
             var isTranslationSuccessful = !string.IsNullOrWhiteSpace(eventData.TranslatedText);
 
+            // 🔧 [PHASE4.5_DEBUG] 翻訳成功判定完了
+            await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] isTranslationSuccessful: {isTranslationSuccessful} - ID: {eventData.Id}");
+
             // 🎯 [COORDINATE_FIX] 座標が(0,0,0,0)でも翻訳テキストが有効なら成功とみなす
             var hasValidBounds = eventData.Bounds.Width > 0 && eventData.Bounds.Height > 0;
+
+            // 🔧 [PHASE4.5_DEBUG] 座標検証完了
+            await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] hasValidBounds: {hasValidBounds}, Bounds: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height}) - ID: {eventData.Id}");
+
             _logger.LogInformation("🎯 [COORDINATE_DEBUG] Bounds: ({X},{Y},{W}x{H}), HasValidBounds: {HasValidBounds}, IsTranslationSuccessful: {IsTranslationSuccessful}",
                 eventData.Bounds.X, eventData.Bounds.Y, eventData.Bounds.Width, eventData.Bounds.Height, hasValidBounds, isTranslationSuccessful);
+
+            // 🔧 [PHASE4.5_DEBUG] オーバーレイマネージャー判定前
+            await WriteToLogFileAsync($"🔧 [PHASE4.5_DEBUG] _overlayManager: {(_overlayManager != null ? "NOT NULL" : "NULL")} - ID: {eventData.Id}");
+
+            // 🔥 [CRITICAL_DEBUG] if条件の各要素を個別に評価
+            var overlayManagerNotNull = _overlayManager != null;
+            await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] overlayManagerNotNull = {overlayManagerNotNull}, isTranslationSuccessful = {isTranslationSuccessful} - ID: {eventData.Id}");
+            await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] AND result = {overlayManagerNotNull && isTranslationSuccessful} - ID: {eventData.Id}");
 
             // 🏗️ PHASE18: 統一オーバーレイシステムを使用（利用可能な場合）
             if (_overlayManager != null && isTranslationSuccessful)
             {
+                // 🔥 [CRITICAL_DEBUG] ifブロック内に入った！
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] ★★★ ifブロック内開始！ ★★★ - ID: {eventData.Id}");
+                Console.WriteLine($"🔥 [CRITICAL_DEBUG] ★★★ ifブロック内開始！ ★★★ - ID: {eventData.Id}");
+
+                // 🔥 [CRITICAL_DEBUG] IsFallbackTranslation値を確認
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] IsFallbackTranslation = {eventData.IsFallbackTranslation} - ID: {eventData.Id}");
+                Console.WriteLine($"🔥 [CRITICAL_DEBUG] IsFallbackTranslation = {eventData.IsFallbackTranslation} - ID: {eventData.Id}");
+
                 // 🔥 [FALLBACK_FIX] フォールバック翻訳の場合、オーバーレイ表示前に既存の個別翻訳オーバーレイを削除
                 if (eventData.IsFallbackTranslation)
                 {
@@ -104,12 +152,31 @@ public class TranslationWithBoundsCompletedHandler(
                     }
                 }
 
+                // 🔥 [CRITICAL_DEBUG] IsFallbackTranslationチェック後
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] IsFallbackTranslationチェック通過 - ID: {eventData.Id}");
+
+                // 🔥 [CRITICAL_DEBUG] LogDebug直前
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] LogDebug呼び出し直前 - ID: {eventData.Id}");
+
                 _logger.LogDebug("🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用開始 - ID: {Id}, IsFallback: {IsFallback}",
                     eventData.Id, eventData.IsFallbackTranslation);
+
+                // 🔥 [CRITICAL_DEBUG] Console.WriteLine直前
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] Console.WriteLine呼び出し直前 - ID: {eventData.Id}");
+
                 Console.WriteLine($"🚀 [PHASE18_HANDLER] 統一InPlaceTranslationOverlayManager使用 - EventId: {eventData.Id}, IsFallback: {eventData.IsFallbackTranslation}");
+
+                // 🔥 [CRITICAL_DEBUG] Console.WriteLine後
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] Console.WriteLine呼び出し完了 - ID: {eventData.Id}");
+
+                // 🔥 [CRITICAL_DEBUG] tryブロック開始直前
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] tryブロック開始直前 - ID: {eventData.Id}");
 
                 try
                 {
+                    // 🔥 [CRITICAL_DEBUG] TextChunk作成開始
+                    await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] TextChunk作成開始 - ID: {eventData.Id}");
+
                     // TextChunkを作成（eventDataから）
                     var textChunk = new TextChunk
                     {
@@ -124,8 +191,46 @@ public class TranslationWithBoundsCompletedHandler(
 
                     Console.WriteLine($"🎯 [COORDINATE_FIX] TextChunk作成 - OriginalBounds: ({eventData.Bounds.X},{eventData.Bounds.Y},{eventData.Bounds.Width}x{eventData.Bounds.Height}), UsedBounds: ({textChunk.CombinedBounds.X},{textChunk.CombinedBounds.Y},{textChunk.CombinedBounds.Width}x{textChunk.CombinedBounds.Height})");
 
-                    // 統一オーバーレイマネージャーで処理
-                    await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+                    // 🔥 [CRITICAL_DEBUG] TextChunk作成完了
+                    await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] TextChunk作成完了 - ID: {eventData.Id}, Bounds: ({textChunk.CombinedBounds.X},{textChunk.CombinedBounds.Y},{textChunk.CombinedBounds.Width}x{textChunk.CombinedBounds.Height})");
+
+                    // 🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsync呼び出し直前
+                    await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsync呼び出し直前 - ID: {eventData.Id}");
+
+                    // 🔥🔥🔥 [ULTRATHINK_PHASE3] メソッド実体の詳細情報ログ
+                    var overlayManagerType = _overlayManager.GetType();
+                    var methodInfo = overlayManagerType.GetMethod("ShowInPlaceOverlayAsync");
+                    var assemblyLocation = overlayManagerType.Assembly.Location;
+                    var assemblyLastWriteTime = System.IO.File.GetLastWriteTime(assemblyLocation);
+
+                    await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] _overlayManager.GetType(): {overlayManagerType.FullName}");
+                    await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] Method: {methodInfo?.DeclaringType?.FullName}.{methodInfo?.Name}");
+                    await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] _overlayManager is null: {_overlayManager == null}");
+                    await WriteToLogFileAsync($"🔥🔥🔥🔥🔥 [ULTRATHINK_PHASE4_ASSEMBLY] Loaded Assembly: {assemblyLocation}");
+                    await WriteToLogFileAsync($"🔥🔥🔥🔥🔥 [ULTRATHINK_PHASE4_ASSEMBLY] DLL LastWriteTime: {assemblyLastWriteTime:yyyy-MM-dd HH:mm:ss}");
+                    Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] Calling ShowInPlaceOverlayAsync on {overlayManagerType.FullName}");
+                    Console.WriteLine($"🔥🔥🔥🔥🔥 [ULTRATHINK_PHASE4_ASSEMBLY] Loaded from: {assemblyLocation} (Modified: {assemblyLastWriteTime:HH:mm:ss})");
+
+                    // 統一オーバーレイマネージャーで処理（try-catchで例外を完全キャプチャ）
+                    try
+                    {
+                        await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] try block開始");
+                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] try block開始");
+
+                        await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+
+                        await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync正常完了");
+                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync正常完了");
+                    }
+                    catch (Exception innerEx)
+                    {
+                        await WriteToLogFileAsync($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync内部で例外発生: {innerEx.GetType().Name} - {innerEx.Message}");
+                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync内部で例外: {innerEx.GetType().Name} - {innerEx.Message}");
+                        throw;
+                    }
+
+                    // 🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsync呼び出し完了
+                    await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsync呼び出し完了 - ID: {eventData.Id}");
 
                     _logger.LogInformation("✅ [PHASE18_HANDLER] 統一システムでオーバーレイ表示成功 - ID: {Id}, Text: '{Text}'",
                         eventData.Id, eventData.TranslatedText.Substring(0, Math.Min(30, eventData.TranslatedText.Length)));
@@ -152,8 +257,12 @@ public class TranslationWithBoundsCompletedHandler(
             }
             else
             {
+                // 🔥 [CRITICAL_DEBUG] elseブロックに入った！
+                await WriteToLogFileAsync($"🔥 [CRITICAL_DEBUG] ▼▼▼ elseブロック開始！ ▼▼▼ - ID: {eventData.Id}");
+                Console.WriteLine($"🔥 [CRITICAL_DEBUG] ▼▼▼ elseブロック開始！ ▼▼▼ - ID: {eventData.Id}");
+
                 // 既存システムを使用（統一システム無効 or 翻訳失敗）
-                _logger.LogDebug("🔄 [LEGACY_HANDLER] 既存システム使用 - OverlayManager: {HasManager}, Success: {Success}", 
+                _logger.LogDebug("🔄 [LEGACY_HANDLER] 既存システム使用 - OverlayManager: {HasManager}, Success: {Success}",
                     _overlayManager != null, isTranslationSuccessful);
                 await PublishLegacyOverlayEvent();
             }
@@ -201,6 +310,11 @@ public class TranslationWithBoundsCompletedHandler(
         }
         catch (Exception ex)
         {
+            // 🔧 [PHASE4.5_DEBUG] 例外catchブロック - 必ず出力
+            var exceptionMessage = $"💥 [PHASE4.5_DEBUG] 例外発生! Type: {ex.GetType().Name}, Message: {ex.Message}, StackTrace: {ex.StackTrace}";
+            await WriteToLogFileAsync(exceptionMessage);
+            Console.WriteLine(exceptionMessage);
+
             _logger.LogError(ex, "座標情報付き翻訳完了イベント処理中にエラーが発生: '{Text}'", eventData.SourceText);
         }
     }
@@ -221,5 +335,23 @@ public class TranslationWithBoundsCompletedHandler(
         {
             _logger.LogError(ex, "ログファイル直接出力でエラーが発生しました");
         }
+    }
+
+    // 🔥🔥🔥 [ULTRATHINK] インスタンス初期化時の型情報ログ
+    private static string LogConstructorInfo(IInPlaceTranslationOverlayManager? overlayManager)
+    {
+        var instanceId = Guid.NewGuid().ToString("N")[..8];
+        var typeName = overlayManager?.GetType().FullName ?? "NULL";
+        var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var log1 = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler インスタンス作成 - ID: {instanceId}{Environment.NewLine}";
+        var log2 = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] _overlayManager実際の型: {typeName}{Environment.NewLine}";
+        try
+        {
+            File.AppendAllText(logFilePath, log1 + log2);
+        }
+        catch { /* ignore */ }
+        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler - ID: {instanceId}, Type: {typeName}");
+        return instanceId;
     }
 }

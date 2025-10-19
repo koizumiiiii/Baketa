@@ -95,24 +95,41 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     /// 元テキストの正確な位置・サイズで翻訳テキストを重ね表示
     /// </summary>
     public async Task ShowInPlaceOverlayAsync(
-        TextChunk textChunk, 
+        TextChunk textChunk,
         CancellationToken cancellationToken = default)
     {
+        // 🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsyncメソッド開始
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] ShowInPlaceOverlayAsync開始 - ChunkId: {textChunk?.ChunkId}");
+
         ArgumentNullException.ThrowIfNull(textChunk);
         ThrowIfDisposed();
 
-        if (!textChunk.CanShowInPlace())
+        // 🔥 [CRITICAL_DEBUG] CanShowInPlace()チェック直前
+        var canShowInPlace = textChunk.CanShowInPlace();
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] CanShowInPlace() = {canShowInPlace} - ChunkId: {textChunk.ChunkId}");
+
+        if (!canShowInPlace)
         {
             _logger?.LogWarning("インプレース表示条件を満たしていません: {InPlaceLog}", textChunk.ToInPlaceLogString());
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] 早期リターン - CanShowInPlace=false");
             return;
         }
 
+        // 🔥 [CRITICAL_DEBUG] CanShowInPlace()チェック通過
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] CanShowInPlace()チェック通過 - ChunkId: {textChunk.ChunkId}");
+
         try
         {
+            // 🔥 [CRITICAL_DEBUG] Dispatcher.UIThread.InvokeAsync呼び出し直前
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] Dispatcher.UIThread.InvokeAsync呼び出し直前 - ChunkId: {textChunk.ChunkId}");
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                // 🔥 [CRITICAL_DEBUG] UIスレッド内開始
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔥 [CRITICAL_DEBUG] UIスレッド内処理開始 - ChunkId: {textChunk.ChunkId}");
+
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎯 [InPlaceTranslationOverlay] インプレース表示開始 - {textChunk.ToInPlaceLogString()}");
-                
+
                 // TextChunkの座標とサイズを正確に適用
                 var overlayPosition = textChunk.GetBasicOverlayPosition();
                 var overlaySize = textChunk.GetOverlaySize();
@@ -121,11 +138,24 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // ウィンドウ位置設定
                 Position = new PixelPoint(overlayPosition.X, overlayPosition.Y);
 
-                // 🔧 [TEXT_WRAPPING] ウィンドウサイズ設定: 横幅固定、縦幅は自動調整
+                // 🔧 [PHASE4.5_WIDTH_FIX] ウィンドウサイズ設定: 横幅固定、縦幅も明示的に設定
                 // 横幅: OCR検知領域の幅に固定 (テキストが収まらない場合は折り返し)
-                // 縦幅: SizeToContent="Height" により TextBlock の折り返し後の高さに自動調整
+                // 縦幅: overlaySize.Heightを使用（TextBlock折り返し後の高さを想定）
                 Width = overlaySize.Width;
-                
+                Height = overlaySize.Height;
+                MaxWidth = overlaySize.Width;  // 🔧 TextBlockの自動拡張を防止
+                MinWidth = overlaySize.Width;  // 🔧 ウィンドウ幅を厳密に固定
+                MaxHeight = overlaySize.Height * 3; // 🔧 折り返し時の高さ拡張を許可（最大3倍）
+                MinHeight = overlaySize.Height; // 🔧 最小高さを元テキストと同じに
+
+                // 🔧 [PHASE4.5_DIAGNOSTIC] 想定サイズと実際の表示座標・サイズを比較
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"📐 [PHASE4.5_SIZE_COMPARE] ChunkId: {ChunkId} | " +
+                    $"想定Position: ({overlayPosition.X},{overlayPosition.Y}) | " +
+                    $"想定Size: {overlaySize.Width}x{overlaySize.Height} | " +
+                    $"設定Size: Width={Width}, Height={Height} | " +
+                    $"制約: MaxWidth={MaxWidth}, MinWidth={MinWidth}, MaxHeight={MaxHeight}, MinHeight={MinHeight}");
+
                 // 🛡️ [CORRUPTED_TRANSLATION_FILTER] 汚染翻訳とエラーメッセージを完全フィルタリング
                 if (IsCorruptedOrErrorTranslation(textChunk.TranslatedText))
                 {
@@ -174,8 +204,18 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定失敗: {ex.Message}");
                 }
                 
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース表示完了 - Position: ({overlayPosition.X},{overlayPosition.Y}) | Size: ({overlaySize.Width},{overlaySize.Height}) | FontSize: {finalFontSize}");
-                
+                // 🔧 [PHASE4.5_DIAGNOSTIC] 表示完了後の実際のウィンドウサイズを記録
+                var actualWidth = Width;
+                var actualHeight = Height;
+                var actualBounds = Bounds;
+
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"✅ [InPlaceTranslationOverlay] インプレース表示完了 | " +
+                    $"Position: ({overlayPosition.X},{overlayPosition.Y}) | " +
+                    $"想定Size: ({overlaySize.Width},{overlaySize.Height}) | " +
+                    $"実際Size: Width={actualWidth}, Height={actualHeight}, Bounds={actualBounds} | " +
+                    $"FontSize: {finalFontSize}");
+
             }, DispatcherPriority.Normal, cancellationToken);
 
             _logger?.LogDebug("🎯 インプレース表示完了 - ChunkId: {ChunkId}", ChunkId);
@@ -234,25 +274,39 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 textBlock.TextTrimming = TextTrimming.None;   // 省略記号無効化（全文表示）
                 textBlock.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
                 textBlock.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
-                
+
+                // 🔧 [PHASE4.5_WIDTH_FIX] TextBlockの横幅も明示的に制限
+                textBlock.MaxWidth = Width - 8;  // Border Padding=4を考慮して-8px
+
                 // テキスト色設定（コントラスト重視）
                 textBlock.Foreground = new SolidColorBrush(Colors.Black);
                 textBlock.FontWeight = FontWeight.Bold;
-                
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] ユーザー設定フォント適用完了 - FontSize: {effectiveFontSize} | Text: '{translatedText}'");
+
+                // 🔧 [PHASE4.5_DIAGNOSTIC] TextBlockサイズを記録
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"✅ [InPlaceTranslationOverlay] ユーザー設定フォント適用完了 | " +
+                    $"FontSize: {effectiveFontSize} | TextBlock.MaxWidth: {textBlock.MaxWidth} | " +
+                    $"Text: '{translatedText}'");
             }
             else
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ [InPlaceTranslationOverlay] InPlaceTranslatedTextBlockが見つかりません");
             }
-            
+
             // Border の洗練されたデザイン適用
             var border = this.FindControl<Border>("InPlaceOverlayBorder");
             if (border != null)
             {
+                // 🔧 [PHASE4.5_WIDTH_FIX] Border自体の横幅も厳密に制限
+                border.MaxWidth = Width;
+                border.Width = Width;
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"🔧 [PHASE4.5_BORDER] Border幅設定完了 | Width: {border.Width}, MaxWidth: {border.MaxWidth}");
+
+
                 // 枠無し設定
-                border.CornerRadius = new CornerRadius(8); // 軽い角丸
-                border.BorderThickness = new Thickness(0); // 枠無し
+                border.CornerRadius = new CornerRadius(0);
+                border.BorderThickness = new Thickness(0);
                 
                 // ブラー効果風の薄い白背景
                 border.Background = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)); // ごく薄い白（90%透明度）
