@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Infrastructure.OCR.BatchProcessing;
+using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent, StopTranslationRequestEvent用
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -94,6 +95,12 @@ internal static class UIServiceCollectionExtensions
                 ocrFailureManager,
                 processingStrategies); // 🔥 [STOP_FIX] Strategy集合を渡す
         });
+
+        // 🔥 [DI_FIX] EventAggregatorがIEventProcessor<>で取得できるようにインターフェース登録を追加
+        services.AddSingleton<IEventProcessor<StartTranslationRequestEvent>>(provider =>
+            provider.GetRequiredService<TranslationFlowEventProcessor>());
+        services.AddSingleton<IEventProcessor<StopTranslationRequestEvent>>(provider =>
+            provider.GetRequiredService<TranslationFlowEventProcessor>());
         
         // メインオーバーレイViewModel
         services.AddSingleton<Baketa.UI.ViewModels.MainOverlayViewModel>();

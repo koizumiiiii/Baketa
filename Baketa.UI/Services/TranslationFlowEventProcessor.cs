@@ -84,7 +84,9 @@ public class TranslationFlowEventProcessor :
     }
 
     public int Priority => 100;
-    public bool SynchronousExecution => false;
+    // 🔥 [START_FIX] 画像変化検知履歴クリアを確実に実行するため同期実行に変更
+    // 理由: Task.Runのfire-and-forget実行では、ClearPreviousImages()呼び出し前に例外が発生した場合に処理が中断される
+    public bool SynchronousExecution => true;
 
     /// <summary>
     /// 翻訳開始要求イベントの処理
@@ -103,9 +105,15 @@ public class TranslationFlowEventProcessor :
         }
         
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+        // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+        // DebugLogUtility.WriteLog($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
         Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
         Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
-        
+
+        // 🔥 [GEMINI_FIX] デッドロック原因切り分けのため一時的にコメントアウト
+        // 問題: DebugLogUtilityまたはSafeFileLoggerでデッドロック発生の可能性
+        // try-catchは例外を捕捉するが、デッドロック（スレッドの永久フリーズ）は防げない
+        /*
         // 🚨 デッドロック問題修正: ログ出力を例外処理で囲む
         try
         {
@@ -129,17 +137,65 @@ public class TranslationFlowEventProcessor :
         {
             Console.WriteLine($"⚠️ SafeFileLogger書き込みエラー（無視して継続）: {logEx.Message}");
         }
+        */
+
+        Console.WriteLine("🔍 [LINE_139_DEBUG] Line 139到達 - _logger.LogInformation呼び出し直前");
+        // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+        // DebugLogUtility.WriteLog("🔍 [LINE_139_DEBUG] Line 139到達 - _logger.LogInformation呼び出し直前");
 
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
-        _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})", 
+
+        Console.WriteLine("🔍 [LINE_141_DEBUG] Line 141到達 - _logger.LogInformation(1)完了");
+        // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+        // DebugLogUtility.WriteLog("🔍 [LINE_141_DEBUG] Line 141到達 - _logger.LogInformation(1)完了");
+
+        _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})",
             eventData.TargetWindow?.Title ?? "null", eventData.TargetWindow?.Handle ?? IntPtr.Zero);
-        
+
+        Console.WriteLine("🔍 [LINE_145_DEBUG] Line 145到達 - START_FIX処理開始直前");
+        // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+        // DebugLogUtility.WriteLog("🔍 [LINE_145_DEBUG] Line 145到達 - START_FIX処理開始直前");
+
+        // 🔥 [CRITICAL_VERIFICATION] DLLビルド検証用 - Line 156直前のチェックポイント
+        Console.WriteLine("🚨🚨🚨 [LINE_156_VERIFICATION] Line 156実行直前 - このログが出ればDLLは最新版");
+        // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+        // DebugLogUtility.WriteLog("🚨🚨🚨 [LINE_156_VERIFICATION] Line 156実行直前 - このログが出ればDLLは最新版");
+
+        // 🧹 [START_FIX] 画像変化検知履歴をクリア（初回キャプチャ/Stop→Start後の初回翻訳を確実に実行）
+        Console.WriteLine("🧹 [START_FIX] Start時: 画像変化検知履歴をクリア中...");
+        _logger.LogInformation("🧹 [START_FIX] Start時: 画像変化検知履歴クリア開始 - 初回翻訳スキップ問題対策");
+        try
+        {
+            // IProcessingStageStrategy集合からImageChangeDetectionStageStrategyを取得
+            var imageChangeStrategy = _processingStrategies
+                .OfType<ImageChangeDetectionStageStrategy>()
+                .FirstOrDefault();
+
+            if (imageChangeStrategy != null)
+            {
+                imageChangeStrategy.ClearPreviousImages();
+                Console.WriteLine("✅ [START_FIX] Start時: 画像変化検知履歴クリア成功");
+                _logger.LogInformation("🚀 [START_FIX] Start時: 画像変化検知履歴クリア完了 - 初回翻訳が確実に実行されます");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ [START_FIX] ImageChangeDetectionStrategyが見つかりません - 履歴クリアをスキップ");
+                _logger.LogWarning("🧹 [START_FIX] ImageChangeDetectionStrategyが見つかりません - 登録確認が必要です");
+            }
+        }
+        catch (Exception clearEx)
+        {
+            Console.WriteLine($"⚠️ [START_FIX] Start時: 画像変化検知履歴クリア中にエラー: {clearEx.Message}");
+            _logger.LogWarning(clearEx, "🧹 [START_FIX] Start時: 画像変化検知履歴クリア中にエラーが発生しましたが、処理を継続します");
+        }
+
         // イベントデータの妥当性チェック
         if (eventData.TargetWindow == null)
         {
             var errorMessage = "ターゲットウィンドウがnullです";
             Console.WriteLine($"❌ {errorMessage}");
-            DebugLogUtility.WriteLog($"❌ {errorMessage}");
+            // 🔥 [CRITICAL_FIX] DebugLogUtility.WriteLogがデッドロックを引き起こすため一時的にコメントアウト
+            // DebugLogUtility.WriteLog($"❌ {errorMessage}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ {errorMessage}");
             _logger.LogError("{ErrorMessage}", errorMessage);
             return;
