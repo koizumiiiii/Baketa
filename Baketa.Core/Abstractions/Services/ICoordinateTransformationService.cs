@@ -16,9 +16,9 @@ public interface ICoordinateTransformationService
     /// </summary>
     /// <param name="roiBounds">ROI座標系での境界</param>
     /// <param name="windowHandle">対象ウィンドウハンドル</param>
-    /// <param name="roiScaleFactor">ROIスケールファクタ（デフォルト: 0.25f）</param>
+    /// <param name="roiScaleFactor">ROIスケールファクタ（デフォルト: 1.0f）</param>
     /// <returns>スクリーン座標系での境界</returns>
-    Rectangle ConvertRoiToScreenCoordinates(Rectangle roiBounds, IntPtr windowHandle, float roiScaleFactor = 0.25f);
+    Rectangle ConvertRoiToScreenCoordinates(Rectangle roiBounds, IntPtr windowHandle, float roiScaleFactor = 1.0f);
 
     /// <summary>
     /// 複数のROI座標を一括変換
@@ -26,9 +26,9 @@ public interface ICoordinateTransformationService
     /// </summary>
     /// <param name="roiBounds">ROI座標系での境界のリスト</param>
     /// <param name="windowHandle">対象ウィンドウハンドル</param>
-    /// <param name="roiScaleFactor">ROIスケールファクタ（デフォルト: 0.25f）</param>
+    /// <param name="roiScaleFactor">ROIスケールファクタ（デフォルト: 1.0f）</param>
     /// <returns>スクリーン座標系での境界のリスト</returns>
-    Rectangle[] ConvertRoiToScreenCoordinatesBatch(Rectangle[] roiBounds, IntPtr windowHandle, float roiScaleFactor = 0.25f);
+    Rectangle[] ConvertRoiToScreenCoordinatesBatch(Rectangle[] roiBounds, IntPtr windowHandle, float roiScaleFactor = 1.0f);
 
     /// <summary>
     /// ウィンドウオフセットを取得

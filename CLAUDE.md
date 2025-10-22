@@ -251,6 +251,70 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - Observable patterns for state management
 - Validation through ReactiveUI.Validation
 
+### Logging Standards
+**CRITICAL**: `DebugLogUtility.WriteLog()` is DEPRECATED and must NOT be used in new code.
+
+**Reason**: `DebugLogUtility.WriteLog()` causes thread deadlocks due to synchronous file I/O inside lock blocks, which can freeze event processing and cause hard-to-debug failures.
+
+**Recommended Logging Methods** (in order of priority):
+
+1. **ILogger (Production & Development - HIGHEST PRIORITY)**
+   ```csharp
+   // Dependency injection
+   private readonly ILogger<MyClass> _logger;
+
+   public MyClass(ILogger<MyClass> logger)
+   {
+       _logger = logger;
+   }
+
+   // Usage
+   _logger.LogInformation("Event {EventType} processing started (Count: {Count})", eventType.Name, count);
+   _logger.LogDebug("Debug info: {Value}", debugValue);
+   _logger.LogError(ex, "Error occurred: {Message}", ex.Message);
+   ```
+
+   **Benefits**:
+   - Asynchronous logging (no thread blocking)
+   - Log level control via appsettings.json
+   - Structured logging with parameter serialization
+   - Multiple output targets (file, console, Application Insights)
+
+2. **Console.WriteLine (Debug Only)**
+   ```csharp
+   Console.WriteLine($"Processing event: {eventType.Name}");
+   Console.WriteLine($"Debug: Count = {count}");
+   ```
+
+   **Benefits**:
+   - Real-time output
+   - No deadlock risk
+   - Easy to add/remove
+
+   **Limitations**:
+   - Not suitable for production
+   - No log level control
+
+3. **DebugLogUtility.WriteLog() - PROHIBITED**
+   - ❌ **DO NOT USE** in new code
+   - ❌ Causes thread deadlocks
+   - ❌ Synchronous I/O blocks threads
+   - ❌ Poor scalability
+
+   **Migration Task**: Replace all existing `DebugLogUtility.WriteLog()` calls with `ILogger`
+
+**Example Migration**:
+```csharp
+// ❌ OLD (Causes deadlock)
+Console.WriteLine($"Event {eventType.Name} processing started");
+DebugLogUtility.WriteLog($"Event {eventType.Name} processing started");
+_logger?.LogDebug("Event {EventType} processing started", eventType.Name);
+
+// ✅ NEW (Recommended)
+Console.WriteLine($"Event {eventType.Name} processing started");  // Debug only
+_logger.LogInformation("Event {EventType} processing started (Count: {Count})", eventType.Name, count);  // Production
+```
+
 ## Project Dependencies
 
 ### Core Technologies

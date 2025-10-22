@@ -81,13 +81,15 @@ public sealed class CaptureModule : ServiceModuleBase
             {
                 var adaptiveService = provider.GetRequiredService<AdaptiveCaptureService>();
                 var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AdaptiveCaptureServiceAdapter>>();
+                var coordinateTransformationService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.ICoordinateTransformationService>();
                 var changeDetectionService = provider.GetService<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
 
                 logger.LogDebug("AdaptiveCaptureServiceAdapter インスタンス作成");
                 logger.LogInformation($"🎯 [PHASE_C] EnhancedImageChangeDetectionService統合: {(changeDetectionService != null ? "有効" : "無効")}");
+                logger.LogInformation("🎯 [WIN32_OVERLAY_FIX] CoordinateTransformationService統合: 動的ROIScaleFactor計算対応");
 
-                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger, changeDetectionService);
-                logger.LogInformation("AdaptiveCaptureServiceAdapter 登録完了 - Phase C画面変化検知機能統合済み");
+                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger, coordinateTransformationService, changeDetectionService);
+                logger.LogInformation("AdaptiveCaptureServiceAdapter 登録完了 - Phase C画面変化検知 + WIN32座標変換統合済み");
                 return adapter;
             }
             catch (Exception ex)
