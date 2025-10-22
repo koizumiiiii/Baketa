@@ -1,13 +1,15 @@
 using System.Runtime.Versioning;
 using Baketa.Infrastructure.Platform.Windows.Overlay;
-using Baketa.Core.UI.Overlay;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
 /// <summary>
 /// オーバーレイ関連サービスのDIモジュール
+///
+/// 🎯 [WIN32_OVERLAY_MIGRATION] Phase 1: Win32 Layered Window統合
+/// - ILayeredOverlayWindowFactory によるファクトリーパターン
+/// - Avalonia依存を完全排除し、OS-nativeウィンドウシステムに移行
 /// </summary>
 [SupportedOSPlatform("windows")]
 public static class OverlayModule
@@ -19,17 +21,9 @@ public static class OverlayModule
     /// <returns>サービスコレクション</returns>
     public static IServiceCollection RegisterOverlayServices(this IServiceCollection services)
     {
-        // Windows固有の実装を登録
-        services.AddSingleton<WindowsOverlayWindowManager>();
-        
-        // プラットフォーム固有実装をインターフェースに登録
-        services.AddSingleton<IOverlayWindowManager>(provider =>
-        {
-            var logger = provider.GetRequiredService<ILogger<WindowsOverlayWindowManager>>();
-            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-            return new WindowsOverlayWindowManager(logger, loggerFactory);
-        });
-        
+        // 🔥 [WIN32_OVERLAY_MIGRATION] Win32 Layered Window Factory登録
+        services.AddSingleton<ILayeredOverlayWindowFactory, LayeredOverlayWindowFactory>();
+
         return services;
     }
 }

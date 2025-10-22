@@ -133,7 +133,12 @@ internal static class User32Methods
     
     [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true, EntryPoint = "RegisterClassW")]
     internal static extern ushort RegisterClass(ref WNDCLASS lpWndClass);
-    
+
+    // 🔥 [P0_GC_FIX] ウィンドウクラス登録解除（静的リソースクリーンアップ用）
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true, EntryPoint = "UnregisterClassW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UnregisterClass(string lpClassName, IntPtr hInstance);
+
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool DestroyWindow(IntPtr hWnd);

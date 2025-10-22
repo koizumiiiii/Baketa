@@ -674,16 +674,38 @@ internal sealed partial class App : Avalonia.Application
         /// </summary>
         private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
         {
+            // 🔥 [SHUTDOWN_DEBUG] 診断ログ - ハンドラー実行確認
+            Console.WriteLine("🚨 [SHUTDOWN_DEBUG] OnShutdownRequested呼び出し開始");
+            System.IO.File.AppendAllText(
+                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                $"[{DateTime.Now:HH:mm:ss.fff}] 🚨 [SHUTDOWN_DEBUG] OnShutdownRequested呼び出し開始\r\n");
+
             try
             {
                 _logger?.LogInformation("アプリケーションシャットダウン要求を受信");
-                
+
+                // 🔥 [P0_GC_FIX] Win32ウィンドウクラスの完全クリーンアップ
+                // WndProcDelegate参照を解放し、UnregisterClassでウィンドウクラス登録解除
+                // これにより.NET Hostプロセス残存問題を解決
+                try
+                {
+                    Console.WriteLine("🔥 [SHUTDOWN_DEBUG] CleanupStaticResources呼び出し直前");
+                    Baketa.Infrastructure.Platform.Windows.Overlay.LayeredOverlayWindow.CleanupStaticResources();
+                    Console.WriteLine("✅ [SHUTDOWN_DEBUG] CleanupStaticResources呼び出し完了");
+                    _logger?.LogInformation("✅ [P0_GC_FIX] LayeredOverlayWindow静的リソースクリーンアップ完了");
+                }
+                catch (Exception cleanupEx)
+                {
+                    Console.WriteLine($"❌ [SHUTDOWN_DEBUG] CleanupStaticResources例外: {cleanupEx.Message}");
+                    _logger?.LogWarning(cleanupEx, "⚠️ [P0_GC_FIX] LayeredOverlayWindowクリーンアップ中にエラー（継続）");
+                }
+
                 // ネイティブライブラリの強制終了を設定
                 NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
-                
+
                 // シャットダウンイベントをパブリッシュ（非ブロッキング）
                 _ = _eventAggregator?.PublishAsync(new ApplicationShutdownEvent());
-                
+
                 if (_logger != null)
                 {
                     _logShuttingDown(_logger, null);
@@ -703,13 +725,101 @@ internal sealed partial class App : Avalonia.Application
         /// </summary>
         private void OnProcessExit(object? sender, EventArgs e)
         {
+            // 🔥 [P0_GC_FIX_CRITICAL] Win32ウィンドウクラスの完全クリーンアップ（最優先実行）
+            // プロセス終了時は限られた時間しかないため、最優先でCleanupStaticResources()を実行
+            // ログ出力などの二次的な処理は後回し
+            try
+            {
+                Baketa.Infrastructure.Platform.Windows.Overlay.LayeredOverlayWindow.CleanupStaticResources();
+
+                // クリーンアップ成功後に診断ログ出力（タイミング余裕があれば）
+                try
+                {
+                    Console.WriteLine("✅ [SHUTDOWN_DEBUG] CleanupStaticResources呼び出し完了（ProcessExit）");
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                        $"[{DateTime.Now:HH:mm:ss.fff}] ✅ [SHUTDOWN_DEBUG] CleanupStaticResources完了\r\n");
+                }
+                catch { /* 診断ログ失敗は無視 */ }
+            }
+            catch (Exception cleanupEx)
+            {
+                // クリーンアップエラーログ（可能な限り出力）
+                try
+                {
+                    Console.WriteLine($"❌ [SHUTDOWN_DEBUG] CleanupStaticResources例外: {cleanupEx.Message}");
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                        $"[{DateTime.Now:HH:mm:ss.fff}] ❌ [SHUTDOWN_DEBUG] Cleanupエラー: {cleanupEx.Message}\r\n");
+                }
+                catch { /* 診断ログ失敗は無視 */ }
+            }
+
+            // 二次的な処理（ネイティブライブラリ強制終了）
             try
             {
                 _logger?.LogInformation("プロセス終了処理開始");
-                
+
                 // ネイティブライブラリの強制終了
                 NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
-                
+
+                _logger?.LogInformation("プロセス終了処理完了");
+            }
+            catch (Exception ex)
+            {
+                // プロセス終了時のエラーは抑制
+                try
+                {
+                    _logger?.LogWarning(ex, "プロセス終了処理中にエラーが発生しましたが、継続します");
+                }
+                catch { /* ログ出力失敗も無視 */ }
+            }
+        }
+
+        // 以下、削除された元のコードを残す（削除済み部分）
+        private void OnProcessExit_Old(object? sender, EventArgs e)
+        {
+            // 🔥 [SHUTDOWN_DEBUG] 診断ログ - ハンドラー実行確認
+            try
+            {
+                Console.WriteLine("🚨 [SHUTDOWN_DEBUG] OnProcessExit呼び出し開始");
+                System.IO.File.AppendAllText(
+                    System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                    $"[{DateTime.Now:HH:mm:ss.fff}] 🚨 [SHUTDOWN_DEBUG] OnProcessExit呼び出し開始\r\n");
+            }
+            catch { }
+
+            try
+            {
+                _logger?.LogInformation("プロセス終了処理開始");
+
+                // 🔥 [P0_GC_FIX] Win32ウィンドウクラスの完全クリーンアップ（フェイルセーフ）
+                // OnShutdownRequestedでクリーンアップ済みでも、クラッシュ時の保険として再実行
+                // _windowClassAtom == 0 の場合は内部で安全にスキップされる
+                try
+                {
+                    Console.WriteLine("🔥 [SHUTDOWN_DEBUG] CleanupStaticResources呼び出し直前（ProcessExit）");
+                    Baketa.Infrastructure.Platform.Windows.Overlay.LayeredOverlayWindow.CleanupStaticResources();
+                    Console.WriteLine("✅ [SHUTDOWN_DEBUG] CleanupStaticResources呼び出し完了（ProcessExit）");
+                    _logger?.LogInformation("✅ [P0_GC_FIX] LayeredOverlayWindow静的リソースクリーンアップ完了（ProcessExit）");
+                }
+                catch (Exception cleanupEx)
+                {
+                    // プロセス終了時のエラーは抑制
+                    try
+                    {
+                        Console.WriteLine($"❌ [SHUTDOWN_DEBUG] CleanupStaticResources例外（ProcessExit）: {cleanupEx.Message}");
+                        _logger?.LogWarning(cleanupEx, "⚠️ [P0_GC_FIX] LayeredOverlayWindowクリーンアップ中にエラー（ProcessExit・継続）");
+                    }
+                    catch
+                    {
+                        // ログ出力も失敗する場合は抑制
+                    }
+                }
+
+                // ネイティブライブラリの強制終了
+                NativeWindowsCaptureWrapper.ForceShutdownOnApplicationExit();
+
                 _logger?.LogInformation("プロセス終了処理完了");
             }
             catch (Exception ex)

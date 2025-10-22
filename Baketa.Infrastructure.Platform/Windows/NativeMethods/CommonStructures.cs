@@ -34,7 +34,7 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
     /// POINT構造体
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal readonly struct POINT
+    public readonly struct POINT
     {
         public readonly int X;
         public readonly int Y;
@@ -52,7 +52,7 @@ namespace Baketa.Infrastructure.Platform.Windows.NativeMethods;
     /// SIZE構造体
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal readonly struct SIZE
+    public readonly struct SIZE
     {
         public readonly int Width;
         public readonly int Height;

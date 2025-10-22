@@ -1,49 +1,45 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
-using Baketa.UI.Views.Overlay;
+using Baketa.Infrastructure.Platform.Windows.Overlay;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services;
 
 /// <summary>
-/// シンプルで確実に動作するインプレース翻訳オーバーレイマネージャー
+/// Win32 Layered Window ベースのインプレース翻訳オーバーレイマネージャー
 ///
-/// Phase 3 完全リファクタリング - UltraThink + Geminiレビュー反映版
+/// 🎯 [WIN32_OVERLAY_MIGRATION] Phase 1: Avalonia → Win32 移行完了版
 /// 設計原則:
-/// - YAGNI原則: 必要最小限の機能のみ実装
-/// - Single Responsibility: オーバーレイ表示/非表示のみ担当
-/// - Dispatcher.UIThread保証: UIスレッドで確実に実行
-/// - Window Pooling: GC圧力軽減のためウィンドウ再利用
-/// - Thread Safety: lock文でコレクション同期
+/// - OS-Native透過ウィンドウで角丸・シャドウ問題を根本解決
+/// - ILayeredOverlayWindowFactory による依存性注入
+/// - ConcurrentBag によるスレッドセーフなコレクション管理（Gemini推奨）
+/// - リソースの適切な破棄（IDisposable パターン）
 /// </summary>
 public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayManager, IDisposable
 {
+    private readonly ILayeredOverlayWindowFactory _windowFactory;
     private readonly ILogger<SimpleInPlaceOverlayManager> _logger;
-    private readonly object _lock = new(); // 🔒 スレッドセーフなコレクション管理
 
-    // アクティブなオーバーレイウィンドウ（表示中）
-    private readonly List<InPlaceTranslationOverlayWindow> _activeWindows = new();
+    // アクティブなオーバーレイウィンドウ（スレッドセーフ）
+    private readonly ConcurrentBag<ILayeredOverlayWindow> _activeWindows = new();
 
-    // ウィンドウプール（再利用可能な非表示ウィンドウ）
-    private readonly Queue<InPlaceTranslationOverlayWindow> _windowPool = new();
-
-    private const int MaxPoolSize = 10; // プールサイズ上限（メモリ使用量制御）
     private bool _disposed;
 
-    public SimpleInPlaceOverlayManager(ILogger<SimpleInPlaceOverlayManager> logger)
+    public SimpleInPlaceOverlayManager(
+        ILayeredOverlayWindowFactory windowFactory,
+        ILogger<SimpleInPlaceOverlayManager> logger)
     {
+        _windowFactory = windowFactory ?? throw new ArgumentNullException(nameof(windowFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // 🔥 [EMERGENCY] コンストラクタ実行確認（Phase 3 診断）
-        Console.WriteLine("🔥🔥🔥 [EMERGENCY] SimpleInPlaceOverlayManager コンストラクタ実行");
-        _logger.LogInformation("✅ SimpleInPlaceOverlayManager初期化完了");
+        _logger.LogInformation("✅ [WIN32_OVERLAY] SimpleInPlaceOverlayManager初期化完了");
     }
 
     /// <summary>
@@ -51,238 +47,203 @@ public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayMana
     /// </summary>
     /// <param name="textChunk">翻訳結果を含むTextChunk</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
-    public async Task ShowInPlaceOverlayAsync(TextChunk textChunk, CancellationToken cancellationToken = default)
+    public Task ShowInPlaceOverlayAsync(TextChunk textChunk, CancellationToken cancellationToken = default)
     {
-        // 🔥🔥🔥 [ULTRA_CRITICAL] メソッド開始ログ（Phase 3 診断）
-        var chunkIdStr = textChunk?.ChunkId.ToString() ?? "NULL";
-        Console.WriteLine($"🔥🔥🔥 [ULTRA_CRITICAL] SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync CALLED - ChunkId: {chunkIdStr}");
-        _logger.LogInformation("🔥 ShowInPlaceOverlayAsync開始 - ChunkId: {ChunkId}", textChunk?.ChunkId ?? -1);
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(SimpleInPlaceOverlayManager));
+        }
 
         if (textChunk == null)
         {
-            _logger.LogWarning("⚠️ TextChunkがnullのため、オーバーレイ表示をスキップ");
-            return;
+            _logger.LogWarning("⚠️ [WIN32_OVERLAY] TextChunkがnullのため、オーバーレイ表示をスキップ");
+            return Task.CompletedTask;
         }
 
-        // UIスレッドで確実に実行
-        await Dispatcher.UIThread.InvokeAsync(async () =>
+        if (string.IsNullOrWhiteSpace(textChunk.TranslatedText))
         {
-            _logger.LogDebug("🎯 UIスレッド内処理開始 - ChunkId: {ChunkId}", textChunk.ChunkId);
+            _logger.LogWarning("⚠️ [WIN32_OVERLAY] TranslatedTextが空のため、オーバーレイ表示をスキップ - ChunkId: {ChunkId}",
+                textChunk.ChunkId);
+            return Task.CompletedTask;
+        }
 
-            InPlaceTranslationOverlayWindow window;
+        _logger.LogDebug("🎯 [WIN32_OVERLAY] オーバーレイ表示開始 - ChunkId: {ChunkId}, Text: {Text}",
+            textChunk.ChunkId, textChunk.TranslatedText);
 
-            // 🔒 スレッドセーフなウィンドウ取得
-            lock (_lock)
+        try
+        {
+            // 🎯 [WIN32_COORDINATE_FIX] マルチモニター・異なる解像度対応
+            // - TextChunk.CombinedBoundsはCoordinateTransformationService経由で
+            //   既にスクリーン絶対座標に変換済み（GetWindowRect使用）
+            // - Win32 Layered Windowはスクリーン絶対座標で配置されるため、
+            //   CombinedBoundsをそのまま使用することで正しい位置に表示される
+            //
+            // 🌍 マルチモニター環境の座標系:
+            // - プライマリモニター: (0, 0) を基準
+            // - セカンダリモニター（右側）: X座標が大きい値（例: 1920~3840）
+            // - セカンダリモニター（上側）: Y座標が負の値（例: -1080~0）
+            // - セカンダリモニター（下側）: Y座標が大きい値（例: 1080~2160）
+            //
+            // 🔧 解像度対応:
+            // - FHD (1920x1080), QHD (2560x1440), 4K (3840x2160) すべて対応
+            // - CoordinateTransformationServiceがDPI/スケール補正を実施済み
+
+            // Win32 Layered Windowを作成
+            var window = _windowFactory.Create();
+
+            // 翻訳テキストを設定
+            window.SetText(textChunk.TranslatedText);
+
+            // 🔧 [MULTI_MONITOR_DEBUG] 座標値を詳細ログ出力
+            _logger.LogInformation("🔍 [WIN32_COORDINATE] CombinedBounds座標: X={X}, Y={Y}, W={W}, H={H} - ChunkId: {ChunkId}",
+                textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y,
+                textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height,
+                textChunk.ChunkId);
+
+            // 座標を設定（CoordinateTransformationService変換済みのスクリーン絶対座標を使用）
+            window.SetPosition(textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y);
+
+            // サイズを設定（TextChunk.CombinedBoundsのWidth, Heightを使用）
+            if (textChunk.CombinedBounds.Width > 0 && textChunk.CombinedBounds.Height > 0)
             {
-                // プールから再利用可能なウィンドウを取得（GC圧力軽減）
-                if (_windowPool.Count > 0)
-                {
-                    window = _windowPool.Dequeue();
-                    _logger.LogDebug("♻️ ウィンドウプールから再利用 - Pool残: {PoolCount}", _windowPool.Count);
-                }
-                else
-                {
-                    window = new InPlaceTranslationOverlayWindow();
-                    _logger.LogDebug("🆕 新規ウィンドウ作成");
-                }
-
-                _activeWindows.Add(window);
+                window.SetSize(textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height);
+            }
+            else
+            {
+                // サイズ未指定の場合はデフォルトサイズ（テキストに応じて自動調整）
+                // LayeredOverlayWindowがテキストサイズから自動計算
+                _logger.LogDebug("📐 [WIN32_OVERLAY] サイズ未指定 - テキストサイズから自動計算");
             }
 
-            try
-            {
-                // InPlaceTranslationOverlayWindow.ShowInPlaceOverlayAsync()を直接呼び出し
-                // TextChunkの拡張メソッド（GetBasicOverlayPosition, GetOverlaySize, CalculateOptimalFontSize）
-                // が座標変換を担当するため、OverlayCoordinateTransformerは不要
-                await window.ShowInPlaceOverlayAsync(textChunk, cancellationToken).ConfigureAwait(false);
+            // 背景色を設定（すりガラス風半透明白）
+            // ARGB: Alpha=240, RGB=(255, 255, 242) - 淡い黄色がかった白
+            window.SetBackgroundColor(240, 255, 255, 242);
 
-                _logger.LogInformation("✅ オーバーレイ表示完了 - ChunkId: {ChunkId}", textChunk.ChunkId);
-                Console.WriteLine($"✅ [SUCCESS] オーバーレイ表示成功 - ChunkId: {textChunk.ChunkId}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ オーバーレイ表示中にエラー - ChunkId: {ChunkId}, Error: {Message}",
-                    textChunk.ChunkId, ex.Message);
+            // ウィンドウを表示
+            window.Show();
 
-                // エラー時はアクティブリストから削除してプールに戻す
-                lock (_lock)
-                {
-                    _activeWindows.Remove(window);
-                    ReturnWindowToPool(window);
-                }
+            // アクティブウィンドウコレクションに追加
+            _activeWindows.Add(window);
 
-                throw;
-            }
-        }, DispatcherPriority.Normal, cancellationToken);
+            _logger.LogInformation("✅ [WIN32_OVERLAY] オーバーレイ表示完了 - ChunkId: {ChunkId}, Pos: ({X}, {Y}), Size: ({W}x{H})",
+                textChunk.ChunkId, textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y, textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height);
+
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [WIN32_OVERLAY] オーバーレイ表示中にエラー - ChunkId: {ChunkId}, Error: {Message}",
+                textChunk.ChunkId, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
     /// 指定されたチャンクのインプレースオーバーレイを非表示
-    /// 簡易実装: 全オーバーレイをクリアして再構築（YAGNI原則）
+    /// 簡易実装: 全オーバーレイをクリア（YAGNI原則）
     /// </summary>
-    public async Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
+    public Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("🗑️ 指定チャンクのオーバーレイ非表示 - ChunkId: {ChunkId}", chunkId);
+        _logger.LogInformation("🗑️ [WIN32_OVERLAY] 指定チャンクのオーバーレイ非表示 - ChunkId: {ChunkId}", chunkId);
         // 簡易実装: 個別管理はせず、全クリアで対応
-        await HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+        return HideAllInPlaceOverlaysAsync();
     }
 
     /// <summary>
     /// 指定領域内のオーバーレイを非表示にする
     /// 簡易実装: 全オーバーレイをクリア（YAGNI原則）
     /// </summary>
-    public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
+    public Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("🗑️ 領域内オーバーレイ非表示 - Area: {Area}, Exclude: {ExcludeChunkId}", area, excludeChunkId);
+        _logger.LogInformation("🗑️ [WIN32_OVERLAY] 領域内オーバーレイ非表示 - Area: {Area}, Exclude: {ExcludeChunkId}",
+            area, excludeChunkId);
         // 簡易実装: 領域判定はせず、全クリアで対応
-        await HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+        return HideAllInPlaceOverlaysAsync();
     }
 
     /// <summary>
     /// すべてのインプレースオーバーレイを非表示
     /// </summary>
-    public async Task HideAllInPlaceOverlaysAsync()
+    public Task HideAllInPlaceOverlaysAsync()
     {
-        _logger.LogInformation("🗑️ 全オーバーレイ非表示開始 - Count: {Count}", _activeWindows.Count);
+        _logger.LogInformation("🗑️ [WIN32_OVERLAY] 全オーバーレイ非表示開始 - Count: {Count}", _activeWindows.Count);
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        // ConcurrentBagからすべてのウィンドウを取り出して処理
+        var windows = _activeWindows.ToArray();
+        _activeWindows.Clear();
+
+        foreach (var window in windows)
         {
-            List<InPlaceTranslationOverlayWindow> windowsToHide;
-
-            lock (_lock)
+            try
             {
-                // アクティブウィンドウのコピーを取得（反復中の変更を回避）
-                windowsToHide = new List<InPlaceTranslationOverlayWindow>(_activeWindows);
-                _activeWindows.Clear();
+                window.Close();
+                window.Dispose();
+                _logger.LogDebug("✅ [WIN32_OVERLAY] ウィンドウ閉じて破棄成功");
             }
-
-            foreach (var window in windowsToHide)
+            catch (Exception ex)
             {
-                try
-                {
-                    // Hide()を使用してウィンドウを非表示（Close()ではなく再利用可能）
-                    window.Hide();
-                    ReturnWindowToPool(window);
-                    _logger.LogDebug("✅ ウィンドウ非表示成功");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ オーバーレイウィンドウの非表示中にエラー: {Message}", ex.Message);
-
-                    // エラー時はウィンドウを破棄
-                    try
-                    {
-                        window.Close();
-                        window.Dispose();
-                    }
-                    catch
-                    {
-                        // Dispose時のエラーは無視
-                    }
-                }
+                _logger.LogWarning(ex, "⚠️ [WIN32_OVERLAY] オーバーレイウィンドウの破棄中にエラー: {Message}", ex.Message);
             }
-        }, DispatcherPriority.Normal);
+        }
 
-        _logger.LogInformation("✅ 全オーバーレイ非表示完了");
+        _logger.LogInformation("✅ [WIN32_OVERLAY] 全オーバーレイ非表示完了");
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// すべてのインプレースオーバーレイの可視性を切り替え
     /// </summary>
-    public async Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
+    public Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("👁️ 全オーバーレイ可視性切り替え - Visible: {Visible}", visible);
+        _logger.LogInformation("👁️ [WIN32_OVERLAY] 全オーバーレイ可視性切り替え - Visible: {Visible}", visible);
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        var windows = _activeWindows.ToArray();
+
+        foreach (var window in windows)
         {
-            lock (_lock)
+            try
             {
-                foreach (var window in _activeWindows)
+                if (visible)
                 {
-                    try
-                    {
-                        if (visible)
-                        {
-                            window.Show();
-                        }
-                        else
-                        {
-                            window.Hide();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "⚠️ ウィンドウ可視性切り替え中にエラー: {Message}", ex.Message);
-                    }
+                    window.Show();
+                }
+                else
+                {
+                    window.Hide();
                 }
             }
-        }, DispatcherPriority.Normal, cancellationToken);
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "⚠️ [WIN32_OVERLAY] ウィンドウ可視性切り替え中にエラー: {Message}", ex.Message);
+            }
+        }
 
-        _logger.LogInformation("✅ 全オーバーレイ可視性切り替え完了");
+        _logger.LogInformation("✅ [WIN32_OVERLAY] 全オーバーレイ可視性切り替え完了");
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// インプレースオーバーレイをリセット（Stop時に呼び出し）
     /// </summary>
-    public async Task ResetAsync()
+    public Task ResetAsync()
     {
-        _logger.LogInformation("🔄 オーバーレイマネージャーリセット");
-        await HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+        _logger.LogInformation("🔄 [WIN32_OVERLAY] オーバーレイマネージャーリセット");
+        return HideAllInPlaceOverlaysAsync();
     }
 
     /// <summary>
     /// 現在アクティブなインプレースオーバーレイの数を取得
     /// </summary>
-    public int ActiveOverlayCount
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _activeWindows.Count;
-            }
-        }
-    }
+    public int ActiveOverlayCount => _activeWindows.Count;
 
     /// <summary>
     /// インプレースオーバーレイマネージャーを初期化
     /// </summary>
     public Task InitializeAsync()
     {
-        _logger.LogInformation("🚀 オーバーレイマネージャー初期化");
-        // シンプル実装では特別な初期化処理は不要
+        _logger.LogInformation("🚀 [WIN32_OVERLAY] オーバーレイマネージャー初期化");
+        // Win32 Layered Window実装では特別な初期化処理は不要
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// ウィンドウをプールに返却（再利用可能にする）
-    /// </summary>
-    /// <param name="window">返却するウィンドウ</param>
-    private void ReturnWindowToPool(InPlaceTranslationOverlayWindow window)
-    {
-        lock (_lock)
-        {
-            // プールサイズ上限チェック（メモリリーク防止）
-            if (_windowPool.Count < MaxPoolSize)
-            {
-                _windowPool.Enqueue(window);
-                _logger.LogDebug("♻️ ウィンドウをプールに返却 - Pool数: {PoolCount}", _windowPool.Count);
-            }
-            else
-            {
-                // プール満杯の場合は破棄
-                try
-                {
-                    window.Close();
-                    window.Dispose();
-                    _logger.LogDebug("🗑️ プール満杯のためウィンドウ破棄");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ ウィンドウ破棄中にエラー: {Message}", ex.Message);
-                }
-            }
-        }
     }
 
     /// <summary>
@@ -295,30 +256,12 @@ public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayMana
             return;
         }
 
-        _logger.LogInformation("🗑️ SimpleInPlaceOverlayManager Dispose開始");
+        _logger.LogInformation("🗑️ [WIN32_OVERLAY] SimpleInPlaceOverlayManager Dispose開始");
 
-        // 全オーバーレイを非表示（同期的に実行）
+        // 全オーバーレイを非表示
         HideAllInPlaceOverlaysAsync().GetAwaiter().GetResult();
 
-        // プール内のウィンドウも全て破棄
-        lock (_lock)
-        {
-            while (_windowPool.Count > 0)
-            {
-                var window = _windowPool.Dequeue();
-                try
-                {
-                    window.Close();
-                    window.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "⚠️ プール内ウィンドウの破棄中にエラー: {Message}", ex.Message);
-                }
-            }
-        }
-
         _disposed = true;
-        _logger.LogInformation("✅ SimpleInPlaceOverlayManager Disposed");
+        _logger.LogInformation("✅ [WIN32_OVERLAY] SimpleInPlaceOverlayManager Disposed");
     }
 }
