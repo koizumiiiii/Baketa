@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統
 using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
 using Baketa.Core.Abstractions.Imaging; // 🔧 [PHASE3.2_FIX] IImage用
 using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
+using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Models.OCR;
@@ -36,7 +37,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
+    private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換
     private int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
+
+    // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出結果のMetadataキー
+    private const string METADATA_KEY_BORDERLESS = "IsBorderlessOrFullscreen";
 
     public ProcessingStageType StageType => ProcessingStageType.OcrExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(80);
@@ -47,6 +52,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
         IImageFactoryInterface imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
         ITextRegionDetector textRegionDetector, // 🔥 [PHASE13.2.31H_FIX] 必須依存に変更（デフォルト値削除） - Gemini推奨⭐5/5
+        ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換サービス注入
         ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -59,6 +65,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _textRegionDetector = textRegionDetector ?? throw new ArgumentNullException(nameof(textRegionDetector)); // 🔥 [PHASE13.2.31H_FIX] 必須依存として明示
+        _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
 
         _logger.LogInformation("✅ [PHASE13.2.31I] OcrExecutionStageStrategy 初期化完了 - _textRegionDetector: {FieldStatus}",
@@ -470,20 +477,49 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                     if (positionedResults.Count > 0)
                     {
-                        // 全テキストチャンクの境界ボックスを計算
+                        // 全テキストチャンクの境界ボックスを計算（ROI座標）
                         var allBounds = positionedResults.Select(r => r.BoundingBox);
                         var minX = allBounds.Min(r => r.X);
                         var minY = allBounds.Min(r => r.Y);
                         var maxX = allBounds.Max(r => r.X + r.Width);
                         var maxY = allBounds.Max(r => r.Y + r.Height);
-                        var combinedBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                        var roiBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+
+                        // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出（セッション初回のみ実行）
+                        if (!context.Metadata.TryGetValue(METADATA_KEY_BORDERLESS, out var borderlessObj))
+                        {
+                            var windowHandle = context.Input.SourceWindowHandle;
+                            var isBorderless = _coordinateTransformationService.DetectBorderlessOrFullscreen(windowHandle);
+
+                            context.Metadata.TryAdd(METADATA_KEY_BORDERLESS, isBorderless);
+
+                            _logger.LogInformation(
+                                "🔥 [PHASE2.1] ウィンドウモード検出完了 - Handle={Handle}, Borderless/Fullscreen={IsBorderless}",
+                                windowHandle, isBorderless);
+                        }
+
+                        // 🔥 [PHASE2.1] Metadataから検出結果を安全に取得
+                        var isBorderlessOrFullscreen = (bool)(context.Metadata[METADATA_KEY_BORDERLESS] ?? false);
+
+                        // 🔥 [COORDINATE_FIX] ROI座標 → スクリーン絶対座標変換
+                        // SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync()はスクリーン絶対座標を期待
+                        // マルチモニター・垂直配置対応: CoordinateTransformationServiceがGetWindowRect経由で正確な座標を算出
+                        // 🔥 [PHASE2.1] ボーダーレス/フルスクリーンフラグを渡してDWM座標補正を適用
+                        var combinedBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
+                            roiBounds,
+                            context.Input.SourceWindowHandle,
+                            roiScaleFactor: 1.0f,
+                            isBorderlessOrFullscreen: isBorderlessOrFullscreen);
+
+                        _logger.LogDebug("🔥 [COORDINATE_FIX] ROI→Screen変換完了 - ROI:({RoiX},{RoiY}), Screen:({ScreenX},{ScreenY})",
+                            roiBounds.X, roiBounds.Y, combinedBounds.X, combinedBounds.Y);
 
                         // TextChunk作成
                         var textChunk = new TextChunk
                         {
                             ChunkId = _nextChunkId++,
                             TextResults = positionedResults,
-                            CombinedBounds = combinedBounds,
+                            CombinedBounds = combinedBounds, // 🔥 [COORDINATE_FIX] スクリーン絶対座標使用
                             CombinedText = detectedText,
                             SourceWindowHandle = context.Input.SourceWindowHandle,
                             DetectedLanguage = null

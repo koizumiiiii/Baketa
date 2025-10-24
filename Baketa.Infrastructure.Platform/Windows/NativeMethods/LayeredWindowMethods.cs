@@ -27,24 +27,39 @@ internal static class LayeredWindowMethods
     /// <summary>
     /// メッセージ処理
     /// </summary>
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    /// <remarks>
+    /// 🔥 [WIN32_FIX] ExactSpelling削除 - GetMessageA/GetMessageWの自動選択を有効化
+    /// ExactSpelling=trueでは「GetMessage」という名前の関数を探すが、実際にはGetMessageA/Wしか存在しない
+    /// </remarks>
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
 
-    [DllImport(USER32_DLL, SetLastError = false, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = false, CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool TranslateMessage(ref MSG lpMsg);
 
-    [DllImport(USER32_DLL, SetLastError = false, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = false, CharSet = CharSet.Auto)]
     internal static extern IntPtr DispatchMessage(ref MSG lpMsg);
 
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = true)]
     internal static extern void PostQuitMessage(int nExitCode);
+
+    /// <summary>
+    /// メッセージをウィンドウのメッセージキューに投稿
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [MESSAGE_QUEUE_FIX] カスタムメッセージキューの処理をトリガー
+    /// GetMessage()のブロックを解除し、_messageQueueを処理させる
+    /// </remarks>
+    [DllImport(USER32_DLL, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     /// <summary>
     /// ウィンドウ位置・サイズ設定
     /// </summary>
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowPos(
         IntPtr hWnd,
@@ -56,7 +71,7 @@ internal static class LayeredWindowMethods
     /// <summary>
     /// ウィンドウ表示状態設定
     /// </summary>
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool ShowWindow(IntPtr hWnd, ShowWindowCommands nCmdShow);
 
@@ -71,7 +86,7 @@ internal static class LayeredWindowMethods
     /// 🔥 [GEMINI_RECOMMENDATION] 簡易的な透明度制御に使用
     /// UpdateLayeredWindow より軽量だが、アルファブレンディングは全体一律
     /// </remarks>
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetLayeredWindowAttributes(
         IntPtr hwnd,
@@ -86,7 +101,7 @@ internal static class LayeredWindowMethods
     /// 🔥 [GEMINI_RECOMMENDATION] ピクセル単位のアルファブレンディング
     /// GDI32で描画したビットマップを直接ウィンドウに転送
     /// </remarks>
-    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(USER32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool UpdateLayeredWindow(
         IntPtr hwnd,
@@ -106,7 +121,7 @@ internal static class LayeredWindowMethods
     /// <summary>
     /// メモリデバイスコンテキスト作成
     /// </summary>
-    [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(GDI32_DLL, SetLastError = true)]
     internal static extern IntPtr CreateCompatibleDC(IntPtr hdc);
 
     /// <summary>
@@ -116,7 +131,7 @@ internal static class LayeredWindowMethods
     /// 🔥 [GEMINI_RECOMMENDATION] 32bit ARGB ビットマップ作成用
     /// ppvBits でピクセルデータへの直接アクセス可能
     /// </remarks>
-    [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(GDI32_DLL, SetLastError = true)]
     internal static extern IntPtr CreateDIBSection(
         IntPtr hdc,
         ref BITMAPINFO pbmi,
@@ -128,20 +143,20 @@ internal static class LayeredWindowMethods
     /// <summary>
     /// GDIオブジェクトをDCに選択
     /// </summary>
-    [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(GDI32_DLL, SetLastError = true)]
     internal static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
 
     /// <summary>
     /// GDIオブジェクト削除
     /// </summary>
-    [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(GDI32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool DeleteObject(IntPtr hObject);
 
     /// <summary>
     /// デバイスコンテキスト削除
     /// </summary>
-    [DllImport(GDI32_DLL, SetLastError = true, ExactSpelling = true)]
+    [DllImport(GDI32_DLL, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool DeleteDC(IntPtr hdc);
 

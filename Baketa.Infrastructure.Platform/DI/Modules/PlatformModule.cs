@@ -159,16 +159,22 @@ namespace Baketa.Infrastructure.Platform.DI.Modules;
         /// その他のWindows固有サービスを登録します。
         /// </summary>
         /// <param name="_">サービスコレクション</param>
-        private static void RegisterWindowsServices(IServiceCollection _)
+        private static void RegisterWindowsServices(IServiceCollection services)
         {
+            // 🔥 [PHASE2.1_CLEAN_ARCH] 座標変換サービス（ROI→スクリーン座標変換）
+            // Clean Architecture準拠: Platform層でWindows固有API依存サービスを登録
+            services.AddSingleton<Baketa.Core.Abstractions.Services.ICoordinateTransformationService,
+                Baketa.Infrastructure.Platform.Windows.Services.CoordinateTransformationService>();
+            Console.WriteLine("✅ [PHASE2.1_CLEAN_ARCH] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換（DWM Hybrid検出対応）");
+
             // その他のWindows API関連サービス
             // 例: services.AddSingleton<IWindowsProcessService, WindowsProcessService>();
             // 例: services.AddSingleton<IHotkeyService, Win32HotkeyService>();
             // 例: services.AddSingleton<IClipboardService, WindowsClipboardService>();
-            
+
             // Windows固有の設定サービス
             // 例: services.AddSingleton<IWindowsRegistryService, WindowsRegistryService>();
-            
+
             // アプリケーション起動関連
             // 例: services.AddSingleton<IStartupManager, WindowsStartupManager>();
         }

@@ -48,6 +48,10 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private int _currentHeight = 50;
     private Color _backgroundColor = Color.FromArgb(240, 255, 255, 255); // 半透明白
 
+    // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
+    // PostMessage()が既に送信済みかを追跡し、重複送信を防ぐ
+    private bool _updatePending;
+
     // GDI リソース
     private IntPtr _hdcScreen = IntPtr.Zero;
     private IntPtr _hdcMem = IntPtr.Zero;
@@ -58,6 +62,10 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     // ウィンドウクラス名
     private const string WINDOW_CLASS_NAME = "BaketaLayeredOverlay";
     private static ushort _windowClassAtom;
+
+    // 🔥 [MESSAGE_QUEUE_FIX] カスタムメッセージ定義 - メッセージキュー処理をトリガー
+    private const uint WM_USER = 0x0400;
+    private const uint WM_PROCESS_QUEUE = WM_USER + 1;
     private static readonly object _classLock = new();
 
     // 🔥 [P0_GC_FIX] WndProcDelegateをstaticフィールドで保持してGCから保護
@@ -149,6 +157,10 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                         _logger.LogError(ex, "❌ [STA_THREAD] メッセージキュー処理中に例外発生");
                     }
                 }
+
+                // 🔥 [MESSAGE_COALESCING] キュー処理完了後にフラグをリセット
+                // 次の更新で再度PostMessage()可能にする
+                _updatePending = false;
             }
 
             _logger.LogDebug("🔄 [STA_THREAD] メッセージループ終了");
@@ -271,6 +283,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                 _logger.LogDebug("👁️ [WIN32_OVERLAY] ウィンドウ表示 - HWND: 0x{Hwnd:X}", _hwnd.ToInt64());
             }
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public void Hide()
@@ -323,6 +338,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
             // GDI描画とUpdateLayeredWindowで更新
             UpdateWindowContent();
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public void SetPosition(int x, int y)
@@ -346,6 +364,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
             _logger.LogDebug("📍 [WIN32_OVERLAY] 位置更新 - X: {X}, Y: {Y}", x, y);
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public void SetSize(int width, int height)
@@ -370,6 +391,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
             _logger.LogDebug("📏 [WIN32_OVERLAY] サイズ更新 - Width: {Width}, Height: {Height}", width, height);
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public void SetBackgroundColor(byte a, byte r, byte g, byte b)
@@ -384,6 +408,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
             if (_hwnd == IntPtr.Zero) return;
             UpdateWindowContent();
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public bool IsVisible => _isVisible;
@@ -539,6 +566,28 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
         {
             User32Methods.ReleaseDC(IntPtr.Zero, _hdcScreen);
             _hdcScreen = IntPtr.Zero;
+        }
+    }
+
+    /// <summary>
+    /// カスタムメッセージキューの処理をトリガー
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でGetMessage()のブロックを解除
+    /// 問題: GetMessage()はWin32メッセージが来るまでブロックし、_messageQueueが処理されない
+    /// 解決策: カスタムメッセージを送ってGetMessage()を起こし、_messageQueueを処理させる
+    ///
+    /// 🔥 [MESSAGE_COALESCING] メッセージ集約による最適化
+    /// 1チャンク内の複数メソッド呼び出し（SetText, SetPosition, SetSize, Show等）で
+    /// PostMessage()を1回のみ実行することで、不要なメッセージループ回転を削減
+    /// 効果: 75回 → 15回（15チャンクの場合）
+    /// </remarks>
+    private void TriggerMessageQueueProcessing()
+    {
+        if (_hwnd != IntPtr.Zero && !_updatePending)
+        {
+            _updatePending = true;
+            LayeredWindowMethods.PostMessage(_hwnd, WM_PROCESS_QUEUE, IntPtr.Zero, IntPtr.Zero);
         }
     }
 

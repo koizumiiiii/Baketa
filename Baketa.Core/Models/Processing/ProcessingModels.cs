@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.Imaging;
+using System.Collections.Concurrent;
 using System.Drawing;
 
 namespace Baketa.Core.Models.Processing;
@@ -335,21 +336,29 @@ public sealed record ProcessingStageResult
 /// <summary>
 /// 処理コンテキスト
 /// 段階間でのデータ共有とステート管理
+/// Phase 2.1: Metadataプロパティ追加（セッション情報の保存用）
 /// </summary>
 public sealed class ProcessingContext
 {
     private readonly Dictionary<ProcessingStageType, ProcessingStageResult> _stageResults = [];
-    
+
     /// <summary>
     /// 処理入力データ
     /// </summary>
     public ProcessingPipelineInput Input { get; }
-    
+
     /// <summary>
     /// 直前段階の処理結果
     /// </summary>
     public ProcessingStageResult? PreviousStageResult { get; private set; }
-    
+
+    /// <summary>
+    /// 🔥 [PHASE2.1] セッション情報保存用Metadata
+    /// スレッドセーフなConcurrentDictionaryで実装
+    /// 用途: ボーダーレス/フルスクリーン検出結果など、セッション全体で共有するデータの保存
+    /// </summary>
+    public ConcurrentDictionary<string, object> Metadata { get; } = new();
+
     /// <summary>
     /// コンストラクタ
     /// </summary>

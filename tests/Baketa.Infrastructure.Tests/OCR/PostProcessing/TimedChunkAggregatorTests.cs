@@ -29,12 +29,13 @@ public class TimedChunkAggregatorTests : IDisposable
 
         // Setup coordinate transformation service mock
         _coordinateTransformationServiceMock = new Mock<ICoordinateTransformationService>();
+        // 🔥 [PHASE2.1_TEST_FIX] オプションパラメータ追加に伴うMock修正
         _coordinateTransformationServiceMock
-            .Setup(x => x.ConvertRoiToScreenCoordinates(It.IsAny<Rectangle>(), It.IsAny<IntPtr>(), It.IsAny<float>()))
-            .Returns((Rectangle rect, IntPtr handle, float scale) => rect); // Return original rect for testing
+            .Setup(x => x.ConvertRoiToScreenCoordinates(It.IsAny<Rectangle>(), It.IsAny<IntPtr>(), It.IsAny<float>(), It.IsAny<bool>()))
+            .Returns((Rectangle rect, IntPtr handle, float scale, bool isBorderless) => rect); // Return original rect for testing
         _coordinateTransformationServiceMock
-            .Setup(x => x.ConvertRoiToScreenCoordinatesBatch(It.IsAny<Rectangle[]>(), It.IsAny<IntPtr>(), It.IsAny<float>()))
-            .Returns((Rectangle[] rects, IntPtr handle, float scale) => rects); // Return original rects for testing
+            .Setup(x => x.ConvertRoiToScreenCoordinatesBatch(It.IsAny<Rectangle[]>(), It.IsAny<IntPtr>(), It.IsAny<float>(), It.IsAny<bool>()))
+            .Returns((Rectangle[] rects, IntPtr handle, float scale, bool isBorderless) => rects); // Return original rects for testing
 
         _settings = new TimedAggregatorSettings
         {

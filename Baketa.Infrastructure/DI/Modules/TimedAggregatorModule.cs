@@ -5,7 +5,6 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Services;
-using Baketa.Infrastructure.Services.Coordinates;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -33,10 +32,8 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
             RegisterSettings<TimedAggregatorSettings>(services);
             Console.WriteLine("✅ [PHASE12.2_DIAG] RegisterSettings<TimedAggregatorSettings>() 完了");
 
-            // 🎯 [P0_COORDINATE_TRANSFORM] 座標変換サービスの登録
-            Console.WriteLine("🔧 [PHASE12.2_DIAG] CoordinateTransformationService登録直前");
-            services.AddSingleton<ICoordinateTransformationService, CoordinateTransformationService>();
-            Console.WriteLine("✅ [P0_COORDINATE_TRANSFORM] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換");
+            // 🔥 [PHASE2.1_CLEAN_ARCH] CoordinateTransformationService登録はPlatformModuleに移動
+            // Clean Architecture準拠: Windows固有API依存サービスはPlatform層で登録
 
             // CoordinateBasedLineBreakProcessorの登録
             Console.WriteLine("🔧 [PHASE12.2_DIAG] CoordinateBasedLineBreakProcessor登録直前");

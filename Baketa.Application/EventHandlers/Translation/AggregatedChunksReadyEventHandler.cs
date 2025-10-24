@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.Translation;
@@ -30,34 +31,30 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // Gemini推奨の多層防御アーキテクチャ - 第2層: 物理的排他制御
     private static readonly SemaphoreSlim _translationExecutionSemaphore = new(1, 1);
 
-    private readonly ITranslationService _translationService;
+    private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
     private readonly IInPlaceTranslationOverlayManager _overlayManager;
     private readonly ILanguageConfigurationService _languageConfig;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
+    private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX]
 
     public AggregatedChunksReadyEventHandler(
-        ITranslationService translationService,
+        Baketa.Core.Abstractions.Translation.ITranslationService translationService,
         IInPlaceTranslationOverlayManager overlayManager,
         ILanguageConfigurationService languageConfig,
         IEventAggregator eventAggregator,
         ILogger<AggregatedChunksReadyEventHandler> logger,
+        ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX]
         IStreamingTranslationService? streamingTranslationService = null)
     {
-        Console.WriteLine("🚨🚨🚨 [CTOR_DEBUG] AggregatedChunksReadyEventHandler コンストラクター開始");
-        DebugLogUtility.WriteLog("🚨🚨🚨 [CTOR_DEBUG] AggregatedChunksReadyEventHandler コンストラクター開始");
-
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
         _streamingTranslationService = streamingTranslationService;
-
-        var streamingServiceType = streamingTranslationService?.GetType().Name ?? "NULL";
-        Console.WriteLine($"✅ [CTOR_DEBUG] AggregatedChunksReadyEventHandler初期化完了 - StreamingService型: {streamingServiceType}");
-        DebugLogUtility.WriteLog($"✅ [CTOR_DEBUG] AggregatedChunksReadyEventHandler初期化完了 - StreamingService型: {streamingServiceType}");
     }
 
     /// <inheritdoc />
@@ -177,37 +174,59 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 DebugLogUtility.WriteLog($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
-            // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] 各翻訳済みチャンクに対してTranslationWithBoundsCompletedEventを発行
-            // 理由: 個別翻訳オーバーレイを表示するには、各チャンクごとにイベントを発行する必要がある
-            // 解決策: TranslationWithBoundsCompletedHandlerが各チャンクのオーバーレイを個別に表示
-            DebugLogUtility.WriteLog($"🔥 [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行開始 - チャンク数: {nonEmptyChunks.Count}");
-            Console.WriteLine($"🔥 [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行開始 - チャンク数: {nonEmptyChunks.Count}");
-
-            var sourceLanguageCode = _languageConfig.GetSourceLanguageCode();
-            var targetLanguageCode = _languageConfig.GetTargetLanguageCode();
+            // 🔥 [OVERLAY_FIX] 直接SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync()を呼び出し
+            // Gemini推奨: TranslationWithBoundsCompletedEventを経由せず、直接オーバーレイ表示
+            // 理由: イベントハンドラー未実装により表示されない問題を解決
+            // アーキテクチャ: Application層 → Core層(IInPlaceTranslationOverlayManager)への依存は正しい（DIP準拠）
+            DebugLogUtility.WriteLog($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
+            Console.WriteLine($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
 
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
                 var chunk = nonEmptyChunks[i];
-                var translatedText = translationResults[i];
+                // chunk.TranslatedTextは既にLine 176で設定済み
 
-                // 各チャンクに対してTranslationWithBoundsCompletedEventを発行
-                var translationEvent = new TranslationWithBoundsCompletedEvent(
-                    sourceText: chunk.CombinedText,
-                    translatedText: translatedText,
-                    sourceLanguage: sourceLanguageCode,
-                    targetLanguage: targetLanguageCode,
-                    bounds: chunk.CombinedBounds,
-                    confidence: 1.0f,
-                    engineName: "StreamingTranslation",
-                    isFallbackTranslation: false // 個別翻訳成功
-                );
+                // 🔥 [COORDINATE_FIX] ROI座標 → スクリーン絶対座標変換
+                // 垂直モニター配置（セカンダリが上: Y=-1080~0, プライマリ: Y=0~1080）に対応
+                var roiBounds = chunk.CombinedBounds;
 
-                await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
-                DebugLogUtility.WriteLog($"✅ [INDIVIDUAL_TRANSLATION_EVENT] チャンク{i}イベント発行完了 - ID: {translationEvent.Id}, Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
+                // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出
+                var isBorderlessOrFullscreen = _coordinateTransformationService.DetectBorderlessOrFullscreen(chunk.SourceWindowHandle);
+                _logger.LogDebug("🔍 [PHASE2.1_DETECTION] ボーダーレス/フルスクリーン検出結果: {IsBorderless}, Handle: {Handle}",
+                    isBorderlessOrFullscreen, chunk.SourceWindowHandle);
+
+                var screenBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
+                    roiBounds,
+                    chunk.SourceWindowHandle,
+                    roiScaleFactor: 1.0f,
+                    isBorderlessOrFullscreen: isBorderlessOrFullscreen);
+
+                _logger.LogDebug("🔥 [COORDINATE_FIX] ROI→Screen変換完了 - ROI:({RoiX},{RoiY},{RoiW}x{RoiH}), Screen:({ScreenX},{ScreenY},{ScreenW}x{ScreenH})",
+                    roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height,
+                    screenBounds.X, screenBounds.Y, screenBounds.Width, screenBounds.Height);
+
+                // 変換後の座標で新しいチャンクインスタンスを作成
+                // AverageConfidenceは計算プロパティのため、TextResultsから自動計算される
+                var chunkWithScreenCoords = new TextChunk
+                {
+                    ChunkId = chunk.ChunkId,
+                    TextResults = chunk.TextResults,
+                    CombinedBounds = screenBounds, // スクリーン絶対座標
+                    CombinedText = chunk.CombinedText,
+                    TranslatedText = chunk.TranslatedText,
+                    SourceWindowHandle = chunk.SourceWindowHandle,
+                    DetectedLanguage = chunk.DetectedLanguage
+                };
+
+                // 🔥 [OVERLAY_FIX] 直接オーバーレイ表示を呼び出し（スクリーン絶対座標使用）
+                await _overlayManager.ShowInPlaceOverlayAsync(chunkWithScreenCoords, CancellationToken.None)
+                    .ConfigureAwait(false);
+
+                DebugLogUtility.WriteLog($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}', Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
+                Console.WriteLine($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}'");
             }
 
-            Console.WriteLine($"✅✅✅ [INDIVIDUAL_TRANSLATION_EVENT] 個別翻訳イベント発行完了 - {nonEmptyChunks.Count}個のオーバーレイ表示");
+            Console.WriteLine($"✅✅✅ [OVERLAY_FIX] オーバーレイ表示完了 - {nonEmptyChunks.Count}個表示");
 
             _logger.LogInformation("✅ [PHASE12.2] バッチ翻訳・個別イベント発行完了 - SessionId: {SessionId}, 翻訳数: {Count}",
                 eventData.SessionId, translationResults.Count);

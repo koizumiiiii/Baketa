@@ -1,7 +1,7 @@
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Baketa.Infrastructure.Services.Coordinates;
+using Baketa.Infrastructure.Platform.Windows.Services; // 🔥 [PHASE2.1_CLEAN_ARCH] Infrastructure.Platformへの移動に伴う修正
 using System;
 using System.Drawing;
 
@@ -249,6 +249,110 @@ public class CoordinateTransformationServiceTests : IDisposable
         Assert.Equal(200, result[0].Y);      // 50 * 4 = 200
         Assert.Equal(400, result[0].Width);  // 100 * 4 = 400
         Assert.Equal(400, result[0].Height); // 100 * 4 = 400
+    }
+
+    // 🔥 [PHASE2.1_TEST] ボーダーレス/フルスクリーン検出機能のテスト
+
+    [Fact]
+    public void DetectBorderlessOrFullscreen_ZeroHandle_ReturnsFalse()
+    {
+        // Arrange
+        var zeroHandle = IntPtr.Zero;
+
+        // Act
+        var result = _service.DetectBorderlessOrFullscreen(zeroHandle);
+
+        // Assert - 無効なハンドルはfalseを返す
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void DetectBorderlessOrFullscreen_ValidHandle_DoesNotThrowException()
+    {
+        // Arrange
+        var handle = new IntPtr(12345); // 実際には存在しないハンドルだが、例外処理をテスト
+
+        // Act & Assert - 例外を投げずに処理を完了することを確認
+        var exception = Record.Exception(() => _service.DetectBorderlessOrFullscreen(handle));
+
+        Assert.Null(exception); // 例外が発生しないことを確認
+    }
+
+    [Theory]
+    [InlineData(true)]  // ボーダーレス/フルスクリーンフラグ有効
+    [InlineData(false)] // ボーダーレス/フルスクリーンフラグ無効
+    public void ConvertRoiToScreenCoordinates_WithBorderlessFlag_ReturnsValidResult(bool isBorderless)
+    {
+        // Arrange
+        var roiBounds = new Rectangle(100, 100, 200, 150);
+        var windowHandle = IntPtr.Zero; // 無効なハンドル（環境依存テスト回避）
+        var scaleFactor = 0.25f;
+
+        // Act
+        var result = _service.ConvertRoiToScreenCoordinates(
+            roiBounds,
+            windowHandle,
+            scaleFactor,
+            isBorderless);
+
+        // Assert - isBorderlessフラグに関わらず、有効な結果が返されることを確認
+        // （実際の座標補正は実環境のウィンドウに依存するため、基本的な妥当性のみ検証）
+        Assert.True(result.Width >= 0);
+        Assert.True(result.Height >= 0);
+
+        // スケーリングが正しく適用されることを確認
+        var inverseScale = 1.0f / scaleFactor;
+        Assert.Equal((int)(roiBounds.Width * inverseScale), result.Width);
+        Assert.Equal((int)(roiBounds.Height * inverseScale), result.Height);
+    }
+
+    [Theory]
+    [InlineData(true)]  // ボーダーレス/フルスクリーンフラグ有効
+    [InlineData(false)] // ボーダーレス/フルスクリーンフラグ無効
+    public void ConvertRoiToScreenCoordinatesBatch_WithBorderlessFlag_ReturnsCorrectCount(bool isBorderless)
+    {
+        // Arrange
+        var rectangles = new[]
+        {
+            new Rectangle(10, 10, 100, 100),
+            new Rectangle(50, 50, 150, 200)
+        };
+        var windowHandle = IntPtr.Zero;
+        var scaleFactor = 0.5f;
+
+        // Act
+        var result = _service.ConvertRoiToScreenCoordinatesBatch(
+            rectangles,
+            windowHandle,
+            scaleFactor,
+            isBorderless);
+
+        // Assert
+        Assert.Equal(rectangles.Length, result.Length);
+
+        // 各要素が適切にスケーリングされていることを確認
+        var inverseScale = 1.0f / scaleFactor;
+        for (int i = 0; i < rectangles.Length; i++)
+        {
+            Assert.Equal((int)(rectangles[i].Width * inverseScale), result[i].Width);
+            Assert.Equal((int)(rectangles[i].Height * inverseScale), result[i].Height);
+        }
+    }
+
+    [Fact]
+    public void ConvertRoiToScreenCoordinates_DefaultBorderlessFlag_UsesFalse()
+    {
+        // Arrange
+        var roiBounds = new Rectangle(100, 100, 200, 200);
+        var windowHandle = IntPtr.Zero;
+        var scaleFactor = 1.0f;
+
+        // Act - isBorderlessOrFullscreenパラメータを省略（デフォルト値 false を使用）
+        var result = _service.ConvertRoiToScreenCoordinates(roiBounds, windowHandle, scaleFactor);
+
+        // Assert - 正常に処理されることを確認
+        Assert.Equal(200, result.Width);
+        Assert.Equal(200, result.Height);
     }
 
     public void Dispose()

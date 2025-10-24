@@ -623,16 +623,23 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
         {
             var bounds = region.Bounds;
 
-            // スケーリング適用
-            if (Math.Abs(scaleFactor - 1.0) > 0.001)
-            {
-                bounds = new Rectangle(
-                    (int)Math.Round(bounds.X / scaleFactor),
-                    (int)Math.Round(bounds.Y / scaleFactor),
-                    (int)Math.Round(bounds.Width / scaleFactor),
-                    (int)Math.Round(bounds.Height / scaleFactor)
-                );
-            }
+            // 🔥 [PHASE2.1_FIX] スケーリング処理を削除
+            // 根本原因: PaddleOCRは縮小画像で処理しても、元の画像サイズベースの座標を返す
+            // 証拠: 縮小画像サイズ1885x1061に対して、X=2505などの座標を返している
+            // /scaleFactorを適用すると座標が2倍以上に膨張し、画面外になる
+            // 例: X=2505 / 0.49 = 5112 > モニター幅3840
+            // → スケーリング処理は不要（PaddleOCRが既に自動スケーリング済み）
+
+            // スケーリング適用（削除）
+            // if (Math.Abs(scaleFactor - 1.0) > 0.001)
+            // {
+            //     bounds = new Rectangle(
+            //         (int)Math.Round(bounds.X / scaleFactor),
+            //         (int)Math.Round(bounds.Y / scaleFactor),
+            //         (int)Math.Round(bounds.Width / scaleFactor),
+            //         (int)Math.Round(bounds.Height / scaleFactor)
+            //     );
+            // }
 
             // ROI座標調整
             if (roi.HasValue)

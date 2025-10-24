@@ -22,7 +22,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
     private readonly IOcrEngine _fallbackOcrEngine;
     private readonly ILogger<BatchOcrIntegrationService>? _logger;
     private readonly IResourceManager _resourceManager;
-    
+
     private readonly SemaphoreSlim _processingSemaphore;
     private bool _disposed;
 
@@ -36,7 +36,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
         _fallbackOcrEngine = fallbackOcrEngine ?? throw new ArgumentNullException(nameof(fallbackOcrEngine));
         _resourceManager = resourceManager ?? throw new ArgumentNullException(nameof(resourceManager));
         _logger = logger;
-        
+
         // 並列処理制限（CPUコア数に基づく）- HybridResourceManagerでの制御に段階的移行予定
         var maxConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
         _processingSemaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);

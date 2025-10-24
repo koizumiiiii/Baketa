@@ -623,10 +623,36 @@ namespace Baketa.UI;
             Console.WriteLine("🔥 [CONFIG_FIX] TimedAggregatorSettings登録完了 - appsettings.jsonから読み込み");
 
             // ロギングの設定
-            services.AddLogging(builder => 
+            services.AddLogging(builder =>
             {
+                // 🔥 [OPTION_C] appsettings.jsonのLogging設定を適用
+                builder.AddConfiguration(configuration.GetSection("Logging"));
+
+                // コンソール出力
                 builder.AddConsole();
-                
+
+                // デバッグ出力（Visual Studio Output window）
+                builder.AddDebug();
+
+                // 🔥 [OPTION_C] カスタムファイルロガーの追加
+                // debug_app_logs.txtにILoggerの出力を記録
+                var debugLogPath = Path.Combine(baseDirectory, "debug_app_logs.txt");
+
+                try
+                {
+                    var customProvider = new Baketa.UI.Utils.CustomFileLoggerProvider(debugLogPath);
+                    builder.AddProvider(customProvider);
+                    Console.WriteLine($"✅ [LOGGING_FIX] CustomFileLoggerProvider登録完了 - Path: {debugLogPath}");
+
+                    // 診断: 即座にテストログを出力
+                    Baketa.UI.Utils.SafeFileLogger.AppendLog(debugLogPath, $"=== CustomFileLoggerProvider Test Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ [LOGGING_FIX] CustomFileLoggerProvider登録失敗: {ex.Message}");
+                    Console.WriteLine($"❌ [LOGGING_FIX] StackTrace: {ex.StackTrace}");
+                }
+
                 // 環境に応じたログレベル設定
                 if (environment == BaketaEnvironment.Development)
                 {

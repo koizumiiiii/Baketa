@@ -70,12 +70,12 @@ public sealed class BatchOcrModule : ServiceModuleBase
             var fallbackOcrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
             var resourceManager = serviceProvider.GetRequiredService<Baketa.Infrastructure.ResourceManagement.IResourceManager>();
             var logger = serviceProvider.GetService<ILogger<BatchOcrIntegrationService>>();
-            
+
             Console.WriteLine($"🔧 [BATCH-INTEGRATION-DI] BatchOcrIntegrationService依存関係確認:");
             Console.WriteLine($"   - BatchOcrProcessor: {batchOcrProcessor != null}");
             Console.WriteLine($"   - FallbackOcrEngine: {fallbackOcrEngine != null}");
             Console.WriteLine($"   - HybridResourceManager: {resourceManager != null}");
-            
+
             return new BatchOcrIntegrationService(batchOcrProcessor, fallbackOcrEngine, resourceManager, logger);
         });
     }

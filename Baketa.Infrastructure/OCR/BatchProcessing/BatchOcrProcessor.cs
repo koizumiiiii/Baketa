@@ -1126,7 +1126,7 @@ public sealed class BatchOcrProcessor(
 
                 // チャンクのバウンディングボックス計算
                 var combinedBounds = CalculateCombinedBounds(groupedRegions);
-                
+
                 // 座標情報ベースの改行処理を適用
                 var rawCombinedText = CombineTextsIntelligently(groupedRegions, ocrResults.LanguageCode);
                 var positionedTextChunks = positionedResults.Select(r => new TextChunk

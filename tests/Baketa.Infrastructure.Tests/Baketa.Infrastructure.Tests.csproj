@@ -42,6 +42,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Baketa.Core\Baketa.Core.csproj" />
     <ProjectReference Include="..\..\Baketa.Infrastructure\Baketa.Infrastructure.csproj" />
+    <!-- 🔥 [PHASE2.1_CLEAN_ARCH] CoordinateTransformationService移動に伴う参照追加 -->
+    <ProjectReference Include="..\..\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj" />
   </ItemGroup>
 
   <!-- 重要: テストで必要なPaddleOCR依存関係を明示的に追加（最新バージョンに統合） -->
