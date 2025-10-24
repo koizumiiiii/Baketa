@@ -1,4 +1,4 @@
-using Baketa.Core.Abstractions.Processing;
+﻿using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
 using Baketa.Core.Abstractions.Capture; // 🎯 UltraThink: ITextRegionDetector用
@@ -300,7 +300,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                                 region.X, region.Y, region.Width, region.Height);
 
                             // 🎯 [OCR_DEBUG_LOG] ROI領域情報をデバッグログに出力
-                            DebugLogUtility.WriteLog($"🔍 [ROI_OCR] 領域OCR開始 - 座標=({region.X},{region.Y}), サイズ=({region.Width}x{region.Height})");
+                            _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR開始 - 座標=({region.X},{region.Y}), サイズ=({region.Width}x{region.Height})");
 
                             var regionOcrResults = await _ocrEngine.RecognizeAsync(
                                 ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用でObjectDisposedException回避
@@ -316,23 +316,23 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                                     allTextChunks.AddRange(regionOcrResults.TextRegions.Cast<object>());
 
                                     // 🎯 [OCR_DEBUG_LOG] 領域OCR結果をデバッグログに出力
-                                    DebugLogUtility.WriteLog($"🔍 [ROI_OCR] 領域OCR成功 - テキスト='{regionText}', チャンク数={regionOcrResults.TextRegions.Count}");
+                                    _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR成功 - テキスト='{regionText}', チャンク数={regionOcrResults.TextRegions.Count}");
                                 }
                                 else
                                 {
-                                    DebugLogUtility.WriteLog($"🔍 [ROI_OCR] 領域OCR結果 - 空文字列");
+                                    _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR結果 - 空文字列");
                                 }
                             }
                             else
                             {
-                                DebugLogUtility.WriteLog($"🔍 [ROI_OCR] 領域OCR結果 - テキスト領域なし");
+                                _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR結果 - テキスト領域なし");
                             }
                         }
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "🎯 UltraThink: 領域({X},{Y},{Width},{Height})のOCR処理でエラー - スキップ",
                                 region.X, region.Y, region.Width, region.Height);
-                            DebugLogUtility.WriteLog($"🔍 [ROI_OCR] 領域OCRエラー - 座標=({region.X},{region.Y}), エラー={ex.Message}");
+                            _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCRエラー - 座標=({region.X},{region.Y}), エラー={ex.Message}");
                         }
                     }
                     
@@ -355,7 +355,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                             context.Input.CaptureRegion.Width, context.Input.CaptureRegion.Height);
 
                         // 🎯 [OCR_DEBUG_LOG] 領域指定OCR実行をデバッグログに出力
-                        DebugLogUtility.WriteLog($"🔍 [REGION_OCR] 領域指定OCR開始 - 座標=({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y}), サイズ=({context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})");
+                        _logger?.LogDebug($"🔍 [REGION_OCR] 領域指定OCR開始 - 座標=({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y}), サイズ=({context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})");
 
                         ocrResults = await _ocrEngine.RecognizeAsync(
                             ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用
@@ -369,7 +369,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                             ocrImage.Width, ocrImage.Height);
 
                         // 🎯 [OCR_DEBUG_LOG] 全体画像OCR実行をデバッグログに出力
-                        DebugLogUtility.WriteLog($"🔍 [FULL_OCR] 全体画像OCR開始 - サイズ=({ocrImage.Width}x{ocrImage.Height})");
+                        _logger?.LogDebug($"🔍 [FULL_OCR] 全体画像OCR開始 - サイズ=({ocrImage.Width}x{ocrImage.Height})");
 
                         ocrResults = await _ocrEngine.RecognizeAsync(
                             ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用
@@ -403,13 +403,13 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             // 🎯 [OCR_DEBUG_LOG] OCR認識結果をデバッグログファイルに出力
             try
             {
-                DebugLogUtility.WriteLog($"📝 [OCR_RESULT] 認識完了 - 処理時間: {stopwatch.ElapsedMilliseconds}ms");
-                DebugLogUtility.WriteLog($"📝 [OCR_RESULT] 検出テキスト: '{detectedText}'");
-                DebugLogUtility.WriteLog($"📝 [OCR_RESULT] テキスト長: {detectedText.Length}文字");
+                _logger?.LogDebug($"📝 [OCR_RESULT] 認識完了 - 処理時間: {stopwatch.ElapsedMilliseconds}ms");
+                _logger?.LogDebug($"📝 [OCR_RESULT] 検出テキスト: '{detectedText}'");
+                _logger?.LogDebug($"📝 [OCR_RESULT] テキスト長: {detectedText.Length}文字");
 
                 if (textChunks.Count > 0)
                 {
-                    DebugLogUtility.WriteLog($"📝 [OCR_RESULT] 検出チャンク数: {textChunks.Count}");
+                    _logger?.LogDebug($"📝 [OCR_RESULT] 検出チャンク数: {textChunks.Count}");
 
                     // テキストチャンクごとの詳細情報を出力
                     for (int i = 0; i < Math.Min(textChunks.Count, 10); i++) // 最大10個まで
@@ -417,28 +417,28 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         var chunk = textChunks[i];
                         if (chunk is Baketa.Core.Abstractions.OCR.TextRegion textRegion)
                         {
-                            DebugLogUtility.WriteLog($"📝 [OCR_RESULT] チャンク{i + 1}: テキスト='{textRegion.Text}', " +
+                            _logger?.LogDebug($"📝 [OCR_RESULT] チャンク{i + 1}: テキスト='{textRegion.Text}', " +
                                 $"座標=({textRegion.Bounds.X},{textRegion.Bounds.Y}), " +
                                 $"サイズ=({textRegion.Bounds.Width}x{textRegion.Bounds.Height}), " +
                                 $"信頼度={textRegion.Confidence:F3}");
                         }
                         else
                         {
-                            DebugLogUtility.WriteLog($"📝 [OCR_RESULT] チャンク{i + 1}: {chunk}");
+                            _logger?.LogDebug($"📝 [OCR_RESULT] チャンク{i + 1}: {chunk}");
                         }
                     }
 
                     if (textChunks.Count > 10)
                     {
-                        DebugLogUtility.WriteLog($"📝 [OCR_RESULT] ... (残り{textChunks.Count - 10}個のチャンクは省略)");
+                        _logger?.LogDebug($"📝 [OCR_RESULT] ... (残り{textChunks.Count - 10}個のチャンクは省略)");
                     }
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog("📝 [OCR_RESULT] テキストチャンクなし");
+                    _logger?.LogDebug("📝 [OCR_RESULT] テキストチャンクなし");
                 }
 
-                DebugLogUtility.WriteLog("📝 [OCR_RESULT] ==========================================");
+                _logger?.LogDebug("📝 [OCR_RESULT] ==========================================");
             }
             catch (Exception logEx)
             {
@@ -531,7 +531,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         _logger.LogInformation("🔧 [TRANSLATION_FIX] OCR結果を翻訳パイプラインに送信 - ChunkId: {ChunkId}, テキスト長: {Length}, 送信成功: {Added}",
                             textChunk.ChunkId, detectedText.Length, added);
 
-                        DebugLogUtility.WriteLog($"🔧 [TRANSLATION_FIX] 翻訳パイプライン送信 - ChunkId: {textChunk.ChunkId}, テキスト: '{detectedText.Substring(0, Math.Min(50, detectedText.Length))}...', 成功: {added}");
+                        _logger?.LogDebug($"🔧 [TRANSLATION_FIX] 翻訳パイプライン送信 - ChunkId: {textChunk.ChunkId}, テキスト: '{detectedText.Substring(0, Math.Min(50, detectedText.Length))}...', 成功: {added}");
                     }
                 }
                 catch (Exception ex)
@@ -603,7 +603,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         try
         {
             // 🎯 [ROI_IMAGE_SAVE] IImage.ToByteArrayAsync()を使用してBitmapに変換
-            DebugLogUtility.WriteLog($"🖼️ [ROI_IMAGE_SAVE] 画像変換開始 - テキスト領域数: {textChunks.Count}");
+            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] 画像変換開始 - テキスト領域数: {textChunks.Count}");
 
             var imageBytes = await ocrImage.ToByteArrayAsync().ConfigureAwait(false);
 
@@ -652,9 +652,9 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             bitmap.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
 
             // デバッグログ出力
-            DebugLogUtility.WriteLog($"🖼️ [ROI_IMAGE_SAVE] ROI画像保存成功 - ファイル: {fileName}");
-            DebugLogUtility.WriteLog($"🖼️ [ROI_IMAGE_SAVE] テキスト領域数: {regionCount}, 画像サイズ: {bitmap.Width}x{bitmap.Height}");
-            DebugLogUtility.WriteLog($"🖼️ [ROI_IMAGE_SAVE] 保存先: {filePath}");
+            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] ROI画像保存成功 - ファイル: {fileName}");
+            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] テキスト領域数: {regionCount}, 画像サイズ: {bitmap.Width}x{bitmap.Height}");
+            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] 保存先: {filePath}");
 
             _logger.LogInformation("🎯 [ROI_IMAGE_SAVE] ROI画像保存完了 - ファイル: {FileName}, 領域数: {RegionCount}",
                 fileName, regionCount);
@@ -662,7 +662,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         catch (Exception ex)
         {
             _logger.LogError(ex, "🎯 [ROI_IMAGE_SAVE] ROI画像保存でエラー");
-            DebugLogUtility.WriteLog($"❌ [ROI_IMAGE_SAVE] ROI画像保存エラー: {ex.Message}");
+            _logger?.LogDebug($"❌ [ROI_IMAGE_SAVE] ROI画像保存エラー: {ex.Message}");
         }
     }
 }

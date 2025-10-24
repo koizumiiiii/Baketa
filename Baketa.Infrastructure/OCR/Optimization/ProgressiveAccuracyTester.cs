@@ -25,7 +25,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// </summary>
     public async Task<ProgressiveTestResults> RunProgressiveTestAsync(CancellationToken cancellationToken = default)
     {
-        DebugLogUtility.WriteLog("🧪 段階的精度改善テスト開始");
+        Console.WriteLine("🧪 段階的精度改善テスト開始");
 
         if (!File.Exists(_testImagePath))
         {
@@ -46,31 +46,31 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         };
 
         // 1. ベースライン（現在の前処理）
-        DebugLogUtility.WriteLog("📊 ベースライン測定開始");
+        Console.WriteLine("📊 ベースライン測定開始");
         var baselineResult = await TestPreprocessingMethod(originalImage, "ベースライン（PP-OCRv5標準）", 
             image => PPOCRv5Preprocessor.ProcessGameImageForV5(image), cancellationToken).ConfigureAwait(false);
         results.BaselineResult = baselineResult;
 
         // 2. 小さなテキスト強化
-        DebugLogUtility.WriteLog("📊 小さなテキスト強化テスト開始");
+        Console.WriteLine("📊 小さなテキスト強化テスト開始");
         var smallTextResult = await TestPreprocessingMethod(originalImage, "小さなテキスト強化", 
             image => EnhanceSmallText(image), cancellationToken).ConfigureAwait(false);
         results.SmallTextResult = smallTextResult;
 
         // 3. 漢字認識強化
-        DebugLogUtility.WriteLog("📊 漢字認識強化テスト開始");
+        Console.WriteLine("📊 漢字認識強化テスト開始");
         var kanjiResult = await TestPreprocessingMethod(originalImage, "漢字認識強化", 
             image => OptimizeForKanji(image), cancellationToken).ConfigureAwait(false);
         results.KanjiResult = kanjiResult;
 
         // 4. 低コントラスト改善
-        DebugLogUtility.WriteLog("📊 低コントラスト改善テスト開始");
+        Console.WriteLine("📊 低コントラスト改善テスト開始");
         var contrastResult = await TestPreprocessingMethod(originalImage, "低コントラスト改善", 
             image => ImproveContrast(image), cancellationToken).ConfigureAwait(false);
         results.ContrastResult = contrastResult;
 
         // 5. 全手法統合
-        DebugLogUtility.WriteLog("📊 全手法統合テスト開始");
+        Console.WriteLine("📊 全手法統合テスト開始");
         var combinedResult = await TestPreprocessingMethod(originalImage, "全手法統合", 
             image => ApplyCombinedOptimizations(image), cancellationToken).ConfigureAwait(false);
         results.CombinedResult = combinedResult;
@@ -81,7 +81,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         // 結果レポート生成
         await GenerateProgressiveReportAsync(results).ConfigureAwait(false);
 
-        DebugLogUtility.WriteLog($"✅ 段階的精度改善テスト完了: 総時間 {results.TotalTestDuration.TotalSeconds:F1}秒");
+        Console.WriteLine($"✅ 段階的精度改善テスト完了: 総時間 {results.TotalTestDuration.TotalSeconds:F1}秒");
         return results;
     }
 
@@ -98,18 +98,18 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         
         try
         {
-            DebugLogUtility.WriteLog($"   🔧 {methodName} 前処理開始");
+            Console.WriteLine($"   🔧 {methodName} 前処理開始");
             
             // 前処理実行
             using var processedImage = preprocessingMethod(originalImage);
             var preprocessingTime = stopwatch.ElapsedMilliseconds;
             
-            DebugLogUtility.WriteLog($"   ✅ {methodName} 前処理完了: {preprocessingTime}ms");
+            Console.WriteLine($"   ✅ {methodName} 前処理完了: {preprocessingTime}ms");
             
             // 前処理完了
             
             // OCR実行
-            DebugLogUtility.WriteLog($"   🤖 {methodName} OCR実行開始");
+            Console.WriteLine($"   🤖 {methodName} OCR実行開始");
             var ocrResults = await ExecuteOcrAsync(processedImage, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
             
@@ -117,8 +117,8 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             var textRegionCount = ocrResults.Count;
             var avgConfidence = ocrResults.Count > 0 ? ocrResults.Average(r => r.Confidence) : 0.0;
             
-            DebugLogUtility.WriteLog($"   ✅ {methodName} OCR完了: {textRegionCount}領域, 平均信頼度 {avgConfidence:F3}");
-            DebugLogUtility.WriteLog($"   📝 認識テキスト: {recognizedText[..Math.Min(100, recognizedText.Length)]}...");
+            Console.WriteLine($"   ✅ {methodName} OCR完了: {textRegionCount}領域, 平均信頼度 {avgConfidence:F3}");
+            Console.WriteLine($"   📝 認識テキスト: {recognizedText[..Math.Min(100, recognizedText.Length)]}...");
             
             return new ProcessingTestResult
             {
@@ -136,7 +136,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         catch (Exception ex)
         {
             stopwatch.Stop();
-            DebugLogUtility.WriteLog($"   ❌ {methodName} テストエラー: {ex.Message}");
+            Console.WriteLine($"   ❌ {methodName} テストエラー: {ex.Message}");
             
             return new ProcessingTestResult
             {
@@ -153,7 +153,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// </summary>
     private Mat EnhanceSmallText(Mat input)
     {
-        DebugLogUtility.WriteLog($"      🔍 小さなテキスト強化処理開始");
+        Console.WriteLine($"      🔍 小さなテキスト強化処理開始");
         
         var output = new Mat();
         
@@ -189,12 +189,12 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height), 
                        interpolation: InterpolationFlags.Area);
             
-            DebugLogUtility.WriteLog($"      ✅ 小さなテキスト強化完了");
+            Console.WriteLine($"      ✅ 小さなテキスト強化完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"      ❌ 小さなテキスト強化エラー: {ex.Message}");
+            Console.WriteLine($"      ❌ 小さなテキスト強化エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -206,7 +206,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// </summary>
     private Mat OptimizeForKanji(Mat input)
     {
-        DebugLogUtility.WriteLog($"      🔍 漢字認識最適化処理開始");
+        Console.WriteLine($"      🔍 漢字認識最適化処理開始");
         
         var output = new Mat();
         
@@ -270,12 +270,12 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             // 3. 縦横線を統合
             Cv2.AddWeighted(horizontalEnhanced, 0.5, verticalEnhanced, 0.5, 0, output);
             
-            DebugLogUtility.WriteLog($"      ✅ 漢字認識最適化完了");
+            Console.WriteLine($"      ✅ 漢字認識最適化完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"      ❌ 漢字認識最適化エラー: {ex.Message}");
+            Console.WriteLine($"      ❌ 漢字認識最適化エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -287,7 +287,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// </summary>
     private Mat ImproveContrast(Mat input)
     {
-        DebugLogUtility.WriteLog($"      🔍 低コントラスト改善処理開始");
+        Console.WriteLine($"      🔍 低コントラスト改善処理開始");
         
         var output = new Mat();
         
@@ -336,12 +336,12 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
                 result.Dispose();
             }
             
-            DebugLogUtility.WriteLog($"      ✅ 低コントラスト改善完了");
+            Console.WriteLine($"      ✅ 低コントラスト改善完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"      ❌ 低コントラスト改善エラー: {ex.Message}");
+            Console.WriteLine($"      ❌ 低コントラスト改善エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -353,7 +353,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// </summary>
     private Mat ApplyCombinedOptimizations(Mat input)
     {
-        DebugLogUtility.WriteLog($"      🔍 全手法統合処理開始");
+        Console.WriteLine($"      🔍 全手法統合処理開始");
         
         try
         {
@@ -366,12 +366,12 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             // 3. 小さなテキスト強化
             var smallTextEnhanced = EnhanceSmallText(kanjiOptimized);
             
-            DebugLogUtility.WriteLog($"      ✅ 全手法統合完了");
+            Console.WriteLine($"      ✅ 全手法統合完了");
             return smallTextEnhanced;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"      ❌ 全手法統合エラー: {ex.Message}");
+            Console.WriteLine($"      ❌ 全手法統合エラー: {ex.Message}");
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;
@@ -461,7 +461,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         }
 
         await File.WriteAllTextAsync(reportPath, report.ToString()).ConfigureAwait(false);
-        DebugLogUtility.WriteLog($"📊 段階的効果測定レポート生成: {reportPath}");
+        Console.WriteLine($"📊 段階的効果測定レポート生成: {reportPath}");
     }
 }
 

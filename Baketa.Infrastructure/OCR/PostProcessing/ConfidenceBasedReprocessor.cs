@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -286,7 +286,7 @@ public sealed class ConfidenceBasedReprocessor(
             // 1. 画像の有効性を事前確認
             if (!IsImageValid(originalImage))
             {
-                DebugLogUtility.WriteLog($"画像有効性チェック失敗: チャンク#{originalChunk.ChunkId}の再処理をスキップ");
+                _logger?.LogDebug($"画像有効性チェック失敗: チャンク#{originalChunk.ChunkId}の再処理をスキップ");
                 return originalChunk;
             }
             
@@ -541,7 +541,7 @@ public sealed class ConfidenceBasedReprocessor(
     {
         if (image == null)
         {
-            DebugLogUtility.WriteLog("IsImageValid: 画像がnull");
+            _logger?.LogDebug("IsImageValid: 画像がnull");
             return false;
         }
         
@@ -553,26 +553,26 @@ public sealed class ConfidenceBasedReprocessor(
             
             if (width <= 0 || height <= 0)
             {
-                DebugLogUtility.WriteLog($"IsImageValid: 無効な画像サイズ {width}x{height}");
+                _logger?.LogDebug($"IsImageValid: 無効な画像サイズ {width}x{height}");
                 return false;
             }
             
-            DebugLogUtility.WriteLog($"IsImageValid: 画像有効 {width}x{height}");
+            _logger?.LogDebug($"IsImageValid: 画像有効 {width}x{height}");
             return true;
         }
         catch (ObjectDisposedException ex)
         {
-            DebugLogUtility.WriteLog($"IsImageValid: 画像が破棄済み {ex.Message}");
+            _logger?.LogDebug($"IsImageValid: 画像が破棄済み {ex.Message}");
             return false;
         }
         catch (InvalidOperationException ex)
         {
-            DebugLogUtility.WriteLog($"IsImageValid: 画像が無効状態 {ex.Message}");
+            _logger?.LogDebug($"IsImageValid: 画像が無効状態 {ex.Message}");
             return false;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"IsImageValid: 未知のエラー {ex.Message}");
+            _logger?.LogDebug($"IsImageValid: 未知のエラー {ex.Message}");
             return false;
         }
     }
@@ -602,14 +602,14 @@ public sealed class ConfidenceBasedReprocessor(
 
             var expandedBounds = new System.Drawing.Rectangle(expandedX, expandedY, expandedWidth, expandedHeight);
             
-            DebugLogUtility.WriteLog($"領域拡張: {originalBounds} → {expandedBounds} (画像: {image.Width}x{image.Height})");
+            _logger?.LogDebug($"領域拡張: {originalBounds} → {expandedBounds} (画像: {image.Width}x{image.Height})");
             
             return expandedBounds;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "画像の領域拡張中にエラーが発生しました");
-            DebugLogUtility.WriteLog($"領域拡張エラー: {ex.Message}");
+            _logger?.LogDebug($"領域拡張エラー: {ex.Message}");
             return originalBounds;
         }
     }

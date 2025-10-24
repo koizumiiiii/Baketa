@@ -24,15 +24,15 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
     /// </summary>
     public async Task<OptimalParameters> FindOptimalParametersAsync(CancellationToken cancellationToken = default)
     {
-        DebugLogUtility.WriteLog("🔍 パラメータ最適化開始");
+        Console.WriteLine("🔍 パラメータ最適化開始");
 
         // 1. 正解データセットを読み込み
         var dataset = await LoadGroundTruthDatasetAsync().ConfigureAwait(false);
-        DebugLogUtility.WriteLog($"📚 正解データセット読み込み完了: {dataset.Count}件");
+        Console.WriteLine($"📚 正解データセット読み込み完了: {dataset.Count}件");
 
         // 2. グリッドサーチ用パラメータ範囲を定義
         var parameterGrid = GenerateParameterGrid();
-        DebugLogUtility.WriteLog($"🎯 テスト対象パラメータ組み合わせ: {parameterGrid.Count}通り");
+        Console.WriteLine($"🎯 テスト対象パラメータ組み合わせ: {parameterGrid.Count}通り");
 
         var results = new List<OptimizationResult>();
 
@@ -41,25 +41,25 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         foreach (var config in parameterGrid)
         {
             tested++;
-            DebugLogUtility.WriteLog($"⚙️ パラメータテスト {tested}/{parameterGrid.Count}: {config}");
+            Console.WriteLine($"⚙️ パラメータテスト {tested}/{parameterGrid.Count}: {config}");
 
             try
             {
                 var accuracy = await EvaluateParameterConfigurationAsync(dataset, config, cancellationToken).ConfigureAwait(false);
                 results.Add(new OptimizationResult(config, accuracy));
 
-                DebugLogUtility.WriteLog($"✅ 精度測定完了: {accuracy:F3}");
+                Console.WriteLine($"✅ 精度測定完了: {accuracy:F3}");
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"❌ パラメータテストエラー: {ex.Message}");
+                Console.WriteLine($"❌ パラメータテストエラー: {ex.Message}");
             }
         }
 
         // 4. 最高精度の設定を選択
         var bestResult = results.OrderByDescending(r => r.Accuracy).First();
-        DebugLogUtility.WriteLog($"🏆 最適パラメータ発見: 精度 {bestResult.Accuracy:F3}");
-        DebugLogUtility.WriteLog($"🏆 最適設定: {bestResult.Configuration}");
+        Console.WriteLine($"🏆 最適パラメータ発見: 精度 {bestResult.Accuracy:F3}");
+        Console.WriteLine($"🏆 最適設定: {bestResult.Configuration}");
 
         // 5. 結果レポートを生成
         await GenerateOptimizationReportAsync(results, bestResult).ConfigureAwait(false);
@@ -150,7 +150,7 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
 
                 if (image.Empty())
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 画像読み込み失敗: {imagePath}");
+                    Console.WriteLine($"⚠️ 画像読み込み失敗: {imagePath}");
                     continue;
                 }
 
@@ -166,11 +166,11 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
                 totalAccuracy += accuracy;
                 validTests++;
 
-                DebugLogUtility.WriteLog($"   📊 {entry.ImagePath}: 精度 {accuracy:F3} (認識: '{recognizedText}' / 正解: '{entry.GroundTruthText}')");
+                Console.WriteLine($"   📊 {entry.ImagePath}: 精度 {accuracy:F3} (認識: '{recognizedText}' / 正解: '{entry.GroundTruthText}')");
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"❌ テスト実行エラー {entry.ImagePath}: {ex.Message}");
+                Console.WriteLine($"❌ テスト実行エラー {entry.ImagePath}: {ex.Message}");
             }
         }
 
@@ -382,7 +382,7 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
 ";
 
         await File.WriteAllTextAsync(reportPath, report).ConfigureAwait(false);
-        DebugLogUtility.WriteLog($"📊 最適化レポート生成完了: {reportPath}");
+        Console.WriteLine($"📊 最適化レポート生成完了: {reportPath}");
     }
 
     private double CalculateStandardDeviation(IEnumerable<double> values)

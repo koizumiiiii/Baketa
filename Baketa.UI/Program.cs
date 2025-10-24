@@ -1166,27 +1166,27 @@ namespace Baketa.UI;
             
             // 🚀 NEW ARCHITECTURE: TimedAggregatorModule登録（完全自律型設定システム）
             Console.WriteLine("🔧 TimedAggregatorModule登録開始（新設計）");
-            DebugLogUtility.WriteLog("🔧 [PHASE12.2_DIAG] TimedAggregatorModule登録開始 - Program.cs:1181");
+            Console.WriteLine("🔧 [PHASE12.2_DIAG] TimedAggregatorModule登録開始 - Program.cs:1181");
 
             try
             {
-                DebugLogUtility.WriteLog("🔧 [PHASE12.2_DIAG] new TimedAggregatorModule() 実行直前");
+                Console.WriteLine("🔧 [PHASE12.2_DIAG] new TimedAggregatorModule() 実行直前");
                 var timedAggregatorModule = new Baketa.Infrastructure.DI.Modules.TimedAggregatorModule();
-                DebugLogUtility.WriteLog($"✅ [PHASE12.2_DIAG] TimedAggregatorModule インスタンス作成完了: {timedAggregatorModule != null}");
+                Console.WriteLine($"✅ [PHASE12.2_DIAG] TimedAggregatorModule インスタンス作成完了: {timedAggregatorModule != null}");
 
-                DebugLogUtility.WriteLog("🔧 [PHASE12.2_DIAG] RegisterServices() 実行直前");
+                Console.WriteLine("🔧 [PHASE12.2_DIAG] RegisterServices() 実行直前");
                 timedAggregatorModule.RegisterServices(services);
-                DebugLogUtility.WriteLog("✅ [PHASE12.2_DIAG] RegisterServices() 実行完了");
+                Console.WriteLine("✅ [PHASE12.2_DIAG] RegisterServices() 実行完了");
 
                 registeredModules.Add(typeof(Baketa.Infrastructure.DI.Modules.TimedAggregatorModule));
                 Console.WriteLine("✅ TimedAggregatorModule登録完了 - 自律型設定システム統合済み");
-                DebugLogUtility.WriteLog("✅ [PHASE12.2_DIAG] TimedAggregatorModule登録完全完了");
+                Console.WriteLine("✅ [PHASE12.2_DIAG] TimedAggregatorModule登録完全完了");
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"❌ [PHASE12.2_DIAG] TimedAggregatorModule登録失敗: {ex.GetType().Name}");
-                DebugLogUtility.WriteLog($"❌ [PHASE12.2_DIAG] Exception Message: {ex.Message}");
-                DebugLogUtility.WriteLog($"❌ [PHASE12.2_DIAG] StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"❌ [PHASE12.2_DIAG] TimedAggregatorModule登録失敗: {ex.GetType().Name}");
+                Console.WriteLine($"❌ [PHASE12.2_DIAG] Exception Message: {ex.Message}");
+                Console.WriteLine($"❌ [PHASE12.2_DIAG] StackTrace: {ex.StackTrace}");
                 throw; // 例外を再スローして明確に失敗させる
             }
             

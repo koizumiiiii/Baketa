@@ -14,7 +14,7 @@ public static class UltraHighAccuracyPreprocessor
     /// </summary>
     public static Mat ProcessForUltraAccuracy(Mat input)
     {
-        DebugLogUtility.WriteLog("🎯 超高精度前処理開始");
+        Console.WriteLine("🎯 超高精度前処理開始");
         
         try
         {
@@ -36,12 +36,12 @@ public static class UltraHighAccuracyPreprocessor
             // 6. 最終シャープネス調整
             var final = FinalSharpnessOptimization(japanese);
             
-            DebugLogUtility.WriteLog("✅ 超高精度前処理完了");
+            Console.WriteLine("✅ 超高精度前処理完了");
             return final;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 超高精度前処理エラー: {ex.Message}");
+            Console.WriteLine($"❌ 超高精度前処理エラー: {ex.Message}");
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;
@@ -271,7 +271,7 @@ public static class UltraHighAccuracyPreprocessor
     /// </summary>
     public static Mat ProcessForPerfectAccuracy(Mat input)
     {
-        DebugLogUtility.WriteLog("🎯 100%精度前処理開始");
+        Console.WriteLine("🎯 100%精度前処理開始");
         
         try
         {
@@ -281,12 +281,12 @@ public static class UltraHighAccuracyPreprocessor
             // 2. 超高精度特化処理
             var ultraProcessed = ProcessForUltraAccuracy(v5Optimized);
             
-            DebugLogUtility.WriteLog("✅ 100%精度前処理完了");
+            Console.WriteLine("✅ 100%精度前処理完了");
             return ultraProcessed;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 100%精度前処理エラー: {ex.Message}");
+            Console.WriteLine($"❌ 100%精度前処理エラー: {ex.Message}");
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;

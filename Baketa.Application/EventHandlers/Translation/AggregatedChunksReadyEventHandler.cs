@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -73,12 +73,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         try
         {
             Console.WriteLine($"🔍 [STOP_CLEANUP_DEBUG] メソッド開始 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
-            DebugLogUtility.WriteLog($"🔍 [STOP_CLEANUP_DEBUG] メソッド開始 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"💥 [STOP_CLEANUP_DEBUG] Console.WriteLine失敗: {ex.GetType().Name} - {ex.Message}");
-            DebugLogUtility.WriteLog($"💥 [STOP_CLEANUP_DEBUG] Console.WriteLine失敗: {ex.GetType().Name} - {ex.Message}");
         }
 
         // セマフォが既に取得されている場合（CurrentCount == 0）のみリセット
@@ -88,7 +86,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             {
                 _translationExecutionSemaphore.Release();
                 Console.WriteLine("🔓 [STOP_CLEANUP] セマフォ強制解放完了 - Stop時クリーンアップ");
-                DebugLogUtility.WriteLog("🔓 [STOP_CLEANUP] セマフォ強制解放完了 - Stop時クリーンアップ");
             }
             catch (SemaphoreFullException)
             {
@@ -116,7 +113,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 eventData.SessionId);
 
             // 🔥 [GEMINI_FEEDBACK] UI/UXフィードバック強化
-            DebugLogUtility.WriteLog($"⏳ [PHASE1] 翻訳スキップ - 別の翻訳実行中（SessionId: {eventData.SessionId}）");
+            _logger?.LogDebug($"⏳ [PHASE1] 翻訳スキップ - 別の翻訳実行中（SessionId: {eventData.SessionId}）");
             Console.WriteLine($"⏳ [PHASE1] 翻訳スキップ - 別の翻訳実行中（SessionId: {eventData.SessionId}）");
 
             return; // 早期リターン - イベント破棄
@@ -124,12 +121,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
         // 🔥 [PHASE12.2_NEW_ARCH] Gemini推奨の見える化ログ
         Console.WriteLine($"✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
-        DebugLogUtility.WriteLog($"✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
+        _logger?.LogDebug($"✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
 
         try
         {
             // 🔥 確実なログ出力（ファイル直接書き込み）
-            DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.2_HANDLER] HandleAsync tryブロック開始 - SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
+            _logger?.LogDebug($"🔥🔥🔥 [PHASE12.2_HANDLER] HandleAsync tryブロック開始 - SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
             Console.WriteLine($"🔥🔥🔥 [PHASE12.2_HANDLER] HandleAsync tryブロック開始 - SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
 
             _logger.LogInformation("🔥 [PHASE12.2] 集約チャンク受信 - {Count}個, SessionId: {SessionId}",
@@ -157,28 +154,28 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             }
 
             // バッチ翻訳実行
-            DebugLogUtility.WriteLog($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
+            _logger?.LogDebug($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
             Console.WriteLine($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
 
             var translationResults = await ExecuteBatchTranslationAsync(
                 nonEmptyChunks,
                 CancellationToken.None).ConfigureAwait(false);
 
-            DebugLogUtility.WriteLog($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
+            _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
             Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
 
             // 翻訳結果を各チャンクに設定
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
                 nonEmptyChunks[i].TranslatedText = translationResults[i];
-                DebugLogUtility.WriteLog($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
+                _logger?.LogDebug($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
             // 🔥 [OVERLAY_FIX] 直接SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync()を呼び出し
             // Gemini推奨: TranslationWithBoundsCompletedEventを経由せず、直接オーバーレイ表示
             // 理由: イベントハンドラー未実装により表示されない問題を解決
             // アーキテクチャ: Application層 → Core層(IInPlaceTranslationOverlayManager)への依存は正しい（DIP準拠）
-            DebugLogUtility.WriteLog($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
+            _logger?.LogDebug($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
             Console.WriteLine($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
 
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
@@ -222,7 +219,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 await _overlayManager.ShowInPlaceOverlayAsync(chunkWithScreenCoords, CancellationToken.None)
                     .ConfigureAwait(false);
 
-                DebugLogUtility.WriteLog($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}', Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
+                _logger?.LogDebug($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}', Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
                 Console.WriteLine($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}'");
             }
 
@@ -269,7 +266,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         {
             // 🔥 [PHASE1_SEMAPHORE] セマフォ解放（必ず実行）
             _translationExecutionSemaphore.Release();
-            DebugLogUtility.WriteLog($"🔓 [PHASE1] セマフォ解放完了 - SessionId: {eventData.SessionId}");
+            _logger?.LogDebug($"🔓 [PHASE1] セマフォ解放完了 - SessionId: {eventData.SessionId}");
         }
     }
 
@@ -282,33 +279,33 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         CancellationToken cancellationToken)
     {
         // 🔥 メソッド開始を確実に記録
-        DebugLogUtility.WriteLog($"🎯🎯🎯 [PHASE12.2_BATCH] ExecuteBatchTranslationAsync メソッド開始 - ChunkCount: {chunks.Count}");
+        _logger?.LogDebug($"🎯🎯🎯 [PHASE12.2_BATCH] ExecuteBatchTranslationAsync メソッド開始 - ChunkCount: {chunks.Count}");
         Console.WriteLine($"🎯🎯🎯 [PHASE12.2_BATCH] ExecuteBatchTranslationAsync メソッド開始 - ChunkCount: {chunks.Count}");
 
         var batchTexts = chunks.Select(c => c.CombinedText).ToList();
 
-        DebugLogUtility.WriteLog($"🎯 [PHASE12.2_BATCH] バッチテキスト作成完了 - テキスト数: {batchTexts.Count}");
+        _logger?.LogDebug($"🎯 [PHASE12.2_BATCH] バッチテキスト作成完了 - テキスト数: {batchTexts.Count}");
 
         try
         {
-            DebugLogUtility.WriteLog($"🚀 [PHASE12.2_BATCH] バッチ翻訳試行開始 - テキスト数: {batchTexts.Count}");
+            _logger?.LogDebug($"🚀 [PHASE12.2_BATCH] バッチ翻訳試行開始 - テキスト数: {batchTexts.Count}");
             _logger.LogInformation("🚀 [PHASE12.2] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
 
             // ストリーミング翻訳サービスが利用可能な場合はそれを使用
             if (_streamingTranslationService != null)
             {
-                DebugLogUtility.WriteLog($"🔥 [PHASE12.2_BATCH] ストリーミング翻訳サービス使用");
+                _logger?.LogDebug($"🔥 [PHASE12.2_BATCH] ストリーミング翻訳サービス使用");
                 _logger.LogDebug("🔥 [PHASE12.2] ストリーミング翻訳サービス使用");
 
                 // CoordinateBasedTranslationServiceと同じシグネチャ
-                DebugLogUtility.WriteLog($"📞 [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync呼び出し直前");
+                _logger?.LogDebug($"📞 [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync呼び出し直前");
 
                 // 🔥 [PHASE3.1_FIX] 設定から言語ペア取得（ハードコード削除）
                 var languagePair = _languageConfig.GetCurrentLanguagePair();
                 var sourceLanguage = Language.FromCode(languagePair.SourceCode);
                 var targetLanguage = Language.FromCode(languagePair.TargetCode);
 
-                DebugLogUtility.WriteLog($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+                _logger?.LogDebug($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
                 Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
 
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し直前を確実に記録
@@ -330,13 +327,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp2}][T{threadId2:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し完了！ - 結果数: {results.Count}\r\n");
 
-                DebugLogUtility.WriteLog($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results.Count}");
+                _logger?.LogDebug($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results.Count}");
                 return results;
             }
             else
             {
                 // 通常の翻訳サービスを使用
-                DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.2_BATCH] DefaultTranslationService使用（_streamingTranslationService is null）");
+                _logger?.LogDebug($"🔥🔥🔥 [PHASE12.2_BATCH] DefaultTranslationService使用（_streamingTranslationService is null）");
                 Console.WriteLine($"🔥🔥🔥 [PHASE12.2_BATCH] DefaultTranslationService使用（_streamingTranslationService is null）");
                 _logger.LogDebug("🔥 [PHASE12.2] DefaultTranslationService使用");
 
@@ -345,7 +342,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 var sourceLanguage = Language.FromCode(languagePair.SourceCode);
                 var targetLanguage = Language.FromCode(languagePair.TargetCode);
 
-                DebugLogUtility.WriteLog($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
+                _logger?.LogDebug($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
                 Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
 
                 var results = new List<string>();
@@ -354,11 +351,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     var text = batchTexts[i];
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        DebugLogUtility.WriteLog($"⚠️ [PHASE12.2_BATCH] キャンセル要求検出 - Index: {i}");
+                        _logger?.LogDebug($"⚠️ [PHASE12.2_BATCH] キャンセル要求検出 - Index: {i}");
                         break;
                     }
 
-                    DebugLogUtility.WriteLog($"📞📞📞 [PHASE12.2_BATCH] TranslateAsync呼び出し直前 - Index: {i}, Text: '{text}'");
+                    _logger?.LogDebug($"📞📞📞 [PHASE12.2_BATCH] TranslateAsync呼び出し直前 - Index: {i}, Text: '{text}'");
                     Console.WriteLine($"📞📞📞 [PHASE12.2_BATCH] TranslateAsync呼び出し直前 - Index: {i}, Text: '{text}'");
 
                     var response = await _translationService.TranslateAsync(
@@ -368,13 +365,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         null,
                         cancellationToken).ConfigureAwait(false);
 
-                    DebugLogUtility.WriteLog($"✅✅✅ [PHASE12.2_BATCH] TranslateAsync完了 - Index: {i}, TranslatedText: '{response.TranslatedText}'");
+                    _logger?.LogDebug($"✅✅✅ [PHASE12.2_BATCH] TranslateAsync完了 - Index: {i}, TranslatedText: '{response.TranslatedText}'");
                     Console.WriteLine($"✅✅✅ [PHASE12.2_BATCH] TranslateAsync完了 - Index: {i}, TranslatedText: '{response.TranslatedText}'");
 
                     results.Add(response.TranslatedText);
                 }
 
-                DebugLogUtility.WriteLog($"✅ [PHASE12.2_BATCH] DefaultTranslationService完了 - 結果数: {results.Count}");
+                _logger?.LogDebug($"✅ [PHASE12.2_BATCH] DefaultTranslationService完了 - 結果数: {results.Count}");
                 return results;
             }
         }
@@ -396,7 +393,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     {
         try
         {
-            DebugLogUtility.WriteLog($"🎯🎯🎯 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync メソッド開始 - ChunkCount: {translatedChunks.Count}");
+            _logger?.LogDebug($"🎯🎯🎯 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync メソッド開始 - ChunkCount: {translatedChunks.Count}");
             Console.WriteLine($"🎯🎯🎯 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync メソッド開始 - ChunkCount: {translatedChunks.Count}");
 
             _logger.LogInformation("🎯 [PHASE12.2] インプレースオーバーレイ表示開始 - チャンク数: {Count}",
@@ -406,7 +403,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             for (int i = 0; i < translatedChunks.Count; i++)
             {
                 var chunk = translatedChunks[i];
-                DebugLogUtility.WriteLog($"   🔍 [PHASE12.2_OVERLAY] チャンク[{i}]: '{chunk.CombinedText}' → '{chunk.TranslatedText}'");
+                _logger?.LogDebug($"   🔍 [PHASE12.2_OVERLAY] チャンク[{i}]: '{chunk.CombinedText}' → '{chunk.TranslatedText}'");
                 _logger.LogDebug("   [{Index}] '{Original}' → '{Translated}'",
                     i, chunk.CombinedText, chunk.TranslatedText);
             }
@@ -417,37 +414,37 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ [PHASE12.2_OVERLAY] キャンセル要求検出 - 表示中断");
+                    _logger?.LogDebug($"⚠️ [PHASE12.2_OVERLAY] キャンセル要求検出 - 表示中断");
                     break;
                 }
 
                 if (chunk.CanShowInPlace() && !string.IsNullOrWhiteSpace(chunk.TranslatedText))
                 {
-                    DebugLogUtility.WriteLog($"🔥 [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync実行開始 - ChunkId: {chunk.ChunkId}");
+                    _logger?.LogDebug($"🔥 [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync実行開始 - ChunkId: {chunk.ChunkId}");
                     _logger.LogDebug("🔥 [PHASE12.2] ShowInPlaceOverlayAsync実行 - ChunkId: {ChunkId}",
                         chunk.ChunkId);
 
                     await _overlayManager.ShowInPlaceOverlayAsync(chunk).ConfigureAwait(false);
 
                     displayedCount++;
-                    DebugLogUtility.WriteLog($"   ✅ [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync完了 - ChunkId: {chunk.ChunkId}, 累計表示: {displayedCount}個");
+                    _logger?.LogDebug($"   ✅ [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync完了 - ChunkId: {chunk.ChunkId}, 累計表示: {displayedCount}個");
                     _logger.LogDebug("   ✅ [PHASE12.2] インプレース表示完了 - ChunkId: {ChunkId}",
                         chunk.ChunkId);
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog($"⚠️ [PHASE12.2_OVERLAY] スキップ - ChunkId: {chunk.ChunkId}, CanShowInPlace: {chunk.CanShowInPlace()}, HasTranslation: {!string.IsNullOrWhiteSpace(chunk.TranslatedText)}");
+                    _logger?.LogDebug($"⚠️ [PHASE12.2_OVERLAY] スキップ - ChunkId: {chunk.ChunkId}, CanShowInPlace: {chunk.CanShowInPlace()}, HasTranslation: {!string.IsNullOrWhiteSpace(chunk.TranslatedText)}");
                 }
             }
 
-            DebugLogUtility.WriteLog($"🎉🎉🎉 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync完了 - 表示数: {displayedCount}/{translatedChunks.Count}");
+            _logger?.LogDebug($"🎉🎉🎉 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync完了 - 表示数: {displayedCount}/{translatedChunks.Count}");
             Console.WriteLine($"🎉🎉🎉 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync完了 - 表示数: {displayedCount}/{translatedChunks.Count}");
 
             _logger.LogInformation("🎉 [PHASE12.2] 座標ベース翻訳処理完了 - オーバーレイ表示成功");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌❌❌ [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync例外: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogDebug($"❌❌❌ [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync例外: {ex.GetType().Name} - {ex.Message}");
             Console.WriteLine($"❌❌❌ [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync例外: {ex.GetType().Name} - {ex.Message}");
             _logger.LogError(ex, "❌ [PHASE12.2] オーバーレイ表示エラー");
             throw;

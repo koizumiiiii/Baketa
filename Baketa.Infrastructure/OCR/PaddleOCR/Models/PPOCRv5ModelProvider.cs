@@ -51,40 +51,40 @@ public static class PPOCRv5ModelProvider
     {
         try
         {
-            DebugLogUtility.WriteLog("🔍 GetPPOCRv5MultilingualModel開始");
-            DebugLogUtility.WriteLog($"🔍 ModelsBasePath = {ModelsBasePath}");
+            Console.WriteLine("🔍 GetPPOCRv5MultilingualModel開始");
+            Console.WriteLine($"🔍 ModelsBasePath = {ModelsBasePath}");
             
             var detModelPath = Path.Combine(ModelsBasePath, "PP-OCRv5_server_det");
             var recModelPath = Path.Combine(ModelsBasePath, "PP-OCRv5_server_rec");
             var clsModelPath = Path.Combine(ModelsBasePath, "ch_ppocr_mobile_v2.0_cls_infer");
             
-            DebugLogUtility.WriteLog($"🔍 検出モデルパス: {detModelPath}");
-            DebugLogUtility.WriteLog($"🔍 認識モデルパス: {recModelPath}");
-            DebugLogUtility.WriteLog($"🔍 分類モデルパス: {clsModelPath}");
+            Console.WriteLine($"🔍 検出モデルパス: {detModelPath}");
+            Console.WriteLine($"🔍 認識モデルパス: {recModelPath}");
+            Console.WriteLine($"🔍 分類モデルパス: {clsModelPath}");
             
             // モデルファイルの存在確認
             var detExists = Directory.Exists(detModelPath);
             var recExists = Directory.Exists(recModelPath);
             var clsExists = Directory.Exists(clsModelPath);
             
-            DebugLogUtility.WriteLog($"🔍 検出モデル存在: {detExists}");
-            DebugLogUtility.WriteLog($"🔍 認識モデル存在: {recExists}");
-            DebugLogUtility.WriteLog($"🔍 分類モデル存在: {clsExists}");
+            Console.WriteLine($"🔍 検出モデル存在: {detExists}");
+            Console.WriteLine($"🔍 認識モデル存在: {recExists}");
+            Console.WriteLine($"🔍 分類モデル存在: {clsExists}");
             
             if (!detExists || !recExists || !clsExists)
             {
-                DebugLogUtility.WriteLog("❌ PP-OCRv5必要ファイルが不足しています");
+                Console.WriteLine("❌ PP-OCRv5必要ファイルが不足しています");
                 return null;
             }
             
             // PP-OCRv5モデルを構築 - 安全な実装戦略
-            DebugLogUtility.WriteLog("🔍 LocalFullModels.ChineseV5取得試行");
+            Console.WriteLine("🔍 LocalFullModels.ChineseV5取得試行");
             var chineseV5 = LocalFullModels.ChineseV5;
-            DebugLogUtility.WriteLog($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
+            Console.WriteLine($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
             
             if (chineseV5 != null)
             {
-                DebugLogUtility.WriteLog("✅ PP-OCRv5 (多言語対応モデル) を使用 - 保守的設定で安定化");
+                Console.WriteLine("✅ PP-OCRv5 (多言語対応モデル) を使用 - 保守的設定で安定化");
             }
             
             return chineseV5;
@@ -92,7 +92,7 @@ public static class PPOCRv5ModelProvider
         catch (Exception ex)
         {
             // モデル読み込みエラー
-            DebugLogUtility.WriteLog($"❌ PP-OCRv5モデル読み込みエラー: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"❌ PP-OCRv5モデル読み込みエラー: {ex.GetType().Name}: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"PP-OCRv5モデル読み込みエラー: {ex.Message}");
             return null;
         }
@@ -105,20 +105,20 @@ public static class PPOCRv5ModelProvider
     {
         try
         {
-            DebugLogUtility.WriteLog("🔍 IsAvailable開始");
+            Console.WriteLine("🔍 IsAvailable開始");
             
             // LocalFullModels.ChineseV5が利用可能かチェック
             var chineseV5 = LocalFullModels.ChineseV5;
             var result = chineseV5 != null;
             
-            DebugLogUtility.WriteLog($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
-            DebugLogUtility.WriteLog($"🔍 IsAvailable結果 = {result}");
+            Console.WriteLine($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
+            Console.WriteLine($"🔍 IsAvailable結果 = {result}");
             
             return result;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ IsAvailable例外: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"❌ IsAvailable例外: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

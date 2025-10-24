@@ -53,7 +53,7 @@ namespace Baketa.Application.DI.Modules;
         public override void RegisterServices(IServiceCollection services)
         {
             // 🔥 [PHASE12.2_DI_DEBUG] ApplicationModule.RegisterServices()実行開始
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_DI_DEBUG] ApplicationModule.RegisterServices()実行開始");
+            Console.WriteLine("🔥🔥🔥 [PHASE12.2_DI_DEBUG] ApplicationModule.RegisterServices()実行開始");
 
             // 環境設定は、BuildServiceProviderが存在しないか必要なパッケージがないため
             // コメントアウトし、デフォルト値を使用
@@ -62,33 +62,33 @@ namespace Baketa.Application.DI.Modules;
             var environment = Core.DI.BaketaEnvironment.Production;
 
             // 🎯 UltraThink Phase 1: オーバーレイ自動削除システム設定登録（Gemini Review対応）
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [PHASE12.2_DI_DEBUG] RegisterAutoOverlayCleanupSettings()呼び出し直前");
+            Console.WriteLine("🔥 [PHASE12.2_DI_DEBUG] RegisterAutoOverlayCleanupSettings()呼び出し直前");
             RegisterAutoOverlayCleanupSettings(services);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [PHASE12.2_DI_DEBUG] RegisterAutoOverlayCleanupSettings()完了");
+            Console.WriteLine("✅ [PHASE12.2_DI_DEBUG] RegisterAutoOverlayCleanupSettings()完了");
             
             // OCR処理モジュールは Infrastructure.DI.OcrProcessingModule で登録
 
             // OCRアプリケーションサービス
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [PHASE12.2_DI_DEBUG] RegisterOcrApplicationServices()呼び出し直前");
+            Console.WriteLine("🔥 [PHASE12.2_DI_DEBUG] RegisterOcrApplicationServices()呼び出し直前");
             RegisterOcrApplicationServices(services);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [PHASE12.2_DI_DEBUG] RegisterOcrApplicationServices()完了");
+            Console.WriteLine("✅ [PHASE12.2_DI_DEBUG] RegisterOcrApplicationServices()完了");
 
             // 翻訳アプリケーションサービス
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [PHASE12.2_DI_DEBUG] RegisterTranslationApplicationServices()呼び出し直前");
+            Console.WriteLine("🔥 [PHASE12.2_DI_DEBUG] RegisterTranslationApplicationServices()呼び出し直前");
             RegisterTranslationApplicationServices(services);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [PHASE12.2_DI_DEBUG] RegisterTranslationApplicationServices()完了");
+            Console.WriteLine("✅ [PHASE12.2_DI_DEBUG] RegisterTranslationApplicationServices()完了");
 
             // その他のアプリケーションサービス
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [PHASE12.2_DI_DEBUG] RegisterOtherApplicationServices()呼び出し直前");
+            Console.WriteLine("🔥 [PHASE12.2_DI_DEBUG] RegisterOtherApplicationServices()呼び出し直前");
             RegisterOtherApplicationServices(services, environment);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [PHASE12.2_DI_DEBUG] RegisterOtherApplicationServices()完了");
+            Console.WriteLine("✅ [PHASE12.2_DI_DEBUG] RegisterOtherApplicationServices()完了");
 
             // イベントハンドラー
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_DI_DEBUG] RegisterEventHandlers()呼び出し直前");
+            Console.WriteLine("🔥🔥🔥 [PHASE12.2_DI_DEBUG] RegisterEventHandlers()呼び出し直前");
             RegisterEventHandlers(services);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅✅✅ [PHASE12.2_DI_DEBUG] RegisterEventHandlers()完了");
+            Console.WriteLine("✅✅✅ [PHASE12.2_DI_DEBUG] RegisterEventHandlers()完了");
 
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅✅✅ [PHASE12.2_DI_DEBUG] ApplicationModule.RegisterServices()完了");
+            Console.WriteLine("✅✅✅ [PHASE12.2_DI_DEBUG] ApplicationModule.RegisterServices()完了");
         }
 
         /// <summary>
@@ -157,38 +157,38 @@ namespace Baketa.Application.DI.Modules;
                 Baketa.Application.Services.Configuration.ConfigurationFacade>();
             
             // 🔥 [STREAMING] ストリーミング翻訳サービス: 段階的結果表示による12.7秒→数秒体感速度向上
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
+            Console.WriteLine("🔍 [DI_DEBUG] StreamingTranslationService登録開始");
             services.AddSingleton<TranslationAbstractions.IStreamingTranslationService, Baketa.Application.Services.Translation.StreamingTranslationService>();
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [DI_DEBUG] StreamingTranslationService登録完了");
+            Console.WriteLine("✅ [DI_DEBUG] StreamingTranslationService登録完了");
             
             // 🎯 [OPTION_A] CoordinateBasedTranslationService正式登録 - SmartProcessingPipelineService統合
             services.AddSingleton<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>(provider =>
             {
-                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService Factory開始");
+                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService Factory開始");
 
                 try
                 {
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ITranslationProcessingFacade取得中...");
+                    Console.WriteLine("🔍 [OPTION_A] ITranslationProcessingFacade取得中...");
                     var processingFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ITranslationProcessingFacade>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ITranslationProcessingFacade取得成功: {processingFacade.GetType().Name}");
+                    Console.WriteLine($"✅ [OPTION_A] ITranslationProcessingFacade取得成功: {processingFacade.GetType().Name}");
 
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] IConfigurationFacade取得中...");
+                    Console.WriteLine("🔍 [OPTION_A] IConfigurationFacade取得中...");
                     var configurationFacade = provider.GetRequiredService<Baketa.Core.Abstractions.Configuration.IConfigurationFacade>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
+                    Console.WriteLine($"✅ [OPTION_A] IConfigurationFacade取得成功: {configurationFacade.GetType().Name}");
 
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] IStreamingTranslationService取得中...");
+                    Console.WriteLine("🔍 [OPTION_A] IStreamingTranslationService取得中...");
                     var streamingService = provider.GetService<TranslationAbstractions.IStreamingTranslationService>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] IStreamingTranslationService取得成功: {streamingService?.GetType().Name ?? "null"}");
+                    Console.WriteLine($"✅ [OPTION_A] IStreamingTranslationService取得成功: {streamingService?.GetType().Name ?? "null"}");
 
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ITextChunkAggregatorService取得中...");
+                    Console.WriteLine("🔍 [OPTION_A] ITextChunkAggregatorService取得中...");
                     var textChunkAggregatorService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITextChunkAggregatorService>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ITextChunkAggregatorService取得成功: {textChunkAggregatorService.GetType().Name}");
+                    Console.WriteLine($"✅ [OPTION_A] ITextChunkAggregatorService取得成功: {textChunkAggregatorService.GetType().Name}");
 
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [OPTION_A] ISmartProcessingPipelineService取得中...");
+                    Console.WriteLine("🔍 [OPTION_A] ISmartProcessingPipelineService取得中...");
                     var pipelineService = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ISmartProcessingPipelineService>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] ISmartProcessingPipelineService取得成功: {pipelineService.GetType().Name}");
+                    Console.WriteLine($"✅ [OPTION_A] ISmartProcessingPipelineService取得成功: {pipelineService.GetType().Name}");
 
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（6パラメータ）");
+                    Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（6パラメータ）");
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                     var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                         processingFacade,
@@ -197,12 +197,12 @@ namespace Baketa.Application.DI.Modules;
                         textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
                         pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
                         logger);
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知統合済み");
+                    Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知統合済み");
                     return instance;
                 }
                 catch (Exception ex)
                 {
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"💥 [OPTION_A] CoordinateBasedTranslationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    Console.WriteLine($"💥 [OPTION_A] CoordinateBasedTranslationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
                     throw;
                 }
             });
@@ -210,7 +210,7 @@ namespace Baketa.Application.DI.Modules;
             // 翻訳統合サービス（IEventAggregatorの依存を削除）
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>(provider =>
             {
-                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] TranslationOrchestrationService Factory開始");
+                Console.WriteLine("🔍 [DI_DEBUG] TranslationOrchestrationService Factory開始");
 
                 try
                 {
@@ -224,11 +224,11 @@ namespace Baketa.Application.DI.Modules;
                     var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.TranslationOrchestrationService>>();
 
                     // 🎯 [OPTION_A] CoordinateBasedTranslationService取得 - AddSingletonで既に登録済み
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎯 [OPTION_A] CoordinateBasedTranslationService取得開始");
+                    Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService取得開始");
                     var coordinateBasedTranslation = provider.GetRequiredService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [OPTION_A] CoordinateBasedTranslationService取得成功 - SmartProcessingPipelineService統合済み");
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
+                    Console.WriteLine($"✅ [OPTION_A] CoordinateBasedTranslationService取得成功 - SmartProcessingPipelineService統合済み");
+                    Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
+                    Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
                     
                     var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                     return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
@@ -245,7 +245,7 @@ namespace Baketa.Application.DI.Modules;
                 }
                 catch (Exception ex)
                 {
-                    Baketa.Core.Utilities.DebugLogUtility.WriteLog($"💥 [DI_DEBUG] TranslationOrchestrationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
+                    Console.WriteLine($"💥 [DI_DEBUG] TranslationOrchestrationService Factory失敗: {ex.GetType().Name}: {ex.Message}");
                     throw;
                 }
             });
@@ -383,12 +383,12 @@ namespace Baketa.Application.DI.Modules;
         private static void RegisterEventHandlers(IServiceCollection services)
         {
             // 🔥 [PHASE12.2_DI_DEBUG] RegisterEventHandlers()実行開始
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_DI_DEBUG] RegisterEventHandlers()メソッド内部開始");
+            Console.WriteLine("🔥🔥🔥 [PHASE12.2_DI_DEBUG] RegisterEventHandlers()メソッド内部開始");
 
             // 翻訳モード変更イベントプロセッサー
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥 [PHASE12.2_DI_DEBUG] TranslationModeChangedEventProcessor登録");
+            Console.WriteLine("🔥 [PHASE12.2_DI_DEBUG] TranslationModeChangedEventProcessor登録");
             services.AddSingleton<Baketa.Application.Events.Processors.TranslationModeChangedEventProcessor>();
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [PHASE12.2_DI_DEBUG] TranslationModeChangedEventProcessor登録完了");
+            Console.WriteLine("✅ [PHASE12.2_DI_DEBUG] TranslationModeChangedEventProcessor登録完了");
             
             
             // 🚀 [ROI_PIPELINE] OCR完了イベント処理は TranslationPipelineService で統合処理
@@ -408,13 +408,13 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Baketa.Core.Events.Handlers.BatchTranslationRequestHandler>());
             
             // 🔄 [FIX] TranslationCompletedHandler登録 - TranslationCompletedEvent中継処理
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔄 [FIX] TranslationCompletedHandler DI登録 - 翻訳完了イベント中継修復");
+            Console.WriteLine("🔄 [FIX] TranslationCompletedHandler DI登録 - 翻訳完了イベント中継修復");
             services.AddSingleton<Baketa.Application.EventHandlers.TranslationCompletedHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.EventHandlers.TranslationCompletedHandler>());
 
             // 🔄 [FIX] TranslationWithBoundsCompletedHandler復活 - 翻訳結果をTextChunkに反映するため必須
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔄 [FIX] TranslationWithBoundsCompletedHandler DI登録復活 - 翻訳結果反映修復");
+            Console.WriteLine("🔄 [FIX] TranslationWithBoundsCompletedHandler DI登録復活 - 翻訳結果反映修復");
             services.AddSingleton<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.EventHandlers.TranslationWithBoundsCompletedHandler>());
@@ -424,13 +424,13 @@ namespace Baketa.Application.DI.Modules;
             // 他のイベントハンドラーの登録
 
             // 🎉 [PHASE12.2] AggregatedChunksReadyEventHandler登録 - 2重翻訳アーキテクチャ排除
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎉 [PHASE12.2] AggregatedChunksReadyEventHandler DI登録 - TimedChunkAggregatorイベント駆動処理");
+            Console.WriteLine("🎉 [PHASE12.2] AggregatedChunksReadyEventHandler DI登録 - TimedChunkAggregatorイベント駆動処理");
             services.AddSingleton<Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler>();
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.Translation.AggregatedChunksReadyEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler>());
 
             // ⚡ [ARCHITECTURAL_FIX] CaptureCompletedHandler登録 - Application層に適切配置
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");
+            Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");
             services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>(provider =>
             {
                 var eventAggregator = provider.GetRequiredService<IEventAggregator>();
@@ -460,14 +460,14 @@ namespace Baketa.Application.DI.Modules;
             });
             services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - キャプチャ画像保存機能付き");
+            Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - キャプチャ画像保存機能付き");
 
             // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [DI_DEBUG] OcrRequestHandler登録開始");
+            Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");
             services.AddSingleton<Baketa.Application.Events.Handlers.OcrRequestHandler>();
             services.AddSingleton<IEventProcessor<OcrRequestEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.OcrRequestHandler>());
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("✅ [DI_DEBUG] OcrRequestHandler登録完了 - Phase 2翻訳チェーン修復");
+            Console.WriteLine("✅ [DI_DEBUG] OcrRequestHandler登録完了 - Phase 2翻訳チェーン修復");
             
             // 自動登録が必要な場合は必要に応じて実装
             // RegisterEventHandlersAutomatically(services);

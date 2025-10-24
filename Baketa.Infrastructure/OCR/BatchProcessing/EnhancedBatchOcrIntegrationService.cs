@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Translation;
@@ -200,7 +200,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         ThrowIfDisposed();
 
         // 🔥 [PHASE22_ENTRY] メソッド実行開始診断
-        DebugLogUtility.WriteLog(
+        _logger?.LogDebug(
             $"🔥🔥🔥 [PHASE22_ENTRY] TryAddTextChunkDirectlyAsync実行開始 - " +
             $"ChunkId: {chunk.ChunkId}, Text: \"{chunk.CombinedText}\", " +
             $"TimedChunkAggregator is null: {_timedChunkAggregator == null}"
@@ -222,7 +222,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
 
             if (!_settings.IsFeatureEnabled)
             {
-                DebugLogUtility.WriteLog("🔥 [PHASE22_DISABLED] Feature無効により早期リターン");
+                _logger?.LogDebug("🔥 [PHASE22_DISABLED] Feature無効により早期リターン");
                 _logger.LogCritical("🔥 [PHASE22_DISABLED] Feature無効により早期リターン");
                 _logger.LogInformation("⚠️ [PHASE22] TimedAggregator機能無効 - チャンク送信スキップ");
                 return false;
@@ -230,20 +230,20 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
 
             if (_timedChunkAggregator == null)
             {
-                DebugLogUtility.WriteLog("🔥 [PHASE22_NULL] TimedChunkAggregator is NULL - 返却: False");
+                _logger?.LogDebug("🔥 [PHASE22_NULL] TimedChunkAggregator is NULL - 返却: False");
                 _logger.LogCritical("🔥 [PHASE22_NULL] TimedChunkAggregator is NULL - 返却: False");
                 return false;
             }
 
             // 🔥 TimedChunkAggregator呼び出し前
-            DebugLogUtility.WriteLog("🔥 [PHASE22_BEFORE_CALL] TimedChunkAggregator.TryAddChunkAsync呼び出し直前");
+            _logger?.LogDebug("🔥 [PHASE22_BEFORE_CALL] TimedChunkAggregator.TryAddChunkAsync呼び出し直前");
             _logger.LogCritical("🔥 [PHASE22_BEFORE_CALL] TimedChunkAggregator.TryAddChunkAsync呼び出し直前");
 
             // TimedChunkAggregatorに直接送信
             var added = await _timedChunkAggregator.TryAddChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
 
             // 🔥 TimedChunkAggregator呼び出し後
-            DebugLogUtility.WriteLog(
+            _logger?.LogDebug(
                 $"🔥 [PHASE22_AFTER_CALL] TimedChunkAggregator.TryAddChunkAsync実行完了 - Result: {added}"
             );
             _logger.LogCritical(
@@ -266,7 +266,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"🔥 [PHASE22_EXCEPTION] 例外発生: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogDebug($"🔥 [PHASE22_EXCEPTION] 例外発生: {ex.GetType().Name} - {ex.Message}");
             _logger.LogCritical(ex, "🔥 [PHASE22_EXCEPTION] 例外発生");
             _logger.LogError(ex, "❌ [PHASE22] TextChunk送信エラー - ChunkId: {ChunkId}", chunk.ChunkId);
             return false;

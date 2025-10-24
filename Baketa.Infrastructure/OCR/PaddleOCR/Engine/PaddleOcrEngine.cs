@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Core.Abstractions.Settings;
@@ -372,8 +372,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         catch (Exception ex)
         {
             // 🔥 [PHASE13.2.26] DebugLogUtility追加 - __loggerがnullでも例外を確実にログ出力
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog($"❌❌❌ [PHASE13.2.26] WarmupAsync例外: {ex.GetType().Name} - {ex.Message}");
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔍 [PHASE13.2.26] StackTrace: {ex.StackTrace}");
+            __logger?.LogDebug($"❌❌❌ [PHASE13.2.26] WarmupAsync例外: {ex.GetType().Name} - {ex.Message}");
+            __logger?.LogDebug($"🔍 [PHASE13.2.26] StackTrace: {ex.StackTrace}");
             __logger?.LogError(ex, "❌ PaddleOCRウォームアップ中にエラーが発生");
             return false;
         }

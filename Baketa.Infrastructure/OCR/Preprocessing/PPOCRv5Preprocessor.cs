@@ -93,7 +93,7 @@ public static class PPOCRv5Preprocessor
             throw new ArgumentException("入力画像が無効です", nameof(input));
         }
 
-        DebugLogUtility.WriteLog($"🚀 PP-OCRv5専用前処理開始: {input.Width}x{input.Height}, モード: {mode}");
+        Console.WriteLine($"🚀 PP-OCRv5専用前処理開始: {input.Width}x{input.Height}, モード: {mode}");
         
         var processed = new Mat();
         
@@ -149,12 +149,12 @@ public static class PPOCRv5Preprocessor
             sharpened.Dispose();
             finalResult.Dispose();
             
-            DebugLogUtility.WriteLog($"✅ PP-OCRv5専用前処理完了");
+            Console.WriteLine($"✅ PP-OCRv5専用前処理完了");
             return processed;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ PP-OCRv5前処理エラー: {ex.Message}");
+            Console.WriteLine($"❌ PP-OCRv5前処理エラー: {ex.Message}");
             processed?.Dispose();
             
             // エラー時は元画像を返す
@@ -170,7 +170,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat EnhanceContrastForV5(Mat input)
     {
-        DebugLogUtility.WriteLog($"   🔆 PP-OCRv5コントラスト強化開始");
+        Console.WriteLine($"   🔆 PP-OCRv5コントラスト強化開始");
         
         var output = new Mat();
         
@@ -207,11 +207,11 @@ public static class PPOCRv5Preprocessor
                 clahe.Apply(input, output);
             }
             
-            DebugLogUtility.WriteLog($"   ✅ PP-OCRv5コントラスト強化完了");
+            Console.WriteLine($"   ✅ PP-OCRv5コントラスト強化完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5コントラスト強化エラー: {ex.Message}");
+            Console.WriteLine($"   ❌ V5コントラスト強化エラー: {ex.Message}");
             input.CopyTo(output);
         }
         
@@ -224,7 +224,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat RemoveHighFrequencyNoiseForV5(Mat input)
     {
-        DebugLogUtility.WriteLog($"   🎯 PP-OCRv5ノイズ除去開始");
+        Console.WriteLine($"   🎯 PP-OCRv5ノイズ除去開始");
         
         var output = new Mat();
         
@@ -239,11 +239,11 @@ public static class PPOCRv5Preprocessor
             output.CopyTo(temp);
             Cv2.GaussianBlur(temp, output, new OpenCvSharp.Size(5, 5), 0.8);
             
-            DebugLogUtility.WriteLog($"   ✅ PP-OCRv5ノイズ除去完了");
+            Console.WriteLine($"   ✅ PP-OCRv5ノイズ除去完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5ノイズ除去エラー: {ex.Message}");
+            Console.WriteLine($"   ❌ V5ノイズ除去エラー: {ex.Message}");
             input.CopyTo(output);
         }
         
@@ -256,7 +256,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat EnhanceMultilingualTextForV5(Mat input)
     {
-        DebugLogUtility.WriteLog($"   🌍 PP-OCRv5多言語テキスト強調開始");
+        Console.WriteLine($"   🌍 PP-OCRv5多言語テキスト強調開始");
         
         var output = new Mat();
         
@@ -294,11 +294,11 @@ public static class PPOCRv5Preprocessor
             using var strongKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
             Cv2.MorphologyEx(cleaned, output, MorphTypes.Close, strongKernel);
             
-            DebugLogUtility.WriteLog($"   ✅ PP-OCRv5多言語テキスト強調完了");
+            Console.WriteLine($"   ✅ PP-OCRv5多言語テキスト強調完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5多言語テキスト強調エラー: {ex.Message}");
+            Console.WriteLine($"   ❌ V5多言語テキスト強調エラー: {ex.Message}");
             input.CopyTo(output);
         }
         
@@ -311,7 +311,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat OptimizeSharpnessForV5(Mat input)
     {
-        DebugLogUtility.WriteLog($"   ✨ PP-OCRv5シャープネス最適化開始");
+        Console.WriteLine($"   ✨ PP-OCRv5シャープネス最適化開始");
         
         var output = new Mat();
         
@@ -328,11 +328,11 @@ public static class PPOCRv5Preprocessor
             // V5専用：控えめなエッジ統合（高速処理重視）
             Cv2.AddWeighted(input, 0.85, laplacianNormalized, 0.15, 0, output);
             
-            DebugLogUtility.WriteLog($"   ✅ PP-OCRv5シャープネス最適化完了");
+            Console.WriteLine($"   ✅ PP-OCRv5シャープネス最適化完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5シャープネス最適化エラー: {ex.Message}");
+            Console.WriteLine($"   ❌ V5シャープネス最適化エラー: {ex.Message}");
             input.CopyTo(output);
         }
         
@@ -345,7 +345,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat ApplyV5FinalOptimization(Mat input)
     {
-        DebugLogUtility.WriteLog($"   🌟 PP-OCRv5最終最適化開始");
+        Console.WriteLine($"   🌟 PP-OCRv5最終最適化開始");
         
         var output = new Mat();
         
@@ -362,11 +362,11 @@ public static class PPOCRv5Preprocessor
             // V5専用：控えめなコントラスト調整（高速処理維持）
             unsharpMask.ConvertTo(output, MatType.CV_8U, alpha: 1.05, beta: 3);
             
-            DebugLogUtility.WriteLog($"   ✅ PP-OCRv5最終最適化完了");
+            Console.WriteLine($"   ✅ PP-OCRv5最終最適化完了");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"   ❌ V5最終最適化エラー: {ex.Message}");
+            Console.WriteLine($"   ❌ V5最終最適化エラー: {ex.Message}");
             input.CopyTo(output);
         }
         
@@ -379,7 +379,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     public static Mat ProcessGameImageForV5(Mat input)
     {
-        DebugLogUtility.WriteLog($"🎮🚀 ゲーム画面PP-OCRv5専用処理開始");
+        Console.WriteLine($"🎮🚀 ゲーム画面PP-OCRv5専用処理開始");
         
         try
         {
@@ -389,12 +389,12 @@ public static class PPOCRv5Preprocessor
             // 2. PP-OCRv5専用最適化を追加適用
             var v5Optimized = ProcessForPPOCRv5(gameProcessed);
             
-            DebugLogUtility.WriteLog($"✅ ゲーム画面PP-OCRv5専用処理完了");
+            Console.WriteLine($"✅ ゲーム画面PP-OCRv5専用処理完了");
             return v5Optimized;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ ゲーム画面V5処理エラー: {ex.Message}");
+            Console.WriteLine($"❌ ゲーム画面V5処理エラー: {ex.Message}");
             
             // エラー時は元画像を返す
             var fallback = new Mat();
@@ -408,7 +408,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat ProcessWithKanjiOptimization(Mat input)
     {
-        DebugLogUtility.WriteLog($"🔍 漢字認識最適化処理開始");
+        Console.WriteLine($"🔍 漢字認識最適化処理開始");
         
         var output = new Mat();
         try
@@ -470,12 +470,12 @@ public static class PPOCRv5Preprocessor
             // 統合
             Cv2.AddWeighted(horizontalEnhanced, 0.5, verticalEnhanced, 0.5, 0, output);
             
-            DebugLogUtility.WriteLog($"✅ 漢字認識最適化完了");
+            Console.WriteLine($"✅ 漢字認識最適化完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 漢字認識最適化エラー: {ex.Message}");
+            Console.WriteLine($"❌ 漢字認識最適化エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -487,7 +487,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat ProcessWithContrastOptimization(Mat input)
     {
-        DebugLogUtility.WriteLog($"🔍 コントラスト改善最適化処理開始");
+        Console.WriteLine($"🔍 コントラスト改善最適化処理開始");
         
         var output = new Mat();
         try
@@ -535,12 +535,12 @@ public static class PPOCRv5Preprocessor
                 result.Dispose();
             }
             
-            DebugLogUtility.WriteLog($"✅ コントラスト改善最適化完了");
+            Console.WriteLine($"✅ コントラスト改善最適化完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ コントラスト改善最適化エラー: {ex.Message}");
+            Console.WriteLine($"❌ コントラスト改善最適化エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -552,7 +552,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat ProcessWithSmallTextOptimization(Mat input)
     {
-        DebugLogUtility.WriteLog($"🔍 小さなテキスト強化最適化処理開始");
+        Console.WriteLine($"🔍 小さなテキスト強化最適化処理開始");
         
         var output = new Mat();
         try
@@ -587,12 +587,12 @@ public static class PPOCRv5Preprocessor
             Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height), 
                        interpolation: InterpolationFlags.Area);
             
-            DebugLogUtility.WriteLog($"✅ 小さなテキスト強化最適化完了");
+            Console.WriteLine($"✅ 小さなテキスト強化最適化完了");
             return output;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 小さなテキスト強化最適化エラー: {ex.Message}");
+            Console.WriteLine($"❌ 小さなテキスト強化最適化エラー: {ex.Message}");
             output?.Dispose();
             input.CopyTo(output = new Mat());
             return output;
@@ -604,7 +604,7 @@ public static class PPOCRv5Preprocessor
     /// </summary>
     private static Mat ProcessWithCombinedOptimization(Mat input)
     {
-        DebugLogUtility.WriteLog($"🔍 全手法統合最適化処理開始");
+        Console.WriteLine($"🔍 全手法統合最適化処理開始");
         
         try
         {
@@ -617,12 +617,12 @@ public static class PPOCRv5Preprocessor
             // 3. 小さなテキスト強化
             var smallTextEnhanced = ProcessWithSmallTextOptimization(kanjiOptimized);
             
-            DebugLogUtility.WriteLog($"✅ 全手法統合最適化完了");
+            Console.WriteLine($"✅ 全手法統合最適化完了");
             return smallTextEnhanced;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 全手法統合最適化エラー: {ex.Message}");
+            Console.WriteLine($"❌ 全手法統合最適化エラー: {ex.Message}");
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;

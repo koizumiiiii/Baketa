@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -122,7 +122,7 @@ public sealed class TimedChunkAggregator : IDisposable
     {
         // 🔥 [TIMED_AGG_ENTRY] メソッド最上部診断
         Console.WriteLine($"🔥🔥🔥 [TIMED_AGG_ENTRY] TryAddChunkAsync実行開始 - ChunkId: {chunk.ChunkId}");
-        DebugLogUtility.WriteLog(
+        _logger?.LogDebug(
             $"🔥🔥🔥 [TIMED_AGG_ENTRY] TryAddChunkAsync実行開始 - " +
             $"ChunkId: {chunk.ChunkId}, Feature Enabled: {_settings.CurrentValue.IsFeatureEnabled}"
         );
@@ -137,21 +137,21 @@ public sealed class TimedChunkAggregator : IDisposable
         if (!_settings.CurrentValue.IsFeatureEnabled)
         {
             Console.WriteLine("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
-            DebugLogUtility.WriteLog("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
+            _logger?.LogDebug("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
             _logger.LogCritical("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
             _logger.LogDebug("TimedChunkAggregator機能が無効化されています");
             return false;
         }
 
         Console.WriteLine("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
-        DebugLogUtility.WriteLog("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
+        _logger?.LogDebug("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
         _logger.LogCritical("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
 
         _logger.LogDebug("🔐 [PHASE_C_DEBUG] TryAddChunkAsync開始 - ロック取得試行中");
         await _processingLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
-        DebugLogUtility.WriteLog("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
+        _logger?.LogDebug("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
         _logger.LogCritical("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
         _logger.LogDebug("✅ [PHASE_C_DEBUG] ロック取得成功 - 処理開始");
         try
@@ -189,7 +189,7 @@ public sealed class TimedChunkAggregator : IDisposable
 
             // 🔥 [PHASE12.2_TIMER_DEBUG] タイマー制御分岐診断
             Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] totalChunks: {totalChunks}, MaxChunkCount: {_settings.CurrentValue.MaxChunkCount}");
-            DebugLogUtility.WriteLog($"🔥 [PHASE12.2_TIMER_DEBUG] totalChunks: {totalChunks}, MaxChunkCount: {_settings.CurrentValue.MaxChunkCount}");
+            _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] totalChunks: {totalChunks}, MaxChunkCount: {_settings.CurrentValue.MaxChunkCount}");
 
             // メモリ保護：最大チャンク数を超えたら強制処理
             if (totalChunks >= _settings.CurrentValue.MaxChunkCount)
@@ -205,7 +205,7 @@ public sealed class TimedChunkAggregator : IDisposable
 
             // 🔥 [PHASE12.2_TIMER_DEBUG] ForceFlushMs判定前の診断
             Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timeSinceLastReset: {timeSinceLastReset.TotalMilliseconds}ms, ForceFlushMs: {_settings.CurrentValue.ForceFlushMs}ms");
-            DebugLogUtility.WriteLog($"🔥 [PHASE12.2_TIMER_DEBUG] timeSinceLastReset: {timeSinceLastReset.TotalMilliseconds}ms, ForceFlushMs: {_settings.CurrentValue.ForceFlushMs}ms");
+            _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timeSinceLastReset: {timeSinceLastReset.TotalMilliseconds}ms, ForceFlushMs: {_settings.CurrentValue.ForceFlushMs}ms");
 
             if (timeSinceLastReset.TotalMilliseconds >= _settings.CurrentValue.ForceFlushMs)
             {
@@ -233,7 +233,7 @@ public sealed class TimedChunkAggregator : IDisposable
             {
                 // 🔥 [PHASE12.2_TIMER_DEBUG] 通常タイマーリセット処理に到達
                 Console.WriteLine("🔥 [PHASE12.2_TIMER_DEBUG] else節到達 - 通常タイマーリセット処理開始");
-                DebugLogUtility.WriteLog("🔥 [PHASE12.2_TIMER_DEBUG] else節到達 - 通常タイマーリセット処理開始");
+                _logger?.LogDebug("🔥 [PHASE12.2_TIMER_DEBUG] else節到達 - 通常タイマーリセット処理開始");
 
                 // 🚀 Phase 19緊急修正: タイマー確実実行保証とタイマー状況監視
                 try
@@ -244,7 +244,7 @@ public sealed class TimedChunkAggregator : IDisposable
 
                     // 🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行直前
                     Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()呼び出し直前 - DelayMs: {_settings.CurrentValue.BufferDelayMs}ms");
-                    DebugLogUtility.WriteLog($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()呼び出し直前 - DelayMs: {_settings.CurrentValue.BufferDelayMs}ms");
+                    _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()呼び出し直前 - DelayMs: {_settings.CurrentValue.BufferDelayMs}ms");
 
                     // タイマーをリセット（新しいチャンクが来たら待ち時間をリセット）
                     bool timerChangeResult = _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
@@ -252,7 +252,7 @@ public sealed class TimedChunkAggregator : IDisposable
 
                     // 🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行直後
                     Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行完了 - Result: {timerChangeResult}");
-                    DebugLogUtility.WriteLog($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行完了 - Result: {timerChangeResult}");
+                    _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行完了 - Result: {timerChangeResult}");
 
                     _logger.LogInformation("⏱️ [PHASE_19_FIX] タイマーリセット完了 - 結果: {Result}, {DelayMs}ms後に処理予定 (バッファ中: {Count}個)",
                         timerChangeResult, _settings.CurrentValue.BufferDelayMs, totalChunks);
@@ -310,18 +310,18 @@ public sealed class TimedChunkAggregator : IDisposable
     {
         // 🚨 [CALLBACK_ENTRY] 絶対最初に実行されるログ（例外発生前診断）
         try { Console.WriteLine("🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {0}", Environment.CurrentManagedThreadId); } catch { }
-        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Environment.CurrentManagedThreadId}"); } catch { }
+        try { _logger?.LogDebug($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Environment.CurrentManagedThreadId}"); } catch { }
 
         // 🔥 [PHASE12.2_CALLBACK] タイマーコールバック実行開始
         Console.WriteLine("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
-        DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
+        _logger?.LogDebug("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
 
         // 🚀 Phase 19強化: タイマーコールバック実行状況詳細監視
         var callbackStart = DateTime.UtcNow;
         var timeSinceLastReset = (callbackStart - _lastTimerReset).TotalMilliseconds;
 
         Console.WriteLine($"🔥 [PHASE12.2_CALLBACK] timeSinceLastReset: {timeSinceLastReset}ms, 期待値: {_settings.CurrentValue.BufferDelayMs}ms");
-        DebugLogUtility.WriteLog($"🔥 [PHASE12.2_CALLBACK] timeSinceLastReset: {timeSinceLastReset}ms, 期待値: {_settings.CurrentValue.BufferDelayMs}ms");
+        _logger?.LogDebug($"🔥 [PHASE12.2_CALLBACK] timeSinceLastReset: {timeSinceLastReset}ms, 期待値: {_settings.CurrentValue.BufferDelayMs}ms");
 
         _logger.LogInformation("🔥 [PHASE_19_CALLBACK] タイマーコールバック実行開始 - リセットから{ElapsedMs}ms経過, 期待値: {ExpectedMs}ms",
             timeSinceLastReset, _settings.CurrentValue.BufferDelayMs);
@@ -476,18 +476,18 @@ public sealed class TimedChunkAggregator : IDisposable
     {
         // 🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始
         Console.WriteLine("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
-        DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
+        _logger?.LogDebug("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
         _logger.LogCritical("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
 
         // 🚨 [STACK_TRACE] 呼び出し元特定のためスタックトレースをログ出力
         var stackTrace = new System.Diagnostics.StackTrace(1, true); // 1フレームスキップ（自身を除く）
         Console.WriteLine($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
-        DebugLogUtility.WriteLog($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
+        _logger?.LogDebug($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
 
         if (_pendingChunksByWindow.IsEmpty)
         {
             Console.WriteLine("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
-            DebugLogUtility.WriteLog("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
+            _logger?.LogDebug("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
             return;
         }
 
@@ -506,10 +506,10 @@ public sealed class TimedChunkAggregator : IDisposable
         try { Console.WriteLine("🚨 [LINE496_BEFORE] Sum計算直前"); } catch { }
         var totalInputChunks = chunksToProcessByWindow.Values.Sum(list => list.Count);
         try { Console.WriteLine($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
-        try { DebugLogUtility.WriteLog($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
+        try { _logger?.LogDebug($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
 
         try { Console.WriteLine($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
-        try { DebugLogUtility.WriteLog($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
+        try { _logger?.LogDebug($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
         _logger.LogCritical("🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {WindowCount}ウィンドウ, {Count}個のチャンク",
             chunksToProcessByWindow.Count, totalInputChunks);
 
@@ -525,7 +525,7 @@ public sealed class TimedChunkAggregator : IDisposable
 
                 var windowLog = $"🚨 [COMBINE_DEBUG] ウィンドウ {windowHandle}: {chunksForWindow.Count}個のチャンク処理開始";
                 Console.WriteLine(windowLog);
-                DebugLogUtility.WriteLog(windowLog);
+                _logger?.LogDebug(windowLog);
                 _logger.LogCritical(windowLog);
 
                 if (chunksForWindow.Count > 0)
@@ -533,7 +533,7 @@ public sealed class TimedChunkAggregator : IDisposable
                     // 🚨 [COMBINE_DEBUG] 入力チャンクの詳細情報をログ出力
                     var logMsg = $"🚨 [COMBINE_DEBUG] CombineChunks呼び出し直前 - Count: {chunksForWindow.Count}";
                     Console.WriteLine(logMsg);
-                    DebugLogUtility.WriteLog(logMsg);
+                    _logger?.LogDebug(logMsg);
                     _logger.LogCritical(logMsg);
 
                     var maxLog = Math.Min(chunksForWindow.Count, 5); // 最初の5個だけログ出力
@@ -542,13 +542,13 @@ public sealed class TimedChunkAggregator : IDisposable
                         var chunk = chunksForWindow[i];
                         var chunkLog = $"  🔍 [INPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})";
                         Console.WriteLine(chunkLog);
-                        DebugLogUtility.WriteLog(chunkLog);
+                        _logger?.LogDebug(chunkLog);
                     }
                     if (chunksForWindow.Count > 5)
                     {
                         var omitLog = $"  ... (残り {chunksForWindow.Count - 5} 個のチャンクは省略)";
                         Console.WriteLine(omitLog);
-                        DebugLogUtility.WriteLog(omitLog);
+                        _logger?.LogDebug(omitLog);
                     }
 
                     var aggregatedChunks = CombineChunks(chunksForWindow);
@@ -578,13 +578,13 @@ public sealed class TimedChunkAggregator : IDisposable
 
                 // 🔥 [PHASE12.2_INTERNAL] イベント発行直前
                 Console.WriteLine($"🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行直前 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-                DebugLogUtility.WriteLog($"🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行直前 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
+                _logger?.LogDebug($"🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行直前 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
 
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
 
                 // 🔥 [PHASE12.2_INTERNAL] イベント発行完了
                 Console.WriteLine($"🔥🔥🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行完了 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-                DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行完了 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
+                _logger?.LogDebug($"🔥🔥🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行完了 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
 
                 _logger.LogInformation("🎯 [PHASE12.2] AggregatedChunksReadyEvent発行完了 - SessionId: {SessionId}, ChunkCount: {Count}",
                     aggregatedEvent.SessionId, allAggregatedChunks.Count);
@@ -641,14 +641,14 @@ public sealed class TimedChunkAggregator : IDisposable
         {
             // 🚨 [ULTRA_DEBUG] CombineChunksメソッド実行確認
             Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
-            DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
+            _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
             _logger.LogCritical("🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {Count}", chunks.Count);
 
             // 🔍 [DEBUG] 設定値のログ出力
             var enabled = _settings.CurrentValue.ProximityGrouping.Enabled;
             var verticalFactor = _settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor;
             Console.WriteLine($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
-            DebugLogUtility.WriteLog($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
+            _logger?.LogDebug($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
             _logger.LogCritical("🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {Enabled}, VerticalDistanceFactor: {Factor}",
                 enabled, verticalFactor);
 

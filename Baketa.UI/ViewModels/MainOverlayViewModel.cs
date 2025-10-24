@@ -74,7 +74,7 @@ public class MainOverlayViewModel : ViewModelBase
         // MainOverlayViewModel初期化時点でサーバーは準備完了しているため、falseで開始
         _isTranslationEngineInitializing = false;
         
-        DebugLogUtility.WriteLog("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
+        Logger?.LogDebug("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         
         // 直接ファイル書き込みでも記録
@@ -268,7 +268,7 @@ public class MainOverlayViewModel : ViewModelBase
                     });
                 }
 
-                DebugLogUtility.WriteLog($"🚀 EventHandler初期化状態変更: IsEventHandlerInitialized={value}");
+                Logger?.LogDebug($"🚀 EventHandler初期化状態変更: IsEventHandlerInitialized={value}");
             }
         }
     }
@@ -297,7 +297,7 @@ public class MainOverlayViewModel : ViewModelBase
                     });
                 }
 
-                DebugLogUtility.WriteLog($"🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態変更: IsTranslationEngineInitializing={value}");
+                Logger?.LogDebug($"🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態変更: IsTranslationEngineInitializing={value}");
             }
         }
     }
@@ -320,7 +320,7 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化完了チェックを追加（StartButton制御）
             // 🚀 EventHandler初期化完了チェックを追加（UI安全性向上）
             var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing;
-            DebugLogUtility.WriteLog($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
+            Logger?.LogDebug($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
 
             // デバッグ用に実際の状態をファイルログにも出力
             try
@@ -338,7 +338,7 @@ public class MainOverlayViewModel : ViewModelBase
         get 
         {
             var result = IsTranslationActive ? "Stop" : "Start";
-            DebugLogUtility.WriteLog($"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
+            Logger?.LogDebug($"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopText計算: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, 結果='{result}'");
             return result;
         }
@@ -390,19 +390,19 @@ public class MainOverlayViewModel : ViewModelBase
             var canExecuteObservable = this.WhenAnyValue(x => x.IsStartStopEnabled)
                 .Do(canExecute => 
                 {
-                    DebugLogUtility.WriteLog($"🔍 StartStopCommand canExecute変更: {canExecute}");
+                    Logger?.LogDebug($"🔍 StartStopCommand canExecute変更: {canExecute}");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopCommand canExecute変更: {canExecute}");
                 })
                 .ObserveOn(RxApp.MainThreadScheduler);
                 
-            DebugLogUtility.WriteLog("🏗️ ReactiveCommand.CreateFromTask開始");
+            Logger?.LogDebug("🏗️ ReactiveCommand.CreateFromTask開始");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏗️ ReactiveCommand.CreateFromTask開始");
                 
             var startStopCmd = ReactiveCommand.CreateFromTask(ExecuteStartStopAsync,
                 canExecuteObservable, // ローディング中は無効
                 outputScheduler: RxApp.MainThreadScheduler);
                 
-            DebugLogUtility.WriteLog("✅ ReactiveCommand.CreateFromTask完了");
+            Logger?.LogDebug("✅ ReactiveCommand.CreateFromTask完了");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ ReactiveCommand.CreateFromTask完了");
             
             // StartStopCommandの実行をトラッキング（開始と完了を分けて記録）
@@ -410,12 +410,12 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 if (isExecuting)
                 {
-                    DebugLogUtility.WriteLog("🚀 StartStopCommand実行開始");
+                    Logger?.LogDebug("🚀 StartStopCommand実行開始");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartStopCommand実行開始");
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog("✅ StartStopCommand実行完了");
+                    Logger?.LogDebug("✅ StartStopCommand実行完了");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ StartStopCommand実行完了");
                 }
             });
@@ -423,15 +423,15 @@ public class MainOverlayViewModel : ViewModelBase
             // コマンド結果の監視
             startStopCmd.Subscribe(result => 
             {
-                DebugLogUtility.WriteLog($"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
+                Logger?.LogDebug($"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
             });
             
             // StartStopCommandのエラーをトラッキング
             startStopCmd.ThrownExceptions.Subscribe(ex =>
             {
-                DebugLogUtility.WriteLog($"❌ StartStopCommandでエラー発生: {ex.Message}");
-                DebugLogUtility.WriteLog($"❌ スタックトレース: {ex.StackTrace}");
+                Logger?.LogDebug($"❌ StartStopCommandでエラー発生: {ex.Message}");
+                Logger?.LogDebug($"❌ スタックトレース: {ex.StackTrace}");
                 Logger?.LogError(ex, "StartStopCommandでエラーが発生しました");
             });
             
@@ -451,7 +451,7 @@ public class MainOverlayViewModel : ViewModelBase
             // SettingsCommandの実行をトラッキング
             settingsCmd.Subscribe(_ => 
             {
-                DebugLogUtility.WriteLog("🔧 SettingsCommandが実行されました");
+                Logger?.LogDebug("🔧 SettingsCommandが実行されました");
             });
             
             SettingsCommand = settingsCmd;
@@ -485,8 +485,8 @@ public class MainOverlayViewModel : ViewModelBase
         var initMessage1 = $"🎯 [INIT_STATE] IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}";
         var initMessage2 = $"🎯 [INIT_STATE] IsStartStopEnabled={IsStartStopEnabled}, StartStopText='{StartStopText}'";
         
-        DebugLogUtility.WriteLog(initMessage1);
-        DebugLogUtility.WriteLog(initMessage2);
+        Logger?.LogDebug(initMessage1);
+        Logger?.LogDebug(initMessage2);
         
         try
         {
@@ -502,7 +502,7 @@ public class MainOverlayViewModel : ViewModelBase
         this.WhenAnyValue(x => x.IsLoading)
             .Subscribe(isLoading =>
             {
-                DebugLogUtility.WriteLog($"🔄 IsLoading状態変更: {isLoading}");
+                Logger?.LogDebug($"🔄 IsLoading状態変更: {isLoading}");
                 this.RaisePropertyChanged(nameof(LoadingText));
                 this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                 this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
@@ -514,7 +514,7 @@ public class MainOverlayViewModel : ViewModelBase
         this.WhenAnyValue(x => x.IsOcrInitialized)
             .Subscribe(isInitialized =>
             {
-                DebugLogUtility.WriteLog($"🔄 OCR初期化状態変更: {isInitialized}");
+                Logger?.LogDebug($"🔄 OCR初期化状態変更: {isInitialized}");
                 this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
             });
             
@@ -522,7 +522,7 @@ public class MainOverlayViewModel : ViewModelBase
         this.WhenAnyValue(x => x.IsWindowSelected)
             .Subscribe(isSelected =>
             {
-                DebugLogUtility.WriteLog($"🔄 ウィンドウ選択状態変更: {isSelected}");
+                Logger?.LogDebug($"🔄 ウィンドウ選択状態変更: {isSelected}");
                 this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                 this.RaisePropertyChanged(nameof(StartStopText));
             });
@@ -539,7 +539,7 @@ public class MainOverlayViewModel : ViewModelBase
     {
         try
         {
-            DebugLogUtility.WriteLog("🔄 OCR初期化監視開始");
+            Logger?.LogDebug("🔄 OCR初期化監視開始");
             
             var timeout = TimeSpan.FromSeconds(30); // 30秒でタイムアウト
             var startTime = DateTime.UtcNow;
@@ -550,11 +550,11 @@ public class MainOverlayViewModel : ViewModelBase
                 {
                     // ServiceProviderからOCRサービスを取得して初期化状態をチェック
                     var serviceProvider = Program.ServiceProvider;
-                    DebugLogUtility.WriteLog($"🔍 ServiceProvider: {serviceProvider != null}");
+                    Logger?.LogDebug($"🔍 ServiceProvider: {serviceProvider != null}");
                     if (serviceProvider != null)
                     {
                         var ocrService = serviceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                        DebugLogUtility.WriteLog($"🔍 IOcrEngine取得: {ocrService != null}");
+                        Logger?.LogDebug($"🔍 IOcrEngine取得: {ocrService != null}");
                         if (ocrService != null)
                         {
                             // OCRサービスが初期化済みかチェック
@@ -565,7 +565,7 @@ public class MainOverlayViewModel : ViewModelBase
                                 {
                                     IsOcrInitialized = true;
                                     CurrentStatus = TranslationStatus.Idle;
-                                    DebugLogUtility.WriteLog("✅ OCR初期化完了 - UI状態更新");
+                                    Logger?.LogDebug("✅ OCR初期化完了 - UI状態更新");
                                 });
                                 return;
                             }
@@ -574,8 +574,8 @@ public class MainOverlayViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ OCR初期化チェックエラー: {ex.Message}");
-                    DebugLogUtility.WriteLog($"⚠️ スタックトレース: {ex.StackTrace}");
+                    Logger?.LogDebug($"⚠️ OCR初期化チェックエラー: {ex.Message}");
+                    Logger?.LogDebug($"⚠️ スタックトレース: {ex.StackTrace}");
                 }
                 
                 await Task.Delay(500).ConfigureAwait(false); // 500ms間隔でチェック
@@ -586,13 +586,13 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 IsOcrInitialized = true; // タイムアウト時は強制的に初期化済みとする
                 CurrentStatus = TranslationStatus.Idle;
-                DebugLogUtility.WriteLog("⏰ OCR初期化監視タイムアウト - 強制的に初期化済み状態に移行");
+                Logger?.LogDebug("⏰ OCR初期化監視タイムアウト - 強制的に初期化済み状態に移行");
             });
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "OCR初期化監視でエラーが発生");
-            DebugLogUtility.WriteLog($"❌ OCR初期化監視エラー: {ex.Message}");
+            Logger?.LogDebug($"❌ OCR初期化監視エラー: {ex.Message}");
             
             // エラー時も強制的に初期化済み状態にする
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -611,8 +611,8 @@ public class MainOverlayViewModel : ViewModelBase
         try
         {
             // 🔥 [PHASE13.2.21] 型情報診断ログ追加
-            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.21] IOcrEngine実際の型: {ocrService.GetType().FullName}");
-            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.21] IOcrEngine.GetType().Name: {ocrService.GetType().Name}");
+            Logger?.LogDebug($"🔍 [PHASE13.2.21] IOcrEngine実際の型: {ocrService.GetType().FullName}");
+            Logger?.LogDebug($"🔍 [PHASE13.2.21] IOcrEngine.GetType().Name: {ocrService.GetType().Name}");
 
             // 🔥 [PHASE13.2.30] WarmupAsync重複実行防止: PooledOcrServiceが自動的にWarmupAsyncを実行
             // 根本原因: MainOverlayViewModelとPooledOcrService両方がWarmupAsyncを呼び出し、
@@ -622,28 +622,28 @@ public class MainOverlayViewModel : ViewModelBase
             if (ocrService.GetType().GetProperty("IsInitialized") is var prop && prop != null)
             {
                 var isInitialized = (bool)(prop.GetValue(ocrService) ?? false);
-                DebugLogUtility.WriteLog($"🔍 [PHASE13.2.30] OCR IsInitialized: {isInitialized}");
+                Logger?.LogDebug($"🔍 [PHASE13.2.30] OCR IsInitialized: {isInitialized}");
 
                 if (isInitialized)
                 {
                     // ✅ [PHASE13.2.30] PooledOcrServiceが既にWarmupAsync実行済み - そのまま成功を返す
-                    DebugLogUtility.WriteLog("✅ [PHASE13.2.30] PooledOcrService初期化済み - WarmupAsync不要");
+                    Logger?.LogDebug("✅ [PHASE13.2.30] PooledOcrService初期化済み - WarmupAsync不要");
                     return true;
                 }
 
                 // 未初期化の場合はInitializeAsync()を呼び出す（後続のフォールバック処理へ）
-                DebugLogUtility.WriteLog("🔍 [PHASE13.2.30] IsInitialized=false - InitializeAsync実行へ");
+                Logger?.LogDebug("🔍 [PHASE13.2.30] IsInitialized=false - InitializeAsync実行へ");
             }
 
             // フォールバック: InitializeAsyncを呼んでみて、初期化結果を返す
-            DebugLogUtility.WriteLog("🔥 [PHASE13.2.20] OCR InitializeAsync呼び出し開始");
+            Logger?.LogDebug("🔥 [PHASE13.2.20] OCR InitializeAsync呼び出し開始");
             var result = await ocrService.InitializeAsync().ConfigureAwait(false);
-            DebugLogUtility.WriteLog($"🔍 [PHASE13.2.20] OCR InitializeAsync結果: {result}");
+            Logger?.LogDebug($"🔍 [PHASE13.2.20] OCR InitializeAsync結果: {result}");
             return result;
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ OCR初期化チェックエラー: {ex.Message}");
+            Logger?.LogDebug($"❌ OCR初期化チェックエラー: {ex.Message}");
             return false;
         }
     }
@@ -654,7 +654,7 @@ public class MainOverlayViewModel : ViewModelBase
 
     private async Task ExecuteSelectWindowAsync()
     {
-        DebugLogUtility.WriteLog("🖥️ ExecuteSelectWindowAsync開始");
+        Logger?.LogDebug("🖥️ ExecuteSelectWindowAsync開始");
         Console.WriteLine("🖥️ MainOverlayViewModel.ExecuteSelectWindowAsync開始");
         Logger?.LogInformation("ウィンドウ選択処理開始");
         
@@ -664,7 +664,7 @@ public class MainOverlayViewModel : ViewModelBase
             
             // 🔒 安全化: ウィンドウ選択開始前にネイティブキャプチャを一時停止
             Console.WriteLine("🔒 [SAFETY] ネイティブキャプチャを一時停止します");
-            DebugLogUtility.WriteLog("🔒 [SAFETY] ネイティブキャプチャを一時停止します");
+            Logger?.LogDebug("🔒 [SAFETY] ネイティブキャプチャを一時停止します");
             Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.PauseForWindowSelection();
             
             Console.WriteLine("🔧 _windowManagementService.ShowWindowSelectionAsync()呼び出し開始");
@@ -678,22 +678,22 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 // 🔒 安全化: キャンセル時もネイティブキャプチャを再開
                 Console.WriteLine("🚀 [SAFETY] ウィンドウ選択キャンセル - ネイティブキャプチャを再開します");
-                DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択キャンセル - ネイティブキャプチャを再開します");
+                Logger?.LogDebug("🚀 [SAFETY] ウィンドウ選択キャンセル - ネイティブキャプチャを再開します");
                 Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
                 
-                DebugLogUtility.WriteLog("❌ ウィンドウ選択がキャンセルされました");
+                Logger?.LogDebug("❌ ウィンドウ選択がキャンセルされました");
                 Console.WriteLine("❌ ウィンドウ選択がキャンセルされました");
                 Logger?.LogDebug("ウィンドウ選択がキャンセルされました");
                 return;
             }
             
-            DebugLogUtility.WriteLog($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Logger?.LogDebug($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
             Console.WriteLine($"✅ ウィンドウが選択されました: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
             Logger?.LogInformation("ウィンドウが選択されました: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
             
             // 🔒 安全化: ウィンドウ選択完了後にネイティブキャプチャを再開
             Console.WriteLine("🚀 [SAFETY] ウィンドウ選択完了 - ネイティブキャプチャを再開します");
-            DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択完了 - ネイティブキャプチャを再開します");
+            Logger?.LogDebug("🚀 [SAFETY] ウィンドウ選択完了 - ネイティブキャプチャを再開します");
             Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -703,7 +703,7 @@ public class MainOverlayViewModel : ViewModelBase
                 CurrentStatus = TranslationStatus.Ready; // 準備完了状態
             });
             
-            DebugLogUtility.WriteLog($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
+            Logger?.LogDebug($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
             Console.WriteLine($"✅ ウィンドウ選択処理完了 - IsWindowSelected: {IsWindowSelected}, IsStartStopEnabled: {IsStartStopEnabled}");
             Logger?.LogInformation("ウィンドウ選択処理完了");
         }
@@ -711,13 +711,13 @@ public class MainOverlayViewModel : ViewModelBase
         {
             // 🔒 安全化: エラー時もネイティブキャプチャを再開
             Console.WriteLine("🚀 [SAFETY] ウィンドウ選択エラー - ネイティブキャプチャを再開します");
-            DebugLogUtility.WriteLog("🚀 [SAFETY] ウィンドウ選択エラー - ネイティブキャプチャを再開します");
+            Logger?.LogDebug("🚀 [SAFETY] ウィンドウ選択エラー - ネイティブキャプチャを再開します");
             Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper.ResumeAfterWindowSelection();
             
             Logger?.LogError(ex, "ウィンドウ選択処理中にエラーが発生");
             Console.WriteLine($"💥 MainOverlayViewModel.ExecuteSelectWindowAsyncエラー: {ex.Message}");
             Console.WriteLine($"💥 スタックトレース: {ex.StackTrace}");
-            DebugLogUtility.WriteLog($"❌ ウィンドウ選択処理エラー: {ex.Message}");
+            Logger?.LogDebug($"❌ ウィンドウ選択処理エラー: {ex.Message}");
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -731,8 +731,8 @@ public class MainOverlayViewModel : ViewModelBase
     {
         Console.WriteLine("🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         Console.WriteLine($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
-        DebugLogUtility.WriteLog("🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
-        DebugLogUtility.WriteLog($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+        Logger?.LogDebug("🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
+        Logger?.LogDebug($"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
 
@@ -742,7 +742,7 @@ public class MainOverlayViewModel : ViewModelBase
             var trigger = $"execute_{operation.ToLower(CultureInfo.InvariantCulture)}_button_pressed";
             var context = $"ExecuteStartStopAsync {operation} operation";
             
-            DebugLogUtility.WriteLog($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
+            Logger?.LogDebug($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
             Console.WriteLine($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
             
             await _diagnosticReportService.GenerateReportAsync(trigger, context).ConfigureAwait(false);
@@ -750,18 +750,18 @@ public class MainOverlayViewModel : ViewModelBase
         
         try
         {
-            DebugLogUtility.WriteLog($"🔍 IsTranslationActive = {IsTranslationActive}");
+            Logger?.LogDebug($"🔍 IsTranslationActive = {IsTranslationActive}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 IsTranslationActive = {IsTranslationActive}");
             
             if (IsTranslationActive)
             {
-                DebugLogUtility.WriteLog("🔴 StopTranslationAsync呼び出し");
+                Logger?.LogDebug("🔴 StopTranslationAsync呼び出し");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 StopTranslationAsync呼び出し");
                 await StopTranslationAsync().ConfigureAwait(false);
             }
             else
             {
-                DebugLogUtility.WriteLog("🟢 StartTranslationAsync呼び出し");
+                Logger?.LogDebug("🟢 StartTranslationAsync呼び出し");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🟢 StartTranslationAsync呼び出し");
                 await StartTranslationAsync().ConfigureAwait(false);
             }
@@ -781,12 +781,12 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task StartTranslationAsync()
     {
         var overallTimer = System.Diagnostics.Stopwatch.StartNew();
-        DebugLogUtility.WriteLog("🚀 StartTranslationAsync開始");
+        Logger?.LogDebug("🚀 StartTranslationAsync開始");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🚀 StartTranslationAsync開始");
         Logger?.LogInformation("🚀 翻訳ワークフローを開始");
 
         // 🔧 診断レポート生成（統一サービス使用）
-        DebugLogUtility.WriteLog("📊 診断レポート生成開始（統一サービス使用 - Start押下時）");
+        Logger?.LogDebug("📊 診断レポート生成開始（統一サービス使用 - Start押下時）");
         await _diagnosticReportService.GenerateReportAsync("start_button_pressed", "StartTranslationAsync operation").ConfigureAwait(false);
 
         try
@@ -795,38 +795,38 @@ public class MainOverlayViewModel : ViewModelBase
             var selectedWindow = SelectedWindow;
             if (selectedWindow == null)
             {
-                DebugLogUtility.WriteLog("❌ ウィンドウが選択されていません");
+                Logger?.LogDebug("❌ ウィンドウが選択されていません");
                 Logger?.LogError("ウィンドウが選択されていない状態で翻訳開始が要求されました");
                 return;
             }
 
-            DebugLogUtility.WriteLog($"✅ 選択済みウィンドウを使用: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Logger?.LogDebug($"✅ 選択済みウィンドウを使用: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
             Logger?.LogInformation("選択済みウィンドウを使用: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
 
             // ローディング状態開始（ウィンドウ選択後）
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsLoading = true;
-                DebugLogUtility.WriteLog($"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
+                Logger?.LogDebug($"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
             });
             
             // 画面中央ローディングオーバーレイ表示
-            DebugLogUtility.WriteLog("🔄 LoadingOverlayManager.ShowAsync呼び出し開始");
+            Logger?.LogDebug("🔄 LoadingOverlayManager.ShowAsync呼び出し開始");
             try
             {
                 await _loadingManager.ShowAsync().ConfigureAwait(false);
-                DebugLogUtility.WriteLog("✅ LoadingOverlayManager.ShowAsync呼び出し完了");
+                Logger?.LogDebug("✅ LoadingOverlayManager.ShowAsync呼び出し完了");
             }
             catch (Exception loadingEx)
             {
-                DebugLogUtility.WriteLog($"❌ LoadingOverlayManager.ShowAsync例外: {loadingEx.Message}");
+                Logger?.LogDebug($"❌ LoadingOverlayManager.ShowAsync例外: {loadingEx.Message}");
                 Logger?.LogError(loadingEx, "ローディングオーバーレイ表示に失敗");
             }
 
             // 2. 翻訳開始
             var uiTimer = System.Diagnostics.Stopwatch.StartNew();
-            DebugLogUtility.WriteLog("📊 翻訳状態をアクティブに設定");
+            Logger?.LogDebug("📊 翻訳状態をアクティブに設定");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📊 翻訳状態をアクティブに設定");
             Logger?.LogDebug("📊 翻訳状態をキャプチャ中に設定");
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -835,50 +835,50 @@ public class MainOverlayViewModel : ViewModelBase
                 IsTranslationActive = true;
                 IsTranslationResultVisible = true; // 翻訳開始時は表示状態に設定
                 IsLoading = false; // ローディング状態終了
-                DebugLogUtility.WriteLog($"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
+                Logger?.LogDebug($"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
             });
             
             // 画面中央ローディングオーバーレイ非表示
-            DebugLogUtility.WriteLog("🔄 LoadingOverlayManager.HideAsync呼び出し開始");
+            Logger?.LogDebug("🔄 LoadingOverlayManager.HideAsync呼び出し開始");
             try
             {
                 await _loadingManager.HideAsync().ConfigureAwait(false);
-                DebugLogUtility.WriteLog("✅ LoadingOverlayManager.HideAsync呼び出し完了");
+                Logger?.LogDebug("✅ LoadingOverlayManager.HideAsync呼び出し完了");
             }
             catch (Exception loadingEx)
             {
-                DebugLogUtility.WriteLog($"❌ LoadingOverlayManager.HideAsync例外: {loadingEx.Message}");
+                Logger?.LogDebug($"❌ LoadingOverlayManager.HideAsync例外: {loadingEx.Message}");
                 Logger?.LogError(loadingEx, "ローディングオーバーレイ非表示に失敗");
             }
             uiTimer.Stop();
-            DebugLogUtility.WriteLog($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
+            Logger?.LogDebug($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
 
             // オーバーレイマネージャーを初期化
             var overlayInitTimer = System.Diagnostics.Stopwatch.StartNew();
-            DebugLogUtility.WriteLog("🖼️ オーバーレイマネージャー初期化開始");
+            Logger?.LogDebug("🖼️ オーバーレイマネージャー初期化開始");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
             Logger?.LogDebug("🖼️ オーバーレイマネージャーを初期化");
             
             await _inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
             overlayInitTimer.Stop();
-            DebugLogUtility.WriteLog($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
+            Logger?.LogDebug($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
             
             // オーバーレイマネージャーを表示状態に設定
-            DebugLogUtility.WriteLog("🖼️ オーバーレイマネージャー表示状態設定開始");
+            Logger?.LogDebug("🖼️ オーバーレイマネージャー表示状態設定開始");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー表示状態設定開始");
             // ARオーバーレイは自動で表示管理（表示はTextChunk個別処理）
-            DebugLogUtility.WriteLog("✅ オーバーレイマネージャー表示状態設定完了");
+            Logger?.LogDebug("✅ オーバーレイマネージャー表示状態設定完了");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー表示状態設定完了");
 
             var eventTimer = System.Diagnostics.Stopwatch.StartNew();
-            DebugLogUtility.WriteLog("📢 StartTranslationRequestEventを発行");
+            Logger?.LogDebug("📢 StartTranslationRequestEventを発行");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📢 StartTranslationRequestEventを発行");
             Logger?.LogDebug("📢 StartTranslationRequestEventを発行");
             var startTranslationEvent = new StartTranslationRequestEvent(selectedWindow);
-            DebugLogUtility.WriteLog($"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
+            Logger?.LogDebug($"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"📨 EventID: {startTranslationEvent.Id}, TargetWindow: {selectedWindow.Title}");
             
             // 直接ファイル書き込みでイベント発行を記録
@@ -903,11 +903,11 @@ public class MainOverlayViewModel : ViewModelBase
             }
             
             eventTimer.Stop();
-            DebugLogUtility.WriteLog($"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
+            Logger?.LogDebug($"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
 
             overallTimer.Stop();
-            DebugLogUtility.WriteLog($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
+            Logger?.LogDebug($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
             
             Logger?.LogInformation("🎉 翻訳が正常に開始されました: '{Title}' - 総処理時間: {TotalMs}ms", selectedWindow.Title, overallTimer.ElapsedMilliseconds);
         }
@@ -922,7 +922,7 @@ public class MainOverlayViewModel : ViewModelBase
             }
             catch (Exception loadingEx)
             {
-                DebugLogUtility.WriteLog($"⚠️ ローディング非表示エラー: {loadingEx.Message}");
+                Logger?.LogDebug($"⚠️ ローディング非表示エラー: {loadingEx.Message}");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ ローディング非表示エラー: {loadingEx.Message}");
             }
             
@@ -931,7 +931,7 @@ public class MainOverlayViewModel : ViewModelBase
                 CurrentStatus = TranslationStatus.Idle; // エラー時は待機状態に戻す
                 IsTranslationActive = false;
                 IsLoading = false; // ローディング状態終了
-                DebugLogUtility.WriteLog($"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
+                Logger?.LogDebug($"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
             });
         }
@@ -944,66 +944,66 @@ public class MainOverlayViewModel : ViewModelBase
 
         try
         {
-            DebugLogUtility.WriteLog("🔴 翻訳停止処理開始");
+            Logger?.LogDebug("🔴 翻訳停止処理開始");
             Logger?.LogInformation("Stopping translation");
 
             // 🔥 [STOP_CLEANUP] セマフォ強制リセット - タイムアウト中でも即座にクリーンアップ
             // 問題: gRPCタイムアウト中（0-10秒）にStopしても、セマフォが保持されたまま
             // 解決策: AggregatedChunksReadyEventHandlerのセマフォを強制解放
             Console.WriteLine("🚀 [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し直前");
-            DebugLogUtility.WriteLog("🚀 [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し直前");
+            Logger?.LogDebug("🚀 [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し直前");
             Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler.ResetSemaphoreForStop();
             Console.WriteLine("✅ [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し完了");
-            DebugLogUtility.WriteLog("✅ [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し完了");
+            Logger?.LogDebug("✅ [STOP_CLEANUP_DEBUG] MainOverlayViewModel - ResetSemaphoreForStop()呼び出し完了");
 
             // 翻訳停止（ウィンドウ選択状態は維持）
-            DebugLogUtility.WriteLog("🔴 翻訳状態をアイドルに設定");
+            Logger?.LogDebug("🔴 翻訳状態をアイドルに設定");
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
                 IsTranslationActive = false;
                 IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
                 // IsWindowSelectedとSelectedWindowは維持（再選択不要）
-                DebugLogUtility.WriteLog($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
+                Logger?.LogDebug($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
             });
 
             // 🚀 RACE CONDITION FIX: StopTranslationRequestEventを最優先で発行（Task.Run終了の影響を回避）
-            DebugLogUtility.WriteLog("🚀 [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行開始");
+            Logger?.LogDebug("🚀 [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行開始");
             try
             {
                 var stopTranslationEvent = new StopTranslationRequestEvent();
                 await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
                 stopEventPublished = true;
-                DebugLogUtility.WriteLog("✅ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行成功");
+                Logger?.LogDebug("✅ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行成功");
             }
             catch (Exception eventEx)
             {
-                DebugLogUtility.WriteLog($"❌ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行失敗: {eventEx.Message}");
+                Logger?.LogDebug($"❌ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行失敗: {eventEx.Message}");
                 // イベント発行失敗でも継続（後でリトライ）
             }
 
             // オーバーレイを非表示にしてリセット（OCRリセットとは独立処理）
-            DebugLogUtility.WriteLog("🔄 オーバーレイ非表示・リセット開始");
+            Logger?.LogDebug("🔄 オーバーレイ非表示・リセット開始");
             try
             {
                 await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
-                DebugLogUtility.WriteLog("✅ オーバーレイ非表示完了");
+                Logger?.LogDebug("✅ オーバーレイ非表示完了");
                 await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
-                DebugLogUtility.WriteLog("✅ オーバーレイリセット完了");
+                Logger?.LogDebug("✅ オーバーレイリセット完了");
             }
             catch (Exception overlayEx)
             {
-                DebugLogUtility.WriteLog($"⚠️ オーバーレイ処理エラー（OCRリセットには影響なし）: {overlayEx.Message}");
+                Logger?.LogDebug($"⚠️ オーバーレイ処理エラー（OCRリセットには影響なし）: {overlayEx.Message}");
                 // オーバーレイエラーはOCRリセットに影響しないため継続
             }
 
-            DebugLogUtility.WriteLog("✅ 翻訳停止処理完了");
+            Logger?.LogDebug("✅ 翻訳停止処理完了");
             Logger?.LogInformation("Translation stopped successfully");
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ StopTranslationAsync例外発生: {ex.Message}");
-            DebugLogUtility.WriteLog($"❌ StackTrace: {ex.StackTrace}");
+            Logger?.LogDebug($"❌ StopTranslationAsync例外発生: {ex.Message}");
+            Logger?.LogDebug($"❌ StackTrace: {ex.StackTrace}");
             Logger?.LogError(ex, "StopTranslationAsync中に例外発生");
         }
         finally
@@ -1013,14 +1013,14 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 try
                 {
-                    DebugLogUtility.WriteLog("🔄 [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行");
+                    Logger?.LogDebug("🔄 [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行");
                     var fallbackStopEvent = new StopTranslationRequestEvent();
                     await PublishEventAsync(fallbackStopEvent).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog("✅ [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行成功");
+                    Logger?.LogDebug("✅ [FINAL_FALLBACK] StopTranslationRequestEvent最終フォールバック発行成功");
                 }
                 catch (Exception eventEx)
                 {
-                    DebugLogUtility.WriteLog($"❌ [FINAL_FALLBACK] 最終フォールバックイベント発行も失敗: {eventEx.Message}");
+                    Logger?.LogDebug($"❌ [FINAL_FALLBACK] 最終フォールバックイベント発行も失敗: {eventEx.Message}");
                     Logger?.LogError(eventEx, "最終フォールバックStopTranslationRequestEvent発行失敗");
                 }
             }
@@ -1029,13 +1029,13 @@ public class MainOverlayViewModel : ViewModelBase
 
     private async void ExecuteShowHide()
     {
-        DebugLogUtility.WriteLog($"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
+        Logger?.LogDebug($"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteShowHide開始 - IsTranslationActive: {IsTranslationActive}, IsTranslationResultVisible: {IsTranslationResultVisible}");
         
         // 翻訳が非アクティブの場合は何もしない（安全措置）
         if (!IsTranslationActive)
         {
-            DebugLogUtility.WriteLog("⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
+            Logger?.LogDebug("⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ 翻訳が非アクティブのため、非表示ボタンの操作をスキップ");
             Logger?.LogWarning("非表示ボタンが翻訳非アクティブ時に押されました");
             return;
@@ -1044,18 +1044,18 @@ public class MainOverlayViewModel : ViewModelBase
         Logger?.LogDebug("Show/Hide toggle requested - Current: {Current} -> New: {New}", IsTranslationResultVisible, !IsTranslationResultVisible);
         
         var newVisibility = !IsTranslationResultVisible;
-        DebugLogUtility.WriteLog($"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
+        Logger?.LogDebug($"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 表示状態変更: {IsTranslationResultVisible} -> {newVisibility}");
         
         IsTranslationResultVisible = newVisibility;
         
         // 重複処理除去: オーバーレイの制御はTranslationFlowEventProcessorで一元管理
-        DebugLogUtility.WriteLog($"👁️ オーバーレイ表示状態変更: {IsTranslationResultVisible} (処理はイベント経由で実行)");
+        Logger?.LogDebug($"👁️ オーバーレイ表示状態変更: {IsTranslationResultVisible} (処理はイベント経由で実行)");
         
         var toggleEvent = new ToggleTranslationDisplayRequestEvent(IsTranslationResultVisible);
         await PublishEventAsync(toggleEvent).ConfigureAwait(false);
         
-        DebugLogUtility.WriteLog($"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
+        Logger?.LogDebug($"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 非表示ボタン処理完了 - IsTranslationResultVisible: {IsTranslationResultVisible}, Text: '{ShowHideText}', Icon: '{ShowHideIcon}'");
         Logger?.LogDebug("Translation display visibility toggled: {IsVisible}", IsTranslationResultVisible);
     }
@@ -1065,13 +1065,13 @@ public class MainOverlayViewModel : ViewModelBase
     private async void ExecuteSettings()
     {
         // 即座にアラートを表示してコマンドが呼ばれたことを確認
-        DebugLogUtility.WriteLog("🚨🚨🚨 ExecuteSettings が呼ばれました！🚨🚨🚨");
+        Logger?.LogDebug("🚨🚨🚨 ExecuteSettings が呼ばれました！🚨🚨🚨");
         
         try
         {
             var currentDialogHash = _currentSettingsDialog?.GetHashCode();
-            DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] ExecuteSettings開始 - 現在のダイアログ: {currentDialogHash}");
-            DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] IsLoading: {IsLoading}, SettingsEnabled: {SettingsEnabled}");
+            Logger?.LogDebug($"🔧 [MainOverlayViewModel] ExecuteSettings開始 - 現在のダイアログ: {currentDialogHash}");
+            Logger?.LogDebug($"🔧 [MainOverlayViewModel] IsLoading: {IsLoading}, SettingsEnabled: {SettingsEnabled}");
             DebugHelper.Log($"🔧 [MainOverlayViewModel] ExecuteSettings開始 - 現在のダイアログ: {currentDialogHash}");
             
             // 既に設定画面が開いている場合は何もしない
@@ -1126,11 +1126,11 @@ public class MainOverlayViewModel : ViewModelBase
             // ダイアログが閉じられたときの処理
             _currentSettingsDialog!.Closed += (_, _) =>
             {
-                DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] Settings dialog Closedイベント - ダイアログ: {dialogHash}");
+                Logger?.LogDebug($"🔧 [MainOverlayViewModel] Settings dialog Closedイベント - ダイアログ: {dialogHash}");
                 Logger?.LogDebug("Settings dialog closed event received");
                 var previousDialog = _currentSettingsDialog;
                 _currentSettingsDialog = null;
-                DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] _currentSettingsDialogをnullに設定 - 前の値: {previousDialog?.GetHashCode()}");
+                Logger?.LogDebug($"🔧 [MainOverlayViewModel] _currentSettingsDialogをnullに設定 - 前の値: {previousDialog?.GetHashCode()}");
             };
 
             // ViewModelのCloseRequestedイベントハンドル - 直接Close()を呼び出し
@@ -1138,20 +1138,20 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 settingsViewModel.CloseRequested += () =>
                 {
-                    DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] Settings dialog close requested by ViewModel - VM: {vmHash}");
+                    Logger?.LogDebug($"🔧 [MainOverlayViewModel] Settings dialog close requested by ViewModel - VM: {vmHash}");
                     Logger?.LogDebug("Settings dialog close requested by ViewModel");
                     var dialog = _currentSettingsDialog;
                     var currentDialogHash2 = dialog?.GetHashCode();
-                    DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] 現在のダイアログ状態: {currentDialogHash2}, 作成時: {dialogHash}");
+                    Logger?.LogDebug($"🔧 [MainOverlayViewModel] 現在のダイアログ状態: {currentDialogHash2}, 作成時: {dialogHash}");
                     if (dialog != null)
                     {
-                        DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] 直接Close()を呼び出し - 対象: {currentDialogHash2}");
+                        Logger?.LogDebug($"🔧 [MainOverlayViewModel] 直接Close()を呼び出し - 対象: {currentDialogHash2}");
                         dialog.Close();
-                        DebugLogUtility.WriteLog($"🔧 [MainOverlayViewModel] Close()完了 - 対象: {currentDialogHash2}");
+                        Logger?.LogDebug($"🔧 [MainOverlayViewModel] Close()完了 - 対象: {currentDialogHash2}");
                     }
                     else
                     {
-                        DebugLogUtility.WriteLog($"⚠️ [MainOverlayViewModel] _currentSettingsDialogがnull");
+                        Logger?.LogDebug($"⚠️ [MainOverlayViewModel] _currentSettingsDialogがnull");
                     }
                 };
             }
@@ -1176,13 +1176,13 @@ public class MainOverlayViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"💥 [MainOverlayViewModel] ExecuteSettingsエラー: {ex.Message}");
-            DebugLogUtility.WriteLog($"💥 [MainOverlayViewModel] スタックトレース: {ex.StackTrace}");
+            Logger?.LogDebug($"💥 [MainOverlayViewModel] ExecuteSettingsエラー: {ex.Message}");
+            Logger?.LogDebug($"💥 [MainOverlayViewModel] スタックトレース: {ex.StackTrace}");
             DebugHelper.Log($"💥 [MainOverlayViewModel] ExecuteSettingsエラー: {ex.Message}");
             DebugHelper.Log($"💥 [MainOverlayViewModel] スタックトレース: {ex.StackTrace}");
             if (ex.InnerException != null)
             {
-                DebugLogUtility.WriteLog($"💥 [MainOverlayViewModel] InnerException: {ex.InnerException.Message}");
+                Logger?.LogDebug($"💥 [MainOverlayViewModel] InnerException: {ex.InnerException.Message}");
                 DebugHelper.Log($"💥 [MainOverlayViewModel] InnerException: {ex.InnerException.Message}");
             }
             Logger?.LogError(ex, "Failed to open settings dialog");
@@ -1279,7 +1279,7 @@ public class MainOverlayViewModel : ViewModelBase
                 if (eventData.IsServerReady)
                 {
                     Logger?.LogInformation("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
-                    DebugLogUtility.WriteLog("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
+                    Logger?.LogDebug("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
                 }
                 else
                 {
@@ -1287,12 +1287,12 @@ public class MainOverlayViewModel : ViewModelBase
                     if (eventData.StatusMessage.Contains("エラー"))
                     {
                         Logger?.LogWarning("❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー - StartButton無効化");
-                        DebugLogUtility.WriteLog($"❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー: {eventData.StatusMessage}");
+                        Logger?.LogDebug($"❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー: {eventData.StatusMessage}");
                     }
                     else
                     {
                         Logger?.LogInformation("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
-                        DebugLogUtility.WriteLog("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
+                        Logger?.LogDebug("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
                     }
                 }
             });
@@ -1302,7 +1302,7 @@ public class MainOverlayViewModel : ViewModelBase
         catch (Exception ex)
         {
             Logger?.LogError(ex, "❌ [PHASE2_PROBLEM2] Pythonサーバー状態変更イベント処理エラー");
-            DebugLogUtility.WriteLog($"❌ [PHASE2_PROBLEM2] イベント処理エラー: {ex.Message}");
+            Logger?.LogDebug($"❌ [PHASE2_PROBLEM2] イベント処理エラー: {ex.Message}");
         }
     }
 

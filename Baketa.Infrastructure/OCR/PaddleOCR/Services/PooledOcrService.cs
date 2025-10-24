@@ -1,4 +1,4 @@
-using Microsoft.Extensions.ObjectPool;
+﻿using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.OCR;
@@ -54,31 +54,31 @@ public sealed class PooledOcrService : IOcrEngine
     {
         ThrowIfDisposed();
 
-        Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE13.2.25] PooledOcrService.WarmupAsync開始");
+        _logger?.LogDebug("🔥🔥🔥 [PHASE13.2.25] PooledOcrService.WarmupAsync開始");
         _logger.LogInformation("🔥 PooledOcrServiceウォームアップ開始");
 
         // プールから最初のエンジンを取得してウォームアップ
         var engine = _enginePool.Get();
-        Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [PHASE13.2.25] enginePool.Get()完了 - engine型: {engine?.GetType().Name ?? "NULL"}");
+        _logger?.LogDebug($"🔥 [PHASE13.2.25] enginePool.Get()完了 - engine型: {engine?.GetType().Name ?? "NULL"}");
         if (engine == null)
         {
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("❌❌❌ [PHASE13.2.25] engine == null");
+            _logger?.LogDebug("❌❌❌ [PHASE13.2.25] engine == null");
             _logger.LogError("❌ PooledOcrService: ウォームアップ用エンジンを取得できませんでした");
             return false;
         }
 
         try
         {
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🚨 [PHASE13.2.25] engine.WarmupAsync()呼び出し直前");
+            _logger?.LogDebug("🚨 [PHASE13.2.25] engine.WarmupAsync()呼び出し直前");
             var result = await engine.WarmupAsync(cancellationToken);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog($"✅ [PHASE13.2.25] engine.WarmupAsync()完了 - 結果: {result}");
+            _logger?.LogDebug($"✅ [PHASE13.2.25] engine.WarmupAsync()完了 - 結果: {result}");
             _logger.LogInformation($"✅ PooledOcrServiceウォームアップ結果: {result}");
             return result;
         }
         finally
         {
             _enginePool.Return(engine);
-            Baketa.Core.Utilities.DebugLogUtility.WriteLog("🔍 [PHASE13.2.25] enginePool.Return()完了");
+            _logger?.LogDebug("🔍 [PHASE13.2.25] enginePool.Return()完了");
         }
     }
 

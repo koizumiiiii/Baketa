@@ -522,7 +522,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})", 
                 selectedWindow.Title, selectedWindow.Handle);
             
-            DebugLogUtility.WriteLog($"📢 ウィンドウ選択実行: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
+            Logger?.LogDebug($"📢 ウィンドウ選択実行: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
 
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -530,13 +530,13 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                 IsClosed = true;
             });
 
-            DebugLogUtility.WriteLog($"✅ ウィンドウ選択ダイアログ完了: DialogResult設定済み");
+            Logger?.LogDebug($"✅ ウィンドウ選択ダイアログ完了: DialogResult設定済み");
             Logger?.LogDebug("Window selection processing completed");
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Error during window selection processing: {ErrorMessage}", ex.Message);
-            DebugLogUtility.WriteLog($"❌ ウィンドウ選択処理エラー: {ex.Message}");
+            Logger?.LogDebug($"❌ ウィンドウ選択処理エラー: {ex.Message}");
         }
     }
 

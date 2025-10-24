@@ -77,7 +77,7 @@ public static class BaketaLogManager
             catch (Exception ex)
             {
                 // 初期化失敗時は既存のDebugLogUtilityにフォールバック
-                DebugLogUtility.WriteLog($"❌ BaketaLogManager initialization failed: {ex.Message}");
+                Console.WriteLine($"❌ BaketaLogManager initialization failed: {ex.Message}");
                 throw;
             }
         }
@@ -177,7 +177,7 @@ public static class BaketaLogManager
         }
         
         // 既存のDebugLogUtilityとの統合（段階的移行のため）
-        DebugLogUtility.WriteLog(message);
+        Console.WriteLine(message);
     }
     
     /// <summary>
@@ -215,7 +215,7 @@ public static class BaketaLogManager
         }
         
         // 既存のDebugLogUtilityとの統合
-        DebugLogUtility.WriteLog($"❌ ERROR in {context}: {ex.Message}");
+        Console.WriteLine($"❌ ERROR in {context}: {ex.Message}");
     }
     
     /// <summary>
@@ -239,7 +239,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ BaketaLogManager shutdown error: {ex.Message}");
+            Console.WriteLine($"❌ BaketaLogManager shutdown error: {ex.Message}");
         }
         finally
         {
@@ -265,7 +265,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ BaketaLogManager background task error: {ex.Message}");
+            Console.WriteLine($"❌ BaketaLogManager background task error: {ex.Message}");
         }
     }
     
@@ -289,7 +289,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ Failed to write log to {operation.FilePath}: {ex.Message}");
+            Console.WriteLine($"❌ Failed to write log to {operation.FilePath}: {ex.Message}");
         }
         finally
         {
@@ -322,7 +322,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ Failed to write log synchronously to {operation.FilePath}: {ex.Message}");
+            Console.WriteLine($"❌ Failed to write log synchronously to {operation.FilePath}: {ex.Message}");
         }
     }
     
@@ -347,7 +347,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ Log rotation failed for {filePath}: {ex.Message}");
+            Console.WriteLine($"❌ Log rotation failed for {filePath}: {ex.Message}");
         }
     }
     
@@ -370,7 +370,7 @@ public static class BaketaLogManager
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ Log rotation failed for {filePath}: {ex.Message}");
+            Console.WriteLine($"❌ Log rotation failed for {filePath}: {ex.Message}");
         }
     }
 }

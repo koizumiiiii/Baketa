@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -255,7 +255,7 @@ public sealed class EventHandlerInitializationService(
                 eventAggregator.Subscribe<Baketa.Core.Events.Translation.AggregatedChunksReadyEvent>(aggregatedChunksReadyHandler);
                 _logger.LogInformation("🎉 AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
                 Console.WriteLine("🎉 [PHASE12.2] AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
-                Baketa.Core.Utilities.DebugLogUtility.WriteLog("🎉 [PHASE12.2] AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
+                _logger?.LogDebug("🎉 [PHASE12.2] AggregatedChunksReadyHandlerを登録しました - TimedChunkAggregatorイベント駆動処理");
 
                 // 確実なファイル記録
                 try
@@ -269,7 +269,7 @@ public sealed class EventHandlerInitializationService(
             {
                 _logger.LogError(ex, "AggregatedChunksReadyHandlerの登録に失敗しました");
                 Console.WriteLine($"🔥 [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}");
-                Baketa.Core.Utilities.DebugLogUtility.WriteLog($"🔥 [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}");
+                _logger?.LogDebug($"🔥 [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}");
 
                 // 確実なファイル記録
                 try

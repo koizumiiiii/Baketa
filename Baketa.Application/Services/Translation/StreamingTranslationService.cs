@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -47,7 +47,7 @@ public class StreamingTranslationService : IStreamingTranslationService
         IEventAggregator? eventAggregator = null)
     {
         Console.WriteLine("🚨🚨🚨 [CTOR_DEBUG] StreamingTranslationService コンストラクター開始");
-        DebugLogUtility.WriteLog("🚨🚨🚨 [CTOR_DEBUG] StreamingTranslationService コンストラクター開始");
+        _logger?.LogDebug("🚨🚨🚨 [CTOR_DEBUG] StreamingTranslationService コンストラクター開始");
 
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -55,7 +55,7 @@ public class StreamingTranslationService : IStreamingTranslationService
         _progress = new Core.Translation.Models.TranslationProgress();
 
         Console.WriteLine($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
-        DebugLogUtility.WriteLog($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
+        _logger?.LogDebug($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
         _logger.LogInformation("StreamingTranslationService初期化完了");
     }
     

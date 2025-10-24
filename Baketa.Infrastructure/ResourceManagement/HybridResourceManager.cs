@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 using Baketa.Core.Abstractions.Common;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Monitoring;
@@ -496,24 +496,24 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     {
         // 🔥🔥🔥 Phase 12.1 検証: 確実に出力されるConsole.WriteLineを追加
         Console.WriteLine($"🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！ OperationId={request?.OperationId ?? "NULL"}");
-        Core.Utilities.DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！ OperationId={request?.OperationId ?? "NULL"}");
+        _logger?.LogDebug($"🔥🔥🔥 [PHASE12.1_ENTRY] ProcessTranslationAsync開始！ OperationId={request?.OperationId ?? "NULL"}");
 
         ArgumentNullException.ThrowIfNull(translationTaskFactory);
         ArgumentNullException.ThrowIfNull(request);
 
         Console.WriteLine("🔥🔥🔥 [PHASE12.1_NULLCHECK] Null チェック完了");
-        Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.1_NULLCHECK] Nullチェック完了");
+        _logger?.LogDebug("🔥🔥🔥 [PHASE12.1_NULLCHECK] Nullチェック完了");
 
         if (!_isInitialized)
         {
             Console.WriteLine("🔥🔥🔥 [PHASE12.1_INIT] InitializeAsync呼び出し");
-            Core.Utilities.DebugLogUtility.WriteLog("🔥🔥🔥 [PHASE12.1_INIT] InitializeAsync呼び出し");
+            _logger?.LogDebug("🔥🔥🔥 [PHASE12.1_INIT] InitializeAsync呼び出し");
             await InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
 
         // 🔥 Phase 12.1: TaskCompletionSourceパターン
         Console.WriteLine($"🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始 - OperationId={request.OperationId}");
-        Core.Utilities.DebugLogUtility.WriteLog($"🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始 - OperationId={request.OperationId}");
+        _logger?.LogDebug($"🔥🔥🔥 [PHASE12.1_MAIN] TaskCompletionSourceパターン開始 - OperationId={request.OperationId}");
         _logger.LogInformation("🔥 [PHASE12.1] ProcessTranslationAsync呼び出し: {OperationId}", request.OperationId);
         var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 

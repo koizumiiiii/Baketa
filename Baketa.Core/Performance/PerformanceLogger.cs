@@ -81,7 +81,7 @@ public static class PerformanceLogger
         Console.WriteLine(timestampedMessage);
         
         // 従来のDebugLogUtility互換性も提供
-        DebugLogUtility.WriteLog(message);
+        Console.WriteLine(message);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -158,13 +158,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         {
             _logger?.LogInformation("🎯 座標ベース翻訳処理開始 - 画像: {Width}x{Height}, ウィンドウ: 0x{Handle:X}", 
                 image.Width, image.Height, windowHandle.ToInt64());
-            DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理開始 - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}");
+            _logger?.LogDebug($"🎯 座標ベース翻訳処理開始 - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}");
             Console.WriteLine($"🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}");
             // 🔥 [FILE_CONFLICT_FIX_3] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {Width}x{Height}", image.Width, image.Height);
 
             // 🔍 [PHASE12.2_TRACE] トレースログ1: メソッド開始直後
-            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
+            _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
             _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
 
             // バッチOCR処理でテキストチャンクを取得（詳細時間測定）
@@ -190,7 +190,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
 
             // 🎯 [OPTION_A] SmartProcessingPipelineServiceで段階的フィルタリング実行
-            DebugLogUtility.WriteLog($"🎯 [OPTION_A] 段階的フィルタリングパイプライン開始 - ImageChangeDetection → OCR");
+            _logger?.LogDebug($"🎯 [OPTION_A] 段階的フィルタリングパイプライン開始 - ImageChangeDetection → OCR");
             _logger?.LogDebug("🎯 [OPTION_A] SmartProcessingPipelineService.ExecuteAsync実行開始");
 
             // ProcessingPipelineInput作成（ContextIdは計算プロパティのため省略）
@@ -205,14 +205,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             var pipelineResult = await _pipelineService.ExecuteAsync(pipelineInput, cancellationToken)
                 .ConfigureAwait(false);
 
-            DebugLogUtility.WriteLog($"🎯 [OPTION_A] パイプライン完了 - ShouldContinue: {pipelineResult.ShouldContinue}, Success: {pipelineResult.Success}, LastCompletedStage: {pipelineResult.LastCompletedStage}");
+            _logger?.LogDebug($"🎯 [OPTION_A] パイプライン完了 - ShouldContinue: {pipelineResult.ShouldContinue}, Success: {pipelineResult.Success}, LastCompletedStage: {pipelineResult.LastCompletedStage}");
             _logger?.LogDebug("🎯 [OPTION_A] パイプライン完了 - ShouldContinue: {ShouldContinue}, Success: {Success}, EarlyTerminated: {EarlyTerminated}",
                 pipelineResult.ShouldContinue, pipelineResult.Success, pipelineResult.Metrics.EarlyTerminated);
 
             // 🎯 [OPTION_A] 早期リターンチェック - 画面変化なしで処理スキップ
             if (!pipelineResult.ShouldContinue || pipelineResult.Metrics.EarlyTerminated)
             {
-                DebugLogUtility.WriteLog($"🎯 [OPTION_A] 画面変化なし検出 - 翻訳処理をスキップ (90%処理時間削減達成)");
+                _logger?.LogDebug($"🎯 [OPTION_A] 画面変化なし検出 - 翻訳処理をスキップ (90%処理時間削減達成)");
                 _logger?.LogInformation("🎯 [OPTION_A] 画面変化なし - 早期リターン (EarlyTerminated: {EarlyTerminated})",
                     pipelineResult.Metrics.EarlyTerminated);
 
@@ -261,7 +261,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 }
             }
 
-            DebugLogUtility.WriteLog($"🎯 [OPTION_A] OCR結果取得 - ChunkCount: {textChunks.Count}");
+            _logger?.LogDebug($"🎯 [OPTION_A] OCR結果取得 - ChunkCount: {textChunks.Count}");
             _logger?.LogDebug("🎯 [OPTION_A] OCR結果取得 - ChunkCount: {ChunkCount}, CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 textChunks.Count, cancellationToken.IsCancellationRequested);
             
@@ -280,7 +280,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
 
             // 🔍 [PHASE12.2_TRACE] トレースログ2: OCR処理完了直後
-            DebugLogUtility.WriteLog($"🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {textChunks.Count}");
+            _logger?.LogDebug($"🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {textChunks.Count}");
             _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {Count}", textChunks.Count);
 
             // 🚀 [PHASE10_FIX] 個別イベント発行を完全無効化 - バッチ翻訳処理のみ実行
@@ -305,22 +305,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // }
 
             // 🔍 [PHASE12.2_TRACE] トレースログ3: TIMED_AGGREGATOR処理直前
-            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
+            _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
             _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
 
             // 🚨 [ULTRA_DEBUG] Line 238-239が実行されるか確認
-            DebugLogUtility.WriteLog("🚨🚨🚨 [ULTRA_DEBUG] Line 238直前に到達！");
+            _logger?.LogDebug("🚨🚨🚨 [ULTRA_DEBUG] Line 238直前に到達！");
 
             // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
-            DebugLogUtility.WriteLog("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
+            _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
             _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - OCRチャンク数: {Count}", textChunks.Count);
             
             try
             {
                 // 🚨 [ULTRA_DEBUG] tryブロック到達確認
-                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] tryブロック開始 - チャンク数: {textChunks.Count}");
-                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] _textChunkAggregatorService is null: {_textChunkAggregatorService == null}");
-                DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] IsFeatureEnabled: {_textChunkAggregatorService?.IsFeatureEnabled}");
+                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] tryブロック開始 - チャンク数: {textChunks.Count}");
+                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] _textChunkAggregatorService is null: {_textChunkAggregatorService == null}");
+                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] IsFeatureEnabled: {_textChunkAggregatorService?.IsFeatureEnabled}");
 
                 // 🔥 [DI_RESOLUTION_CHECK] DI解決されたインスタンス型を完全診断
                 var aggregatorServiceType = _textChunkAggregatorService?.GetType().FullName ?? "NULL";
@@ -328,7 +328,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 var aggregatorInterfaces = _textChunkAggregatorService?.GetType().GetInterfaces()
                     .Select(i => i.Name).ToList() ?? new List<string>();
 
-                DebugLogUtility.WriteLog(
+                _logger?.LogDebug(
                     $"🔥🔥🔥 [DI_RESOLUTION_CHECK] " +
                     $"Service Type: {aggregatorServiceType}, " +
                     $"Base Type: {aggregatorBaseType}, " +
@@ -348,10 +348,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // 各チャンクをTimedChunkAggregatorに追加
                 foreach (var chunk in textChunks)
                 {
-                    DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync呼び出し直前 - ChunkId: {chunk.ChunkId}");
+                    _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync呼び出し直前 - ChunkId: {chunk.ChunkId}");
                     // チャンクには既にSourceWindowHandleが設定済み（initプロパティのため後から変更不可）
                     var added = await _textChunkAggregatorService.TryAddTextChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync結果: {added}, ChunkId: {chunk.ChunkId}");
+                    _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync結果: {added}, ChunkId: {chunk.ChunkId}");
                     _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'",
                         chunk.ChunkId, chunk.CombinedText);
                 }
@@ -370,13 +370,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
             
             // 🚨 [ULTRA_DEBUG] tryブロック完了確認
-            DebugLogUtility.WriteLog("🚨🚨🚨 [ULTRA_DEBUG] tryブロック完了 - Line 268到達");
+            _logger?.LogDebug("🚨🚨🚨 [ULTRA_DEBUG] tryブロック完了 - Line 268到達");
 
             Console.WriteLine($"🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {textChunks.Count}");
             _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {Count}", textChunks.Count);
 
             // 🔍 [PHASE12.2_TRACE] トレースログ4: Phase 12.2早期リターン直前
-            DebugLogUtility.WriteLog("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
+            _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
             _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
 
             // 🎉 [PHASE12.2] 2重翻訳アーキテクチャ排除 - AggregatedChunksReadyEventHandler経由で処理
@@ -393,33 +393,33 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // ========== 以下、Phase 12.2完全移行後に削除予定（後方互換性のため一時保持） ==========
             // チャンクの詳細情報をデバッグ出力
-            DebugLogUtility.WriteLog($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
-            DebugLogUtility.WriteLog($"   入力画像サイズ: {image.Width}x{image.Height}");
-            DebugLogUtility.WriteLog($"   検出されたテキストチャンク数: {textChunks.Count}");
+            _logger?.LogDebug($"\n🔍 [CoordinateBasedTranslationService] バッチOCR結果詳細解析 (ウィンドウ: 0x{windowHandle.ToInt64():X}):");
+            _logger?.LogDebug($"   入力画像サイズ: {image.Width}x{image.Height}");
+            _logger?.LogDebug($"   検出されたテキストチャンク数: {textChunks.Count}");
 
             for (int i = 0; i < textChunks.Count; i++)
             {
                 var chunk = textChunks[i];
-                DebugLogUtility.WriteLog($"\n📍 チャンク[{i}] ID={chunk.ChunkId}");
-                DebugLogUtility.WriteLog($"   OCR生座標: X={chunk.CombinedBounds.X}, Y={chunk.CombinedBounds.Y}");
-                DebugLogUtility.WriteLog($"   OCR生サイズ: W={chunk.CombinedBounds.Width}, H={chunk.CombinedBounds.Height}");
-                DebugLogUtility.WriteLog($"   元テキスト: '{chunk.CombinedText}'");
-                DebugLogUtility.WriteLog($"   翻訳テキスト: '{chunk.TranslatedText}'");
+                _logger?.LogDebug($"\n📍 チャンク[{i}] ID={chunk.ChunkId}");
+                _logger?.LogDebug($"   OCR生座標: X={chunk.CombinedBounds.X}, Y={chunk.CombinedBounds.Y}");
+                _logger?.LogDebug($"   OCR生サイズ: W={chunk.CombinedBounds.Width}, H={chunk.CombinedBounds.Height}");
+                _logger?.LogDebug($"   元テキスト: '{chunk.CombinedText}'");
+                _logger?.LogDebug($"   翻訳テキスト: '{chunk.TranslatedText}'");
 
                 // 座標変換情報
                 var overlayPos = chunk.GetBasicOverlayPosition();
                 var overlaySize = chunk.GetOverlaySize();
-                DebugLogUtility.WriteLog($"   インプレース位置: ({overlayPos.X},{overlayPos.Y}) [元座標と同じ]");
-                DebugLogUtility.WriteLog($"   インプレースサイズ: ({overlaySize.Width},{overlaySize.Height}) [元サイズと同じ]");
-                DebugLogUtility.WriteLog($"   計算フォントサイズ: {chunk.CalculateOptimalFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
-                DebugLogUtility.WriteLog($"   インプレース表示可能: {chunk.CanShowInPlace()}");
+                _logger?.LogDebug($"   インプレース位置: ({overlayPos.X},{overlayPos.Y}) [元座標と同じ]");
+                _logger?.LogDebug($"   インプレースサイズ: ({overlaySize.Width},{overlaySize.Height}) [元サイズと同じ]");
+                _logger?.LogDebug($"   計算フォントサイズ: {chunk.CalculateOptimalFontSize()}px (Height {chunk.CombinedBounds.Height} * 0.45)");
+                _logger?.LogDebug($"   インプレース表示可能: {chunk.CanShowInPlace()}");
 
                 // TextResultsの詳細情報
-                DebugLogUtility.WriteLog($"   構成TextResults数: {chunk.TextResults.Count}");
+                _logger?.LogDebug($"   構成TextResults数: {chunk.TextResults.Count}");
                 for (int j = 0; j < Math.Min(chunk.TextResults.Count, 3); j++) // 最初の3個だけ表示
                 {
                     var result = chunk.TextResults[j];
-                    DebugLogUtility.WriteLog($"     [{j}] テキスト: '{result.Text}', 位置: ({result.BoundingBox.X},{result.BoundingBox.Y}), サイズ: ({result.BoundingBox.Width}x{result.BoundingBox.Height})");
+                    _logger?.LogDebug($"     [{j}] テキスト: '{result.Text}', 位置: ({result.BoundingBox.X},{result.BoundingBox.Y}), サイズ: ({result.BoundingBox.Width}x{result.BoundingBox.Height})");
                 }
             }
 
@@ -439,18 +439,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     var clampedX = Math.Max(0, Math.Min(originalBounds.X, screenWidth - originalBounds.Width));
                     var clampedY = Math.Max(0, Math.Min(originalBounds.Y, screenHeight - originalBounds.Height));
 
-                    DebugLogUtility.WriteLog($"🚨 画面外座標を修正: チャンク[{i}] 元座標({originalBounds.X},{originalBounds.Y}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
+                    _logger?.LogDebug($"🚨 画面外座標を修正: チャンク[{i}] 元座標({originalBounds.X},{originalBounds.Y}) → 補正後({clampedX},{clampedY}) [画面サイズ:{screenWidth}x{screenHeight}]");
 
                     // チャンクの座標を修正（注：実際のチャンク座標修正は別途実装が必要）
                     // この段階ではログ出力のみで警告
-                    DebugLogUtility.WriteLog($"⚠️ このテキストは画面外のため表示されません: '{chunk.CombinedText}'");
+                    _logger?.LogDebug($"⚠️ このテキストは画面外のため表示されません: '{chunk.CombinedText}'");
                 }
             }
 
             if (textChunks.Count == 0)
             {
                 _logger?.LogWarning("📝 テキストチャンクが0個のため、オーバーレイ表示をスキップ");
-                DebugLogUtility.WriteLog("📝 テキストチャンクが0個のため、オーバーレイ表示をスキップ");
+                _logger?.LogDebug("📝 テキストチャンクが0個のため、オーバーレイ表示をスキップ");
                 return;
             }
 
@@ -463,11 +463,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 textChunks.Count, cancellationToken.IsCancellationRequested);
             
             _logger?.LogInformation("🌐 バッチ翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
-            DebugLogUtility.WriteLog($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
+            _logger?.LogDebug($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
             
             // 翻訳サービスの詳細情報をログ出力
             var serviceType = _processingFacade.TranslationService.GetType().Name;
-            DebugLogUtility.WriteLog($"🔧 使用中の翻訳サービス: {serviceType}");
+            _logger?.LogDebug($"🔧 使用中の翻訳サービス: {serviceType}");
             
             // 🚀 Phase 2: バッチ翻訳の実装
             Console.WriteLine($"🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}");
@@ -633,7 +633,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
                     {
                         nonEmptyChunks[i].TranslatedText = batchResults[i];
-                        DebugLogUtility.WriteLog($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
+                        _logger?.LogDebug($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
                     }
                     
                     var batchResult = batchTranslationMeasurement.Complete();
@@ -667,22 +667,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             
                             // 翻訳結果の詳細をログ出力
                             var engineName = translationResult.EngineName ?? "Unknown";
-                            DebugLogUtility.WriteLog($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
+                            _logger?.LogDebug($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
                                 
                             // 🛡️ [ERROR_SKIP] エラー結果（IsSuccess=false）のオーバーレイ表示をスキップ
                             Console.WriteLine($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
-                            DebugLogUtility.WriteLog($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
+                            _logger?.LogDebug($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
                             
                             if (translationResult.IsSuccess)
                             {
                                 chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
                                 Console.WriteLine($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
-                                DebugLogUtility.WriteLog($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
+                                _logger?.LogDebug($"✅ [SUCCESS_PATH] 翻訳成功 - ChunkId: {chunk.ChunkId}, 結果設定: '{chunk.TranslatedText}'");
                             }
                             else
                             {
                                 Console.WriteLine($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}");
-                                DebugLogUtility.WriteLog($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}, エラー: '{translationResult.TranslatedText}'");
+                                _logger?.LogDebug($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}, エラー: '{translationResult.TranslatedText}'");
                                 _logger?.LogWarning("🚫 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {ChunkId}, エラー: {Error}", 
                                     chunk.ChunkId, translationResult.TranslatedText);
                                 chunk.TranslatedText = ""; // エラー時は空文字に設定してオーバーレイ表示を阻止
@@ -691,7 +691,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             
                             _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
                                 chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
-                            DebugLogUtility.WriteLog($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
+                            _logger?.LogDebug($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
                         }
                         catch (Exception ex)
                         {
@@ -717,7 +717,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             if (inPlaceOverlayManager != null)
             {
                 _logger?.LogInformation("🎯 インプレースオーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
-                DebugLogUtility.WriteLog($"🎯 インプレースオーバーレイ表示開始 - チャンク数: {textChunks.Count}");
+                _logger?.LogDebug($"🎯 インプレースオーバーレイ表示開始 - チャンク数: {textChunks.Count}");
                 
                 try
                 {
@@ -725,25 +725,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
                     
                     // 各テキストチャンクをインプレースで表示
-                    DebugLogUtility.WriteLog($"\n🎭 インプレース表示開始処理:");
+                    _logger?.LogDebug($"\n🎭 インプレース表示開始処理:");
                     foreach (var chunk in textChunks)
                     {
-                        DebugLogUtility.WriteLog($"\n🔸 チャンク {chunk.ChunkId} インプレース表示判定:");
-                        DebugLogUtility.WriteLog($"   インプレース表示可能: {chunk.CanShowInPlace()}");
-                        DebugLogUtility.WriteLog($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
-                        DebugLogUtility.WriteLog($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
+                        _logger?.LogDebug($"\n🔸 チャンク {chunk.ChunkId} インプレース表示判定:");
+                        _logger?.LogDebug($"   インプレース表示可能: {chunk.CanShowInPlace()}");
+                        _logger?.LogDebug($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
+                        _logger?.LogDebug($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
                         
                         // 🛡️ [ERROR_PROTECTION] 失敗・エラー結果の表示を包括的に防止
                         var hasValidTranslation = TranslationValidator.IsValid(chunk.TranslatedText, chunk.CombinedText);
                         
-                        DebugLogUtility.WriteLog($"   翻訳結果: '{chunk.TranslatedText}'");
-                        DebugLogUtility.WriteLog($"   原文: '{chunk.CombinedText}'");
-                        DebugLogUtility.WriteLog($"   有効な翻訳: {hasValidTranslation}");
+                        _logger?.LogDebug($"   翻訳結果: '{chunk.TranslatedText}'");
+                        _logger?.LogDebug($"   原文: '{chunk.CombinedText}'");
+                        _logger?.LogDebug($"   有効な翻訳: {hasValidTranslation}");
                         
                         // 🔍 [DEBUG] TranslatedTextの初期値と翻訳後の値を確認
                         if (!string.IsNullOrEmpty(chunk.TranslatedText) && chunk.TranslatedText == chunk.CombinedText)
                         {
-                            DebugLogUtility.WriteLog($"   ⚠️ [WARNING] TranslatedTextが原文と同じ: '{chunk.TranslatedText}'");
+                            _logger?.LogDebug($"   ⚠️ [WARNING] TranslatedTextが原文と同じ: '{chunk.TranslatedText}'");
                             Console.WriteLine($"⚠️ [WARNING] TranslatedTextが原文と同じ - ChunkId: {chunk.ChunkId}, Text: '{chunk.TranslatedText}'");
                         }
                         
@@ -762,26 +762,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             // 問題: Phase 11.2でコメントアウトされた表示処理により、翻訳成功しても画面に表示されない
                             // 解決: 実際のShowInPlaceOverlayAsyncを有効化し、真の表示完了を実現
                             Console.WriteLine($"🔥 [ULTRAFUIX] 実際のUI表示処理を実行 - チャンク {chunk.ChunkId}: 画面オーバーレイ表示開始");
-                            DebugLogUtility.WriteLog($"🔥 [ULTRAFUIX] ShowInPlaceOverlayAsync実行開始 - チャンク {chunk.ChunkId}");
+                            _logger?.LogDebug($"🔥 [ULTRAFUIX] ShowInPlaceOverlayAsync実行開始 - チャンク {chunk.ChunkId}");
 
                             await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
 
                             var overlayResult = overlayMeasurement.Complete();
 
-                            DebugLogUtility.WriteLog($"   ✅ [ULTRAFUIX] 真のインプレース表示完了 - チャンク {chunk.ChunkId}, 時間: {overlayResult.Duration.TotalMilliseconds:F1}ms");
+                            _logger?.LogDebug($"   ✅ [ULTRAFUIX] 真のインプレース表示完了 - チャンク {chunk.ChunkId}, 時間: {overlayResult.Duration.TotalMilliseconds:F1}ms");
                             Console.WriteLine($"✅ [ULTRAFUIX] オーバーレイ表示完了 - チャンク {chunk.ChunkId}");
                         }
                         else
                         {
                             if (!hasValidTranslation)
                             {
-                                DebugLogUtility.WriteLog($"   🚫 インプレース表示スキップ - チャンク {chunk.ChunkId}: エラー結果のため表示阻止");
+                                _logger?.LogDebug($"   🚫 インプレース表示スキップ - チャンク {chunk.ChunkId}: エラー結果のため表示阻止");
                                 _logger?.LogInformation("🚫 エラー結果のためオーバーレイ表示をスキップ - ChunkId: {ChunkId}", chunk.ChunkId);
                             }
                             else
                             {
                                 _logger?.LogWarning("⚠️ インプレース表示条件を満たしていません - {InPlaceLog}", chunk.ToInPlaceLogString());
-                                DebugLogUtility.WriteLog($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
+                                _logger?.LogDebug($"   ❌ インプレース表示スキップ - チャンク {chunk.ChunkId}: 条件未満足");
                             }
                         }
                     }
@@ -792,7 +792,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "❌ インプレースオーバーレイ表示でエラーが発生");
-                    DebugLogUtility.WriteLog($"❌❌❌ インプレースオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+                    _logger?.LogDebug($"❌❌❌ インプレースオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
                     
                     // インプレースUIでエラーが発生した場合は従来のオーバーレイにフォールバック
                     _logger?.LogWarning("🔄 従来のオーバーレイ表示にフォールバック");
@@ -807,7 +807,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
             
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
-            DebugLogUtility.WriteLog("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
+            _logger?.LogDebug("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
             
             // BaketaLogManagerで座標ベース翻訳フローのパフォーマンスログを記録
             try
@@ -1246,9 +1246,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         try
         {
             _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
-            DebugLogUtility.WriteLog("🖼️ インプレース翻訳オーバーレイ表示開始");
+            _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
             
-            DebugLogUtility.WriteLog($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - overlayManager null?: {_processingFacade.OverlayManager == null}");
+            _logger?.LogDebug($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - overlayManager null?: {_processingFacade.OverlayManager == null}");
             if (_processingFacade.OverlayManager != null)
             {
                 // 各TextChunkを個別にインプレース表示
@@ -1266,11 +1266,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     }
                     else
                     {
-                        DebugLogUtility.WriteLog($"🚫 [TRANSLATION_ONLY] オーバーレイ表示スキップ - ChunkId: {textChunk.ChunkId}, 原文: '{textChunk.CombinedText}'");
+                        _logger?.LogDebug($"🚫 [TRANSLATION_ONLY] オーバーレイ表示スキップ - ChunkId: {textChunk.ChunkId}, 原文: '{textChunk.CombinedText}'");
                     }
                 }
             }
-            DebugLogUtility.WriteLog("🔥🔥🔥 インプレース翻訳オーバーレイ表示完了");
+            _logger?.LogDebug("🔥🔥🔥 インプレース翻訳オーバーレイ表示完了");
         }
         catch (TaskCanceledException)
         {
@@ -1280,8 +1280,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         catch (Exception ex)
         {
             _logger?.LogError(ex, "❌ インプレース翻訳オーバーレイ表示でエラーが発生");
-            DebugLogUtility.WriteLog($"❌❌❌ インプレース翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
-            DebugLogUtility.WriteLog($"❌❌❌ スタックトレース: {ex.StackTrace}");
+            _logger?.LogDebug($"❌❌❌ インプレース翻訳オーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
+            _logger?.LogDebug($"❌❌❌ スタックトレース: {ex.StackTrace}");
             throw;
         }
     }
@@ -1385,10 +1385,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             var overlayAvailable = _processingFacade.OverlayManager != null;
             var available = batchOcrAvailable && overlayAvailable;
             
-            DebugLogUtility.WriteLog($"🔍 [CoordinateBasedTranslationService] 座標ベース翻訳システム可用性チェック:");
-            DebugLogUtility.WriteLog($"   📦 BatchOcrProcessor: {batchOcrAvailable}");
-            DebugLogUtility.WriteLog($"   🖼️ OverlayManager: {overlayAvailable}");
-            DebugLogUtility.WriteLog($"   ✅ 総合判定: {available}");
+            _logger?.LogDebug($"🔍 [CoordinateBasedTranslationService] 座標ベース翻訳システム可用性チェック:");
+            _logger?.LogDebug($"   📦 BatchOcrProcessor: {batchOcrAvailable}");
+            _logger?.LogDebug($"   🖼️ OverlayManager: {overlayAvailable}");
+            _logger?.LogDebug($"   ✅ 総合判定: {available}");
             
             _logger?.LogDebug("🔍 座標ベース翻訳システム可用性チェック: {Available}", available);
             return available;
