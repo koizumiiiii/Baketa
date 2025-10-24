@@ -75,6 +75,19 @@ internal static class LayeredWindowMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool ShowWindow(IntPtr hWnd, ShowWindowCommands nCmdShow);
 
+    /// <summary>
+    /// ウィンドウのDPI値取得
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [PHASE3_DPI_AWARENESS] Per-Monitor DPI V2対応
+    /// 高DPI環境（125%, 150%, 200%スケーリング）での座標精度向上
+    /// Windows 10 Anniversary Update (1607)以降で使用可能
+    /// </remarks>
+    /// <param name="hwnd">ウィンドウハンドル</param>
+    /// <returns>ウィンドウのDPI値（96 = 100%スケーリング）</returns>
+    [DllImport(USER32_DLL)]
+    internal static extern uint GetDpiForWindow(IntPtr hwnd);
+
     // ========================================
     // Layered Window Specific APIs
     // ========================================

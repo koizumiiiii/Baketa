@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Infrastructure.Platform.Windows.NativeMethods; // 🔥 [PHASE3_DPI_AWARENESS] GetDpiForWindow用
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Services;
@@ -133,6 +134,47 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
             var scaledHeight = (int)(roiBounds.Height * inverseScale);
 
             _logger.LogInformation("📐 [PHASE2_SCALED] スケーリング後 - Scaled=({ScaledX},{ScaledY})", scaledX, scaledY);
+
+            // 🔥 [PHASE3_DPI_AWARENESS] DPI補正 - 高DPI環境（125%, 150%, 200%）対応
+            //    Per-Monitor DPI V2により、各モニターごとの異なるDPI設定に対応
+            //    物理ピクセル = 論理ピクセル * (DPI / 96.0)
+            if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
+            {
+                try
+                {
+                    uint dpi = LayeredWindowMethods.GetDpiForWindow(windowHandle);
+
+                    // 🔥 [GEMINI_P0_FIX] DPI取得失敗時のフォールバック
+                    // GetDpiForWindowが0を返す場合: Windows 10 1607以前、無効なハンドル、API失敗
+                    if (dpi == 0)
+                    {
+                        _logger.LogWarning("⚠️ [PHASE3_DPI] GetDpiForWindow返り値が0 - DPI補正をスキップします（スケール1.0として継続）");
+                        // DPI補正なしで継続（スケーリング後の座標をそのまま使用）
+                    }
+                    else
+                    {
+                        float dpiScale = dpi / 96.0f; // 96 = 100% DPI（基準値）
+
+                        // DPI補正を適用
+                        scaledX = (int)(scaledX * dpiScale);
+                        scaledY = (int)(scaledY * dpiScale);
+                        scaledWidth = (int)(scaledWidth * dpiScale);
+                        scaledHeight = (int)(scaledHeight * dpiScale);
+
+                        _logger.LogInformation("📐 [PHASE3_DPI] DPI補正後 - DPI={Dpi}, Scale={DpiScale:F2}, Corrected=({CorrectedX},{CorrectedY})",
+                            dpi, dpiScale, scaledX, scaledY);
+                    }
+                }
+                catch (Exception dpiEx)
+                {
+                    _logger.LogWarning(dpiEx, "⚠️ [PHASE3_DPI] GetDpiForWindow例外発生 - DPI補正をスキップします");
+                    // DPI取得失敗時はスケーリング後の座標をそのまま使用（フォールバック）
+                }
+            }
+            else
+            {
+                _logger.LogDebug("🔍 [PHASE3_DPI] 無効なウィンドウハンドル - DPI補正をスキップします");
+            }
 
             // 2. 🔥 [PHASE1_CLIENT_TO_SCREEN] クライアント座標→スクリーン絶対座標変換
             //    ROI座標はクライアント領域内の相対座標（0,0起点）
