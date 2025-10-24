@@ -236,7 +236,32 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                                 _logger.LogInformation("🔧 [PHASE2_FIX] Y座標補正: {OldY} → {NewY}", topLeft.Y, correctedY);
                             }
 
-                            topLeft = new Point(correctedX, correctedY);
+                            // 🔥 [COORDINATE_CLAMP_FIX] DWM Extended Frame Boundsによる座標オーバーを防止
+                            // モニター範囲内にクランプ（オーバーレイが画面外に出るのを防止）
+                            var clampedX = correctedX;
+                            var clampedY = correctedY;
+
+                            // 左上座標がモニター範囲内に収まるようにクランプ
+                            if (clampedX < monitorInfo.rcMonitor.Left)
+                                clampedX = monitorInfo.rcMonitor.Left;
+                            if (clampedY < monitorInfo.rcMonitor.Top)
+                                clampedY = monitorInfo.rcMonitor.Top;
+
+                            // オーバーレイの右下がモニター範囲内に収まるようにクランプ
+                            if (clampedX + scaledWidth > monitorInfo.rcMonitor.Right)
+                                clampedX = monitorInfo.rcMonitor.Right - scaledWidth;
+                            if (clampedY + scaledHeight > monitorInfo.rcMonitor.Bottom)
+                                clampedY = monitorInfo.rcMonitor.Bottom - scaledHeight;
+
+                            // クランプが発生した場合はログ出力
+                            if (clampedX != correctedX || clampedY != correctedY)
+                            {
+                                _logger.LogWarning("🔧 [COORDINATE_CLAMP_FIX] 座標クランプ実行: ({OldX},{OldY}) → ({NewX},{NewY}) - モニター境界=({Left},{Top},{Right},{Bottom})",
+                                    correctedX, correctedY, clampedX, clampedY,
+                                    monitorInfo.rcMonitor.Left, monitorInfo.rcMonitor.Top, monitorInfo.rcMonitor.Right, monitorInfo.rcMonitor.Bottom);
+                            }
+
+                            topLeft = new Point(clampedX, clampedY);
                             _logger.LogInformation("✅ [PHASE2_RESULT] 補正後座標=({X},{Y})", topLeft.X, topLeft.Y);
                         }
                         else
@@ -366,7 +391,24 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                         correctedY = monitorInfo.rcWork.Top;
                     }
 
-                    topLeft = new Point(correctedX, correctedY);
+                    // 🔥 [COORDINATE_CLAMP_FIX] DWM Extended Frame Boundsによる座標オーバーを防止
+                    // モニター範囲内にクランプ（オーバーレイが画面外に出るのを防止）
+                    var clampedX = correctedX;
+                    var clampedY = correctedY;
+
+                    // 左上座標がモニター範囲内に収まるようにクランプ
+                    if (clampedX < monitorInfo.rcMonitor.Left)
+                        clampedX = monitorInfo.rcMonitor.Left;
+                    if (clampedY < monitorInfo.rcMonitor.Top)
+                        clampedY = monitorInfo.rcMonitor.Top;
+
+                    // オーバーレイの右下がモニター範囲内に収まるようにクランプ
+                    if (clampedX + scaledWidth > monitorInfo.rcMonitor.Right)
+                        clampedX = monitorInfo.rcMonitor.Right - scaledWidth;
+                    if (clampedY + scaledHeight > monitorInfo.rcMonitor.Bottom)
+                        clampedY = monitorInfo.rcMonitor.Bottom - scaledHeight;
+
+                    topLeft = new Point(clampedX, clampedY);
                 }
 
                 // 3. スクリーン絶対座標のRectangleを構築
