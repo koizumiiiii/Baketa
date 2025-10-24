@@ -16,13 +16,11 @@
     </application>
   </compatibility>
 
-  <!-- 🔥 [PHASE3_DPI_AWARENESS] Per-Monitor DPI V2 設定 -->
+  <!-- [PHASE3_DPI_AWARENESS] Per-Monitor DPI V2 設定 -->
   <!-- Win32 Layered Windowの高DPI環境座標精度向上 -->
+  <!-- Windows 10 1703以降では dpiAwareness のみ使用（dpiAware との併用は非推奨） -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <!-- Per-Monitor DPI Aware (V1) - Windows 8.1以降 -->
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-
       <!-- Per-Monitor DPI Aware V2 - Windows 10 Creators Update (1703)以降 -->
       <!-- 各モニターごとの異なるDPI設定に対応、座標計算の精度向上 -->
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
