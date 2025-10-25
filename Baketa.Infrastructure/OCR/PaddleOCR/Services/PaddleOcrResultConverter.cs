@@ -145,11 +145,13 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
 
                 for (int i = 0; i < paddleResults.Length; i++)
                 {
-                    // 実際のPaddleOCR検出結果から座標情報を取得（テキストは空に設定）
-                    var detectionRegion = ProcessSinglePaddleResultForDetectionOnly(paddleResults[i], i + 1);
-                    if (detectionRegion != null)
+                    // 🔧 [GEMINI_FIX] 実際のPaddleOCR検出結果から座標情報を取得（テキストは空に設定）
+                    // ProcessSinglePaddleResultForDetectionOnlyはList<OcrTextRegion>?を返すため、AddRange()で追加
+                    var detectionRegions = ProcessSinglePaddleResultForDetectionOnly(paddleResults[i], i + 1);
+                    if (detectionRegions != null && detectionRegions.Count > 0)
                     {
-                        textRegions.Add(detectionRegion);
+                        textRegions.AddRange(detectionRegions);
+                        _logger?.LogDebug("⚡ PaddleResult #{Index}: {Count}個の領域を追加", i + 1, detectionRegions.Count);
                     }
                 }
             }
@@ -437,8 +439,9 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
     /// <summary>
     /// 検出専用: PaddleOcrResultから座標情報のみを取得してテキストを空にする
     /// Phase 2.9.1: PaddleOcrEngineから移行（リフレクション対応）
+    /// 🔧 [GEMINI_FIX] 全Regionsをループ処理してList<OcrTextRegion>を返すように修正
     /// </summary>
-    private OcrTextRegion? ProcessSinglePaddleResultForDetectionOnly(object paddleResult, int index)
+    private List<OcrTextRegion>? ProcessSinglePaddleResultForDetectionOnly(object paddleResult, int index)
     {
         try
         {
@@ -456,20 +459,35 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
                 {
                     _logger?.LogDebug("⚡ Regionsプロパティ発見: 件数={Count}", regionsArray.Length);
 
-                    // 最初のリージョンの座標情報を取得
-                    var firstRegion = regionsArray.GetValue(0);
-                    if (firstRegion != null)
+                    // 🔧 [GEMINI_FIX] 全Regionsをループ処理
+                    var detectionRegions = new List<OcrTextRegion>();
+                    for (int i = 0; i < regionsArray.Length; i++)
                     {
-                        return ExtractBoundsFromRegion(firstRegion, index);
+                        var region = regionsArray.GetValue(i);
+                        if (region != null)
+                        {
+                            var detectionRegion = ExtractBoundsFromRegion(region, i + 1);
+                            if (detectionRegion != null)
+                            {
+                                detectionRegions.Add(detectionRegion);
+                            }
+                        }
                     }
+
+                    _logger?.LogDebug("⚡ 検出専用結果: {Count}個の領域を抽出", detectionRegions.Count);
+                    return detectionRegions;
                 }
             }
             else
             {
-                _logger?.LogDebug("⚡ Regionsプロパティなし - 代替方法で座標取得を試行");
+                _logger?.LogDebug("⚡ Regionsプロパティなし - 単一結果として処理を試行");
 
                 // 代替方法：直接PaddleOcrResultから座標情報を取得
-                return ExtractBoundsFromResult(paddleResult, index);
+                var singleRegion = ExtractBoundsFromResult(paddleResult, index);
+                if (singleRegion != null)
+                {
+                    return new List<OcrTextRegion> { singleRegion };
+                }
             }
 
             return null;
@@ -483,42 +501,140 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
 
     /// <summary>
     /// リージョンオブジェクトから座標情報を抽出
-    /// Phase 2.9.1: PaddleOcrEngineから移行
+    /// 🔧 [GEMINI_FIX] ProcessPaddleRegionロジック流用: RotatedRect + Point配列対応
     /// </summary>
     private OcrTextRegion? ExtractBoundsFromRegion(object region, int index)
     {
         try
         {
             var regionType = region.GetType();
+            var boundingBox = Rectangle.Empty;
 
-            // Rectプロパティまたは類似の座標情報を探す
-            var rectProperty = regionType.GetProperty("Rect") ??
-                              regionType.GetProperty("Bounds") ??
-                              regionType.GetProperty("BoundingBox");
+            // 🔧 [GEMINI_FIX] Regionプロパティを最優先で探す（RotatedRect型の可能性）
+            var regionProperty = regionType.GetProperty("Region") ??
+                               regionType.GetProperty("Rect") ??
+                               regionType.GetProperty("Box") ??
+                               regionType.GetProperty("Bounds") ??
+                               regionType.GetProperty("BoundingBox");
 
-            if (rectProperty != null)
+            if (regionProperty != null)
             {
-                var rectValue = rectProperty.GetValue(region);
-                if (rectValue != null)
+                var regionValue = regionProperty.GetValue(region);
+
+                // 🔧 [GEMINI_FIX] RotatedRect型として処理（ProcessPaddleRegionロジック流用）
+                // NOTE [GEMINI_REVIEW]: 文字列比較を使用する理由 - PaddleOCRの型はdynamic型で
+                // 直接参照不可のため、is演算子ではなくGetType().Nameでの判定が現実的
+                if (regionValue != null && regionValue.GetType().Name == "RotatedRect")
                 {
-                    var bounds = ExtractRectangleFromObject(rectValue);
+                    try
+                    {
+                        var regionValueType = regionValue.GetType();
+
+                        var centerField = regionValueType.GetField("Center");
+                        var sizeField = regionValueType.GetField("Size");
+                        var angleField = regionValueType.GetField("Angle");
+
+                        if (centerField != null && sizeField != null)
+                        {
+                            var center = centerField.GetValue(regionValue);
+                            var size = sizeField.GetValue(regionValue);
+
+                            // Centerから座標を取得
+                            var centerType = center?.GetType();
+                            var centerX = Convert.ToSingle(centerType?.GetField("X")?.GetValue(center) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                            var centerY = Convert.ToSingle(centerType?.GetField("Y")?.GetValue(center) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+
+                            // Sizeから幅・高さを取得
+                            var sizeType = size?.GetType();
+                            var width = Convert.ToSingle(sizeType?.GetField("Width")?.GetValue(size) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+                            var height = Convert.ToSingle(sizeType?.GetField("Height")?.GetValue(size) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+
+                            // Angleを取得
+                            var angle = Convert.ToSingle(angleField?.GetValue(regionValue) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
+
+                            // 回転を考慮したバウンディングボックス計算
+                            var angleRad = angle * Math.PI / 180.0;
+                            var cosA = Math.Abs(Math.Cos(angleRad));
+                            var sinA = Math.Abs(Math.Sin(angleRad));
+
+                            var boundingWidth = (int)Math.Ceiling(width * cosA + height * sinA);
+                            var boundingHeight = (int)Math.Ceiling(width * sinA + height * cosA);
+
+                            var left = (int)Math.Floor(centerX - boundingWidth / 2.0);
+                            var top = (int)Math.Floor(centerY - boundingHeight / 2.0);
+
+                            boundingBox = new Rectangle(left, top, boundingWidth, boundingHeight);
+                            _logger?.LogDebug("⚡ RotatedRect座標抽出成功: Center=({CenterX:F1}, {CenterY:F1}), Size=({Width:F1}x{Height:F1}), Angle={Angle:F1}°, Bounds={Bounds}",
+                                centerX, centerY, width, height, angle, boundingBox);
+                        }
+                    }
+                    catch (Exception rotatedRectEx)
+                    {
+                        _logger?.LogWarning(rotatedRectEx, "RotatedRect処理エラー（フォールバック処理へ）");
+                    }
+                }
+                // 🔧 [GEMINI_FIX] 座標配列として処理（フォールバック）
+                else if (regionValue is Array pointArray && pointArray.Length >= 4)
+                {
+                    var points = new List<PointF>();
+                    for (int j = 0; j < Math.Min(4, pointArray.Length); j++)
+                    {
+                        var point = pointArray.GetValue(j);
+                        if (point != null)
+                        {
+                            var pointType = point.GetType();
+                            var xProp = pointType.GetProperty("X");
+                            var yProp = pointType.GetProperty("Y");
+
+                            if (xProp != null && yProp != null)
+                            {
+                                var x = Convert.ToSingle(xProp.GetValue(point), System.Globalization.CultureInfo.InvariantCulture);
+                                var y = Convert.ToSingle(yProp.GetValue(point), System.Globalization.CultureInfo.InvariantCulture);
+                                points.Add(new PointF(x, y));
+                            }
+                        }
+                    }
+
+                    if (points.Count >= 4)
+                    {
+                        var minX = (int)points.Min(p => p.X);
+                        var maxX = (int)points.Max(p => p.X);
+                        var minY = (int)points.Min(p => p.Y);
+                        var maxY = (int)points.Max(p => p.Y);
+                        boundingBox = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                        _logger?.LogDebug("⚡ Point配列から座標抽出成功: Points={PointCount}, Bounds={Bounds}", points.Count, boundingBox);
+                    }
+                }
+                // 既存のExtractRectangleFromObjectロジック（互換性維持）
+                else if (regionValue != null)
+                {
+                    var bounds = ExtractRectangleFromObject(regionValue);
                     if (bounds.HasValue)
                     {
-                        _logger?.LogDebug("⚡ リージョンから座標抽出成功: {Bounds}", bounds);
-                        return new OcrTextRegion(
-                            text: "", // 検出専用なのでテキストは空
-                            bounds: bounds.Value,
-                            confidence: 0.8 // デフォルト信頼度
-                        );
+                        boundingBox = bounds.Value;
+                        _logger?.LogDebug("⚡ ExtractRectangleFromObjectで座標抽出成功: {Bounds}", bounds);
                     }
                 }
             }
 
+            // 座標が取得できた場合のみOcrTextRegionを返す
+            if (!boundingBox.IsEmpty)
+            {
+                // NOTE [GEMINI_REVIEW]: 検出専用モードでは信頼度スコアはPaddleOCR結果に含まれないため、
+                // デフォルト値0.8を使用。通常の認識モードではProcessPaddleRegionで実際のスコアを抽出。
+                return new OcrTextRegion(
+                    text: "", // 検出専用なのでテキストは空
+                    bounds: boundingBox,
+                    confidence: 0.8 // デフォルト信頼度（検出専用モードのため固定値）
+                );
+            }
+
+            _logger?.LogDebug("⚠️ リージョン #{Index} から座標抽出失敗（プロパティなし or 無効な値）", index);
             return null;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "リージョンから座標抽出エラー");
+            _logger?.LogError(ex, "リージョンから座標抽出エラー: Index={Index}", index);
             return null;
         }
     }
