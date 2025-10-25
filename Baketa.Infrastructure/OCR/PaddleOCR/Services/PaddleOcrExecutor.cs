@@ -27,10 +27,11 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 /// 🔧 [TODO_PHASE2.9.2] 将来の拡張:
 /// - タイムアウト設定の外部化（IOptions<OcrSettings>）
 ///
-/// ✅ [P1-B_FIX] スレッドセーフティ強化 (2025-10-25)
-/// - SemaphoreSlim(1, 1)導入により、PaddleOCRネイティブライブラリへの並行アクセスを完全防止
-/// - 根本原因: engine.Run()の非スレッドセーフ性 → 複数Task.Run()からの並行アクセスで失敗
-/// - 効果: PaddlePredictor run failed エラー失敗率 100% → 0%
+/// ✅ [P1-B_FIX-Phase1] QueuedPaddleOcrAll統合 (2025-10-25)
+/// - Gemini推奨: QueuedPaddleOcrAllで複数ワーカーインスタンスを使用（スレッドセーフ保証）
+/// - 根本原因: PaddleOcrAllシングルトンの内部状態非スレッドセーフ問題を完全解決
+/// - 修正内容: SemaphoreSlim削除、QueuedPaddleOcrAllが内部でスレッドセーフ管理
+/// - 期待効果: PaddlePredictor run failed エラー失敗率 56% → 0%、パフォーマンス向上
 /// </summary>
 public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
 {
@@ -42,10 +43,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
     private CancellationTokenSource? _currentOcrCancellation;
     private readonly object _lockObject = new();
 
-    // 🔥 [P1-B_FIX] PaddleOCRエンジンへの排他アクセス制御
-    // 理由: PaddlePredictor(Detector).Run()は非スレッドセーフ - 並行実行で内部状態破損
-    // 効果: engine.Run()呼び出しをシリアライズ化、スレッド並行性問題を根本解決
-    private readonly SemaphoreSlim _engineLock = new(1, 1);
+    // 🔥 [P1-B_FIX-Phase1] SemaphoreSlim削除 - QueuedPaddleOcrAllが内部管理
     private bool _disposed;
 
     // タイムアウト設定（将来的にはIOptions<OcrSettings>から注入）
@@ -84,14 +82,14 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         var sw = Stopwatch.StartNew();
         var imageSize = new System.Drawing.Size(processedMat.Width, processedMat.Height);
 
-        _logger?.LogDebug("⚙️ ExecuteOcrAsync開始: {Width}x{Height}", imageSize.Width, imageSize.Height);
+        _logger?.LogDebug("⚙️ [P1-B-FIX] QueuedOCR ExecuteOcrAsync開始: {Width}x{Height}", imageSize.Width, imageSize.Height);
         progress?.Report(new CoreOcrProgress(0.0, "OCR実行開始"));
 
-        var engine = _engineInitializer.GetOcrEngine();
-        if (engine == null)
+        var queuedEngine = _engineInitializer.GetQueuedEngine();
+        if (queuedEngine == null)
         {
-            var error = new InvalidOperationException("OCRエンジンが初期化されていません");
-            _logger?.LogError(error, "❌ OCRエンジン初期化エラー");
+            var error = new InvalidOperationException("QueuedPaddleOcrAllが初期化されていません");
+            _logger?.LogError(error, "❌ [P1-B-FIX] QueuedOCRエンジン初期化エラー");
             throw error;
         }
 
@@ -198,14 +196,14 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         var sw = Stopwatch.StartNew();
         var imageSize = new System.Drawing.Size(processedMat.Width, processedMat.Height);
 
-        _logger?.LogDebug("⚡ ExecuteDetectionOnlyAsync開始 - 高速検出モード: {Width}x{Height}",
+        _logger?.LogDebug("⚡ [P1-B-FIX] Queued検出専用Async開始 - 高速検出モード: {Width}x{Height}",
             imageSize.Width, imageSize.Height);
 
-        var engine = _engineInitializer.GetOcrEngine();
-        if (engine == null)
+        var queuedEngine = _engineInitializer.GetQueuedEngine();
+        if (queuedEngine == null)
         {
-            var error = new InvalidOperationException("OCRエンジンが初期化されていません");
-            _logger?.LogError(error, "❌ OCRエンジン初期化エラー（検出専用）");
+            var error = new InvalidOperationException("QueuedPaddleOcrAllが初期化されていません");
+            _logger?.LogError(error, "❌ [P1-B-FIX] QueuedOCRエンジン初期化エラー（検出専用）");
             throw error;
         }
 
@@ -323,12 +321,12 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         int timeoutSeconds,
         CancellationToken cancellationToken)
     {
-        _logger?.LogDebug("🚀 ExecuteOcrInSeparateTask開始: Timeout={Timeout}秒", timeoutSeconds);
+        _logger?.LogDebug("🚀 [P1-B-FIX] QueuedOCR実行開始: Timeout={Timeout}秒", timeoutSeconds);
 
-        var engine = _engineInitializer.GetOcrEngine();
-        if (engine == null)
+        var queuedEngine = _engineInitializer.GetQueuedEngine();
+        if (queuedEngine == null)
         {
-            throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            throw new InvalidOperationException("QueuedPaddleOcrAllが初期化されていません");
         }
 
         lock (_lockObject)
@@ -340,51 +338,28 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _currentOcrCancellation.Token);
 
-        // 🔥 [P1-B_FIX] SemaphoreSlimでengine.Run()への並行アクセスを防止
-        var waitStartTime = DateTime.UtcNow;
-        var threadId = Environment.CurrentManagedThreadId;
-        var instanceHash = this.GetHashCode();
-
-        // 🔍 [DIAGNOSTIC] Console.WriteLineで確実に出力
-        Console.WriteLine($"🔍 [P1-B_DIAGNOSTIC] ExecuteOcrInSeparateTaskAsync - Instance: {instanceHash}, Thread: {threadId}, _logger==null: {_logger == null}");
-
-        _logger?.LogInformation("🔒 [P1-B_LOCK] WaitAsync開始 - Thread: {ThreadId}, メソッド: ExecuteOcrInSeparateTaskAsync", threadId);
-        Console.WriteLine($"🔒 [P1-B_LOCK] WaitAsync開始 - Instance: {instanceHash}, Thread: {threadId}");
-
-        await _engineLock.WaitAsync(combinedCts.Token).ConfigureAwait(false);
-
-        var waitDuration = DateTime.UtcNow - waitStartTime;
-        Console.WriteLine($"✅ [P1-B_LOCK] ロック取得成功 - Instance: {instanceHash}, Thread: {threadId}, 待機時間: {waitDuration.TotalMilliseconds}ms");
-        _logger?.LogInformation("✅ [P1-B_LOCK] ロック取得成功 - Thread: {ThreadId}, 待機時間: {WaitMs}ms",
-            threadId, waitDuration.TotalMilliseconds);
-
         try
         {
-            // 🔥 [P1-B_FIX_FINAL] Task.Run()削除 - スレッドホッピング防止
-            // Gemini分析結果: Task.Run()によりロック取得スレッドとengine.Run()実行スレッドが異なる
-            // → PaddleOCRネイティブライブラリの内部状態破損 → PaddlePredictor run failed
-            // 修正: ロック取得したスレッドで直接engine.Run()を実行し、スレッド安定化
-            _logger?.LogDebug("🚀 OCR処理実行開始（同期実行 - スレッド安定化）");
+            // 🔥 [P1-B-FIX-Phase1] QueuedPaddleOcrAllは内部でスレッドセーフ管理
+            // - SemaphoreSlim不要: QueuedPaddleOcrAllがBlockingCollectionベースのキューで並行制御
+            // - 各ワーカーが独立したPaddleOcrAllインスタンスを持つため、スレッド安全性保証
+            // - await engine.Run()で非同期実行（QueuedPaddleOcrAll.RunはTask<PaddleOcrResult>を返す）
+            _logger?.LogDebug("🚀 [P1-B-FIX] QueuedOCR処理実行（内部スレッドセーフ管理）");
 
             // Mat.Clone()で独立したメモリを確保し、スレッドセーフティを向上
             using var matForOcr = processedMat.Clone();
-            var result = engine.Run(matForOcr);
+            var result = await queuedEngine.Run(matForOcr).ConfigureAwait(false);
 
-            _logger?.LogDebug("✅ OCR完了: 検出領域数={Count}", result.Regions.Length);
+            _logger?.LogDebug("✅ [P1-B-FIX] QueuedOCR完了: 検出領域数={Count}", result.Regions.Length);
             return result;
         }
         catch (OperationCanceledException) when (_currentOcrCancellation?.IsCancellationRequested == true)
         {
-            _logger?.LogWarning("⏱️ OCRタイムアウト: {Timeout}秒", timeoutSeconds);
+            _logger?.LogWarning("⏱️ [P1-B-FIX] QueuedOCRタイムアウト: {Timeout}秒", timeoutSeconds);
             throw new TimeoutException($"OCR処理が{timeoutSeconds}秒でタイムアウトしました");
         }
         finally
         {
-            // 🔥 [P1-B_FIX] Semaphore解放（finally必須 - 例外時も確実に解放）
-            Console.WriteLine($"🔓 [P1-B_LOCK] ロック解放 - Instance: {instanceHash}, Thread: {threadId}");
-            _logger?.LogInformation("🔓 [P1-B_LOCK] ロック解放 - Thread: {ThreadId}, メソッド: ExecuteOcrInSeparateTaskAsync", threadId);
-            _engineLock.Release();
-
             lock (_lockObject)
             {
                 _currentOcrCancellation?.Dispose();
@@ -402,12 +377,12 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         int timeoutSeconds,
         CancellationToken cancellationToken)
     {
-        _logger?.LogDebug("🎯 ExecuteDetectionOnlyInternal開始: Timeout={Timeout}秒", timeoutSeconds);
+        _logger?.LogDebug("🎯 [P1-B-FIX] Queued検出専用OCR開始: Timeout={Timeout}秒", timeoutSeconds);
 
-        var engine = _engineInitializer.GetOcrEngine();
-        if (engine == null)
+        var queuedEngine = _engineInitializer.GetQueuedEngine();
+        if (queuedEngine == null)
         {
-            throw new InvalidOperationException("OCRエンジンが初期化されていません");
+            throw new InvalidOperationException("QueuedPaddleOcrAllが初期化されていません");
         }
 
         lock (_lockObject)
@@ -419,56 +394,30 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _currentOcrCancellation.Token);
 
-        // 🔥 [P1-B_FIX] SemaphoreSlimでengine.Run()への並行アクセスを防止
-        var waitStartTime = DateTime.UtcNow;
-        var threadId = Environment.CurrentManagedThreadId;
-        var instanceHash = this.GetHashCode();
-
-        // 🔍 [DIAGNOSTIC] Console.WriteLineで確実に出力
-        Console.WriteLine($"🔍 [P1-B_DIAGNOSTIC] ExecuteDetectionOnlyInternalAsync - Instance: {instanceHash}, Thread: {threadId}, _logger==null: {_logger == null}");
-
-        _logger?.LogInformation("🔒 [P1-B_LOCK] WaitAsync開始 - Thread: {ThreadId}, メソッド: ExecuteDetectionOnlyInternalAsync", threadId);
-        Console.WriteLine($"🔒 [P1-B_LOCK] WaitAsync開始 - Instance: {instanceHash}, Thread: {threadId}");
-
-        await _engineLock.WaitAsync(combinedCts.Token).ConfigureAwait(false);
-
-        var waitDuration = DateTime.UtcNow - waitStartTime;
-        Console.WriteLine($"✅ [P1-B_LOCK] ロック取得成功 - Instance: {instanceHash}, Thread: {threadId}, 待機時間: {waitDuration.TotalMilliseconds}ms");
-        _logger?.LogInformation("✅ [P1-B_LOCK] ロック取得成功 - Thread: {ThreadId}, 待機時間: {WaitMs}ms",
-            threadId, waitDuration.TotalMilliseconds);
-
         try
         {
-            // 🔥 [P1-B_FIX_FINAL] Task.Run()削除 - スレッドホッピング防止
-            // Gemini分析結果: Task.Run()によりロック取得スレッドとengine.Run()実行スレッドが異なる
-            // → PaddleOCRネイティブライブラリの内部状態破損 → PaddlePredictor run failed
-            // 修正: ロック取得したスレッドで直接engine.Run()を実行し、スレッド安定化
-            _logger?.LogDebug("🚀 検出専用処理実行開始（同期実行 - スレッド安定化）");
+            // 🔥 [P1-B-FIX-Phase1] QueuedPaddleOcrAllは内部でスレッドセーフ管理
+            _logger?.LogDebug("🚀 [P1-B-FIX] Queued検出専用処理実行（内部スレッドセーフ管理）");
 
             // Mat.Clone()で独立したメモリを確保し、スレッドセーフティを向上
             using var matForDetection = mat.Clone();
-            var result = engine.Run(matForDetection);
+            var result = await queuedEngine.Run(matForDetection).ConfigureAwait(false);
 
-            _logger?.LogDebug("✅ 検出完了: 検出領域数={Count}", result.Regions.Length);
+            _logger?.LogDebug("✅ [P1-B-FIX] Queued検出完了: 検出領域数={Count}", result.Regions.Length);
             return result;
         }
         catch (OperationCanceledException) when (_currentOcrCancellation?.IsCancellationRequested == true)
         {
-            _logger?.LogWarning("⏱️ 検出専用OCRタイムアウト: {Timeout}秒", timeoutSeconds);
+            _logger?.LogWarning("⏱️ [P1-B-FIX] Queued検出専用OCRタイムアウト: {Timeout}秒", timeoutSeconds);
             throw new TimeoutException($"検出専用OCR処理が{timeoutSeconds}秒でタイムアウトしました");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "検出専用OCR実行エラー");
+            _logger?.LogError(ex, "[P1-B-FIX] Queued検出専用OCR実行エラー");
             throw;
         }
         finally
         {
-            // 🔥 [P1-B_FIX] Semaphore解放（finally必須 - 例外時も確実に解放）
-            Console.WriteLine($"🔓 [P1-B_LOCK] ロック解放 - Instance: {instanceHash}, Thread: {threadId}");
-            _logger?.LogInformation("🔓 [P1-B_LOCK] ロック解放 - Thread: {ThreadId}, メソッド: ExecuteDetectionOnlyInternalAsync", threadId);
-            _engineLock.Release();
-
             lock (_lockObject)
             {
                 _currentOcrCancellation?.Dispose();
@@ -510,7 +459,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
 
     /// <summary>
     /// リソース解放
-    /// 🔥 [P1-B_FIX] SemaphoreSlimとCancellationTokenSourceを適切に破棄
+    /// 🔥 [P1-B-FIX-Phase1] CancellationTokenSourceを適切に破棄
     /// </summary>
     public void Dispose()
     {
@@ -519,8 +468,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
             return;
         }
 
-        // SemaphoreSlim破棄
-        _engineLock?.Dispose();
+        // 🔥 [P1-B-FIX-Phase1] SemaphoreSlim削除 - QueuedPaddleOcrAllが内部管理
 
         // CancellationTokenSource破棄（スレッドセーフ）
         lock (_lockObject)
@@ -532,7 +480,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
         _disposed = true;
         GC.SuppressFinalize(this);
 
-        _logger?.LogDebug("🔄 PaddleOcrExecutor Dispose完了");
+        _logger?.LogDebug("🔄 [P1-B-FIX] PaddleOcrExecutor Dispose完了");
     }
 
     #endregion

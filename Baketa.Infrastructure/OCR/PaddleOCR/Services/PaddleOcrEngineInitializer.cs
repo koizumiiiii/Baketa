@@ -117,40 +117,42 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             {
                 try
                 {
-                    // PaddleOcrAllの作成（正しいFullOcrModelを使用）
+                    // 🔥 [P1-B-FIX_PHASE1] QueuedPaddleOcrAll作成（スレッドセーフ保証）
+                    // Gemini推奨: 各ワーカーが独立したPaddleOcrAllインスタンスを持つ
+                    // 🚀 [P1-B-FIX_PHASE3] consumerCount=4: Phase2検証完了後の並列度最適化（2→4）
                     lock (_lockObject)
                     {
-                        _ocrEngine = new PaddleOcrAll(models)
-                        {
-                            AllowRotateDetection = true,
-                            Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
-                            // 根本原因: PaddleOcrClassifier.ShouldRotate180()内でPD_PredictorRunがメモリアクセス違反
-                            // 180度回転テキストは未対応となるが、ゲーム翻訳では実用上問題なし
-                        };
+                        _queuedEngine = new QueuedPaddleOcrAll(
+                            factory: () =>
+                            {
+                                var engine = new PaddleOcrAll(models)
+                                {
+                                    AllowRotateDetection = true,
+                                    Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
+                                };
+
+                                // 🔥 [PHASE13.2.2_FIX] 各ワーカーインスタンスに検出最適化適用
+                                try
+                                {
+                                    ApplyDetectionOptimization(engine);
+                                    _logger?.LogDebug("✅ [P1-B-FIX] ワーカーインスタンスに検出最適化適用完了");
+                                }
+                                catch (Exception optEx)
+                                {
+                                    _logger?.LogWarning(optEx, "⚠️ ワーカーインスタンス最適化で警告（処理継続）");
+                                }
+
+                                return engine;
+                            },
+                            consumerCount: 4,  // 🚀 [P1-B-FIX_PHASE3] Phase2検証完了後の並列度最適化（2→4）
+                            boundedCapacity: 64 // デフォルトキューサイズ
+                        );
+
+                        _logger?.LogInformation("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll初期化完了 - consumerCount: 4, boundedCapacity: 64");
+                        Console.WriteLine("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll初期化完了 - 並列度最適化（4ワーカー）");
                     }
 
-                    // 🔥 [PHASE13.2.2_FIX] OCR認識精度向上 - 最適化パラメーター有効化
-                    // UltraThink Phase 1で特定: このコメントアウトがOCR文字化けの根本原因
-                    // 効果: det_db_thresh 0.3→0.1, det_db_box_thresh 0.6→0.3, 解像度960→1440
-
-                    // 🔥 [PHASE13.2.5_DIAGNOSTIC] Console.WriteLine診断ログ追加（Logger null対策）
-                    Console.WriteLine($"🚨🚨🚨 [PHASE13.2.5] InitializeAsync実行中 - _logger is null: {_logger == null}");
-                    Console.WriteLine($"🚨🚨🚨 [PHASE13.2.5] ApplyDetectionOptimization呼び出し直前");
-
-                    try
-                    {
-                        // 検出感度向上パラメーター適用（低コントラスト・小文字対応）
-                        ApplyDetectionOptimization(_ocrEngine);
-                        Console.WriteLine("✅✅✅ [PHASE13.2.5] ApplyDetectionOptimization呼び出し成功");
-                        _logger?.LogInformation("✅ [PHASE13.2.2] PaddleOCR検出精度最適化パラメーター適用完了");
-                    }
-                    catch (Exception optEx)
-                    {
-                        Console.WriteLine($"❌❌❌ [PHASE13.2.5] ApplyDetectionOptimization失敗: {optEx.Message}");
-                        _logger?.LogWarning(optEx, "⚠️ PaddleOCR最適化パラメーター適用で警告発生（処理継続）");
-                    }
-
-                    _logger?.LogDebug("✅ PaddleOcrAll作成完了 - エンジン型: {EngineType}", _ocrEngine?.GetType()?.Name);
+                    _logger?.LogDebug("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll作成完了 - ワーカー数: 4（Phase3最適化）");
 
                     // Gemini推奨：初期化パラメータの確認
                     _logger?.LogDebug("🔧 OCRエンジン初期化パラメータ:");
@@ -193,10 +195,10 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             _logger?.LogInformation("🔥 PaddleOCRウォームアップ開始");
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            // OCRエンジンが初期化されているか確認
-            if (_ocrEngine == null)
+            // 🔥 [P1-B-FIX] QueuedPaddleOcrAll初期化確認
+            if (_queuedEngine == null)
             {
-                _logger?.LogWarning("OCRエンジンが初期化されていないため、ウォームアップをスキップ");
+                _logger?.LogWarning("QueuedPaddleOcrAll初期化されていないため、ウォームアップをスキップ");
                 return false;
             }
 
@@ -210,11 +212,11 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
 
                 if (!mat.Empty())
                 {
-                    // Task.Runでワーカースレッドにオフロードし、UIスレッドをブロックしない
-                    await Task.Run(() =>
+                    // 🔥 [P1-B-FIX] QueuedPaddleOcrAllはTask<PaddleOcrResult>を返すためawait必須
+                    await Task.Run(async () =>
                     {
-                        var result = _ocrEngine.Run(mat);
-                        _logger?.LogDebug("🔍 ウォームアップOCR結果: 検出領域数={Count}", result.Regions.Length);
+                        var result = await _queuedEngine.Run(mat).ConfigureAwait(false);
+                        _logger?.LogDebug("🔍 [P1-B-FIX] QueuedOCRウォームアップ結果: 検出領域数={Count}", result.Regions.Length);
                     }, cancellationToken).ConfigureAwait(false);
                 }
             }
