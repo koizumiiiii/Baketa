@@ -70,7 +70,6 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     {
         _logger.LogInformation("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
         Console.WriteLine("🚀 [DUPLICATE_FIX] 統合処理有効: 個別翻訳スキップ → TimedChunkAggregatorグルーピング翻訳使用");
-        await WriteToLogFileAsync("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
         return; // 統合処理に委ねる
     }
 
@@ -79,9 +78,6 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         _logger.LogInformation("🎯 [OCR_RESULT_EMPTY] OCR結果が空のためグループ翻訳をスキップ - Results: {ResultsNull}, Count: {Count}",
             eventData.Results == null, eventData.Results?.Count ?? 0);
         Console.WriteLine($"🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
-        
-        // ログファイル直接出力追加
-        await WriteToLogFileAsync("🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
         return;
     }
 
@@ -113,9 +109,6 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
                     $"テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', " +
                     $"座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height})");
 
-                // ログファイル直接出力追加
-                await WriteToLogFileAsync(logMessage);
-
                 var translationRequest = new TranslationRequestEvent(
                     ocrResult: ocrResult,
                     sourceLanguage: sourceLanguageCode,
@@ -134,9 +127,6 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
 
         var completionMessage = $"🎯 Phase A+完了: {eventData.Results.Count}個の翻訳リクエストを発行";
         _logger.LogInformation("🎯 Phase A+完了: {Count}個の翻訳リクエストを発行", eventData.Results.Count);
-        
-        // ログファイル直接出力追加
-        await WriteToLogFileAsync(completionMessage);
     }
     catch (Exception ex)
     {
@@ -246,21 +236,4 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
         return totalWeight > 0 ? (float)(weightedSum / totalWeight) : DefaultConfidence;
     }
 
-    /// <summary>
-    /// ログファイルに直接出力
-    /// </summary>
-    private async Task WriteToLogFileAsync(string message)
-    {
-        try
-        {
-            var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            var logEntry = $"[{timestamp}] {message}{Environment.NewLine}";
-            await File.AppendAllTextAsync(logFilePath, logEntry).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "ログファイル直接出力でエラーが発生しました");
-        }
-    }
 }
