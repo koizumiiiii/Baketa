@@ -397,6 +397,22 @@ public class OcrEngineSettings
     public bool EnableHybridMode { get; set; }
 
     /// <summary>
+    /// 🔥 [P4-B_FIX] QueuedPaddleOcrAll並列ワーカー数（スレッドセーフ実行）
+    /// - デフォルト: 4（Gemini推奨、Phase 3最適化結果）
+    /// - 推奨範囲: 2-8（CPUコア数に応じて調整）
+    /// - 各ワーカーが独立したPaddleOcrAllインスタンスを保持
+    /// </summary>
+    public int QueuedOcrConsumerCount { get; set; } = 4;
+
+    /// <summary>
+    /// 🔥 [P4-B_FIX] QueuedPaddleOcrAll内部キューの最大容量
+    /// - デフォルト: 64（ライブラリデフォルト値）
+    /// - 推奨範囲: 32-128（メモリとレイテンシのバランス）
+    /// - キューが満杯の場合、新規リクエストはブロックされる
+    /// </summary>
+    public int QueuedOcrBoundedCapacity { get; set; } = 64;
+
+    /// <summary>
     /// 設定の妥当性を検証する
     /// </summary>
     /// <returns>妥当性チェック結果</returns>
@@ -425,7 +441,14 @@ public class OcrEngineSettings
             
         if (WorkerCount < 1 || WorkerCount > 10)
             return false;
-            
+
+        // 🔥 [P4-B_FIX] QueuedPaddleOcrAll設定バリデーション
+        if (QueuedOcrConsumerCount < 1 || QueuedOcrConsumerCount > 16)
+            return false;
+
+        if (QueuedOcrBoundedCapacity < 8 || QueuedOcrBoundedCapacity > 256)
+            return false;
+
         return true;
     }
 
@@ -451,7 +474,10 @@ public class OcrEngineSettings
             WorkerCount = WorkerCount,
             UseLanguageModel = UseLanguageModel,
             EnablePreprocessing = EnablePreprocessing,
-            EnableHybridMode = EnableHybridMode
+            EnableHybridMode = EnableHybridMode,
+            // 🔥 [P4-B_FIX] QueuedPaddleOcrAll設定
+            QueuedOcrConsumerCount = QueuedOcrConsumerCount,
+            QueuedOcrBoundedCapacity = QueuedOcrBoundedCapacity
         };
     }
 }

@@ -95,14 +95,8 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
         OcrEngineSettings settings,
         CancellationToken cancellationToken)
     {
-        // Gemini推奨：スレッドセーフティ問題解決のため、一時的にCPUモード、シングルスレッドに強制
-        if (true) // デバッグ用：常に適用
-        {
-            settings.UseGpu = false;
-            settings.EnableMultiThread = false;
-            settings.WorkerCount = 1;
-            _logger?.LogDebug("🔧 スレッドセーフティ検証のため、CPU/シングルスレッドモードに強制設定");
-        }
+        // 🔥 [P4-A_FIX] デバッグコード削除完了 - QueuedPaddleOcrAllによりスレッドセーフティ保証済み
+        // GPU/マルチスレッド設定は settings.UseGpu, settings.EnableMultiThread に従う
 
         try
         {
@@ -144,15 +138,16 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
 
                                 return engine;
                             },
-                            consumerCount: 4,  // 🚀 [P1-B-FIX_PHASE3] Phase2検証完了後の並列度最適化（2→4）
-                            boundedCapacity: 64 // デフォルトキューサイズ
+                            consumerCount: settings.QueuedOcrConsumerCount,  // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
+                            boundedCapacity: settings.QueuedOcrBoundedCapacity // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
                         );
 
-                        _logger?.LogInformation("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll初期化完了 - consumerCount: 4, boundedCapacity: 64");
-                        Console.WriteLine("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll初期化完了 - 並列度最適化（4ワーカー）");
+                        _logger?.LogInformation("✅ [P4-B_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: {ConsumerCount}, boundedCapacity: {BoundedCapacity}",
+                            settings.QueuedOcrConsumerCount, settings.QueuedOcrBoundedCapacity);
+                        Console.WriteLine($"✅ [P4-B_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: {settings.QueuedOcrConsumerCount}, boundedCapacity: {settings.QueuedOcrBoundedCapacity}");
                     }
 
-                    _logger?.LogDebug("✅ [P1-B-FIX_PHASE3] QueuedPaddleOcrAll作成完了 - ワーカー数: 4（Phase3最適化）");
+                    _logger?.LogDebug("✅ [P4-B_FIX] QueuedPaddleOcrAll作成完了 - ワーカー数: {ConsumerCount}（設定値）", settings.QueuedOcrConsumerCount);
 
                     // Gemini推奨：初期化パラメータの確認
                     _logger?.LogDebug("🔧 OCRエンジン初期化パラメータ:");
