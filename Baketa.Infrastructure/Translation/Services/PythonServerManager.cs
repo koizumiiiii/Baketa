@@ -27,7 +27,7 @@ public class PythonServerManager(
 {
     private readonly ConcurrentDictionary<string, PythonServerInstance> _activeServers = [];
     private readonly ConcurrentDictionary<int, bool> _serverStartDetectionFlags = []; // 🔥 UltraPhase 14.17: [SERVER_START]検出フラグ
-    private readonly ConcurrentDictionary<int, bool> _commandCommunicationActiveFlags = []; // 🔥 UltraPhase 14.21: stdout競合回避フラグ
+    // 🔥 [P1-C_FIX] _commandCommunicationActiveFlags削除 - gRPCモード移行によりstdin通信不要
     private readonly SemaphoreSlim _startServerSemaphore = new(1, 1); // 🔥 [PORT_CONFLICT_FIX] 並行起動防止
     private System.Threading.Timer? _healthCheckTimer;
     private readonly object _healthCheckLock = new();
@@ -154,21 +154,9 @@ public class PythonServerManager(
             // サーバー準備完了まで待機（UltraPhase 14.5: プロセス参照も渡して確実な準備確認）
             await WaitForServerReadyAsync(port, process).ConfigureAwait(false);
 
-            // 🔥 UltraPhase 14.15: Pythonのstdin読み取りループ開始待機
-            // [SERVER_START]出力後、実際にstdin.readline()が実行されるまで数ミリ秒のギャップがあるため、
-            // 短い待機時間を追加してタイミング問題を回避
-            Console.WriteLine("🔍 [UltraPhase 14.15] stdin読み取りループ開始待機 (500ms)");
-            logger.LogDebug("🔍 [UltraPhase 14.15] Pythonのstdin読み取りループ開始待機");
-            await Task.Delay(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
-            Console.WriteLine("✅ [UltraPhase 14.15] 待機完了 - stdin通信開始");
+            // 🔥 [P1-C_FIX] stdin通信削除 - gRPCモード移行により不要
+            // [SERVER_START]検出はWaitForServerReadyAsync内のstderr監視で実行済み（Line 415-419）
 
-            // UltraPhase 14.5: stdin通信でサーバー準備完了確認 + EOF防止
-            var isServerReady = await CheckServerReadyViaStdinAsync(process, port).ConfigureAwait(false);
-            if (!isServerReady)
-            {
-                logger.LogWarning("⚠️ stdin通信でのサーバー準備確認に失敗しましたが、TCP接続は成功しているため続行します");
-            }
-            
             var instance = new PythonServerInstance(port, languagePair, process);
             instance.UpdateStatus(ServerStatus.Running);
 
@@ -507,103 +495,8 @@ public class PythonServerManager(
         }
     }
 
-    /// <summary>
-    /// stdin/stdout通信でサーバー準備状態確認（UltraPhase 14.5: is_readyコマンド送信）
-    /// </summary>
-    private async Task<bool> CheckServerReadyViaStdinAsync(Process process, int port)
-    {
-        // 🔥 UltraPhase 14.21: コマンド通信フラグを有効化（バックグラウンドstdout監視を一時停止）
-        _commandCommunicationActiveFlags[port] = true;
-        logger.LogInformation("🔒 [UltraPhase 14.21] コマンド通信モード有効化: Port {Port}", port);
-
-        try
-        {
-            Console.WriteLine("🔍 [UltraPhase 14.14] STDIN通信デバッグ開始");
-            logger.LogDebug("🔍 [STDIN_CHECK] is_readyコマンド送信開始");
-
-            // 🔥 UltraPhase 14.14: プロセス状態確認
-            Console.WriteLine($"🔍 [UltraPhase 14.14] Pythonプロセス状態: PID={process.Id}, HasExited={process.HasExited}");
-            Console.WriteLine($"🔍 [UltraPhase 14.14] StandardInput可能: {!process.StandardInput.BaseStream.CanWrite}");
-
-            // is_readyコマンドをJSON形式で送信
-            var isReadyCommand = JsonSerializer.Serialize(new { command = "is_ready" });
-            Console.WriteLine($"🔍 [UltraPhase 14.14] 送信コマンド: '{isReadyCommand}'");
-
-            await process.StandardInput.WriteLineAsync(isReadyCommand).ConfigureAwait(false);
-            Console.WriteLine("🔍 [UltraPhase 14.14] WriteLineAsync完了");
-
-            await process.StandardInput.FlushAsync().ConfigureAwait(false);
-            Console.WriteLine("🔍 [UltraPhase 14.14] FlushAsync完了");
-
-            logger.LogDebug("📤 [STDIN_SEND] コマンド送信完了: {Command}", isReadyCommand);
-
-            // 🔥 UltraPhase 14.20: C#側stdout受信詳細デバッグ
-            logger.LogInformation("🔍 [C#_STDOUT_DEBUG] StandardOutput状態確認開始");
-            logger.LogInformation("🔍 [C#_STDOUT_DEBUG] process.StandardOutput.EndOfStream: {EndOfStream}", process.StandardOutput.EndOfStream);
-            logger.LogInformation("🔍 [C#_STDOUT_DEBUG] process.HasExited: {HasExited}", process.HasExited);
-
-            // タイムアウト付きでレスポンス読み取り
-            var readTask = process.StandardOutput.ReadLineAsync();
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10));
-
-            Console.WriteLine("🔍 [UltraPhase 14.14] レスポンス待機開始 (10秒タイムアウト)");
-            logger.LogInformation("🔄 [C#_STDOUT_DEBUG] ReadLineAsync()タスク開始 - 待機中...");
-
-            var completedTask = await Task.WhenAny(readTask, timeoutTask).ConfigureAwait(false);
-
-            if (completedTask == timeoutTask)
-            {
-                Console.WriteLine("❌ [UltraPhase 14.14] レスポンスタイムアウト - Python応答なし");
-                // 🔥 UltraPhase 14.20: タイムアウト時の詳細状態診断
-                logger.LogWarning("⏰ [STDIN_TIMEOUT] is_readyレスポンスタイムアウト (10秒)");
-                logger.LogWarning("🔍 [C#_STDOUT_DEBUG] タイムアウト時状態: EndOfStream={EndOfStream}, HasExited={HasExited}",
-                    process.StandardOutput.EndOfStream, process.HasExited);
-                logger.LogWarning("🔍 [C#_STDOUT_DEBUG] ReadLineAsyncタスク状態: {TaskStatus}", readTask.Status);
-                return false;
-            }
-
-            Console.WriteLine("✅ [UltraPhase 14.14] レスポンス受信完了");
-            // 🔥 UltraPhase 14.20: 受信成功時のデバッグ
-            logger.LogInformation("✅ [C#_STDOUT_DEBUG] ReadLineAsync完了 - レスポンス取得中...");
-            var response = await readTask.ConfigureAwait(false);
-
-            // 🔥 UltraPhase 14.20: 受信したレスポンスの詳細ログ
-            logger.LogInformation("📥 [C#_STDOUT_DEBUG] 受信レスポンス: {Response}", response ?? "null");
-            Console.WriteLine($"🔍 [UltraPhase 14.14] 受信データ: '{response}' (IsNull={response == null}, IsEmpty={string.IsNullOrEmpty(response)})");
-
-            if (string.IsNullOrEmpty(response))
-            {
-                Console.WriteLine("❌ [UltraPhase 14.14] 空のレスポンス - Python側がコマンドを受信・処理できていない");
-                logger.LogWarning("📭 [STDIN_EMPTY] 空のレスポンス受信");
-                return false;
-            }
-
-            Console.WriteLine($"✅ [UltraPhase 14.14] 有効なレスポンス受信: {response}");
-            logger.LogDebug("📥 [STDIN_RECV] レスポンス受信: {Response}", response);
-
-            // JSONレスポンスを解析
-            var responseJson = JsonSerializer.Deserialize<JsonElement>(response);
-            var success = responseJson.GetProperty("success").GetBoolean();
-            var ready = responseJson.GetProperty("ready").GetBoolean();
-            var modelLoaded = responseJson.GetProperty("model_loaded").GetBoolean();
-
-            logger.LogInformation("✅ [STDIN_READY] サーバー状態確認完了: Success={Success}, Ready={Ready}, ModelLoaded={ModelLoaded}",
-                success, ready, modelLoaded);
-
-            return success && ready && modelLoaded;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "❌ [STDIN_ERROR] stdin通信でのサーバー状態確認失敗");
-            return false;
-        }
-        finally
-        {
-            // 🔥 UltraPhase 14.21: コマンド通信フラグを無効化（バックグラウンドstdout監視を再開）
-            _commandCommunicationActiveFlags[port] = false;
-            logger.LogInformation("🔓 [UltraPhase 14.21] コマンド通信モード無効化: Port {Port}", port);
-        }
-    }
+    // 🔥 [P1-C_FIX] CheckServerReadyViaStdinAsync削除 - gRPCモード移行により不要
+    // stdin/stdout通信は旧実装、現在は[SERVER_START]検出（Line 415-419）で準備完了確認
 
     /// <summary>
     /// ポートレジストリにサーバー情報を登録

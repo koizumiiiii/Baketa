@@ -37,11 +37,12 @@ public static class ProcessingServiceExtensions
         services.AddSingleton<IServiceCollection>(provider =>
         {
             // サービス登録確認のログ出力
-            Console.WriteLine("🔧 [STRATEGY_A_FIX] ProcessingServices登録完了 - PipelineExecutionManager + SmartProcessingPipelineService + 4戦略");
+            Console.WriteLine("🔧 [STRATEGY_A_FIX] ProcessingServices登録完了 - PipelineExecutionManager + SmartProcessingPipelineService + 3戦略");
             Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IPipelineExecutionManager → PipelineExecutionManager (排他制御)");
             Console.WriteLine("🔧 [STRATEGY_A_FIX]   - ISmartProcessingPipelineService → SmartProcessingPipelineService");
             Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → OcrExecutionStageStrategy");
-            Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → TranslationExecutionStageStrategy");
+            // 🔥 [P3_FIX] TranslationExecutionStageStrategy削除済み - Phase 12.2アーキテクチャ移行完了
+            // Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → TranslationExecutionStageStrategy");
             Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → ImageChangeDetectionStageStrategy");
             Console.WriteLine("🔧 [STRATEGY_A_FIX]   - IProcessingStageStrategy → TextChangeDetectionStageStrategy");
             return services;
