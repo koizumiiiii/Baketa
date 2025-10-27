@@ -44,7 +44,7 @@ jobs:
       shell: cmd
       
     - name: Upload Native DLL
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: native-dll
         path: |
@@ -136,7 +136,7 @@ jobs:
         CI: true
     
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: always()
       with:
         name: test-results
