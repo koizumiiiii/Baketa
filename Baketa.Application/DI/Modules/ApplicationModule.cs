@@ -462,6 +462,13 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());
             Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - キャプチャ画像保存機能付き");
 
+            // 🎯 [PHASE2.5] ROIImageCapturedEventHandler登録 - 複数ROI画像の個別処理
+            Console.WriteLine("🔍 [DI_DEBUG] ROIImageCapturedEventHandler登録開始");
+            services.AddSingleton<Baketa.Application.EventHandlers.Capture.ROIImageCapturedEventHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.Capture.ROIImageCapturedEvent>>(
+                provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Capture.ROIImageCapturedEventHandler>());
+            Console.WriteLine("✅ [DI_DEBUG] ROIImageCapturedEventHandler登録完了");
+
             // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
             Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");
             services.AddSingleton<Baketa.Application.Events.Handlers.OcrRequestHandler>();

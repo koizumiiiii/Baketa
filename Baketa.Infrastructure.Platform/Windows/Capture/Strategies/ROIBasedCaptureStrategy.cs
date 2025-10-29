@@ -71,11 +71,13 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
     {
         try
         {
-            // 専用GPUまたは大画面での制約回避が必要な場合
-            var canApply = environment.IsDedicatedGpu || 
-                          environment.MaximumTexture2DDimension < 8192;
+            // 🔥 [FIX7_PHASE1] Gemini指摘: 論理エラー修正（< 8192は逆、||も誤り）
+            // 正しい条件: 専用GPU かつ 大画面対応環境でROIを使用
+            // 理由: ROIは部分キャプチャなので大画面に適している
+            var canApply = environment.IsDedicatedGpu &&
+                          environment.MaximumTexture2DDimension >= 8192;
 
-            _logger.LogInformation("ROIBased戦略適用判定: {CanApply} (専用GPU: {IsDedicated}, MaxTexture: {MaxTexture})", 
+            _logger.LogInformation("🔥 [FIX7_PHASE1] ROIBased戦略適用判定: {CanApply} (専用GPU: {IsDedicated}, MaxTexture: {MaxTexture})",
                 canApply, environment.IsDedicatedGpu, environment.MaximumTexture2DDimension);
 
             return canApply;
@@ -253,8 +255,6 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
                 }
             }).ConfigureAwait(false);
 
-            result.TextRegions = textRegions;
-
             // Phase 3: 高解像度部分キャプチャ
             var phase3Stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -266,6 +266,13 @@ public class ROIBasedCaptureStrategy : ICaptureStrategy
             var highResImages = await CaptureHighResRegionsAsync(hwnd, textRegions, options.ROIScaleFactor).ConfigureAwait(false);
 
             phase3Stopwatch.Stop();
+
+            // ✅ [Y_COORDINATE_FIX_FINAL] PaddleOCRは既に座標復元済み
+            // - textRegionsには元画像スケール（3840x2160）の座標が含まれている
+            // - DetectTextRegionsAsync内部でCoordinateRestorer.RestoreOriginalCoordinates()が実行済み
+            // - 追加のスケーリングは不要（二重スケーリングを防止）
+            // - ログ証拠: "検出専用統合座標復元完了: X個のテキスト領域を復元"
+            result.TextRegions = textRegions;
 
             // 🔥 [PHASE13.2.31K-29-A] Phase 3完了ログ
             _logger.LogInformation("✅ [K-29-A_PHASE3_END] 高解像度部分キャプチャ完了 - 成功数: {SuccessCount}/{TotalCount}, 処理時間: {ElapsedMs}ms",

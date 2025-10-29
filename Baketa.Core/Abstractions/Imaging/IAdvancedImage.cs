@@ -135,6 +135,19 @@ namespace Baketa.Core.Abstractions.Imaging;
         /// </summary>
         /// <returns>検出されたテキスト領域の矩形リスト</returns>
         Task<List<Rectangle>> DetectTextRegionsAsync();
+
+        /// <summary>
+        /// この画像がキャプチャされた画面上の領域（絶対座標）
+        /// ROI画像の場合、元画像内での絶対座標を保持します。
+        /// 通常画像の場合はnullです。
+        /// Phase 2.5: ROI座標変換対応
+        /// </summary>
+        /// <remarks>
+        /// ROI画像OCR処理で、相対座標を絶対座標に変換するために使用されます。
+        /// 例: ROI AbsoluteRegion=(267,743), OCR相対座標=(12,10)
+        ///      → 絶対座標=(279,753) = (267+12, 743+10)
+        /// </remarks>
+        System.Drawing.Rectangle? CaptureRegion { get; }
     }
     
     /// <summary>

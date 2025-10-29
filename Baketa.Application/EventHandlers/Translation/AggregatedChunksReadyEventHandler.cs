@@ -183,32 +183,42 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 var chunk = nonEmptyChunks[i];
                 // chunk.TranslatedTextは既にLine 176で設定済み
 
-                // 🔥 [COORDINATE_FIX] ROI座標 → スクリーン絶対座標変換
-                // 垂直モニター配置（セカンダリが上: Y=-1080~0, プライマリ: Y=0~1080）に対応
-                var roiBounds = chunk.CombinedBounds;
+                // 🔥 [FIX6_NORMALIZE] ROI相対座標 → 画像絶対座標の正規化
+                // Gemini推奨: キャッシュ保存前（オーバーレイ表示前）に座標を正規化
+                // CaptureRegion == null: フルスクリーンキャプチャ → 変換不要
+                // CaptureRegion != null: ROIキャプチャ → CombinedBoundsにOffsetを加算
+                chunk = NormalizeChunkCoordinates(chunk);
 
-                // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出
+                _logger.LogInformation("🔥 [FIX6_NORMALIZE] 座標正規化完了 - ChunkId: {ChunkId}, CaptureRegion: {CaptureRegion}, Bounds: ({X},{Y},{W}x{H})",
+                    chunk.ChunkId,
+                    chunk.CaptureRegion.HasValue ? $"({chunk.CaptureRegion.Value.X},{chunk.CaptureRegion.Value.Y})" : "null",
+                    chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
+                    chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
+
+                // 🔥🔥🔥 [FIX4_FULLSCREEN_COORD] フルスクリーンキャプチャ座標変換修正
+                // 問題: ROIキャプチャ(CaptureRegion != null) → ROI_COORD_FIX実行 → 画像絶対座標
+                //       フルスクリーンキャプチャ(CaptureRegion == null) → ROI_COORD_FIX未実行 → 画像相対座標
+                // 解決: 全てのチャンクに対してConvertRoiToScreenCoordinates実行
+                //       ROI_COORD_FIX実行済み: 画像絶対座標 → スクリーン絶対座標変換
+                //       ROI_COORD_FIX未実行: 画像相対座標 → スクリーン絶対座標変換
                 var isBorderlessOrFullscreen = _coordinateTransformationService.DetectBorderlessOrFullscreen(chunk.SourceWindowHandle);
-                _logger.LogDebug("🔍 [PHASE2.1_DETECTION] ボーダーレス/フルスクリーン検出結果: {IsBorderless}, Handle: {Handle}",
-                    isBorderlessOrFullscreen, chunk.SourceWindowHandle);
 
                 var screenBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
-                    roiBounds,
+                    chunk.CombinedBounds,  // 画像絶対座標またはROI相対座標
                     chunk.SourceWindowHandle,
                     roiScaleFactor: 1.0f,
                     isBorderlessOrFullscreen: isBorderlessOrFullscreen);
 
-                _logger.LogDebug("🔥 [COORDINATE_FIX] ROI→Screen変換完了 - ROI:({RoiX},{RoiY},{RoiW}x{RoiH}), Screen:({ScreenX},{ScreenY},{ScreenW}x{ScreenH})",
-                    roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height,
-                    screenBounds.X, screenBounds.Y, screenBounds.Width, screenBounds.Height);
+                _logger.LogDebug("🔥 [FIX4_FULLSCREEN_COORD] 座標変換実行 - 画像座標:({X},{Y}) → スクリーン座標:({SX},{SY})",
+                    chunk.CombinedBounds.X, chunk.CombinedBounds.Y, screenBounds.X, screenBounds.Y);
 
-                // 変換後の座標で新しいチャンクインスタンスを作成
+                // 座標変換不要 - chunk.CombinedBoundsをそのまま使用して新しいチャンクインスタンスを作成
                 // AverageConfidenceは計算プロパティのため、TextResultsから自動計算される
                 var chunkWithScreenCoords = new TextChunk
                 {
                     ChunkId = chunk.ChunkId,
                     TextResults = chunk.TextResults,
-                    CombinedBounds = screenBounds, // スクリーン絶対座標
+                    CombinedBounds = screenBounds, // 画像絶対座標（CoordinateBasedTranslationServiceで変換済み）
                     CombinedText = chunk.CombinedText,
                     TranslatedText = chunk.TranslatedText,
                     SourceWindowHandle = chunk.SourceWindowHandle,
@@ -268,6 +278,52 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _translationExecutionSemaphore.Release();
             _logger?.LogDebug($"🔓 [PHASE1] セマフォ解放完了 - SessionId: {eventData.SessionId}");
         }
+    }
+
+    /// <summary>
+    /// 🔥 [FIX6_NORMALIZE] TextChunk座標正規化メソッド
+    /// ROI相対座標 → 画像絶対座標の変換を実行
+    ///
+    /// Gemini推奨アプローチ (Option B):
+    /// - キャッシュ保存前に座標を正規化し、再利用時に変換不要にする
+    /// - CombinedBounds: ROI相対座標 → 画像絶対座標に変換
+    /// - CaptureRegion: コンテキスト情報として保持（座標検証・デバッグ用）
+    /// </summary>
+    /// <param name="chunk">正規化対象のTextChunk（ROI相対座標）</param>
+    /// <returns>正規化後のTextChunk（画像絶対座標）</returns>
+    private TextChunk NormalizeChunkCoordinates(TextChunk chunk)
+    {
+        // CaptureRegionがnull = フルスクリーンキャプチャ → 変換不要
+        if (!chunk.CaptureRegion.HasValue)
+        {
+            _logger.LogInformation("🔍 [FIX6_NORMALIZE] フルスクリーンキャプチャ - 座標変換不要 - ChunkId: {ChunkId}",
+                chunk.ChunkId);
+            return chunk;
+        }
+
+        // ROI相対座標 → 画像絶対座標変換
+        // CombinedBounds.Offset()メソッドでCaptureRegion.Locationを加算
+        var absoluteBounds = chunk.CombinedBounds;
+        absoluteBounds.Offset(chunk.CaptureRegion.Value.Location);
+
+        _logger.LogInformation("🔧 [FIX6_NORMALIZE] ROI相対座標変換 - ChunkId: {ChunkId}, ROI相対: ({RX},{RY}) + Offset({OX},{OY}) = 画像絶対: ({AX},{AY})",
+            chunk.ChunkId,
+            chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
+            chunk.CaptureRegion.Value.X, chunk.CaptureRegion.Value.Y,
+            absoluteBounds.X, absoluteBounds.Y);
+
+        // 正規化後の新しいTextChunkインスタンスを生成（classのためwith式不可）
+        return new TextChunk
+        {
+            ChunkId = chunk.ChunkId,
+            TextResults = chunk.TextResults,
+            CombinedBounds = absoluteBounds,  // 🔥 画像絶対座標（正規化済み）
+            CombinedText = chunk.CombinedText,
+            TranslatedText = chunk.TranslatedText,
+            SourceWindowHandle = chunk.SourceWindowHandle,
+            DetectedLanguage = chunk.DetectedLanguage,
+            CaptureRegion = chunk.CaptureRegion  // コンテキスト情報を保持
+        };
     }
 
     /// <summary>

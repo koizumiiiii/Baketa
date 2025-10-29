@@ -248,6 +248,11 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
 
     /// <summary>
+    /// Phase 2.5: ROI座標変換対応 - テスト用画像なのでnull
+    /// </summary>
+    public System.Drawing.Rectangle? CaptureRegion => null;
+
+    /// <summary>
     /// 画像データの読み取り専用メモリを取得（Gemini推奨拡張）
     /// </summary>
     public ReadOnlyMemory<byte> GetImageMemory()

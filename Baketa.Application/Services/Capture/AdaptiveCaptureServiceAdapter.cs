@@ -126,19 +126,29 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogInformation("適応的ウィンドウキャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
+            // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegionsからCaptureRegionを取得
+            // AdaptiveCaptureServiceがROI画像の絶対座標をDetectedTextRegionsに格納している
+            Rectangle? captureRegion = null;
+            if (result.DetectedTextRegions != null && result.DetectedTextRegions.Count > 0)
+            {
+                captureRegion = result.DetectedTextRegions[0];
+                _logger.LogDebug("🔥 [ROI_CAPTURE_REGION] CaptureRegion取得: {CaptureRegion}", captureRegion);
+            }
+
             // 🎯 CRITICAL FIX: SafeImageAdapterの場合はWindowsImageAdapterでラップ（型互換性確保）
             var capturedImage = result.CapturedImages[0];
             if (capturedImage is SafeImageAdapter safeImageAdapter)
             {
                 _logger.LogInformation("🎯 [PHASE3.18.4] SafeImageAdapter検出 - WindowsImageAdapterでラップしてIImage互換性確保");
                 Console.WriteLine("🎯 [PHASE3.18.4] SafeImageAdapter → WindowsImageAdapter変換（型安全）");
-                // SafeImageAdapterをWindowsImageAdapterでラップしてIImage互換性を確保
-                return new WindowsImageAdapter(safeImageAdapter);
+                // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegions[0]から取得したCaptureRegionを設定
+                return new WindowsImageAdapter(safeImageAdapter, captureRegion);
             }
 
             // レガシー対応: SafeImageAdapter以外の場合はWindowsImageAdapterでラップ
             _logger.LogWarning("⚠️ [PHASE3.18.4] 非SafeImageAdapter検出 - WindowsImageAdapterでラップ: Type={Type}", capturedImage.GetType().Name);
-            return new WindowsImageAdapter(capturedImage);
+            // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegions[0]から取得したCaptureRegionを設定
+            return new WindowsImageAdapter(capturedImage, captureRegion);
         }
         catch (Exception ex)
         {

@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP2] OcrContext統合
 using Baketa.Infrastructure.ResourceManagement;
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
@@ -45,13 +46,16 @@ public sealed class BatchOcrIntegrationService : IDisposable
     /// <summary>
     /// 統合OCR処理 - バッチ処理とフォールバックの組み合わせ
     /// Phase 2統合: HybridResourceManager経由でリソース制御付き処理を実行
+    /// FIX7 Step2: OcrContext対応 - CaptureRegion情報を保持
     /// </summary>
     public async Task<IReadOnlyList<TextChunk>> ProcessWithIntegratedOcrAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
-        CancellationToken cancellationToken = default)
+        OcrContext context)
     {
         ThrowIfDisposed();
+
+        _logger?.LogInformation("🔥 [FIX7_STEP2] ProcessWithIntegratedOcrAsync開始 - CaptureRegion: {HasCaptureRegion}, Value: {CaptureRegion}",
+            context.HasCaptureRegion,
+            context.HasCaptureRegion ? $"({context.CaptureRegion.Value.X},{context.CaptureRegion.Value.Y},{context.CaptureRegion.Value.Width}x{context.CaptureRegion.Value.Height})" : "null");
 
         // HybridResourceManager経由でリソース制御付きOCR処理を実行
         var request = new ProcessingRequest(
@@ -63,16 +67,16 @@ public sealed class BatchOcrIntegrationService : IDisposable
         return await _resourceManager.ProcessOcrAsync(
             async (req, ct) =>
             {
-                _logger?.LogInformation("🔄 [HybridResourceManager] 統合OCR処理開始 - 画像: {Width}x{Height}, OperationId: {OperationId}", 
-                    image.Width, image.Height, req.OperationId);
+                _logger?.LogInformation("🔄 [HybridResourceManager] 統合OCR処理開始 - 画像: {Width}x{Height}, OperationId: {OperationId}",
+                    context.Image.Width, context.Image.Height, req.OperationId);
 
                 // 1. バッチOCR処理を試行（レガシーセマフォア制御付き）
                 await _processingSemaphore.WaitAsync(ct).ConfigureAwait(false);
-                
+
                 try
                 {
-                    var chunks = await TryBatchOcrProcessingAsync(image, windowHandle, ct).ConfigureAwait(false);
-                    
+                    var chunks = await TryBatchOcrProcessingAsync(context, ct).ConfigureAwait(false);
+
                     // 2. バッチ処理結果の検証
                     if (IsValidOcrResult(chunks))
                     {
@@ -82,7 +86,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
 
                     // 3. フォールバック処理
                     _logger?.LogWarning("⚠️ [HybridResourceManager] バッチOCR結果不十分、フォールバック処理実行");
-                    return await ExecuteFallbackOcrAsync(image, windowHandle, ct).ConfigureAwait(false);
+                    return await ExecuteFallbackOcrAsync(context, ct).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -90,44 +94,42 @@ public sealed class BatchOcrIntegrationService : IDisposable
                 }
             },
             request,
-            cancellationToken).ConfigureAwait(false);
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// 複数画像の並列バッチ処理
+    /// FIX7 Step2: OcrContext対応
     /// </summary>
     public async Task<IReadOnlyList<IReadOnlyList<TextChunk>>> ProcessMultipleImagesAsync(
-        IReadOnlyList<(IAdvancedImage Image, IntPtr WindowHandle)> imageData,
+        IReadOnlyList<OcrContext> contexts,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
-        if (imageData.Count == 0)
+
+        if (contexts.Count == 0)
             return [];
 
-        _logger?.LogInformation("📦 複数画像並列処理開始 - 画像数: {ImageCount}", imageData.Count);
+        _logger?.LogInformation("📦 複数画像並列処理開始 - 画像数: {ImageCount}", contexts.Count);
 
         // 並列処理タスクを作成
-        var tasks = imageData.Select(async data =>
+        var tasks = contexts.Select(async context =>
         {
             try
             {
-                return await ProcessWithIntegratedOcrAsync(
-                    data.Image, 
-                    data.WindowHandle, 
-                    cancellationToken).ConfigureAwait(false);
+                return await ProcessWithIntegratedOcrAsync(context).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}", 
-                    data.Image.Width, data.Image.Height);
-                return [];
+                _logger?.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}",
+                    context.Image.Width, context.Image.Height);
+                return (IReadOnlyList<TextChunk>)[];
             }
         });
 
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        
-        _logger?.LogInformation("✅ 複数画像並列処理完了 - 総チャンク数: {TotalChunks}", 
+
+        _logger?.LogInformation("✅ 複数画像並列処理完了 - 総チャンク数: {TotalChunks}",
             results.Sum(r => r.Count));
 
         return results;
@@ -166,19 +168,19 @@ public sealed class BatchOcrIntegrationService : IDisposable
 
     /// <summary>
     /// バッチOCR処理を試行
+    /// FIX7 Step2: OcrContext対応
     /// </summary>
     private async Task<IReadOnlyList<TextChunk>> TryBatchOcrProcessingAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
+        OcrContext context,
         CancellationToken cancellationToken)
     {
         try
         {
             // 画像サイズに基づく最適化
-            await OptimizeBatchPerformanceAsync(image.Width, image.Height, cancellationToken).ConfigureAwait(false);
-            
+            await OptimizeBatchPerformanceAsync(context.Image.Width, context.Image.Height, cancellationToken).ConfigureAwait(false);
+
             // バッチ処理実行
-            return await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
+            return await _batchOcrProcessor.ProcessBatchAsync(context.Image, context.WindowHandle, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -189,16 +191,16 @@ public sealed class BatchOcrIntegrationService : IDisposable
 
     /// <summary>
     /// フォールバックOCR処理
+    /// FIX7 Step2: OcrContext対応 - **ROOT CAUSE FIX**: CaptureRegionをTextChunkに設定
     /// </summary>
     private async Task<IReadOnlyList<TextChunk>> ExecuteFallbackOcrAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
+        OcrContext context,
         CancellationToken cancellationToken)
     {
         try
         {
-            var ocrResults = await _fallbackOcrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
-            
+            var ocrResults = await _fallbackOcrEngine.RecognizeAsync(context.Image, cancellationToken: cancellationToken).ConfigureAwait(false);
+
             if (!ocrResults.HasText)
                 return [];
 
@@ -217,20 +219,24 @@ public sealed class BatchOcrIntegrationService : IDisposable
                     DetectedLanguage = ocrResults.LanguageCode
                 };
 
+                // 🔥 [FIX7_ROOT_CAUSE_FIX] CaptureRegionをTextChunkに設定 - これがFIX7の根本原因修正
                 var chunk = new TextChunk
                 {
                     ChunkId = i,
                     TextResults = [positionedResult],
                     CombinedBounds = region.Bounds,
                     CombinedText = region.Text,
-                    SourceWindowHandle = windowHandle,
-                    DetectedLanguage = ocrResults.LanguageCode
+                    SourceWindowHandle = context.WindowHandle,
+                    DetectedLanguage = ocrResults.LanguageCode,
+                    CaptureRegion = context.CaptureRegion // ✅ [FIX7_CRITICAL] ROI座標ズレ問題の根本原因修正
                 };
 
                 chunks.Add(chunk);
             }
 
-            _logger?.LogInformation("🔄 フォールバックOCR完了 - チャンク数: {ChunkCount}", chunks.Count);
+            _logger?.LogInformation("🔥 [FIX7_STEP2] フォールバックOCR完了 - チャンク数: {ChunkCount}, CaptureRegion設定: {HasCaptureRegion}",
+                chunks.Count, context.HasCaptureRegion);
+
             return chunks;
         }
         catch (Exception ex)

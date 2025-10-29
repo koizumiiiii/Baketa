@@ -103,11 +103,11 @@ public sealed class EventHandlerInitializationService(
                 eventAggregator.Subscribe<CaptureCompletedEvent>(captureCompletedHandler);
                 _logger.LogInformation("CaptureCompletedHandlerを登録しました");
                 Console.WriteLine("🔥 [DEBUG] CaptureCompletedHandlerを登録しました");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] CaptureCompletedHandlerを登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -116,12 +116,42 @@ public sealed class EventHandlerInitializationService(
             {
                 _logger.LogError(ex, "CaptureCompletedHandlerの登録に失敗しました");
                 Console.WriteLine($"🔥 [ERROR] CaptureCompletedHandlerの登録失敗: {ex.Message}");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] CaptureCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+
+            // 🎯 [PHASE2.5] ROIImageCapturedEventHandlerの登録 - 複数ROI画像の個別処理
+            try
+            {
+                var roiImageCapturedHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.Capture.ROIImageCapturedEvent>>();
+                eventAggregator.Subscribe<Baketa.Core.Events.Capture.ROIImageCapturedEvent>(roiImageCapturedHandler);
+                _logger.LogInformation("🎯 ROIImageCapturedEventHandlerを登録しました - 複数ROI画像の個別処理");
+                Console.WriteLine("🎯 [PHASE2.5] ROIImageCapturedEventHandlerを登録しました - 複数ROI画像の個別処理");
+
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [PHASE2.5] ROIImageCapturedEventHandlerを登録しました{Environment.NewLine}");
+                }
+                catch { /* ファイル出力失敗は無視 */ }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ROIImageCapturedEventHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] ROIImageCapturedEventHandler登録失敗: {ex.Message}");
+
+                // 確実なファイル記録
+                try
+                {
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
+                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] ROIImageCapturedEventHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
             }

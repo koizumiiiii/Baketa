@@ -1424,37 +1424,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            // 🚀 [FUNDAMENTAL_FIX] CaptureCompletedEventを座標ベース翻訳条件評価の前に発行
-            _logger?.LogDebug($"🎯 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行開始: ID={translationId}");
-            _logger?.LogInformation("🚀 [FUNDAMENTAL_FIX] 根本修正実装 - CaptureCompletedEventによるイベントドリブン翻訳開始: TranslationId={TranslationId}", translationId);
 
-            try
-            {
-                // キャプチャ領域を計算 (画像のサイズを使用)
-                var captureRegion = new System.Drawing.Rectangle(0, 0, image.Width, image.Height);
-
-                // CaptureCompletedEventを作成して発行
-                var captureCompletedEvent = new Baketa.Core.Events.EventTypes.CaptureCompletedEvent(
-                    capturedImage: image,
-                    captureRegion: captureRegion,
-                    captureTime: TimeSpan.FromMilliseconds(100) // 仮の処理時間
-                );
-
-                _logger?.LogDebug($"📤 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行中: CaptureRegion=({captureRegion.X},{captureRegion.Y},{captureRegion.Width}x{captureRegion.Height}), Mode={mode}");
-
-                // イベント発行 (これによりCaptureCompletedHandler → SmartProcessingPipelineService → TimedChunkAggregator の適切なフローが実行される)
-                await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
-
-                _logger?.LogDebug($"✅ [FUNDAMENTAL_FIX] CaptureCompletedEvent発行完了 - 適切なイベントドリブン翻訳フローが開始されました: ID={translationId}");
-                _logger?.LogInformation("✅ [FUNDAMENTAL_FIX] CaptureCompletedEvent発行完了 - SmartProcessingPipelineService経由でTimedChunkAggregator処理開始: TranslationId={TranslationId}", translationId);
-            }
-            catch (Exception eventEx)
-            {
-                _logger?.LogDebug($"💥 [FUNDAMENTAL_FIX] CaptureCompletedEvent発行でエラー: ID={translationId}, Error={eventEx.Message}");
-                _logger?.LogError(eventEx, "CaptureCompletedEvent発行中にエラーが発生しました: TranslationId={TranslationId}", translationId);
-                // エラーが発生しても座標ベース翻訳処理は継続
-            }
+            // 🗑️ [PHASE2.5_CLEANUP] CaptureCompletedEvent重複発行削除
+            // CaptureCompletedEventの発行はAdaptiveCaptureService.PublishCaptureCompletedEventAsyncに統一
+            // 複数ROI画像の場合はROIImageCapturedEvent × 8が発行され、各ROIが個別に処理される
+            _logger?.LogDebug($"🔄 [PHASE2.5_CLEANUP] CaptureCompletedEvent発行はAdaptiveCaptureServiceに統一: ID={translationId}");
 
             // 🚨 CRITICAL DEBUG: _logger?.LogDebug呼び出し直前
             try

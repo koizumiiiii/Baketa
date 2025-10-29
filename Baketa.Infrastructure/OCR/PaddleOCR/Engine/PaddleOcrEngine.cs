@@ -602,12 +602,21 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 }
             }
             
-            // ROI座標の補正
-            if (regionOfInterest.HasValue && textRegions != null)
-            {
-                // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
-                textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
-            }
+            // 🔥 [GEMINI_COORDINATE_FIX] ROI座標の二重加算問題修正
+            // 問題: PaddleOcrResultConverter.ApplyScalingAndRoi()で既にROIオフセット追加済み
+            //       (bounds.Y + roi.Y による1回目の加算)
+            //       AdjustCoordinatesForRoiを呼び出すと2回目の加算が発生
+            //       → 結果: Y:3049, Y:4252等の異常座標
+            // 修正: AdjustCoordinatesForRoi呼び出しを削除（冗長な処理）
+            // 責務: 座標変換はPaddleOcrResultConverter.ApplyScalingAndRoi()に集約
+            // 参考: ConvertRoiToScreenCoordinatesはClientToScreen API使用のため
+            //       クライアント座標（ROI補正済み）を入力として期待
+            //
+            // if (regionOfInterest.HasValue && textRegions != null)
+            // {
+            //     // Note: staticメソッドではログ出力不可 // _unifiedLoggingService?.WriteDebugLog($"📍 ROI座標補正実行: {regionOfInterest.Value}");
+            //     textRegions = AdjustCoordinatesForRoi(textRegions, regionOfInterest.Value);
+            // }
 
             // ✅ [PHASE2.9.5] Phase 3診断ログ削除 - __ocrPreprocessingService未使用のため不要
 

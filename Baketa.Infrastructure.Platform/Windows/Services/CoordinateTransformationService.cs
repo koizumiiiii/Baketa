@@ -130,15 +130,21 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
             // 1. ROI座標を実際の画面座標にスケーリング（クライアント座標系）
             var scaledX = (int)(roiBounds.X * inverseScale);
             var scaledY = (int)(roiBounds.Y * inverseScale);
-            var scaledWidth = (int)(roiBounds.Width * inverseScale);
-            var scaledHeight = (int)(roiBounds.Height * inverseScale);
+            // 🔥 [GEMINI_P2_FIX] scaledWidth/Heightが負の値にならないようにガード処理
+            var scaledWidth = Math.Max(0, (int)(roiBounds.Width * inverseScale));
+            var scaledHeight = Math.Max(0, (int)(roiBounds.Height * inverseScale));
 
             _logger.LogInformation("📐 [PHASE2_SCALED] スケーリング後 - Scaled=({ScaledX},{ScaledY})", scaledX, scaledY);
 
             // 🔥 [PHASE3_DPI_AWARENESS] DPI補正 - 高DPI環境（125%, 150%, 200%）対応
             //    Per-Monitor DPI V2により、各モニターごとの異なるDPI設定に対応
             //    物理ピクセル = 論理ピクセル * (DPI / 96.0)
-            if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
+            // 🔥 [OVERLAY_FIX] ボーダーレス/フルスクリーンの場合、キャプチャは既に物理ピクセルなのでDPI補正不要
+            if (isBorderlessOrFullscreen)
+            {
+                _logger.LogInformation("🔍 [PHASE3_DPI] ボーダーレス/フルスクリーン検出 - DPI補正をスキップ（キャプチャは既に物理ピクセル）");
+            }
+            else if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
             {
                 try
                 {
@@ -236,32 +242,15 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                                 _logger.LogInformation("🔧 [PHASE2_FIX] Y座標補正: {OldY} → {NewY}", topLeft.Y, correctedY);
                             }
 
-                            // 🔥 [COORDINATE_CLAMP_FIX] DWM Extended Frame Boundsによる座標オーバーを防止
-                            // モニター範囲内にクランプ（オーバーレイが画面外に出るのを防止）
-                            var clampedX = correctedX;
-                            var clampedY = correctedY;
-
-                            // 左上座標がモニター範囲内に収まるようにクランプ
-                            if (clampedX < monitorInfo.rcMonitor.Left)
-                                clampedX = monitorInfo.rcMonitor.Left;
-                            if (clampedY < monitorInfo.rcMonitor.Top)
-                                clampedY = monitorInfo.rcMonitor.Top;
-
-                            // オーバーレイの右下がモニター範囲内に収まるようにクランプ
-                            if (clampedX + scaledWidth > monitorInfo.rcMonitor.Right)
-                                clampedX = monitorInfo.rcMonitor.Right - scaledWidth;
-                            if (clampedY + scaledHeight > monitorInfo.rcMonitor.Bottom)
-                                clampedY = monitorInfo.rcMonitor.Bottom - scaledHeight;
-
-                            // クランプが発生した場合はログ出力
-                            if (clampedX != correctedX || clampedY != correctedY)
-                            {
-                                _logger.LogWarning("🔧 [COORDINATE_CLAMP_FIX] 座標クランプ実行: ({OldX},{OldY}) → ({NewX},{NewY}) - モニター境界=({Left},{Top},{Right},{Bottom})",
-                                    correctedX, correctedY, clampedX, clampedY,
-                                    monitorInfo.rcMonitor.Left, monitorInfo.rcMonitor.Top, monitorInfo.rcMonitor.Right, monitorInfo.rcMonitor.Bottom);
-                            }
-
-                            topLeft = new Point(clampedX, clampedY);
+                            // 🔥 [GEMINI_P0_P1_FIX] ヘルパーメソッドを使用してクランプ処理
+                            // DWM Extended Frame Boundsによる座標オーバーを防止
+                            topLeft = ClampPointToMonitor(
+                                correctedX,
+                                correctedY,
+                                scaledWidth,
+                                scaledHeight,
+                                monitorInfo,
+                                out _); // wasClamped フラグは使用しない（ヘルパー内でログ出力）
                             _logger.LogInformation("✅ [PHASE2_RESULT] 補正後座標=({X},{Y})", topLeft.X, topLeft.Y);
                         }
                         else
@@ -361,8 +350,9 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                 // 1. ROI座標をスケーリング（クライアント座標系）
                 var scaledX = (int)(roi.X * inverseScale);
                 var scaledY = (int)(roi.Y * inverseScale);
-                var scaledWidth = (int)(roi.Width * inverseScale);
-                var scaledHeight = (int)(roi.Height * inverseScale);
+                // 🔥 [GEMINI_P2_FIX] scaledWidth/Heightが負の値にならないようにガード処理
+                var scaledWidth = Math.Max(0, (int)(roi.Width * inverseScale));
+                var scaledHeight = Math.Max(0, (int)(roi.Height * inverseScale));
 
                 // 2. 🔥 [PHASE1_CLIENT_TO_SCREEN] ClientToScreenで変換
                 var topLeft = new Point(scaledX, scaledY);
@@ -391,24 +381,15 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                         correctedY = monitorInfo.rcWork.Top;
                     }
 
-                    // 🔥 [COORDINATE_CLAMP_FIX] DWM Extended Frame Boundsによる座標オーバーを防止
-                    // モニター範囲内にクランプ（オーバーレイが画面外に出るのを防止）
-                    var clampedX = correctedX;
-                    var clampedY = correctedY;
-
-                    // 左上座標がモニター範囲内に収まるようにクランプ
-                    if (clampedX < monitorInfo.rcMonitor.Left)
-                        clampedX = monitorInfo.rcMonitor.Left;
-                    if (clampedY < monitorInfo.rcMonitor.Top)
-                        clampedY = monitorInfo.rcMonitor.Top;
-
-                    // オーバーレイの右下がモニター範囲内に収まるようにクランプ
-                    if (clampedX + scaledWidth > monitorInfo.rcMonitor.Right)
-                        clampedX = monitorInfo.rcMonitor.Right - scaledWidth;
-                    if (clampedY + scaledHeight > monitorInfo.rcMonitor.Bottom)
-                        clampedY = monitorInfo.rcMonitor.Bottom - scaledHeight;
-
-                    topLeft = new Point(clampedX, clampedY);
+                    // 🔥 [GEMINI_P0_P1_FIX] ヘルパーメソッドを使用してクランプ処理
+                    // DWM Extended Frame Boundsによる座標オーバーを防止
+                    topLeft = ClampPointToMonitor(
+                        correctedX,
+                        correctedY,
+                        scaledWidth,
+                        scaledHeight,
+                        monitorInfo,
+                        out _); // wasClamped フラグは使用しない（ヘルパー内でログ出力）
                 }
 
                 // 3. スクリーン絶対座標のRectangleを構築
@@ -648,5 +629,49 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
             _logger.LogError(ex, "❌ [P0_COORDINATE_TRANSFORM] ウィンドウオフセット取得エラー: Handle={Handle}", windowHandle);
             return Point.Empty;
         }
+    }
+
+    /// <summary>
+    /// 🔥 [GEMINI_P0_P1_FIX] モニター範囲内に座標をクランプする共通ロジック
+    /// オーバーレイサイズがモニターサイズより大きい場合でも、確実に範囲内に収める
+    /// DRY原則に従い、重複コードを削減し、保守性を向上
+    /// </summary>
+    /// <param name="x">元のX座標</param>
+    /// <param name="y">元のY座標</param>
+    /// <param name="width">オーバーレイの幅</param>
+    /// <param name="height">オーバーレイの高さ</param>
+    /// <param name="monitorInfo">モニター情報</param>
+    /// <param name="wasClamped">クランプが発生したかどうか</param>
+    /// <returns>クランプ後の座標</returns>
+    private Point ClampPointToMonitor(
+        int x,
+        int y,
+        int width,
+        int height,
+        MONITORINFO monitorInfo,
+        out bool wasClamped)
+    {
+        // 🔥 [GEMINI_P0_FIX] Math.MaxとMath.Minの組み合わせで確実にクランプ
+        // オーバーレイサイズがモニターサイズより大きい場合でも正しく動作する
+        // 例: モニター幅1920px、オーバーレイ幅2000pxの場合
+        //     - Math.Min(x, Right - 2000) で右端を制限
+        //     - Math.Max(Left, ...) で左端を制限
+        //     → 結果的にLeft座標に固定され、画面外にはみ出さない
+        var clampedX = Math.Max(monitorInfo.rcMonitor.Left,
+                                Math.Min(x, monitorInfo.rcMonitor.Right - width));
+        var clampedY = Math.Max(monitorInfo.rcMonitor.Top,
+                                Math.Min(y, monitorInfo.rcMonitor.Bottom - height));
+
+        wasClamped = (clampedX != x || clampedY != y);
+
+        // 🔥 [GEMINI_P1_FIX] クランプ発生時のログ出力（一貫性確保）
+        if (wasClamped)
+        {
+            _logger.LogWarning("🔧 [COORDINATE_CLAMP_FIX] 座標クランプ実行: ({OldX},{OldY}) → ({NewX},{NewY}) - モニター境界=({Left},{Top},{Right},{Bottom})",
+                x, y, clampedX, clampedY,
+                monitorInfo.rcMonitor.Left, monitorInfo.rcMonitor.Top, monitorInfo.rcMonitor.Right, monitorInfo.rcMonitor.Bottom);
+        }
+
+        return new Point(clampedX, clampedY);
     }
 }

@@ -64,6 +64,21 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);
 
+            // 🔥 [FIX7_PHASE1] 緊急修正: IsMultiROICaptureチェックをコメントアウト
+            // Gemini推奨: Option A（即座検証）→ Option B（恒久対策）の2段階修正
+            // 目的: ROI画像がOcrExecutionStageStrategyに到達し、FIX7_OPTION_Cコードが実行されるか検証
+            /*
+            // 🎯 [PHASE2.5] 複数ROI画像処理システムからのCaptureCompletedEventはスキップ
+            // ROIImageCapturedEventHandlerが各ROI画像に対してCaptureCompletedEventを発行済み
+            // 既存パイプラインでの二重処理を防止
+            if (eventData.IsMultiROICapture)
+            {
+                _logger?.LogDebug("🎯 [MULTI_ROI_SKIP] 複数ROI画像処理からのCaptureCompletedEvent検出 - 既存パイプラインスキップ (ROI {Index}/{Total})",
+                    eventData.ROIIndex, eventData.TotalROICount);
+                return;
+            }
+            */
+
             try
             {
                 _logger?.LogDebug("キャプチャ完了イベント処理開始 - Image: {Width}x{Height}",

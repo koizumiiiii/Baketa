@@ -194,10 +194,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogDebug("🎯 [OPTION_A] SmartProcessingPipelineService.ExecuteAsync実行開始");
 
             // ProcessingPipelineInput作成（ContextIdは計算プロパティのため省略）
+            // 🔥 [PHASE2.5_ROI_COORD_FIX] image.CaptureRegionを保持し、ROI座標オフセットを適用可能にする
             var pipelineInput = new Baketa.Core.Models.Processing.ProcessingPipelineInput
             {
                 CapturedImage = image,
-                CaptureRegion = new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
+                CaptureRegion = image.CaptureRegion ?? new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
                 SourceWindowHandle = windowHandle
             };
 
@@ -228,16 +229,86 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 {
                     if (chunk is Baketa.Core.Abstractions.Translation.TextChunk textChunk)
                     {
-                        // 既にTextChunk型の場合はそのまま追加
-                        textChunks.Add(textChunk);
+                        // 🔥 [FIX5_CACHE_COORD_NORMALIZE] Gemini推奨: キャッシュから取得したTextChunkでも座標正規化
+                        // 問題: キャッシュされたTextChunkがROI相対座標のまま → 座標ズレ
+                        // 解決: CaptureRegionがある場合、画像絶対座標に変換して新しいTextChunkを作成
+                        // 理由: キャッシュには常に正規化された（画像絶対座標）データを保存すべき（Gemini Option B）
+                        if (image.CaptureRegion.HasValue)
+                        {
+                            var captureRegion = image.CaptureRegion.Value;
+                            // TextChunkの座標を画像絶対座標に変換
+                            var normalizedBounds = new System.Drawing.Rectangle(
+                                textChunk.CombinedBounds.X + captureRegion.X,
+                                textChunk.CombinedBounds.Y + captureRegion.Y,
+                                textChunk.CombinedBounds.Width,
+                                textChunk.CombinedBounds.Height);
+
+                            _logger?.LogDebug("🔥 [FIX5_CACHE_COORD_NORMALIZE] TextChunk座標正規化 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
+                                textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y,
+                                captureRegion.X, captureRegion.Y,
+                                normalizedBounds.X, normalizedBounds.Y);
+
+                            // TextResultsも座標正規化が必要
+                            var normalizedTextResults = textChunk.TextResults.Select(tr => new Baketa.Core.Abstractions.OCR.Results.PositionedTextResult
+                            {
+                                Text = tr.Text,
+                                BoundingBox = new System.Drawing.Rectangle(
+                                    tr.BoundingBox.X + captureRegion.X,
+                                    tr.BoundingBox.Y + captureRegion.Y,
+                                    tr.BoundingBox.Width,
+                                    tr.BoundingBox.Height),
+                                Confidence = tr.Confidence,
+                                ChunkId = tr.ChunkId,
+                                ProcessingTime = tr.ProcessingTime,
+                                DetectedLanguage = tr.DetectedLanguage
+                            }).ToList();
+
+                            // 正規化された座標で新しいTextChunkを作成
+                            var normalizedChunk = new Baketa.Core.Abstractions.Translation.TextChunk
+                            {
+                                ChunkId = textChunk.ChunkId,
+                                TextResults = normalizedTextResults,
+                                CombinedBounds = normalizedBounds,
+                                CombinedText = textChunk.CombinedText,
+                                TranslatedText = textChunk.TranslatedText,
+                                SourceWindowHandle = textChunk.SourceWindowHandle,
+                                DetectedLanguage = textChunk.DetectedLanguage
+                            };
+                            textChunks.Add(normalizedChunk);
+                        }
+                        else
+                        {
+                            // CaptureRegionがない場合はそのまま追加（既に画像絶対座標）
+                            textChunks.Add(textChunk);
+                        }
                     }
                     else if (chunk is Baketa.Core.Abstractions.OCR.OcrTextRegion ocrRegion)
                     {
+                        // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI相対座標 → 画像絶対座標変換
+                        // 問題: OCRはROI画像に対して実行され、ROI画像内の相対座標(12, 10)を返す
+                        // 解決: CaptureRegionオフセットを加算して画像絶対座標(279, 757)に変換
+                        // これにより、AggregatedChunksReadyEventHandlerの画像→スクリーン座標変換が正常動作する
+                        var boundingBox = ocrRegion.Bounds;
+                        if (image.CaptureRegion.HasValue)
+                        {
+                            var captureRegion = image.CaptureRegion.Value;
+                            boundingBox = new System.Drawing.Rectangle(
+                                ocrRegion.Bounds.X + captureRegion.X,
+                                ocrRegion.Bounds.Y + captureRegion.Y,
+                                ocrRegion.Bounds.Width,
+                                ocrRegion.Bounds.Height);
+
+                            _logger?.LogDebug("🔥 [ROI_COORD_FIX] ROI相対座標変換 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
+                                ocrRegion.Bounds.X, ocrRegion.Bounds.Y,
+                                captureRegion.X, captureRegion.Y,
+                                boundingBox.X, boundingBox.Y);
+                        }
+
                         // 🔥 [PHASE13.1_P1] OcrTextRegion → TextChunk変換（P1改善: ChunkId衝突防止）
                         var positionedResult = new Baketa.Core.Abstractions.OCR.Results.PositionedTextResult
                         {
                             Text = ocrRegion.Text,
-                            BoundingBox = ocrRegion.Bounds,
+                            BoundingBox = boundingBox,  // 🔥 [ROI_COORD_FIX] 調整済み画像絶対座標を使用
                             Confidence = (float)ocrRegion.Confidence,
                             // 🔥 [P1_FIX_1] スレッドセーフなアトミックカウンター使用（Random.Shared衝突リスク完全排除）
                             ChunkId = Interlocked.Increment(ref _nextChunkId),
@@ -251,7 +322,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         {
                             ChunkId = positionedResult.ChunkId,
                             TextResults = new[] { positionedResult },
-                            CombinedBounds = positionedResult.BoundingBox,
+                            CombinedBounds = positionedResult.BoundingBox,  // 🔥 [ROI_COORD_FIX] 画像絶対座標がAggregatedChunksReadyEventHandlerに渡される
                             CombinedText = positionedResult.Text,
                             SourceWindowHandle = windowHandle,
                             DetectedLanguage = positionedResult.DetectedLanguage
@@ -1312,12 +1383,50 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             if (positionedResults.Count > 0)
             {
                 Console.WriteLine($"🔥 [DEBUG] OcrResult作成開始 - positionedResults数: {positionedResults.Count}");
-                
-                var ocrResults = positionedResults.Select(posResult => new OcrResult(
-                    text: posResult.Text,
-                    bounds: posResult.BoundingBox,
-                    confidence: posResult.Confidence)).ToList();
-                    
+
+                // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI画像の場合、OCR相対座標を絶対座標に変換
+                System.Drawing.Rectangle? captureRegion = null;
+                if (image is IAdvancedImage advancedImage)
+                {
+                    captureRegion = advancedImage.CaptureRegion;
+                    if (captureRegion.HasValue)
+                    {
+                        _logger?.LogDebug("🔥 [ROI_COORD_TRANSFORM] CaptureRegion検出: ({X}, {Y}) - ROI相対座標を絶対座標に変換します",
+                            captureRegion.Value.X, captureRegion.Value.Y);
+                    }
+                }
+
+                var ocrResults = positionedResults.Select(posResult =>
+                {
+                    var bounds = posResult.BoundingBox;
+
+                    // ROI画像の場合: 相対座標を絶対座標に変換
+                    if (captureRegion.HasValue)
+                    {
+                        var absoluteBounds = new System.Drawing.Rectangle(
+                            bounds.X + captureRegion.Value.X,
+                            bounds.Y + captureRegion.Value.Y,
+                            bounds.Width,
+                            bounds.Height);
+
+                        _logger?.LogDebug("🔥 [ROI_COORD_TRANSFORM] 座標変換: 相対({RelX}, {RelY}) → 絶対({AbsX}, {AbsY})",
+                            bounds.X, bounds.Y, absoluteBounds.X, absoluteBounds.Y);
+
+                        return new OcrResult(
+                            text: posResult.Text,
+                            bounds: absoluteBounds,
+                            confidence: posResult.Confidence);
+                    }
+                    else
+                    {
+                        // 通常画像の場合: OCR座標をそのまま使用
+                        return new OcrResult(
+                            text: posResult.Text,
+                            bounds: bounds,
+                            confidence: posResult.Confidence);
+                    }
+                }).ToList();
+
                 Console.WriteLine($"🔥 [DEBUG] OcrResult作成完了 - ocrResults数: {ocrResults.Count}");
                 
                 var ocrCompletedEvent = new OcrCompletedEvent(

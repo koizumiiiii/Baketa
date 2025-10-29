@@ -177,6 +177,11 @@ namespace Baketa.Core.Tests.Imaging;
         public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
 
         /// <summary>
+        /// Phase 2.5: ROI座標変換対応 - モック画像なのでnull
+        /// </summary>
+        public System.Drawing.Rectangle? CaptureRegion => null;
+
+        /// <summary>
         /// 🔥 [PHASE5.2G-A] LockPixelData (MockAdvancedImage is test-only, not supported)
         /// </summary>
         public PixelDataLock LockPixelData() => throw new NotSupportedException("MockAdvancedImage does not support LockPixelData");

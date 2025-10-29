@@ -25,16 +25,27 @@ namespace Baketa.Infrastructure.Platform.Adapters;
     public class WindowsImageAdapter : DisposableBase, IAdvancedImage
     {
         private readonly IWindowsImage _windowsImage;
-        
+
+        /// <inheritdoc/>
+        /// <summary>
+        /// この画像がキャプチャされた画面上の領域（絶対座標）
+        /// ROI画像の場合、元画像内での絶対座標を保持します。
+        /// 通常画像の場合はnullです。
+        /// Phase 2.5: ROI座標変換対応
+        /// </summary>
+        public System.Drawing.Rectangle? CaptureRegion { get; }
+
         /// <summary>
         /// WindowsImageAdapterのコンストラクタ
         /// </summary>
         /// <param name="windowsImage">Windows画像オブジェクト</param>
+        /// <param name="captureRegion">Phase 2.5: この画像がキャプチャされた画面上の領域（ROI画像の場合）</param>
         /// <exception cref="ArgumentNullException">windowsImageがnullの場合</exception>
-        public WindowsImageAdapter(IWindowsImage windowsImage)
+        public WindowsImageAdapter(IWindowsImage windowsImage, System.Drawing.Rectangle? captureRegion = null)
         {
             ArgumentNullException.ThrowIfNull(windowsImage, nameof(windowsImage));
             _windowsImage = windowsImage;
+            CaptureRegion = captureRegion;
         }
         
         /// <summary>
@@ -178,8 +189,9 @@ namespace Baketa.Infrastructure.Platform.Adapters;
             // 所有権が移転されるので、Disposeされないクローンを作成
             var persistentBitmap = (Bitmap)clonedBitmap.Clone();
             var clonedWindowsImage = new WindowsImage(persistentBitmap);
-            
-            return new WindowsImageAdapter(clonedWindowsImage);
+
+            // 🔥 [PHASE2.5_ROI_FIX] CaptureRegionを引き継ぐ
+            return new WindowsImageAdapter(clonedWindowsImage, CaptureRegion);
         }
         
         /// <summary>
@@ -541,7 +553,10 @@ namespace Baketa.Infrastructure.Platform.Adapters;
                         var resultWindowsImage = new WindowsImage(clonedBitmap);
                         extractTimer.Stop();
                         Console.WriteLine($"✅ [EXTRACT] 画像領域抽出完了 - 処理時間: {extractTimer.ElapsedMilliseconds}ms");
-                        return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage);
+
+                        // 🔥 [PHASE2.5_ROI_FIX] 抽出された領域にもCaptureRegionを引き継ぐ
+                        // 注意: 抽出後の画像は元のCaptureRegionを保持するが、座標はそのまま（抽出された部分の絶対座標）
+                        return (IAdvancedImage)new WindowsImageAdapter(resultWindowsImage, CaptureRegion);
                     }
                     catch (Exception ex)
                     {

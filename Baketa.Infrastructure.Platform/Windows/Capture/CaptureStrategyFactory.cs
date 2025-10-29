@@ -35,12 +35,18 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
                 environment.GpuName, environment.IsIntegratedGpu, environment.IsDedicatedGpu);
 
             var strategies = GetStrategiesInOrder();
-            
+
+            // 🔥 [FIX7_PHASE2] 各戦略のCanApply結果を詳細ログ出力
             foreach (var strategy in strategies)
             {
-                if (strategy.CanApply(environment, hwnd))
+                var canApply = strategy.CanApply(environment, hwnd);
+                _logger.LogDebug("🔍 [FIX7_PHASE2] 戦略適用チェック: {StrategyName} → CanApply={CanApply}",
+                    strategy.StrategyName, canApply);
+
+                if (canApply)
                 {
-                    _logger.LogInformation("戦略選択: {StrategyName}", strategy.StrategyName);
+                    _logger.LogInformation("✅ [FIX7_PHASE2] 戦略選択完了: {StrategyName} (Priority={Priority})",
+                        strategy.StrategyName, strategy.Priority);
                     return strategy;
                 }
             }
@@ -97,6 +103,10 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
 
             // フォールバック戦略を優先度でソート
             strategies.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+
+            // 🔥 [FIX7_PHASE2] ソート後の戦略優先順位を明確にログ出力
+            _logger.LogInformation("🎯 [FIX7_PHASE2] 戦略優先順位（降順ソート後）: [{StrategiesByPriority}]",
+                string.Join(", ", strategies.Select(s => $"{s.StrategyName}(P:{s.Priority})")));
 
             // 🎯 [PRIMARY_FIRST] primaryStrategyを最優先に配置
             if (reservedPrimary != null)

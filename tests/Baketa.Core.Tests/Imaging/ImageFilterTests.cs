@@ -145,7 +145,12 @@ namespace Baketa.Core.Tests.Imaging;
             public bool IsGrayscale => false;
             public int BitsPerPixel => 24;
             public int ChannelCount => 3;
-            
+
+            /// <summary>
+            /// Phase 2.5: ROI座標変換対応 - モック画像なのでnull
+            /// </summary>
+            public System.Drawing.Rectangle? CaptureRegion => null;
+
             public IAdvancedImage ToGrayscale() => new MockAdvancedImage(_data, Width, Height);
             
             public Task<byte[]> ToByteArrayAsync() => Task.FromResult(_data);

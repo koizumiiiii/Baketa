@@ -652,6 +652,11 @@ internal sealed class TestAdvancedImage(Bitmap bitmap) : IAdvancedImage
     public int ChannelCount => 4;
 
     /// <summary>
+    /// Phase 2.5: ROI座標変換対応 - テスト用画像なのでnull
+    /// </summary>
+    public System.Drawing.Rectangle? CaptureRegion => null;
+
+    /// <summary>
     /// PixelFormat property for IImage extension
     /// </summary>
     public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;

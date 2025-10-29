@@ -435,7 +435,8 @@ public sealed class TimedChunkAggregator : IDisposable
                         CombinedBounds = allChunks.First().CombinedBounds,
                         SourceWindowHandle = allChunks.First().SourceWindowHandle,
                         DetectedLanguage = allChunks.First().DetectedLanguage,
-                        TextResults = allChunks.SelectMany(c => c.TextResults).ToList()
+                        TextResults = allChunks.SelectMany(c => c.TextResults).ToList(),
+                        CaptureRegion = allChunks.First().CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
                     };
 
                     // 🔥 [PHASE12.2] AggregatedChunksReadyEvent発行（旧コールバック削除済み）
@@ -718,7 +719,8 @@ public sealed class TimedChunkAggregator : IDisposable
             CombinedBounds = combinedBounds,
             CombinedText = combinedText,
             SourceWindowHandle = groupChunks[0].SourceWindowHandle,
-            DetectedLanguage = groupChunks[0].DetectedLanguage
+            DetectedLanguage = groupChunks[0].DetectedLanguage,
+            CaptureRegion = groupChunks[0].CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
         };
 
         if (_settings.CurrentValue.ProximityGrouping.EnableDetailedLogging)
@@ -750,7 +752,8 @@ public sealed class TimedChunkAggregator : IDisposable
             CombinedBounds = combinedBounds,
             CombinedText = combinedText,
             SourceWindowHandle = chunks[0].SourceWindowHandle,
-            DetectedLanguage = chunks[0].DetectedLanguage
+            DetectedLanguage = chunks[0].DetectedLanguage,
+            CaptureRegion = chunks[0].CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
         };
 
         _logger.LogDebug("🔄 [LEGACY] 従来統合完了 - {Count}個 → 1個: 「{Text}」",

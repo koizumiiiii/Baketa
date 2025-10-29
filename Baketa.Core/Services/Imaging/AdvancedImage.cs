@@ -16,7 +16,16 @@ namespace Baketa.Core.Services.Imaging;
     {
         private readonly byte[] _rawPixelData;
         private readonly int _stride;
-        
+
+        /// <inheritdoc/>
+        /// <summary>
+        /// この画像がキャプチャされた画面上の領域（絶対座標）
+        /// ROI画像の場合、元画像内での絶対座標を保持します。
+        /// 通常画像の場合はnullです。
+        /// Phase 2.5: ROI座標変換対応
+        /// </summary>
+        public System.Drawing.Rectangle? CaptureRegion { get; }
+
         /// <inheritdoc/>
         public bool IsGrayscale => Format == ImageFormat.Grayscale8;
         
@@ -46,11 +55,13 @@ namespace Baketa.Core.Services.Imaging;
         /// <param name="height">高さ</param>
         /// <param name="format">フォーマット</param>
         /// <param name="stride">ストライド（オプション）</param>
-        public AdvancedImage(byte[] pixelData, int width, int height, ImageFormat format, int stride = 0)
+        /// <param name="captureRegion">Phase 2.5: この画像がキャプチャされた画面上の領域（ROI画像の場合）</param>
+        public AdvancedImage(byte[] pixelData, int width, int height, ImageFormat format, int stride = 0, System.Drawing.Rectangle? captureRegion = null)
             : base(pixelData, width, height, format)
         {
             _rawPixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
             _stride = stride > 0 ? stride : width * BytesPerPixel;
+            CaptureRegion = captureRegion;
         }
         
         /// <inheritdoc/>

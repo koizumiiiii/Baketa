@@ -181,9 +181,27 @@ public sealed class CachedOcrEngine : IOcrEngine
             
             var imageHash = _cacheService.GenerateImageHash(imageData);
             hashStopwatch.Stop();
-            
-            _logger.LogDebug("🔍 [Req:{RequestId}] 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes", 
+
+            _logger.LogDebug("🔍 [Req:{RequestId}] 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes",
                 requestId, imageHash[..12], hashStopwatch.ElapsedMilliseconds, imageData.Length);
+
+            // 🔥 [ROI_COORDINATE_FIX] ROI指定時はキャッシュをスキップ
+            // 問題: ベースエンジンが返す絶対座標をキャッシュすると、後続処理で相対座標として誤認される
+            // 解決策: ROI指定時はキャッシュを使わず、常にベースエンジンを直接呼び出す
+            // Gemini推奨の恒久的修正（座標変換）は今後の改善として保留
+            if (regionOfInterest.HasValue)
+            {
+                _logger.LogDebug("🔧 [ROI_FIX] ROI指定検出 - キャッシュスキップして直接OCR実行 (座標ズレ防止)");
+                var ocrStopwatchDirect = Stopwatch.StartNew();
+                var ocrResultDirect = await _baseEngine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken).ConfigureAwait(false);
+                ocrStopwatchDirect.Stop();
+
+                totalStopwatch.Stop();
+                _logger.LogInformation("✅ [ROI_FIX] ROI直接OCR完了 - 総時間: {TotalMs}ms (OCR: {OcrMs}ms), 認識数: {TextCount}",
+                    totalStopwatch.ElapsedMilliseconds, ocrStopwatchDirect.ElapsedMilliseconds, ocrResultDirect.TextRegions.Count);
+
+                return ocrResultDirect;
+            }
 
             // 🎯 Step 2: キャッシュチェック
             var cacheStopwatch = Stopwatch.StartNew();

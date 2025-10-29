@@ -263,7 +263,12 @@ namespace Baketa.Core.Abstractions.Imaging.Filters;
                 ImageFormat.Rgba32 => 4,
                 _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
             };
-            
+
+            /// <summary>
+            /// Phase 2.5: ROI座標変換対応 - VirtualImageはメタデータ専用なので常にnull
+            /// </summary>
+            public System.Drawing.Rectangle? CaptureRegion => null;
+
             /// <summary>
             /// 画像データの読み取り専用メモリを取得（IImage拡張対応）
             /// </summary>

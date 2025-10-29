@@ -280,7 +280,19 @@ namespace Baketa.Infrastructure.Platform.Windows;
                 // Phase 3.1: BitmapからSafeImageを生成
                 var safeImage = CreateSafeImageFromBitmap(croppedBitmap);
                 croppedBitmap.Dispose(); // 元のBitmapは破棄
-                var result = new SafeImageAdapter(safeImage, _safeImageFactory);
+
+                // 🔥 [FIX7_PHASE3] ROI座標コンテキスト設定: CaptureRegion = cropArea
+                // WindowsImageFactory.CropImage → SafeImageAdapter { CaptureRegion = cropArea }
+                // → OcrExecutionStageStrategy → TextChunk.CaptureRegion
+                // → AggregatedChunksReadyEventHandler.NormalizeChunkCoordinates
+                var result = new SafeImageAdapter(safeImage, _safeImageFactory)
+                {
+                    CaptureRegion = cropArea  // ROI画像の元画像内での絶対座標
+                };
+
+                _logger?.LogInformation("🔥 [FIX7_PHASE3] CaptureRegion設定完了: ({X},{Y}) {Width}x{Height}",
+                    cropArea.X, cropArea.Y, cropArea.Width, cropArea.Height);
+
                 croppedBitmap = null; // SafeImageが所有権を取得
                 return result;
             }

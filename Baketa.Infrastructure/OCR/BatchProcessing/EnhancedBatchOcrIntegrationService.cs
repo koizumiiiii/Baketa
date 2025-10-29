@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Settings;
+using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP3] OcrContext統合
 using Baketa.Core.Utilities;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Core.Events.EventTypes;
@@ -74,25 +75,26 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     /// <summary>
     /// 拡張統合OCR処理 - TimedChunkAggregator統合版
     /// 戦略書フィードバック反映: 時間軸統合による翻訳品質向上40-60%
+    /// FIX7 Step3: OcrContext対応
     /// </summary>
     public async Task<IReadOnlyList<TextChunk>> ProcessWithEnhancedOcrAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
-        CancellationToken cancellationToken = default)
+        OcrContext context)
     {
         ThrowIfDisposed();
 
         var operationId = Guid.NewGuid().ToString();
         var startTime = DateTime.UtcNow;
-        
-        _logger.LogDebug("🔍 拡張OCR処理開始 - Image: {Width}x{Height}, OperationId: {OperationId}", 
-            image.Width, image.Height, operationId);
+
+        _logger.LogDebug("🔍 拡張OCR処理開始 - Image: {Width}x{Height}, OperationId: {OperationId}",
+            context.Image.Width, context.Image.Height, operationId);
+
+        _logger.LogInformation("🔥 [FIX7_STEP3] ProcessWithEnhancedOcrAsync開始 - CaptureRegion: {HasCaptureRegion}",
+            context.HasCaptureRegion);
 
         try
         {
             // 1. 既存BatchOcrIntegrationServiceでOCR実行
-            var ocrChunks = await _baseBatchService.ProcessWithIntegratedOcrAsync(
-                image, windowHandle, cancellationToken).ConfigureAwait(false);
+            var ocrChunks = await _baseBatchService.ProcessWithIntegratedOcrAsync(context).ConfigureAwait(false);
 
             if (ocrChunks.Count == 0)
             {
@@ -108,7 +110,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
                 foreach (var chunk in ocrChunks)
                 {
                     // TimedChunkAggregatorにチャンクを追加
-                    var added = await _timedChunkAggregator.TryAddChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
+                    var added = await _timedChunkAggregator.TryAddChunkAsync(chunk, context.CancellationToken).ConfigureAwait(false);
                     
                     if (!added)
                     {
@@ -149,39 +151,37 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
 
     /// <summary>
     /// 複数画像の拡張並列処理
+    /// FIX7 Step3: OcrContext対応
     /// </summary>
     public async Task<IReadOnlyList<IReadOnlyList<TextChunk>>> ProcessMultipleImagesWithEnhancedOcrAsync(
-        IReadOnlyList<(IAdvancedImage Image, IntPtr WindowHandle)> imageData,
+        IReadOnlyList<OcrContext> contexts,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
-        if (imageData.Count == 0)
+
+        if (contexts.Count == 0)
             return [];
 
-        _logger.LogInformation("📦 拡張複数画像処理開始 - 画像数: {ImageCount}, TimedAggregator: {Enabled}", 
-            imageData.Count, _settings.IsFeatureEnabled);
+        _logger.LogInformation("📦 拡張複数画像処理開始 - 画像数: {ImageCount}, TimedAggregator: {Enabled}",
+            contexts.Count, _settings.IsFeatureEnabled);
 
         // 並列処理タスクを作成
-        var tasks = imageData.Select(async data =>
+        var tasks = contexts.Select(async context =>
         {
             try
             {
-                return await ProcessWithEnhancedOcrAsync(
-                    data.Image, 
-                    data.WindowHandle, 
-                    cancellationToken).ConfigureAwait(false);
+                return await ProcessWithEnhancedOcrAsync(context).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}", 
-                    data.Image.Width, data.Image.Height);
+                _logger.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}",
+                    context.Image.Width, context.Image.Height);
                 return (IReadOnlyList<TextChunk>)[];
             }
         });
 
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        
+
         var totalChunks = results.Sum(r => r.Count);
         _logger.LogInformation("✅ 拡張複数画像処理完了 - 総チャンク数: {TotalChunks}", totalChunks);
 

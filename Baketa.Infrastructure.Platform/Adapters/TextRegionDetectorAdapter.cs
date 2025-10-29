@@ -230,6 +230,12 @@ internal sealed class SimpleAdvancedImageAdapter : IAdvancedImage, IDisposable
     public bool IsGrayscale => false; // 簡易実装
     public int BitsPerPixel => 32; // 簡易実装
     public int ChannelCount => 4; // 簡易実装
+
+    /// <summary>
+    /// Phase 2.5: ROI座標変換対応 - 簡易実装アダプターなのでnull
+    /// </summary>
+    public System.Drawing.Rectangle? CaptureRegion => null;
+
     public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32; // IImage要求
 
     public SimpleAdvancedImageAdapter(Bitmap bitmap, ILogger logger)

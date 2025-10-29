@@ -37,9 +37,29 @@ public class CaptureCompletedEvent(IImage capturedImage, Rectangle captureRegion
     /// </summary>
     public bool ImageChangeSkipped { get; init; } = false;
 
+    /// <summary>
+    /// 複数ROI画像処理システムにより発行されたイベントかどうか
+    /// Phase 2.5: 複数ROI画像処理システム
+    /// </summary>
+    /// <remarks>
+    /// trueの場合、このイベントは複数ROI画像の1つを表し、
+    /// AdaptiveCaptureServiceでの二重発行を防止するためのフラグとして使用される。
+    /// </remarks>
+    public bool IsMultiROICapture { get; init; } = false;
+
+    /// <summary>
+    /// 総ROI数（IsMultiROICapture = trueの場合のみ有効）
+    /// </summary>
+    public int TotalROICount { get; init; } = 0;
+
+    /// <summary>
+    /// ROIインデックス（IsMultiROICapture = trueの場合のみ有効、0始まり）
+    /// </summary>
+    public int ROIIndex { get; init; } = 0;
+
     /// <inheritdoc />
     public override string Name => "CaptureCompleted";
-        
+
         /// <inheritdoc />
         public override string Category => "Capture";
     }

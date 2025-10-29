@@ -453,45 +453,104 @@ public class AdaptiveCaptureService(
             // CaptureCompletedEventを発行して、OCR・翻訳パイプラインをトリガー
             if (result.Success && result.CapturedImages.Count > 0)
             {
+                // 🎯 [PHASE2.5] 複数ROI画像処理システム
+                if (result.CapturedImages.Count > 1 && result.DetectedTextRegions.Count == result.CapturedImages.Count)
+                {
+                    _logger.LogInformation("🎯 [MULTI_ROI] 複数ROI画像検出: {Count}個の領域", result.CapturedImages.Count);
+
+                    // 🔍 [DIAGNOSTIC] ログレベル実行時確認
+                    _logger.LogInformation("🔍 [DIAGNOSTIC] Logger IsEnabled(Debug): {IsDebugEnabled}, IsEnabled(Info): {IsInfoEnabled}",
+                        _logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug),
+                        _logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information));
+
+                    // 各ROI画像に対してROIImageCapturedEventを発行
+                    for (int i = 0; i < result.CapturedImages.Count; i++)
+                    {
+                        var roiImage = result.CapturedImages[i];
+                        var absoluteRegion = result.DetectedTextRegions[i]; // 元画像内の絶対座標
+
+                        // 🔥 [PHASE2.5_ROI_FIX] CaptureRegion付きIImage生成
+                        // WindowsImageAdapterを直接作成し、absoluteRegionをCaptureRegionとして設定
+                        var captureRegionRect = new System.Drawing.Rectangle(
+                            absoluteRegion.X, absoluteRegion.Y,
+                            absoluteRegion.Width, absoluteRegion.Height);
+
+                        var imageAdapter = new Baketa.Infrastructure.Platform.Adapters.WindowsImageAdapter(
+                            roiImage,
+                            captureRegion: captureRegionRect); // CaptureRegion設定
+
+                        IImage imageInterface = imageAdapter;
+
+                        // 🔍 [DIAGNOSTIC] LogDebug呼び出し前
+                        _logger.LogInformation("🔍 [DIAGNOSTIC_BEFORE] ROI #{Index} - about to call LogDebug", i);
+
+                        try
+                        {
+                            _logger.LogDebug("🔥 [ROI_CAPTURE_REGION] ROI #{Index} CaptureRegion設定完了: {CaptureRegion}",
+                                i, captureRegionRect);
+                            _logger.LogInformation("🔍 [DIAGNOSTIC_AFTER] ROI #{Index} - LogDebug succeeded", i);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "🔥 [DIAGNOSTIC_ERROR] ROI #{Index} - LogDebug threw exception", i);
+                        }
+
+                        // ROIImageCapturedEvent発行
+                        var roiEvent = new Baketa.Core.Events.Capture.ROIImageCapturedEvent
+                        {
+                            Image = imageInterface,
+                            AbsoluteRegion = absoluteRegion,
+                            ROIIndex = i,
+                            TotalROIs = result.CapturedImages.Count
+                        };
+
+                        await _eventAggregator.PublishAsync(roiEvent).ConfigureAwait(false);
+
+                        // 🔍 [DIAGNOSTIC] 2つ目のLogDebug呼び出し前
+                        _logger.LogInformation("🔍 [DIAGNOSTIC_BEFORE2] ROI #{Index} - about to call LogDebug #2", i);
+
+                        try
+                        {
+                            _logger.LogDebug("🎯 [MULTI_ROI] ROIImageCapturedEvent発行完了: ROI {Index}/{Total}, Region={Region}",
+                                i, result.CapturedImages.Count, absoluteRegion);
+                            _logger.LogInformation("🔍 [DIAGNOSTIC_AFTER2] ROI #{Index} - LogDebug #2 succeeded", i);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "🔥 [DIAGNOSTIC_ERROR2] ROI #{Index} - LogDebug #2 threw exception", i);
+                        }
+                    }
+
+                    _logger.LogInformation("✅ [MULTI_ROI] {Count}個のROIImageCapturedEvent発行完了", result.CapturedImages.Count);
+                    return; // 複数ROI処理の場合、CaptureCompletedEventは発行しない
+                }
+
+                // 🎯 [SINGLE_ROI] 単一画像の場合は従来通りCaptureCompletedEvent発行
                 var primaryImage = result.CapturedImages[0];
-                
+
                 // 🔧 [CAPTURE_FIX] IImage変換処理
-                IImage? imageInterface = null;
-                
-                if (primaryImage is IImage directImage)
+                IImage? singleImageInterface = ConvertToIImage(primaryImage);
+
+                if (singleImageInterface == null)
                 {
-                    // 直接IImageの場合
-                    imageInterface = directImage;
-                    _logger.LogDebug("🔧 [CAPTURE_FIX] 直接IImage変換成功");
-                }
-                else if (primaryImage is IWindowsImage windowsImage)
-                {
-                    // WindowsImageの場合はアダプターを直接作成して変換
-                    var adapter = new Baketa.Infrastructure.Platform.Adapters.DefaultWindowsImageAdapter();
-                    imageInterface = adapter.ToImage(windowsImage);
-                    _logger.LogDebug("🔧 [CAPTURE_FIX] WindowsImageAdapter変換成功 - Type: {Type}", imageInterface?.GetType()?.Name ?? "null");
-                    // 🔧 [DISPOSE_FIX] adapter.Dispose()を削除 - WindowsImageの早期破棄を防ぐ
-                }
-                
-                if (imageInterface == null)
-                {
-                    _logger.LogWarning("🔧 [CAPTURE_FIX] IImage変換失敗 - Type: {Type}", 
+                    _logger.LogWarning("🔧 [CAPTURE_FIX] IImage変換失敗 - Type: {Type}",
                         primaryImage?.GetType()?.Name ?? "null");
                     return;
                 }
-                
+
                 var captureRegion = new Rectangle(0, 0, primaryImage.Width, primaryImage.Height);
                 var captureCompletedEvent = new CaptureCompletedEvent(
-                    imageInterface, 
-                    captureRegion, 
+                    singleImageInterface,
+                    captureRegion,
                     result.ProcessingTime)
                 {
-                    ImageChangeSkipped = result.ImageChangeSkipped
+                    ImageChangeSkipped = result.ImageChangeSkipped,
+                    IsMultiROICapture = false // 単一画像
                 };
-                
+
                 await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);
-                
-                _logger.LogInformation("🎯 CaptureCompletedEvent発行完了: {Width}x{Height}", 
+
+                _logger.LogInformation("🎯 CaptureCompletedEvent発行完了: {Width}x{Height}",
                     primaryImage.Width, primaryImage.Height);
             }
         }
@@ -500,7 +559,31 @@ public class AdaptiveCaptureService(
             _logger.LogWarning(ex, "キャプチャ完了イベント発行中にエラー");
         }
     }
-    
+
+    /// <summary>
+    /// IWindowsImageをIImageに変換するヘルパーメソッド
+    /// </summary>
+    /// <param name="windowsImage">変換元のIWindowsImage</param>
+    /// <returns>変換されたIImage、失敗時はnull</returns>
+    private IImage? ConvertToIImage(IWindowsImage windowsImage)
+    {
+        if (windowsImage is IImage directImage)
+        {
+            // 直接IImageの場合
+            _logger.LogDebug("🔧 [CONVERT_IIMAGE] 直接IImage変換成功");
+            return directImage;
+        }
+
+        // WindowsImageの場合はアダプターを直接作成して変換
+        var adapter = new Baketa.Infrastructure.Platform.Adapters.DefaultWindowsImageAdapter();
+        var imageInterface = adapter.ToImage(windowsImage);
+        _logger.LogDebug("🔧 [CONVERT_IIMAGE] WindowsImageAdapter変換成功 - Type: {Type}",
+            imageInterface?.GetType()?.Name ?? "null");
+        // 🔧 [DISPOSE_FIX] adapter.Dispose()を削除 - WindowsImageの早期破棄を防ぐ
+
+        return imageInterface;
+    }
+
     /// <summary>
     /// キャプチャサービスを停止し、リソースをクリーンアップ
     /// </summary>

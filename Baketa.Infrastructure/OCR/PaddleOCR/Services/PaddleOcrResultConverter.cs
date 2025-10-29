@@ -75,7 +75,13 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
             // スケーリング・ROI調整を適用
             if (Math.Abs(scaleFactor - 1.0) > 0.001 || roi.HasValue)
             {
+                _logger?.LogDebug("🔧 [COORDINATE_DEBUG] ApplyScalingAndRoi実行前 - textRegions[0]: {Bounds}",
+                    textRegions.Count > 0 ? textRegions[0].Bounds : Rectangle.Empty);
+
                 textRegions = ApplyScalingAndRoi(textRegions, scaleFactor, roi);
+
+                _logger?.LogDebug("🔧 [COORDINATE_DEBUG] ApplyScalingAndRoi実行後 - textRegions[0]: {Bounds}, ROI: {Roi}",
+                    textRegions.Count > 0 ? textRegions[0].Bounds : Rectangle.Empty, roi);
             }
 
             _logger?.LogDebug("✅ ConvertToTextRegions完了: 変換領域数={Count}", textRegions.Count);

@@ -287,7 +287,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 if (detectedRegions?.Count > 0)
                 {
                     _logger.LogInformation("🎯 UltraThink: {RegionCount}個の検出領域でROI指定OCR実行", detectedRegions.Count);
-                    
+
+                    // 🔥 [FIX7_DEBUG] ROI特化OCRパス実行時のcontext.Input.CaptureRegion値を診断
+                    _logger.LogInformation("🔥 [FIX7_DEBUG] ROI特化OCRパス - context.Input.CaptureRegion: HasValue={HasValue}, Value={CaptureRegion}",
+                        context.Input.CaptureRegion != Rectangle.Empty,
+                        context.Input.CaptureRegion != Rectangle.Empty ?
+                            $"({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y},{context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})" :
+                            "Empty");
+
                     var allTextResults = new List<string>();
                     var allTextChunks = new List<object>();
                     
@@ -309,6 +316,55 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                             if (regionOcrResults?.TextRegions?.Count > 0)
                             {
+                                // 🔥 [FIX7_OPTION_C_ROI] ROI特化OCRパス座標変換
+                                // 問題: ROI特化OCRパスにCaptureRegionオフセット加算が欠落していた
+                                // 解決策: ROI相対座標 + CaptureRegionオフセット = 画像絶対座標に変換
+                                // 注意: OcrTextRegion/OcrResultsは不変オブジェクト（immutable）のため新規インスタンス作成
+                                if (context.Input.CaptureRegion != Rectangle.Empty)
+                                {
+                                    var captureRegion = context.Input.CaptureRegion;
+                                    _logger.LogInformation("🔥 [FIX7_OPTION_C_ROI] CaptureRegionオフセット加算開始: ({X},{Y})",
+                                        captureRegion.X, captureRegion.Y);
+
+                                    // 座標変換された新しいTextRegionリストを作成
+                                    var transformedRegions = new List<OcrTextRegion>();
+
+                                    foreach (var textRegion in regionOcrResults.TextRegions)
+                                    {
+                                        var originalBounds = textRegion.Bounds;
+                                        var transformedBounds = new Rectangle(
+                                            originalBounds.X + captureRegion.X,
+                                            originalBounds.Y + captureRegion.Y,
+                                            originalBounds.Width,
+                                            originalBounds.Height);
+
+                                        // 不変オブジェクトなので新しいインスタンスを作成
+                                        var transformedRegion = new OcrTextRegion(
+                                            textRegion.Text,
+                                            transformedBounds,
+                                            textRegion.Confidence,
+                                            textRegion.Contour,
+                                            textRegion.Direction);
+
+                                        transformedRegions.Add(transformedRegion);
+
+                                        _logger.LogDebug("🔥 [FIX7_OPTION_C_ROI] 座標変換 - ROI相対:({RoiX},{RoiY}) + Offset:({OffX},{OffY}) = 画像絶対:({AbsX},{AbsY})",
+                                            originalBounds.X, originalBounds.Y, captureRegion.X, captureRegion.Y,
+                                            transformedBounds.X, transformedBounds.Y);
+                                    }
+
+                                    // 新しいOcrResultsインスタンスを作成
+                                    regionOcrResults = new OcrResults(
+                                        transformedRegions,
+                                        regionOcrResults.SourceImage,
+                                        regionOcrResults.ProcessingTime,
+                                        regionOcrResults.LanguageCode,
+                                        regionOcrResults.RegionOfInterest);
+
+                                    _logger.LogInformation("🔥 [FIX7_OPTION_C_ROI] 座標変換完了 - {Count}個の領域を変換",
+                                        transformedRegions.Count);
+                                }
+
                                 var regionText = string.Join(" ", regionOcrResults.TextRegions.Select(r => r.Text));
                                 if (!string.IsNullOrWhiteSpace(regionText))
                                 {
@@ -461,9 +517,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             {
                 try
                 {
-                    // TextRegionをPositionedTextResultに変換
+                    // 🔥 [FIX7_CRITICAL_FIX] OcrTextRegionをPositionedTextResultに変換
+                    // 問題: OfType<TextRegion>() が空を返す → positionedResults.Count == 0 → 座標変換スキップ
+                    // 修正: OfType<OcrTextRegion>() に変更 → 座標変換コード（Line 534-650）が正常実行
                     var positionedResults = textChunks
-                        .OfType<Baketa.Core.Abstractions.OCR.TextRegion>()
+                        .OfType<Baketa.Core.Abstractions.OCR.OcrTextRegion>()
                         .Select(region => new PositionedTextResult
                         {
                             Text = region.Text,
@@ -485,6 +543,45 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         var maxY = allBounds.Max(r => r.Y + r.Height);
                         var roiBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
 
+                        // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI相対座標 → 画像絶対座標変換
+                        // ROIキャプチャ時、OCR結果はROI内の相対座標（例: 12, 10）
+                        // CaptureRegionオフセット（例: 267, 747）を加算して画像絶対座標（例: 279, 757）に変換
+
+                        // 🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegionが利用できないケースへの対応
+                        // IImageToReferencedSafeImageConverterによる変換後、IAdvancedImageインターフェースが失われるため、
+                        // パイプライン入力DTOであるProcessingPipelineInput.CaptureRegionをフォールバックとして使用。
+                        // データフロー: ROIImageCapturedEventHandler -> CaptureCompletedEvent.CaptureRegion -> ProcessingPipelineInput.CaptureRegion
+                        Rectangle? captureRegionForTransform = null;
+
+                        if (context.Input.CapturedImage is IAdvancedImage advancedImage &&
+                            advancedImage.CaptureRegion.HasValue)
+                        {
+                            captureRegionForTransform = advancedImage.CaptureRegion.Value;
+                            _logger.LogDebug("🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegion使用: ({X},{Y})",
+                                captureRegionForTransform.Value.X, captureRegionForTransform.Value.Y);
+                        }
+                        else if (context.Input.CaptureRegion != Rectangle.Empty)
+                        {
+                            // フォールバック: ProcessingPipelineInput.CaptureRegionを使用
+                            captureRegionForTransform = context.Input.CaptureRegion;
+                            _logger.LogInformation("🔥 [FIX7_OPTION_C] Input.CaptureRegionフォールバック使用: ({X},{Y})",
+                                captureRegionForTransform.Value.X, captureRegionForTransform.Value.Y);
+                        }
+
+                        if (captureRegionForTransform.HasValue)
+                        {
+                            var captureRegion = captureRegionForTransform.Value;
+                            var originalRoiBounds = roiBounds;
+                            roiBounds = new Rectangle(
+                                roiBounds.X + captureRegion.X,
+                                roiBounds.Y + captureRegion.Y,
+                                roiBounds.Width,
+                                roiBounds.Height);
+
+                            _logger.LogDebug("🔥 [ROI_COORD_FIX] ROI相対座標変換 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
+                                originalRoiBounds.X, originalRoiBounds.Y, captureRegion.X, captureRegion.Y, roiBounds.X, roiBounds.Y);
+                        }
+
                         // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出（セッション初回のみ実行）
                         if (!context.Metadata.TryGetValue(METADATA_KEY_BORDERLESS, out var borderlessObj))
                         {
@@ -501,28 +598,56 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         // 🔥 [PHASE2.1] Metadataから検出結果を安全に取得
                         var isBorderlessOrFullscreen = (bool)(context.Metadata[METADATA_KEY_BORDERLESS] ?? false);
 
-                        // 🔥 [COORDINATE_FIX] ROI座標 → スクリーン絶対座標変換
-                        // SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync()はスクリーン絶対座標を期待
-                        // マルチモニター・垂直配置対応: CoordinateTransformationServiceがGetWindowRect経由で正確な座標を算出
-                        // 🔥 [PHASE2.1] ボーダーレス/フルスクリーンフラグを渡してDWM座標補正を適用
-                        var combinedBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
-                            roiBounds,
-                            context.Input.SourceWindowHandle,
-                            roiScaleFactor: 1.0f,
-                            isBorderlessOrFullscreen: isBorderlessOrFullscreen);
+                        // 🔥 [FIX6_COORDINATE_SYSTEM] Gemini推奨アーキテクチャ
+                        // TextChunk.CombinedBounds: 画像絶対座標を格納（ROI相対座標 + CaptureRegion.Offset、Line 494-507で変換済み）
+                        // 座標変換タイミング: AggregatedChunksReadyEventHandlerで画像絶対→スクリーン絶対に変換
+                        // 理由: キャッシュ保存前に正規化し、再利用時の変換を不要にする（Gemini Option B）
 
-                        _logger.LogDebug("🔥 [COORDINATE_FIX] ROI→Screen変換完了 - ROI:({RoiX},{RoiY}), Screen:({ScreenX},{ScreenY})",
-                            roiBounds.X, roiBounds.Y, combinedBounds.X, combinedBounds.Y);
+                        // CaptureRegion情報を取得（コンテキスト保持用）
+                        // 🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegionフォールバック対応
+
+                        // 🔥 [FIX7_DEBUG] TextChunk作成直前のcontext.Input.CaptureRegion値を診断
+                        _logger.LogInformation("🔥 [FIX7_DEBUG] TextChunk作成 - context.Input.CaptureRegion: HasValue={HasValue}, Value={CaptureRegion}",
+                            context.Input.CaptureRegion != Rectangle.Empty,
+                            context.Input.CaptureRegion != Rectangle.Empty ?
+                                $"({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y},{context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})" :
+                                "Empty");
+                        _logger.LogInformation("🔥 [FIX7_DEBUG] TextChunk作成 - CapturedImage型: {ImageType}, IsIAdvancedImage: {IsAdvanced}",
+                            context.Input.CapturedImage.GetType().Name,
+                            context.Input.CapturedImage is IAdvancedImage);
+
+                        Rectangle? captureRegionInfo = null;
+                        if (context.Input.CapturedImage is IAdvancedImage advImg && advImg.CaptureRegion.HasValue)
+                        {
+                            captureRegionInfo = advImg.CaptureRegion.Value;
+                            _logger.LogInformation("🔥 [FIX7_DEBUG] IAdvancedImage.CaptureRegion取得成功: ({X},{Y})",
+                                captureRegionInfo.Value.X, captureRegionInfo.Value.Y);
+                        }
+                        else if (context.Input.CaptureRegion != Rectangle.Empty)
+                        {
+                            // フォールバック: ProcessingPipelineInput.CaptureRegionを使用
+                            captureRegionInfo = context.Input.CaptureRegion;
+                            _logger.LogInformation("🔥 [FIX7_OPTION_C] TextChunk.CaptureRegion - Input.CaptureRegionフォールバック: ({X},{Y})",
+                                captureRegionInfo.Value.X, captureRegionInfo.Value.Y);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("🔥 [FIX7_DEBUG] CaptureRegion取得失敗 - IAdvancedImageチェック失敗 かつ Input.CaptureRegion=Empty");
+                        }
+
+                        _logger.LogDebug("🔥 [FIX6_COORDINATE_SYSTEM] TextChunk作成 - CombinedBounds: 画像絶対座標({X},{Y}), CaptureRegion: {CaptureRegion}",
+                            roiBounds.X, roiBounds.Y, captureRegionInfo.HasValue ? $"({captureRegionInfo.Value.X},{captureRegionInfo.Value.Y})" : "null");
 
                         // TextChunk作成
                         var textChunk = new TextChunk
                         {
                             ChunkId = _nextChunkId++,
                             TextResults = positionedResults,
-                            CombinedBounds = combinedBounds, // 🔥 [COORDINATE_FIX] スクリーン絶対座標使用
+                            CombinedBounds = roiBounds, // 🔥 [FIX6_COORDINATE_SYSTEM] 画像絶対座標使用（Line 494-507で変換済み）
                             CombinedText = detectedText,
                             SourceWindowHandle = context.Input.SourceWindowHandle,
-                            DetectedLanguage = null
+                            DetectedLanguage = null,
+                            CaptureRegion = captureRegionInfo // 🔥 [FIX6_CONTEXT_INFO] ROI座標変換コンテキスト保持
                         };
 
                         // TimedChunkAggregatorに送信

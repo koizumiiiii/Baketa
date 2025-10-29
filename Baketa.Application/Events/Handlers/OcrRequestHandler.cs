@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP4] OcrContext統合
 using Baketa.Application.Services.Translation;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Microsoft.Extensions.Logging;
@@ -52,9 +53,18 @@ public sealed class OcrRequestHandler(
             }
             
             var targetWindowHandle = eventData.TargetWindowHandle ?? IntPtr.Zero;
-            var enhancedChunks = await _enhancedBatchOcrService.ProcessWithEnhancedOcrAsync(
-                advancedImage, 
-                targetWindowHandle).ConfigureAwait(false);
+
+            // 🔥 [FIX7_STEP4] OcrContext生成 - CaptureRegion情報を含むコンテキストオブジェクト作成
+            var ocrContext = new OcrContext(
+                Image: advancedImage,
+                WindowHandle: targetWindowHandle,
+                CaptureRegion: eventData.CaptureRegion != System.Drawing.Rectangle.Empty ? eventData.CaptureRegion : null);
+
+            _logger.LogInformation("🔥 [FIX7_STEP4] OcrContext生成完了 - CaptureRegion: {HasCaptureRegion}, Value: {CaptureRegion}",
+                ocrContext.HasCaptureRegion,
+                ocrContext.HasCaptureRegion ? $"({ocrContext.CaptureRegion.Value.X},{ocrContext.CaptureRegion.Value.Y},{ocrContext.CaptureRegion.Value.Width}x{ocrContext.CaptureRegion.Value.Height})" : "null");
+
+            var enhancedChunks = await _enhancedBatchOcrService.ProcessWithEnhancedOcrAsync(ocrContext).ConfigureAwait(false);
 
             if (enhancedChunks.Count > 0)
             {

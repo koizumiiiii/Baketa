@@ -20,21 +20,37 @@ public sealed class TextChunk
     
     /// <summary>チャンクを構成するテキスト結果のリスト</summary>
     public required IReadOnlyList<PositionedTextResult> TextResults { get; init; } = [];
-    
-    /// <summary>チャンク全体のバウンディングボックス（画面座標）</summary>
+
+    /// <summary>
+    /// チャンク全体のバウンディングボックス（画像絶対座標）
+    /// 🔥 [FIX6_COORDINATE_SYSTEM] 座標系統一: 画像絶対座標を格納
+    /// - ROI相対座標ではなく、キャプチャ画像全体での絶対座標
+    /// - TextChunk作成時に CaptureRegion.Offset を加算して正規化済み
+    /// - オーバーレイ表示、キャッシング、Multi-ROI対応で一貫した座標系を保証
+    /// </summary>
     public required Rectangle CombinedBounds { get; init; }
-    
+
     /// <summary>チャンク内のテキストを結合した文字列</summary>
     public required string CombinedText { get; init; } = string.Empty;
-    
+
     /// <summary>翻訳結果テキスト</summary>
     public string TranslatedText { get; set; } = string.Empty;
-    
+
     /// <summary>ソースウィンドウのハンドル</summary>
     public required IntPtr SourceWindowHandle { get; init; }
-    
+
     /// <summary>検出された言語コード</summary>
     public string? DetectedLanguage { get; init; }
+
+    /// <summary>
+    /// ROI画像のキャプチャ領域情報（オフセット座標）
+    /// 🆕 [FIX6_CONTEXT_INFO] ROI相対座標 → 画像絶対座標の変換コンテキスト
+    /// - null = フルスクリーンキャプチャ、または座標変換不要
+    /// - 値あり = ROIキャプチャ、CombinedBoundsは既に画像絶対座標に正規化済み
+    /// - 用途: 座標系変換、Multi-ROI対応、デバッグ情報、座標検証
+    /// - Gemini推奨: TextChunkが座標変換に必要な全情報を保持すべき（DDD原則）
+    /// </summary>
+    public Rectangle? CaptureRegion { get; init; }
     
     /// <summary>チャンクの信頼度（構成テキストの平均信頼度）</summary>
     public float AverageConfidence => TextResults.Count > 0 
@@ -84,11 +100,19 @@ public sealed class TextChunk
     /// <summary>
     /// ログ出力用の文字列表現
     /// ユーザー要求: 座標位置もログで確認できるように
+    /// 🆕 [FIX6_DEBUG] CaptureRegion情報も出力（座標系検証用）
     /// </summary>
-    public string ToLogString() => 
-        $"ChunkId: {ChunkId} | Text: '{CombinedText}' | Translated: '{TranslatedText}' | " +
-        $"Bounds: ({CombinedBounds.X},{CombinedBounds.Y},{CombinedBounds.Width},{CombinedBounds.Height}) | " +
-        $"Confidence: {AverageConfidence:F3} | TextCount: {TextResults.Count} | Language: {DetectedLanguage ?? "unknown"}";
+    public string ToLogString()
+    {
+        var captureInfo = CaptureRegion.HasValue
+            ? $"CaptureRegion: ({CaptureRegion.Value.X},{CaptureRegion.Value.Y},{CaptureRegion.Value.Width},{CaptureRegion.Value.Height})"
+            : "CaptureRegion: FullScreen";
+
+        return $"ChunkId: {ChunkId} | Text: '{CombinedText}' | Translated: '{TranslatedText}' | " +
+               $"Bounds: ({CombinedBounds.X},{CombinedBounds.Y},{CombinedBounds.Width},{CombinedBounds.Height}) | " +
+               $"{captureInfo} | " +
+               $"Confidence: {AverageConfidence:F3} | TextCount: {TextResults.Count} | Language: {DetectedLanguage ?? "unknown"}";
+    }
     
     /// <summary>
     /// チャンクの詳細情報をログ出力用に取得
