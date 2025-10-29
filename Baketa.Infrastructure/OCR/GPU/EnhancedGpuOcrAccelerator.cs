@@ -1,6 +1,7 @@
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.OCR;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
@@ -540,6 +541,22 @@ public sealed class EnhancedGpuOcrAccelerator : IOcrEngine, IDisposable
         }
     }
 
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    public async Task<OcrResults> RecognizeAsync(OcrContext context, IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        _logger.LogInformation("🎯 [OPTION_B] EnhancedGpuOcrAccelerator - OcrContext使用のRecognizeAsync呼び出し");
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
+    }
 
     private string GetOcrModelPath()
     {

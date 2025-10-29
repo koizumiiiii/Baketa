@@ -1,5 +1,6 @@
 using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.OCR;
 
 namespace Baketa.Core.Abstractions.OCR;
 
@@ -559,7 +560,21 @@ public interface IOcrEngine : IDisposable
         Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
-    
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// OcrContext.CaptureRegionを使用してROI座標変換を一元管理します。
+    /// CaptureRegionが設定されている場合、OCR結果の座標は元画像での絶対座標に変換されます。
+    /// </remarks>
+    Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null);
+
     /// <summary>
     /// OCRエンジンの設定を取得します
     /// </summary>

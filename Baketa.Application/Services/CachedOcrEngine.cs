@@ -253,6 +253,50 @@ public sealed class CachedOcrEngine : IOcrEngine
         }
     }
 
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// OcrContextにCaptureRegionが設定されている場合、キャッシュをスキップします。
+    /// 理由: ベースエンジンが返す絶対座標をキャッシュすると、後続処理で相対座標として誤認される座標ズレ問題を防ぐため。
+    /// </remarks>
+    public async Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var requestId = ++_totalRequests;
+        _logger.LogInformation("🎯 [OPTION_B] CachedOcrEngine - OcrContext使用 (Req:{RequestId}) - HasCaptureRegion: {HasCaptureRegion}",
+            requestId, context.HasCaptureRegion);
+
+        // 🔥 [ROI_COORDINATE_FIX] CaptureRegion指定時はキャッシュスキップ
+        // 既存のRecognizeAsync(IImage, Rectangle?)と同様のポリシーを適用
+        if (context.HasCaptureRegion)
+        {
+            _logger.LogDebug("🔧 [ROI_FIX] CaptureRegion指定検出 - キャッシュスキップして直接OCR実行 (座標ズレ防止)");
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _baseEngine.RecognizeAsync(context, progressCallback).ConfigureAwait(false);
+            stopwatch.Stop();
+
+            _logger.LogInformation("✅ [ROI_FIX] CaptureRegion直接OCR完了 - 時間: {ElapsedMs}ms, 認識数: {TextCount}",
+                stopwatch.ElapsedMilliseconds, result.TextRegions.Count);
+
+            return result;
+        }
+
+        // CaptureRegion未指定の場合は、既存のキャッシング実装を使用
+        // OcrContext.Imageを使用してキャッシュキーを生成
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
+    }
+
     public OcrEngineSettings GetSettings()
     {
         return _baseEngine.GetSettings();

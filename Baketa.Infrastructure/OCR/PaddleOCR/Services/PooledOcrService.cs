@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.OCR;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 
@@ -143,6 +144,23 @@ public sealed class PooledOcrService : IOcrEngine
                 // 返却エラーは処理を中断しない
             }
         }
+    }
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    public async Task<OcrResults> RecognizeAsync(OcrContext context, IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        _logger.LogInformation("🎯 [OPTION_B] PooledOcrService - OcrContext使用のRecognizeAsync呼び出し");
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     public OcrEngineSettings GetSettings()

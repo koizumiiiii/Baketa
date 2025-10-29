@@ -535,22 +535,12 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                     if (positionedResults.Count > 0)
                     {
-                        // 全テキストチャンクの境界ボックスを計算（ROI座標）
-                        var allBounds = positionedResults.Select(r => r.BoundingBox);
-                        var minX = allBounds.Min(r => r.X);
-                        var minY = allBounds.Min(r => r.Y);
-                        var maxX = allBounds.Max(r => r.X + r.Width);
-                        var maxY = allBounds.Max(r => r.Y + r.Height);
-                        var roiBounds = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                        // 🔥 [OPTION_A_FIX] 個別TextChunk生成 - メニュー項目を個別オーバーレイ表示
+                        // 問題: 全OcrTextRegionを1つのTextChunkに統合 → 巨大オーバーレイ（H:2519px）
+                        // 修正: 各OcrTextRegionごとに個別TextChunkを作成 → 個別オーバーレイ表示
+                        // ProximityGroupingは後段で実行（セリフ行のグルーピング用）
 
-                        // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI相対座標 → 画像絶対座標変換
-                        // ROIキャプチャ時、OCR結果はROI内の相対座標（例: 12, 10）
-                        // CaptureRegionオフセット（例: 267, 747）を加算して画像絶対座標（例: 279, 757）に変換
-
-                        // 🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegionが利用できないケースへの対応
-                        // IImageToReferencedSafeImageConverterによる変換後、IAdvancedImageインターフェースが失われるため、
-                        // パイプライン入力DTOであるProcessingPipelineInput.CaptureRegionをフォールバックとして使用。
-                        // データフロー: ROIImageCapturedEventHandler -> CaptureCompletedEvent.CaptureRegion -> ProcessingPipelineInput.CaptureRegion
+                        // 🔥 [FIX7_OPTION_C] CaptureRegion情報取得（全TextChunk共通）
                         Rectangle? captureRegionForTransform = null;
 
                         if (context.Input.CapturedImage is IAdvancedImage advancedImage &&
@@ -568,20 +558,6 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                                 captureRegionForTransform.Value.X, captureRegionForTransform.Value.Y);
                         }
 
-                        if (captureRegionForTransform.HasValue)
-                        {
-                            var captureRegion = captureRegionForTransform.Value;
-                            var originalRoiBounds = roiBounds;
-                            roiBounds = new Rectangle(
-                                roiBounds.X + captureRegion.X,
-                                roiBounds.Y + captureRegion.Y,
-                                roiBounds.Width,
-                                roiBounds.Height);
-
-                            _logger.LogDebug("🔥 [ROI_COORD_FIX] ROI相対座標変換 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
-                                originalRoiBounds.X, originalRoiBounds.Y, captureRegion.X, captureRegion.Y, roiBounds.X, roiBounds.Y);
-                        }
-
                         // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出（セッション初回のみ実行）
                         if (!context.Metadata.TryGetValue(METADATA_KEY_BORDERLESS, out var borderlessObj))
                         {
@@ -595,68 +571,72 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                                 windowHandle, isBorderless);
                         }
 
-                        // 🔥 [PHASE2.1] Metadataから検出結果を安全に取得
-                        var isBorderlessOrFullscreen = (bool)(context.Metadata[METADATA_KEY_BORDERLESS] ?? false);
-
-                        // 🔥 [FIX6_COORDINATE_SYSTEM] Gemini推奨アーキテクチャ
-                        // TextChunk.CombinedBounds: 画像絶対座標を格納（ROI相対座標 + CaptureRegion.Offset、Line 494-507で変換済み）
-                        // 座標変換タイミング: AggregatedChunksReadyEventHandlerで画像絶対→スクリーン絶対に変換
-                        // 理由: キャッシュ保存前に正規化し、再利用時の変換を不要にする（Gemini Option B）
-
-                        // CaptureRegion情報を取得（コンテキスト保持用）
-                        // 🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegionフォールバック対応
-
-                        // 🔥 [FIX7_DEBUG] TextChunk作成直前のcontext.Input.CaptureRegion値を診断
-                        _logger.LogInformation("🔥 [FIX7_DEBUG] TextChunk作成 - context.Input.CaptureRegion: HasValue={HasValue}, Value={CaptureRegion}",
-                            context.Input.CaptureRegion != Rectangle.Empty,
-                            context.Input.CaptureRegion != Rectangle.Empty ?
-                                $"({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y},{context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})" :
-                                "Empty");
-                        _logger.LogInformation("🔥 [FIX7_DEBUG] TextChunk作成 - CapturedImage型: {ImageType}, IsIAdvancedImage: {IsAdvanced}",
-                            context.Input.CapturedImage.GetType().Name,
-                            context.Input.CapturedImage is IAdvancedImage);
-
+                        // CaptureRegion情報（コンテキスト保持用）
                         Rectangle? captureRegionInfo = null;
                         if (context.Input.CapturedImage is IAdvancedImage advImg && advImg.CaptureRegion.HasValue)
                         {
                             captureRegionInfo = advImg.CaptureRegion.Value;
-                            _logger.LogInformation("🔥 [FIX7_DEBUG] IAdvancedImage.CaptureRegion取得成功: ({X},{Y})",
-                                captureRegionInfo.Value.X, captureRegionInfo.Value.Y);
                         }
                         else if (context.Input.CaptureRegion != Rectangle.Empty)
                         {
-                            // フォールバック: ProcessingPipelineInput.CaptureRegionを使用
                             captureRegionInfo = context.Input.CaptureRegion;
-                            _logger.LogInformation("🔥 [FIX7_OPTION_C] TextChunk.CaptureRegion - Input.CaptureRegionフォールバック: ({X},{Y})",
-                                captureRegionInfo.Value.X, captureRegionInfo.Value.Y);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("🔥 [FIX7_DEBUG] CaptureRegion取得失敗 - IAdvancedImageチェック失敗 かつ Input.CaptureRegion=Empty");
                         }
 
-                        _logger.LogDebug("🔥 [FIX6_COORDINATE_SYSTEM] TextChunk作成 - CombinedBounds: 画像絶対座標({X},{Y}), CaptureRegion: {CaptureRegion}",
-                            roiBounds.X, roiBounds.Y, captureRegionInfo.HasValue ? $"({captureRegionInfo.Value.X},{captureRegionInfo.Value.Y})" : "null");
+                        _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk生成開始 - OCR検出数: {Count}, CaptureRegion: {CaptureRegion}",
+                            positionedResults.Count,
+                            captureRegionInfo.HasValue ? $"({captureRegionInfo.Value.X},{captureRegionInfo.Value.Y})" : "null");
 
-                        // TextChunk作成
-                        var textChunk = new TextChunk
+                        // 🔥 [OPTION_A_FIX] 各OcrTextRegionごとにTextChunkを個別生成
+                        foreach (var positionedResult in positionedResults)
                         {
-                            ChunkId = _nextChunkId++,
-                            TextResults = positionedResults,
-                            CombinedBounds = roiBounds, // 🔥 [FIX6_COORDINATE_SYSTEM] 画像絶対座標使用（Line 494-507で変換済み）
-                            CombinedText = detectedText,
-                            SourceWindowHandle = context.Input.SourceWindowHandle,
-                            DetectedLanguage = null,
-                            CaptureRegion = captureRegionInfo // 🔥 [FIX6_CONTEXT_INFO] ROI座標変換コンテキスト保持
-                        };
+                            var roiBounds = positionedResult.BoundingBox;
 
-                        // TimedChunkAggregatorに送信
-                        var added = await _textChunkAggregator.TryAddTextChunkAsync(textChunk, cancellationToken).ConfigureAwait(false);
+                            // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI相対座標 → 画像絶対座標変換
+                            if (captureRegionForTransform.HasValue)
+                            {
+                                var captureRegion = captureRegionForTransform.Value;
+                                var originalRoiBounds = roiBounds;
+                                roiBounds = new Rectangle(
+                                    roiBounds.X + captureRegion.X,
+                                    roiBounds.Y + captureRegion.Y,
+                                    roiBounds.Width,
+                                    roiBounds.Height);
 
-                        _logger.LogInformation("🔧 [TRANSLATION_FIX] OCR結果を翻訳パイプラインに送信 - ChunkId: {ChunkId}, テキスト長: {Length}, 送信成功: {Added}",
-                            textChunk.ChunkId, detectedText.Length, added);
+                                _logger.LogDebug("🔥 [ROI_COORD_FIX] ROI相対座標変換 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
+                                    originalRoiBounds.X, originalRoiBounds.Y, captureRegion.X, captureRegion.Y, roiBounds.X, roiBounds.Y);
+                            }
 
-                        _logger?.LogDebug($"🔧 [TRANSLATION_FIX] 翻訳パイプライン送信 - ChunkId: {textChunk.ChunkId}, テキスト: '{detectedText.Substring(0, Math.Min(50, detectedText.Length))}...', 成功: {added}");
+                            // 座標変換後のPositionedTextResult作成
+                            var transformedResult = new PositionedTextResult
+                            {
+                                Text = positionedResult.Text,
+                                BoundingBox = roiBounds, // 画像絶対座標
+                                Confidence = positionedResult.Confidence,
+                                ChunkId = _nextChunkId,
+                                ProcessingTime = positionedResult.ProcessingTime,
+                                DetectedLanguage = positionedResult.DetectedLanguage
+                            };
+
+                            // 個別TextChunk作成
+                            var textChunk = new TextChunk
+                            {
+                                ChunkId = _nextChunkId++,
+                                TextResults = new[] { transformedResult },
+                                CombinedBounds = roiBounds, // 画像絶対座標
+                                CombinedText = positionedResult.Text,
+                                SourceWindowHandle = context.Input.SourceWindowHandle,
+                                DetectedLanguage = null,
+                                CaptureRegion = captureRegionInfo
+                            };
+
+                            // TimedChunkAggregatorに送信
+                            var added = await _textChunkAggregator.TryAddTextChunkAsync(textChunk, cancellationToken).ConfigureAwait(false);
+
+                            _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk送信 - ChunkId: {ChunkId}, Text: '{Text}', Bounds: ({X},{Y},{W}x{H}), 成功: {Added}",
+                                textChunk.ChunkId, positionedResult.Text, roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height, added);
+                        }
+
+                        _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk生成完了 - 送信数: {Count}", positionedResults.Count);
                     }
                 }
                 catch (Exception ex)
@@ -833,9 +813,14 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
             int actualLength;
             (pooledArray, actualLength) = await _underlyingImage.ToPooledByteArrayWithLengthAsync(cancellationToken).ConfigureAwait(false);
 
-            // 🔥 [PHASE5.2C] actualLengthで正確なサイズのMemoryStreamを作成
+            // 🔥 [PHASE5.2C_FIX] actualLengthで正確なサイズのMemoryStreamを作成
+            // 重要: MemoryStream/ArrayPoolへの依存を切断するため、Bitmapクローンを作成
             using var memoryStream = new MemoryStream(pooledArray, 0, actualLength, writable: false);
-            _cachedBitmap = new Bitmap(memoryStream);
+            using var tempBitmap = new Bitmap(memoryStream);
+
+            // 🔥 [PHASE5.2C_FIX] Bitmapクローン作成でMemoryStream依存を切断
+            // 理由: MemoryStream Dispose後もBitmapが有効であることを保証
+            _cachedBitmap = new Bitmap(tempBitmap);
 
             _logger.LogDebug("✅ [PHASE5.2C] Bitmap async変換成功 - Size: {Width}x{Height}",
                 _cachedBitmap.Width, _cachedBitmap.Height);

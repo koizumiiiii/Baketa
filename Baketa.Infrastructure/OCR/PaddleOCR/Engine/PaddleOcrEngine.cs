@@ -794,6 +794,35 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     }
 
     /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// OcrContext.CaptureRegionを使用してROI座標変換を一元管理します。
+    /// PaddleOcrResultConverterで既にROI座標変換が実装されているため、
+    /// ここではCaptureRegionをregionOfInterestとして渡すだけです。
+    /// </remarks>
+    public async Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<CoreOcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        __logger?.LogInformation("🎯 [OPTION_B] OcrContext使用のRecognizeAsync呼び出し - HasCaptureRegion: {HasCaptureRegion}",
+            context.HasCaptureRegion);
+
+        // OcrContext内のCancellationTokenとCaptureRegionを使用して既存メソッドを呼び出し
+        // PaddleOcrResultConverterが自動的にROI座標変換を実施
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// OCRエンジンの設定を取得します
     /// </summary>
     /// <returns>現在の設定</returns>

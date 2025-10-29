@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Models.OCR;
 using System.Diagnostics;
 using System.Drawing;
 
@@ -75,6 +76,23 @@ public class AdaptiveOcrEngine(
     {
         // 簡易実装：領域指定は無視してフル画像で処理
         return await RecognizeAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    public async Task<OcrResults> RecognizeAsync(OcrContext context, IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        logger.LogInformation("🎯 [OPTION_B] AdaptiveOcrEngine - OcrContext使用のRecognizeAsync呼び出し");
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
