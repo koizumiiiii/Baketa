@@ -185,7 +185,11 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
                     // UltraThink Phase 3: 個別翻訳実行時の統合翻訳スキップ制御
                     // グルーピング後のOCR結果が複数存在する場合は個別翻訳を実行するため統合翻訳をスキップ
-                    SkipIntegratedTranslation = ShouldSkipIntegratedTranslation()
+                    SkipIntegratedTranslation = ShouldSkipIntegratedTranslation(),
+
+                    // 🔥 [PHASE10.6] ROI画像からの処理フラグを設定
+                    // ROI画像の場合、領域検出をスキップし、OCR最小サイズ要件を緩和
+                    IsMultiROICapture = eventData.IsMultiROICapture
                 }
             };
 

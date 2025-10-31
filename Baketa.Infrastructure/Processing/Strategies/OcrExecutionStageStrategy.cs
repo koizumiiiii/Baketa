@@ -185,11 +185,24 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
 
-            // 🎯 UltraThink Phase 50.1: ROI検出統合による テキスト領域特定処理
-            // Note: ここではocrImageを使用してROI検出を実行
+            // 🔥 [PHASE10.6] ROI画像の場合、領域検出をスキップして画像全体をOCR
+            // Gemini推奨: Option A - 2段階検出問題の根本解決
             IList<Rectangle>? detectedRegions = null;
-            if (_textRegionDetector != null)
+            bool isMultiROICapture = context.Input.Options?.IsMultiROICapture ?? false;
+
+            if (isMultiROICapture)
             {
+                // ROI画像の場合: 領域検出をスキップし、画像全体を単一領域として扱う
+                detectedRegions = new List<Rectangle>
+                {
+                    new Rectangle(0, 0, ocrImage.Width, ocrImage.Height)
+                };
+                _logger.LogInformation("🔥 [PHASE10.6] ROI画像検出 - 領域検出スキップ、画像全体をOCR: {Width}x{Height}",
+                    ocrImage.Width, ocrImage.Height);
+            }
+            else if (_textRegionDetector != null)
+            {
+                // 通常の全画面キャプチャ: 標準の領域検出を実行
                 try
                 {
                     _logger.LogDebug("🎯 UltraThink: ROI検出開始 - テキスト領域を事前検出");
@@ -265,11 +278,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
                     }
                     
-                    // 🎯 UltraThink Phase 36: OCRに適さない極小画像を除外
-                    const int MinimumOcrImageSize = 50; // 50x50ピクセル未満はOCR不適
-                    if (testWidth < MinimumOcrImageSize || testHeight < MinimumOcrImageSize)
+                    // 🔥 [PHASE10.6] OCR最小サイズチェックの条件分岐
+                    // ROI画像: 20x20ピクセル（PaddleOCR Recognition Modelの最小サイズ）
+                    // 全画面: 50x50ピクセル（Detection + Recognition の安全マージン）
+                    int minimumOcrImageSize = isMultiROICapture ? 20 : 50;
+                    if (testWidth < minimumOcrImageSize || testHeight < minimumOcrImageSize)
                     {
-                        var error = $"🎯 UltraThink Phase 36: OCRに適さない極小画像サイズ: {testWidth}x{testHeight} (最小要件: {MinimumOcrImageSize}x{MinimumOcrImageSize})";
+                        var contextType = isMultiROICapture ? "ROI画像" : "全画面";
+                        var error = $"🎯 UltraThink Phase 36 + PHASE10.6: OCRに適さない極小画像サイズ: {testWidth}x{testHeight} ({contextType}最小要件: {minimumOcrImageSize}x{minimumOcrImageSize})";
                         _logger.LogWarning(error);
                         return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
                     }

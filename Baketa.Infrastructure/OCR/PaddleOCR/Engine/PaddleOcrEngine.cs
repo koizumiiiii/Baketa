@@ -661,53 +661,22 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // IReadOnlyList<TextChunk> processedTextChunks = [];
             
             } // using (mat) の終了
-            
-            // 🎯 Level 1大画面対応: 一元化された座標復元システム活用
-            OcrResults result;
-            if (Math.Abs(scaleFactor - 1.0) >= 0.001 && textRegions != null && textRegions.Count > 0)
-            {
-                __logger?.LogDebug("📍 統合座標復元開始: スケール係数={ScaleFactor}", scaleFactor);
-                
-                try
-                {
-                    // CoordinateRestorer.RestoreOcrResultsを活用して一元管理
-                    var tempResult = new OcrResults(
-                        textRegions,
-                        image, // スケーリング済み画像から元画像に変更される
-                        stopwatch.Elapsed,
-                        CurrentLanguage ?? "jpn",
-                        regionOfInterest,
-                        postProcessedText
-                    );
-                    
-                    result = CoordinateRestorer.RestoreOcrResults(tempResult, scaleFactor, image);
-                    __logger?.LogDebug("✅ 統合座標復元完了: {Count}個のテキスト領域とROIを復元", result.TextRegions.Count);
-                }
-                catch (Exception ex)
-                {
-                    __logger?.LogWarning(ex, "⚠️ 統合座標復元でエラーが発生しました。スケーリングされた座標を使用します");
-                    // エラー時はスケーリングされた座標をそのまま使用
-                    result = new OcrResults(
-                        textRegions,
-                        image,
-                        stopwatch.Elapsed,
-                        CurrentLanguage ?? "jpn",
-                        regionOfInterest,
-                        postProcessedText
-                    );
-                }
-            }
-            else
-            {
-                result = new OcrResults(
-                    textRegions ?? [],
-                    image,
-                    stopwatch.Elapsed,
-                    CurrentLanguage ?? "jpn",
-                    regionOfInterest,
-                    postProcessedText
-                );
-            }
+
+            // 🔧 [PHASE10.4_REVERT_REMOVAL] ApplyScalingAndRoiで既に座標復元済みのため削除
+            // 根本原因: PaddleOcrResultConverter.ApplyScalingAndRoiが既にスケール復元を実行
+            // 証拠: textRegions[0]: {X=271,Y=750} はROI: {X=267,Y=745}と一致（元画像座標系）
+            // Phase 10.4 Revertを追加実行すると二重復元となり、Y軸が2倍ずれる
+            // 修正: Phase 10.4 Revert削除（ApplyScalingAndRoiの結果をそのまま使用）
+            // 参照: debug_app_logs.txt:15:18:48.805 [COORDINATE_DEBUG] ApplyScalingAndRoi実行後
+
+            var result = new OcrResults(
+                textRegions ?? [],
+                image,
+                stopwatch.Elapsed,
+                CurrentLanguage ?? "jpn",
+                regionOfInterest,
+                postProcessedText
+            );
             
             // 📊 [DIAGNOSTIC] OCR処理成功イベント
             await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
@@ -3400,55 +3369,41 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 // テキスト検出のみを実行（認識をスキップ）
                 textRegions = await ExecuteTextDetectionOnlyAsync(mat, cancellationToken).ConfigureAwait(false);
             }
-            
-            // 🎯 Level 1大画面対応: 統合座標復元（検出専用）
+
             stopwatch.Stop();
-            
-            OcrResults result;
-            if (Math.Abs(scaleFactor - 1.0) >= 0.001 && textRegions != null && textRegions.Count > 0)
+
+            // 🔥 [PHASE10.4_REVERT] 座標復元処理を復活（Gemini専門分析による決定）
+            // 根本原因: PaddleOCRライブラリのバージョンアップにより動作変更
+            //   - PHASE2.1_FIX当時: 縮小画像でも元スケールの座標を返していた（X=2505など）
+            //   - 現在: 縮小画像のスケールで座標を返す（X=131など）
+            // 証拠: PaddleOcrResultConverter.cs:748のPHASE2.1_FIXコメント
+            // 修正: scaleFactorによる座標復元を復活（元画像スケールへの変換が必須）
+            // 参照: /tmp/gemini_phase10_4_coordinate_scale_issue.md
+            if (Math.Abs(scaleFactor - 1.0) > 0.001) // スケーリングが行われた場合のみ
             {
-                __logger?.LogDebug("📍 検出専用統合座標復元開始: スケール係数={ScaleFactor}", scaleFactor);
-                
-                try
+                __logger?.LogDebug("🔧 [PHASE10.4_REVERT] 座標復元実行: ScaleFactor={ScaleFactor}", scaleFactor);
+
+                var restoredRegions = new List<OcrTextRegion>(textRegions.Count);
+                foreach (var region in textRegions)
                 {
-                    // CoordinateRestorer.RestoreOcrResultsを活用（検出専用モード）
-                    var tempResult = new OcrResults(
-                        textRegions,
-                        image,
-                        stopwatch.Elapsed,
-                        CurrentLanguage ?? "jpn",
-                        null,
-                        "" // 検出専用なので結合テキストは空
-                    );
-                    
-                    result = CoordinateRestorer.RestoreOcrResults(tempResult, scaleFactor, image);
-                    __logger?.LogDebug("✅ 検出専用統合座標復元完了: {Count}個のテキスト領域を復元", result.TextRegions.Count);
+                    restoredRegions.Add(CoordinateRestorer.RestoreTextRegion(region, scaleFactor));
                 }
-                catch (Exception ex)
+                textRegions = restoredRegions;
+
+                if (textRegions.Count > 0)
                 {
-                    __logger?.LogWarning(ex, "⚠️ 検出専用統合座標復元でエラーが発生しました。スケーリングされた座標を使用します");
-                    // エラー時はスケーリングされた座標をそのまま使用
-                    result = new OcrResults(
-                        textRegions,
-                        image,
-                        stopwatch.Elapsed,
-                        CurrentLanguage ?? "jpn",
-                        null,
-                        "" // 検出専用なので結合テキストは空
-                    );
+                    __logger?.LogDebug("  -> 復元後の最初の座標: {Bounds}", textRegions[0].Bounds);
                 }
             }
-            else
-            {
-                result = new OcrResults(
-                    textRegions ?? [],
-                    image,
-                    stopwatch.Elapsed,
-                    CurrentLanguage ?? "jpn",
-                    null,
-                    "" // 検出専用なので結合テキストは空
-                );
-            }
+
+            var result = new OcrResults(
+                textRegions ?? [],
+                image,
+                stopwatch.Elapsed,
+                CurrentLanguage ?? "jpn",
+                null,
+                "" // 検出専用なので結合テキストは空
+            );
 
             __logger?.LogDebug("✅ テキスト検出専用処理完了 - 検出領域数: {Count}, 処理時間: {Time}ms", 
                 textRegions?.Count ?? 0, stopwatch.ElapsedMilliseconds);

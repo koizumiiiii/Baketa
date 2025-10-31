@@ -745,23 +745,28 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
         {
             var bounds = region.Bounds;
 
-            // 🔥 [PHASE2.1_FIX] スケーリング処理を削除
-            // 根本原因: PaddleOCRは縮小画像で処理しても、元の画像サイズベースの座標を返す
-            // 証拠: 縮小画像サイズ1885x1061に対して、X=2505などの座標を返している
-            // /scaleFactorを適用すると座標が2倍以上に膨張し、画面外になる
-            // 例: X=2505 / 0.49 = 5112 > モニター幅3840
-            // → スケーリング処理は不要（PaddleOCRが既に自動スケーリング済み）
+            // 🔧 [PHASE10.4_SIZE_FIX] スケーリング処理を復活（サイズが小さい問題の修正）
+            // 根本原因: PaddleOCRライブラリのバージョン変更により、縮小画像スケールの座標を返すように変更
+            // 証拠: textRegions[0]: {X=5,Y=3,Width=136,Height=40} はROI内の縮小画像スケール
+            // ROIオフセット加算後: {X=272,Y=750,Width=136,Height=40} ← Width/Heightが小さいまま
+            // 期待値: Width=136/0.491=277, Height=40/0.491=81
+            // 修正: スケーリング処理を復活し、サイズも元画像スケールに復元
+            //
+            // 🔧 [SIZE_TUNING] Width/HeightをMath.Ceiling()に変更
+            // 理由: Math.Round()だと小数点以下が切り捨てられ、オーバーレイが元テキストより小さくなる
+            // 例: Height=40/0.491=81.46 → Math.Round()=81, Math.Ceiling()=82
+            // 効果: オーバーレイが元テキストを確実に覆うサイズになる
 
-            // スケーリング適用（削除）
-            // if (Math.Abs(scaleFactor - 1.0) > 0.001)
-            // {
-            //     bounds = new Rectangle(
-            //         (int)Math.Round(bounds.X / scaleFactor),
-            //         (int)Math.Round(bounds.Y / scaleFactor),
-            //         (int)Math.Round(bounds.Width / scaleFactor),
-            //         (int)Math.Round(bounds.Height / scaleFactor)
-            //     );
-            // }
+            // スケーリング適用
+            if (Math.Abs(scaleFactor - 1.0) > 0.001)
+            {
+                bounds = new Rectangle(
+                    (int)Math.Round(bounds.X / scaleFactor),     // 位置は四捨五入（ずれ防止）
+                    (int)Math.Round(bounds.Y / scaleFactor),     // 位置は四捨五入（ずれ防止）
+                    (int)Math.Ceiling(bounds.Width / scaleFactor),   // サイズは切り上げ（確実に覆う）
+                    (int)Math.Ceiling(bounds.Height / scaleFactor)   // サイズは切り上げ（確実に覆う）
+                );
+            }
 
             // ROI座標調整
             if (roi.HasValue)

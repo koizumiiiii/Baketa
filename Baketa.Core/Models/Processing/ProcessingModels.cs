@@ -133,6 +133,16 @@ public sealed record ProcessingPipelineOptions
     /// UltraThink Phase 3: グルーピング個別翻訳時は全体統合翻訳を無効化
     /// </summary>
     public bool SkipIntegratedTranslation { get; init; } = false;
+
+    /// <summary>
+    /// 複数ROI画像からの処理かどうか
+    /// Phase 10.6: ROI画像の場合、領域検出をスキップし、OCR最小サイズ要件を緩和
+    /// </summary>
+    /// <remarks>
+    /// CaptureCompletedEvent.IsMultiROICaptureから設定されます。
+    /// OcrExecutionStageStrategyで、ProcessingContextType.RegionOfInterestの判定に使用されます。
+    /// </remarks>
+    public bool IsMultiROICapture { get; init; } = false;
 }
 
 /// <summary>
