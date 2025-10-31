@@ -309,10 +309,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                             // 🎯 [OCR_DEBUG_LOG] ROI領域情報をデバッグログに出力
                             _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR開始 - 座標=({region.X},{region.Y}), サイズ=({region.Width}x{region.Height})");
 
-                            var regionOcrResults = await _ocrEngine.RecognizeAsync(
-                                ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用でObjectDisposedException回避
-                                region,
-                                cancellationToken: cancellationToken).ConfigureAwait(false);
+                            // 🎯 [OPTION_B_PHASE2] OcrContext使用でROI座標変換を一元化
+                            var ocrContext = new OcrContext(
+                                ocrImage,
+                                context.Input.SourceWindowHandle,
+                                region, // ROI領域
+                                cancellationToken);
+
+                            var regionOcrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
 
                             if (regionOcrResults?.TextRegions?.Count > 0)
                             {
@@ -413,10 +417,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         // 🎯 [OCR_DEBUG_LOG] 領域指定OCR実行をデバッグログに出力
                         _logger?.LogDebug($"🔍 [REGION_OCR] 領域指定OCR開始 - 座標=({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y}), サイズ=({context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})");
 
-                        ocrResults = await _ocrEngine.RecognizeAsync(
-                            ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用
+                        // 🎯 [OPTION_B_PHASE2] OcrContext使用でCaptureRegion座標変換を一元化
+                        var ocrContext = new OcrContext(
+                            ocrImage,
+                            context.Input.SourceWindowHandle,
                             context.Input.CaptureRegion,
-                            cancellationToken: cancellationToken).ConfigureAwait(false);
+                            cancellationToken);
+
+                        ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
                     }
                     else
                     {
@@ -427,9 +435,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         // 🎯 [OCR_DEBUG_LOG] 全体画像OCR実行をデバッグログに出力
                         _logger?.LogDebug($"🔍 [FULL_OCR] 全体画像OCR開始 - サイズ=({ocrImage.Width}x{ocrImage.Height})");
 
-                        ocrResults = await _ocrEngine.RecognizeAsync(
-                            ocrImage, // 🔧 [PHASE3.2_FIX] 直接画像使用
-                            cancellationToken: cancellationToken).ConfigureAwait(false);
+                        // 🎯 [OPTION_B_PHASE2] OcrContext使用（CaptureRegion=null）
+                        var ocrContext = new OcrContext(
+                            ocrImage,
+                            context.Input.SourceWindowHandle,
+                            null, // 全体画像処理
+                            cancellationToken);
+
+                        ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
                     }
                     
                     // OCR結果から文字列とチャンクを取得

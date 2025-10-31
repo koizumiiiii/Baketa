@@ -12,6 +12,7 @@ using Baketa.Core.Abstractions.Memory;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
 using Baketa.Core.Extensions;
+using Baketa.Core.Models.OCR; // 🎯 [OPTION_B] OcrContext用
 
 namespace Baketa.Application.Services;
 

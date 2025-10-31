@@ -131,8 +131,9 @@ public sealed class PaddleOcrEngineTests : IDisposable
         await _safeOcrEngine.InitializeAsync(settings).ConfigureAwait(false);
 
         // Act & Assert
+        // 🎯 [OPTION_B] 型キャストを明示してメソッドオーバーロードを明確化
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _safeOcrEngine.RecognizeAsync(null!)).ConfigureAwait(false);
+            _safeOcrEngine.RecognizeAsync((IImage)null!)).ConfigureAwait(false);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using System.Drawing;
+using Baketa.Core.Models.OCR; // 🎯 [OPTION_B] OcrContext用
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 
@@ -180,6 +181,32 @@ public class SafeTestPaddleOcrEngine(
             _logger?.LogError(ex, "OCR処理中にエラーが発生（テスト用）");
             throw new OcrException("OCR処理に失敗しました（テスト用）", ex);
         }
+    }
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// テスト用の実装。既存のRecognizeAsyncメソッドに委譲します。
+    /// </remarks>
+    public async Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        _logger?.LogDebug("🎯 [OPTION_B] SafeTestPaddleOcrEngine - OcrContext使用 - HasCaptureRegion: {HasCaptureRegion}",
+            context.HasCaptureRegion);
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ namespace Baketa.Core.Models.OCR;
 /// - 保守性: ⭐⭐⭐⭐⭐
 /// </remarks>
 public sealed record OcrContext(
-    IAdvancedImage Image,
+    IImage Image,
     IntPtr WindowHandle,
     Rectangle? CaptureRegion,
     CancellationToken CancellationToken = default
@@ -30,7 +30,7 @@ public sealed record OcrContext(
     /// デフォルトコンストラクタ（CancellationToken省略可能）
     /// </summary>
     public OcrContext(
-        IAdvancedImage image,
+        IImage image,
         IntPtr windowHandle,
         Rectangle? captureRegion)
         : this(image, windowHandle, captureRegion, CancellationToken.None)

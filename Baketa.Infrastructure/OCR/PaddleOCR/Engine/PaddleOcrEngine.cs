@@ -8,6 +8,7 @@ using SafeImage = Baketa.Core.Abstractions.Memory.SafeImage;
 using ReferencedSafeImage = Baketa.Core.Abstractions.Memory.ReferencedSafeImage;
 using ImagePixelFormat = Baketa.Core.Abstractions.Memory.ImagePixelFormat;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Models.OCR; // 🎯 [OPTION_B] OcrContext用
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Diagnostics;

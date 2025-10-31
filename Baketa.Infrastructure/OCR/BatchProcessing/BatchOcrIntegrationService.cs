@@ -179,8 +179,14 @@ public sealed class BatchOcrIntegrationService : IDisposable
             // 画像サイズに基づく最適化
             await OptimizeBatchPerformanceAsync(context.Image.Width, context.Image.Height, cancellationToken).ConfigureAwait(false);
 
+            // 🎯 [OPTION_B_PHASE2] IImage → IAdvancedImage キャスト
+            if (context.Image is not IAdvancedImage advancedImage)
+            {
+                throw new InvalidOperationException($"バッチOCR処理にはIAdvancedImageが必要です（実際の型: {context.Image.GetType().Name}）");
+            }
+
             // バッチ処理実行
-            return await _batchOcrProcessor.ProcessBatchAsync(context.Image, context.WindowHandle, cancellationToken).ConfigureAwait(false);
+            return await _batchOcrProcessor.ProcessBatchAsync(advancedImage, context.WindowHandle, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
