@@ -742,7 +742,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             var imageBytes = await ocrImage.ToByteArrayAsync().ConfigureAwait(false);
 
             using var memoryStream = new MemoryStream(imageBytes);
-            using var bitmap = new Bitmap(memoryStream);
+            using var sourceBitmap = new Bitmap(memoryStream);
+
+            // 🔥 [ARRAYPOOL_FIX] SafeImage ArrayPool破損回避 - 防御的Bitmapクローン作成
+            // 問題: ReferencedSafeImage.ToByteArrayAsync()がArrayPoolメモリから読み取り
+            //       SafeImage.Dispose()後にArrayPool.Return()されたメモリを参照する可能性
+            // 解決策: 即座にBitmapをクローンし、ArrayPoolから完全に独立したコピーを作成
+            using var bitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height, sourceBitmap.PixelFormat);
+            using (var g = Graphics.FromImage(bitmap))
+            {
+                g.DrawImage(sourceBitmap, 0, 0);
+            }
 
             // 保存ディレクトリの準備
             var roiImagesPath = @"C:\Users\suke0\AppData\Roaming\Baketa\ROI\Images";

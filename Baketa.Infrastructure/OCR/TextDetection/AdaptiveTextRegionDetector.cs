@@ -709,9 +709,12 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
             return false;
         }
 
-        // アスペクト比チェック（極端な縦横比を除外）
+        // 🔧 [PHASE_ASPECTRATIO_FIX] アスペクト比チェック（極端な縦横比を除外）
+        // 修正理由: スケール復元後の横長テキスト行（1100x90px）はaspectRatio=12.2となる
+        // 実測データ: 3行テキストで領域1=12.2, 領域2=12.0, 領域3=5.1
+        // 旧制限10.0では正常なテキスト行が除外されるため20.0に緩和（Gemini検証済み⭐⭐⭐⭐⭐）
         float aspectRatio = (float)rect.Width / rect.Height;
-        if (aspectRatio < 0.1f || aspectRatio > 10.0f)
+        if (aspectRatio < 0.05f || aspectRatio > 20.0f)
         {
             return false;
         }

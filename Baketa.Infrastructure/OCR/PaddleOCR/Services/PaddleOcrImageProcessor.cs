@@ -133,6 +133,22 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
     public async Task<(Mat mat, double scaleFactor)> ConvertToMatWithScalingAsync(
         IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
     {
+        // 🔥 [ROI_NO_SCALING] ROI画像（小さい画像）は追加縮小しない
+        // 問題: 全画面OCR用のscaleFactor（0.491等）がROI抽出後の小さい画像にも適用され、
+        //       視認可能な90px高さの画像が48pxまで縮小されてOCR認識精度が低下していた
+        // 解決策: 高さ200px以下の小画像はPaddleOCR制限（4096x4096、2Mピクセル）を
+        //         余裕でクリアするため、追加縮小をスキップして元サイズで認識処理
+        const int ROI_MIN_HEIGHT_FOR_SCALING = 200; // 200px以下は縮小しない
+
+        if (image.Height <= ROI_MIN_HEIGHT_FOR_SCALING)
+        {
+            _logger?.LogInformation("🎯 [ROI_NO_SCALING] ROI画像は縮小スキップ: {Width}x{Height} (高さ≤{Threshold}px)",
+                image.Width, image.Height, ROI_MIN_HEIGHT_FOR_SCALING);
+
+            var roiMat = await ConvertToMatAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
+            return (roiMat, scaleFactor: 1.0); // スケーリングなし
+        }
+
         // Step 1: スケーリングが必要かどうかを判定
         var (newWidth, newHeight, scaleFactor) = AdaptiveImageScaler.CalculateOptimalSize(
             image.Width, image.Height);
@@ -200,6 +216,24 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
         // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
         var mat = await ConvertToMatAsync(processImage, adjustedRoi, cancellationToken).ConfigureAwait(false);
+
+        // 🔍 [DEBUG_IMAGE_OUTPUT] ROI抽出直後の画像を保存（縮小問題調査用）
+        #if DEBUG
+        try
+        {
+            var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+            System.IO.Directory.CreateDirectory(debugFolder);
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            var debugPath = System.IO.Path.Combine(debugFolder, $"roi_after_extraction_{timestamp}_{mat.Width}x{mat.Height}.png");
+            Cv2.ImWrite(debugPath, mat);
+            _logger?.LogInformation("🔍 [DEBUG_IMG] ROI抽出直後画像保存: {Path} (Size: {Width}x{Height})",
+                debugPath, mat.Width, mat.Height);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗");
+        }
+        #endif
 
         // Step 6: スケーリングされた画像のリソースを解放（元画像と異なる場合）
         if (processImage != image)
@@ -504,6 +538,23 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
                 _logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
+
+                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ODD適用後の画像を保存
+                #if DEBUG
+                try
+                {
+                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+                    System.IO.Directory.CreateDirectory(debugFolder);
+                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_odd_{timestamp}_{evenWidth}x{evenHeight}.png");
+                    Cv2.ImWrite(debugPath, processedMat);
+                    _logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ODD後画像保存: {Path}", debugPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ODD)");
+                }
+                #endif
             }
 
             // ステップ3: メモリアライメント最適化 (16バイト境界)
@@ -532,6 +583,23 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
                 _logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
+
+                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ALIGN適用後の画像を保存
+                #if DEBUG
+                try
+                {
+                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+                    System.IO.Directory.CreateDirectory(debugFolder);
+                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_align_{timestamp}_{alignWidth}x{alignHeight}.png");
+                    Cv2.ImWrite(debugPath, processedMat);
+                    _logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ALIGN後画像保存: {Path}", debugPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ALIGN)");
+                }
+                #endif
             }
 
             // ステップ4: チャンネル数正規化

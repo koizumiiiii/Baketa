@@ -1521,7 +1521,19 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                             return mat; // 元のMatを返す（ROI適用せず）
                         }
 
-                        rect = rect.Intersect(new Rect(0, 0, matWidth, matHeight));
+                        // 🔥 [ROI_MARGIN] OCR検出境界に15pxマージン追加 - 文字欠損防止
+                        // 問題: PaddleOCR検出モデルが不完全なバウンディングボックスを返すことがあり、
+                        //       末尾文字（'!!'等）や上下の文字が切れる場合がある（907x59画像の事例）
+                        // 解決策: 検出矩形を全方向に15px拡大してから画像境界でクリップ
+                        //         これによりOCR検出の不完全性を補完し、テキスト全体をキャプチャ
+                        const int ROI_MARGIN = 15; // 15pxの安全マージン
+                        var expandedRect = new Rect(
+                            rect.X - ROI_MARGIN,
+                            rect.Y - ROI_MARGIN,
+                            rect.Width + ROI_MARGIN * 2,
+                            rect.Height + ROI_MARGIN * 2
+                        );
+                        rect = expandedRect.Intersect(new Rect(0, 0, matWidth, matHeight));
 
                         if (rect.Width > 0 && rect.Height > 0)
                         {
@@ -1649,13 +1661,31 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         
         // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
         var mat = await ConvertToMatAsync(processImage, adjustedRoi, cancellationToken);
-        
+
+        // 🔍 [DEBUG_IMAGE_OUTPUT] ROI抽出直後の画像を保存（縮小問題調査用）
+        #if DEBUG
+        try
+        {
+            var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+            System.IO.Directory.CreateDirectory(debugFolder);
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            var debugPath = System.IO.Path.Combine(debugFolder, $"roi_after_extraction_{timestamp}_{mat.Width}x{mat.Height}.png");
+            Cv2.ImWrite(debugPath, mat);
+            __logger?.LogInformation("🔍 [DEBUG_IMG] ROI抽出直後画像保存: {Path} (Size: {Width}x{Height})",
+                debugPath, mat.Width, mat.Height);
+        }
+        catch (Exception ex)
+        {
+            __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗");
+        }
+        #endif
+
         // Step 6: スケーリングされた画像のリソースを解放（元画像と異なる場合）
         if (processImage != image)
         {
             processImage.Dispose();
         }
-        
+
         return (mat, scaleFactor);
     }
     
@@ -4478,9 +4508,26 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 
                 if (processedMat != inputMat) processedMat.Dispose();
                 processedMat = evenMat;
-                
-                __logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}", 
+
+                __logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
+
+                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ODD適用後の画像を保存
+                #if DEBUG
+                try
+                {
+                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+                    System.IO.Directory.CreateDirectory(debugFolder);
+                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_odd_{timestamp}_{evenWidth}x{evenHeight}.png");
+                    Cv2.ImWrite(debugPath, processedMat);
+                    __logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ODD後画像保存: {Path}", debugPath);
+                }
+                catch (Exception ex)
+                {
+                    __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ODD)");
+                }
+                #endif
             }
 
             // ステップ3: メモリアライメント最適化 (16バイト境界)
@@ -4506,9 +4553,26 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 
                 if (processedMat != inputMat) processedMat.Dispose();
                 processedMat = alignedMat;
-                
-                __logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}", 
+
+                __logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
+
+                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ALIGN適用後の画像を保存
+                #if DEBUG
+                try
+                {
+                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+                    System.IO.Directory.CreateDirectory(debugFolder);
+                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_align_{timestamp}_{alignWidth}x{alignHeight}.png");
+                    Cv2.ImWrite(debugPath, processedMat);
+                    __logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ALIGN後画像保存: {Path}", debugPath);
+                }
+                catch (Exception ex)
+                {
+                    __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ALIGN)");
+                }
+                #endif
             }
 
             // ステップ4: チャンネル数正規化

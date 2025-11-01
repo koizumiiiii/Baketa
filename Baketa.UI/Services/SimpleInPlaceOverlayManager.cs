@@ -100,13 +100,58 @@ public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayMana
                 textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height,
                 textChunk.ChunkId);
 
-            // 座標を設定（CoordinateTransformationService変換済みのスクリーン絶対座標を使用）
-            window.SetPosition(textChunk.CombinedBounds.X, textChunk.CombinedBounds.Y);
+            // 🔧 [MARGIN_FIX] 固定マージン + 10%のハイブリッドマージン追加
+            var baseX = textChunk.CombinedBounds.X;
+            var baseY = textChunk.CombinedBounds.Y;
+            var baseWidth = textChunk.CombinedBounds.Width;
+            var baseHeight = textChunk.CombinedBounds.Height;
 
-            // サイズを設定（TextChunk.CombinedBoundsのWidth, Heightを使用）
-            if (textChunk.CombinedBounds.Width > 0 && textChunk.CombinedBounds.Height > 0)
+            // マージン計算: 最低10px + 10%（大きいテキストにも対応）
+            var marginWidth = Math.Max(10, (int)(baseWidth * 0.1));
+            var marginHeight = Math.Max(5, (int)(baseHeight * 0.1));
+
+            var finalWidth = baseWidth + marginWidth;
+            var finalHeight = baseHeight + marginHeight;
+
+            // 🔧 [SCREEN_BOUNDS_CHECK] 画面境界を超えないように調整
+            var screenBounds = GetScreenBounds(baseX, baseY);
+
+            // 右端チェック
+            if (baseX + finalWidth > screenBounds.Right)
             {
-                window.SetSize(textChunk.CombinedBounds.Width, textChunk.CombinedBounds.Height);
+                var overflow = (baseX + finalWidth) - screenBounds.Right;
+                finalWidth = Math.Max(baseWidth, finalWidth - overflow); // 少なくとも元のサイズは確保
+            }
+
+            // 下端チェック
+            if (baseY + finalHeight > screenBounds.Bottom)
+            {
+                var overflow = (baseY + finalHeight) - screenBounds.Bottom;
+                finalHeight = Math.Max(baseHeight, finalHeight - overflow); // 少なくとも元のサイズは確保
+            }
+
+            // 左端チェック（念のため）
+            if (baseX < screenBounds.Left)
+            {
+                baseX = screenBounds.Left;
+            }
+
+            // 上端チェック（念のため）
+            if (baseY < screenBounds.Top)
+            {
+                baseY = screenBounds.Top;
+            }
+
+            _logger.LogDebug("📏 [MARGIN_CALC] 元: ({BaseW}x{BaseH}) → マージン追加後: ({FinalW}x{FinalH}), 画面: {ScreenBounds}",
+                baseWidth, baseHeight, finalWidth, finalHeight, screenBounds);
+
+            // 座標を設定（調整後）
+            window.SetPosition(baseX, baseY);
+
+            // サイズを設定（マージン追加 + 画面境界調整後）
+            if (finalWidth > 0 && finalHeight > 0)
+            {
+                window.SetSize(finalWidth, finalHeight);
             }
             else
             {
@@ -244,6 +289,35 @@ public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayMana
         _logger.LogInformation("🚀 [WIN32_OVERLAY] オーバーレイマネージャー初期化");
         // Win32 Layered Window実装では特別な初期化処理は不要
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 🔧 [SCREEN_BOUNDS_HELPER] 指定座標が属するモニターの作業領域を取得
+    /// マルチモニター対応
+    /// </summary>
+    /// <param name="x">X座標（スクリーン絶対座標）</param>
+    /// <param name="y">Y座標（スクリーン絶対座標）</param>
+    /// <returns>モニターの作業領域（タスクバー除外）</returns>
+    private Rectangle GetScreenBounds(int x, int y)
+    {
+        try
+        {
+            // System.Windows.Forms.Screen APIを使用してマルチモニター対応
+            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point(x, y));
+            var workingArea = screen.WorkingArea; // タスクバーを除外した作業領域
+
+            _logger.LogTrace("🖥️ [SCREEN_BOUNDS] 座標({X}, {Y}) → モニター: {MonitorName}, 作業領域: {Bounds}",
+                x, y, screen.DeviceName, workingArea);
+
+            return workingArea;
+        }
+        catch (Exception ex)
+        {
+            // フォールバック: プライマリモニター
+            _logger.LogWarning(ex, "⚠️ [SCREEN_BOUNDS] モニター検出失敗 - プライマリモニターを使用");
+            var primaryScreen = System.Windows.Forms.Screen.PrimaryScreen;
+            return primaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
+        }
     }
 
     /// <summary>
