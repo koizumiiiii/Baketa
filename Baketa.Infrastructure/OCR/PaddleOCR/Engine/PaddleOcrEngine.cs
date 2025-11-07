@@ -4461,23 +4461,6 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             var originalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
             __logger?.LogDebug("🎯 [PREVENTIVE_START] 予防処理開始: {OriginalInfo}", originalInfo);
 
-            // 🔍 [PHASE10.35] PREVENTION処理の入力Mat状態をPNG保存（破損タイミング特定）
-            #if DEBUG
-            try
-            {
-                var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-                System.IO.Directory.CreateDirectory(debugFolder);
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_input_{timestamp}_{processedMat.Width}x{processedMat.Height}.png");
-                Cv2.ImWrite(debugPath, processedMat);
-                __logger?.LogInformation("🔍 [PHASE10.35] PREVENTION入力Mat保存: {Path}", debugPath);
-            }
-            catch (Exception ex)
-            {
-                __logger?.LogWarning(ex, "⚠️ [PHASE10.35] デバッグ画像保存失敗 (PREVENTION入力)");
-            }
-            #endif
-
             // ステップ1: 極端なサイズ問題の予防
             var totalPixels = processedMat.Width * processedMat.Height;
             if (totalPixels > 2000000) // 200万ピクセル制限
@@ -4514,23 +4497,6 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
                 __logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
-
-                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ODD適用後の画像を保存
-                #if DEBUG
-                try
-                {
-                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-                    System.IO.Directory.CreateDirectory(debugFolder);
-                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_odd_{timestamp}_{evenWidth}x{evenHeight}.png");
-                    Cv2.ImWrite(debugPath, processedMat);
-                    __logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ODD後画像保存: {Path}", debugPath);
-                }
-                catch (Exception ex)
-                {
-                    __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ODD)");
-                }
-                #endif
             }
 
             // ステップ3: メモリアライメント最適化 (16バイト境界)
@@ -4562,23 +4528,6 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
                 __logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
-
-                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ALIGN適用後の画像を保存
-                #if DEBUG
-                try
-                {
-                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-                    System.IO.Directory.CreateDirectory(debugFolder);
-                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_align_{timestamp}_{alignWidth}x{alignHeight}.png");
-                    Cv2.ImWrite(debugPath, processedMat);
-                    __logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ALIGN後画像保存: {Path}", debugPath);
-                }
-                catch (Exception ex)
-                {
-                    __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ALIGN)");
-                }
-                #endif
             }
 
             // ステップ4: チャンネル数正規化

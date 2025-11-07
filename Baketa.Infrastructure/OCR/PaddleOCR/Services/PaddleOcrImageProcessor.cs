@@ -520,23 +520,6 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
                 _logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
-
-                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ODD適用後の画像を保存
-                #if DEBUG
-                try
-                {
-                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-                    System.IO.Directory.CreateDirectory(debugFolder);
-                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_odd_{timestamp}_{evenWidth}x{evenHeight}.png");
-                    Cv2.ImWrite(debugPath, processedMat);
-                    _logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ODD後画像保存: {Path}", debugPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ODD)");
-                }
-                #endif
             }
 
             // ステップ3: メモリアライメント最適化 (16バイト境界)
@@ -565,23 +548,6 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
                 _logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}",
                     $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
-
-                // 🔍 [DEBUG_IMAGE_OUTPUT] PREVENTION_ALIGN適用後の画像を保存
-                #if DEBUG
-                try
-                {
-                    var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-                    System.IO.Directory.CreateDirectory(debugFolder);
-                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-                    var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_align_{timestamp}_{alignWidth}x{alignHeight}.png");
-                    Cv2.ImWrite(debugPath, processedMat);
-                    _logger?.LogInformation("🔍 [DEBUG_IMG] PREVENTION_ALIGN後画像保存: {Path}", debugPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗 (PREVENTION_ALIGN)");
-                }
-                #endif
             }
 
             // ステップ4: チャンネル数正規化
