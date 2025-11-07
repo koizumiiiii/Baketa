@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
@@ -122,6 +123,10 @@ public class MainOverlayViewModel : ViewModelBase
                 // 依存プロパティの変更通知を安全に送信
                 if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
                 {
+                    // 🔥 [PHASE6.1_GEMINI_FIX] 自分自身の変更通知を追加（WhenAnyValue検知のため必須）
+                    this.RaisePropertyChanged(nameof(IsTranslationActive));
+
+                    // 依存プロパティの通知
                     this.RaisePropertyChanged(nameof(StartStopText));
                     this.RaisePropertyChanged(nameof(SettingsEnabled));
                     this.RaisePropertyChanged(nameof(ShowHideEnabled));
@@ -131,6 +136,10 @@ public class MainOverlayViewModel : ViewModelBase
                 {
                     Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
+                        // 🔥 [PHASE6.1_GEMINI_FIX] 自分自身の変更通知を追加（WhenAnyValue検知のため必須）
+                        this.RaisePropertyChanged(nameof(IsTranslationActive));
+
+                        // 依存プロパティの通知
                         this.RaisePropertyChanged(nameof(StartStopText));
                         this.RaisePropertyChanged(nameof(SettingsEnabled));
                         this.RaisePropertyChanged(nameof(ShowHideEnabled));
@@ -317,16 +326,22 @@ public class MainOverlayViewModel : ViewModelBase
     {
         get
         {
-            // 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化完了チェックを追加（StartButton制御）
-            // 🚀 EventHandler初期化完了チェックを追加（UI安全性向上）
-            var enabled = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing;
-            Logger?.LogDebug($"🔍 IsStartStopEnabled計算: IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
+            // 🔥 [PHASE6.1_ROOT_CAUSE_FIX] Start/Stop両方の条件を正しく実装
+            // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ローディング中でない、翻訳中でない
+            var canStart = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing && !IsTranslationActive;
+
+            // Stop可能条件: 翻訳実行中、ローディング中でない
+            var canStop = IsTranslationActive && !IsLoading;
+
+            var enabled = canStart || canStop;
+
+            Logger?.LogDebug($"🔍 IsStartStopEnabled計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
 
             // デバッグ用に実際の状態をファイルログにも出力
             try
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
-                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}");
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}");
             }
             catch { }
 
@@ -386,14 +401,44 @@ public class MainOverlayViewModel : ViewModelBase
         // 各コマンドをUIスレッドで安全に初期化
         try
         {
-            // canExecute Observableをデバッグ
-            var canExecuteObservable = this.WhenAnyValue(x => x.IsStartStopEnabled)
-                .Do(canExecute => 
+            // 🔥 [PHASE6.1_FINAL_FIX_V2] WhenAnyValueによる依存プロパティ監視 + 初期値発行
+            // 根本原因: Cold ObservableはSubscribeされるまで値を発行しない
+            // 解決策1: 依存する6つのプロパティを個別に監視
+            // 解決策2: StartWith()で初期値を強制的に発行してReactiveCommandに確実に通知
+
+            Console.WriteLine("🔧🔧🔧 [INIT] canExecuteObservable作成開始");
+
+            var canExecuteObservable = this.WhenAnyValue(
+                x => x.IsLoading,
+                x => x.IsWindowSelected,
+                x => x.IsOcrInitialized,
+                x => x.IsEventHandlerInitialized,
+                x => x.IsTranslationEngineInitializing,
+                x => x.IsTranslationActive,
+                (isLoading, isWindowSelected, isOcrInitialized, isEventHandlerInitialized, isTranslationEngineInitializing, isTranslationActive) =>
                 {
-                    Logger?.LogDebug($"🔍 StartStopCommand canExecute変更: {canExecute}");
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 StartStopCommand canExecute変更: {canExecute}");
+                    // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ローディング中でない、翻訳中でない
+                    var canStart = !isLoading && isWindowSelected && isOcrInitialized && isEventHandlerInitialized && !isTranslationEngineInitializing && !isTranslationActive;
+
+                    // Stop可能条件: 翻訳実行中、ローディング中でない
+                    var canStop = isTranslationActive && !isLoading;
+
+                    var enabled = canStart || canStop;
+
+                    Console.WriteLine($"🔍🔍🔍 [OBSERVABLE_CHANGE] canExecute計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={isTranslationActive}, enabled={enabled}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [OBSERVABLE_CHANGE] canStart={canStart}, canStop={canStop}, IsTranslationActive={isTranslationActive}, enabled={enabled}");
+
+                    return enabled;
                 })
+                .Do(canExecute =>
+                {
+                    Console.WriteLine($"🔍🔍🔍 [DO_OPERATOR] canExecute値: {canExecute}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [DO_OPERATOR] canExecute値: {canExecute}");
+                })
+                .StartWith(false) // 🔥 [PHASE6.1_FINAL_FIX_V3] Cold Observable問題の完全解決 - 初期値を強制発行
                 .ObserveOn(RxApp.MainThreadScheduler);
+
+            Console.WriteLine("🔧🔧🔧 [INIT] canExecuteObservable作成完了");
                 
             Logger?.LogDebug("🏗️ ReactiveCommand.CreateFromTask開始");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏗️ ReactiveCommand.CreateFromTask開始");
@@ -420,11 +465,12 @@ public class MainOverlayViewModel : ViewModelBase
                 }
             });
             
-            // コマンド結果の監視
-            startStopCmd.Subscribe(result => 
+            // 🔥 [PHASE6.1_DIAGNOSTIC_DEEP] コマンド結果の監視
+            startStopCmd.Subscribe(result =>
             {
+                Console.WriteLine($"🎬🎬🎬 [COMMAND_SUBSCRIBE] StartStopCommand.Subscribe()実行！IsTranslationActive={IsTranslationActive}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
                 Logger?.LogDebug($"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎬 [COMMAND_SUBSCRIBE] StartStopCommand.Subscribe()実行！IsTranslationActive={IsTranslationActive}");
             });
             
             // StartStopCommandのエラーをトラッキング
@@ -736,17 +782,21 @@ public class MainOverlayViewModel : ViewModelBase
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔥🔥🔥 ExecuteStartStopAsync メソッドが呼び出されました！🔥🔥🔥");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔘 ExecuteStartStopAsync開始 - IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
 
-        // 🔧 診断レポート生成（StartまたはStop操作時）- 統一サービス使用
+        // 🔧 [PHASE6.1_TEMPORARY_DISABLED] 診断レポート生成を一時的に無効化
+        // 理由: Stop処理のブロッキング問題を切り分けるため
+        // TODO: 根本原因解決後に再有効化
+        /*
         {
             var operation = IsTranslationActive ? "Stop" : "Start";
             var trigger = $"execute_{operation.ToLower(CultureInfo.InvariantCulture)}_button_pressed";
             var context = $"ExecuteStartStopAsync {operation} operation";
-            
-            Logger?.LogDebug($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
-            Console.WriteLine($"📊 診断レポート生成開始（統一サービス使用 - {operation}操作時）");
-            
-            await _diagnosticReportService.GenerateReportAsync(trigger, context).ConfigureAwait(false);
+
+            Logger?.LogDebug($"📊 診断レポート生成開始（バックグラウンド実行 - {operation}操作時）");
+            Console.WriteLine($"📊 診断レポート生成開始（バックグラウンド実行 - {operation}操作時）");
+
+            _ = Task.Run(() => _diagnosticReportService.GenerateReportAsync(trigger, context));
         }
+        */
         
         try
         {
@@ -940,6 +990,10 @@ public class MainOverlayViewModel : ViewModelBase
 
     private async Task StopTranslationAsync()
     {
+        // 🔥 [PHASE6.1_STOP_PROOF] Stop処理開始の確実な証拠 - SafeFileLoggerで確実にファイル出力
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴🔴🔴 [STOP_PROOF] StopTranslationAsync開始 - Stopボタンが押されました！");
+        Console.WriteLine("🔴🔴🔴 [STOP_PROOF] StopTranslationAsync開始 - Stopボタンが押されました！");
+
         var stopEventPublished = false;
 
         try
@@ -958,6 +1012,11 @@ public class MainOverlayViewModel : ViewModelBase
 
             // 翻訳停止（ウィンドウ選択状態は維持）
             Logger?.LogDebug("🔴 翻訳状態をアイドルに設定");
+
+            // 🔥 [PHASE6.1_STOP_PROOF] UI状態変更前のログ - この直後にボタン表示が"Stop"→"Start"に変わる
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [STOP_PROOF] IsTranslationActive=falseに設定する直前（ボタン表示が変わる瞬間）");
+            Console.WriteLine("🔄 [STOP_PROOF] IsTranslationActive=falseに設定する直前（ボタン表示が変わる瞬間）");
+
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
@@ -965,20 +1024,38 @@ public class MainOverlayViewModel : ViewModelBase
                 IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
                 // IsWindowSelectedとSelectedWindowは維持（再選択不要）
                 Logger?.LogDebug($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
+
+                // 🔥 [PHASE6.1_STOP_PROOF] UI状態変更完了のログ - ボタン表示が"Start"に変わった
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [STOP_PROOF] IsTranslationActive=false設定完了、StartStopText='{StartStopText}' (ボタンが「Start」に変わった)");
+                Console.WriteLine($"✅ [STOP_PROOF] IsTranslationActive=false設定完了、StartStopText='{StartStopText}' (ボタンが「Start」に変わった)");
             });
 
             // 🚀 RACE CONDITION FIX: StopTranslationRequestEventを最優先で発行（Task.Run終了の影響を回避）
             Logger?.LogDebug("🚀 [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行開始");
+
+            // 🔥 [PHASE6.1_STOP_PROOF] イベント発行前のログ
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📤 [STOP_PROOF] StopTranslationRequestEvent発行開始");
+            Console.WriteLine("📤 [STOP_PROOF] StopTranslationRequestEvent発行開始");
+
             try
             {
                 var stopTranslationEvent = new StopTranslationRequestEvent();
                 await PublishEventAsync(stopTranslationEvent).ConfigureAwait(false);
                 stopEventPublished = true;
                 Logger?.LogDebug("✅ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行成功");
+
+                // 🔥 [PHASE6.1_STOP_PROOF] イベント発行成功のログ
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [STOP_PROOF] StopTranslationRequestEvent発行成功 (ID: {stopTranslationEvent.Id})");
+                Console.WriteLine($"✅ [STOP_PROOF] StopTranslationRequestEvent発行成功 (ID: {stopTranslationEvent.Id})");
             }
             catch (Exception eventEx)
             {
                 Logger?.LogDebug($"❌ [RACE_CONDITION_FIX] StopTranslationRequestEvent最優先発行失敗: {eventEx.Message}");
+
+                // 🔥 [PHASE6.1_STOP_PROOF] イベント発行失敗のログ
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [STOP_PROOF] StopTranslationRequestEvent発行失敗: {eventEx.Message}");
+                Console.WriteLine($"❌ [STOP_PROOF] StopTranslationRequestEvent発行失敗: {eventEx.Message}");
+
                 // イベント発行失敗でも継続（後でリトライ）
             }
 

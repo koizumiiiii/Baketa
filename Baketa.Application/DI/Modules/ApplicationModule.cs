@@ -429,6 +429,12 @@ namespace Baketa.Application.DI.Modules;
             services.AddSingleton<IEventProcessor<Baketa.Core.Events.Translation.AggregatedChunksReadyEvent>>(
                 provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler>());
 
+            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録 - Stop処理問題修正
+            Console.WriteLine("🛑 [PHASE6.1] StopTranslationRequestEventHandler DI登録 - Stop押下後も処理継続問題の修正");
+            services.AddSingleton<Baketa.Application.EventHandlers.Translation.StopTranslationRequestEventHandler>();
+            services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>>(
+                provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Translation.StopTranslationRequestEventHandler>());
+
             // ⚡ [ARCHITECTURAL_FIX] CaptureCompletedHandler登録 - Application層に適切配置
             Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");
             services.AddSingleton<Baketa.Application.Events.Handlers.CaptureCompletedHandler>(provider =>
@@ -462,12 +468,7 @@ namespace Baketa.Application.DI.Modules;
                 provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());
             Console.WriteLine("✅ [DI_DEBUG] CaptureCompletedHandler登録完了 - キャプチャ画像保存機能付き");
 
-            // 🎯 [PHASE2.5] ROIImageCapturedEventHandler登録 - 複数ROI画像の個別処理
-            Console.WriteLine("🔍 [DI_DEBUG] ROIImageCapturedEventHandler登録開始");
-            services.AddSingleton<Baketa.Application.EventHandlers.Capture.ROIImageCapturedEventHandler>();
-            services.AddSingleton<IEventProcessor<Baketa.Core.Events.Capture.ROIImageCapturedEvent>>(
-                provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Capture.ROIImageCapturedEventHandler>());
-            Console.WriteLine("✅ [DI_DEBUG] ROIImageCapturedEventHandler登録完了");
+            // 🔥 [PHASE5] ROIImageCapturedEventHandler削除 - ROI廃止により不要
 
             // ⚡ [PHASE2_FIX] OcrRequestHandler登録 - 翻訳処理チェーン連鎖修復
             Console.WriteLine("🔍 [DI_DEBUG] OcrRequestHandler登録開始");

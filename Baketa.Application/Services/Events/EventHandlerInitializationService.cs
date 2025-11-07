@@ -126,35 +126,7 @@ public sealed class EventHandlerInitializationService(
                 catch { /* ファイル出力失敗は無視 */ }
             }
 
-            // 🎯 [PHASE2.5] ROIImageCapturedEventHandlerの登録 - 複数ROI画像の個別処理
-            try
-            {
-                var roiImageCapturedHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.Capture.ROIImageCapturedEvent>>();
-                eventAggregator.Subscribe<Baketa.Core.Events.Capture.ROIImageCapturedEvent>(roiImageCapturedHandler);
-                _logger.LogInformation("🎯 ROIImageCapturedEventHandlerを登録しました - 複数ROI画像の個別処理");
-                Console.WriteLine("🎯 [PHASE2.5] ROIImageCapturedEventHandlerを登録しました - 複数ROI画像の個別処理");
-
-                // 確実なファイル記録
-                try
-                {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [PHASE2.5] ROIImageCapturedEventHandlerを登録しました{Environment.NewLine}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "ROIImageCapturedEventHandlerの登録に失敗しました");
-                Console.WriteLine($"🔥 [ERROR] ROIImageCapturedEventHandler登録失敗: {ex.Message}");
-
-                // 確実なファイル記録
-                try
-                {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] ROIImageCapturedEventHandler登録失敗: {ex.Message}{Environment.NewLine}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
-            }
+            // 🔥 [PHASE5] ROIImageCapturedEventHandler削除 - ROI廃止により不要
 
             // ⚡ [PHASE_2_FIX] OcrRequestHandlerの登録 - 翻訳パイプライン連鎖修復
             try
@@ -308,6 +280,24 @@ public sealed class EventHandlerInitializationService(
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] AggregatedChunksReadyHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
+            }
+
+            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録 - Stop処理問題修正
+            try
+            {
+                // 🔥 [PHASE6.1_EVENTAG_INSTANCE_CHECK] EventAggregatorインスタンス確認
+                var eventAggregatorHash = eventAggregator?.GetHashCode() ?? -1;
+                Console.WriteLine($"🔍 [INSTANCE_CHECK] EventHandlerInitializationService - EventAggregator HashCode: {eventAggregatorHash}");
+
+                var stopTranslationHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>>();
+                eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>(stopTranslationHandler);
+                _logger.LogInformation("🛑 StopTranslationRequestHandlerを登録しました - Stop押下後も処理継続問題の修正");
+                Console.WriteLine("🛑 [PHASE6.1] StopTranslationRequestHandlerを登録しました");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ StopTranslationRequestHandlerの登録に失敗しました");
+                Console.WriteLine($"❌ [ERROR] StopTranslationRequestHandler登録失敗: {ex.Message}");
             }
 
             // 🔥 [CRITICAL_FIX] PriorityAwareOcrCompletedHandlerの登録 - 統合翻訳処理実現

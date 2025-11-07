@@ -253,10 +253,10 @@ public class AdaptiveCaptureServiceMockTests
 
         // Assert
         Assert.True(result.Success);
-        Assert.Equal(CaptureStrategyUsed.ROIBased, result.StrategyUsed);
+        Assert.Equal(CaptureStrategyUsed.FullScreenOcr, result.StrategyUsed); // 🔥 [PHASE5] ROI → FullScreenOcr
         Assert.Single(result.CapturedImages);
         Assert.True(result.FallbacksAttempted.Count >= 1); // 実装では複数の戦略が記録される可能性がある
-        Assert.Contains("ROIBased", result.FallbacksAttempted);
+        Assert.Contains("FullScreenOcr", result.FallbacksAttempted); // 🔥 [PHASE5] ROI → FullScreenOcr
         Assert.Equal("Optimized", result.Metrics.PerformanceCategory);
     }
 

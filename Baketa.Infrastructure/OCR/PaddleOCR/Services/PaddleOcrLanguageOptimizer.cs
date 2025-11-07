@@ -200,12 +200,13 @@ public sealed class PaddleOcrLanguageOptimizer : IPaddleOcrLanguageOptimizer
     {
         try
         {
-            // 回転検出を有効化（日本語の縦書き対応）
+            // 🔥 [PHASE10.26_FIX] 回転検出を無効化（横書き専用モード）
+            // Angle=90°誤検出によるX座標ずれと検出失敗を完全解消
             var rotationProp = ocrType.GetProperty("AllowRotateDetection");
             if (rotationProp != null && rotationProp.CanWrite)
             {
-                rotationProp.SetValue(ocrEngine, true);
-                _logger?.LogDebug("🔄 日本語縦書き対応: 回転検出有効");
+                rotationProp.SetValue(ocrEngine, false);
+                _logger?.LogDebug("✅ [PHASE10.26_FIX] 横書き専用モード: 回転検出無効化");
             }
         }
         catch (Exception ex)

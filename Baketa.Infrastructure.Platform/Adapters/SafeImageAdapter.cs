@@ -41,6 +41,15 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
     }
 
     /// <summary>
+    /// 🔥 [PHASE10.37] 内部のSafeImageを取得（PNG経由バイパス用）
+    /// </summary>
+    public SafeImage GetUnderlyingSafeImage()
+    {
+        ThrowIfDisposed();
+        return _safeImage;
+    }
+
+    /// <summary>
     /// 🔥 [FIX7_PHASE3] ROI画像の場合、元画像内での絶対座標を保持
     /// ROI座標変換コンテキスト（FIX6座標正規化で使用）
     /// null = フルスクリーンキャプチャ（座標変換不要）
@@ -339,9 +348,9 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
         // SafeImageから直接画像データを取得（既にメモリ内に保持されている）
         var imageData = _safeImage.GetImageData();
 
-        // Strideを計算（Width * BytesPerPixel）
-        var bytesPerPixel = GetBytesPerPixel(_safeImage.PixelFormat);
-        var stride = _safeImage.Width * bytesPerPixel;
+        // 🔥 [ULTRATHINK_PHASE5.4_FIX] SafeImage.Strideを使用（Width * bytesPerPixelは誤り）
+        // SafeImageが保持する正確なStride値を使用
+        var stride = _safeImage.Stride;
 
         // PixelDataLockを作成（unlockActionは不要：SafeImageが既にメモリ管理している）
         // SafeImageはメモリ内データを保持しているため、UnlockBitsのような処理は不要
@@ -366,17 +375,26 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
             var imageData = _safeImage.GetImageData();
             Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] SafeImage.GetImageData完了 - データサイズ: {imageData.Length}bytes");
             
+            // 🔥 [PHASE10.31] Gemini推奨実装の正しい適用: SafeImageのPixelFormatを尊重
+            // Phase 10.30の誤り: Format24bppRgb固定により、Bgra32のSafeImageで縦線発生
+            // 正しい修正: SafeImageのPixelFormatに応じてBitmapを作成
             var pixelFormat = ConvertToPixelFormat(_safeImage.PixelFormat);
-            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] PixelFormat変換完了 - SafeFormat: {_safeImage.PixelFormat}, GdiFormat: {pixelFormat}");
-
             var bitmap = new Bitmap(_safeImage.Width, _safeImage.Height, pixelFormat);
-            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] 空Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}");
-            
+            System.Diagnostics.Debug.WriteLine($"✅ [PHASE10.31] Bitmap作成: SafeFormat={_safeImage.PixelFormat}, GdiFormat={pixelFormat} - Size: {bitmap.Width}x{bitmap.Height}");
+
             var bitmapData = bitmap.LockBits(
                 new GdiRectangle(0, 0, _safeImage.Width, _safeImage.Height),
                 ImageLockMode.WriteOnly,
                 pixelFormat);
-            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.LockBits完了 - Stride: {bitmapData.Stride}");
+            System.Diagnostics.Debug.WriteLine($"✅ [PHASE10.31] Bitmap.LockBits完了 - Stride: {bitmapData.Stride}");
+
+            // 🔥 [GEMINI_DEBUG_3] SafeImageAdapter側のStride詳細ログ
+            var bytesPerPixel = GetBytesPerPixel(_safeImage.PixelFormat);
+            System.Diagnostics.Debug.WriteLine($"🔍 [GEMINI_DEBUG_3] SafeImageAdapter Bitmap変換:");
+            System.Diagnostics.Debug.WriteLine($"  SourceStride (SafeImage): {_safeImage.Stride}");
+            System.Diagnostics.Debug.WriteLine($"  DestStride (Bitmap): {bitmapData.Stride}");
+            System.Diagnostics.Debug.WriteLine($"  Width * BytesPerPixel: {_safeImage.Width * bytesPerPixel}");
+            System.Diagnostics.Debug.WriteLine($"  BytesPerPixel: {bytesPerPixel}");
 
             try
             {
@@ -385,29 +403,41 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
                     var destPtr = (byte*)bitmapData.Scan0;
                     var stride = bitmapData.Stride;
                     var imageDataSpan = imageData;
-                    var bytesPerPixel = GetBytesPerPixel(_safeImage.PixelFormat);
-                    
-                    Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ピクセルコピー開始 - BytesPerPixel: {bytesPerPixel}, ExpectedRowBytes: {_safeImage.Width * bytesPerPixel}");
+
+                    // 🔥 [PHASE10.33] UltraThink Phase 5推奨実装: 有効データコピー + パディングゼロ埋め
+                    // SafeImageはパディングなし（correctStride = width × bytesPerPixel）で保存されている
+                    // Bitmapは4バイトアライメント必須のため、パディング部分を明示的にゼロ埋めする
+                    var bytesPerLine = _safeImage.Width * bytesPerPixel; // 1行あたりの有効な画像データバイト数
+                    var paddingBytes = stride - bytesPerLine;            // 各行のパディングバイト数
+                    System.Diagnostics.Debug.WriteLine($"✅ [PHASE10.33] ピクセルコピー開始 - BytesPerLine: {bytesPerLine}, Stride: {stride}, Padding: {paddingBytes}bytes/row");
 
                     for (int y = 0; y < _safeImage.Height; y++)
                     {
-                        var sourceOffset = y * _safeImage.Width * bytesPerPixel;
+                        // 各行の開始アドレスを計算（Strideを使用）
+                        var sourceOffset = y * _safeImage.Stride;
                         var destOffset = y * stride;
-                        var rowBytes = _safeImage.Width * bytesPerPixel;
 
-                        if (sourceOffset + rowBytes <= imageDataSpan.Length)
+                        // 1行分の有効な画像データをコピー
+                        if (sourceOffset + bytesPerLine <= imageDataSpan.Length)
                         {
-                            var sourceSpan = imageDataSpan.Slice(sourceOffset, rowBytes);
-                            var destSpan = new Span<byte>(destPtr + destOffset, rowBytes);
+                            var sourceSpan = imageDataSpan.Slice(sourceOffset, bytesPerLine);
+                            var destSpan = new Span<byte>(destPtr + destOffset, bytesPerLine);
                             sourceSpan.CopyTo(destSpan);
+
+                            // 🔥 [PHASE10.33] パディング部分をゼロ埋め（未初期化メモリ防止）
+                            if (paddingBytes > 0)
+                            {
+                                var paddingSpan = new Span<byte>(destPtr + destOffset + bytesPerLine, paddingBytes);
+                                paddingSpan.Clear(); // ゼロ埋め
+                            }
                         }
                         else
                         {
-                            Console.WriteLine($"🚨 [PHASE_3_10_WARNING] Row {y}: ソースデータ不足 - Offset: {sourceOffset}, RowBytes: {rowBytes}, DataLength: {imageDataSpan.Length}");
+                            System.Diagnostics.Debug.WriteLine($"🚨 [PHASE10.33_WARNING] Row {y}: ソースデータ不足 - Offset: {sourceOffset}, BytesPerLine: {bytesPerLine}, DataLength: {imageDataSpan.Length}");
                         }
                     }
-                    
-                    Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] ピクセルコピー完了 - 全{_safeImage.Height}行処理");
+
+                    System.Diagnostics.Debug.WriteLine($"✅ [PHASE10.33] ピクセルコピー完了 - 全{_safeImage.Height}行処理、パディング{paddingBytes}bytes/rowゼロ埋め");
                 }
             }
             finally
@@ -416,7 +446,27 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
                 Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] Bitmap.UnlockBits完了");
             }
 
-            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] CreateBitmapFromSafeImage成功 - 最終Bitmap: {bitmap.Width}x{bitmap.Height}");
+            // 🔥 [PHASE10.39] Gemini推奨Option B: Format32bppArgb統一
+            // 根本原因: PNG encoding時のStride情報喪失 + Mat.FromImageData()でのデコード失敗
+            // 解決策: Width*4は常に4の倍数 → Strideパディング不要 → PNG経由でも破損しない
+            // Phase 10.36証拠: unlockbits_verify正常、prevention_input破損（Width=254以外）
+            //
+            // メモリトレードオフ: 24bpp → 32bpp = 33%増加
+            // 安定性優先: 確実な問題解決を最優先
+            if (bitmap.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+            {
+                var originalFormat = bitmap.PixelFormat;
+                var argbBitmap = new Bitmap(bitmap.Width, bitmap.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using (var g = Graphics.FromImage(argbBitmap))
+                {
+                    g.DrawImage(bitmap, 0, 0, bitmap.Width, bitmap.Height);
+                }
+                bitmap.Dispose();
+                System.Diagnostics.Debug.WriteLine($"✅ [PHASE10.39] Format32bppArgb変換完了 - {originalFormat} → Format32bppArgb");
+                bitmap = argbBitmap;
+            }
+
+            Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] CreateBitmapFromSafeImage成功 - 最終Bitmap: {bitmap.Width}x{bitmap.Height}, Format: {bitmap.PixelFormat}");
             return bitmap;
         }
         catch (Exception ex)
@@ -439,6 +489,7 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
             SafePixelFormat.Bgra32 => 4,
             SafePixelFormat.Rgba32 => 4,
             SafePixelFormat.Rgb24 => 3,
+            SafePixelFormat.Bgr24 => 3,  // 🔥 [PHASE10.32] Bgr24ケース追加
             SafePixelFormat.Gray8 => 1,
             _ => 4
         };
@@ -456,6 +507,7 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
             SafePixelFormat.Bgra32 => GdiPixelFormat.Format32bppArgb,
             SafePixelFormat.Rgba32 => GdiPixelFormat.Format32bppArgb,
             SafePixelFormat.Rgb24 => GdiPixelFormat.Format24bppRgb,
+            SafePixelFormat.Bgr24 => GdiPixelFormat.Format24bppRgb,  // 🔥 [PHASE10.32] Bgr24ケース追加 - GDI+ Format24bppRgbはBGRバイトオーダー
             SafePixelFormat.Gray8 => GdiPixelFormat.Format8bppIndexed,
             _ => GdiPixelFormat.Format32bppArgb
         };

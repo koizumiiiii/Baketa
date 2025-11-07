@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
+using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory; // 🔥 [ULTRATHINK_PHASE10.2] PNG round-trip回避用
 
 namespace Baketa.Infrastructure.DI;
 
@@ -48,7 +49,11 @@ namespace Baketa.Infrastructure.DI;
                 var ocrEngine = sp.GetRequiredService<IOcrEngine>();
                 var imageFactory = sp.GetRequiredService<IImageFactory>();
 
-                return new AdaptiveTextRegionDetector(logger, ocrEngine, imageFactory);
+                // 🔥 [ULTRATHINK_PHASE10.2] PNG round-trip回避のためIWindowsImageFactory注入
+                // GetService使用: PlatformModuleで登録されるため、Infrastructure層から解決可能
+                var windowsImageFactory = sp.GetService<IWindowsImageFactory>();
+
+                return new AdaptiveTextRegionDetector(logger, ocrEngine, imageFactory, windowsImageFactory);
             });
             
             // ファクトリーを通じて適切な検出器を選択できるようにする

@@ -330,6 +330,10 @@ public class NativeWindowsCaptureWrapper : IDisposable
 
 
         // 🎯 Gemini推奨: ネイティブメモリを一時的にラップし、安全な管理コピーを作成
+        // 🔍 [PHASE4_DEBUG] tempBitmap作成前のフレーム情報ログ
+        _logger?.LogDebug("🔍 [PHASE4] tempBitmap作成開始: bgraData={BgraData}, width={Width}, height={Height}, stride={Stride}",
+            frame.bgraData, frame.width, frame.height, frame.stride);
+
         using var tempBitmap = new Bitmap(
             width: frame.width,
             height: frame.height,
@@ -337,10 +341,16 @@ public class NativeWindowsCaptureWrapper : IDisposable
             format: System.Drawing.Imaging.PixelFormat.Format32bppArgb,
             scan0: frame.bgraData);
 
+        _logger?.LogDebug("✅ [PHASE4] tempBitmap作成成功: {Width}x{Height}", tempBitmap.Width, tempBitmap.Height);
+
         // 🛡️ メモリ安全性: Clone()で管理メモリにコピーしてAccessViolationException防止
+        _logger?.LogDebug("🔍 [PHASE4] Clone()実行開始");
+
         var bitmap = tempBitmap.Clone(
             new System.Drawing.Rectangle(0, 0, tempBitmap.Width, tempBitmap.Height),
             tempBitmap.PixelFormat);
+
+        _logger?.LogDebug("✅ [PHASE4] Clone()実行成功: {Width}x{Height}", bitmap.Width, bitmap.Height);
 
         _logger?.LogDebug("安全化Bitmap作成成功: {Width}x{Height}, Stride={Stride}",
             frame.width, frame.height, frame.stride);
@@ -386,7 +396,12 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 bitmap.UnlockBits(bitmapData);
             }
         }
-        catch { /* デバッグログ失敗は無視 */ }
+        catch (Exception ex)
+        {
+            // 🚨 [PHASE3_CRITICAL] 例外情報を完全にログ出力して根本原因特定
+            _logger?.LogError(ex, "🚨 [CRITICAL] 安全化品質検証失敗: Type={ExceptionType}, Message={Message}, StackTrace={StackTrace}",
+                ex.GetType().Name, ex.Message, ex.StackTrace);
+        }
 
         return bitmap;
     }

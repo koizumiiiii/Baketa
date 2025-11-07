@@ -108,6 +108,10 @@ public class AdaptiveCaptureService(
             result.Metrics = captureResult.Metrics;
             result.ErrorDetails = captureResult.ErrorMessage;
             result.ImageChangeSkipped = imageChangeSkipped; // 新機能: 変化検知結果
+
+            // 🔥 [PHASE5] ROI廃止により、常に後続処理を継続
+            // FullScreenOcr方式では、全画面キャプチャ後にSmartProcessingPipelineで処理
+            result.ShouldContinueProcessing = true;
             
             // キャプチャ結果をログ出力
             if (_loggingSettings.EnableDebugFileLogging)
@@ -326,10 +330,10 @@ public class AdaptiveCaptureService(
         return strategyName switch
         {
             "DirectFullScreen" => CaptureStrategyUsed.DirectFullScreen,
-            "ROIBased" => CaptureStrategyUsed.ROIBased,
+            "FullScreenOcr" => CaptureStrategyUsed.FullScreenOcr, // 🔥 [PHASE5] ROI代替
             "PrintWindowFallback" => CaptureStrategyUsed.PrintWindowFallback,
             "GDIFallback" => CaptureStrategyUsed.GDIFallback,
-            _ => CaptureStrategyUsed.DirectFullScreen
+            _ => CaptureStrategyUsed.FullScreenOcr // 🔥 [PHASE5] デフォルトをFullScreenOcrに変更
         };
     }
 
@@ -453,79 +457,8 @@ public class AdaptiveCaptureService(
             // CaptureCompletedEventを発行して、OCR・翻訳パイプラインをトリガー
             if (result.Success && result.CapturedImages.Count > 0)
             {
-                // 🎯 [PHASE2.5] 複数ROI画像処理システム
-                if (result.CapturedImages.Count > 1 && result.DetectedTextRegions.Count == result.CapturedImages.Count)
-                {
-                    _logger.LogInformation("🎯 [MULTI_ROI] 複数ROI画像検出: {Count}個の領域", result.CapturedImages.Count);
-
-                    // 🔍 [DIAGNOSTIC] ログレベル実行時確認
-                    _logger.LogInformation("🔍 [DIAGNOSTIC] Logger IsEnabled(Debug): {IsDebugEnabled}, IsEnabled(Info): {IsInfoEnabled}",
-                        _logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug),
-                        _logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Information));
-
-                    // 各ROI画像に対してROIImageCapturedEventを発行
-                    for (int i = 0; i < result.CapturedImages.Count; i++)
-                    {
-                        var roiImage = result.CapturedImages[i];
-                        var absoluteRegion = result.DetectedTextRegions[i]; // 元画像内の絶対座標
-
-                        // 🔥 [PHASE2.5_ROI_FIX] CaptureRegion付きIImage生成
-                        // WindowsImageAdapterを直接作成し、absoluteRegionをCaptureRegionとして設定
-                        var captureRegionRect = new System.Drawing.Rectangle(
-                            absoluteRegion.X, absoluteRegion.Y,
-                            absoluteRegion.Width, absoluteRegion.Height);
-
-                        var imageAdapter = new Baketa.Infrastructure.Platform.Adapters.WindowsImageAdapter(
-                            roiImage,
-                            captureRegion: captureRegionRect); // CaptureRegion設定
-
-                        IImage imageInterface = imageAdapter;
-
-                        // 🔍 [DIAGNOSTIC] LogDebug呼び出し前
-                        _logger.LogInformation("🔍 [DIAGNOSTIC_BEFORE] ROI #{Index} - about to call LogDebug", i);
-
-                        try
-                        {
-                            _logger.LogDebug("🔥 [ROI_CAPTURE_REGION] ROI #{Index} CaptureRegion設定完了: {CaptureRegion}",
-                                i, captureRegionRect);
-                            _logger.LogInformation("🔍 [DIAGNOSTIC_AFTER] ROI #{Index} - LogDebug succeeded", i);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "🔥 [DIAGNOSTIC_ERROR] ROI #{Index} - LogDebug threw exception", i);
-                        }
-
-                        // ROIImageCapturedEvent発行
-                        var roiEvent = new Baketa.Core.Events.Capture.ROIImageCapturedEvent
-                        {
-                            Image = imageInterface,
-                            AbsoluteRegion = absoluteRegion,
-                            ROIIndex = i,
-                            TotalROIs = result.CapturedImages.Count
-                        };
-
-                        await _eventAggregator.PublishAsync(roiEvent).ConfigureAwait(false);
-
-                        // 🔍 [DIAGNOSTIC] 2つ目のLogDebug呼び出し前
-                        _logger.LogInformation("🔍 [DIAGNOSTIC_BEFORE2] ROI #{Index} - about to call LogDebug #2", i);
-
-                        try
-                        {
-                            _logger.LogDebug("🎯 [MULTI_ROI] ROIImageCapturedEvent発行完了: ROI {Index}/{Total}, Region={Region}",
-                                i, result.CapturedImages.Count, absoluteRegion);
-                            _logger.LogInformation("🔍 [DIAGNOSTIC_AFTER2] ROI #{Index} - LogDebug #2 succeeded", i);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "🔥 [DIAGNOSTIC_ERROR2] ROI #{Index} - LogDebug #2 threw exception", i);
-                        }
-                    }
-
-                    _logger.LogInformation("✅ [MULTI_ROI] {Count}個のROIImageCapturedEvent発行完了", result.CapturedImages.Count);
-                    return; // 複数ROI処理の場合、CaptureCompletedEventは発行しない
-                }
-
-                // 🎯 [SINGLE_ROI] 単一画像の場合は従来通りCaptureCompletedEvent発行
+                // 🔥 [PHASE5] ROI廃止により、常に単一画像としてCaptureCompletedEvent発行
+                // FullScreenOcr方式では、全画面画像を単一イベントで処理
                 var primaryImage = result.CapturedImages[0];
 
                 // 🔧 [CAPTURE_FIX] IImage変換処理
@@ -544,8 +477,8 @@ public class AdaptiveCaptureService(
                     captureRegion,
                     result.ProcessingTime)
                 {
-                    ImageChangeSkipped = result.ImageChangeSkipped,
-                    IsMultiROICapture = false // 単一画像
+                    ImageChangeSkipped = result.ImageChangeSkipped
+                    // 🔥 [PHASE5] IsMultiROICapture削除 - ROI廃止により不要
                 };
 
                 await _eventAggregator.PublishAsync(captureCompletedEvent).ConfigureAwait(false);

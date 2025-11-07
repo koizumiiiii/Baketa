@@ -275,6 +275,22 @@ internal sealed class SimpleAdvancedImageAdapter : IAdvancedImage, IDisposable
     public ReadOnlyMemory<byte> GetImageMemory() => ToByteArrayAsync().Result;
 
     /// <summary>
+    /// 🔥 [ULTRATHINK_PHASE7] 内部Bitmapへのアクセスを提供 - PNG round-trip回避
+    ///
+    /// 使用方法:
+    /// <code>
+    /// if (advancedImage is SimpleAdvancedImageAdapter adapter)
+    /// {
+    ///     var bitmap = adapter.GetUnderlyingBitmap();
+    ///     var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, bitmap.Width, bitmap.Height);
+    ///     // SafeImageFactory.CreateFromBitmap()がデータをコピーするため、この後すぐにDispose()可能
+    /// }
+    /// </code>
+    /// </summary>
+    /// <returns>内部Bitmapの参照（呼び出し側はCreateFromBitmap()でデータコピー後にDispose推奨）</returns>
+    public Bitmap GetUnderlyingBitmap() => _bitmap;
+
+    /// <summary>
     /// 🔥 [PHASE5.2G-A] LockPixelData (SimpleAdvancedImageAdapter is adapter-only, not supported)
     /// </summary>
     public PixelDataLock LockPixelData() => throw new NotSupportedException("SimpleAdvancedImageAdapter does not support LockPixelData");

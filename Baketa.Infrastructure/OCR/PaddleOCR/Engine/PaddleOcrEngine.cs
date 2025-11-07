@@ -1662,24 +1662,6 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
         var mat = await ConvertToMatAsync(processImage, adjustedRoi, cancellationToken);
 
-        // 🔍 [DEBUG_IMAGE_OUTPUT] ROI抽出直後の画像を保存（縮小問題調査用）
-        #if DEBUG
-        try
-        {
-            var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-            System.IO.Directory.CreateDirectory(debugFolder);
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-            var debugPath = System.IO.Path.Combine(debugFolder, $"roi_after_extraction_{timestamp}_{mat.Width}x{mat.Height}.png");
-            Cv2.ImWrite(debugPath, mat);
-            __logger?.LogInformation("🔍 [DEBUG_IMG] ROI抽出直後画像保存: {Path} (Size: {Width}x{Height})",
-                debugPath, mat.Width, mat.Height);
-        }
-        catch (Exception ex)
-        {
-            __logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗");
-        }
-        #endif
-
         // Step 6: スケーリングされた画像のリソースを解放（元画像と異なる場合）
         if (processImage != image)
         {
@@ -3413,10 +3395,11 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             {
                 __logger?.LogDebug("🔧 [PHASE10.4_REVERT] 座標復元実行: ScaleFactor={ScaleFactor}", scaleFactor);
 
+                var originalImageSize = new System.Drawing.Size(image.Width, image.Height);
                 var restoredRegions = new List<OcrTextRegion>(textRegions.Count);
                 foreach (var region in textRegions)
                 {
-                    restoredRegions.Add(CoordinateRestorer.RestoreTextRegion(region, scaleFactor));
+                    restoredRegions.Add(CoordinateRestorer.RestoreTextRegion(region, scaleFactor, originalImageSize));
                 }
                 textRegions = restoredRegions;
 
@@ -4478,6 +4461,23 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             var originalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
             __logger?.LogDebug("🎯 [PREVENTIVE_START] 予防処理開始: {OriginalInfo}", originalInfo);
 
+            // 🔍 [PHASE10.35] PREVENTION処理の入力Mat状態をPNG保存（破損タイミング特定）
+            #if DEBUG
+            try
+            {
+                var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
+                System.IO.Directory.CreateDirectory(debugFolder);
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                var debugPath = System.IO.Path.Combine(debugFolder, $"prevention_input_{timestamp}_{processedMat.Width}x{processedMat.Height}.png");
+                Cv2.ImWrite(debugPath, processedMat);
+                __logger?.LogInformation("🔍 [PHASE10.35] PREVENTION入力Mat保存: {Path}", debugPath);
+            }
+            catch (Exception ex)
+            {
+                __logger?.LogWarning(ex, "⚠️ [PHASE10.35] デバッグ画像保存失敗 (PREVENTION入力)");
+            }
+            #endif
+
             // ステップ1: 極端なサイズ問題の予防
             var totalPixels = processedMat.Width * processedMat.Height;
             if (totalPixels > 2000000) // 200万ピクセル制限
@@ -4502,8 +4502,11 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             {
                 var evenWidth = processedMat.Width + (processedMat.Width % 2);
                 var evenHeight = processedMat.Height + (processedMat.Height % 2);
-                
-                var evenMat = new Mat();
+
+                // 🔥 [PHASE10.34] Cv2.Resize()メモリ破損対策: 出力Matを事前初期化
+                // 問題: new Mat()では内部バッファが未確保、Resize時にメモリアライメント不整合
+                // 解決: processedMat.Type()で明示的に初期化し、正しいStride/チャンネル情報を設定
+                var evenMat = new Mat(evenHeight, evenWidth, processedMat.Type());
                 Cv2.Resize(processedMat, evenMat, new OpenCvSharp.Size(evenWidth, evenHeight), 0, 0, InterpolationFlags.Linear);
                 
                 if (processedMat != inputMat) processedMat.Dispose();
@@ -4548,7 +4551,10 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
             if (needsAlignment)
             {
-                var alignedMat = new Mat();
+                // 🔥 [PHASE10.34] Cv2.Resize()メモリ破損対策: 出力Matを事前初期化
+                // 問題: new Mat()では内部バッファが未確保、Resize時にメモリアライメント不整合でノイズ発生
+                // 解決: processedMat.Type()で明示的に初期化し、正しいチャンネル数とデータ型を設定
+                var alignedMat = new Mat(alignHeight, alignWidth, processedMat.Type());
                 Cv2.Resize(processedMat, alignedMat, new OpenCvSharp.Size(alignWidth, alignHeight), 0, 0, InterpolationFlags.Linear);
                 
                 if (processedMat != inputMat) processedMat.Dispose();

@@ -379,7 +379,8 @@ namespace Baketa.Infrastructure.Platform.Windows;
                         width: bitmap.Width,
                         height: bitmap.Height,
                         pixelFormat: pixelFormat,
-                        id: Guid.NewGuid());
+                        id: Guid.NewGuid(),
+                        stride: stride);  // 🔥 [PHASE12.1] GDI+ Stride値を明示的に渡す
 
                     _logger?.LogDebug("✅ UltraThink修正: SafeImage高品質生成完了 - {Width}x{Height}, Format={Format}, RawPixelSize={Size}bytes",
                         bitmap.Width, bitmap.Height, pixelFormat, pixelDataSize);

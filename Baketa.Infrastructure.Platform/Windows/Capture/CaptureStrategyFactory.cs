@@ -1,8 +1,14 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection; // 🔥 [PHASE9_FIX] GetRequiredService拡張メソッド用
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using System; // 🔥 [PHASE9_FIX] ArgumentNullException用
+using Baketa.Core.Abstractions.Memory; // 🔥 [PHASE9_FIX] ISafeImageFactory用
+using Baketa.Core.Settings; // 🔥 [PHASE9_FIX] LoggingSettings用
+using Baketa.Infrastructure.Platform.Windows; // 🔥 [PHASE9_FIX] WindowsImageFactory用
+using Baketa.Core.Abstractions.Events; // 🔥 [PHASE9_FIX] IEventAggregator用（修正: Core.Events → Core.Abstractions.Events）
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: CaptureStrategyUsedのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -83,11 +89,11 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
                     primaryStrategy.StrategyName, primaryStrategy.Priority);
             }
 
-            // フォールバック戦略を優先順位順に追加（統合GPU優先の設計）
+            // 🔥 [PHASE5] ROIBased削除 - FullScreenOcrに統一
             var strategyTypes = new[]
             {
+                CaptureStrategyUsed.FullScreenOcr,     // 🔥 [PHASE2] 全画面OCR方式（ROI代替・60-80%高速化） Priority=30
                 CaptureStrategyUsed.DirectFullScreen,   // 統合GPU向け（最高効率）
-                CaptureStrategyUsed.ROIBased,          // 専用GPU向け（バランス）
                 CaptureStrategyUsed.PrintWindowFallback, // 確実動作保証
                 CaptureStrategyUsed.GDIFallback        // 最終手段
             };
@@ -196,14 +202,15 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
     {
         return new Dictionary<CaptureStrategyUsed, Func<ICaptureStrategy>>
         {
-            [CaptureStrategyUsed.DirectFullScreen] = () => 
-                _serviceProvider.GetService(typeof(DirectFullScreenCaptureStrategy)) as ICaptureStrategy ?? 
+            [CaptureStrategyUsed.DirectFullScreen] = () =>
+                _serviceProvider.GetService(typeof(DirectFullScreenCaptureStrategy)) as ICaptureStrategy ??
                 throw new InvalidOperationException("DirectFullScreenCaptureStrategy が登録されていません"),
-                
-            [CaptureStrategyUsed.ROIBased] = () => 
-                _serviceProvider.GetService(typeof(ROIBasedCaptureStrategy)) as ICaptureStrategy ?? 
-                throw new InvalidOperationException("ROIBasedCaptureStrategy が登録されていません"),
-                
+
+            // 🔥 [PHASE2] FullScreenOcrCaptureStrategy作成関数（ROI代替）
+            [CaptureStrategyUsed.FullScreenOcr] = () =>
+                _serviceProvider.GetService(typeof(FullScreenOcrCaptureStrategy)) as ICaptureStrategy ??
+                throw new InvalidOperationException("FullScreenOcrCaptureStrategy が登録されていません"),
+
             [CaptureStrategyUsed.PrintWindowFallback] = () => 
                 _serviceProvider.GetService(typeof(PrintWindowFallbackStrategy)) as ICaptureStrategy ?? 
                 throw new InvalidOperationException("PrintWindowFallbackStrategy が登録されていません"),

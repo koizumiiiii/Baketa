@@ -199,11 +199,28 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                         continue;
                     }
 
+                    // 🔥 [PHASE2.2.1] キャプチャ段階でOCRが既に実行済みの場合、OCR段階をスキップ
+                    if (stageType == ProcessingStageType.OcrExecution && input.PreExecutedOcrResult != null)
+                    {
+                        _logger.LogInformation("🔥 [PHASE2.2.1] OCR段階スキップ - キャプチャ時にOCR実行済み (FullScreenOcrCaptureStrategy), Regions: {RegionCount}",
+                            input.PreExecutedOcrResult.TextRegions.Count);
+
+                        // OCR結果をcontextに格納（後続の翻訳段階で使用）
+                        var skippedResult = ProcessingStageResult.CreateSkipped(
+                            ProcessingStageType.OcrExecution,
+                            $"FullScreenOcrCaptureStrategyでOCR実行済み ({input.PreExecutedOcrResult.TextRegions.Count} regions)");
+                        skippedResult = skippedResult with { Data = input.PreExecutedOcrResult };
+                        context.AddStageResult(ProcessingStageType.OcrExecution, skippedResult);
+
+                        executedStages.Add(stageType);
+                        continue;
+                    }
+
                     // 段階実行の必要性判定
                     if (!strategy.ShouldExecute(context))
                     {
                         _logger.LogDebug("段階スキップ: {StageType} - 実行条件未満", stageType);
-                        
+
                         // 早期終了判定（強制完全実行でない場合）
                         if (settings.EnableEarlyTermination && !input.Options.ForceCompleteExecution)
                         {

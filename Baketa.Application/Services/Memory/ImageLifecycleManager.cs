@@ -80,8 +80,12 @@ public sealed class ImageLifecycleManager : IImageLifecycleManager, IDisposable
             // データをArrayPoolから借りたバッファにコピー
             sourceData.Span.CopyTo(rentedBuffer);
 
+            // 🔥 [PHASE12.5] strideパラメータ追加（パディングなしの詰めデータ）
+            var bytesPerPixel = GetBytesPerPixel(pixelFormat);
+            var stride = width * bytesPerPixel;
+
             // Phase 3: SafeImageFactoryを使用して安全にインスタンス生成
-            var safeImage = _safeImageFactory.CreateSafeImage(rentedBuffer, _arrayPool, sourceData.Length, width, height, pixelFormat, imageId);
+            var safeImage = _safeImageFactory.CreateSafeImage(rentedBuffer, _arrayPool, sourceData.Length, width, height, pixelFormat, imageId, stride);
 
             var imageInfo = new SafeImageInfo
             {
@@ -198,5 +202,21 @@ public sealed class ImageLifecycleManager : IImageLifecycleManager, IDisposable
         public required int Width { get; init; }
         public required int Height { get; init; }
         public required ImagePixelFormat PixelFormat { get; init; }
+    }
+
+    /// <summary>
+    /// PixelFormatごとのバイト数を取得
+    /// Phase 12.5: stride計算に必要
+    /// </summary>
+    private static int GetBytesPerPixel(ImagePixelFormat format)
+    {
+        return format switch
+        {
+            ImagePixelFormat.Bgra32 => 4,
+            ImagePixelFormat.Rgba32 => 4,
+            ImagePixelFormat.Rgb24 => 3,
+            ImagePixelFormat.Gray8 => 1,
+            _ => 4 // デフォルト
+        };
     }
 }

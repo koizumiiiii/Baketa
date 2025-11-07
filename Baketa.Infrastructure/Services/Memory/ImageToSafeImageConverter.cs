@@ -23,6 +23,10 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
         var rentedBuffer = arrayPool.Rent(imageMemory.Length);
         imageMemory.Span.CopyTo(rentedBuffer);
 
+        // 🔥 [PHASE12.5] strideパラメータ追加（パディングなしの詰めデータ）
+        var bytesPerPixel = GetBytesPerPixel(image.PixelFormat);
+        var stride = image.Width * bytesPerPixel;
+
         return await Task.FromResult(new SafeImage(
             rentedBuffer,
             arrayPool,
@@ -30,7 +34,8 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
             image.Width,
             image.Height,
             image.PixelFormat,
-            Guid.NewGuid()
+            Guid.NewGuid(),
+            stride
         )).ConfigureAwait(false);
     }
 
@@ -46,6 +51,10 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
         var rentedBuffer = arrayPool.Rent(imageMemory.Length);
         imageMemory.Span.CopyTo(rentedBuffer);
 
+        // 🔥 [PHASE12.5] strideパラメータ追加（パディングなしの詰めデータ）
+        var bytesPerPixel = GetBytesPerPixel(image.PixelFormat);
+        var stride = image.Width * bytesPerPixel;
+
         return await Task.FromResult(new SafeImage(
             rentedBuffer,
             arrayPool,
@@ -53,7 +62,8 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
             image.Width,
             image.Height,
             image.PixelFormat,
-            Guid.NewGuid()
+            Guid.NewGuid(),
+            stride
         )).ConfigureAwait(false);
     }
 
@@ -68,6 +78,10 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
         var rentedBuffer = arrayPool.Rent(imageMemory.Length);
         imageMemory.Span.CopyTo(rentedBuffer);
 
+        // 🔥 [PHASE12.5] strideパラメータ追加（パディングなしの詰めデータ）
+        var bytesPerPixel = GetBytesPerPixel(image.PixelFormat);
+        var stride = image.Width * bytesPerPixel;
+
         return new SafeImage(
             rentedBuffer,
             arrayPool,
@@ -75,8 +89,25 @@ public sealed class ImageToSafeImageConverter : IImageToSafeImageConverter
             image.Width,
             image.Height,
             image.PixelFormat,
-            Guid.NewGuid()
+            Guid.NewGuid(),
+            stride
         );
+    }
+
+    /// <summary>
+    /// PixelFormatごとのバイト数を取得
+    /// Phase 12.5: stride計算に必要
+    /// </summary>
+    private static int GetBytesPerPixel(ImagePixelFormat format)
+    {
+        return format switch
+        {
+            ImagePixelFormat.Bgra32 => 4,
+            ImagePixelFormat.Rgba32 => 4,
+            ImagePixelFormat.Rgb24 => 3,
+            ImagePixelFormat.Gray8 => 1,
+            _ => 4 // デフォルト
+        };
     }
 
 }

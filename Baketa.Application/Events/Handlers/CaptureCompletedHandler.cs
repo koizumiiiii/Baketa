@@ -64,20 +64,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // NULLチェック
             ArgumentNullException.ThrowIfNull(eventData);
 
-            // 🔥 [FIX7_PHASE1] 緊急修正: IsMultiROICaptureチェックをコメントアウト
-            // Gemini推奨: Option A（即座検証）→ Option B（恒久対策）の2段階修正
-            // 目的: ROI画像がOcrExecutionStageStrategyに到達し、FIX7_OPTION_Cコードが実行されるか検証
-            /*
-            // 🎯 [PHASE2.5] 複数ROI画像処理システムからのCaptureCompletedEventはスキップ
-            // ROIImageCapturedEventHandlerが各ROI画像に対してCaptureCompletedEventを発行済み
-            // 既存パイプラインでの二重処理を防止
-            if (eventData.IsMultiROICapture)
-            {
-                _logger?.LogDebug("🎯 [MULTI_ROI_SKIP] 複数ROI画像処理からのCaptureCompletedEvent検出 - 既存パイプラインスキップ (ROI {Index}/{Total})",
-                    eventData.ROIIndex, eventData.TotalROICount);
-                return;
-            }
-            */
+            // 🔥 [PHASE5] ROI関連チェック削除 - ROI廃止により不要
 
             try
             {
@@ -185,11 +172,9 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
                     // UltraThink Phase 3: 個別翻訳実行時の統合翻訳スキップ制御
                     // グルーピング後のOCR結果が複数存在する場合は個別翻訳を実行するため統合翻訳をスキップ
-                    SkipIntegratedTranslation = ShouldSkipIntegratedTranslation(),
+                    SkipIntegratedTranslation = ShouldSkipIntegratedTranslation()
 
-                    // 🔥 [PHASE10.6] ROI画像からの処理フラグを設定
-                    // ROI画像の場合、領域検出をスキップし、OCR最小サイズ要件を緩和
-                    IsMultiROICapture = eventData.IsMultiROICapture
+                    // 🔥 [PHASE5] ROI関連設定削除 - ROI廃止により不要
                 }
             };
 

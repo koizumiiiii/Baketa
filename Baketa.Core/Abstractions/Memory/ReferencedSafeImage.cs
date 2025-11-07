@@ -174,10 +174,17 @@ public sealed class ReferencedSafeImage : IImage, IDisposable
     }
 
     /// <summary>
-    /// 🔥 [PHASE5.2G-A] 生ピクセルデータへの直接アクセス（ReferencedSafeImageは非サポート）
-    /// Phase 3でSafeImageの実装完了後、必要に応じて委譲実装に変更予定
+    /// 🔥 [PHASE12.3.1] 生ピクセルデータへの直接アクセス - 内部SafeImageに委譲
+    /// Phase 12.3でStride対応Mat生成のため実装完了
     /// </summary>
-    public PixelDataLock LockPixelData() => throw new NotSupportedException("ReferencedSafeImageは現在、生ピクセルデータアクセスをサポートしません（Phase 3で実装予定）");
+    public PixelDataLock LockPixelData()
+    {
+        lock (_lockObject)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _safeImage.LockPixelData();
+        }
+    }
 
     /// <summary>
     /// 内部のSafeImageインスタンスへの安全なアクセス
@@ -239,7 +246,9 @@ public sealed class ReferencedSafeImage : IImage, IDisposable
                         // 行単位でraw pixel dataをBitmapにコピー
                         for (int y = 0; y < _safeImage.Height; y++)
                         {
-                            var sourceOffset = y * _safeImage.Width * bytesPerPixel;
+                            // 🔥 [ULTRATHINK_PHASE5.4_FIX] SafeImage.Strideを使用してソースオフセット計算
+                            // SafeImageAdapterと同じ問題: Width * bytesPerPixelではなくStrideを使用
+                            var sourceOffset = y * _safeImage.Stride;
                             var destOffset = y * stride;
                             var rowBytes = _safeImage.Width * bytesPerPixel;
 

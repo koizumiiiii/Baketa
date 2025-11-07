@@ -17,6 +17,7 @@ public sealed class SafeImageFactory : ISafeImageFactory
 {
     /// <summary>
     /// ArrayPool管理下のSafeImageインスタンスを生成
+    /// Phase 12: stride引数追加（明示的Stride伝達）
     /// </summary>
     /// <param name="rentedBuffer">ArrayPoolから借用したバッファ</param>
     /// <param name="arrayPool">使用中のArrayPoolインスタンス</param>
@@ -25,6 +26,7 @@ public sealed class SafeImageFactory : ISafeImageFactory
     /// <param name="height">画像高さ</param>
     /// <param name="pixelFormat">ピクセルフォーマット</param>
     /// <param name="id">一意識別ID</param>
+    /// <param name="stride">1行あたりのバイト数（GDI+パディング含む）</param>
     /// <returns>生成されたSafeImageインスタンス</returns>
     public SafeImage CreateSafeImage(
         byte[] rentedBuffer,
@@ -33,11 +35,13 @@ public sealed class SafeImageFactory : ISafeImageFactory
         int width,
         int height,
         ImagePixelFormat pixelFormat,
-        Guid id)
+        Guid id,
+        int stride)
     {
         // Phase 3: Factory パターンによる安全なSafeImageインスタンス生成
         // Clean Architecture原則を維持しつつ、内部コンストラクタアクセス問題を解決
-        return new SafeImage(rentedBuffer, arrayPool, actualDataLength, width, height, pixelFormat, id);
+        // Phase 12: stride値をSafeImageコンストラクタに渡す
+        return new SafeImage(rentedBuffer, arrayPool, actualDataLength, width, height, pixelFormat, id, stride);
     }
 
     /// <summary>
@@ -96,8 +100,11 @@ public sealed class SafeImageFactory : ISafeImageFactory
             }
 
             // SafeImageインスタンスを生成
+            // 🔥 [PHASE12.2] このメソッドはパディングを除去して詰めたデータを作成
+            // 実際のstride = width * bytesPerPixel（パディングなし）
             var id = Guid.NewGuid();
-            return new SafeImage(rentedBuffer, arrayPool, dataLength, width, height, pixelFormat, id);
+            var actualStride = width * bytesPerPixel;
+            return new SafeImage(rentedBuffer, arrayPool, dataLength, width, height, pixelFormat, id, actualStride);
         }
         catch
         {
@@ -118,7 +125,10 @@ public sealed class SafeImageFactory : ISafeImageFactory
         {
             GdiPixelFormat.Format32bppArgb => ImagePixelFormat.Bgra32,
             GdiPixelFormat.Format32bppRgb => ImagePixelFormat.Bgra32,
-            GdiPixelFormat.Format24bppRgb => ImagePixelFormat.Rgb24,
+            // 🔥 [ULTRATHINK_PHASE10.6] Format24bppRgb → Bgr24 (正しいマッピング)
+            // GDI+ Format24bppRgbは実際にBGRバイトオーダーで保存される（Microsoft仕様）
+            // これによりRGB/BGRバイトオーダー不一致によるRGBノイズ問題が解消される
+            GdiPixelFormat.Format24bppRgb => ImagePixelFormat.Bgr24,
             GdiPixelFormat.Format8bppIndexed => ImagePixelFormat.Gray8,
             _ => ImagePixelFormat.Bgra32 // デフォルト
         };
@@ -136,6 +146,7 @@ public sealed class SafeImageFactory : ISafeImageFactory
             ImagePixelFormat.Bgra32 => 4,
             ImagePixelFormat.Rgba32 => 4,
             ImagePixelFormat.Rgb24 => 3,
+            ImagePixelFormat.Bgr24 => 3,  // 🔥 [ULTRATHINK_PHASE10.6] BGR24も3バイト/ピクセル
             ImagePixelFormat.Gray8 => 1,
             _ => 4
         };

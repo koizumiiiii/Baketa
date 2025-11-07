@@ -10,7 +10,7 @@ namespace Baketa.Core.Models.Capture;
 public enum CaptureStrategyUsed
 {
     DirectFullScreen,       // 統合GPU：直接大画面キャプチャ
-    ROIBased,              // 専用GPU：段階的ROIキャプチャ  
+    FullScreenOcr,         // 🔥 [PHASE2] 全画面OCR直接翻訳方式：ROI廃止により60-80%高速化
     PrintWindowFallback,   // ソフトウェア：確実動作保証
     GDIFallback            // 最終手段：古いシステム対応
 }
@@ -73,6 +73,37 @@ public class AdaptiveCaptureResult
     /// Phase 1: OCR処理最適化システム
     /// </summary>
     public bool ImageChangeSkipped { get; set; } = false;
+
+    // 🔥 [PHASE5] ROIメタデータ削除 - ROI廃止により不要
+
+    /// <summary>
+    /// 後続処理を継続すべきかどうかを示すフラグ
+    /// Phase 1: 重複チャンク検出対応（Option B - Gemini推奨DTO導入アプローチ）
+    /// </summary>
+    /// <remarks>
+    /// 🎯 [P0-1_PHASE3_GEMINI_RECOMMENDED] 重複チャンク問題の根本解決
+    /// - 従来方式の場合: true （通常通り後続処理を実行）
+    /// - 従来方式の場合: true （通常通り後続処理を実行）
+    ///
+    /// **背景**: ROI方式では既にROIImageCapturedEventで全ROI画像を処理済み。
+    /// PrimaryImageを返すと、TranslationOrchestrationServiceが従来フローを実行し、
+    /// 同じROI #0が2回処理される（ChunkID: 2 と 1000002）。
+    ///
+    /// **効果**: このフラグでROI方式と従来方式を明確に区別し、重複処理を根本から防止。
+    /// </remarks>
+    public bool ShouldContinueProcessing { get; set; } = true;
+
+    /// <summary>
+    /// キャプチャ段階で既に実行されたOCR結果（あれば）
+    /// Phase 2: FullScreenOcrCaptureStrategy対応
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [PHASE2.2] ROI廃止による全画面OCR直接実行対応
+    /// - FullScreenOcrCaptureStrategyが使用された場合、OCR結果がキャプチャ時に取得される
+    /// - nullでない場合、SmartProcessingPipelineServiceはOcrExecutionStageStrategyをスキップする
+    /// - 従来のキャプチャ戦略（DirectFullScreen等）ではnullのまま、通常のOCR段階で処理される
+    /// </remarks>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; } = null;
 }
 
 /// <summary>

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
 using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;

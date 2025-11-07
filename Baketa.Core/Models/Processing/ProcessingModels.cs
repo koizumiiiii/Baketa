@@ -77,6 +77,17 @@ public sealed record ProcessingPipelineInput : IDisposable
     public string ContextId => $"Window_{SourceWindowHandle.ToInt64()}";
 
     /// <summary>
+    /// キャプチャ段階で既に実行されたOCR結果（あれば）
+    /// Phase 2: FullScreenOcrCaptureStrategy対応
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [PHASE2.2] ROI廃止による全画面OCR直接実行対応
+    /// - FullScreenOcrCaptureStrategyが使用された場合、OCR結果がキャプチャ時に取得される
+    /// - nullでない場合、SmartProcessingPipelineServiceはOcrExecutionStageStrategyをスキップする
+    /// </remarks>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; init; } = null;
+
+    /// <summary>
     /// 🎯 UltraThink: 所有権管理フラグ
     /// </summary>
     public bool OwnsImage { get; init; } = true;
@@ -134,15 +145,7 @@ public sealed record ProcessingPipelineOptions
     /// </summary>
     public bool SkipIntegratedTranslation { get; init; } = false;
 
-    /// <summary>
-    /// 複数ROI画像からの処理かどうか
-    /// Phase 10.6: ROI画像の場合、領域検出をスキップし、OCR最小サイズ要件を緩和
-    /// </summary>
-    /// <remarks>
-    /// CaptureCompletedEvent.IsMultiROICaptureから設定されます。
-    /// OcrExecutionStageStrategyで、ProcessingContextType.RegionOfInterestの判定に使用されます。
-    /// </remarks>
-    public bool IsMultiROICapture { get; init; } = false;
+    // 🔥 [PHASE5] ROI関連プロパティ削除 - ROI廃止により不要
 }
 
 /// <summary>

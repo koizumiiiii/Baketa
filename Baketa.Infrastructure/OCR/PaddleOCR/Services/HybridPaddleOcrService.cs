@@ -128,7 +128,7 @@ private async Task InitializeV3EngineAsync(CancellationToken cancellationToken)
             var safeModel = LocalFullModels.EnglishV4 ?? LocalFullModels.EnglishV3;
             _v3Engine = new PaddleOcrAll(safeModel, PaddleDevice.Mkldnn())
             {
-                AllowRotateDetection = true,
+                AllowRotateDetection = false, // 🔥 [PHASE10.26_FIX] 横書き専用モード - Angle=90°誤検出完全解消
                 Enable180Classification = false // 高速検出では回転分類を無効化
             };
             _logger.LogDebug("✅ V3エンジン初期化完了（安全モデル使用: {ModelType}）", safeModel?.GetType().Name ?? "unknown");
@@ -159,7 +159,7 @@ private async Task InitializeV5EngineAsync(CancellationToken cancellationToken)
             var highAccuracyModel = LocalFullModels.JapanV4 ?? LocalFullModels.EnglishV4 ?? LocalFullModels.EnglishV3;
             _v5Engine = new PaddleOcrAll(highAccuracyModel, PaddleDevice.Mkldnn())
         {
-            AllowRotateDetection = true,
+            AllowRotateDetection = false, // 🔥 [PHASE10.26_FIX] 横書き専用モード - Angle=90°誤検出完全解消
             Enable180Classification = true // 高精度認識では全機能を有効化
         };
             _logger.LogDebug("✅ V5エンジン初期化完了（高精度認識用・安全モデル: {ModelType}）", highAccuracyModel?.GetType().Name ?? "unknown");

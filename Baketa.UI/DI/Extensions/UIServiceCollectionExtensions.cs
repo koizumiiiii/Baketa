@@ -7,6 +7,7 @@ using Baketa.UI.Services;
 using Baketa.UI.DI.Modules;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Services;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Services;
@@ -14,7 +15,7 @@ using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Infrastructure.OCR.BatchProcessing;
-using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent, StopTranslationRequestEvent用
+using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent用
 using System;
 using System.Threading;
 using System.Threading.Tasks;

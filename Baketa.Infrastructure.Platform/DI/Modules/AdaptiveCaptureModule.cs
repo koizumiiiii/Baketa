@@ -51,9 +51,12 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
         sp.GetRequiredKeyedService<Baketa.Core.Abstractions.Factories.IWindowsImageFactory>("legacy") as WindowsImageFactory
         ?? throw new InvalidOperationException("WindowsImageFactory (legacy) registration failed"));
 
-    // ネイティブWindows Captureラッパー
-    services.AddTransient<NativeWindowsCaptureWrapper>();
-    
+    // 🔥 [PHASE7.3_FIX] NativeWindowsCaptureWrapperの登録を削除
+    // ISafeImageFactoryへの依存があるため、DIコンテナに登録すると
+    // ApplicationModuleより前に解決されてArgumentNullExceptionが発生する
+    // 代わりに、IWindowsCapturerファクトリー内で明示的に作成する
+    // services.AddTransient<NativeWindowsCaptureWrapper>(); // ← 削除
+
     // 高性能WindowsCapturer実装
     services.AddTransient<WindowsGraphicsCapturer>();
     
@@ -61,13 +64,32 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
     services.AddSingleton<IWindowsCapturer>(serviceProvider =>
     {
         var logger = serviceProvider.GetService<ILogger<IWindowsCapturer>>();
-        
+
         try
         {
-            // Windows Graphics Capture API サポートをチェック
-            var nativeWrapper = serviceProvider.GetRequiredService<NativeWindowsCaptureWrapper>();
+            // 🔥 [PHASE7.3_FIX] NativeWindowsCaptureWrapperを明示的に作成
+            // ISafeImageFactoryへの依存があるため、DIコンテナからは解決できない
+            // 必要な依存関係を手動で取得して、明示的にインスタンス化する
+
+            var imageFactory = serviceProvider.GetRequiredService<WindowsImageFactory>();
+            var safeImageFactory = serviceProvider.GetService<Baketa.Core.Abstractions.Memory.ISafeImageFactory>();
+            var nativeLogger = serviceProvider.GetService<ILogger<NativeWindowsCaptureWrapper>>();
+            var loggingSettings = serviceProvider.GetService<LoggingSettings>();
+
+            if (safeImageFactory == null)
+            {
+                logger?.LogWarning("⚠️ ISafeImageFactory未登録 - FallbackWindowsCapturerモードに切り替え");
+                // Fallbackキャプチャー使用（NotSupportedException をスローする実装）
+                var fallbackCapturer = new FallbackWindowsCapturer(logger);
+                logger?.LogInformation("✅ FallbackWindowsCapturer をプライマリとして使用");
+                return fallbackCapturer;
+            }
+
+            // NativeWindowsCaptureWrapperを明示的に作成
+            var nativeWrapper = new NativeWindowsCaptureWrapper(imageFactory, safeImageFactory, nativeLogger, loggingSettings);
+
             logger?.LogInformation("🔍 ネイティブDLL サポート状況チェック開始");
-            
+
             // 🚨 CRITICAL FIX: Initialize()を確実に呼び出してからIsSupported()をチェック
             logger?.LogInformation("🔧 NativeWindowsCaptureWrapper初期化実行開始");
             bool initialized = nativeWrapper.Initialize();
@@ -81,7 +103,9 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
             if (nativeWrapper.IsSupported())
             {
                 logger?.LogInformation("✅ Windows Graphics Capture APIをサポート、WindowsGraphicsCapturerを使用");
-                return serviceProvider.GetRequiredService<WindowsGraphicsCapturer>();
+                // 🔥 [PHASE5_FIX] 手動で作成したnativeWrapperを使用してWindowsGraphicsCapturerを作成
+                var graphicsLogger = serviceProvider.GetService<ILogger<WindowsGraphicsCapturer>>();
+                return new WindowsGraphicsCapturer(nativeWrapper, graphicsLogger, loggingSettings);
             }
             else
             {
@@ -106,7 +130,7 @@ public sealed class AdaptiveCaptureModule : ServiceModuleBase
     
     // キャプチャ戦略実装
     services.AddTransient<DirectFullScreenCaptureStrategy>();
-    services.AddTransient<ROIBasedCaptureStrategy>();
+    services.AddTransient<FullScreenOcrCaptureStrategy>(); // 🔥 [PHASE2] 全画面OCR直接翻訳方式（ROI代替）
     services.AddTransient<PrintWindowFallbackStrategy>();
     services.AddTransient<GDIFallbackStrategy>();
     

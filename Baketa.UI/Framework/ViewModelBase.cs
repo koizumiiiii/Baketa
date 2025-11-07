@@ -192,8 +192,14 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     protected async Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // 🔥 [PHASE6.1_EVENTAG_INSTANCE_CHECK] EventAggregatorインスタンス確認
+        var eventAggregatorHash = EventAggregator?.GetHashCode() ?? -1;
         Console.WriteLine($"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        Console.WriteLine($"🔍 [INSTANCE_CHECK] EventAggregator HashCode: {eventAggregatorHash}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [INSTANCE_CHECK] EventAggregator HashCode: {eventAggregatorHash}");
+
         await EventAggregator.PublishAsync(eventData).ConfigureAwait(false);
         Console.WriteLine($"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");

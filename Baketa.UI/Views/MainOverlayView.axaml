@@ -161,7 +161,7 @@
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartStopText}"
               Name="StartStopButton"
-              IsEnabled="{Binding IsStartStopEnabled}">
+              PointerPressed="StartStopButton_OnPointerPressed">
         <StackPanel Orientation="Vertical" Spacing="4">
           <PathIcon Width="20" Height="20"
                     Data="{Binding IsTranslationActive, Converter={StaticResource TranslationStateToIconConverter}}"

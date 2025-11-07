@@ -217,24 +217,6 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
         // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
         var mat = await ConvertToMatAsync(processImage, adjustedRoi, cancellationToken).ConfigureAwait(false);
 
-        // 🔍 [DEBUG_IMAGE_OUTPUT] ROI抽出直後の画像を保存（縮小問題調査用）
-        #if DEBUG
-        try
-        {
-            var debugFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_images");
-            System.IO.Directory.CreateDirectory(debugFolder);
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
-            var debugPath = System.IO.Path.Combine(debugFolder, $"roi_after_extraction_{timestamp}_{mat.Width}x{mat.Height}.png");
-            Cv2.ImWrite(debugPath, mat);
-            _logger?.LogInformation("🔍 [DEBUG_IMG] ROI抽出直後画像保存: {Path} (Size: {Width}x{Height})",
-                debugPath, mat.Width, mat.Height);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "⚠️ [DEBUG_IMG] デバッグ画像保存失敗");
-        }
-        #endif
-
         // Step 6: スケーリングされた画像のリソースを解放（元画像と異なる場合）
         if (processImage != image)
         {

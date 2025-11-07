@@ -64,16 +64,7 @@ public class StartTranslationRequestEvent(WindowInfo targetWindow) : IEvent
     public WindowInfo TargetWindow { get; } = targetWindow ?? throw new ArgumentNullException(nameof(targetWindow));
 }
 
-/// <summary>
-/// 翻訳停止要求イベント
-/// </summary>
-public class StopTranslationRequestEvent : IEvent
-{
-    public Guid Id { get; } = Guid.NewGuid();
-    public DateTime Timestamp { get; } = DateTime.UtcNow;
-    public string Name { get; } = nameof(StopTranslationRequestEvent);
-    public string Category { get; } = "Translation";
-}
+// StopTranslationRequestEvent は Core.Events.EventTypes に移動
 
 /// <summary>
 /// 翻訳表示切り替え要求イベント

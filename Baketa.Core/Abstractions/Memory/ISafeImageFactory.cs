@@ -12,6 +12,7 @@ public interface ISafeImageFactory
 {
     /// <summary>
     /// ArrayPool管理下のSafeImageインスタンスを生成
+    /// Phase 12: stride引数追加（明示的Stride伝達）
     /// </summary>
     /// <param name="rentedBuffer">ArrayPoolから借用したバッファ</param>
     /// <param name="arrayPool">使用中のArrayPoolインスタンス</param>
@@ -20,6 +21,7 @@ public interface ISafeImageFactory
     /// <param name="height">画像高さ</param>
     /// <param name="pixelFormat">ピクセルフォーマット</param>
     /// <param name="id">一意識別ID</param>
+    /// <param name="stride">1行あたりのバイト数（GDI+パディング含む）</param>
     /// <returns>生成されたSafeImageインスタンス</returns>
     SafeImage CreateSafeImage(
         byte[] rentedBuffer,
@@ -28,7 +30,8 @@ public interface ISafeImageFactory
         int width,
         int height,
         ImagePixelFormat pixelFormat,
-        Guid id);
+        Guid id,
+        int stride);
 
     /// <summary>
     /// BitmapからSafeImageインスタンスを生成

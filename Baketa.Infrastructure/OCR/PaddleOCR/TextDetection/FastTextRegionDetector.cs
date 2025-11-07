@@ -133,8 +133,10 @@ public sealed class FastTextRegionDetector(
             }
 
             // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
+            // 🔥 [P0-2_FIX] 元画像サイズを渡して境界クリッピングを有効化
+            var originalImageSize = new Size(image.Width, image.Height);
             var restoredRegions = ocrResults.TextRegions
-                .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor))
+                .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor, originalImageSize))
                 .Where(region => IsRegionValid(region.Bounds))
                 .Select(region => region.Bounds)
                 .ToList();

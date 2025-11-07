@@ -81,8 +81,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         var stopwatch = Stopwatch.StartNew();
         const string OriginalRequestId = "OCR処理";
 
-        _logger.LogInformation("🔍 OCR実行段階開始 - 画像サイズ: {Width}x{Height}", 
+        _logger.LogInformation("🔍 OCR実行段階開始 - 画像サイズ: {Width}x{Height}",
             context.Input.CapturedImage.Width, context.Input.CapturedImage.Height);
+
+        // 🔥 [PHASE5] ROI診断ログ削除 - ROI廃止により不要
 
         try
         {
@@ -185,22 +187,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
 
-            // 🔥 [PHASE10.6] ROI画像の場合、領域検出をスキップして画像全体をOCR
-            // Gemini推奨: Option A - 2段階検出問題の根本解決
+            // 🔥 [PHASE5] ROI特別処理削除 - FullScreenOcr方式に統一、常にテキスト領域検出を実行
             IList<Rectangle>? detectedRegions = null;
-            bool isMultiROICapture = context.Input.Options?.IsMultiROICapture ?? false;
 
-            if (isMultiROICapture)
-            {
-                // ROI画像の場合: 領域検出をスキップし、画像全体を単一領域として扱う
-                detectedRegions = new List<Rectangle>
-                {
-                    new Rectangle(0, 0, ocrImage.Width, ocrImage.Height)
-                };
-                _logger.LogInformation("🔥 [PHASE10.6] ROI画像検出 - 領域検出スキップ、画像全体をOCR: {Width}x{Height}",
-                    ocrImage.Width, ocrImage.Height);
-            }
-            else if (_textRegionDetector != null)
+            if (_textRegionDetector != null)
             {
                 // 通常の全画面キャプチャ: 標準の領域検出を実行
                 try
@@ -230,8 +220,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                     try
                     {
+                        // 🔥 [OPTION_D_POC] パフォーマンス測定開始
+                        var pocStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
                         // TextRegionDetectorAdapter による高精度 ROI 検出実行
                         detectedRegions = await _textRegionDetector.DetectTextRegionsAsync(windowsImage).ConfigureAwait(false);
+
+                        // 🔥 [OPTION_D_POC] パフォーマンス測定終了
+                        pocStopwatch.Stop();
+                        _logger.LogWarning("🔥 [OPTION_D_POC] DetectTextRegionsAsync実行時間: {ElapsedMs}ms (画像サイズ: {Width}x{Height})",
+                            pocStopwatch.ElapsedMilliseconds, windowsImage.Width, windowsImage.Height);
+
                         _logger.LogInformation("🎯 UltraThink: ROI検出完了 - 検出領域数: {RegionCount}", detectedRegions.Count);
                     }
                     finally
@@ -278,14 +277,12 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
                     }
                     
-                    // 🔥 [PHASE10.6] OCR最小サイズチェックの条件分岐
-                    // ROI画像: 20x20ピクセル（PaddleOCR Recognition Modelの最小サイズ）
-                    // 全画面: 50x50ピクセル（Detection + Recognition の安全マージン）
-                    int minimumOcrImageSize = isMultiROICapture ? 20 : 50;
+                    // 🔥 [PHASE5] ROI/全画面条件分岐削除 - FullScreenOcr統一で常に全画面最小サイズ要件
+                    // FullScreenOcr: 50x50ピクセル（Detection + Recognition の安全マージン）
+                    const int minimumOcrImageSize = 50;
                     if (testWidth < minimumOcrImageSize || testHeight < minimumOcrImageSize)
                     {
-                        var contextType = isMultiROICapture ? "ROI画像" : "全画面";
-                        var error = $"🎯 UltraThink Phase 36 + PHASE10.6: OCRに適さない極小画像サイズ: {testWidth}x{testHeight} ({contextType}最小要件: {minimumOcrImageSize}x{minimumOcrImageSize})";
+                        var error = $"🎯 OCRに適さない極小画像サイズ: {testWidth}x{testHeight} (最小要件: {minimumOcrImageSize}x{minimumOcrImageSize})";
                         _logger.LogWarning(error);
                         return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
                     }
@@ -336,54 +333,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                             if (regionOcrResults?.TextRegions?.Count > 0)
                             {
-                                // 🔥 [FIX7_OPTION_C_ROI] ROI特化OCRパス座標変換
-                                // 問題: ROI特化OCRパスにCaptureRegionオフセット加算が欠落していた
-                                // 解決策: ROI相対座標 + CaptureRegionオフセット = 画像絶対座標に変換
-                                // 注意: OcrTextRegion/OcrResultsは不変オブジェクト（immutable）のため新規インスタンス作成
-                                if (context.Input.CaptureRegion != Rectangle.Empty)
-                                {
-                                    var captureRegion = context.Input.CaptureRegion;
-                                    _logger.LogInformation("🔥 [FIX7_OPTION_C_ROI] CaptureRegionオフセット加算開始: ({X},{Y})",
-                                        captureRegion.X, captureRegion.Y);
-
-                                    // 座標変換された新しいTextRegionリストを作成
-                                    var transformedRegions = new List<OcrTextRegion>();
-
-                                    foreach (var textRegion in regionOcrResults.TextRegions)
-                                    {
-                                        var originalBounds = textRegion.Bounds;
-                                        var transformedBounds = new Rectangle(
-                                            originalBounds.X + captureRegion.X,
-                                            originalBounds.Y + captureRegion.Y,
-                                            originalBounds.Width,
-                                            originalBounds.Height);
-
-                                        // 不変オブジェクトなので新しいインスタンスを作成
-                                        var transformedRegion = new OcrTextRegion(
-                                            textRegion.Text,
-                                            transformedBounds,
-                                            textRegion.Confidence,
-                                            textRegion.Contour,
-                                            textRegion.Direction);
-
-                                        transformedRegions.Add(transformedRegion);
-
-                                        _logger.LogDebug("🔥 [FIX7_OPTION_C_ROI] 座標変換 - ROI相対:({RoiX},{RoiY}) + Offset:({OffX},{OffY}) = 画像絶対:({AbsX},{AbsY})",
-                                            originalBounds.X, originalBounds.Y, captureRegion.X, captureRegion.Y,
-                                            transformedBounds.X, transformedBounds.Y);
-                                    }
-
-                                    // 新しいOcrResultsインスタンスを作成
-                                    regionOcrResults = new OcrResults(
-                                        transformedRegions,
-                                        regionOcrResults.SourceImage,
-                                        regionOcrResults.ProcessingTime,
-                                        regionOcrResults.LanguageCode,
-                                        regionOcrResults.RegionOfInterest);
-
-                                    _logger.LogInformation("🔥 [FIX7_OPTION_C_ROI] 座標変換完了 - {Count}個の領域を変換",
-                                        transformedRegions.Count);
-                                }
+                                // ✅ [GEMINI_FIX] FIX7_OPTION_C_ROI座標変換削除
+                                // 理由: PHASE2.5_ROI_COORD_FIXで統一的に座標変換を実行するため、ここでの早期変換は不要
+                                //       二重加算問題（ROI相対 → FIX7で加算 → PHASE2.5で再加算）を完全に解消
+                                // 設計: Single Responsibility Principle準拠、座標変換責務をTextChunk生成直前に集約
 
                                 var regionText = string.Join(" ", regionOcrResults.TextRegions.Select(r => r.Text));
                                 if (!string.IsNullOrWhiteSpace(regionText))
@@ -533,6 +486,24 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             // 🎯 [ROI_IMAGE_SAVE] ROI実行時にテキスト検出領域枠をつけた画像を保存
             try
             {
+                // 🔍 [ULTRATHINK_PHASE20] ocrImage状態確認
+                _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] SaveRoiImageWithTextBounds呼び出し前 - ocrImage型: {ImageType}, Size: {Width}x{Height}",
+                    ocrImage.GetType().Name, ocrImage.Width, ocrImage.Height);
+
+                // context.Input.CapturedImageとの比較
+                if (ocrImage == context.Input.CapturedImage)
+                {
+                    _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] ocrImage == context.Input.CapturedImage (同一インスタンス)");
+                }
+                else
+                {
+                    _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] ocrImage != context.Input.CapturedImage (異なるインスタンス)");
+                    _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] context.Input.CapturedImage - 型: {ImageType}, Size: {Width}x{Height}",
+                        context.Input.CapturedImage?.GetType().Name ?? "NULL",
+                        context.Input.CapturedImage?.Width ?? 0,
+                        context.Input.CapturedImage?.Height ?? 0);
+                }
+
                 // IImage.ToByteArrayAsync()を使用して画像変換による保存機能を実行
                 await SaveRoiImageWithTextBounds(ocrImage, textChunks, context.Input.ContextId, stopwatch.Elapsed);
             }
@@ -618,28 +589,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         // 🔥 [OPTION_A_FIX] 各OcrTextRegionごとにTextChunkを個別生成
                         foreach (var positionedResult in positionedResults)
                         {
+                            // ✅ [GEMINI_FIX2] PHASE2.5_ROI_COORD_FIX削除
+                            // 理由: FIX6_NORMALIZE (AggregatedChunksReadyEventHandler) で統一的に座標変換を実行
+                            // 設計: OCR段階ではROI画像相対座標のまま保持、翻訳段階で画面絶対座標に変換
+                            // Separation of Concerns原則準拠
                             var roiBounds = positionedResult.BoundingBox;
 
-                            // 🔥 [PHASE2.5_ROI_COORD_FIX] ROI相対座標 → 画像絶対座標変換
-                            if (captureRegionForTransform.HasValue)
-                            {
-                                var captureRegion = captureRegionForTransform.Value;
-                                var originalRoiBounds = roiBounds;
-                                roiBounds = new Rectangle(
-                                    roiBounds.X + captureRegion.X,
-                                    roiBounds.Y + captureRegion.Y,
-                                    roiBounds.Width,
-                                    roiBounds.Height);
-
-                                _logger.LogDebug("🔥 [ROI_COORD_FIX] ROI相対座標変換 - ROI相対:({RoiX},{RoiY}) + CaptureRegion:({CapX},{CapY}) → 画像絶対:({AbsX},{AbsY})",
-                                    originalRoiBounds.X, originalRoiBounds.Y, captureRegion.X, captureRegion.Y, roiBounds.X, roiBounds.Y);
-                            }
-
-                            // 座標変換後のPositionedTextResult作成
+                            // ROI画像相対座標のままPositionedTextResult作成
                             var transformedResult = new PositionedTextResult
                             {
                                 Text = positionedResult.Text,
-                                BoundingBox = roiBounds, // 画像絶対座標
+                                BoundingBox = roiBounds, // ROI画像相対座標（変換なし）
                                 Confidence = positionedResult.Confidence,
                                 ChunkId = _nextChunkId,
                                 ProcessingTime = positionedResult.ProcessingTime,
@@ -736,13 +696,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     {
         try
         {
-            // 🎯 [ROI_IMAGE_SAVE] IImage.ToByteArrayAsync()を使用してBitmapに変換
-            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] 画像変換開始 - テキスト領域数: {textChunks.Count}");
+            // 🔍 [ULTRATHINK_PHASE20] 詳細ログ追加 - AppData ROI画像破損調査
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] SaveRoiImageWithTextBounds開始 - ocrImage型: {ImageType}, Size: {Width}x{Height}, テキスト領域数: {ChunkCount}",
+                ocrImage.GetType().Name, ocrImage.Width, ocrImage.Height, textChunks.Count);
 
             var imageBytes = await ocrImage.ToByteArrayAsync().ConfigureAwait(false);
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] ToByteArrayAsync完了 - バイト数: {ByteCount}", imageBytes.Length);
 
             using var memoryStream = new MemoryStream(imageBytes);
             using var sourceBitmap = new Bitmap(memoryStream);
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] sourceBitmap作成完了 - Size: {Width}x{Height}, PixelFormat: {Format}",
+                sourceBitmap.Width, sourceBitmap.Height, sourceBitmap.PixelFormat);
 
             // 🔥 [ARRAYPOOL_FIX] SafeImage ArrayPool破損回避 - 防御的Bitmapクローン作成
             // 問題: ReferencedSafeImage.ToByteArrayAsync()がArrayPoolメモリから読み取り
@@ -752,6 +716,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             using (var g = Graphics.FromImage(bitmap))
             {
                 g.DrawImage(sourceBitmap, 0, 0);
+                _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] Bitmapクローン作成完了 - DrawImage(sourceBitmap, 0, 0) 実行");
             }
 
             // 保存ディレクトリの準備
@@ -793,12 +758,18 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             }
 
             // 画像として保存
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] PNG保存直前 - bitmap: {Width}x{Height}, ファイル: {FilePath}",
+                bitmap.Width, bitmap.Height, filePath);
+
             bitmap.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
 
-            // デバッグログ出力
-            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] ROI画像保存成功 - ファイル: {fileName}");
-            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] テキスト領域数: {regionCount}, 画像サイズ: {bitmap.Width}x{bitmap.Height}");
-            _logger?.LogDebug($"🖼️ [ROI_IMAGE_SAVE] 保存先: {filePath}");
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] PNG保存完了 - ファイル: {FileName}, テキスト領域数: {RegionCount}",
+                fileName, regionCount);
+
+            // ファイル情報確認
+            var fileInfo = new System.IO.FileInfo(filePath);
+            _logger?.LogWarning("🔍 [ULTRATHINK_PHASE20] 保存ファイル情報 - サイズ: {FileSize} bytes, 存在: {Exists}",
+                fileInfo.Length, fileInfo.Exists);
 
             _logger.LogInformation("🎯 [ROI_IMAGE_SAVE] ROI画像保存完了 - ファイル: {FileName}, 領域数: {RegionCount}",
                 fileName, regionCount);

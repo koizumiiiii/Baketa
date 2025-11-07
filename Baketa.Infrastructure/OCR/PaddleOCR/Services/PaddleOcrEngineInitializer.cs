@@ -121,9 +121,13 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                             {
                                 var engine = new PaddleOcrAll(models)
                                 {
-                                    AllowRotateDetection = true,
+                                    AllowRotateDetection = true, // ✅ [PHASE10.26_REVERT] commit 09e1fc3の正常動作設定に戻す - false設定が原因で検出激減（8→1個）
                                     Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
                                 };
+
+                                // 🔥 [PHASE10.26_DEBUG_A] 設定確認ログ
+                                Console.WriteLine($"🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={engine.AllowRotateDetection}");
+                                _logger?.LogDebug("🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={AllowRotateDetection}", engine.AllowRotateDetection);
 
                                 // 🔥 [PHASE13.2.2_FIX] 各ワーカーインスタンスに検出最適化適用
                                 try
@@ -135,6 +139,10 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                                 {
                                     _logger?.LogWarning(optEx, "⚠️ ワーカーインスタンス最適化で警告（処理継続）");
                                 }
+
+                                // 🔥 [PHASE10.26_DEBUG_A] 最終確認ログ
+                                Console.WriteLine($"🔥 [DEBUG_A] factory return直前: AllowRotateDetection={engine.AllowRotateDetection}");
+                                _logger?.LogDebug("🔥 [DEBUG_A] factory return直前: AllowRotateDetection={AllowRotateDetection}", engine.AllowRotateDetection);
 
                                 return engine;
                             },

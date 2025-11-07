@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Reflection; // 🔥 [ULTRATHINK_PHASE7] リフレクション経由でGetUnderlyingBitmap()呼び出し
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using TextDetectionMethod = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 using IOcrEngine = Baketa.Core.Abstractions.OCR.IOcrEngine;
 using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
+using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory; // 🔥 [ULTRATHINK_PHASE7] Bitmap直接変換用
 using Timer = System.Threading.Timer;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
@@ -26,12 +28,21 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private readonly ILogger<AdaptiveTextRegionDetector> _logger;
     private readonly IOcrEngine? _ocrEngine;
     private readonly IImageFactory? _imageFactory;
+    private readonly IWindowsImageFactory? _windowsImageFactory; // 🔥 [ULTRATHINK_PHASE7] PNG round-trip回避用
     private readonly Dictionary<string, object> _parameters = [];
     private readonly ConcurrentQueue<DetectionHistoryEntry> _detectionHistory = [];
     private readonly ConcurrentDictionary<string, RegionTemplate> _regionTemplates = [];
     private readonly Timer _adaptationTimer;
     
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    /// <summary>
+    /// 🔥 [ULTRATHINK_PHASE9] Gemini推奨改善: 型名定数化でリネーム脆弱性解消
+    /// SimpleAdvancedImageAdapter型の名前（リフレクションで使用）
+    /// この定数により、リネーム時の影響箇所を明確化し、検索・メンテナンスを容易にする
+    /// </summary>
+    private const string SimpleAdvancedImageAdapterTypeName = "SimpleAdvancedImageAdapter";
+
     private bool _disposed;
     private int _detectionCount;
     private const int MaxHistorySize = 100;
@@ -44,11 +55,13 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     public AdaptiveTextRegionDetector(
         ILogger<AdaptiveTextRegionDetector> logger,
         IOcrEngine? ocrEngine = null,
-        IImageFactory? imageFactory = null)
+        IImageFactory? imageFactory = null,
+        IWindowsImageFactory? windowsImageFactory = null) // 🔥 [ULTRATHINK_PHASE7] PNG round-trip回避用
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrEngine = ocrEngine;
         _imageFactory = imageFactory;
+        _windowsImageFactory = windowsImageFactory; // 🔥 [ULTRATHINK_PHASE7] Bitmap直接変換用
 
         InitializeDefaultParameters();
 
@@ -57,8 +70,8 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
             TimeSpan.FromMilliseconds(AdaptationIntervalMs),
             TimeSpan.FromMilliseconds(AdaptationIntervalMs));
 
-        _logger.LogInformation("適応的テキスト領域検出器を初期化 - PaddleOCR統合: {HasOcr}, ImageFactory: {HasFactory}",
-            _ocrEngine != null, _imageFactory != null);
+        _logger.LogInformation("適応的テキスト領域検出器を初期化 - PaddleOCR統合: {HasOcr}, ImageFactory: {HasFactory}, WindowsImageFactory: {HasWindowsFactory}",
+            _ocrEngine != null, _imageFactory != null, _windowsImageFactory != null);
     }
 
     /// <summary>
@@ -223,8 +236,10 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 _logger.LogDebug("🔍 [K-28_STEP4] 座標復元処理開始: {RegionCount}個の領域", ocrResults.TextRegions.Count);
 
                 // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
+                // 🔥 [P0-2_FIX] 元画像サイズを渡して境界クリッピングを有効化
+                var originalImageSize = new Size(image.Width, image.Height);
                 var restoredRegions = ocrResults.TextRegions
-                    .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor))
+                    .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor, originalImageSize))
                     .Where(region => IsRegionValid(region.Bounds))
                     .ToList();
 
@@ -645,7 +660,19 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     #region Helper Methods
 
     /// <summary>
-    /// IAdvancedImage を IImage に変換
+    /// 🔥 [ULTRATHINK_PHASE7] IAdvancedImage を IImage に変換 - PNG round-trip回避
+    ///
+    /// SimpleAdvancedImageAdapterの場合:
+    ///   - リフレクションでGetUnderlyingBitmap()を呼び出し（アーキテクチャクリーン）
+    ///   - IWindowsImageFactory.CreateFromBitmap()で直接SafeImage生成
+    ///   - PNG経由の劣化を完全回避（Format24bppRgb問題解決）
+    ///
+    /// その他のIAdvancedImage実装:
+    ///   - 既存のPNG経由変換を維持（後方互換性）
+    ///
+    /// アーキテクチャノート:
+    ///   - Baketa.Infrastructure → Baketa.Infrastructure.Platform参照を回避
+    ///   - リフレクション使用でClean Architecture原則を維持
     /// </summary>
     private async Task<IImage> ConvertAdvancedImageToImageAsync(IAdvancedImage advancedImage)
     {
@@ -656,6 +683,42 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
 
         try
         {
+            // 🔥 [ULTRATHINK_PHASE10_DEBUG] 変換ルート診断ログ
+            var actualTypeName = advancedImage.GetType().Name;
+            var hasWindowsFactory = _windowsImageFactory != null;
+            _logger.LogDebug("🔍 [ULTRATHINK_PHASE10_DEBUG] 変換前診断 - 型名: {ActualTypeName}, 期待型名: {ExpectedTypeName}, 一致: {TypeMatch}, WindowsFactory: {HasWindowsFactory}",
+                actualTypeName, SimpleAdvancedImageAdapterTypeName, actualTypeName == SimpleAdvancedImageAdapterTypeName, hasWindowsFactory);
+
+            // 🔥 [ULTRATHINK_PHASE7] SimpleAdvancedImageAdapterの場合はPNG round-trip回避
+            // 🔥 [ULTRATHINK_PHASE9] Gemini推奨改善: 型名定数使用でリネーム脆弱性解消
+            if (advancedImage.GetType().Name == SimpleAdvancedImageAdapterTypeName && _windowsImageFactory != null)
+            {
+                _logger.LogDebug("🔥 [ULTRATHINK_PHASE7] SimpleAdvancedImageAdapter検出 - Bitmap直接変換開始（リフレクション使用）");
+
+                // リフレクションでGetUnderlyingBitmap()を呼び出し（アーキテクチャクリーン）
+                var method = advancedImage.GetType().GetMethod("GetUnderlyingBitmap", BindingFlags.Public | BindingFlags.Instance);
+                if (method != null && method.ReturnType == typeof(Bitmap))
+                {
+                    var bitmap = (Bitmap?)method.Invoke(advancedImage, null);
+                    if (bitmap != null)
+                    {
+                        var windowsImage = _windowsImageFactory.CreateFromBitmap(bitmap);
+
+                        _logger.LogDebug("✅ [ULTRATHINK_PHASE7] Bitmap直接変換成功 - Size: {Width}x{Height}",
+                            windowsImage.Width, windowsImage.Height);
+
+                        // IWindowsImageはIImageではないため、明示的にIImageとして扱う
+                        // CreateFromBitmapは内部でSafeImageを生成し、SafeImageAdapterでIWindowsImageを実装
+                        return (IImage)windowsImage;
+                    }
+                }
+
+                // GetUnderlyingBitmap()が利用できない場合はPNG経由にフォールバック
+                _logger.LogWarning("⚠️ [ULTRATHINK_PHASE7] GetUnderlyingBitmap()メソッドが利用不可 - PNG経由にフォールバック");
+            }
+
+            // 従来のPNG経由変換（その他の実装またはフォールバック）
+            _logger.LogDebug("🔄 PNG経由変換開始（非SimpleAdvancedImageAdapterまたはフォールバック）");
             var imageBytes = await advancedImage.ToByteArrayAsync().ConfigureAwait(false);
             return await _imageFactory.CreateFromBytesAsync(imageBytes).ConfigureAwait(false);
         }

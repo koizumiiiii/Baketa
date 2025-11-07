@@ -11,46 +11,75 @@ namespace Baketa.Infrastructure.OCR.Scaling;
 public static class CoordinateRestorer
 {
     /// <summary>
-    /// スケーリングされた座標を元のスケールに復元
+    /// スケーリングされた座標を元のスケールに復元（Gemini改善版 - 境界クリッピング対応）
     /// </summary>
     /// <param name="scaledRect">スケーリング後の座標</param>
     /// <param name="scaleFactor">スケール係数</param>
+    /// <param name="originalImageSize">元画像サイズ（境界クリッピング用）</param>
     /// <returns>元スケールでの座標</returns>
-    public static Rectangle RestoreOriginalCoordinates(Rectangle scaledRect, double scaleFactor)
+    /// <remarks>
+    /// 🎯 [P0-2_GEMINI_FIX] Math.Round四捨五入問題の完全解決:
+    /// - Math.Floor（座標）+ Math.Ceiling（サイズ）で累積誤差を防止
+    /// - 右下座標(x2, y2)先計算方式で精度向上
+    /// - 境界クリッピングで画像範囲外アクセス防止
+    /// </remarks>
+    public static Rectangle RestoreOriginalCoordinates(Rectangle scaledRect, double scaleFactor, Size originalImageSize)
     {
         if (Math.Abs(scaleFactor - 1.0) < 0.001) // スケーリングされていない場合
         {
             return scaledRect;
         }
-        
+
         if (scaleFactor <= 0)
         {
             throw new ArgumentException($"Invalid scale factor: {scaleFactor}");
         }
-        
-        return new Rectangle(
-            x: (int)Math.Round(scaledRect.X / scaleFactor),
-            y: (int)Math.Round(scaledRect.Y / scaleFactor), 
-            width: (int)Math.Round(scaledRect.Width / scaleFactor),
-            height: (int)Math.Round(scaledRect.Height / scaleFactor)
-        );
+
+        // 🔥 [P0-2_GEMINI_IMPROVED] 浮動小数点演算を先に実行
+        double originalX = scaledRect.X / scaleFactor;
+        double originalY = scaledRect.Y / scaleFactor;
+        double originalWidth = scaledRect.Width / scaleFactor;
+        double originalHeight = scaledRect.Height / scaleFactor;
+
+        // 🔥 [P0-2_GEMINI_IMPROVED] 左上はFloor、右下はCeilingで最大精度確保
+        int x1 = (int)Math.Floor(originalX);
+        int y1 = (int)Math.Floor(originalY);
+        int x2 = (int)Math.Ceiling(originalX + originalWidth);
+        int y2 = (int)Math.Ceiling(originalY + originalHeight);
+
+        // 🔥 [P0-2_GEMINI_IMPROVED] 境界クリッピング - 画像範囲外アクセス防止
+        x1 = Math.Max(0, x1);
+        y1 = Math.Max(0, y1);
+        x2 = Math.Min(originalImageSize.Width, x2);
+        y2 = Math.Min(originalImageSize.Height, y2);
+
+        // 🔥 [P0-2_GEMINI_IMPROVED] クリッピング後の座標から幅・高さ計算
+        int finalWidth = Math.Max(0, x2 - x1);
+        int finalHeight = Math.Max(0, y2 - y1);
+
+        return new Rectangle(x1, y1, finalWidth, finalHeight);
     }
     
     /// <summary>
-    /// OCRテキスト領域の座標を復元
+    /// OCRテキスト領域の座標を復元（境界クリッピング対応）
     /// </summary>
     /// <param name="scaledRegion">スケーリング後のテキスト領域</param>
     /// <param name="scaleFactor">スケール係数</param>
+    /// <param name="originalImageSize">元画像サイズ（境界クリッピング用）</param>
     /// <returns>元スケールでのテキスト領域</returns>
-    public static OcrTextRegion RestoreTextRegion(OcrTextRegion scaledRegion, double scaleFactor)
+    /// <remarks>
+    /// 🎯 [P0-2_GEMINI_FIX] RestoreOriginalCoordinatesに元画像サイズを渡す
+    /// </remarks>
+    public static OcrTextRegion RestoreTextRegion(OcrTextRegion scaledRegion, double scaleFactor, Size originalImageSize)
     {
         if (Math.Abs(scaleFactor - 1.0) < 0.001) // スケーリングされていない場合
         {
             return scaledRegion;
         }
-        
-        var restoredBounds = RestoreOriginalCoordinates(scaledRegion.Bounds, scaleFactor);
-        
+
+        // 🔥 [P0-2_FIX] 元画像サイズを渡して境界クリッピングを有効化
+        var restoredBounds = RestoreOriginalCoordinates(scaledRegion.Bounds, scaleFactor, originalImageSize);
+
         return new OcrTextRegion(
             text: scaledRegion.Text,
             bounds: restoredBounds,
@@ -59,18 +88,21 @@ public static class CoordinateRestorer
     }
     
     /// <summary>
-    /// OCR結果全体の座標を復元
+    /// OCR結果全体の座標を復元（境界クリッピング対応）
     /// </summary>
     /// <param name="scaledResults">スケーリング後のOCR結果</param>
     /// <param name="scaleFactor">スケール係数</param>
     /// <param name="originalImage">元画像（復元後のOcrResultsで使用）</param>
     /// <returns>元スケールでのOCR結果</returns>
-    public static OcrResults RestoreOcrResults(OcrResults scaledResults, double scaleFactor, 
+    /// <remarks>
+    /// 🎯 [P0-2_FIX] 元画像サイズを自動取得して境界クリッピングを有効化
+    /// </remarks>
+    public static OcrResults RestoreOcrResults(OcrResults scaledResults, double scaleFactor,
         Baketa.Core.Abstractions.Imaging.IImage originalImage)
     {
         ArgumentNullException.ThrowIfNull(scaledResults);
         ArgumentNullException.ThrowIfNull(originalImage);
-        
+
         if (Math.Abs(scaleFactor - 1.0) < 0.001) // スケーリングされていない場合
         {
             return new OcrResults(
@@ -82,19 +114,22 @@ public static class CoordinateRestorer
                 scaledResults.Text
             );
         }
-        
+
+        // 🔥 [P0-2_FIX] 元画像サイズを取得
+        var originalImageSize = new Size(originalImage.Width, originalImage.Height);
+
         // 各テキスト領域の座標を復元
         var restoredRegions = scaledResults.TextRegions
-            .Select(region => RestoreTextRegion(region, scaleFactor))
+            .Select(region => RestoreTextRegion(region, scaleFactor, originalImageSize))
             .ToList();
-        
+
         // ROIも復元（存在する場合）
         Rectangle? restoredRoi = null;
         if (scaledResults.RegionOfInterest.HasValue)
         {
-            restoredRoi = RestoreOriginalCoordinates(scaledResults.RegionOfInterest.Value, scaleFactor);
+            restoredRoi = RestoreOriginalCoordinates(scaledResults.RegionOfInterest.Value, scaleFactor, originalImageSize);
         }
-        
+
         return new OcrResults(
             restoredRegions,
             originalImage, // 元画像を使用
@@ -106,17 +141,21 @@ public static class CoordinateRestorer
     }
     
     /// <summary>
-    /// 複数の座標を一括で復元
+    /// 複数の座標を一括で復元（境界クリッピング対応）
     /// </summary>
     /// <param name="scaledRectangles">スケーリング後の座標リスト</param>
     /// <param name="scaleFactor">スケール係数</param>
+    /// <param name="originalImageSize">元画像サイズ（境界クリッピング用）</param>
     /// <returns>元スケールでの座標リスト</returns>
-    public static IList<Rectangle> RestoreMultipleCoordinates(IEnumerable<Rectangle> scaledRectangles, double scaleFactor)
+    /// <remarks>
+    /// 🎯 [P0-2_FIX] 境界クリッピングを有効化
+    /// </remarks>
+    public static IList<Rectangle> RestoreMultipleCoordinates(IEnumerable<Rectangle> scaledRectangles, double scaleFactor, Size originalImageSize)
     {
         ArgumentNullException.ThrowIfNull(scaledRectangles);
-        
+
         return scaledRectangles
-            .Select(rect => RestoreOriginalCoordinates(rect, scaleFactor))
+            .Select(rect => RestoreOriginalCoordinates(rect, scaleFactor, originalImageSize))
             .ToList();
     }
     

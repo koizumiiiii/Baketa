@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Imaging; // 🔥 [PHASE12.3.1] PixelDataLock型参照のため追加
 
 namespace Baketa.Core.Abstractions.Memory;
 
@@ -105,8 +106,16 @@ public sealed class SafeImage : IDisposable
     public int DataLength => _actualDataLength;
 
     /// <summary>
+    /// 1行あたりのバイト数（Stride）
+    /// Phase 12: GDI+のメモリパディングを含む実際のストライド値
+    /// Mat.FromPixelData()へ正確に渡すために必要
+    /// </summary>
+    public int Stride { get; }
+
+    /// <summary>
     /// コンストラクタ（SafeImageFactoryパターンからアクセス可能）
     /// Phase 3: Clean Architecture維持のため、Factoryパターン経由でのみ利用を想定
+    /// Phase 12: stride引数追加（明示的Stride伝達）
     /// </summary>
     public SafeImage(
         byte[] rentedBuffer,
@@ -115,7 +124,8 @@ public sealed class SafeImage : IDisposable
         int width,
         int height,
         ImagePixelFormat pixelFormat,
-        Guid id)
+        Guid id,
+        int stride)
     {
         _rentedBuffer = rentedBuffer ?? throw new ArgumentNullException(nameof(rentedBuffer));
         _arrayPool = arrayPool ?? throw new ArgumentNullException(nameof(arrayPool));
@@ -124,6 +134,7 @@ public sealed class SafeImage : IDisposable
         Height = height;
         PixelFormat = pixelFormat;
         Id = id;
+        Stride = stride; // 🔥 [PHASE12.1] GDI+から取得したStride値を保存
         CreatedAt = DateTime.UtcNow;
     }
 
@@ -152,6 +163,19 @@ public sealed class SafeImage : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new ReadOnlyMemory<byte>(_rentedBuffer, 0, _actualDataLength);
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE12.3.1] 生ピクセルデータへの直接アクセス - Stride情報を含む
+    /// Phase 12.3でStride対応Mat生成のため実装完了
+    /// SafeImageはArrayPoolで管理されているため、unlockActionは不要（Dispose()で一括解放）
+    /// </summary>
+    public PixelDataLock LockPixelData()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var data = GetImageData();
+        // SafeImageの場合、unlockActionは不要（ArrayPoolはDispose()で管理）
+        return new PixelDataLock(data, Stride, () => { /* No-op for SafeImage */ });
     }
 
     /// <summary>
@@ -191,6 +215,13 @@ public enum ImagePixelFormat
     /// RGB 24bit
     /// </summary>
     Rgb24,
+
+    /// <summary>
+    /// 🔥 [ULTRATHINK_PHASE10.6] BGR 24bit (GDI+ Format24bppRgb実体)
+    /// Microsoft GDI+仕様: Format24bppRgbは実際にBGRバイトオーダーで保存される
+    /// 参照: https://docs.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-constant-image-pixel-format-constants
+    /// </summary>
+    Bgr24,
 
     /// <summary>
     /// グレースケール 8bit
