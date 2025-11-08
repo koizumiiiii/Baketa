@@ -944,7 +944,7 @@ public sealed class BatchOcrProcessor(
                 var optimizationOptions = new PerformanceOptimizationOptions
                 {
                     PreferGpuAcceleration = true,
-                    UseStickyRoi = true,
+                    // [ROI_DELETION] UseStickyRoi削除 - レガシー機能除去
                     Priority = PerformancePriority.Balanced,
                     QualitySettings = QualitySpeedTradeoff.Balanced,
                     EnableTdrProtection = true

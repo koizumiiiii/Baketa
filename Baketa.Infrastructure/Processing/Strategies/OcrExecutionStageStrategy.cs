@@ -453,9 +453,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     for (int i = 0; i < Math.Min(textChunks.Count, 10); i++) // 最大10個まで
                     {
                         var chunk = textChunks[i];
-                        if (chunk is Baketa.Core.Abstractions.OCR.TextRegion textRegion)
+                        if (chunk is Baketa.Core.Abstractions.OCR.TextDetection.TextRegion textRegion)
                         {
-                            _logger?.LogDebug($"📝 [OCR_RESULT] チャンク{i + 1}: テキスト='{textRegion.Text}', " +
+                            // [ROI_DELETION] TextRegionにTextプロパティは存在しない（位置情報のみ）
+                            _logger?.LogDebug($"📝 [OCR_RESULT] チャンク{i + 1}: " +
                                 $"座標=({textRegion.Bounds.X},{textRegion.Bounds.Y}), " +
                                 $"サイズ=({textRegion.Bounds.Width}x{textRegion.Bounds.Height}), " +
                                 $"信頼度={textRegion.Confidence:F3}");
@@ -739,7 +740,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             int regionCount = 0;
             foreach (var chunk in textChunks)
             {
-                if (chunk is Baketa.Core.Abstractions.OCR.TextRegion textRegion)
+                if (chunk is Baketa.Core.Abstractions.OCR.TextDetection.TextRegion textRegion)
                 {
                     // テキスト領域に赤い枠を描画
                     var rect = new System.Drawing.Rectangle(

@@ -85,8 +85,7 @@ namespace Baketa.Infrastructure.DI.Modules;
             // 🔄 P1: 段階的フィルタリングシステム
             RegisterStagedFilteringServices(services);
 
-            // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
-            RegisterStickyRoiServices(services);
+            // [ROI_DELETION] スティッキーROIシステム登録削除 - レガシー機能除去
 
             // 🔥 [PHASE12.5.3_FIX] NLLB-200翻訳サービス登録を削除
             // 理由: RegisterServices(services, config)メソッドで既に登録されるため重複を回避
@@ -149,13 +148,12 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // 🔄 Phase 1: 画像変化検知システム
             RegisterImageChangeDetectionServices(services);
-            
+
             // 🔄 P1: 段階的フィルタリングシステム（appsettings.json対応）
             RegisterStagedFilteringServices(services, configuration);
-            
-            // スティッキーROIシステム（Issue #143 Week 3: 処理効率向上）
-            RegisterStickyRoiServices(services);
-            
+
+            // [ROI_DELETION] スティッキーROIシステム登録削除 - レガシー機能除去
+
             // 🔥 [PHASE12.5.4_FIX] RegisterPortManagementServicesを最優先実行
             // 理由: RegisterNllb200TranslationServicesがIPythonServerManager登録状況を確認するため、
             //       先にIPythonServerManagerを登録する必要がある
@@ -512,94 +510,9 @@ namespace Baketa.Infrastructure.DI.Modules;
             // Sprint 2 Phase 1完了: Mock除去準備完了（次スプリントでIntelligentOcrEngine完全実装）
             Console.WriteLine("🚧 Sprint 2 Phase 1: Mock除去準備・基盤整備完了");
             Console.WriteLine("📋 IntelligentOcrEngine完全実装は Sprint 3で実施");
-            
-            // 🎯 UltraThink Phase 64修正: IGpuOcrEngine登録を条件付きで実行
-            // IImageFactoryが利用可能な場合のみ登録（ApplicationModule登録完了後）
-            services.AddSingleton<Baketa.Core.Abstractions.GPU.IGpuOcrEngine>(provider =>
-            {
-                var logger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
-                var imageFactory = provider.GetService<Baketa.Core.Abstractions.Factories.IImageFactory>();
 
-                if (imageFactory == null)
-                {
-                    // ApplicationModule登録が未完了のため、IGpuOcrEngineはnull実装を返す
-                    logger?.LogWarning("🔄 IImageFactory未登録のため、IGpuOcrEngine機能は無効化されます");
-                    throw new InvalidOperationException("IImageFactory not available - IGpuOcrEngine cannot be initialized");
-                }
-
-                var basePaddleOcr = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-
-                // ROI統合のためのGpuOcrEngineアダプター（通常動作時のみ）
-                var adapter = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
-                    basePaddleOcr, imageFactory, logger);
-
-                return new SimpleOcrEngineGpuAdapter(adapter,
-                    provider.GetRequiredService<ILogger<SimpleOcrEngineGpuAdapter>>());
-            });
-            Console.WriteLine("✅ IGpuOcrEngine暫定登録完了 - SimpleOcrEngineAdapter経由（Mock完全除去済み）");
-            
+            // [ROI_DELETION] IGpuOcrEngine登録削除 - レガシーROI機能除去
             Console.WriteLine("✅ GPU統合サービス登録完了");
-        }
-        
-        // Sprint 2 Phase 1: 基盤整備完了
-        // IntelligentOcrEngine完全実装はSprint 3で実施
-        
-        /// <summary>
-        /// スティッキーROIシステムを登録します（Issue #143 Week 3: 処理効率向上）。
-        /// Sprint 2統合: IntelligentOcrEngine + ROI最適化
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        private static void RegisterStickyRoiServices(IServiceCollection services)
-        {
-            Console.WriteLine("🎯 Sprint 2統合: スティッキーROIシステム登録開始 - IntelligentOcrEngine統合");
-            
-            // スティッキーROI管理サービス
-            services.AddSingleton<Baketa.Core.Abstractions.OCR.IStickyRoiManager, Baketa.Infrastructure.OCR.StickyRoi.InMemoryStickyRoiManager>();
-            Console.WriteLine("✅ IStickyRoiManager登録完了 - InMemory実装");
-            
-            // ROI拡張OCRエンジン（Sprint 2: IntelligentOcrEngine統合）
-            services.AddSingleton<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>(provider =>
-            {
-                var logger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>>();
-                var roiManager = provider.GetService<Baketa.Core.Abstractions.OCR.IStickyRoiManager>();
-                
-                // ベースエンジン: IntelligentOcrEngineをSimpleOcrEngineとして使用
-                // IntelligentOcrEngineを直接使用する代わりに、Sprint 1で実装したSimpleOcrEngineAdapterを使用
-                var imageFactory = provider.GetService<Baketa.Core.Abstractions.Factories.IImageFactory>();
-
-                if (imageFactory == null || roiManager == null)
-                {
-                    // ApplicationModule登録が未完了のため、StickyRoiEnhancedOcrEngine初期化不可
-                    var errorMsg = $"Dependencies not available - IImageFactory: {imageFactory != null}, IStickyRoiManager: {roiManager != null}";
-                    logger?.LogError(errorMsg);
-                    throw new InvalidOperationException(errorMsg);
-                }
-
-                var basePaddleOcr = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                var adapterLogger = provider.GetService<ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
-
-                var baseOcrEngine = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
-                    basePaddleOcr, imageFactory, adapterLogger);
-                
-                var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
-                var roiEnhancedEngine = new Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine(
-                    logger, baseOcrEngine, roiManager, ocrSettings);
-                
-                logger.LogInformation("🎯 StickyRoiEnhancedOcrEngine統合完了 - " +
-                    "BaseEngine: SimpleOcrEngineAdapter(PaddleOCR), ROI最適化有効, Mock除去済み");
-                
-                return roiEnhancedEngine;
-            });
-            Console.WriteLine("🚀 StickyRoiEnhancedOcrEngine登録完了 - IntelligentOcrEngine統合（Mock完全除去）");
-            
-            // ISimpleOcrEngineとしてROI拡張エンジンを登録
-            services.AddSingleton<Baketa.Infrastructure.OCR.StickyRoi.ISimpleOcrEngine>(provider =>
-            {
-                return provider.GetRequiredService<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>();
-            });
-            Console.WriteLine("✅ ISimpleOcrEngine登録完了 - ROI拡張エンジン統合");
-            
-            Console.WriteLine("✅ スティッキーROIシステム登録完了 - 3-10倍パフォーマンス向上準備完了");
         }
         
         /// <summary>
@@ -767,10 +680,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             
             // パフォーマンス分析サービス
             services.AddSingleton<IAsyncPerformanceAnalyzer, AsyncPerformanceAnalyzer>();
-            
-            // 統合パフォーマンスオーケストレーター（Week 3 Phase 2: 60-80%改善目標）
-            services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
-            Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
+
+            // [ROI_DELETION] IntegratedPerformanceOrchestrator削除 - レガシーROI機能除去
+            // services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
+            // Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
             
             // 🚀 プール化×GPU最適化統合オーケストレーター（最終フェーズ）
             services.AddSingleton<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>();

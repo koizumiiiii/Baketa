@@ -179,10 +179,10 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private async Task InitializePerformanceMonitoringAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("📊 パフォーマンス監視初期化開始");
-        
-        // パフォーマンスオーケストレーターと連携
-        // IntegratedPerformanceOrchestratorが既に動作しているため、連携のみ
-        
+
+        // [ROI_DELETION] IntegratedPerformanceOrchestrator削除済み - パフォーマンス監視は独立動作
+        // パフォーマンスメトリクス収集システム初期化
+
         await Task.CompletedTask;
         _logger.LogInformation("✅ パフォーマンス監視初期化完了");
     }

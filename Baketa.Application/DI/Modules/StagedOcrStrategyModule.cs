@@ -33,54 +33,17 @@ public sealed class StagedOcrStrategyModule : ServiceModuleBase
         // 🎯 高機能版OCRスタック構成
         Console.WriteLine("🚀 HighPerformanceOcrModule.RegisterServices 実行中！");
         
-        // 🎯 Phase 3.1: ROI並列処理統合版PaddleOcrEngineを登録
+        // [ROI_DELETION] ROI並列処理統合削除 - シンプルなPaddleOcrEngine登録に変更
         services.AddTransient<IOcrEngine>(provider =>
         {
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PaddleOcrEngine>>();
             var factory = provider.GetRequiredService<IPaddleOcrEngineFactory>();
-            
-            // Step 1: 標準PaddleOcrEngineを作成
+
+            // 標準PaddleOcrEngineを作成
             var baseOcrEngine = factory.CreateAsync().GetAwaiter().GetResult();
-            
-            // Step 2: Phase 3.1 ROI並列処理機能の統合チェック
-            var enableRoiOptimization = Environment.GetEnvironmentVariable("BAKETA_ENABLE_ROI_OPTIMIZATION");
-            logger.LogInformation("🔍 Phase 3.1: 環境変数チェック - BAKETA_ENABLE_ROI_OPTIMIZATION: '{EnvVar}' (一時的に強制有効)", enableRoiOptimization ?? "null");
-            if (true) // 🚨 Phase 3.1テスト: 一時的に常時有効化
-            {
-                logger.LogInformation("🚀 Phase 3.1: ROI並列処理機能アクティベート開始");
-                
-                try
-                {
-                    // ROI機能統合のための依存関係取得
-                    var imageFactory = provider.GetRequiredService<Baketa.Core.Abstractions.Factories.IImageFactory>();
-                    var roiManager = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IStickyRoiManager>();
-                    var ocrSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
-                    
-                    // Step 2.1: IOcrEngine → ISimpleOcrEngine アダプター
-                    var adapterLogger = provider.GetService<Microsoft.Extensions.Logging.ILogger<Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter>>();
-                    var simpleOcrEngine = new Baketa.Infrastructure.OCR.StickyRoi.SimpleOcrEngineAdapter(
-                        baseOcrEngine, imageFactory, adapterLogger);
-                    
-                    // Step 2.2: StickyRoiEnhancedOcrEngine作成
-                    var stickyRoiLogger = provider.GetService<Microsoft.Extensions.Logging.ILogger<Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine>>();
-                    var stickyRoiEngine = new Baketa.Infrastructure.OCR.StickyRoi.StickyRoiEnhancedOcrEngine(
-                        stickyRoiLogger, simpleOcrEngine, roiManager, ocrSettings);
-                    
-                    // Step 2.3: ISimpleOcrEngine → IOcrEngine 逆アダプター（必要時作成）
-                    // 一旦はsimpleOcrEngineのラッパーとしてbaseOcrEngineを返却
-                    logger.LogInformation("✅ Phase 3.1: ROI並列処理機能統合完了");
-                    
-                    // 注意: 現在はアーキテクチャ制約のため、baseOcrEngineを返却
-                    // 将来的にはROI機能を完全統合予定
-                    return baseOcrEngine;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "⚠️ Phase 3.1: ROI並列処理統合失敗 - 標準エンジン使用");
-                    return baseOcrEngine;
-                }
-            }
-            
+
+            logger.LogInformation("✅ PaddleOcrEngine作成完了 - ROI機能除去済み");
+
             return baseOcrEngine;
         });
         

@@ -11,7 +11,7 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.OCR.TextProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
-using Baketa.Infrastructure.OCR.StickyRoi;
+// [ROI_DELETION] using Baketa.Infrastructure.OCR.StickyRoi; - レガシーROI機能削除
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 
