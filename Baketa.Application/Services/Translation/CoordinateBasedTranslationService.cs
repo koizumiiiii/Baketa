@@ -24,6 +24,7 @@ using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Baketa.Infrastructure.Translation.Local;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Application.Services.Translation;
 
@@ -792,9 +793,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 
                 try
                 {
-                    // インプレース翻訳オーバーレイマネージャーを初期化
-                    await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
-                    
+                    // 🔧 [OVERLAY_UNIFICATION] IOverlayManagerには InitializeAsync メソッドがないため削除
+                    // Win32OverlayManagerはDIコンテナで初期化済み
+
                     // 各テキストチャンクをインプレースで表示
                     _logger?.LogDebug($"\n🎭 インプレース表示開始処理:");
                     foreach (var chunk in textChunks)
@@ -831,11 +832,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             
                             // 🔥 [ULTRAFUIX] UltraThink Phase 9 根本修正: 実際のUI表示処理を復活
                             // 問題: Phase 11.2でコメントアウトされた表示処理により、翻訳成功しても画面に表示されない
-                            // 解決: 実際のShowInPlaceOverlayAsyncを有効化し、真の表示完了を実現
+                            // 🔧 [OVERLAY_UNIFICATION] ShowInPlaceOverlayAsync → ShowAsync に変更
                             Console.WriteLine($"🔥 [ULTRAFUIX] 実際のUI表示処理を実行 - チャンク {chunk.ChunkId}: 画面オーバーレイ表示開始");
-                            _logger?.LogDebug($"🔥 [ULTRAFUIX] ShowInPlaceOverlayAsync実行開始 - チャンク {chunk.ChunkId}");
+                            _logger?.LogDebug($"🔥 [ULTRAFUIX] ShowAsync実行開始 - チャンク {chunk.ChunkId}");
 
-                            await inPlaceOverlayManager!.ShowInPlaceOverlayAsync(chunk, cancellationToken).ConfigureAwait(false);
+                            // 🔧 [OVERLAY_UNIFICATION] OverlayContent と OverlayPosition を作成
+                            var content = new Baketa.Core.Abstractions.UI.Overlays.OverlayContent
+                            {
+                                Text = chunk.TranslatedText,
+                                OriginalText = chunk.CombinedText
+                            };
+
+                            var position = new Baketa.Core.Abstractions.UI.Overlays.OverlayPosition
+                            {
+                                X = chunk.CombinedBounds.X,
+                                Y = chunk.CombinedBounds.Y,
+                                Width = chunk.CombinedBounds.Width,
+                                Height = chunk.CombinedBounds.Height
+                            };
+
+                            await inPlaceOverlayManager!.ShowAsync(content, position).ConfigureAwait(false);
 
                             var overlayResult = overlayMeasurement.Complete();
 

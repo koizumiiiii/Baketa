@@ -32,7 +32,8 @@ public class TranslationPipelineMigrationTests
         services.AddSingleton(Mock.Of<IEventAggregator>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>());
-        services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>());
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>());
         
         // Phase 4 Migration DI configuration
         services.AddSingleton<TranslationPipelineService>();

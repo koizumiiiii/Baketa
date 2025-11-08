@@ -99,7 +99,7 @@ public class TranslationFlowModule : ServiceModuleBase
 
                 // 🔥 [PHASE3_REFACTORING] OverlayUpdateEvent購読削除
                 // SimpleInPlaceOverlayManagerはIEventProcessor<OverlayUpdateEvent>を実装していない
-                // オーバーレイ表示は IInPlaceTranslationOverlayManager.ShowInPlaceOverlayAsync()経由で行う
+                // 🔧 [OVERLAY_UNIFICATION] オーバーレイ表示は IOverlayManager.ShowAsync()経由で行う
 
                 // OverlayUpdateEventの購読を追加（削除済み）
                 /*

@@ -13,6 +13,7 @@ using Baketa.Core.Settings;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Application.Services.UI;
 
@@ -26,7 +27,8 @@ namespace Baketa.Application.Services.UI;
 /// </summary>
 public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEventProcessor<TextDisappearanceEvent>, IHostedService
 {
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly IOverlayManager _overlayManager;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutoOverlayCleanupService> _logger;
     private readonly IOptionsMonitor<AutoOverlayCleanupSettings> _settings;
@@ -60,7 +62,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     public bool SynchronousExecution => false;
     
     public AutoOverlayCleanupService(
-        IInPlaceTranslationOverlayManager overlayManager,
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        IOverlayManager overlayManager,
         IEventAggregator eventAggregator,
         ILogger<AutoOverlayCleanupService> logger,
         IOptionsMonitor<AutoOverlayCleanupSettings> settings)
@@ -190,15 +193,27 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         
         try
         {
-            // 各領域に対してオーバーレイ削除を実行
+            // 🔧 [OVERLAY_UNIFICATION] TODO: IOverlayManagerには領域指定削除機能がないため、Phase 4で実装必要
+            // 暫定対応: 全オーバーレイを削除
+            await _overlayManager.HideAllAsync().ConfigureAwait(false);
+            totalCleaned = regions.Count; // 暫定的に領域数でカウント
+
+            _logger.LogWarning("⚠️ [OVERLAY_UNIFICATION] 領域指定削除未実装のため全オーバーレイを削除 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
+                windowHandle, regions.Count);
+
+            // TODO: Phase 4で以下の機能を IOverlayManager に追加:
+            // - HideOverlaysInAreaAsync(Rectangle region, int excludeChunkId, CancellationToken)
+            // - または、領域内のオーバーレイを取得するメソッド + 個別HideAsync
+
+            /* 元の実装（領域指定削除）:
             foreach (var region in regions)
             {
                 await _overlayManager.HideOverlaysInAreaAsync(region, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
-                totalCleaned++; // 実際の削除数はInPlaceTranslationOverlayManager内で管理されるため、領域数でカウント
+                totalCleaned++;
             }
-            
             _logger.LogDebug("🎯 領域指定オーバーレイ削除完了 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
                 windowHandle, regions.Count);
+            */
         }
         catch (Exception ex)
         {

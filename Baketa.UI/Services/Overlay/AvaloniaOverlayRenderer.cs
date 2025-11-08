@@ -21,6 +21,8 @@ namespace Baketa.UI.Services.Overlay;
 /// Avalonia UI フレームワークを使用したオーバーレイレンダラー
 /// Phase 16 統一実装: IInPlaceTranslationOverlayManager と IEventProcessor<OverlayUpdateEvent> を実装
 /// Legacy システムと新システムの統一インターフェースを提供
+/// 🔧 [OVERLAY_UNIFICATION] 注意: このクラスは旧システム互換性のため IInPlaceTranslationOverlayManager を実装
+/// Win32OverlayManager への完全移行後は廃止予定
 /// </summary>
 public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOverlayManager, IEventProcessor<OverlayUpdateEvent>, IAsyncDisposable, IDisposable
 {

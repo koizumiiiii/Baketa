@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager 用
 using Baketa.Core.Events.Capture;
 using Baketa.Core.Settings;
 using FluentAssertions;
@@ -22,7 +22,8 @@ namespace Baketa.Application.Tests.Services.UI;
 /// </summary>
 public class AutoOverlayCleanupServiceTests : IDisposable
 {
-    private readonly Mock<IInPlaceTranslationOverlayManager> _overlayManagerMock;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly Mock<IOverlayManager> _overlayManagerMock;
     private readonly Mock<IEventAggregator> _eventAggregatorMock;
     private readonly Mock<ILogger<AutoOverlayCleanupService>> _loggerMock;
     private readonly Mock<IOptionsMonitor<AutoOverlayCleanupSettings>> _settingsMock;
@@ -31,7 +32,8 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
     public AutoOverlayCleanupServiceTests()
     {
-        _overlayManagerMock = new Mock<IInPlaceTranslationOverlayManager>();
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        _overlayManagerMock = new Mock<IOverlayManager>();
         _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<AutoOverlayCleanupService>>();
         _settingsMock = new Mock<IOptionsMonitor<AutoOverlayCleanupSettings>>();
@@ -74,7 +76,8 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         await _service.HandleAsync(null!);
 
         // Assert
-        _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
+        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
     }
 
     [Fact]
@@ -96,8 +99,9 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         var statistics = _service.GetStatistics();
         statistics.RejectedByConfidence.Should().Be(1);
         statistics.OverlaysCleanedUp.Should().Be(0);
-        
-        _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
+        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
     }
 
     [Fact]
@@ -121,11 +125,9 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         statistics.OverlaysCleanedUp.Should().Be(2); // Number of regions
         statistics.RejectedByConfidence.Should().Be(0);
 
-        // Verify overlay manager was called for each region
-        foreach (var region in regions)
-        {
-            _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(region, -1, It.IsAny<CancellationToken>()), Times.Once);
-        }
+        // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
+        // 暫定: HideAllAsync が1回呼ばれることを確認
+        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Once);
     }
 
     [Fact]
@@ -200,7 +202,8 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
         // Assert
         result.Should().Be(0);
-        _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
+        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
     }
 
     [Fact]
@@ -229,11 +232,10 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
         // Assert
         result.Should().Be(regions.Count);
-        
-        foreach (var region in regions)
-        {
-            _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(region, -1, It.IsAny<CancellationToken>()), Times.Once);
-        }
+
+        // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
+        // 暫定: HideAllAsync が1回呼ばれることを確認
+        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Once);
     }
 
     [Fact]

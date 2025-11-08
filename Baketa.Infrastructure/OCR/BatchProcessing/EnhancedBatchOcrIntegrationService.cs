@@ -13,6 +13,7 @@ using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Models;
 using ITranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
 
@@ -26,7 +27,8 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     private readonly BatchOcrIntegrationService _baseBatchService;
     private readonly TimedChunkAggregator _timedChunkAggregator;
     private readonly ITranslationService _translationService;
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly IOverlayManager _overlayManager;
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly ILogger<EnhancedBatchOcrIntegrationService> _logger;
@@ -43,7 +45,8 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         BatchOcrIntegrationService baseBatchService,
         TimedChunkAggregator timedChunkAggregator,
         ITranslationService translationService,
-        IInPlaceTranslationOverlayManager overlayManager,
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        IOverlayManager overlayManager,
         IEventAggregator eventAggregator,
         IUnifiedSettingsService unifiedSettingsService,
         IOptionsMonitor<TimedAggregatorSettings> settings,

@@ -465,37 +465,25 @@ internal sealed partial class App : Avalonia.Application
                         // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
                     }
                     
-                    // インプレース翻訳オーバーレイマネージャーを初期化（優先）
-                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager初期化設定");
+                    // 🔧 [OVERLAY_UNIFICATION] オーバーレイマネージャー統合確認
+                    Console.WriteLine("🎯 IOverlayManager (Win32OverlayManager) 初期化確認");
                     try
                     {
-                        var inPlaceOverlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
-                        if (inPlaceOverlayManager != null)
+                        var overlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>();
+                        if (overlayManager != null)
                         {
-                            // UIスレッドデッドロックを避けるため、遅延初期化に変更
-                            Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    Console.WriteLine("🎯 InPlaceTranslationOverlayManager非同期初期化開始");
-                                    await inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
-                                    Console.WriteLine("✅ InPlaceTranslationOverlayManager初期化完了");
-                                }
-                                catch (Exception asyncEx)
-                                {
-                                    Console.WriteLine($"⚠️ InPlaceTranslationOverlayManager非同期初期化失敗: {asyncEx.Message}");
-                                }
-                            });
-                            Console.WriteLine("✅ InPlaceTranslationOverlayManager遅延初期化設定完了");
+                            // 🔧 [OVERLAY_UNIFICATION] Win32OverlayManagerはDIコンテナで初期化済み
+                            // InitializeAsync()メソッドは存在しないため、初期化不要
+                            Console.WriteLine($"✅ IOverlayManager (Win32OverlayManager) DI解決成功: {overlayManager.GetType().Name}");
                         }
                         else
                         {
-                            Console.WriteLine("⚠️ InPlaceTranslationOverlayManagerが見つかりません");
+                            Console.WriteLine("⚠️ IOverlayManagerが見つかりません");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ InPlaceTranslationOverlayManager初期化設定エラー: {ex.Message}");
+                        Console.WriteLine($"❌ IOverlayManager確認エラー: {ex.Message}");
                     }
 
                     // 旧TranslationResultOverlayManagerは削除済み - インプレースシステムが自動で管理
