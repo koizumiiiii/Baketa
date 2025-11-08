@@ -36,7 +36,9 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly IEventAggregator _eventAggregator;
     private readonly IUnifiedSettingsService _settingsService;
     private readonly ITranslationServiceCore _translationService;
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    // 現在は未使用だが、将来の使用を想定してIOverlayManagerに変更
+    private readonly Baketa.Core.Abstractions.UI.Overlays.IOverlayManager _overlayManager;
     private readonly ILogger<TranslationPipelineService> _logger;
     private readonly ILanguageConfigurationService _languageConfig;
     private readonly CancellationTokenSource _cancellationTokenSource;
@@ -68,7 +70,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         IEventAggregator eventAggregator,
         IUnifiedSettingsService settingsService,
         ITranslationServiceCore translationService,
-        IInPlaceTranslationOverlayManager overlayManager,
+        Baketa.Core.Abstractions.UI.Overlays.IOverlayManager overlayManager,
         ILogger<TranslationPipelineService> logger,
         ILanguageConfigurationService languageConfig)
     {

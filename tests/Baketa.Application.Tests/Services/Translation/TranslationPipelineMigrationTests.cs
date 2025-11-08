@@ -64,7 +64,8 @@ public class TranslationPipelineMigrationTests
         var mockEventAggregator = Mock.Of<IEventAggregator>();
         var mockSettingsService = Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>();
         var mockTranslationService = Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>();
-        var mockOverlayManager = Mock.Of<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        var mockOverlayManager = Mock.Of<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>();
         var mockLogger = Mock.Of<ILogger<TranslationPipelineService>>();
         var mockLanguageConfig = Mock.Of<ILanguageConfigurationService>();
 

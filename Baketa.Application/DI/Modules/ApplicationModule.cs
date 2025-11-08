@@ -125,12 +125,13 @@ namespace Baketa.Application.DI.Modules;
             //     Baketa.Application.Services.TranslationModelLoader>();
 
             // 🔧 PHASE 3: TranslationPipelineService DI Registration (Critical Issue対応)
+            // 🎯 [OVERLAY_UNIFICATION] IOverlayManager統合 - Geminiレビュー指摘事項対応
             services.AddSingleton<Baketa.Application.Services.Translation.TranslationPipelineService>(provider =>
             {
                 var eventAggregator = provider.GetRequiredService<IEventAggregator>();
                 var settingsService = provider.GetRequiredService<IUnifiedSettingsService>();
                 var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
-                var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.IInPlaceTranslationOverlayManager>();
+                var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>();
                 var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.TranslationPipelineService>>();
                 var languageConfig = provider.GetRequiredService<ILanguageConfigurationService>();
 
@@ -522,6 +523,6 @@ namespace Baketa.Application.DI.Modules;
             // yield return typeof(InfrastructureModule); // PlatformModule経由で間接取得
             yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
             yield return typeof(CaptureModule); // キャプチャサービス統合
-            // 🗑️ [PHASE18] Phase15OverlayModule削除完了 - 統一オーバーレイシステムに移行
+            yield return typeof(OverlayOrchestrationModule); // オーバーレイ調整・管理システム（旧Phase15OverlayModule）
         }
     }
