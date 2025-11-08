@@ -3,6 +3,7 @@ using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays;
 using Microsoft.Extensions.Logging;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -15,7 +16,7 @@ namespace Baketa.Application.Services.Translation;
 /// </summary>
 public sealed class TranslationControlService : ITranslationControlService, IDisposable
 {
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    private readonly IOverlayManager _overlayManager;
     private readonly IDiagnosticReportService _diagnosticReportService;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<TranslationControlService> _logger;
@@ -34,7 +35,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
     private bool _disposed;
 
     public TranslationControlService(
-        IInPlaceTranslationOverlayManager overlayManager,
+        IOverlayManager overlayManager,
         IDiagnosticReportService diagnosticReportService,
         IEventAggregator eventAggregator,
         ILogger<TranslationControlService> logger)
@@ -206,9 +207,9 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
             Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler.ResetSemaphoreForStop();
             Console.WriteLine("✅ [STOP_CLEANUP_DEBUG] ResetSemaphoreForStop()呼び出し完了");
 
-            // オーバーレイを非表示にしてリセット
-            await _overlayManager.HideAllInPlaceOverlaysAsync();
-            await _overlayManager.ResetAsync();
+            // 🔧 [OVERLAY_UNIFICATION] 統一されたIOverlayManagerでオーバーレイを非表示
+            // Win32OverlayManagerがWindowsOverlayWindowManager.CloseAllOverlaysAsync()を呼び出す
+            await _overlayManager.HideAllAsync();
 
             // 翻訳停止状態に更新
             await UpdateTranslationStateAsync(TranslationStatus.Idle, false, false, false, "StopTranslationAsync");
@@ -232,21 +233,29 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
     {
         if (_disposed) return;
 
+        // TODO [PHASE4]: IOverlayManagerに SetAllOverlaysVisibilityAsync() メソッドを追加してから再実装
+        // 現在はオーバーレイ統一作業中のため、一時的にコメントアウト
+        // Phase 4でWin32OverlayManagerのDI登録完了後に実装する
+        _logger.LogWarning("ToggleTranslationVisibilityAsync は現在実装中です（Phase 4で完成予定）");
+        await Task.CompletedTask;
+
+        /* 元の実装 - Phase 4で復活予定
         try
         {
             var newVisibility = !_isTranslationResultVisible;
-            
+
             // 可視性を切り替え（高速化版 - 削除/再作成ではなく可視性プロパティのみ変更）
             await _overlayManager.SetAllOverlaysVisibilityAsync(newVisibility);
 
             await UpdateTranslationStateAsync(_currentStatus, _isTranslationActive, newVisibility, _isLoading, "ToggleTranslationVisibility");
-            
+
             _logger.LogDebug("翻訳表示切り替え完了: {IsVisible}", newVisibility);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳表示切り替え中にエラーが発生");
         }
+        */
     }
 
     /// <summary>
