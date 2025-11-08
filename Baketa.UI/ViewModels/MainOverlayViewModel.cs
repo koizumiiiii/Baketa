@@ -6,6 +6,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
@@ -51,7 +52,8 @@ public class MainOverlayViewModel : ViewModelBase
         IEventAggregator eventAggregator,
         ILogger<MainOverlayViewModel> logger,
         IWindowManagerAdapter windowManager,
-        IInPlaceTranslationOverlayManager inPlaceOverlayManager,
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        IOverlayManager overlayManager,
         LoadingOverlayManager loadingManager,
         IDiagnosticReportService diagnosticReportService,
         IWindowManagementService windowManagementService,
@@ -60,7 +62,8 @@ public class MainOverlayViewModel : ViewModelBase
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _loadingManager = loadingManager ?? throw new ArgumentNullException(nameof(loadingManager));
         _diagnosticReportService = diagnosticReportService ?? throw new ArgumentNullException(nameof(diagnosticReportService));
         _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
@@ -97,7 +100,8 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     private readonly IWindowManagerAdapter _windowManager;
-    private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly IOverlayManager _overlayManager;
     private readonly LoadingOverlayManager _loadingManager;
     private readonly IDiagnosticReportService _diagnosticReportService;
     private readonly IWindowManagementService _windowManagementService;
@@ -905,23 +909,11 @@ public class MainOverlayViewModel : ViewModelBase
             Logger?.LogDebug($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
 
-            // オーバーレイマネージャーを初期化
-            var overlayInitTimer = System.Diagnostics.Stopwatch.StartNew();
-            Logger?.LogDebug("🖼️ オーバーレイマネージャー初期化開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー初期化開始");
-            Logger?.LogDebug("🖼️ オーバーレイマネージャーを初期化");
-            
-            await _inPlaceOverlayManager.InitializeAsync().ConfigureAwait(false);
-            overlayInitTimer.Stop();
-            Logger?.LogDebug($"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ オーバーレイマネージャー初期化時間: {overlayInitTimer.ElapsedMilliseconds}ms");
-            
-            // オーバーレイマネージャーを表示状態に設定
-            Logger?.LogDebug("🖼️ オーバーレイマネージャー表示状態設定開始");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖼️ オーバーレイマネージャー表示状態設定開始");
+            // 🔧 [OVERLAY_UNIFICATION] IOverlayManagerには InitializeAsync メソッドがないため、初期化処理を削除
+            // Win32OverlayManager は DIコンテナで初期化済み
+            Logger?.LogDebug("🖼️ オーバーレイマネージャーはDI初期化済み（Win32OverlayManager）");
             // ARオーバーレイは自動で表示管理（表示はTextChunk個別処理）
-            Logger?.LogDebug("✅ オーバーレイマネージャー表示状態設定完了");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ オーバーレイマネージャー表示状態設定完了");
+            Logger?.LogDebug("✅ オーバーレイマネージャー準備完了");
 
             var eventTimer = System.Diagnostics.Stopwatch.StartNew();
             Logger?.LogDebug("📢 StartTranslationRequestEventを発行");
@@ -957,7 +949,8 @@ public class MainOverlayViewModel : ViewModelBase
             // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ StartTranslationRequestEvent発行完了 - イベント処理時間: {eventTimer.ElapsedMilliseconds}ms");
 
             overallTimer.Stop();
-            Logger?.LogDebug($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (UI更新: {uiTimer.ElapsedMilliseconds}ms, オーバーレイ初期化: {overlayInitTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
+            // 🔧 [OVERLAY_UNIFICATION] オーバーレイ初期化時間を削除（Win32OverlayManagerは初期化不要）
+            Logger?.LogDebug($"⏱️ 【総合時間】翻訳開始処理全体: {overallTimer.ElapsedMilliseconds}ms (UI更新: {uiTimer.ElapsedMilliseconds}ms, イベント処理: {eventTimer.ElapsedMilliseconds}ms)");
             
             Logger?.LogInformation("🎉 翻訳が正常に開始されました: '{Title}' - 総処理時間: {TotalMs}ms", selectedWindow.Title, overallTimer.ElapsedMilliseconds);
         }
@@ -1059,14 +1052,14 @@ public class MainOverlayViewModel : ViewModelBase
                 // イベント発行失敗でも継続（後でリトライ）
             }
 
-            // オーバーレイを非表示にしてリセット（OCRリセットとは独立処理）
-            Logger?.LogDebug("🔄 オーバーレイ非表示・リセット開始");
+            // 🔧 [OVERLAY_UNIFICATION] オーバーレイを非表示（IOverlayManager.HideAllAsync）
+            Logger?.LogDebug("🔄 オーバーレイ非表示開始");
             try
             {
-                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                await _overlayManager.HideAllAsync().ConfigureAwait(false);
                 Logger?.LogDebug("✅ オーバーレイ非表示完了");
-                await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
-                Logger?.LogDebug("✅ オーバーレイリセット完了");
+                // 🔧 [OVERLAY_UNIFICATION] IOverlayManagerには ResetAsync メソッドがないため削除
+                // Win32OverlayManagerは HideAllAsync で全オーバーレイを破棄するため、リセット不要
             }
             catch (Exception overlayEx)
             {
