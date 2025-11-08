@@ -75,7 +75,8 @@ internal static class UIServiceCollectionExtensions
         {
             var logger = provider.GetRequiredService<ILogger<TranslationFlowEventProcessor>>();
             var eventAggregator = provider.GetRequiredService<IEventAggregator>();
-            var inPlaceOverlayManager = provider.GetRequiredService<IInPlaceTranslationOverlayManager>();
+            // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+            var overlayManager = provider.GetRequiredService<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>();
             var captureService = provider.GetRequiredService<ICaptureService>();
             var translationService = provider.GetRequiredService<ITranslationOrchestrationService>();
             var settingsService = provider.GetRequiredService<ISettingsService>();
@@ -87,7 +88,7 @@ internal static class UIServiceCollectionExtensions
             return new TranslationFlowEventProcessor(
                 logger,
                 eventAggregator,
-                inPlaceOverlayManager,
+                overlayManager,
                 captureService,
                 translationService,
                 settingsService,

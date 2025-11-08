@@ -16,6 +16,7 @@ using Baketa.UI.Utils;
 using ReactiveUI;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Baketa.Infrastructure.Processing.Strategies; // 🔥 [STOP_FIX] ImageChangeDetectionStageStrategy参照
@@ -37,7 +38,8 @@ public class TranslationFlowEventProcessor :
 {
     private readonly ILogger<TranslationFlowEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
-    private readonly IInPlaceTranslationOverlayManager _inPlaceOverlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly IOverlayManager _overlayManager;
     private readonly ICaptureService _captureService;
     private readonly ITranslationOrchestrationService _translationService;
     private readonly ISettingsService _settingsService;
@@ -61,7 +63,8 @@ public class TranslationFlowEventProcessor :
     public TranslationFlowEventProcessor(
         ILogger<TranslationFlowEventProcessor> logger,
         IEventAggregator eventAggregator,
-        IInPlaceTranslationOverlayManager inPlaceOverlayManager,
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        IOverlayManager overlayManager,
         ICaptureService captureService,
         ITranslationOrchestrationService translationService,
         ISettingsService settingsService,
@@ -72,7 +75,7 @@ public class TranslationFlowEventProcessor :
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _inPlaceOverlayManager = inPlaceOverlayManager ?? throw new ArgumentNullException(nameof(inPlaceOverlayManager));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -250,7 +253,8 @@ public class TranslationFlowEventProcessor :
             _logger.LogDebug("Clearing existing in-place overlays to prevent overlap");
             try
             {
-                await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                // 🔧 [OVERLAY_UNIFICATION] HideAllInPlaceOverlaysAsync() → HideAllAsync() に統一
+                await _overlayManager.HideAllAsync().ConfigureAwait(false);
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ 既存オーバーレイクリア完了");
                 _logger.LogDebug("Successfully cleared existing in-place overlays");
             }
@@ -384,17 +388,13 @@ public class TranslationFlowEventProcessor :
             var statusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
             await _eventAggregator.PublishAsync(statusEvent).ConfigureAwait(false);
 
-            // 2. 🚨 [STOP_FIX] すべてのインプレースオーバーレイを非表示・リセット
-            Console.WriteLine("🛑 [Stop機能] すべてのインプレースオーバーレイを非表示中...");
-            await _inPlaceOverlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
-            Console.WriteLine("✅ [Stop機能] すべてのインプレースオーバーレイ非表示完了");
-            
-            // 🔄 [STOP_FIX] オーバーレイマネージャーを完全リセット
-            Console.WriteLine("🔄 [Stop機能] オーバーレイマネージャーリセット中...");
-            await _inPlaceOverlayManager.ResetAsync().ConfigureAwait(false);
-            Console.WriteLine("✅ [Stop機能] オーバーレイマネージャーリセット完了");
-            
-            _logger.LogInformation("🚀 Stop機能: すべてのインプレースオーバーレイ非表示・リセット完了");
+            // 2. 🚨 [OVERLAY_UNIFICATION] すべてのオーバーレイを非表示
+            // Win32OverlayManager.HideAllAsync() → WindowsOverlayWindowManager.CloseAllOverlaysAsync()
+            Console.WriteLine("🛑 [Stop機能] すべてのオーバーレイを非表示中...");
+            await _overlayManager.HideAllAsync().ConfigureAwait(false);
+            Console.WriteLine("✅ [Stop機能] すべてのオーバーレイ非表示完了");
+
+            _logger.LogInformation("🚀 Stop機能: すべてのオーバーレイ非表示完了");
 
             // 3. 実際の翻訳停止処理
             await _translationService.StopAutomaticTranslationAsync().ConfigureAwait(false);
@@ -508,8 +508,10 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogDebug("翻訳表示切り替え要求を処理中: IsVisible={IsVisible}", eventData.IsVisible);
 
-            // 高速化: オーバーレイの削除/再作成ではなく可視性のみを変更
-            await _inPlaceOverlayManager.SetAllOverlaysVisibilityAsync(eventData.IsVisible).ConfigureAwait(false);
+            // 🔧 [OVERLAY_UNIFICATION] TODO: IOverlayManagerにSetAllOverlaysVisibilityAsync()メソッドを追加
+            // 現時点では可視性切り替えは未実装
+            _logger.LogWarning("⚠️ 翻訳表示切り替え機能は現在実装中です (Phase 4で完成予定)");
+            await Task.CompletedTask.ConfigureAwait(false);
 
             // 表示状態変更イベントを発行
             var visibilityEvent = new TranslationDisplayVisibilityChangedEvent(eventData.IsVisible);
