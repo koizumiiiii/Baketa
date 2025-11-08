@@ -19,11 +19,6 @@ public interface IPaddleOcrImageProcessor
     Task<(Mat mat, double scaleFactor)> ConvertToMatWithScalingAsync(IImage image, Rectangle? roi, CancellationToken cancellationToken);
 
     /// <summary>
-    /// 言語別最適化前処理を適用
-    /// </summary>
-    Mat ApplyLanguageOptimizations(Mat inputMat, string language);
-
-    /// <summary>
     /// 画像サイズ正規化
     /// </summary>
     Mat NormalizeImageDimensions(Mat inputMat);
