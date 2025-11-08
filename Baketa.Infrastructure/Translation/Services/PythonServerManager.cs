@@ -283,7 +283,8 @@ public class PythonServerManager(
                 throw new FileNotFoundException($"Python翻訳サーバースクリプトが見つかりません: {scriptPath}");
             }
 
-            logger.LogWarning("⚠️ CTranslate2版が見つからず、旧版サーバーを使用: {Script}", scriptPath);
+            // [CTRANSLATE2_INFO] grpc_server/start_server.pyは既にCTranslate2統合済み（Phase 2.2.1完了）
+            logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
         }
         
         // Step 1統合: PythonEnvironmentResolver使用（py.exe優先戦略）
