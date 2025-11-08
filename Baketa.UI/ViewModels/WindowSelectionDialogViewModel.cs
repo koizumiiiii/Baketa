@@ -295,8 +295,19 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// </summary>
     /// <param name="title">ウィンドウタイトル</param>
     /// <returns>開発ツールの場合はtrue</returns>
+    /// <remarks>
+    /// Phase 1: 名称ベース判定を無効化
+    /// 理由: ゲームタイトル（例: "StellarCode"）が "Code" パターンで誤検出される問題
+    /// 開発ツールが選択肢に表示されても、ユーザーが選択するかは自由なので実害なし
+    /// 将来的には、プロセスパス/プロセス名ベースの判定に移行予定（Phase 2）
+    /// </remarks>
     private static bool IsDeveloperToolWindow(string title)
     {
+        // Phase 1: 名称ベース判定を完全無効化
+        return false;
+
+        #region 旧実装（Phase 2でプロセスベース判定に移行予定）
+        /*
         var developerPatterns = new[]
         {
             // IDEs
@@ -323,6 +334,8 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         };
 
         return developerPatterns.Any(pattern => title.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+        */
+        #endregion
     }
 
     /// <summary>
