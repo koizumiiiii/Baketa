@@ -17,16 +17,13 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 {
     private readonly IPaddleOcrUtilities _utilities;
-    private readonly IPaddleOcrLanguageOptimizer _languageOptimizer;
     private readonly ILogger<PaddleOcrImageProcessor>? _logger;
 
     public PaddleOcrImageProcessor(
         IPaddleOcrUtilities utilities,
-        IPaddleOcrLanguageOptimizer languageOptimizer,
         ILogger<PaddleOcrImageProcessor>? logger = null)
     {
         _utilities = utilities ?? throw new ArgumentNullException(nameof(utilities));
-        _languageOptimizer = languageOptimizer ?? throw new ArgumentNullException(nameof(languageOptimizer));
         _logger = logger;
         _logger?.LogInformation("🚀 PaddleOcrImageProcessor初期化完了");
     }
@@ -437,67 +434,77 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
             var originalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
             _logger?.LogDebug("🎯 [PREVENTIVE_START] 予防処理開始: {OriginalInfo}", originalInfo);
 
-            // ステップ1: 極端なサイズ問題の予防
-            var totalPixels = processedMat.Width * processedMat.Height;
+            // 🔥 [PHASE7.2-C] Resize統合最適化: 3回のResize → 1回のResizeに統合
+            // 最終サイズを事前計算して、中間Mat生成を削減（メモリ効率化）
+
+            // Step 1: 初期サイズ取得
+            var currentWidth = processedMat.Width;
+            var currentHeight = processedMat.Height;
+            var totalPixels = currentWidth * currentHeight;
+
+            // Step 2: ピクセル制限の計算
             if (totalPixels > 2000000) // 200万ピクセル制限
             {
                 var scale = Math.Sqrt(2000000.0 / totalPixels);
-                var newWidth = Math.Max(16, (int)(processedMat.Width * scale));
-                var newHeight = Math.Max(16, (int)(processedMat.Height * scale));
+                currentWidth = Math.Max(16, (int)(currentWidth * scale));
+                currentHeight = Math.Max(16, (int)(currentHeight * scale));
 
-                var resizedMat = new Mat();
-                Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
-
-                if (processedMat != inputMat) processedMat.Dispose();
-                processedMat = resizedMat;
-
-                _logger?.LogInformation("🎯 [PREVENTION_RESIZE] 大画像リサイズ: {OriginalPixels:N0} → {NewPixels:N0} pixels",
-                    totalPixels, newWidth * newHeight);
+                _logger?.LogInformation("🎯 [PREVENTION_RESIZE] 大画像リサイズ計算: {OriginalPixels:N0} → {NewPixels:N0} pixels",
+                    totalPixels, currentWidth * currentHeight);
             }
 
-            // ステップ2: 奇数幅・高さの完全解決
-            var needsOddFix = (processedMat.Width % 2 == 1) || (processedMat.Height % 2 == 1);
+            // Step 3: 奇数幅・高さ修正
+            var needsOddFix = (currentWidth % 2 == 1) || (currentHeight % 2 == 1);
             if (needsOddFix)
             {
-                var evenWidth = processedMat.Width + (processedMat.Width % 2);
-                var evenHeight = processedMat.Height + (processedMat.Height % 2);
+                currentWidth = currentWidth + (currentWidth % 2);
+                currentHeight = currentHeight + (currentHeight % 2);
 
-                var evenMat = new Mat();
-                Cv2.Resize(processedMat, evenMat, new OpenCvSharp.Size(evenWidth, evenHeight), 0, 0, InterpolationFlags.Linear);
-
-                if (processedMat != inputMat) processedMat.Dispose();
-                processedMat = evenMat;
-
-                _logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正: {OriginalSize} → {EvenSize}",
-                    $"{inputMat.Width}x{inputMat.Height}", $"{evenWidth}x{evenHeight}");
+                _logger?.LogInformation("🎯 [PREVENTION_ODD] 奇数幅修正計算: → {EvenSize}",
+                    $"{currentWidth}x{currentHeight}");
             }
 
-            // ステップ3: メモリアライメント最適化 (16バイト境界)
-            var alignWidth = processedMat.Width;
-            var alignHeight = processedMat.Height;
+            // Step 4: 16バイトアライメント計算
             var needsAlignment = false;
-
-            if (alignWidth % 16 != 0)
+            if (currentWidth % 16 != 0)
             {
-                alignWidth = ((alignWidth / 16) + 1) * 16;
+                currentWidth = ((currentWidth / 16) + 1) * 16;
                 needsAlignment = true;
             }
-            if (alignHeight % 16 != 0)
+            if (currentHeight % 16 != 0)
             {
-                alignHeight = ((alignHeight / 16) + 1) * 16;
+                currentHeight = ((currentHeight / 16) + 1) * 16;
                 needsAlignment = true;
             }
 
             if (needsAlignment)
             {
-                var alignedMat = new Mat();
-                Cv2.Resize(processedMat, alignedMat, new OpenCvSharp.Size(alignWidth, alignHeight), 0, 0, InterpolationFlags.Linear);
+                _logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列計算: → {AlignedSize}",
+                    $"{currentWidth}x{currentHeight}");
+            }
+
+            // Step 5: サイズ変更が必要か判定し、1回のResizeで完結
+            var needsResize = (currentWidth != processedMat.Width) || (currentHeight != processedMat.Height);
+            if (needsResize)
+            {
+                // 🔥 [PHASE7.2-C] 補間方法の最適化
+                // 縮小時: Area（高品質）、拡大時: Linear（軽量）
+                var isShrinking = (currentWidth * currentHeight) < totalPixels;
+                var interpolation = isShrinking ? InterpolationFlags.Area : InterpolationFlags.Linear;
+
+                var resizedMat = new Mat();
+                Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(currentWidth, currentHeight), 0, 0, interpolation);
 
                 if (processedMat != inputMat) processedMat.Dispose();
-                processedMat = alignedMat;
+                processedMat = resizedMat;
 
-                _logger?.LogDebug("🎯 [PREVENTION_ALIGN] 16バイト境界整列: {OriginalSize} → {AlignedSize}",
-                    $"{inputMat.Width}x{inputMat.Height}", $"{alignWidth}x{alignHeight}");
+                _logger?.LogInformation("✅ [PHASE7.2-C] Resize統合完了: {OriginalSize} → {FinalSize} ({Interpolation})",
+                    $"{inputMat.Width}x{inputMat.Height}", $"{currentWidth}x{currentHeight}",
+                    isShrinking ? "Area" : "Linear");
+            }
+            else
+            {
+                _logger?.LogDebug("⏭️ [PHASE7.2-C] Resize不要: サイズ変更なし");
             }
 
             // ステップ4: チャンネル数正規化
