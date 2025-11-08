@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
 using Baketa.Core.Events.Translation;
 using Baketa.Core.Events.EventTypes; // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] TranslationWithBoundsCompletedEvent用
 using Baketa.Core.Translation.Models;
@@ -33,7 +34,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
     private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
-    private readonly IInPlaceTranslationOverlayManager _overlayManager;
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private readonly IOverlayManager _overlayManager;
     private readonly ILanguageConfigurationService _languageConfig;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
@@ -41,7 +43,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
-        IInPlaceTranslationOverlayManager overlayManager,
+        // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+        IOverlayManager overlayManager,
         ILanguageConfigurationService languageConfig,
         IEventAggregator eventAggregator,
         ILogger<AggregatedChunksReadyEventHandler> logger,
@@ -171,10 +174,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 _logger?.LogDebug($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
-            // 🔥 [OVERLAY_FIX] 直接SimpleInPlaceOverlayManager.ShowInPlaceOverlayAsync()を呼び出し
+            // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示
             // Gemini推奨: TranslationWithBoundsCompletedEventを経由せず、直接オーバーレイ表示
             // 理由: イベントハンドラー未実装により表示されない問題を解決
-            // アーキテクチャ: Application層 → Core層(IInPlaceTranslationOverlayManager)への依存は正しい（DIP準拠）
+            // アーキテクチャ: Application層 → Core層(IOverlayManager)への依存は正しい（DIP準拠）
             _logger?.LogDebug($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
             Console.WriteLine($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
 
@@ -225,9 +228,22 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     DetectedLanguage = chunk.DetectedLanguage
                 };
 
-                // 🔥 [OVERLAY_FIX] 直接オーバーレイ表示を呼び出し（スクリーン絶対座標使用）
-                await _overlayManager.ShowInPlaceOverlayAsync(chunkWithScreenCoords, CancellationToken.None)
-                    .ConfigureAwait(false);
+                // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示（スクリーン絶対座標使用）
+                var content = new OverlayContent
+                {
+                    Text = chunkWithScreenCoords.TranslatedText,
+                    OriginalText = chunkWithScreenCoords.CombinedText
+                };
+
+                var position = new OverlayPosition
+                {
+                    X = chunkWithScreenCoords.CombinedBounds.X,
+                    Y = chunkWithScreenCoords.CombinedBounds.Y,
+                    Width = chunkWithScreenCoords.CombinedBounds.Width,
+                    Height = chunkWithScreenCoords.CombinedBounds.Height
+                };
+
+                await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
 
                 _logger?.LogDebug($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}', Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
                 Console.WriteLine($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}'");
@@ -476,15 +492,30 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 if (chunk.CanShowInPlace() && !string.IsNullOrWhiteSpace(chunk.TranslatedText))
                 {
-                    _logger?.LogDebug($"🔥 [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync実行開始 - ChunkId: {chunk.ChunkId}");
-                    _logger.LogDebug("🔥 [PHASE12.2] ShowInPlaceOverlayAsync実行 - ChunkId: {ChunkId}",
+                    _logger?.LogDebug($"🔧 [OVERLAY_UNIFICATION] ShowAsync実行開始 - ChunkId: {chunk.ChunkId}");
+                    _logger.LogDebug("🔧 [OVERLAY_UNIFICATION] ShowAsync実行 - ChunkId: {ChunkId}",
                         chunk.ChunkId);
 
-                    await _overlayManager.ShowInPlaceOverlayAsync(chunk).ConfigureAwait(false);
+                    // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()でオーバーレイ表示
+                    var content = new OverlayContent
+                    {
+                        Text = chunk.TranslatedText,
+                        OriginalText = chunk.CombinedText
+                    };
+
+                    var position = new OverlayPosition
+                    {
+                        X = chunk.CombinedBounds.X,
+                        Y = chunk.CombinedBounds.Y,
+                        Width = chunk.CombinedBounds.Width,
+                        Height = chunk.CombinedBounds.Height
+                    };
+
+                    await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
 
                     displayedCount++;
-                    _logger?.LogDebug($"   ✅ [PHASE12.2_OVERLAY] ShowInPlaceOverlayAsync完了 - ChunkId: {chunk.ChunkId}, 累計表示: {displayedCount}個");
-                    _logger.LogDebug("   ✅ [PHASE12.2] インプレース表示完了 - ChunkId: {ChunkId}",
+                    _logger?.LogDebug($"   ✅ [OVERLAY_UNIFICATION] ShowAsync完了 - ChunkId: {chunk.ChunkId}, 累計表示: {displayedCount}個");
+                    _logger.LogDebug("   ✅ [OVERLAY_UNIFICATION] インプレース表示完了 - ChunkId: {ChunkId}",
                         chunk.ChunkId);
                 }
                 else
