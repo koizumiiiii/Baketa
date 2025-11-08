@@ -320,6 +320,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
             LayeredWindowMethods.PostQuitMessage(0);
         });
 
+        // 🔥 [CLOSE_FIX] メッセージキュー処理をトリガーしてDestroyWindow()を確実に実行
+        TriggerMessageQueueProcessing();
+
         // メッセージキューをクローズして追加の操作を防ぐ
         _messageQueue.CompleteAdding();
     }
