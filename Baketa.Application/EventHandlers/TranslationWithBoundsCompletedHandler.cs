@@ -1,6 +1,7 @@
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Logging;
 using System;
@@ -17,15 +18,16 @@ namespace Baketa.Application.EventHandlers;
 /// コンストラクタ
 /// </remarks>
 /// <param name="eventAggregator">イベント集約インスタンス</param>
-/// <param name="overlayManager">インプレース翻訳オーバーレイマネージャー（PHASE18統一システム）</param>
+/// <param name="overlayManager">統一オーバーレイマネージャー（OVERLAY_UNIFICATION）</param>
 /// <param name="logger">ロガー</param>
 public class TranslationWithBoundsCompletedHandler(
     IEventAggregator eventAggregator,
-    IInPlaceTranslationOverlayManager? overlayManager,
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    IOverlayManager? overlayManager,
     ILogger<TranslationWithBoundsCompletedHandler> logger) : IEventProcessor<TranslationWithBoundsCompletedEvent>
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-    private readonly IInPlaceTranslationOverlayManager? _overlayManager = overlayManager;
+    private readonly IOverlayManager? _overlayManager = overlayManager;
     private readonly ILogger<TranslationWithBoundsCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // 🔥🔥🔥 [ULTRATHINK] コンストラクタで型情報をログ出力
@@ -107,7 +109,8 @@ public class TranslationWithBoundsCompletedHandler(
 
                     try
                     {
-                        await _overlayManager.HideAllInPlaceOverlaysAsync().ConfigureAwait(false);
+                        // 🔧 [OVERLAY_UNIFICATION] HideAllInPlaceOverlaysAsync() → HideAllAsync() に統一
+                        await _overlayManager.HideAllAsync().ConfigureAwait(false);
                         _logger.LogInformation("✅ [FALLBACK] オーバーレイクリア完了");
                     }
                     catch (Exception clearEx)
@@ -142,21 +145,38 @@ public class TranslationWithBoundsCompletedHandler(
                     var assemblyLocation = overlayManagerType.Assembly.Location;
                     var assemblyLastWriteTime = System.IO.File.GetLastWriteTime(assemblyLocation);
 
-                    Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] Calling ShowInPlaceOverlayAsync on {overlayManagerType.FullName}");
+                    Console.WriteLine($"🔥🔥🔥 [OVERLAY_UNIFICATION] Calling ShowAsync on {overlayManagerType.FullName}");
                     Console.WriteLine($"🔥🔥🔥🔥🔥 [ULTRATHINK_PHASE4_ASSEMBLY] Loaded from: {assemblyLocation} (Modified: {assemblyLastWriteTime:HH:mm:ss})");
 
-                    // 統一オーバーレイマネージャーで処理（try-catchで例外を完全キャプチャ）
+                    // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェースで処理
                     try
                     {
-                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] try block開始");
+                        Console.WriteLine($"🔥🔥🔥 [OVERLAY_UNIFICATION] try block開始");
 
-                        await _overlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
+                        // OverlayContentの作成
+                        var content = new Baketa.Core.Abstractions.UI.Overlays.OverlayContent
+                        {
+                            Text = eventData.TranslatedText,
+                            OriginalText = eventData.SourceText
+                        };
 
-                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync正常完了");
+                        // OverlayPositionの作成
+                        var position = new Baketa.Core.Abstractions.UI.Overlays.OverlayPosition
+                        {
+                            X = eventData.Bounds.X,
+                            Y = eventData.Bounds.Y,
+                            Width = eventData.Bounds.Width,
+                            Height = eventData.Bounds.Height
+                        };
+
+                        // 統一IOverlayManager.ShowAsync()でオーバーレイ表示
+                        await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
+
+                        Console.WriteLine($"🔥🔥🔥 [OVERLAY_UNIFICATION] ShowAsync正常完了");
                     }
                     catch (Exception innerEx)
                     {
-                        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK_PHASE3] ShowInPlaceOverlayAsync内部で例外: {innerEx.GetType().Name} - {innerEx.Message}");
+                        Console.WriteLine($"🔥🔥🔥 [OVERLAY_UNIFICATION] ShowAsync内部で例外: {innerEx.GetType().Name} - {innerEx.Message}");
                         throw;
                     }
 
@@ -257,7 +277,8 @@ public class TranslationWithBoundsCompletedHandler(
     }
 
     // 🔥🔥🔥 [ULTRATHINK] インスタンス初期化時の型情報ログ
-    private static string LogConstructorInfo(IInPlaceTranslationOverlayManager? overlayManager)
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    private static string LogConstructorInfo(IOverlayManager? overlayManager)
     {
         var instanceId = Guid.NewGuid().ToString("N")[..8];
         var typeName = overlayManager?.GetType().FullName ?? "NULL";

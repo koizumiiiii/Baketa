@@ -13,14 +13,15 @@ public sealed class OverlayUIModule : ServiceModuleBase
 {
     public override void RegisterServices(IServiceCollection services)
     {
-        // 🔥 [PHASE3_REFACTORING] SimpleInPlaceTranslationOverlayManagerに切り替え
-        // 旧実装（InPlaceTranslationOverlayManager）はメソッド本体が実行されない異常により削除
-        services.AddSingleton<SimpleInPlaceOverlayManager>();
+        // 🔥 [OVERLAY_UNIFICATION] Phase 3 - Option C完全統一
+        // IInPlaceTranslationOverlayManager → IOverlayManager 移行完了
+        // SimpleInPlaceOverlayManagerは廃止、Win32OverlayManagerに統一
 
-        // IInPlaceTranslationOverlayManagerインターフェース実装登録
-        services.AddSingleton<IInPlaceTranslationOverlayManager>(serviceProvider =>
-            serviceProvider.GetRequiredService<SimpleInPlaceOverlayManager>());
+        // ❌ [DEPRECATED] 旧実装を無効化 - すべてIOverlayManagerに移行
+        // services.AddSingleton<SimpleInPlaceOverlayManager>();
+        // services.AddSingleton<IInPlaceTranslationOverlayManager>(serviceProvider =>
+        //     serviceProvider.GetRequiredService<SimpleInPlaceOverlayManager>());
 
-        Console.WriteLine("✅ [OVERLAY_UI] SimpleInPlaceOverlayManager登録完了（Phase 3 Refactoring）");
+        Console.WriteLine("✅ [OVERLAY_UNIFICATION] IOverlayManager統一完了 - SimpleInPlaceOverlayManager廃止");
     }
 }
