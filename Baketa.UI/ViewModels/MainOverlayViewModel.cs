@@ -3,6 +3,7 @@ using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.GPU; // 🔥 [PHASE5.2E] IWarmupService用
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
@@ -46,6 +47,9 @@ public class MainOverlayViewModel : ViewModelBase
     // 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態（StartButton制御）
     private bool _isTranslationEngineInitializing;
 
+    // 🔥 [PHASE5.2E] Startボタンツールチップ（ウォームアップ進捗表示用）
+    private string _startButtonTooltip = "翻訳を開始";
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -58,7 +62,8 @@ public class MainOverlayViewModel : ViewModelBase
         IDiagnosticReportService diagnosticReportService,
         IWindowManagementService windowManagementService,
         ITranslationControlService translationControlService,
-        SimpleSettingsViewModel settingsViewModel)
+        SimpleSettingsViewModel settingsViewModel,
+        IWarmupService warmupService) // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -69,6 +74,10 @@ public class MainOverlayViewModel : ViewModelBase
         _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
         _translationControlService = translationControlService ?? throw new ArgumentNullException(nameof(translationControlService));
         _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
+
+        // 🔥 [PHASE5.2E] ウォームアップサービス依存設定とイベント購読
+        _warmupService = warmupService ?? throw new ArgumentNullException(nameof(warmupService));
+        _warmupService.WarmupProgressChanged += OnWarmupProgressChanged;
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -107,6 +116,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IWindowManagementService _windowManagementService;
     private readonly ITranslationControlService _translationControlService;
     private readonly SimpleSettingsViewModel _settingsViewModel;
+    private readonly IWarmupService _warmupService; // 🔥 [PHASE5.2E] ウォームアップサービス
 
     #region Properties
 
@@ -287,6 +297,15 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 🔥 [PHASE5.2E] Startボタンツールチップ - ウォームアップ進捗表示
+    /// </summary>
+    public string StartButtonTooltip
+    {
+        get => _startButtonTooltip;
+        set => SetPropertySafe(ref _startButtonTooltip, value);
+    }
+
+    /// <summary>
     /// 🔥 [PHASE2_PROBLEM2] 翻訳エンジン初期化状態 - Start button制御
     /// TranslationInitializationServiceがPythonサーバー起動完了後にfalseに設定
     /// </summary>
@@ -331,21 +350,22 @@ public class MainOverlayViewModel : ViewModelBase
         get
         {
             // 🔥 [PHASE6.1_ROOT_CAUSE_FIX] Start/Stop両方の条件を正しく実装
-            // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ローディング中でない、翻訳中でない
-            var canStart = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing && !IsTranslationActive;
+            // 🔥 [PHASE5.2E] ウォームアップ完了条件追加 - Startボタン押下前に全準備完了を保証
+            // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ウォームアップ完了、ローディング中でない、翻訳中でない
+            var canStart = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing && _warmupService.IsWarmupCompleted && !IsTranslationActive;
 
             // Stop可能条件: 翻訳実行中、ローディング中でない
             var canStop = IsTranslationActive && !IsLoading;
 
             var enabled = canStart || canStop;
 
-            Logger?.LogDebug($"🔍 IsStartStopEnabled計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, 結果={enabled}");
+            Logger?.LogDebug($"🔍 IsStartStopEnabled計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, IsWarmupCompleted={_warmupService.IsWarmupCompleted}, 結果={enabled}");
 
             // デバッグ用に実際の状態をファイルログにも出力
             try
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
-                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}");
+                    $"🔍 [START_BUTTON_STATE] IsStartStopEnabled={enabled}, canStart={canStart}, canStop={canStop}, IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, IsWindowSelected={IsWindowSelected}, IsOcrInitialized={IsOcrInitialized}, IsEventHandlerInitialized={IsEventHandlerInitialized}, IsTranslationEngineInitializing={IsTranslationEngineInitializing}, IsWarmupCompleted={_warmupService.IsWarmupCompleted}");
             }
             catch { }
 
@@ -1374,6 +1394,71 @@ public class MainOverlayViewModel : ViewModelBase
             Logger?.LogError(ex, "❌ [PHASE2_PROBLEM2] Pythonサーバー状態変更イベント処理エラー");
             Logger?.LogDebug($"❌ [PHASE2_PROBLEM2] イベント処理エラー: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE5.2E] ウォームアップ進捗変更イベントハンドラー
+    /// BackgroundWarmupServiceがウォームアップ進行中に進捗を通知
+    /// UIスレッドで実行してStartボタンのツールチップと有効状態を更新
+    /// </summary>
+    private void OnWarmupProgressChanged(object? sender, WarmupProgressEventArgs e)
+    {
+        // 🔥 [GEMINI_FIX] UIスレッドで実行（スレッドセーフティ確保）
+        // BackgroundWarmupServiceはバックグラウンドスレッドからイベントを発行するため、
+        // UI更新は必ずDispatcher.UIThread.InvokeAsyncでマーシャリングする必要がある
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            // 🔥 [PHASE5.2E.1] ウォームアップ失敗状態を最優先でチェック
+            // 失敗時はエラーメッセージを表示し、Startボタンは永続的に無効化
+            if (_warmupService.Status == Baketa.Core.Abstractions.GPU.WarmupStatus.Failed)
+            {
+                // ウォームアップ失敗: ユーザーにアプリ再起動を促すエラーメッセージ
+                StartButtonTooltip = "モデルの初期化に失敗しました。アプリを再起動してください。";
+                Logger?.LogError(_warmupService.LastError, "❌ [PHASE5.2E.1] ウォームアップ失敗 - Startボタン永続的に無効化");
+                // Startボタンは canStartCapture() で IsWarmupCompleted をチェックするため、
+                // 失敗状態では永遠に有効化されない（IsWarmupCompleted = false のまま）
+            }
+            else if (!_warmupService.IsWarmupCompleted)
+            {
+                // ウォームアップ進行中: 進捗パーセンテージを表示
+                StartButtonTooltip = $"モデル読み込み中... {e.Progress:P0}";
+                Logger?.LogDebug($"🔥 [PHASE5.2E] ウォームアップ進捗: {e.Progress:P0} - {e.Status}");
+            }
+            else
+            {
+                // ウォームアップ完了: デフォルトツールチップに戻す
+                StartButtonTooltip = "翻訳を開始";
+                Logger?.LogInformation("✅ [PHASE5.2E] ウォームアップ完了 - Startボタン有効化");
+            }
+
+            // 🔥 [PHASE5.2E] Startボタンの CanExecute を再評価
+            // IsStartStopEnabled プロパティ変更を通知してReactiveCommandのCanExecuteを更新
+            this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+        });
+    }
+
+    #endregion
+
+    #region Dispose
+
+    /// <summary>
+    /// 🔥 [PHASE5.2E] リソース解放処理 - イベント購読解除
+    /// メモリリーク防止のため、WarmupProgressChangedイベントの購読を解除
+    /// </summary>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // 🔥 [PHASE5.2E] イベント購読解除（メモリリーク防止）
+            if (_warmupService != null)
+            {
+                _warmupService.WarmupProgressChanged -= OnWarmupProgressChanged;
+            }
+
+            Logger?.LogDebug("🔥 [PHASE5.2E] MainOverlayViewModel Dispose完了 - イベント購読解除");
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion

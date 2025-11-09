@@ -683,9 +683,10 @@ namespace Baketa.Infrastructure.DI.Modules;
             // [ROI_DELETION] IntegratedPerformanceOrchestrator削除 - レガシーROI機能除去
             // services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
             // Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
-            
+
             // 🚀 プール化×GPU最適化統合オーケストレーター（最終フェーズ）
-            services.AddSingleton<Baketa.Infrastructure.Performance.PooledGpuOptimizationOrchestrator>();
+            // [DI_FIX] AddSingleton削除 - AddHostedServiceが内部的にシングルトン登録するため重複登録不要
+            // 重複登録によりコンストラクタ解析が2回実行され、IPerformanceOrchestrator依存エラーが発生していた
             services.AddHostedService<PooledGpuOptimizationOrchestrator>();
             Console.WriteLine("🚀 PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム");
             

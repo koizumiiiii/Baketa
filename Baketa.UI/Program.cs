@@ -42,7 +42,7 @@ namespace Baketa.UI;
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             // 🚧 Single Instance Application Check - 重複翻訳表示問題根本解決
             const string mutexName = "Global\\BaketaTranslationOverlayApp_SingleInstance_v3";
@@ -269,9 +269,9 @@ namespace Baketa.UI;
             {
                 Console.WriteLine("🔧 DIコンテナの初期化開始");
                 System.Diagnostics.Debug.WriteLine("🔧 DIコンテナの初期化開始");
-                
+
                 // DIコンテナの初期化
-                ConfigureServices();
+                await ConfigureServices();
                 
                 // 🩺 診断システム直接初期化 - OnFrameworkInitializationCompleted代替
                 Console.WriteLine("🚨🚨🚨 [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ 🚨🚨🚨");
@@ -520,7 +520,7 @@ namespace Baketa.UI;
         /// <summary>
         /// DIコンテナを構成します。
         /// </summary>
-        private static void ConfigureServices()
+        private static async Task ConfigureServices()
         {
             Console.WriteLine("🔍 ConfigureServices開始");
             System.Diagnostics.Debug.WriteLine("🔍 ConfigureServices開始");
@@ -709,14 +709,6 @@ namespace Baketa.UI;
                 Console.WriteLine($"⚠️ [PHASE13.2.22_FIX] BaketaLogManager.LogSystemDebugエラー（処理は継続）: {baketaLogEx.Message}");
             }
 
-            // 🔥 [PHASE13.2.31J] 手動IHostedService起動コード削除
-            // 根本原因: GetServices<IHostedService>()が ServerManagerHostedService を検出できない
-            // 解決策: .NET標準のIHostedService自動起動に移行
-            // - Avalonia AppBuilder.StartWithClassicDesktopLifetime() が内部的に IHost.StartAsync() を呼び出す
-            // - すべての登録済みIHostedServiceが自動的に起動される
-            // - ServerManagerHostedService が正常に検出され、Python翻訳サーバーが起動する
-            Console.WriteLine("✅ [PHASE13.2.31J] .NET標準のIHostedService自動起動を使用 - 手動起動コード削除完了");
-
             // 🚀 CRITICAL: EventHandlerInitializationServiceをDI完了直後に実行（競合状態根本解決）
             Console.WriteLine("🚀🚀🚀 [CRITICAL] EventHandlerInitializationService即座実行開始！ 🚀🚀🚀");
             try
@@ -731,6 +723,22 @@ namespace Baketa.UI;
                 Console.WriteLine($"❌ [CRITICAL] Message: {ex.Message}");
                 Console.WriteLine($"❌ [CRITICAL] StackTrace: {ex.StackTrace}");
                 // アプリケーション起動は継続（EventHandler初期化失敗しても機能する部分はある）
+            }
+
+            // 🔥 [PHASE5.2E_FIX] IHostedService手動起動 - Avalonia は Generic Host を使わないため手動起動が必須
+            // Option A: WarmupHostedService等のバックグラウンドサービスを起動
+            Console.WriteLine("🚀 [PHASE5.2E_FIX] IHostedService手動起動開始");
+            try
+            {
+                await StartHostedServicesAsync(ServiceProvider).ConfigureAwait(false);
+                Console.WriteLine("✅ [PHASE5.2E_FIX] IHostedService手動起動完了 - WarmupHostedServiceが起動しました");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] IHostedService起動エラー: {ex.GetType().Name}");
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] Message: {ex.Message}");
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] StackTrace: {ex.StackTrace}");
+                // ウォームアップ失敗してもアプリケーション起動は継続
             }
 
             // 🔥 UltraThink翻訳モデル事前ロード戦略 - Program.cs統合実装
@@ -748,13 +756,56 @@ namespace Baketa.UI;
             // アプリケーション起動完了後にサービスを開始（App.axaml.csで実行）
         }
 
+        /// <summary>
+        /// 🔥 [PHASE5.2E_FIX] IHostedServiceを手動で起動します
+        /// Avalonia は Generic Host を使わないため、WarmupHostedService等を手動起動
+        /// </summary>
+        /// <param name="serviceProvider">ServiceProvider</param>
+        private static async Task StartHostedServicesAsync(IServiceProvider serviceProvider)
+        {
+            if (serviceProvider == null)
+            {
+                Console.WriteLine("⚠️ [PHASE5.2E_FIX] ServiceProviderがnull - IHostedService起動をスキップ");
+                return;
+            }
 
-        // 🔥 [PHASE13.2.31J] StartHostedServicesAsync完全削除
-        // 根本原因: GetServices<IHostedService>()がServerManagerHostedServiceを検出できない
-        // 解決策: .NET標準のIHostedService自動起動に完全移行
-        // - Avalonia AppBuilder.StartWithClassicDesktopLifetime()が内部的にIHost.StartAsync()を呼び出す
-        // - すべての登録済みIHostedServiceが自動起動される
-        
+            try
+            {
+                Console.WriteLine("🚀 [PHASE5.2E_FIX] IHostedService検出中...");
+
+                var hostedServices = serviceProvider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+                var serviceList = hostedServices.ToList();
+
+                Console.WriteLine($"🔍 [PHASE5.2E_FIX] 検出されたIHostedService数: {serviceList.Count}");
+
+                foreach (var service in serviceList)
+                {
+                    var serviceName = service.GetType().Name;
+                    Console.WriteLine($"🚀 [PHASE5.2E_FIX] {serviceName} 起動開始...");
+
+                    try
+                    {
+                        await service.StartAsync(CancellationToken.None).ConfigureAwait(false);
+                        Console.WriteLine($"✅ [PHASE5.2E_FIX] {serviceName} 起動完了");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ [PHASE5.2E_FIX] {serviceName} 起動エラー: {ex.GetType().Name} - {ex.Message}");
+                        // 1つのサービス起動失敗でも他のサービスは起動継続
+                    }
+                }
+
+                Console.WriteLine($"✅ [PHASE5.2E_FIX] IHostedService起動完了 - 起動済み: {serviceList.Count}個");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] IHostedService起動エラー: {ex.GetType().Name}");
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] Message: {ex.Message}");
+                Console.WriteLine($"❌ [PHASE5.2E_FIX] StackTrace: {ex.StackTrace}");
+                throw;
+            }
+        }
+
         /// <summary>
         /// ReactiveUIの設定を行います
         /// </summary>

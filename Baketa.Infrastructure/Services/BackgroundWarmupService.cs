@@ -23,7 +23,11 @@ public sealed class BackgroundWarmupService(
     private volatile bool _isOcrWarmupCompleted;
     private volatile bool _isTranslationWarmupCompleted;
     private double _warmupProgress; // volatileはdoubleに使用不可、lockで同期化
-    
+
+    // 🔥 [PHASE5.2E.1] エラー状態管理
+    private WarmupStatus _status = WarmupStatus.NotStarted;
+    private Exception? _lastError;
+
     // 同期制御
     private readonly SemaphoreSlim _warmupSemaphore = new(1, 1);
     private CancellationTokenSource? _warmupCancellationSource;
@@ -37,9 +41,9 @@ public sealed class BackgroundWarmupService(
     public bool IsWarmupCompleted => _isWarmupCompleted;
     public bool IsOcrWarmupCompleted => _isOcrWarmupCompleted;
     public bool IsTranslationWarmupCompleted => _isTranslationWarmupCompleted;
-    public double WarmupProgress 
+    public double WarmupProgress
     {
-        get 
+        get
         {
             lock (_lockObject)
             {
@@ -47,7 +51,44 @@ public sealed class BackgroundWarmupService(
             }
         }
     }
-    
+
+    // 🔥 [PHASE5.2E.1] エラー状態管理プロパティ
+    public WarmupStatus Status
+    {
+        get
+        {
+            lock (_lockObject)
+            {
+                return _status;
+            }
+        }
+        private set
+        {
+            lock (_lockObject)
+            {
+                _status = value;
+            }
+        }
+    }
+
+    public Exception? LastError
+    {
+        get
+        {
+            lock (_lockObject)
+            {
+                return _lastError;
+            }
+        }
+        private set
+        {
+            lock (_lockObject)
+            {
+                _lastError = value;
+            }
+        }
+    }
+
     private readonly object _lockObject = new();
 
     public event EventHandler<WarmupProgressEventArgs>? WarmupProgressChanged;
@@ -136,8 +177,11 @@ public sealed class BackgroundWarmupService(
     {
         try
         {
+            // 🔥 [PHASE5.2E.1] ウォームアップ開始状態を設定
+            Status = WarmupStatus.Running;
+
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            
+
             ReportProgress(0.0, "ウォームアップ開始", WarmupPhase.Starting);
 
             // フェーズ1: GPU環境検出（10%）
@@ -156,16 +200,26 @@ public sealed class BackgroundWarmupService(
 
             _isWarmupCompleted = true;
             stopwatch.Stop();
-            
+
+            // 🔥 [PHASE5.2E.1] 正常完了状態を設定
+            Status = WarmupStatus.Completed;
+            LastError = null; // エラーをクリア
+
             _logger.LogInformation("バックグラウンドウォームアップ完了: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // 🔥 [PHASE5.2E.1] キャンセル状態を設定
+            Status = WarmupStatus.Cancelled;
             _logger.LogInformation("ウォームアップがキャンセルされました");
             throw;
         }
         catch (Exception ex)
         {
+            // 🔥 [PHASE5.2E.1] エラー状態を設定
+            Status = WarmupStatus.Failed;
+            LastError = ex;
+
             _logger.LogError(ex, "ウォームアップ中にエラーが発生しました");
             ReportProgress(_warmupProgress, $"エラー: {ex.Message}", WarmupPhase.Starting);
             throw;

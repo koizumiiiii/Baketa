@@ -24,7 +24,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private readonly ILogger<PooledGpuOptimizationOrchestrator> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly IUnifiedGpuOptimizer _gpuOptimizer;
-    private readonly IPerformanceOrchestrator _performanceOrchestrator;
+    // [ROI_DELETION] IPerformanceOrchestrator削除 - 実際に使用されていない依存関係
     private readonly IObjectPoolStatisticsReporter _poolStatistics;
     
     // GPU最適化プール管理
@@ -45,13 +45,13 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         ILogger<PooledGpuOptimizationOrchestrator> logger,
         IServiceProvider serviceProvider,
         IUnifiedGpuOptimizer gpuOptimizer,
-        IPerformanceOrchestrator performanceOrchestrator,
+        // [ROI_DELETION] IPerformanceOrchestrator performanceOrchestrator, パラメーター削除
         IObjectPoolStatisticsReporter poolStatistics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _gpuOptimizer = gpuOptimizer ?? throw new ArgumentNullException(nameof(gpuOptimizer));
-        _performanceOrchestrator = performanceOrchestrator ?? throw new ArgumentNullException(nameof(performanceOrchestrator));
+        // [ROI_DELETION] _performanceOrchestrator初期化削除 - 使用されていない依存関係
         _poolStatistics = poolStatistics ?? throw new ArgumentNullException(nameof(poolStatistics));
         
         // 30秒間隔で最適化実行
