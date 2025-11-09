@@ -120,6 +120,12 @@ public class MainOverlayViewModel : ViewModelBase
 
     #region Properties
 
+    /// <summary>
+    /// 🔥 [WARMUP_FIX] ウォームアップ完了状態を監視可能なプロパティとして公開
+    /// ReactiveCommandのWhenAnyValueでウォームアップ完了状態を監視するため必須
+    /// </summary>
+    public bool IsWarmupCompleted => _warmupService.IsWarmupCompleted;
+
     public bool IsCollapsed
     {
         get => _isCollapsed;
@@ -439,10 +445,12 @@ public class MainOverlayViewModel : ViewModelBase
                 x => x.IsEventHandlerInitialized,
                 x => x.IsTranslationEngineInitializing,
                 x => x.IsTranslationActive,
-                (isLoading, isWindowSelected, isOcrInitialized, isEventHandlerInitialized, isTranslationEngineInitializing, isTranslationActive) =>
+                x => x.IsWarmupCompleted, // 🔥 [WARMUP_FIX] ウォームアップ完了状態の監視追加
+                (isLoading, isWindowSelected, isOcrInitialized, isEventHandlerInitialized, isTranslationEngineInitializing, isTranslationActive, isWarmupCompleted) =>
                 {
-                    // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ローディング中でない、翻訳中でない
-                    var canStart = !isLoading && isWindowSelected && isOcrInitialized && isEventHandlerInitialized && !isTranslationEngineInitializing && !isTranslationActive;
+                    // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ウォームアップ完了、ローディング中でない、翻訳中でない
+                    // 🔥 [WARMUP_FIX] isWarmupCompletedチェック追加 - ウォームアップ完了前のStartボタン押下を防止
+                    var canStart = !isLoading && isWindowSelected && isOcrInitialized && isEventHandlerInitialized && !isTranslationEngineInitializing && isWarmupCompleted && !isTranslationActive;
 
                     // Stop可能条件: 翻訳実行中、ローディング中でない
                     var canStop = isTranslationActive && !isLoading;
@@ -1434,6 +1442,10 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [PHASE5.2E] Startボタンの CanExecute を再評価
             // IsStartStopEnabled プロパティ変更を通知してReactiveCommandのCanExecuteを更新
             this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+
+            // 🔥 [WARMUP_FIX] IsWarmupCompletedプロパティの変更通知
+            // ReactiveCommandのWhenAnyValueがウォームアップ完了状態を検出するために必須
+            this.RaisePropertyChanged(nameof(IsWarmupCompleted));
         });
     }
 
