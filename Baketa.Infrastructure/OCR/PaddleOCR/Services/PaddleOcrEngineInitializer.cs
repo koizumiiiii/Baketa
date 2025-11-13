@@ -345,6 +345,22 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             var detectorType = detector.GetType();
             _logger?.LogInformation("🔥 [PPOCRV5_2025] Detectorオブジェクト取得成功: {DetectorType}", detectorType.Name);
 
+            // 🔍 [DEBUG] Recognizerプロパティの詳細を確認（文字認識精度調査）
+            var recognizerProperty = engineType.GetProperty("Recognizer");
+            if (recognizerProperty != null)
+            {
+                var recognizer = recognizerProperty.GetValue(ocrEngine);
+                if (recognizer != null)
+                {
+                    var recognizerType = recognizer.GetType();
+                    var recognizerProperties = recognizerType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Select(p => $"{p.Name} ({p.PropertyType.Name})")
+                        .ToList();
+                    _logger?.LogInformation("🔍 [PPOCRV5_2025] Recognizer利用可能なプロパティ ({Count}個): {Properties}",
+                        recognizerProperties.Count, string.Join(", ", recognizerProperties.Take(30)));
+                }
+            }
+
             // ✅ [PPOCRV5_2025] PP-OCRv5公式推奨パラメータ適用（2025年ベストプラクティス）
             // 参考: https://paddlepaddle.github.io/PaddleOCR/main/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5.html
             // 🔥 実際のDetectorプロパティ名にマッピング: BoxScoreThreahold, BoxThreshold, UnclipRatio, MaxSize
