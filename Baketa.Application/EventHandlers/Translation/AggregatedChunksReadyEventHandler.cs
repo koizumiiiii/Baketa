@@ -186,6 +186,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp2}][T{threadId2:D2}] 🚨 [ULTRATHINK_TRACE2] 翻訳結果設定完了 - チャンク数: {nonEmptyChunks.Count}\r\n");
 
+            // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
+            try
+            {
+                await _overlayManager.HideAllAsync().ConfigureAwait(false);
+                _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
+                Console.WriteLine("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger?.LogWarning(cleanupEx, "⚠️ [OVERLAY_CLEANUP] オーバーレイクリーンアップ中にエラー - 処理継続");
+                Console.WriteLine($"⚠️ [OVERLAY_CLEANUP] クリーンアップエラー: {cleanupEx.Message}");
+            }
+
             // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示
             // Gemini推奨: TranslationWithBoundsCompletedEventを経由せず、直接オーバーレイ表示
             // 理由: イベントハンドラー未実装により表示されない問題を解決
