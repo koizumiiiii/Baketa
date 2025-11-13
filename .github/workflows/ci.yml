@@ -118,7 +118,7 @@ jobs:
       shell: powershell
     
     - name: Restore dependencies
-      run: dotnet restore --verbosity minimal
+      run: dotnet restore Baketa.sln --verbosity minimal
     
     - name: Build solution
       run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
@@ -174,7 +174,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
     - name: Restore dependencies
-      run: dotnet restore --verbosity minimal
+      run: dotnet restore Baketa.sln --verbosity minimal
     
     - name: Run security analysis
       run: dotnet build Baketa.sln --configuration Release --verbosity minimal -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
