@@ -93,7 +93,7 @@ jobs:
           
     - name: Copy Native DLL to Output
       run: |
-        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.22621.0"
+        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.19041.0"
         New-Item -ItemType Directory -Path $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.pdb" $outputPath -Force
