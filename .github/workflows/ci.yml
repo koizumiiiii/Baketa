@@ -32,7 +32,16 @@ jobs:
         
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
-      
+
+    - name: Diagnose Windows SDK
+      run: |
+        echo "=== Installed Windows SDKs ==="
+        dir "C:\Program Files (x86)\Windows Kits\10\Include" 2>nul || echo "No Windows Kits folder"
+        echo ""
+        echo "=== Registry Info ==="
+        reg query "HKLM\SOFTWARE\Microsoft\Windows Kits\Installed Roots" /v KitsRoot10 2>nul || echo "No registry key"
+      shell: cmd
+
     - name: Build Native DLL
       run: |
         if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" (
@@ -40,7 +49,7 @@ jobs:
         ) else (
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
         )
-        msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64 /v:normal
+        msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.20348.0 /v:normal
       shell: cmd
       
     - name: Upload Native DLL
@@ -84,7 +93,7 @@ jobs:
           
     - name: Copy Native DLL to Output
       run: |
-        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.19041.0"
+        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.20348.0"
         New-Item -ItemType Directory -Path $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.pdb" $outputPath -Force
