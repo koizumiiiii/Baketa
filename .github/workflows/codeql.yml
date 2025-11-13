@@ -40,10 +40,10 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore Baketa.sln
 
     - name: Build solution
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build Baketa.sln --configuration Release --no-restore
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
